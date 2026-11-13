@@ -653,27 +653,32 @@ function scanRun(
             return { member };
         }
 
-        // A break keeps the next output apart from the run, so it cannot touch a word.
-        if (gap > 0) {
-            break;
-        }
+        const edgeRun = siblingEdgeRun(sibling, side, options, lookup);
 
-        // A custom rule writes its own output, so the DOM says nothing about its edge. The edge is unknown, so the
-        // run takes the asterisk, which is valid whatever the neighbour's edge is.
-        if (isCustomRendered(sibling, lookup)) {
-            return { run: { count: 0, wordEdge: true } };
-        }
-
-        const edge = edgeCharacter(sibling, side, options);
-
-        if (edge !== null) {
-            return { run: { count: 0, wordEdge: WORD_CHARACTER.test(edge) } };
+        // A sibling that prints nothing (a comment, an empty span) is stepped over in both directions, so the two
+        // members' walks agree about the run. A printing sibling ends the run; after a break it cannot touch a word.
+        if (edgeRun) {
+            return { run: gap > 0 ? { count: 0, wordEdge: false } : edgeRun };
         }
 
         sibling = neighbour(sibling, side);
     }
 
     return { run: { count: 0, wordEdge: false } };
+}
+
+/**
+ * The run end that a printing sibling gives, or null when the sibling prints nothing. A custom rule writes its
+ * own output, so the DOM says nothing about its edge; the run then takes the asterisk, valid against any edge.
+ */
+function siblingEdgeRun(sibling: Node, side: Side, options: Options, lookup: RuleLookup): EmphasisRun | null {
+    if (isCustomRendered(sibling, lookup)) {
+        return { count: 0, wordEdge: true };
+    }
+
+    const edge = edgeCharacter(sibling, side, options);
+
+    return edge === null ? null : { count: 0, wordEdge: WORD_CHARACTER.test(edge) };
 }
 
 /**
