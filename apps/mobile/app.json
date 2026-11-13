@@ -35,6 +35,7 @@
             ]
         ],
         "experiments": {
+            "reactCompiler": true,
             "typedRoutes": false
         },
         "runtimeVersion": {
