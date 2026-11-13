@@ -3,7 +3,10 @@ import type { AnnotatedNode, Options, ReplacementFunction, Rule, RuleLookup } fr
 
 /** The answers given to nodes during one conversion. */
 interface Answers {
-    /** A rule's answer, kept for the whole conversion so a node never gets a second one. */
+    /**
+     * A rule's answer for a node. Kept for as long as this service lives, so a node never gets a second answer.
+     * Each parse makes new nodes, so one document never sees another document's answers.
+     */
     readonly decided: WeakMap<Node, Rule>;
     /** No-match answers. Dropped when a rule, keep or remove is added, because the new one may match them. */
     undecided: WeakSet<Node>;
