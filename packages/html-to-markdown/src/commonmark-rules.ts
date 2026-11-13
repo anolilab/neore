@@ -32,6 +32,12 @@ const EMPHASIS_NAMES = new Set(["em", "i"]);
 const STRONG_NAMES = new Set(["b", "strong"]);
 // Elements whose output starts or ends with a delimiter, so their edge is never a word character.
 const DELIMITED_NAMES = new Set(["a", "b", "code", "em", "i", "strong"]);
+const HEADING_NAMES = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
+// Marks a hard break in a heading that holds a block, when the break marker is a newline. With `br: "\n"` the marker
+// is "\n\n", the text a block separator writes too, so the heading could not tell them apart. A private-use character
+// is never a separator, and the heading writes it as a space. Text that holds this character is read as a break in such a heading.
+const HEADING_BREAK = "";
+const HEADING_BREAK_RUN = / ? ?/g;
 
 interface RunStyle {
     /** The delimiter for a run that touches a word character. */
@@ -196,8 +202,7 @@ const rules: Record<string, Rule> = {
 
         replacement(content, node, options) {
             const hLevel = Number(node.nodeName.charAt(1));
-            // A heading is one line, so a hard break in it becomes a space.
-            const text = node.querySelector("br") ? flattenBreaks(content, lineBreakMarker(options.br), hasBlockDescendant(node)) : content;
+            const text = headingText(content, node, options);
 
             if (options.headingStyle === "setext" && hLevel < 3) {
                 const underline = repeat(hLevel === 1 ? "=" : "-", text.length);
@@ -266,8 +271,8 @@ const rules: Record<string, Rule> = {
     lineBreak: {
         filter: "br",
 
-        replacement(_content, _node, options) {
-            return lineBreakMarker(options.br);
+        replacement(_content, node, options) {
+            return options.br.includes("\n") && isInBlockHeading(node) ? HEADING_BREAK : lineBreakMarker(options.br);
         },
     },
 
@@ -705,6 +710,30 @@ function annotationOf(node: Node, options: Options): AnnotatedNode {
     }
 
     return annotated;
+}
+
+/**
+ * The text of a heading. A heading is one line, so a hard break in it becomes a space. A heading that holds a
+ * block has its breaks marked (see HEADING_BREAK), so only the block separators remain as newlines.
+ */
+function headingText(content: string, node: AnnotatedNode, options: Options): string {
+    if (content.includes(HEADING_BREAK)) {
+        // The block's own separators at either end are not heading text, so the underline is not sized to them.
+        return trimNewlines(content.replaceAll(HEADING_BREAK_RUN, " "));
+    }
+
+    return node.querySelector("br") ? flattenBreaks(content, lineBreakMarker(options.br), hasBlockDescendant(node)) : content;
+}
+
+/** True when the node sits in a heading that holds a block, so its break is marked (see HEADING_BREAK). */
+function isInBlockHeading(node: Node): boolean {
+    for (let ancestor = node.parentNode; ancestor; ancestor = ancestor.parentNode) {
+        if (HEADING_NAMES.has(ancestor.nodeName)) {
+            return hasBlockDescendant(ancestor);
+        }
+    }
+
+    return false;
 }
 
 /** True when a block element sits inside the node, at any depth. */

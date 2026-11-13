@@ -242,4 +242,18 @@ describe("headings keep the block separators when the break marker is empty (Qod
     it("still flattens every break in a heading with no block", () => {
         expect(convert("<h1>a<br><br>b</h1>", { br: "" })).toBe("a b\n===");
     });
+
+    // With br "\n" the break marker is "\n\n", the same text a block separator writes, so a heading with a block must not
+    // flatten the separator. The break is written as a space and the paragraph break after it is kept.
+    it("keeps the paragraph break around a block when the break marker is a blank line (setext)", () => {
+        expect(convert("<h1>a<br>b<div>c</div></h1>", { br: "\n" })).toBe("a b\n\nc\n======");
+    });
+
+    it("keeps the paragraph break around a block when the break marker is a blank line (atx)", () => {
+        expect(convert("<h1>a<br>b<div>c</div></h1>", { br: "\n", headingStyle: "atx" })).toBe("# a b\n\nc");
+    });
+
+    it("still flattens a break in a heading with no block when the break marker is a blank line", () => {
+        expect(convert("<h1>a<br>b</h1>", { br: "\n" })).toBe("a b\n===");
+    });
 });
