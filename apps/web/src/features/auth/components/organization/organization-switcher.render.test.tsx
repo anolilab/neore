@@ -54,13 +54,6 @@ vi.mock("@neore/chat-ui/org-switcher/org-switcher", () => {
     };
 });
 
-vi.mock("@/features/auth/lib/utilities", async (importOriginal: () => Promise<Record<string, unknown>>) => {
-    return {
-        ...(await importOriginal()),
-        getLocalizedError: ({ error }: { error: Error }) => `localized:${error.message}`,
-    };
-});
-
 vi.mock("./create-organization-dialog", () => {
     return {
         default: () => null,
@@ -170,10 +163,13 @@ describe("OrganizationSwitcher", () => {
         expect(screen.getByText("switching")).toBeTruthy();
 
         await act(async () => {
-            pendingSwitch.reject(new Error("forbidden"));
+            // What the auth client throws for a failed request: the server's body, with its error code, under `error`.
+            pendingSwitch.reject(
+                Object.assign(new Error("Bad Request"), { error: { code: "ORGANIZATION_NOT_FOUND", message: "Organization not found" }, status: 400 }),
+            );
         });
 
         expect(screen.getByText("idle")).toBeTruthy();
-        expect(harness.toast).toHaveBeenCalledExactlyOnceWith({ message: "localized:forbidden", variant: "error" });
+        expect(harness.toast).toHaveBeenCalledExactlyOnceWith({ message: "Organization not found", variant: "error" });
     });
 });

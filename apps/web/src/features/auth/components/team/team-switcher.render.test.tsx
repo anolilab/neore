@@ -22,8 +22,12 @@ vi.mock("@lingui/react/macro", () => {
     return {
         useLingui: () => {
             return {
-                // Reads the language when called, as Lingui's `t` does after an in-place locale change.
-                t: (strings: TemplateStringsArray, ...values: unknown[]) => `${harness.locale}:${String.raw({ raw: strings }, ...values)}`,
+                // Reads the language when called, as Lingui's `t` does after an in-place locale change; English is the source text.
+                t: (strings: TemplateStringsArray, ...values: unknown[]) => {
+                    const source = String.raw({ raw: strings }, ...values);
+
+                    return harness.locale === "en" ? source : `${harness.locale}:${source}`;
+                },
             };
         },
     };
@@ -101,12 +105,6 @@ vi.mock("@/features/auth/lib/auth-ui-provider", () => {
     };
 });
 
-vi.mock("../../lib/utilities", () => {
-    return {
-        getLocalizedError: ({ error }: { error: Error }) => `localized:${error.message}`,
-    };
-});
-
 type HeldCall<T> = { promise: Promise<T>; reject: (error: Error) => void; resolve: (value: T) => void };
 
 /** A call that stays open until the test settles it. */
@@ -150,11 +148,12 @@ describe("TeamSwitcher", () => {
         expect(screen.getByTestId("switching")).toBeTruthy();
 
         await act(async () => {
-            save.reject(new Error("forbidden"));
+            // The error the switch's call rejects with: the server's body, with its error code, under `error`.
+            save.reject(Object.assign(new Error("Bad Request"), { error: { code: "TEAM_NOT_FOUND", message: "Team not found" }, status: 400 }));
         });
 
         expect(screen.queryByTestId("switching")).toBeNull();
-        expect(harness.toast).toHaveBeenCalledExactlyOnceWith({ message: "localized:forbidden", variant: "error" });
+        expect(harness.toast).toHaveBeenCalledExactlyOnceWith({ message: "Team not found", variant: "error" });
     });
 
     it("posts the success toast in the language active when the switch finishes", async () => {
