@@ -11,6 +11,7 @@ import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import { useDateBoundaries } from "../contexts/date-boundaries-context";
 import { isIdleThread, nextSnoozeWake, partitionDerivedSections } from "../lib/derived-sections";
+import { createNodeSharer } from "../lib/share-unchanged-nodes";
 import { selectSelectedTagIds, useThreadListUIStore } from "../stores/thread-list-ui-store";
 import type { BranchNode, GroupType, MinimalThreadRelationship, ThreadGroup } from "../types";
 import { usePersistThreadList, useThreadListPlaceholder } from "./use-thread-list-cache";
@@ -110,6 +111,8 @@ const useThreadGroups = (
 
     // Snoozes end on their own (the timer below re-arms per wake); idle rows read the same clock.
     const [now, setNow] = useState(() => Date.now());
+    // Gives an unchanged thread the node it had: rows are memoized on their node, so only changed threads re-render.
+    const [shareUnchangedNodes] = useState(createNodeSharer);
 
     // --- Stage 1: Build lookup maps (only recomputes when raw data changes) ---
     const lookupMaps = useMemo(() => {
@@ -265,14 +268,15 @@ const useThreadGroups = (
             };
         };
 
-        const allThreadsList = rootThreads
+        const builtThreadsList = rootThreads
             .map((thread: any) => buildHierarchy(thread._id))
             .filter((node: BranchNode | null): node is BranchNode => node !== null);
 
         // Build temporary threads hierarchy separately
-        const temporaryThreadsList: BranchNode[] = temporaryRootThreads
+        const builtTemporaryThreadsList: BranchNode[] = temporaryRootThreads
             .map((thread: any) => buildHierarchy(thread._id))
             .filter((node: BranchNode | null): node is BranchNode => node !== null && node.expiresAt !== undefined);
+        const [allThreadsList = [], temporaryThreadsList = []] = shareUnchangedNodes([builtThreadsList, builtTemporaryThreadsList]);
 
         // Single pass: separate threads by type (more efficient than multiple filters)
         // Apply category + tag filters if selected
@@ -309,7 +313,19 @@ const useThreadGroups = (
             statelessThreads,
             temporaryThreadsList: filteredTemporaryThreadsList,
         };
-    }, [lookupMaps, optimisticPins, optimisticStatuses, optimisticDeletions, selectedCategory, selectedTagIds, compositeData?.tags, titleRevision, now, t]);
+    }, [
+        lookupMaps,
+        optimisticPins,
+        optimisticStatuses,
+        optimisticDeletions,
+        selectedCategory,
+        selectedTagIds,
+        compositeData?.tags,
+        titleRevision,
+        now,
+        t,
+        shareUnchangedNodes,
+    ]);
 
     // --- Stage 3: Sort callback for search results (stable reference) ---
     const sortThreadsByPriority = useCallback(

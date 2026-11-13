@@ -33,8 +33,12 @@ vi.mock("@lingui/react/macro", () => {
         },
     };
 });
-vi.mock("@tanstack/react-query", () => {
+vi.mock("@tanstack/react-query", async (importOriginal) => {
+    const { replaceEqualDeep } = await importOriginal<typeof import("@tanstack/react-query")>();
+
     return {
+        // The node sharing uses the real one.
+        replaceEqualDeep,
         skipToken: Symbol("skip"),
         useQuery: () => {
             return { data: composite, isPlaceholderData: state.isPlaceholderData };
@@ -217,6 +221,63 @@ describe("derived sections", () => {
             expect(idleOf()).toBe(true);
         } finally {
             vi.useRealTimers();
+        }
+    });
+});
+
+describe("node identity across rebuilds", () => {
+    const original = composite.threads.page;
+
+    beforeEach(() => {
+        state.isPlaceholderData = false;
+        state.projects = [{ _id: "p1", createdAt: 1, title: "Work" }];
+        state.projectsAnswered = true;
+        composite.threads.page = [
+            { _id: "a", _creationTime: NOW, createdAt: NOW, status: "active", title: "First" },
+            { _id: "b", _creationTime: NOW, createdAt: NOW, projectId: "p1", status: "active", title: "Second" },
+            { _id: "c", _creationTime: NOW, createdAt: NOW, status: "active", title: "Third" },
+        ] as never;
+    });
+
+    afterEach(() => {
+        composite.threads.page = original;
+    });
+
+    const nodesOf = (groups: ReturnType<typeof groupsFor>) => new Map(groups.flatMap((group) => group.threads).map((node) => [node.threadId, node]));
+
+    it("keeps every other thread's node when one thread's status changes, so only that row re-renders", () => {
+        const collapsedGroups = new Set<GroupType>();
+        const collapsedProjects = new Set<string>();
+        const { rerender, result } = renderHook(() => useThreadGroups(collapsedGroups, collapsedProjects, "", "threads", undefined, [], undefined, undefined));
+        const before = nodesOf(result.current.threadGroups);
+
+        // A live push is a freshly decoded page: every thread object is new, and one of them changed.
+        composite.threads.page = (structuredClone(composite.threads.page) as { _id: string; status: string }[]).map((thread) =>
+            thread._id === "c" ? { ...thread, status: "running" } : thread,
+        ) as never;
+        rerender();
+        const after = nodesOf(result.current.threadGroups);
+
+        expect(after.get("a")).toBe(before.get("a"));
+        expect(after.get("b")).toBe(before.get("b"));
+        expect(after.get("c")).not.toBe(before.get("c"));
+        expect(after.get("c")?.status).toBe("running");
+    });
+
+    it("keeps every node when a rebuild changes nothing in them", () => {
+        const collapsedGroups = new Set<GroupType>();
+        const collapsedProjects = new Set<string>();
+        const { rerender, result } = renderHook(() => useThreadGroups(collapsedGroups, collapsedProjects, "", "threads", undefined, [], undefined, undefined));
+        const before = nodesOf(result.current.threadGroups);
+
+        composite.threads.page = structuredClone(composite.threads.page);
+        rerender();
+        const after = nodesOf(result.current.threadGroups);
+
+        expect([...after.keys()]).toStrictEqual([...before.keys()]);
+
+        for (const [threadId, node] of after) {
+            expect(node).toBe(before.get(threadId));
         }
     });
 });
