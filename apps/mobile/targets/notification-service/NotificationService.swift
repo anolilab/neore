@@ -7,7 +7,9 @@ import UserNotifications
 /// A push carries only ids: the server never hands a title to Expo, Apple or Google. This
 /// extension signs in with the app's session grant (read from the shared keychain group),
 /// asks our backend for the text (`POST /notifications/push-content`), and rewrites the alert.
-/// Any failure, a locked chat, or running out of time leaves the placeholder as it came.
+/// Any failure or running out of time leaves the placeholder and its thread as they came.
+/// A chat the server withholds (locked, unshared, deleted) keeps its placeholder but loses its `threadId`,
+/// so a tap opens the chat list. Another account's notification loses it too.
 final class NotificationService: UNNotificationServiceExtension {
     private let lock = NSLock()
     private var contentHandler: ((UNNotificationContent) -> Void)?
@@ -33,9 +35,9 @@ final class NotificationService: UNNotificationServiceExtension {
             switch await PushContent.fetch(notificationId: notificationId) {
             case let .text(text):
                 self?.deliver(text)
-            case .notThisAccount:
-                // Another account's notification: iOS must still show it, so the placeholder stays, but a tap
-                // must not open that account's chat under the one signed in now.
+            case .notThisAccount, .withheld:
+                // Another account's notification, or a chat the server will not name (locked, unshared, deleted): iOS
+                // must still show the placeholder, but a tap must not open that chat under the account signed in now.
                 self?.deliver(withoutThread: true)
             case .placeholder:
                 self?.deliver()
@@ -121,7 +123,9 @@ enum PushContent {
         case text(Text)
         /// The content route answered 404: the notification is not the signed-in account's.
         case notThisAccount
-        /// Signed out, offline, too slow, a failure on our side, or a locked chat (`generic`).
+        /// The content route answered `generic`: the chat is locked, unshared, deleted, or its check failed.
+        case withheld
+        /// Signed out, offline, too slow, or a failure on our side: the chat may still be the right one to open.
         case placeholder
     }
 
@@ -171,6 +175,10 @@ enum PushContent {
         // The route answers 404 when the notification is not the signed-in account's (it switched since the push went out).
         if answer.status == 404 {
             return .notThisAccount
+        }
+
+        if (answer.json?["generic"] as? Bool) == true {
+            return .withheld
         }
 
         guard
