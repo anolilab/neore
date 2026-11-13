@@ -26,7 +26,7 @@ function wordItem(level: number, marker: string, text: string): string {
 describe("paste lists: Google Docs", () => {
     it("writes a Google Docs list and leaves out the normal-weight bold it wraps a copy in", () => {
         expect(convert(fixture("google-docs-list.html"))).toBe(
-            "Release plan\n\n- Ship the beta on Monday\n- Read the [release notes](https://example.com/notes)\n  - twice",
+            "Release plan\n\n- **Ship** the beta on Monday\n- Read the [release notes](https://example.com/notes)\n  - *twice*",
         );
     });
 

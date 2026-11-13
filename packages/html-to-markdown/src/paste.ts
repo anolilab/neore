@@ -7,7 +7,9 @@
  */
 import { gfm } from "./gfm";
 import { declaredStyle } from "./inline-style";
+import { codeRules } from "./paste-code";
 import { isWordMarker, listRules, unlessRemoved } from "./paste-lists";
+import { guardMarks, NORMAL_WEIGHTS, styleRules } from "./paste-styles";
 import type TurndownService from "./turndown";
 import type { Options, Rule } from "./types";
 
@@ -95,8 +97,6 @@ const CONTENT_VISIBILITY_VALUES = new Set(["auto", "hidden", "visible", ...GLOBA
 // `collapse` hides an element as `hidden` does, except in a table, where it also takes the row's or column's space.
 const HIDING_VISIBILITY = new Set(["collapse", "hidden"]);
 const OUTER_DISPLAY = new Set(["block", "inline", "run-in"]);
-// `lighter` is not here: it is relative, and under a heavy weight it is still bold.
-const NORMAL_WEIGHT = new Set(["100", "200", "300", "400", "normal"]);
 const INNER_DISPLAY = new Set(["flex", "flow", "flow-root", "grid", "ruby", "table"]);
 
 /**
@@ -288,7 +288,7 @@ const pasteRules: Record<string, Rule> = {
     normalWeightBold: {
         filter: unlessRemoved(
             (node) =>
-                (node.nodeName === "B" || node.nodeName === "STRONG") && NORMAL_WEIGHT.has(declaredStyle(node.getAttribute("style") ?? "", "font-weight")),
+                (node.nodeName === "B" || node.nodeName === "STRONG") && NORMAL_WEIGHTS.has(declaredStyle(node.getAttribute("style") ?? "", "font-weight")),
         ),
         replacement: (content) => content,
     },
@@ -334,12 +334,20 @@ function texSource(node: Element): string {
 export function paste(service: TurndownService): void {
     service.remove(isHiddenElement);
 
-    const rules = { ...pasteRules, ...listRules(isHiddenOnPage) };
+    const rules = { ...pasteRules, ...listRules(isHiddenOnPage), ...codeRules };
 
     for (const [key, rule] of Object.entries(rules)) {
         service.addRule(key, rule);
     }
 
-    // Added last, so it comes first: inside a table cell its rules write a list as the cell's text.
+    // Added after the preset's rules, so it comes before them: inside a table cell its rules write a list or a code
+    // block as the cell's text.
     service.use(gfm);
+
+    // Added last, so it comes first: a styled list item or table cell is formatted, then passed on to its rule.
+    for (const [key, rule] of Object.entries(styleRules)) {
+        service.addRule(key, rule);
+    }
+
+    guardMarks(service);
 }
