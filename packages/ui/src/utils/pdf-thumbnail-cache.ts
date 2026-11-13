@@ -15,6 +15,12 @@ export const MAX_CACHED_PDF_THUMBNAILS = 32;
 
 const thumbnails = new Map<string, CachedPdfThumbnail>();
 
+/** Bumped by every clear: a draw that started before it belongs to the session that ended. */
+const cacheState = { generation: 0 };
+
+/** The cache's current generation; a thumbnail takes it when its draw starts and hands it back with the result. */
+export const pdfThumbnailCacheGeneration = (): number => cacheState.generation;
+
 export const getCachedPdfThumbnail = (fileKey: string): CachedPdfThumbnail | undefined => {
     const cached = thumbnails.get(fileKey);
 
@@ -26,7 +32,15 @@ export const getCachedPdfThumbnail = (fileKey: string): CachedPdfThumbnail | und
     return cached;
 };
 
-export const cachePdfThumbnail = (fileKey: string, thumbnail: CachedPdfThumbnail): void => {
+/**
+ * Keeps a drawn thumbnail, unless the cache was cleared since its draw started (`generation`): a page drawn for the
+ * account that signed out must not be shown to the next one, which the file key alone (no signature) would allow.
+ */
+export const cachePdfThumbnail = (fileKey: string, thumbnail: CachedPdfThumbnail, generation: number): void => {
+    if (generation !== cacheState.generation) {
+        return;
+    }
+
     thumbnails.delete(fileKey);
     thumbnails.set(fileKey, thumbnail);
 
@@ -39,5 +53,6 @@ export const cachePdfThumbnail = (fileKey: string, thumbnail: CachedPdfThumbnail
 
 /** Drops every cached thumbnail: they were drawn from files of the session that ended. */
 export const clearPdfThumbnailCache = (): void => {
+    cacheState.generation += 1;
     thumbnails.clear();
 };

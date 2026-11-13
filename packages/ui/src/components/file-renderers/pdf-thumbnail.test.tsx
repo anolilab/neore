@@ -262,4 +262,30 @@ describe("the thumbnail's worker and cache", () => {
         expect(container.querySelector("img")).toBeNull();
         expect(container.querySelector("button")?.getAttribute("aria-busy")).toBe("true");
     });
+
+    it("does not cache a page whose draw started before the session ended", async () => {
+        // The draw starts, then the session ends before the page is drawn.
+        firstPage.renders = false;
+        await render(<PdfThumbnail onOpen={() => {}} url={PDF_URL} />);
+
+        forgetPdfUrls();
+        // The page finishes drawing for the old session (the stand-in page draws on the next render).
+        firstPage.renders = true;
+        await render(<PdfThumbnail onOpen={() => {}} url={PDF_URL} />);
+
+        expect(container.querySelector("img")?.getAttribute("src")).toBe("data:image/png;base64,cGFnZQ==");
+
+        // The next account's thumbnail of the same file: nothing cached, so it loads (and never finishes here).
+        act(() => {
+            root.unmount();
+        });
+        root = createRoot(container);
+        firstPage.renders = false;
+        firstPage.documentPending = true;
+
+        await render(<PdfThumbnail onOpen={() => {}} url={`${ORIGIN}/report.pdf?sig=next-account`} />);
+
+        expect(container.querySelector("img")).toBeNull();
+        expect(container.querySelector("button")?.getAttribute("aria-busy")).toBe("true");
+    });
 });

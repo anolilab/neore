@@ -11,7 +11,7 @@ import { Plural, useLingui } from "@lingui/react/macro";
 import { isFetchableUrl, useFetchableOrigins } from "@ui/hooks/use-fetchable-origins";
 import cn from "@ui/utils/cn";
 import { pdfFileKey } from "@ui/utils/pdf-preview-event";
-import { cachePdfThumbnail, getCachedPdfThumbnail } from "@ui/utils/pdf-thumbnail-cache";
+import { cachePdfThumbnail, getCachedPdfThumbnail, pdfThumbnailCacheGeneration } from "@ui/utils/pdf-thumbnail-cache";
 import type { FC } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
@@ -43,6 +43,8 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
     const fileKey = pdfFileKey(url);
     // A thumbnail drawn before (this file, any signature) starts out drawn: no document, no worker, no placeholder.
     const [cached] = useState(() => getCachedPdfThumbnail(fileKey));
+    // The cache's generation when this thumbnail's draw starts: a sign-out (cache clear) before it finishes discards it.
+    const [cacheGeneration] = useState(pdfThumbnailCacheGeneration);
     const [pages, setPages] = useState(cached?.pages ?? 0);
     const [rendered, setRendered] = useState(cached !== undefined);
     const [failed, setFailed] = useState(false);
@@ -72,9 +74,9 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
     // Kept once both the drawn page and the page count are in, whichever arrives last.
     useEffect(() => {
         if (snapshot && pages > 0) {
-            cachePdfThumbnail(fileKey, { pages, snapshot });
+            cachePdfThumbnail(fileKey, { pages, snapshot }, cacheGeneration);
         }
-    }, [fileKey, pages, snapshot]);
+    }, [cacheGeneration, fileKey, pages, snapshot]);
 
     const name = filename ? t`Open ${filename}` : t`Open PDF`;
     const pagesLabel = pages > 0 ? t`${name}, ${plural(pages, { one: "# page", other: "# pages" })}` : name;
