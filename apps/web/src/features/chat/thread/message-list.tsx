@@ -173,7 +173,8 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
             element.focus({ preventScroll: true });
         }
 
-        // Re-centre until the row stops moving (rows above it render at their real height as they come into view).
+        // Re-centre whenever the row moved, for every frame of the budget: rows above it render at their real height as
+        // they come into view, and one can still change after a still frame (a late image, a skip that ends later).
         let framesLeft = JUMP_SETTLE_FRAMES;
         let previousTop = NaN;
         const settle = () => {
@@ -183,12 +184,11 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
             const { top } = element.getBoundingClientRect();
 
-            if (Math.abs(top - previousTop) < 1) {
-                return;
+            if (Number.isNaN(previousTop) || Math.abs(top - previousTop) >= 1) {
+                element.scrollIntoView({ block: "center" });
             }
 
             previousTop = top;
-            element.scrollIntoView({ block: "center" });
             framesLeft -= 1;
 
             if (framesLeft > 0) {

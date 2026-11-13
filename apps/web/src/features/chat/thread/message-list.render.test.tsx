@@ -555,6 +555,20 @@ describe("a long thread", () => {
             expect(document.activeElement).toBe(rowOf("m100"));
         });
 
+        it("re-centres its row again when a row above changes after it stood still", () => {
+            // Still for two frames, then a late image above it pushes it once more.
+            tops.set("m100", [500, 300, 300, 300, 250, 250]);
+            mountInto();
+            stubRows();
+
+            act(() => scrollToMessage("m100"));
+            runFrames(8);
+
+            // The jump's own scroll, the two moves while rows settled, and the late one.
+            expect(scrolls.get("m100")).toBe(4);
+            expect(document.activeElement).toBe(rowOf("m100"));
+        });
+
         it("stops re-centring an older jump once a newer one is asked for", () => {
             // A row that never settles would be re-centred for every frame of the budget.
             tops.set("m100", [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100]);
