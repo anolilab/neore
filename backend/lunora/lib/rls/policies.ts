@@ -442,6 +442,7 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     organizationPolicies: "an organization's policy document; the owner writes and any member reads, both decided by the caller's active-organization role",
     payment_customers: "`@lunora/payment` store (Creem customers); read and written only through `ctx.payments` on `__root__`",
     payment_events: "`@lunora/payment` webhook claim log; system only",
+    payment_referenceRevisions: "`@lunora/payment` per-reference grant counter; unused (`singleSubscriptionPerReference` is off), system only",
     payment_sessions: "`@lunora/payment` store (Creem checkouts); system only",
     payment_subscriptions: "`@lunora/payment` store (Creem subscriptions); system only — the tier lands on `user` / `organization`",
     payment_usageEvents: "`@lunora/payment` usage metering; unused (Creem has none), system only",

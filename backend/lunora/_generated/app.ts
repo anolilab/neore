@@ -800,6 +800,7 @@ class AppBuilder<Env extends object> {
             ["workflowVersions", { mode: { field: "userId", kind: "shardBy" } }],
             ["payment_customers", { mode: { kind: "root" } }],
             ["payment_events", { mode: { kind: "root" } }],
+            ["payment_referenceRevisions", { mode: { kind: "root" } }],
             ["payment_sessions", { mode: { kind: "root" } }],
             ["payment_subscriptions", { mode: { kind: "root" } }],
             ["payment_usageEvents", { mode: { kind: "root" } }],

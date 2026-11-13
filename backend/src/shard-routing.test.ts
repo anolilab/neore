@@ -19,6 +19,25 @@ describe("withCallerShard", () => {
         expect(routed.headers.get("authorization")).toBe("Bearer t");
     });
 
+    it("sends a checkout to the root shard, where the payment store lives, alone and in a batch", async () => {
+        const single = await withCallerShard(rpc({ args: { plan: "pro" }, functionPath: "billing_checkout:createCheckout" }), "user-a");
+        const batch = await withCallerShard(
+            rpc(
+                {
+                    calls: [
+                        { args: {}, functionPath: "billing_checkout:createCheckout", id: 0 },
+                        { args: {}, functionPath: "billing_checkout:getMyPlan", id: 1 },
+                    ],
+                },
+                "/_lunora/rpc-batch",
+            ),
+            "user-a",
+        );
+
+        expect(await single.json()).toMatchObject({ shardKey: "__root__" });
+        expect(((await batch.json()) as { calls: { shardKey: string }[] }).calls.map((call) => call.shardKey)).toStrictEqual(["__root__", "user-a"]);
+    });
+
     it("keeps a shard the caller named — a shared thread's owner", async () => {
         const request = rpc({ args: {}, functionPath: "x:y", shardKey: "owner-b" });
 
