@@ -64,6 +64,34 @@ const newerThan = (table: string) =>
  */
 const FILLS_LEGACY_SHARE_TEXT = "OR cached_messages.share_text IS NULL";
 
+const MESSAGE_ROW_VALUES = "(?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+/** The placeholders of `count` (at least one) message rows in one upsert. */
+const messageRowValues = (count: number): string => MESSAGE_ROW_VALUES + `, ${MESSAGE_ROW_VALUES}`.repeat(count - 1);
+
+/** A message as a save takes it: with the start time of the read it came from, when it is not the save's own. */
+type SavedMessage = CachedMessage & { syncedAt?: number };
+
+/** One message row's values, in the column order of the upsert. The message's own read time wins over the save's. */
+const messageRowParams = (message: SavedMessage, threadId: string, syncedAt: number): SqlParametereter[] => [
+    message.id,
+    threadId,
+    message.role,
+    message.text,
+    message.shareText,
+    message.status,
+    message.createdAt,
+    message.updatedAt ?? message.createdAt,
+    message.syncedAt ?? syncedAt,
+];
+
+/** The values of a chunk of message rows, row after row. */
+const messageRowsParams = (messages: ReadonlyArray<SavedMessage>, threadId: string, syncedAt: number): SqlParametereter[] =>
+    messages.flatMap((message) => messageRowParams(message, threadId, syncedAt));
+
+/** Message rows per upsert statement: 100 rows of 9 values stay under SQLite's oldest limit of 999 bound values. */
+const MESSAGE_ROWS_PER_STATEMENT = 100;
+
 const RECENT_THREAD_IDS = `SELECT id FROM cached_threads ORDER BY updated_at DESC, id DESC LIMIT ${MAX_THREADS_WITH_MESSAGES}`;
 
 interface ThreadSql {
@@ -347,26 +375,19 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                         return;
                     }
 
-                    const savedAt = options?.syncedAt ?? now();
+                    const syncedAt = options?.syncedAt ?? now();
 
                     await database.withTransactionAsync(async () => {
-                        for (const message of messages) {
-                            const syncedAt = message.syncedAt ?? savedAt;
-                            const params: SqlParametereter[] = [
-                                message.id,
-                                threadId,
-                                message.role,
-                                message.text,
-                                message.shareText,
-                                message.status,
-                                message.createdAt,
-                                message.updatedAt ?? message.createdAt,
-                                syncedAt,
-                            ];
+                        // One statement per chunk of rows, not one per row: a read saves up to 50 messages, and each
+                        // statement is a call across to the native database.
+                        for (let start = 0; start < messages.length; start += MESSAGE_ROWS_PER_STATEMENT) {
+                            const chunk = messages.slice(start, start + MESSAGE_ROWS_PER_STATEMENT);
+                            const params = messageRowsParams(chunk, threadId, syncedAt);
 
+                            // Each row is upserted on its own terms, as before: the guard compares it with the stored copy.
                             // eslint-disable-next-line no-await-in-loop -- statements of one transaction run in order
                             await database.runAsync(
-                                `INSERT INTO cached_messages (id, thread_id, role, text, share_text, status, created_at, updated_at, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                `INSERT INTO cached_messages (id, thread_id, role, text, share_text, status, created_at, updated_at, synced_at) VALUES ${messageRowValues(chunk.length)}
                                  ON CONFLICT(id) DO UPDATE SET role = excluded.role, text = excluded.text, share_text = excluded.share_text, status = excluded.status, created_at = excluded.created_at,
                                      updated_at = excluded.updated_at, synced_at = excluded.synced_at
                                  ${newerThan("cached_messages")} ${FILLS_LEGACY_SHARE_TEXT}`,
