@@ -1243,25 +1243,33 @@ export const createTemporaryThread = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const thread = await ctx.db.get("threads", args.threadId);
-
-        await ctx.db.insert("temporaryThreads", {
-            expiresAt: args.expiresAt,
-            retentionHours: args.retentionHours,
-            threadId: args.threadId,
-            userId: thread?.userId,
-        });
-
-        // Denormalize isTemporary onto thread for efficient filtering
-        if (thread) {
-            await ctx.db.patch("threads", args.threadId, { isTemporary: true });
-        }
-
-        // A temporary chat takes no guest posts: a link already given out is withdrawn with its notes, as archiving does.
-        await withdrawGuestLinksForThread(ctx, args.threadId);
+        await insertTemporaryThread(ctx, args);
 
         return null;
     });
+
+/** A thread made temporary, in the caller's transaction (`createThreadWithInitialMessage` creates one as temporary). */
+export const insertTemporaryThread = async (
+    ctx: MutationContext,
+    args: { expiresAt: number; retentionHours?: number; threadId: Id<"threads"> },
+): Promise<void> => {
+    const thread = await ctx.db.get("threads", args.threadId);
+
+    await ctx.db.insert("temporaryThreads", {
+        expiresAt: args.expiresAt,
+        retentionHours: args.retentionHours,
+        threadId: args.threadId,
+        userId: thread?.userId,
+    });
+
+    // Denormalize isTemporary onto thread for efficient filtering
+    if (thread) {
+        await ctx.db.patch("threads", args.threadId, { isTemporary: true });
+    }
+
+    // A temporary chat takes no guest posts: a link already given out is withdrawn with its notes, as archiving does.
+    await withdrawGuestLinksForThread(ctx, args.threadId);
+};
 
 export const getTemporaryThreads = query
     .input({

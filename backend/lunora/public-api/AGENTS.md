@@ -18,3 +18,7 @@
   `auth_api_keys.createScopedApiKey`. `auth.api` is typed without plugin
   endpoints (`buildAuthOptions` returns plain `BetterAuthOptions`) — use
   `ApiKeyAuthApi` from `public-api/identity.ts`.
+- **`clientMessageId` on `/chat`** — forwarded to `runChatStart` (`chat/start-claim.ts`), separate from
+  `Idempotency-Key`. A retry answers 200 with `duplicate: true` (not 202), and the start's 409/422 map to
+  `chat_start_in_progress` / `client_message_id_reused` in `chatStartError`; keep the zod rule in step with
+  `isValidClientMessageId`.
