@@ -90,14 +90,21 @@ export const latestTurnRows = async (
 /** The requests in an assistant message's `parts` that `answered` does not hold, by approval id, each with its call. */
 const unansweredRequests = (parts: ReadonlyArray<StoredPart>, answered: ReadonlySet<string>): Map<string, PendingToolRequest> => {
     const open = new Map<string, PendingToolRequest>();
+    // The turn's calls by id, indexed once; the first call with an id wins, as a search from the start would.
+    const calls = new Map<string | undefined, StoredPart>();
+
+    for (const part of parts) {
+        if (part.type === "tool-call" && !calls.has(part.toolCallId)) {
+            calls.set(part.toolCallId, part);
+        }
+    }
 
     for (const request of parts) {
         if (request.type !== "tool-approval-request" || request.approvalId === undefined || answered.has(request.approvalId)) {
             continue;
         }
 
-        const call = parts.find((p) => p.type === "tool-call" && p.toolCallId === request.toolCallId);
-
+        const call = calls.get(request.toolCallId);
         const { mcpServerName: server, mcpToolName: tool } = call?.providerOptions?.neore ?? {};
         const label = typeof server === "string" && typeof tool === "string" ? { server, tool } : null;
 

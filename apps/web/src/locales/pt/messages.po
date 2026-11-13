@@ -37,7 +37,7 @@ msgstr "-- NORMAL --"
 msgid ", unread"
 msgstr ", não lida"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:55
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:63
 msgid "… ({omitted, plural, one {# more character not shown} other {# more characters not shown}}; approving runs the whole call)"
 msgstr "… ({omitted, plural, one {mais # caractere não exibido} other {mais # caracteres não exibidos}}; aprovar executa a chamada inteira)"
 
@@ -1234,7 +1234,7 @@ msgstr "{name} removido dos favoritos"
 msgid "{name} resumed"
 msgstr "{name} retomado"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:63
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:71
 msgid "{name} wants to run \"{tool}\""
 msgstr "{name} quer executar \"{tool}\""
 
@@ -1935,7 +1935,7 @@ msgstr "Um modelo adiciona os participantes às suas habilidades, onde você pod
 msgid "A thread gets a reply"
 msgstr "Uma conversa recebe uma resposta"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:50
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:58
 msgid "a tool"
 msgstr "uma ferramenta"
 
@@ -18789,6 +18789,10 @@ msgstr "Carregando o guia"
 msgid "Loading the linked pull requests…"
 msgstr "Carregando os pull requests vinculados…"
 
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:48
+msgid "Loading the sub-agent's requests…"
+msgstr "Carregando as solicitações do subagente…"
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:59
 msgid "Loading threads"
 msgstr "Carregando conversas"
@@ -20415,7 +20419,7 @@ msgstr "Mais opções"
 msgid "More pages"
 msgstr "Mais páginas"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:77
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:85
 msgid "More requests are waiting in the sub-agent's thread."
 msgstr "Há mais solicitações aguardando na conversa do subagente."
 
@@ -33002,7 +33006,7 @@ msgstr "O servidor ainda não lista nenhum modelo — baixe ou carregue um prime
 msgid "The skill could not be imported."
 msgstr "Não foi possível importar a habilidade."
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:49
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:57
 msgid "The sub-agent"
 msgstr "O subagente"
 

@@ -37,7 +37,7 @@ msgstr "-- 普通 --"
 msgid ", unread"
 msgstr "，未读"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:55
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:63
 msgid "… ({omitted, plural, one {# more character not shown} other {# more characters not shown}}; approving runs the whole call)"
 msgstr "…（{omitted, plural, other {还有 # 个字符未显示}}；批准将执行整个调用）"
 
@@ -1234,7 +1234,7 @@ msgstr "已将 {name} 移出星标"
 msgid "{name} resumed"
 msgstr "{name} 已恢复"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:63
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:71
 msgid "{name} wants to run \"{tool}\""
 msgstr "{name} 想要运行“{tool}”"
 
@@ -1935,7 +1935,7 @@ msgstr "模板会将其参与者添加到你的技能中，你可以在那里编
 msgid "A thread gets a reply"
 msgstr "对话收到回复"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:50
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:58
 msgid "a tool"
 msgstr "某个工具"
 
@@ -18789,6 +18789,10 @@ msgstr "正在加载指南"
 msgid "Loading the linked pull requests…"
 msgstr "正在加载已关联的拉取请求…"
 
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:48
+msgid "Loading the sub-agent's requests…"
+msgstr "正在加载子代理的请求…"
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:59
 msgid "Loading threads"
 msgstr "正在加载对话"
@@ -20415,7 +20419,7 @@ msgstr "更多选项"
 msgid "More pages"
 msgstr "更多页"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:77
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:85
 msgid "More requests are waiting in the sub-agent's thread."
 msgstr "子代理的对话中还有更多请求在等待。"
 
@@ -33002,7 +33006,7 @@ msgstr "服务器尚未列出任何模型——请先拉取或加载一个"
 msgid "The skill could not be imported."
 msgstr "无法导入该技能。"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:49
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:57
 msgid "The sub-agent"
 msgstr "子代理"
 

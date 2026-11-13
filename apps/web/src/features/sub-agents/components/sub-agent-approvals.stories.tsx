@@ -5,7 +5,7 @@ import { expect, screen, userEvent, waitFor, within } from "storybook/test";
 
 import { userFixtures } from "@/storybook/fixtures/user";
 import type { LunoraFixture } from "@/storybook/lunora";
-import { lunora, lunoraError, lunoraHandlers } from "@/storybook/lunora";
+import { lunora, lunoraError, lunoraHandlers, lunoraPending } from "@/storybook/lunora";
 
 import SubAgentApprovals from "./sub-agent-approvals";
 
@@ -145,5 +145,13 @@ export const CutShort: Story = {
     play: async ({ canvas }) => {
         await canvas.findByRole("group", { name: '/tidy wants to run "delete"' });
         await expect(canvas.getByText(MORE_WAITING)).toBeVisible();
+    },
+};
+
+/** The list has not answered yet: a polite status, not an empty card. */
+export const Loading: Story = {
+    parameters: { msw: { handlers: { lunora: handlers(lunoraPending(api.sub_agents.functions.listSubAgentApprovals)) } } },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByRole("status")).toHaveTextContent("Loading the sub-agent's requests…");
     },
 };

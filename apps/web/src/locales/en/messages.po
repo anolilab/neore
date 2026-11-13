@@ -36,7 +36,7 @@ msgstr "-- NORMAL --"
 msgid ", unread"
 msgstr ", unread"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:55
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:63
 msgid "… ({omitted, plural, one {# more character not shown} other {# more characters not shown}}; approving runs the whole call)"
 msgstr "… ({omitted, plural, one {# more character not shown} other {# more characters not shown}}; approving runs the whole call)"
 
@@ -1254,7 +1254,7 @@ msgstr "{name} removed from starred"
 msgid "{name} resumed"
 msgstr "{name} resumed"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:63
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:71
 msgid "{name} wants to run \"{tool}\""
 msgstr "{name} wants to run \"{tool}\""
 
@@ -1959,7 +1959,7 @@ msgstr "A template adds its participants to your skills, where you can edit them
 msgid "A thread gets a reply"
 msgstr "A thread gets a reply"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:50
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:58
 msgid "a tool"
 msgstr "a tool"
 
@@ -18836,6 +18836,10 @@ msgstr "Loading the guide"
 msgid "Loading the linked pull requests…"
 msgstr "Loading the linked pull requests…"
 
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:48
+msgid "Loading the sub-agent's requests…"
+msgstr "Loading the sub-agent's requests…"
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:59
 msgid "Loading threads"
 msgstr "Loading threads"
@@ -20462,7 +20466,7 @@ msgstr "More options"
 msgid "More pages"
 msgstr "More pages"
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:77
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:85
 msgid "More requests are waiting in the sub-agent's thread."
 msgstr "More requests are waiting in the sub-agent's thread."
 
@@ -33084,7 +33088,7 @@ msgstr "The server lists no models yet — pull or load one first"
 msgid "The skill could not be imported."
 msgstr "The skill could not be imported."
 
-#: src/features/sub-agents/components/sub-agent-approvals.tsx:49
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:57
 msgid "The sub-agent"
 msgstr "The sub-agent"
 

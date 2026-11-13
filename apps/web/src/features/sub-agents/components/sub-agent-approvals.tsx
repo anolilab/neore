@@ -27,7 +27,7 @@ const SubAgentApprovals: FC<{ parentThreadId: string; runId: string }> = ({ pare
     const crpc = useCRPC();
     // A locked parent answers the list only with its unlock proof, as every read of the chat does.
     const unlockProof = useUnlockProof(parentThreadId);
-    const { data, isError } = useQuery(
+    const { data, isError, isPending } = useQuery(
         crpc.sub_agents.functions.listSubAgentApprovals.queryOptions({
             parentThreadId: parentThreadId as Id<"threads">,
             ...(unlockProof !== undefined && { unlockProof }),
@@ -38,6 +38,14 @@ const SubAgentApprovals: FC<{ parentThreadId: string; runId: string }> = ({ pare
         return (
             <p className="text-destructive mt-2 text-xs" role="alert">
                 {t`Could not load the sub-agent's requests.`}
+            </p>
+        );
+    }
+
+    if (isPending) {
+        return (
+            <p className="text-muted-foreground mt-2 text-xs" role="status">
+                {t`Loading the sub-agent's requests…`}
             </p>
         );
     }
