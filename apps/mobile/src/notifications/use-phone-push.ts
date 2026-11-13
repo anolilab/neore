@@ -201,17 +201,20 @@ export const usePhonePush = (): void => {
     // A tapped notification opens its chat (the chat list when it names none). An approval alert's body opens its chat too;
     // its approve and deny buttons answer it (`approval-tap-listener`), and a tap is never an answer.
     useEffect(() => {
+        // A sign-out that has begun still shows the account on the phone until it finishes: a tap then waits for the sign-in.
+        const isAccountCurrent = signedIn.account?.isCurrent === true;
+
         if (response?.actionIdentifier === DEFAULT_ACTION_IDENTIFIER && handled.current !== response.notification.request.identifier) {
             const { request } = response.notification;
 
             handled.current = request.identifier;
             // A launch from a notification opens its chat, not the one the launch would reopen.
             canClaimLaunchReopen();
-            holdTapRoute(routeForPush(pushIdsFromNotification(request)), { whileSignedOut: status !== "signed-in" });
+            holdTapRoute(routeForPush(pushIdsFromNotification(request)), { whileSignedOut: status !== "signed-in" || !isAccountCurrent });
         }
 
         // Still signing in (or on the sign-in screen): the sign-in gate goes there instead of the chat list.
-        if (canNavigateToTap({ isOnSignIn, status })) {
+        if (isAccountCurrent && canNavigateToTap({ isOnSignIn, status })) {
             const route = takeTapRoute();
 
             if (route !== undefined) {
