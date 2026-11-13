@@ -1,5 +1,5 @@
 import { closestCorners, DndContext, KeyboardSensor, PointerSensor, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { plural } from "@lingui/core/macro";
 import { Plural, useLingui } from "@lingui/react/macro";
@@ -24,8 +24,10 @@ import {
 } from "@/features/projects/hooks/use-projects";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { useCRPC } from "@/lib/lunora/crpc";
+import settle from "@/lib/settle";
 import { showError, showInfo } from "@/lib/toast";
 
+import applyDragEnd from "./apply-drag-end";
 import ThreadGroupRenderer from "./components/thread-group-renderer";
 import GroupHeader from "./group-header";
 import useKeyboardNavigation from "./hooks/use-keyboard-navigation";
@@ -486,26 +488,30 @@ const HierarchicalThreadList: FC<
 
         setIsDeletingProject(true);
 
-        try {
-            // Ids in this component travel as plain strings (dnd-kit `active.id`/`over.id`,
-            // `BranchNode`/`ThreadGroup` fields, local dialog state) but always originate
-            // from documents returned by the backend, so the brand is re-applied here.
-            await deleteProject({ projectId: projectToDelete.id as Id<"projects"> });
-            setProjectToDelete(null);
-        } catch (error) {
-            console.error("Failed to delete project:", error);
-            showError(t`Failed to delete project`);
-        } finally {
-            setIsDeletingProject(false);
-        }
+        await settle(
+            async () => {
+                try {
+                    // Ids in this component travel as plain strings (dnd-kit `active.id`/`over.id`,
+                    // `BranchNode`/`ThreadGroup` fields, local dialog state) but always originate
+                    // from documents returned by the backend, so the brand is re-applied here.
+                    await deleteProject({ projectId: projectToDelete.id as Id<"projects"> });
+                    setProjectToDelete(null);
+                } catch (error) {
+                    console.error("Failed to delete project:", error);
+                    showError(t`Failed to delete project`);
+                }
+            },
+            () => setIsDeletingProject(false),
+        );
     }, [deleteProject, projectToDelete, t]);
 
     const handlePinProject = useCallback(
         async (projectId: string, isPinned: boolean) => {
-            try {
-                const brandedProjectId = projectId as Id<"projects">;
+            // Chosen outside the `try`: the React Compiler cannot lower a conditional inside one.
+            const togglePin = isPinned ? unpinProject : pinProject;
 
-                await (isPinned ? unpinProject({ projectId: brandedProjectId }) : pinProject({ projectId: brandedProjectId }));
+            try {
+                await togglePin({ projectId: projectId as Id<"projects"> });
             } catch (error) {
                 console.error("Failed to pin/unpin project:", error);
             }
@@ -776,240 +782,18 @@ const HierarchicalThreadList: FC<
             });
 
             try {
-                // Check if we're reordering project groups
-                const activeId = active.id as string;
-                const isProjectGroupDrag = activeId.startsWith("project-group-");
-
-                // If dragging a project group, only handle project group reordering
-                // Don't fall through to thread handling
-                if (isProjectGroupDrag) {
-                    const activeProjectId = activeId.replace("project-group-", "");
-                    const overId = over.id as string;
-
-                    // Check if dropping on another project group (could be project-group-{id} or project-{id})
-                    let overProjectId: string | undefined;
-
-                    if (overId.startsWith("project-group-")) {
-                        overProjectId = overId.replace("project-group-", "");
-                    } else if (overId.startsWith("project-") && !overId.startsWith("project-group-")) {
-                        // Dropping on ProjectGroupContainer (but not a project-group- ID)
-                        overProjectId = overId.replace("project-", "");
-                    } else if (over.data?.current?.type === "project-container" && over.data.current.projectId) {
-                        // Dropping on project container via data
-                        overProjectId = over.data.current.projectId;
-                    }
-
-                    // Only reorder if we found a valid target project and it's different from the source
-                    if (overProjectId && overProjectId !== activeProjectId) {
-                        // Find project groups in threadGroups (maintain current order from threadGroups)
-                        const projectGroups = threadGroups.filter((g) => g.projectId);
-                        const activeIndex = projectGroups.findIndex((g) => g.projectId === activeProjectId);
-                        const overIndex = projectGroups.findIndex((g) => g.projectId === overProjectId);
-
-                        if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
-                            const reorderedProjects = arrayMove(projectGroups, activeIndex, overIndex);
-
-                            // Update project orders
-                            const projectOrders = reorderedProjects.map((group, index) => {
-                                return {
-                                    order: index,
-                                    projectId: group.projectId!,
-                                };
-                            });
-
-                            await updateProjectOrderMutation({
-                                projectOrders,
-                            });
-                        } else {
-                            // If indices not found or same, still clear loading state
-                            setLoadingStates((previous) => {
-                                return { ...previous, reordering: false };
-                            });
-
-                            return;
-                        }
-                    } else {
-                        // No valid drop target or same project - just clear loading
-                        setLoadingStates((previous) => {
-                            return { ...previous, reordering: false };
-                        });
-
-                        return;
-                    }
-
-                    // Always return early for project group drags - don't handle as thread
-                    setLoadingStates((previous) => {
-                        return { ...previous, reordering: false };
-                    });
-
-                    return;
-                }
-
-                // Only handle thread drags from here on
-                const threadId = active.id as Id<"threads">;
-
-                // Ensure we're not accidentally treating a project group ID as a thread ID
-                if (threadId.startsWith("project-group-")) {
-                    setLoadingStates((previous) => {
-                        return { ...previous, reordering: false };
-                    });
-
-                    return;
-                }
-
-                // First, check if we're dropping on a project container (highest priority)
-                // Check both the ID and the data type to ensure we catch project container drops
-                const isProjectContainerDrop =
-                    (typeof over.id === "string" && over.id.startsWith("project-")) || over.data?.current?.type === "project-container";
-
-                if (isProjectContainerDrop) {
-                    let targetProjectId: string | undefined;
-
-                    if (typeof over.id === "string" && over.id.startsWith("project-")) {
-                        targetProjectId = over.id.replace("project-", "");
-                    } else if (over.data?.current?.projectId) {
-                        targetProjectId = over.data.current.projectId;
-                    }
-
-                    // Find which project the thread currently belongs to
-                    let currentProjectId: string | undefined;
-
-                    for (const group of threadGroups) {
-                        if (group.threads.some((candidate) => candidate.threadId === threadId)) {
-                            currentProjectId = group.projectId;
-                            break;
-                        }
-                    }
-
-                    // Only move if it's a different project
-                    if (currentProjectId !== targetProjectId) {
-                        await moveThreadToProject({
-                            projectId: (targetProjectId || undefined) as Id<"projects"> | undefined,
-                            threadId,
-                        });
-                    }
-
-                    setLoadingStates((previous) => {
-                        return { ...previous, reordering: false };
-                    });
-
-                    return;
-                }
-
-                // Find which group the active and over items belong to
-                let activeGroup: ThreadGroup | null = null;
-                let overGroup: ThreadGroup | null = null;
-                let activeIndex = -1;
-                let overIndex = -1;
-
-                for (const group of threadGroups) {
-                    const activeThreadIndex = group.threads.findIndex((candidate) => candidate.threadId === active.id);
-                    const overThreadIndex = group.threads.findIndex((candidate) => candidate.threadId === over.id);
-
-                    if (activeThreadIndex !== -1) {
-                        activeGroup = group;
-                        activeIndex = activeThreadIndex;
-                    }
-
-                    if (overThreadIndex !== -1) {
-                        overGroup = group;
-                        overIndex = overThreadIndex;
-                    }
-                }
-
-                // If we couldn't find the groups, check if over.id is a thread ID that belongs to a project
-                // This handles the case where we drop on a thread inside a project container
-                if (!overGroup && typeof over.id === "string") {
-                    for (const group of threadGroups) {
-                        if (group.threads.some((candidate) => candidate.threadId === over.id)) {
-                            overGroup = group;
-                            overIndex = group.threads.findIndex((candidate) => candidate.threadId === over.id);
-                            break;
-                        }
-                    }
-                }
-
-                // Check if we're moving between different groups (including project groups)
-                if (activeGroup && overGroup && activeGroup !== overGroup) {
-                    // If moving from one project to another, use project move
-                    if (activeGroup.projectId && overGroup.projectId && activeGroup.projectId !== overGroup.projectId) {
-                        await moveThreadToProject({
-                            projectId: overGroup.projectId as Id<"projects">,
-                            threadId,
-                        });
-                        setLoadingStates((previous) => {
-                            return { ...previous, reordering: false };
-                        });
-
-                        return;
-                    }
-
-                    // If moving from project to non-project group, remove from project
-                    if (activeGroup.projectId && !overGroup.projectId) {
-                        await moveThreadToProject({
-                            projectId: undefined,
-                            threadId,
-                        });
-                        setLoadingStates((previous) => {
-                            return { ...previous, reordering: false };
-                        });
-
-                        return;
-                    }
-
-                    // If moving from non-project to project group, add to project
-                    if (!activeGroup.projectId && overGroup.projectId) {
-                        await moveThreadToProject({
-                            projectId: overGroup.projectId as Id<"projects">,
-                            threadId,
-                        });
-                        setLoadingStates((previous) => {
-                            return { ...previous, reordering: false };
-                        });
-
-                        return;
-                    }
-
-                    // If moving between any different groups (not same group), don't reorder
-                    setLoadingStates((previous) => {
-                        return { ...previous, reordering: false };
-                    });
-
-                    return;
-                }
-
-                // Only allow reordering within the same group
-                if (!activeGroup || !overGroup || activeGroup.title !== overGroup.title) {
-                    setLoadingStates((previous) => {
-                        return { ...previous, reordering: false };
-                    });
-
-                    return;
-                }
-
-                // Reorder threads within the group
-                const reorderedThreads = arrayMove(activeGroup.threads, activeIndex, overIndex);
-
-                // Update the order in the database
-                const threadOrders = reorderedThreads.map((thread, index) => {
-                    return {
-                        order: index,
-                        threadId: thread.threadId,
-                    };
-                });
-
-                await updateThreadOrderMutation({
-                    threadOrders,
-                });
-                setLoadingStates((previous) => {
-                    return { ...previous, reordering: false };
+                await applyDragEnd(active, over, threadGroups, {
+                    moveThreadToProject,
+                    updateProjectOrder: updateProjectOrderMutation,
+                    updateThreadOrder: updateThreadOrderMutation,
                 });
             } catch {
                 showError(t`Failed to move thread`);
-                setLoadingStates((previous) => {
-                    return { ...previous, reordering: false };
-                });
             }
+
+            setLoadingStates((previous) => {
+                return { ...previous, reordering: false };
+            });
         },
         [setLoadingStates, updateThreadOrderMutation, updateProjectOrderMutation, threadGroups, isPlaceholderData, moveThreadToProject, t],
     );
