@@ -84,9 +84,15 @@ export const POSTHOG_OPTIONS = {
  */
 const loadTiming = { requested: false };
 
-const startReporter = (reportLoadTiming: (options: { exited: boolean }) => void, exited: boolean): void => {
+interface PageSeen {
+    exited: boolean;
+    firstHiddenAt?: number;
+    hasBeenVisible: boolean;
+}
+
+const startReporter = (reportLoadTiming: (seen: PageSeen) => void, seen: PageSeen): void => {
     try {
-        reportLoadTiming({ exited });
+        reportLoadTiming(seen);
     } catch (error: unknown) {
         // eslint-disable-next-line no-console -- the only trace of why this page sends no load timing
         console.warn("[PostHog] Load timing did not start:", error);
@@ -100,26 +106,38 @@ const startLoadTiming = (): void => {
 
     loadTiming.requested = true;
 
-    // A page left while the chunk loads is still reported, if the document lives long enough for it to arrive.
-    const exit = { happened: false };
+    // What happens while the chunk loads: a page left is still reported, if the document lives long enough for it to
+    // arrive, and one shown and then hidden is not taken for a background tab (Safari and Firefox keep no record of it).
+    const visibleAtMount = document.visibilityState === "visible";
+    const seen: PageSeen = { exited: false, firstHiddenAt: visibleAtMount ? undefined : 0, hasBeenVisible: visibleAtMount };
     const onExit = (): void => {
-        exit.happened = true;
+        seen.exited = true;
+    };
+    const onVisibility = (): void => {
+        if (document.visibilityState === "visible") {
+            seen.hasBeenVisible = true;
+        } else {
+            seen.firstHiddenAt ??= performance.now();
+        }
+    };
+    const stopWatching = (): void => {
+        globalThis.removeEventListener("pagehide", onExit);
+        document.removeEventListener("visibilitychange", onVisibility);
     };
 
     globalThis.addEventListener("pagehide", onExit);
+    document.addEventListener("visibilitychange", onVisibility);
 
     void import("@/lib/analytics/load-timing/report-load-timing")
         .then(({ reportLoadTiming }) => {
-            globalThis.removeEventListener("pagehide", onExit);
-            startReporter(reportLoadTiming, exit.happened);
+            stopWatching();
+            startReporter(reportLoadTiming, seen);
 
             return undefined;
         })
         // Only the import can reject here: `startReporter` handles the reporter's own failure. A chunk that fails to load
         // (offline, a deploy in between) only costs this page's timings.
-        .catch(() => {
-            globalThis.removeEventListener("pagehide", onExit);
-        });
+        .catch(stopWatching);
 };
 
 /** PostHog's `loaded` callback: applies the consent state that arrived before `posthog.init` finished. */

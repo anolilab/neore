@@ -267,7 +267,7 @@ describe("AnalyticsProvider", () => {
         render(<AnalyticsProvider>{null}</AnalyticsProvider>);
 
         await vi.waitFor(() => {
-            expect(reportLoadTiming).toHaveBeenCalledExactlyOnceWith({ exited: false });
+            expect(reportLoadTiming).toHaveBeenCalledExactlyOnceWith({ exited: false, hasBeenVisible: true });
         });
     });
 
@@ -287,10 +287,49 @@ describe("AnalyticsProvider", () => {
         arrive();
 
         await vi.waitFor(() => {
-            expect(reportLoadTiming).toHaveBeenCalledExactlyOnceWith({ exited: true });
+            expect(reportLoadTiming).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ exited: true }));
         });
 
         loadTimingChunk.arrived = Promise.resolve();
+    });
+
+    it("tells the reporter the page was shown when it was hidden while the chunk loaded", async () => {
+        reportLoadTiming.mockClear();
+        loadPostHog.mockReturnValue(new Promise(() => {}));
+
+        let arrive: () => void = () => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- not in this project's TypeScript lib (es2023)
+        loadTimingChunk.arrived = new Promise((resolve) => {
+            arrive = resolve;
+        });
+
+        render(<AnalyticsProvider>{null}</AnalyticsProvider>);
+        // A tab switch before the chunk arrived: in Safari and Firefox nothing else records that the page was shown.
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+        document.dispatchEvent(new Event("visibilitychange"));
+        arrive();
+
+        await vi.waitFor(() => {
+            expect(reportLoadTiming).toHaveBeenCalledExactlyOnceWith({ exited: false, firstHiddenAt: expect.any(Number), hasBeenVisible: true });
+        });
+
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+        loadTimingChunk.arrived = Promise.resolve();
+    });
+
+    it("does not tell the reporter a tab opened in the background was shown", async () => {
+        reportLoadTiming.mockClear();
+        loadPostHog.mockReturnValue(new Promise(() => {}));
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+
+        render(<AnalyticsProvider>{null}</AnalyticsProvider>);
+
+        await vi.waitFor(() => {
+            expect(reportLoadTiming).toHaveBeenCalledExactlyOnceWith({ exited: false, firstHiddenAt: 0, hasBeenVisible: false });
+        });
+
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
     });
 
     it("logs a load-timing reporter that fails to start instead of dropping the error", async () => {

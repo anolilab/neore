@@ -157,6 +157,15 @@ const entryNavigationType = (navigation: PerformanceNavigationTiming | undefined
 export interface ReportLoadTimingOptions {
     /** A `pagehide` came before this started (`providers/analytics-provider.tsx`): send now, the page is going away. */
     exited?: boolean;
+
+    /**
+     * When the provider first saw the page hidden (`performance.now()`); 0 when it was hidden at mount. Safari and Firefox
+     * keep no `visibility-state` entries, so this is what tells a returning tab's load marks from its reveal.
+     */
+    firstHiddenAt?: number;
+
+    /** The provider saw the page visible, at mount or since; a page never shown (a background tab) waits until it is. */
+    hasBeenVisible?: boolean;
 }
 
 /**
@@ -164,7 +173,7 @@ export interface ReportLoadTimingOptions {
  * has been visible. Started on a page that was shown and then hidden (or left) in the meantime, it sends at once; a page
  * that has never been visible (a tab opened in the background) waits until it has been.
  */
-export const reportLoadTiming = ({ exited = false }: ReportLoadTimingOptions = {}): void => {
+export const reportLoadTiming = ({ exited = false, firstHiddenAt: seenHiddenAt, hasBeenVisible: seenVisible = false }: ReportLoadTimingOptions = {}): void => {
     if (reporter.started) {
         return;
     }
@@ -173,9 +182,10 @@ export const reportLoadTiming = ({ exited = false }: ReportLoadTimingOptions = {
 
     const pathname = loadedPathname();
     const visibilityEntries = performance.getEntriesByType("visibility-state");
-    let hasBeenVisible = document.visibilityState === "visible" || visibilityEntries.some((entry) => entry.name === "visible");
-    let firstHiddenAt: number | undefined =
-        visibilityEntries.find((entry) => entry.name === "hidden")?.startTime ?? (document.visibilityState === "hidden" ? 0 : undefined);
+    // The provider's record first; the `visibility-state` entries (Chromium) and the current state add to it.
+    let hasBeenVisible = seenVisible || document.visibilityState === "visible" || visibilityEntries.some((entry) => entry.name === "visible");
+    const hiddenAtStart = document.visibilityState === "hidden" && !hasBeenVisible ? 0 : undefined;
+    let firstHiddenAt: number | undefined = seenHiddenAt ?? visibilityEntries.find((entry) => entry.name === "hidden")?.startTime ?? hiddenAtStart;
 
     const vitals: Partial<Record<VitalName, number>> = {};
     let navigationType: string | undefined;

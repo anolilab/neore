@@ -100,6 +100,53 @@ describe("reportLoadTiming", () => {
         expect(trackEvent).toHaveBeenCalledWith("page_load_timing", expect.objectContaining({ route_section: "root" }));
     });
 
+    it("sends at once in a browser without visibility-state entries when the provider saw the page shown, then hidden", async () => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+        entries.mark = [
+            { name: LOAD_MARKS.composerVisible, startTime: 800 },
+            { name: LOAD_MARKS.sidebarListVisible, startTime: 4000 },
+        ];
+
+        const { reportLoadTiming } = await loadReporter();
+
+        reportLoadTiming({ firstHiddenAt: 3000, hasBeenVisible: true });
+
+        expect(trackEvent).toHaveBeenCalledOnce();
+        // Painted before the tab switch counts; after it, frames held until the page was shown again.
+        expect(sentProperties()).toMatchObject({ composer_visible_ms: 800, sidebar_list_visible_ms: undefined });
+    });
+
+    it("keeps a returning tab's marks from before its first hide, without visibility-state entries", async () => {
+        // Shown at mount, hidden at 3000 while the chunk loaded, back in front when it arrived.
+        entries.mark = [
+            { name: LOAD_MARKS.composerVisible, startTime: 800 },
+            { name: LOAD_MARKS.sidebarListVisible, startTime: 4000 },
+        ];
+
+        const { reportLoadTiming } = await loadReporter();
+
+        reportLoadTiming({ firstHiddenAt: 3000, hasBeenVisible: true });
+        vi.spyOn(performance, "now").mockReturnValue(10_000);
+        setVisibility("hidden");
+
+        expect(sentProperties()).toMatchObject({ composer_visible_ms: 800, sidebar_list_visible_ms: undefined });
+    });
+
+    it("waits in a browser without visibility-state entries when the page was never shown", async () => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+
+        const { reportLoadTiming } = await loadReporter();
+
+        reportLoadTiming({ firstHiddenAt: 0, hasBeenVisible: false });
+
+        expect(trackEvent).not.toHaveBeenCalled();
+
+        setVisibility("visible");
+        setVisibility("hidden");
+
+        expect(trackEvent).toHaveBeenCalledOnce();
+    });
+
     it("waits for a tab opened in the background to be shown, then hidden, before it sends", async () => {
         Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
         entries["visibility-state"] = [{ name: "hidden", startTime: 0 }];
