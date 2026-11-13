@@ -1,4 +1,4 @@
-import { ChatError } from "./chat-api";
+import { ChatError, isClientMessageIdReused, isStartInProgress } from "./chat-api";
 
 /**
  * The composer after a send the server never accepted: the prompt goes back, ahead of anything typed since, so a
@@ -19,29 +19,36 @@ export const withoutUnsentRows = <T extends { id: string }>(rows: T[], ids: Read
 export type SendStage = "accepted" | "before-request" | "requested";
 
 /**
- * What a failed send does with its prompt. `give-back`: the server provably never took it (the failure came before the
- * request, or the gateway answered with a refusal), so it returns to the composer and its rows go. `possibly-sent`: the
- * request went out and no answer says whether the chat started (a timeout, a dropped connection, a body that would not
- * parse), so giving it back at once would invite a second copy; it is held and checked for (`possibly-sent.ts`).
- * `accepted`: the chat started; only the reply failed.
+ * What a failed send does with its prompt. `accepted`: the chat started; only the reply failed. `give-back`: anything
+ * else, whether or not the server took it. The prompt returns to the composer with its `clientMessageId` kept
+ * ({@link shouldKeepClientMessageId}), so sending it again is the same send: the server saves it once and answers a resend of
+ * a saved one with its ids (`duplicate: true`).
  */
-export const failedSendOutcome = (stage: SendStage, error: unknown): "accepted" | "give-back" | "possibly-sent" => {
-    if (stage === "requested") {
-        return error instanceof ChatError && error.isRefusal ? "give-back" : "possibly-sent";
+export const failedSendOutcome = (stage: SendStage): "accepted" | "give-back" => {
+    if (stage === "accepted") {
+        return "accepted";
     }
 
-    return stage === "accepted" ? "accepted" : "give-back";
+    return "give-back";
 };
 
-/** The end of the error for a send that may have reached the server; a found or given-back prompt clears it. */
-export const POSSIBLY_SENT_NOTICE = "The message may have been sent. It is being checked; if it did not arrive, it goes back to the message box.";
+/** Whether a prompt given back keeps its `clientMessageId` for a resend: not when the server said the id belongs to another request. */
+export const shouldKeepClientMessageId = (error: unknown): boolean => !isClientMessageIdReused(error);
 
-/** Shown when a possibly-sent prompt was not found on the server and is back in the composer. */
-export const UNSENT_GIVEN_BACK_MESSAGE = "The message may not have been sent. It is back in the message box; send it again if it does not show up.";
+/** Ends the message of a send that may have reached the server: its prompt is back, and sending it again is safe. */
+export const MAY_HAVE_BEEN_SENT_NOTICE = "It may have been sent: it is back in the message box, and sending it again will not send it twice.";
 
-/** The error shown for a failed send. One that may have reached the server says it is being checked. */
-export const failedSendMessage = (error: unknown, outcome: ReturnType<typeof failedSendOutcome>): string => {
+/** A send whose first try was still being saved when the wait ran out. */
+export const STILL_SENDING_MESSAGE = `The message is still being sent. ${MAY_HAVE_BEEN_SENT_NOTICE}`;
+
+/** The error shown for a failed send. One that may have reached the server says it is safe to send again. */
+export const failedSendMessage = (error: unknown, stage: SendStage): string => {
+    if (isStartInProgress(error)) {
+        return STILL_SENDING_MESSAGE;
+    }
+
     const message = error instanceof Error ? error.message : "Could not send.";
+    const isPossiblySent = stage === "requested" && !(error instanceof ChatError && error.isRefusal);
 
-    return outcome === "possibly-sent" ? `${message} ${POSSIBLY_SENT_NOTICE}` : message;
+    return isPossiblySent ? `${message} ${MAY_HAVE_BEEN_SENT_NOTICE}` : message;
 };

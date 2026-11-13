@@ -2,9 +2,10 @@ import type { LegendListRef } from "@legendapp/list/react-native";
 import { LegendList } from "@legendapp/list/react-native";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
+import { randomUUID } from "expo-crypto";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import type { ComponentRef } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Pressable, Share, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -14,13 +15,13 @@ import { secureGrantStore } from "@/auth/secure-store";
 import { ChatError, startChat } from "@/chat/chat-api";
 import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
 import { displayTextOf, shareTextOf } from "@/chat/message-parts";
-import { entriesFor, foundAction } from "@/chat/possibly-sent";
-import { possiblySent } from "@/chat/possibly-sent-store";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
+import type { HeldSend } from "@/chat/start-send";
+import { clientMessageIdFor, startWithRetries } from "@/chat/start-send";
 import { relayReply } from "@/chat/stream";
 import type { SendStage } from "@/chat/unsent-send";
-import { draftAfterUnsent, failedSendMessage, failedSendOutcome, POSSIBLY_SENT_NOTICE, UNSENT_GIVEN_BACK_MESSAGE, withoutUnsentRows } from "@/chat/unsent-send";
+import { draftAfterUnsent, failedSendMessage, failedSendOutcome, shouldKeepClientMessageId, withoutUnsentRows } from "@/chat/unsent-send";
 import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
 import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
@@ -63,15 +64,6 @@ const withoutShareFailure = (current: string | null): string | null => {
 /** A confirmation that ends clears the wait message; any other message on screen is not the confirmation's to clear. */
 const withoutAwaitReply = (current: string | null): string | null => {
     if (current === AWAIT_REPLY_MESSAGE) {
-        return null;
-    }
-
-    return current;
-};
-
-/** A possibly-sent prompt that was found or given back ends its notice; any other message on screen is not its to clear. */
-const withoutPossiblySent = (current: string | null): string | null => {
-    if (current?.endsWith(POSSIBLY_SENT_NOTICE)) {
         return null;
     }
 
@@ -164,9 +156,9 @@ const Chat = () => {
         threadIdRef.current = threadId;
     }, [threadId]);
     const [rows, setRows] = useState<Row[]>([]);
-    // Prompts that went out with no answer: shown after the rows while the server is checked for them (`possibly-sent.ts`).
-    const allHeld = useSyncExternalStore(possiblySent.subscribe, possiblySent.snapshot);
-    const held = useMemo(() => entriesFor(allHeld, accountId, threadId), [accountId, allHeld, threadId]);
+    // The prompt that went back to the composer with its `clientMessageId`: sending that prompt again reuses the id, so a
+    // send the server took on a try whose answer was lost is saved once (`start-send.ts`).
+    const heldSend = useRef<HeldSend | null>(null);
     // The rows as the last write left them. Every write goes through `writeRows`, so a read can decide against the rows on
     // screen when it lands, not against the rows of the render it was started in.
     const rowsRef = useRef<Row[]>([]);
@@ -428,73 +420,28 @@ const Chat = () => {
         }
     }, [confirmTick, hasToken, loadMessages, refreshTick, sending, status, threadId]);
 
-    // A prompt the checks did not find goes back into the composer, with a notice that it may not have been sent: at once
-    // when this chat's screen is open, or when it opens next.
-    useEffect(
-        () =>
-            possiblySent.watchUnsent(accountId, threadId, (prompts) => {
-                for (const prompt of prompts) {
-                    setDraft((current) => draftAfterUnsent(current, prompt));
-                }
-
-                setError(UNSENT_GIVEN_BACK_MESSAGE);
-            }),
-        [accountId, threadId],
-    );
-
-    // A prompt the checks found: a new chat on screen opens the chat that started (one left behind leaves it to the list,
-    // since `setParams` would change the route on screen), an existing one reads its messages again.
-    useEffect(
-        () =>
-            possiblySent.onFound((entry, foundThreadId) => {
-                const action = foundAction(entry, { accountId, isFocused: isFocusedRef.current, threadId: threadIdRef.current });
-
-                if (action === "ignore") {
-                    return;
-                }
-
-                setError(withoutPossiblySent);
-
-                if (action === "open") {
-                    setThreadId(foundThreadId);
-                    router.setParams({ threadId: foundThreadId });
-                } else if (action === "reload") {
-                    loadMessages(foundThreadId);
-                }
-            }),
-        [accountId, loadMessages, router],
-    );
-
-    // A send the server never accepted gives its prompt back and drops its local rows: no read will confirm them. One that
-    // may have reached it is held in `possiblySent`, which shows it here and checks the server for it until it is found or
-    // given back; its local rows go, so no read of the chat can drop it.
+    // A send the server did not accept, or whose answer was lost, gives its prompt back and drops its local rows: no read
+    // will confirm them. The prompt keeps its `clientMessageId`, so sending it again cannot save it twice; the server answers
+    // a resend of a saved one with its ids. Only an id the server says belongs to another request is dropped.
     const settleFailedSend = ({
+        clientMessageId,
         error: failure,
         ids,
         prompt,
-        sentAt,
-        session,
         stage,
     }: {
+        clientMessageId: string;
         error: unknown;
         ids: { assistant: string; user: string };
         prompt: string;
-        sentAt: number;
-        /** `possiblySent.session()` when the send started: a sign-out since then holds nothing. */
-        session: number;
         stage: SendStage;
     }) => {
-        const outcome = failedSendOutcome(stage, failure);
+        const outcome = failedSendOutcome(stage);
 
-        // Without an account to hold it for (not expected while sending), the prompt goes back rather than nowhere.
-        if (outcome === "give-back" || (outcome === "possibly-sent" && !accountId)) {
+        if (outcome === "give-back") {
             setDraft((current) => draftAfterUnsent(current, prompt));
             writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
-        } else if (outcome === "possibly-sent" && accountId) {
-            const knownMessageIds = new Set(rowsRef.current.filter((row) => row.status !== "local").map((row) => row.id));
-
-            writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
-            settleQuietly(possiblySent.track({ accountId, failedAt: Date.now(), id: ids.user, knownMessageIds, prompt, sentAt, threadId }, session));
+            heldSend.current = shouldKeepClientMessageId(failure) ? { clientMessageId, prompt } : null;
         }
 
         return outcome;
@@ -516,7 +463,10 @@ const Chat = () => {
         const controller = new AbortController();
         // The account that sends: the offer below is its, even if another account is signed in by the time it lands.
         const sender = accountId;
-        const session = possiblySent.session();
+        // One id per composed message: the held one when this is the prompt that went back, so the resend is the same send.
+        const clientMessageId = clientMessageIdFor(heldSend.current, prompt, randomUUID);
+
+        heldSend.current = null;
 
         sendAbort.current = controller;
         setSending(true);
@@ -548,15 +498,26 @@ const Chat = () => {
 
             getClient().setAuthToken(jwt);
 
-            // Nothing is held back for later: a send that finds the app offline is refused, not queued.
+            // Nothing is held back for later: a send that finds the app offline is refused, not queued. Online, the same send
+            // is tried again while its first try is still being saved, or when a try gets no answer (`startWithRetries`). A
+            // resend the server already took answers with that send's ids (`duplicate`), and opens that chat like any start.
             const started = await requireOnline({ isOffline: sendControl.disabled }, () => {
                 stage = "requested";
 
-                return startChat({
-                    body: { model: DEFAULT_CHAT_MODEL, prompt, threadId },
-                    fetch,
-                    gatewayUrl: config.gatewayUrl,
-                    jwt,
+                return startWithRetries({
+                    attempt: async () =>
+                        await startChat({
+                            body: { clientMessageId, model: DEFAULT_CHAT_MODEL, prompt, threadId },
+                            fetch,
+                            gatewayUrl: config.gatewayUrl,
+                            jwt,
+                        }),
+                    signal: controller.signal,
+                    sleep: async (ms) => {
+                        await new Promise((resolve) => {
+                            setTimeout(resolve, ms);
+                        });
+                    },
                 });
             });
 
@@ -630,11 +591,11 @@ const Chat = () => {
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
-            const outcome = settleFailedSend({ error: error_, ids: { assistant: assistantId, user: userId }, prompt, sentAt: stamp, session, stage });
+            settleFailedSend({ clientMessageId, error: error_, ids: { assistant: assistantId, user: userId }, prompt, stage });
 
             // The abort error of a send stopped on purpose is not shown: its notice is.
             if (!controller.signal.aborted) {
-                setError(failedSendMessage(error_, outcome));
+                setError(failedSendMessage(error_, stage));
             }
         } finally {
             setSending(false);
@@ -684,10 +645,7 @@ const Chat = () => {
 
     // The home indicator's inset, which the open keyboard already covers.
     const safeBottom = keyboardShown ? 0 : insets.bottom;
-    const shownRows = [
-        ...rows,
-        ...held.filter((entry) => entry.state === "pending").map((entry) => localRow(entry.id, "user", threadId ?? NEW_THREAD, entry.prompt)),
-    ];
+    const shownRows = rows;
     const syncedTimes = rows.filter((row) => row.status !== "local" && row.finished !== true).map((row) => row.syncedAt);
     const syncedAt = syncedTimes.length === 0 ? undefined : Math.max(...syncedTimes);
 

@@ -16,7 +16,7 @@
   statuses and cleared from the screen (`message-read.ts`). Every start signs the stored user in before the first
   token mint answers (`session-state.ts`, `isConfirming`: not offline yet, but every write control waits for the token like a
   connection being checked; the splash holds until the chat list has read its saved rows, at most 2 s,
-  `splash-gate.ts`). A send the server provably never took (failed before the request, or an answered 4xx) gives its prompt back; one that timed out, lost its answer or got a 5xx is held in memory per account (`possibly-sent.ts`, cleared at sign-out; a send settling after a sign-out holds nothing) and checked against the server (the chat's messages back to the send, or for a first message every page of the chat list): found, its chat opens or re-reads (a new-chat screen not on screen leaves it to the list); proven absent after 60 s (every read answered and covered its range; an error or a page cap proves nothing), it goes back to the composer with a notice. Giving it back at once invites a duplicate: `/chat/start` has no idempotency key. A mint still out when a sign-in or sign-out starts applies nothing (`createAuthEpoch`). A mint with no answer keeps them signed in without a JWT, which counts as offline; an answered "no session"
+  `splash-gate.ts`). A mint still out when a sign-in or sign-out starts applies nothing (`createAuthEpoch`). A mint with no answer keeps them signed in without a JWT, which counts as offline; an answered "no session"
   signs out and empties the cache. Live queries wait for a JWT.
   **Stamps and races:** a read stamps its rows with the moment it STARTED (`syncedAt`), and only the newest read of a
   screen may paint or save (`createMessageReadGate`), because messages carry no server version. A thread missing from
@@ -29,6 +29,15 @@
   Android Auto Backup never copies the cache directory, so no backup rule is needed (the secure-store plugin owns the
   app's backup rules). `PRAGMA user_version` (`SCHEMA_VERSION` in `cache.ts`) drops and recreates the tables on a
   mismatch: bump it with any `SCHEMA` change. The screens are keyed by the signed-in account.
+- **Sending a message** (`src/chat/start-send.ts`, `chat-api.ts`, `unsent-send.ts`):
+  - One `clientMessageId` per composed message, sent on `/v1/chat` and reused on every retry: the server saves it once.
+  - 409 `CHAT_START_IN_PROGRESS`: the first try is still saving. Wait and resend (past the server's 2-minute lease); not a failure.
+  - A try with no answer (timeout, dropped connection, 5xx) is resent a bounded number of times under the same id.
+  - 200 with `duplicate: true`: the first send's ids. Open that chat like any start.
+  - 422 `CLIENT_MESSAGE_ID_REUSED`: show it, never retry, drop the id.
+  - A send that still fails gives its prompt back with its id held; the same text sent again is the same send.
+  - Match codes lower-cased: the gateway passes `/chat/start`'s SCREAMING_CASE, the public API uses snake_case.
+  - Nothing is held and polled for: the resend is idempotent.
 - **Voice input paths** (`src/voice/`) — the cloud by default; "Transcribe on this device" (secure store, read on every
   press by `createDictationRouter`) switches to the phone's recognizer. There is NO fallback between them: an on-device
   press that cannot be served shows a message and records nothing, and a setting that cannot be read records nothing.
