@@ -236,3 +236,16 @@ describe("paste: review cases, sixth round", () => {
         expect(convert(`<p><math><semantics><mi>v</mi><annotation encoding="${encoding}">x^2</annotation></semantics></math></p>`)).toBe("$x^2$");
     });
 });
+
+describe("paste: review cases, seventh round", () => {
+    it.each([
+        ["a tab", "math\tother"],
+        ["a line break", "other\nmath"],
+    ])("reads a formula image whose classes are separated by %s", (_name, classes) => {
+        expect(convert(`<p><img class="${classes}" alt="x^2"></p>`)).toBe("$x^2$");
+    });
+
+    it("keeps a negative item number as text after a bullet, where a bare -1. would read as a bullet", () => {
+        expect(convert(`<ol><li value="-1">a</li><li>b</li></ol>`)).toBe("- -1. a\n0. b");
+    });
+});

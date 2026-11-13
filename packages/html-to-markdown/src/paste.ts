@@ -6,9 +6,10 @@
  * writes the rest as GitHub Flavored Markdown (it uses the `gfm` plugin) in the forms people type in a composer.
  */
 import { gfm } from "./gfm";
+import { declaredStyle } from "./inline-style";
+import { isWordMarker, listRules, unlessRemoved } from "./paste-lists";
 import type TurndownService from "./turndown";
-import type { FilterFunction, Options, Rule, RuleLookup } from "./types";
-import { parseListStart, trimNewlines } from "./utilities";
+import type { Options, Rule } from "./types";
 
 /**
  * The options the preset is written for. A line break is a plain newline, with no trailing spaces a composer would
@@ -48,6 +49,8 @@ const SKIPPED = new Set([
     "title",
     "video",
 ]);
+// The whitespace that separates the classes in a class attribute.
+const HTML_SPACE = /[\t\n\f\r ]+/;
 const HIDDEN_CLASS = /(?:^|\s)(?:sr-only|visually-?hidden)(?:\s|$)/i;
 const EMOJI_NAME = /^:[\w+-]{1,40}:$/;
 // A pictograph, or a flag: a pair of regional indicator letters, which holds no pictograph.
@@ -92,116 +95,20 @@ const CONTENT_VISIBILITY_VALUES = new Set(["auto", "hidden", "visible", ...GLOBA
 // `collapse` hides an element as `hidden` does, except in a table, where it also takes the row's or column's space.
 const HIDING_VISIBILITY = new Set(["collapse", "hidden"]);
 const OUTER_DISPLAY = new Set(["block", "inline", "run-in"]);
+// `lighter` is not here: it is relative, and under a heavy weight it is still bold.
+const NORMAL_WEIGHT = new Set(["100", "200", "300", "400", "normal"]);
 const INNER_DISPLAY = new Set(["flex", "flow", "flow-root", "grid", "ruby", "table"]);
-// How a character changes the depth of parentheses a style's reader is in.
-const DEPTH_CHANGE: Readonly<Record<string, number>> = { "(": 1, ")": -1 };
-const QUOTES = new Set(["'", `"`]);
 
 /**
- * The value an inline style gives a property, as CSS reads it: the last declaration wins, unless an earlier one is
- * `!important` and the later one is not. Lower case, without `!important`; empty when the style sets none.
+ * True when the page does not show the element: hidden by an attribute, a style or a screen-reader class, or no text.
+ * Word's list marker is left out too: the preset writes it as the item's marker.
  */
-export function declaredStyle(style: string, property: string, isValid: (value: string) => boolean = () => true): string {
-    let value = "";
-    let isImportant = false;
-
-    const parts = declarations(style);
-
-    for (const declaration of parts) {
-        const colon = declaration.indexOf(":");
-
-        if (colon === -1 || declaration.slice(0, colon).trim().toLowerCase() !== property) {
-            continue;
-        }
-
-        const raw = declaration.slice(colon + 1);
-        const { isImportant: isThisImportant, value: candidate } = priority(raw);
-
-        // A browser drops a declaration whose value it cannot read, so an invalid value overrides nothing.
-        if ((isThisImportant || !isImportant) && isValid(candidate)) {
-            value = candidate;
-            isImportant = isThisImportant;
-        }
-    }
-
-    return value;
-}
-
-/**
- * The declarations of an inline style, without its comments: split at each `;` that is not inside a quoted string or
- * parentheses, so a value such as `url('a;b')` or `"x; y"` stays whole.
- */
-function declarations(style: string): string[] {
-    const parts: string[] = [];
-    let current = "";
-    let depth = 0;
-    let index = 0;
-
-    while (index < style.length) {
-        const char = style.charAt(index);
-
-        if (QUOTES.has(char)) {
-            const end = afterQuoted(style, index);
-
-            current += style.slice(index, end);
-            index = end;
-            continue;
-        }
-
-        // A comment is no text to CSS (a value broken by one reads as if it were not there); an unclosed one runs to the
-        // end. Markers inside a quoted string are its text, so they were copied above.
-        if (style.startsWith("/*", index)) {
-            const close = style.indexOf("*/", index + 2);
-
-            index = close === -1 ? style.length : close + 2;
-            // A comment ends the word before it: `no/**/ne` is two words to CSS, not `none`.
-            current += " ";
-            continue;
-        }
-
-        depth = Math.max(0, depth + (DEPTH_CHANGE[char] ?? 0));
-
-        if (char === ";" && depth === 0) {
-            parts.push(current);
-            current = "";
-        } else {
-            current += char;
-        }
-
-        index += 1;
-    }
-
-    parts.push(current);
-
-    return parts;
-}
-
-/** The index after the quoted string that opens at `open`, skipping a backslash and the character after it. */
-function afterQuoted(style: string, open: number): number {
-    const quote = style.charAt(open);
-    let index = open + 1;
-
-    while (index < style.length) {
-        const char = style.charAt(index);
-
-        if (char === quote) {
-            return index + 1;
-        }
-
-        index += char === "\\" ? 2 : 1;
-    }
-
-    return style.length;
-}
-
-/** True when the page does not show the element: hidden by an attribute, a style or a screen-reader class, or no text. */
 export function isHiddenElement(node: Node): boolean {
-    if (node.nodeType !== 1) {
-        return false;
-    }
+    return node.nodeType === 1 && (isWordMarker(node as Element) || isHiddenOnPage(node as Element));
+}
 
-    const element = node as Element;
-
+/** True when the page does not show the element. */
+function isHiddenOnPage(element: Element): boolean {
     if (SKIPPED.has(element.localName) || element.hasAttribute("hidden") || isClosedContent(element)) {
         return true;
     }
@@ -254,25 +161,9 @@ function isDisplayCombination(keywords: ReadonlyArray<string>): boolean {
     return markers.length === 0 || inner.every((keyword) => keyword === "flow" || keyword === "flow-root");
 }
 
-/** A declaration's value and whether it is `!important`; any whitespace may come before and after the `!`. */
-function priority(raw: string): { isImportant: boolean; value: string } {
-    const trimmed = raw.trim();
-    const lower = trimmed.toLowerCase();
-
-    if (lower.endsWith("important")) {
-        const before = trimmed.slice(0, -"important".length).trimEnd();
-
-        if (before.endsWith("!")) {
-            return { isImportant: true, value: before.slice(0, -1).trim().toLowerCase() };
-        }
-    }
-
-    return { isImportant: false, value: lower };
-}
-
 /** True when one of the image's classes has `math` as a word of its own, as `math` or `mwe-math-fallback` does. */
 function isFormulaImage(image: Element): boolean {
-    return (image.getAttribute("class") ?? "").split(" ").some((name) => name.toLowerCase().split("-").includes("math"));
+    return (image.getAttribute("class") ?? "").split(HTML_SPACE).some((name) => name.toLowerCase().split("-").includes("math"));
 }
 
 /** True for a dialog that is not open, and for what a closed details holds besides its summary: the page shows neither. */
@@ -286,15 +177,29 @@ function isClosedContent(element: Element): boolean {
     return parent?.nodeName === "DETAILS" && !parent.hasAttribute("open") && element !== summaryOf(parent);
 }
 
+// Each details element's summary, found once: every child of a closed one asks for it.
+const summaries = new WeakMap<Element, Element | null>();
+
 /** A details element's summary: its first summary child, as the page shows it. */
 function summaryOf(details: Element): Element | null {
+    const cached = summaries.get(details);
+
+    if (cached !== undefined) {
+        return cached;
+    }
+
+    let summary: Element | null = null;
+
     for (let child = details.firstElementChild; child; child = child.nextElementSibling) {
         if (child.nodeName === "SUMMARY") {
-            return child;
+            summary = child;
+            break;
         }
     }
 
-    return null;
+    summaries.set(details, summary);
+
+    return summary;
 }
 
 /** Each closed details' summary text, kept until the details is written. */
@@ -345,11 +250,6 @@ function inlineMath(source: string): string {
     return `${fence}${pad}${tex}${pad}${fence}`;
 }
 
-/** A filter that matches only what no remove filter drops: the preset's rules are added, so they come before those. */
-function unlessRemoved(isMatch: (node: Element) => boolean): FilterFunction {
-    return (node, _options, lookup) => isMatch(node) && !lookup.isRemoved(node);
-}
-
 const pasteRules: Record<string, Rule> = {
     // A closed details shows its summary alone. Its other elements are hidden; its loose text is left out here.
     closedDetails: {
@@ -377,58 +277,22 @@ const pasteRules: Record<string, Rule> = {
         replacement: (_content, node) => imageText(node),
     },
 
-    // A list item written with the marker and one space, as people type it; its later lines are indented to its text.
-    listItem: {
-        filter: unlessRemoved((node) => node.nodeName === "LI"),
-        replacement(content, node, options, lookup) {
-            const parent = node.parentNode as Element | null;
-            const marker = parent?.nodeName === "OL" ? `${itemNumber(parent, node, lookup)}.` : options.bulletListMarker;
-
-            const prefix = `${marker} `;
-            const body = trimNewlines(content).replaceAll("\n", () => `\n${" ".repeat(prefix.length)}`);
-
-            return `${prefix}${body}${node.nextSibling ? "\n" : ""}`;
-        },
-    },
-
     // A formula with a TeX source is written as inline math. Without one, its visible text stays (its other annotations
     // are skipped).
     math: {
         filter: unlessRemoved((node) => node.nodeName.toUpperCase() === "MATH" && Boolean(texSource(node))),
         replacement: (_content, node) => inlineMath(texSource(node)),
     },
+
+    // Bold set back to normal weight is not bold: Google Docs wraps a whole copy in `<b style="font-weight:normal">`.
+    normalWeightBold: {
+        filter: unlessRemoved(
+            (node) =>
+                (node.nodeName === "B" || node.nodeName === "STRONG") && NORMAL_WEIGHT.has(declaredStyle(node.getAttribute("style") ?? "", "font-weight")),
+        ),
+        replacement: (content) => content,
+    },
 };
-
-// Each ordered list's item numbers, worked out once for the list, so a long list is numbered in one pass.
-const itemNumbers = new WeakMap<Element, Map<Element, bigint>>();
-
-/**
- * The number HTML gives the item: the list's `start`, or the item's own `value`, counting up from there. An item a remove
- * filter drops takes no number.
- */
-function itemNumber(list: Element, item: Element, lookup: RuleLookup): bigint {
-    let numbers = itemNumbers.get(list);
-
-    if (!numbers) {
-        numbers = new Map();
-
-        let next = parseListStart(list.getAttribute("start")) ?? 1n;
-
-        for (let child = list.firstElementChild; child; child = child.nextElementSibling) {
-            if (child.nodeName !== "LI" || lookup.isRemoved(child)) {
-                continue;
-            }
-
-            next = parseListStart(child.getAttribute("value")) ?? next;
-            numbers.set(child, next);
-            next += 1n;
-        }
-
-        itemNumbers.set(list, numbers);
-    }
-
-    return numbers.get(item) ?? 1n;
-}
 
 /** A media type without its parameters, in lower case: `application/x-tex; charset=utf-8` is `application/x-tex`. */
 function mediaType(value: string): string {
@@ -470,7 +334,9 @@ function texSource(node: Element): string {
 export function paste(service: TurndownService): void {
     service.remove(isHiddenElement);
 
-    for (const [key, rule] of Object.entries(pasteRules)) {
+    const rules = { ...pasteRules, ...listRules(isHiddenOnPage) };
+
+    for (const [key, rule] of Object.entries(rules)) {
         service.addRule(key, rule);
     }
 
