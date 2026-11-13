@@ -11,7 +11,6 @@
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
-import "./pdf-worker";
 
 import { useLingui } from "@lingui/react/macro";
 import { isFetchableUrl, useFetchableOrigins } from "@ui/hooks/use-fetchable-origins";
@@ -22,6 +21,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
 
 import { PDF_LOAD_TIMEOUT_MS } from "./pdf-limits";
+import { useSharedPdfOptions } from "./pdf-worker";
 
 export interface PdfViewerProps {
     className?: string;
@@ -42,6 +42,8 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, fill, url }) 
     // A URL the page may not fetch is refused before any request, as the thumbnail refuses it.
     const origins = useFetchableOrigins();
     const refused = !isFetchableUrl(url, origins);
+    // The shared pdf.js worker, taken after commit and only for a document that will load: it renders once it is there.
+    const pdfOptions = useSharedPdfOptions(loadState !== "failed" && !refused);
 
     const loadDeadlineRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -95,6 +97,29 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, fill, url }) 
 
     // Calculate page width: fit to container at scale 1
     const pageWidth = containerWidth ? (containerWidth - 32) * scale : undefined;
+
+    const loadingPreview = (
+        <div className="flex items-center justify-center py-12" role="status">
+            <ZoomIn aria-hidden="true" className="text-muted-foreground size-6 animate-pulse motion-reduce:animate-none" />
+            <span className="sr-only">{t`Loading preview…`}</span>
+        </div>
+    );
+    const documentOrLoading = pdfOptions ? (
+        <Document
+            file={url}
+            loading={loadingPreview}
+            onLoadError={onDocumentLoadError}
+            onLoadProgress={armLoadDeadline}
+            onLoadSuccess={onDocumentLoadSuccess}
+            options={pdfOptions}
+            // react-pdf 11 suspends by default; keep the inline `loading` UI instead.
+            suspense={false}
+        >
+            <Page pageNumber={pageNumber} renderAnnotationLayer renderTextLayer width={pageWidth} />
+        </Document>
+    ) : (
+        loadingPreview
+    );
 
     return (
         <div className={cn("my-2 w-full max-w-2xl overflow-hidden rounded-lg border", fill && "flex flex-col", className)}>
@@ -162,22 +187,7 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, fill, url }) 
                         {t`This preview could not be loaded.`}
                     </p>
                 ) : (
-                    <Document
-                        file={url}
-                        loading={
-                            <div className="flex items-center justify-center py-12" role="status">
-                                <ZoomIn aria-hidden="true" className="text-muted-foreground size-6 animate-pulse motion-reduce:animate-none" />
-                                <span className="sr-only">{t`Loading preview…`}</span>
-                            </div>
-                        }
-                        onLoadError={onDocumentLoadError}
-                        onLoadProgress={armLoadDeadline}
-                        onLoadSuccess={onDocumentLoadSuccess}
-                        // react-pdf 11 suspends by default; keep the inline `loading` UI instead.
-                        suspense={false}
-                    >
-                        <Page pageNumber={pageNumber} renderAnnotationLayer renderTextLayer width={pageWidth} />
-                    </Document>
+                    documentOrLoading
                 )}
             </div>
         </div>

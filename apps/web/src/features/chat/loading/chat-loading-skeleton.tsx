@@ -41,7 +41,7 @@ const ChatLoadingSkeleton: FC = () => {
                         </div>
                     </div>
                 </div>
-                <Sidebar className="left-16 [&>div]:flex-row" collapsible="offcanvas" name="left" variant="inset">
+                <Sidebar className="left-16 [--sidebar-offset:4rem] [&>div]:flex-row" collapsible="offcanvas" name="left" variant="inset">
                     <div className="relative z-10 flex w-(--sidebar-width) flex-col rounded-l-xl">
                         <SidebarHeader>
                             <div className="text-brand-black flex flex-col items-stretch gap-1.5 pl-2">
