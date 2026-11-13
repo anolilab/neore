@@ -15,6 +15,8 @@ import { Loader2 } from "lucide-react";
 import type { FC } from "react";
 
 interface DeleteConfirmationDialogProperties {
+    /** The confirm button's label, when the action is not plainly "Delete". */
+    confirmLabel?: string;
     description?: string;
     isDeleting?: boolean;
     itemName?: string;
@@ -25,6 +27,7 @@ interface DeleteConfirmationDialogProperties {
 }
 
 const DeleteConfirmationDialog: FC<DeleteConfirmationDialogProperties> = ({
+    confirmLabel,
     description,
     isDeleting = false,
     itemName,
@@ -65,7 +68,7 @@ const DeleteConfirmationDialog: FC<DeleteConfirmationDialogProperties> = ({
                                 {t`Deleting...`}
                             </div>
                         ) : (
-                            t`Delete`
+                            (confirmLabel ?? t`Delete`)
                         )}
                     </AlertDialogAction>
                 </AlertDialogFooter>

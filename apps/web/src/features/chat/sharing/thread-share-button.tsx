@@ -19,7 +19,12 @@ import React, { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
+import { useChatThread } from "@/features/chat/core/context/chat-context-hooks";
 import { getValidThreadId } from "@/features/chat/core/hooks/use-validated-thread";
+import { canHaveGuestLink } from "@/features/chat/guest-links/can-have-guest-link";
+import GuestLinkPanel from "@/features/chat/guest-links/guest-link-panel";
+import useGuestLinkRevoke from "@/features/chat/guest-links/use-guest-link-revoke";
+import useWorker from "@/features/sub-agents/hooks/use-worker";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 interface ThreadShareButtonProperties {
@@ -44,6 +49,8 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
     const [userToRemove, setUserToRemove] = useState<{ name: string; userId: Id<"users"> } | null>(null);
 
     const actualThreadId = getValidThreadId(threadId);
+    // The guest-link revoke and its confirm live here, beside the menu, so they outlast the menu's popup.
+    const { confirmDialog: guestRevokeDialog, revokeLink: revokeGuestLink } = useGuestLinkRevoke(actualThreadId);
     const canShare = !!actualThreadId;
 
     // Read with the unlock proof: an unlocked chat's owner is granted access, and the reads refresh on unlock or relock.
@@ -59,6 +66,15 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
     const { mutateAsync: revokeInviteMutation } = useMutation(crpc.chat.sharing.revokeThreadInvite.mutationOptions());
     const { mutateAsync: removeAccessMutation } = useMutation(crpc.chat.sharing.removeThreadAccess.mutationOptions());
     const { mutateAsync: toggleVisibilityMutation } = useMutation(crpc.chat.sharing.toggleThreadVisibility.mutationOptions());
+
+    const { thread } = useChatThread();
+    const { knownNotWorker } = useWorker(actualThreadId);
+    // No tab until the thread and its relationship are known (`canHaveGuestLink`). A locked chat's read says nothing of its
+    // relationship (`null`), so a locked worker's thread shows the tab; there Create is off and the backend refuses a link.
+    const showGuests =
+        threadAccess?.isOwner === true && canHaveGuestLink(thread as Parameters<typeof canHaveGuestLink>[0], knownNotWorker) && Boolean(actualThreadId);
+    // The Guests tab can go while it is open (the chat is archived, or turns out to be a worker's): fall back to the first tab.
+    const shownTab = tab === "guests" && !showGuests ? "access" : tab;
 
     const handleTabChange = useCallback((value: string) => setTab(value), []);
     const handleInviteEmailChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => setInviteEmail(event.target.value), []);
@@ -234,11 +250,12 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
                 }
             />
             <DropdownMenuContent className="w-[420px] p-0">
-                <Tabs className="w-full" onValueChange={handleTabChange} value={tab}>
-                    <TabsList className="grid w-full grid-cols-3">
+                <Tabs className="w-full" onValueChange={handleTabChange} value={shownTab}>
+                    <TabsList className={cn("grid w-full", showGuests ? "grid-cols-4" : "grid-cols-3")}>
                         <TabsTrigger value="access">{t`Access`}</TabsTrigger>
                         <TabsTrigger value="invites">{t`Invites`}</TabsTrigger>
                         <TabsTrigger value="public">{t`Public`}</TabsTrigger>
+                        {showGuests && <TabsTrigger value="guests">{t`Guests`}</TabsTrigger>}
                     </TabsList>
                     <TabsContent className="px-4 py-2" value="access">
                         {threadAccess.users.length === 0 ? (
@@ -376,6 +393,16 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
                             </Field.Root>
                         )}
                     </TabsContent>
+                    {showGuests && actualThreadId && (
+                        <TabsContent className="px-4 py-2" value="guests">
+                            <GuestLinkPanel
+                                key={actualThreadId}
+                                locked={thread?.lockedAt !== undefined && thread?.lockedAt !== null}
+                                revokeLink={revokeGuestLink}
+                                threadId={actualThreadId}
+                            />
+                        </TabsContent>
+                    )}
                 </Tabs>
             </DropdownMenuContent>
             <DeleteConfirmationDialog
@@ -397,6 +424,7 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
                 open={!!userToRemove}
                 title={t`Remove User`}
             />
+            {guestRevokeDialog}
         </DropdownMenu>
     );
 };
