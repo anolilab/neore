@@ -6,19 +6,25 @@
 import type { LunoraClient } from "@lunora/client";
 import { api } from "@neore/backend/api";
 import Constants from "expo-constants";
+import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
 import {
     AndroidImportance,
+    dismissAllNotificationsAsync,
     getExpoPushTokenAsync,
     getPermissionsAsync,
     requestPermissionsAsync,
     setNotificationChannelAsync,
     setNotificationHandler,
 } from "expo-notifications";
+import { getItemAsync, setItemAsync } from "expo-secure-store";
 import { Platform } from "react-native";
 
+import { sharedKeychainOps } from "../auth/secure-store";
+import { writeIfDifferent } from "../auth/shared-keychain";
+import { loadConfig } from "../lib/config";
 import { registerApprovalActions } from "./approval-actions";
 import type { PushPlatform, PushServer } from "./push-registration";
-import { createPendingWork, languageTag, onceItWorks } from "./push-registration";
+import { createPendingWork, createSerialSteps, languageTag, noteAccountOnPhone, onceItWorks } from "./push-registration";
 
 /** Registrations in flight; sign-out settles them before it releases the token. */
 export const pushRegistrations = createPendingWork();
@@ -107,6 +113,9 @@ export const backendPushServer = (client: LunoraClient): PushServer => {
     };
 };
 
+/** The backend's address, for the notification extension: it reads it from the shared keychain group to fetch a push's text. */
+const EXTENSION_LUNORA_URL_KEY = "neore.mobile.lunora-url";
+
 /**
  * Once per launch, once it worked: a notification that arrives while the app is open still shows as a banner, and
  * Android gets the channel its pushes show on (Android 8+ shows nothing on a channel that does not exist). A failed
@@ -123,6 +132,23 @@ export const configurePhoneNotifications = onceItWorks(async () => {
         await setNotificationChannelAsync(ANDROID_CHANNEL_ID, { importance: AndroidImportance.HIGH, name: channelName(deviceLocale()) });
     }
 });
+
+/**
+ * Gives the notification extension the backend's address on every setup, not only the first: a write that failed before
+ * is tried again. It never fails setup: the approval actions do not depend on it.
+ */
+export const syncExtensionAddress = async (): Promise<void> => {
+    if (Platform.OS !== "ios") {
+        return;
+    }
+
+    try {
+        await writeIfDifferent(EXTENSION_LUNORA_URL_KEY, loadConfig().lunoraUrl, sharedKeychainOps);
+    } catch (error) {
+        // eslint-disable-next-line no-console -- no logger in the app; a failed write must not be silent
+        console.warn("Could not give the notification extension the server address.", error);
+    }
+};
 
 /** The language the approval actions were last registered in, once they were: a change of language registers them again. */
 const approvalActionsState = { isRegistered: false, locale: undefined as string | undefined };
@@ -163,3 +189,24 @@ export const syncApprovalActions = async (): Promise<void> => {
         turn.done?.();
     }
 };
+
+/** Removes the alerts still on this phone. */
+export const dismissAccountNotifications = async (): Promise<void> => {
+    await dismissAllNotificationsAsync();
+};
+
+/** Records the account signed in on this phone; `onSwitch` removes the previous person's alerts first when it differs. */
+/** Every read and write of the record, one at a time, in the order they were asked for. */
+const recordSteps = createSerialSteps();
+
+export const noteSignedInAccount = async (userId: string, onSwitch: () => Promise<void>, isCurrent: () => boolean): Promise<void> =>
+    await noteAccountOnPhone(
+        userId,
+        {
+            digest: async (value) => await digestStringAsync(CryptoDigestAlgorithm.SHA256, value),
+            read: async (key) => await recordSteps(async () => await getItemAsync(key)),
+            write: async (key, value) => await recordSteps(async () => await setItemAsync(key, value)),
+        },
+        onSwitch,
+        isCurrent,
+    );

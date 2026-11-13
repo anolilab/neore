@@ -1,5 +1,6 @@
 import annotateNode from "./node";
 import type { AnnotatedNode, Options, ReplacementFunction, Rule, RuleLookup } from "./types";
+import { removeReplacement } from "./utilities";
 
 /** The answers given to nodes during one conversion. */
 interface Answers {
@@ -69,7 +70,7 @@ export default class Rules implements RuleLookup {
     remove(filter: Rule["filter"]): void {
         this.removeList.unshift({
             filter,
-            replacement: () => "",
+            replacement: removeReplacement,
         });
         this.answers.undecided = new WeakSet();
     }
@@ -87,12 +88,28 @@ export default class Rules implements RuleLookup {
      * decide whether to treat a node as transparent asks this first.
      */
     hasRuleFor(node: Node): boolean {
+        return this.ruleFor(node) !== undefined;
+    }
+
+    ruleFor(node: Node): Rule | undefined {
         // Only an element has a rule. A filter written for elements must not be handed a text node.
         if (node.nodeType !== 1) {
-            return false;
+            return undefined;
         }
 
-        return decideRule(this.answers, this.searchOrder, annotateNode(node, this.options), this.options, this) !== undefined;
+        // A node already answered is not annotated again: annotating reads the node's whole text, and a parent is
+        // asked about once per child, so annotating each time made a parent with many children quadratic.
+        const known = this.answers.decided.get(node);
+
+        if (known) {
+            return known;
+        }
+
+        if (this.answers.undecided.has(node)) {
+            return undefined;
+        }
+
+        return decideRule(this.answers, this.searchOrder, annotateNode(node, this.options), this.options, this);
     }
 
     forEach(visit: (rule: Rule, index: number) => void): void {

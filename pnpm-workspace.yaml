@@ -329,12 +329,14 @@ catalogs:
     "@streamdown/math": 1.0.3
     "@streamdown/mermaid": 1.0.3
     "@tanstack/highlight": 1.2.11
+    hast-util-to-jsx-runtime: 2.3.6
     rehype-parse: 9.0.1
     rehype-remark: 10.0.1
     remark-directive: ^4.0.0
     remark-gfm: 4.0.1
     remark-html: 16.0.1
     remark-parse: 11.0.0
+    remark-rehype: 11.1.2
     remark-stringify: 11.0.0
     streamdown: 2.7.1
     unified: 11.0.5
@@ -352,6 +354,9 @@ catalogs:
     "@onboardjs/posthog-plugin": 1.0.6
     "@onboardjs/react": 1.0.0-rc.5
   react:
+    # `apps/mobile`'s compiler check (`react-compiler.test.ts`) runs the compiler through this; Metro's
+    # own transform uses babel-preset-expo's copy. Kept on the 7.x line the compiler needs.
+    "@babel/core": 7.29.7
     babel-plugin-react-compiler: ^1.0.0
     react: 19.3.1
     react-compiler-runtime: ^1.0.0
@@ -482,6 +487,7 @@ catalogs:
     # (the pre-push hook). CI and `lint:types` stay on `typescript` above.
     tsrs: 0.23.0-ts7.1.0-beta
   types:
+    "@types/babel__core": 7.20.5
     "@types/chrome": 0.3.7
     "@types/json-schema": ^7.0.15
     "@types/node": 26.6.6
@@ -703,6 +709,8 @@ overrides:
   # a second rule for the 0.9 line never got a look in. An upper bound at the
   # patched version is what actually forces the re-resolve.
   "@xmldom/xmldom@<0.9.12": ">=0.9.12"
+  # GHSA on glob 10.5.0 (AbortSignal cancellation bypass). Pulled in by @bacons/apple-targets, which runs at prebuild only.
+  "glob@10.5.0": 11.1.0
   # plist 3.1.0 still needs @xmldom/xmldom 0.8 and calls its parser without a mime type,
   # so the 0.9.12 pin above broke electron-builder's Info.plist read on macOS. 3.1.1 moved
   # to the 0.9 line; this override sends the old range there, with the security pin intact.

@@ -3,9 +3,14 @@ import { StoredGrantNotClearedError } from "./stored-grant-error";
 /** How long sign-out waits for the server to drop this phone's push token before it carries on without it. */
 export const RELEASE_PUSH_TIMEOUT_MS = 5000;
 
+/** How long sign-out waits for the phone's alerts to be removed before it carries on without them. */
+export const ALERT_REMOVAL_TIMEOUT_MS = 5000;
+
 interface SignOutSteps {
     /** Empties the offline cache. */
     clearCache: () => Promise<void>;
+    /** Removes the alerts still on the phone. */
+    dismissNotifications?: () => Promise<void>;
     /** Forgets the chat saved to reopen on launch. */
     forgetLastChat: () => Promise<void>;
     /** Tells the server this phone stops getting the account's pushes. Signs in with the in-memory JWT. */
@@ -17,6 +22,37 @@ interface SignOutSteps {
     warn: (message: string, error: unknown) => void;
 }
 
+/** Removes the alerts of the account that leaves. A failure only warns: sign-out goes on, and the next sign-in sees the switch. */
+const removeAlerts = async (dismiss: (() => Promise<void>) | undefined, warn: (message: string, error: unknown) => void): Promise<void> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        await Promise.race([
+            dismiss?.(),
+            new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(() => reject(new Error("Timed out")), ALERT_REMOVAL_TIMEOUT_MS);
+            }),
+        ]);
+    } catch (error) {
+        warn("Could not remove this account's notifications.", error);
+    } finally {
+        clearTimeout(timer);
+    }
+};
+
+/** Revokes the stored session. Offline or refused, the session expires on its own, and nothing on the phone holds it. */
+const revokeStored = async (token: string | undefined, revokeSession: (token: string) => Promise<void>, warn: (message: string, error: unknown) => void): Promise<void> => {
+    if (token === undefined) {
+        return;
+    }
+
+    try {
+        await revokeSession(token);
+    } catch (error) {
+        warn("Could not revoke the session on the server.", error);
+    }
+};
+
 /**
  * Signing out takes the person's saved chats off the device FIRST, locally, before the server is asked anything: a
  * sign-out request that fails or hangs offline must not leave their chats behind for the next person to open.
@@ -25,7 +61,15 @@ interface SignOutSteps {
  * phone's push token is released while the in-memory sign-in still works, waited on for at most
  * {@link RELEASE_PUSH_TIMEOUT_MS}. Last the session is revoked server-side with the token taken above.
  */
-export const signOutOnDevice = async ({ clearCache, forgetLastChat, releasePush, revokeSession, takeCredential, warn }: SignOutSteps): Promise<void> => {
+export const signOutOnDevice = async ({
+    clearCache,
+    dismissNotifications,
+    forgetLastChat,
+    releasePush,
+    revokeSession,
+    takeCredential,
+    warn,
+}: SignOutSteps): Promise<void> => {
     try {
         await clearCache();
     } catch (error) {
@@ -50,6 +94,8 @@ export const signOutOnDevice = async ({ clearCache, forgetLastChat, releasePush,
         warn("Could not clear the stored sign-in.", error instanceof StoredGrantNotClearedError ? error.cause : error);
     }
 
+    await removeAlerts(dismissNotifications, warn);
+
     if (releasePush) {
         let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -67,14 +113,10 @@ export const signOutOnDevice = async ({ clearCache, forgetLastChat, releasePush,
         }
     }
 
-    if (token !== undefined) {
-        try {
-            await revokeSession(token);
-        } catch (error) {
-            // Offline or refused: the session expires on its own, and nothing on the phone holds it any more.
-            warn("Could not revoke the session on the server.", error);
-        }
-    }
+    await revokeStored(token, revokeSession, warn);
+
+    // Once more after the revoke, whether or not it landed: a push accepted before the revoke can still be on its way.
+    await removeAlerts(dismissNotifications, warn);
 };
 
 /**

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createAuthEpoch } from "./session-state";
-import { emptyCacheWhileSignedOut, RELEASE_PUSH_TIMEOUT_MS, runSignOut, signOutOnDevice } from "./sign-out";
+import { ALERT_REMOVAL_TIMEOUT_MS, emptyCacheWhileSignedOut, RELEASE_PUSH_TIMEOUT_MS, runSignOut, signOutOnDevice } from "./sign-out";
 import { StoredGrantNotClearedError } from "./stored-grant-error";
 
 describe("signOutOnDevice", () => {
@@ -309,5 +309,88 @@ describe(runSignOut, () => {
         epoch.open();
         expect(begunDuringTeardown?.()).toBe(true);
         expect(epoch.start()()).toBe(false);
+    });
+});
+
+describe("alerts of the account that leaves", () => {
+    it("removes them after the grant is taken, before the release and again after the revoke, and signs out anyway when that fails", async () => {
+        const calls: string[] = [];
+        const warn = vi.fn();
+
+        await signOutOnDevice({
+            clearCache: async () => {
+                calls.push("clear");
+            },
+            dismissNotifications: async () => {
+                calls.push("dismiss");
+
+                throw new Error("denied");
+            },
+            forgetLastChat: async () => {
+                calls.push("forget");
+            },
+            releasePush: async () => {
+                calls.push("release");
+            },
+            revokeSession: async () => {
+                calls.push("revoke");
+            },
+            takeCredential: async () => {
+                calls.push("take");
+
+                return "session-1";
+            },
+            warn,
+        });
+
+        expect(calls).toEqual(["clear", "forget", "take", "dismiss", "release", "revoke", "dismiss"]);
+        expect(warn).toHaveBeenCalledWith("Could not remove this account's notifications.", expect.any(Error));
+    });
+});
+
+describe("alerts after the revoke", () => {
+    it("are removed again when the revoke fails", async () => {
+        const dismissNotifications = vi.fn(async () => undefined);
+
+        await signOutOnDevice({
+            clearCache: async () => undefined,
+            dismissNotifications,
+            forgetLastChat: async () => undefined,
+            revokeSession: async () => {
+                throw new Error("offline");
+            },
+            takeCredential: async () => "session-1",
+            warn: vi.fn(),
+        });
+
+        expect(dismissNotifications).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe("alert removal that never finishes", () => {
+    it("does not hold sign-out: the release and the revoke still run", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const releasePush = vi.fn(async () => undefined);
+            const revokeSession = vi.fn(async () => undefined);
+            const signingOut = signOutOnDevice({
+                clearCache: async () => undefined,
+                dismissNotifications: async () => await new Promise<void>(() => {}),
+                forgetLastChat: async () => undefined,
+                releasePush,
+                revokeSession,
+                takeCredential: async () => "session-1",
+                warn: vi.fn(),
+            });
+
+            await vi.advanceTimersByTimeAsync(ALERT_REMOVAL_TIMEOUT_MS * 3);
+            await signingOut;
+
+            expect(releasePush).toHaveBeenCalledOnce();
+            expect(revokeSession).toHaveBeenCalledWith("session-1");
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

@@ -1,5 +1,20 @@
+import annotateNode from "./node";
 import type { AnnotatedNode, Options, Rule, RuleLookup } from "./types";
-import { escapeMarkdown, parseListStart, repeat, trimNewlines } from "./utilities";
+import {
+    codeText,
+    defaultBlankReplacement,
+    defaultElementReplacement,
+    edgeBreaks,
+    escapeMarkdown,
+    hasOnlyBreaks,
+    isBlock,
+    isVoid,
+    lineBreakMarker,
+    parseListStart,
+    removeReplacement,
+    repeat,
+    trimNewlines,
+} from "./utilities";
 
 const LINE_START = /^/gm;
 const NEWLINE = /\n/g;
@@ -12,11 +27,160 @@ const BACKTICK_EDGE = /^`|`$/;
 const LANGUAGE_CLASS = /language-(\S+)/;
 const LINE_BREAK_RUN = /\n\s*/g;
 const DOUBLE_QUOTE = /"/g;
+const WHITESPACE_EDGE = /^\s$/u;
+// A word character: anything but whitespace, punctuation and symbols. Emphasis that touches one is intraword, where
+// `_` cannot open or close (CommonMark's flanking rules), so a run that touches one uses `*`.
+const WORD_CHARACTER = /^[^\s\p{P}\p{S}]$/u;
+const EMPHASIS_NAMES = new Set(["em", "i"]);
+const STRONG_NAMES = new Set(["b", "strong"]);
+// Elements whose output starts or ends with a delimiter, so their edge is never a word character.
+const DELIMITED_NAMES = new Set(["a", "b", "code", "em", "i", "strong"]);
+const HEADING_NAMES = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
+// Each heading's break mark, or undefined for a heading without one. Filled by headingMarkOf.
+const headingMarks = new WeakMap<Node, string | undefined>();
+const TRAILING_SPACE = / $/;
+const LEADING_SPACE = /^ /;
+
+interface RunStyle {
+    /** The delimiter for a run that touches a word character. */
+    intraword: string;
+    /** The element names that share a run with this one. */
+    names: ReadonlySet<string>;
+    /** The delimiter for a run that stands alone in a word-free context. */
+    plain: string;
+}
 
 // The <code> each selected <pre> was matched with. The replacement reads it from here
 // rather than searching again: a rule that claims a wrapper after the match would make
 // the search find nothing, and the block would lose its code.
 const pinnedCode = new WeakMap<Node, Element>();
+
+// A backslash escapes the ASCII punctuation character after it, and at the end of
+// the destination it would escape the closing parenthesis. Such a backslash is
+// doubled. Any other backslash is literal, so it is left alone.
+const BACKSLASH_BEFORE_PUNCTUATION = /\\(?=[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]|$)/g;
+// The hard break is `options.br` followed by a line break. CommonMark reads a line that ends in
+// two or more spaces, or in an unescaped backslash, as a hard break. The marker may hold other
+// text before that ending, as in ` \`. An even run of backslashes is escaped pairs, not a break.
+const HARD_BREAK = / {2}$|(?:^|[^\\])(?:\\\\)*\\$/;
+const SPACES_ONLY = /^ *$/;
+const MARKER_NEWLINES = /[\r\n]+/g;
+const REGEXP_SPECIAL = /[.*+?^${}()|[\]\\]/g;
+
+function escapeRegExp(text: string): string {
+    return text.replaceAll(REGEXP_SPECIAL, String.raw`\$&`);
+}
+
+// The tag names of CommonMark's HTML block type 6. A tag with one of these names may interrupt a
+// paragraph. Any other tag (an inline one such as `<em>`) cannot, so it does not start a block.
+const HTML_BLOCK_TAGS = [
+    "address",
+    "article",
+    "aside",
+    "base",
+    "basefont",
+    "blockquote",
+    "body",
+    "caption",
+    "center",
+    "col",
+    "colgroup",
+    "dd",
+    "details",
+    "dialog",
+    "dir",
+    "div",
+    "dl",
+    "dt",
+    "fieldset",
+    "figcaption",
+    "figure",
+    "footer",
+    "form",
+    "frame",
+    "frameset",
+    "h[1-6]",
+    "head",
+    "header",
+    "hr",
+    "html",
+    "iframe",
+    "legend",
+    "li",
+    "link",
+    "main",
+    "menu",
+    "menuitem",
+    "nav",
+    "noframes",
+    "ol",
+    "optgroup",
+    "option",
+    "p",
+    "param",
+    "search",
+    "section",
+    "summary",
+    "table",
+    "tbody",
+    "td",
+    "tfoot",
+    "th",
+    "thead",
+    "title",
+    "tr",
+    "track",
+    "ul",
+].join("|");
+// The HTML blocks that can interrupt a paragraph (CommonMark types 1 to 6): comments, declarations,
+// processing instructions, the block tags above, and the raw-text tags `script`, `pre`, `style` and
+// `textarea`. Each needs a word end after its name, so `<divide>` is not a block.
+const HTML_BLOCK_START = new RegExp(String.raw`<(?:[!?]|/?(?:${HTML_BLOCK_TAGS})(?=[\t\n\r />]|$)|(?:script|pre|style|textarea)(?=[\t\n\r >]|$))`, "iy");
+// The line starts that CommonMark lets interrupt a paragraph: a quote, an ATX heading, a
+// fence, a bullet followed by a space, a setext underline, a thematic break, an ordered
+// item that starts at 1, and an HTML block. Only `1` can start an ordered item that
+// interrupts a paragraph. Sticky, so each one tests at a single index and copies nothing.
+const BLOCK_OPENERS: ReadonlyArray<RegExp> = [
+    />/y,
+    /#{1,6}(?=[ \t\n]|$)/y,
+    /`{3}|~{3}/y,
+    /[*+-](?=[ \t\n]|$)/y,
+    /-+(?=[ \t]*(?:\n|$))/y,
+    /=+(?=[ \t]*(?:\n|$))/y,
+    // A thematic break is three or more markers and nothing else on the line. Text that starts with
+    // three markers, such as emphasis around a word, is not one.
+    /([*_-])(?:[ \t]*\1){2}[ \t]*(?=\n|$)/y,
+    /1[.)](?=[ \t\n]|$)/y,
+    HTML_BLOCK_START,
+];
+
+/** The next numbered id after `count` references, skipping any number that a label already names. */
+function nextReferenceId(count: number, labels: ReadonlyMap<string, string>): number {
+    let id = count + 1;
+
+    while (labels.has(String(id))) {
+        id += 1;
+    }
+
+    return id;
+}
+
+// The whitespace CommonMark collapses in a label: spaces, tabs and line endings. A non-breaking space is part of it.
+const WHITESPACE_RUN = /[ \t\r\n]+/g;
+const EDGE_SPACE = /^ | $/g;
+
+/**
+ * A reference label as CommonMark matches it: leading and trailing whitespace dropped, each run of
+ * whitespace read as one space, and case folded. Lowercasing and then uppercasing folds case as the
+ * reference parsers do, so `ß` and `SS` are one label.
+ */
+function normalizeLabel(text: string): string {
+    return text.replaceAll(WHITESPACE_RUN, " ").replaceAll(EDGE_SPACE, "").toLowerCase().toUpperCase();
+}
+
+function hasHref(node: Node): boolean {
+    return node.nodeName === "A" && Boolean((node as Element).getAttribute("href"));
+}
 
 /**
  * Reference-style links collect their definitions here and append them after
@@ -24,21 +188,32 @@ const pinnedCode = new WeakMap<Node, Element>();
  * upstream; the rule is shared by every converter in the process.
  */
 function isReferencedLink(node: AnnotatedNode, options: Options): boolean {
-    return options.linkStyle === "referenced" && node.nodeName === "A" && Boolean(node.getAttribute("href"));
+    return options.linkStyle === "referenced" && hasHref(node);
 }
 
 class ReferenceLinkRule implements Rule {
     references: string[] = [];
 
+    /**
+     * The destination (with its title) that each label names, so a second link with the same label
+     * and another destination is not sent to the first. Keys are labels as CommonMark matches them.
+     */
+    labels = new Map<string, string>();
+
     filter = isReferencedLink;
 
-    replacement(content: string, node: AnnotatedNode, options: Options): string {
+    replacement(rawContent: string, node: AnnotatedNode, options: Options, lookup: RuleLookup): string {
         const rawHref = node.getAttribute("href") ?? "";
 
         if (options.safeLinks && isUnsafeDestination(rawHref)) {
-            return content;
+            return rawContent;
         }
 
+        // The reference definition is written after the document, out of the heading's reach, so a heading's break
+        // marks are turned into spaces here; otherwise the label in the heading and the definition would differ.
+        const mark = breakMarkFor(node, lookup);
+        const { lead, text: markedText, trail } = headingLinkParts(rawContent, mark);
+        const text = linkText(mark === undefined ? markedText : joinAtMarks(markedText, mark), options.br);
         const href = escapeLinkDestination(rawHref, options.safeLinks);
         let title = cleanAttribute(node.getAttribute("title"));
 
@@ -46,31 +221,26 @@ class ReferenceLinkRule implements Rule {
             title = ` "${escapeLinkTitle(title)}"`;
         }
 
-        let replacement: string;
-        let reference: string;
+        const definition = `${href}${title}`;
+        const isInline = options.linkReferenceStyle === "collapsed" || options.linkReferenceStyle === "shortcut";
+        const label = normalizeLabel(text);
+        const owner = isInline ? this.labels.get(label) : undefined;
 
-        switch (options.linkReferenceStyle) {
-            case "collapsed": {
-                replacement = `[${content}][]`;
-                reference = `[${content}]: ${href}${title}`;
-                break;
-            }
-            case "shortcut": {
-                replacement = `[${content}]`;
-                reference = `[${content}]: ${href}${title}`;
-                break;
-            }
-            default: {
-                const id = this.references.length + 1;
+        // A label that another link names with a different destination cannot name this one, so it
+        // takes a numbered id. The same destination under the same label is one definition either way.
+        if (isInline && (owner === undefined || owner === definition)) {
+            this.labels.set(label, definition);
+            this.references.push(`[${text}]: ${definition}`);
 
-                replacement = `[${content}][${id}]`;
-                reference = `[${id}]: ${href}${title}`;
-            }
+            return lead + (options.linkReferenceStyle === "collapsed" ? `[${text}][]` : `[${text}]`) + trail;
         }
 
-        this.references.push(reference);
+        const id = nextReferenceId(this.references.length, this.labels);
 
-        return replacement;
+        this.labels.set(String(id), definition);
+        this.references.push(`[${id}]: ${definition}`);
+
+        return `${lead}[${text}][${id}]${trail}`;
     }
 
     append(): string {
@@ -79,6 +249,7 @@ class ReferenceLinkRule implements Rule {
         if (this.references.length > 0) {
             references = `\n\n${this.references.join("\n")}\n\n`;
             this.references = []; // Reset references
+            this.labels = new Map(); // and the labels they name
         }
 
         return references;
@@ -126,12 +297,8 @@ const rules: Record<string, Rule> = {
     emphasis: {
         filter: ["em", "i"],
 
-        replacement(content, _node, options) {
-            if (!content.trim()) {
-                return "";
-            }
-
-            return options.emDelimiter + content + options.emDelimiter;
+        replacement(content, node, options, lookup) {
+            return wrapRun(content, node, options, { intraword: "*", names: EMPHASIS_NAMES, plain: options.emDelimiter }, lookup);
         },
     },
 
@@ -144,7 +311,7 @@ const rules: Record<string, Rule> = {
             const codeElement = pinnedCode.get(node) ?? preCodeElement(node, lookup);
             const className = codeElement?.getAttribute("class") ?? "";
             const language = (LANGUAGE_CLASS.exec(className) ?? [null, ""])[1];
-            const code = codeElement?.textContent ?? "";
+            const code = codeElement ? codeText(codeElement) : "";
 
             const fenceChar = options.fence.charAt(0);
             let fenceSize = 3;
@@ -169,16 +336,17 @@ const rules: Record<string, Rule> = {
     heading: {
         filter: ["h1", "h2", "h3", "h4", "h5", "h6"],
 
-        replacement(content, node, options) {
+        replacement(content, node, options, lookup) {
             const hLevel = Number(node.nodeName.charAt(1));
+            const text = headingText(content, node, lookup);
 
             if (options.headingStyle === "setext" && hLevel < 3) {
-                const underline = repeat(hLevel === 1 ? "=" : "-", content.length);
+                const underline = repeat(hLevel === 1 ? "=" : "-", text.length);
 
-                return `\n\n${content}\n${underline}\n\n`;
+                return `\n\n${text}\n${underline}\n\n`;
             }
 
-            return `\n\n${repeat("#", hLevel)} ${content}\n\n`;
+            return `\n\n${repeat("#", hLevel)} ${text}\n\n`;
         },
     },
 
@@ -209,7 +377,8 @@ const rules: Record<string, Rule> = {
         },
 
         replacement(_content, node, _options, lookup) {
-            const code = (pinnedCode.get(node) ?? preCodeElement(node, lookup))?.textContent ?? "";
+            const codeElement = pinnedCode.get(node) ?? preCodeElement(node, lookup);
+            const code = codeElement ? codeText(codeElement) : "";
 
             return `\n\n    ${code.replaceAll(NEWLINE, "\n    ")}\n\n`;
         },
@@ -217,10 +386,10 @@ const rules: Record<string, Rule> = {
 
     inlineLink: {
         filter(node, options) {
-            return options.linkStyle === "inlined" && node.nodeName === "A" && Boolean(node.getAttribute("href"));
+            return options.linkStyle === "inlined" && hasHref(node);
         },
 
-        replacement(content, node, options) {
+        replacement(content, node, options, lookup) {
             const rawHref = node.getAttribute("href") ?? "";
 
             if (options.safeLinks && isUnsafeDestination(rawHref)) {
@@ -230,16 +399,17 @@ const rules: Record<string, Rule> = {
             const href = escapeLinkDestination(rawHref, options.safeLinks);
             const title = escapeLinkTitle(cleanAttribute(node.getAttribute("title")));
             const titlePart = title ? ` "${title}"` : "";
+            const { lead, text, trail } = headingLinkParts(content, breakMarkFor(node, lookup));
 
-            return `[${content}](${href}${titlePart})`;
+            return `${lead}[${linkText(text, options.br)}](${href}${titlePart})${trail}`;
         },
     },
 
     lineBreak: {
         filter: "br",
 
-        replacement(_content, _node, options) {
-            return `${options.br}\n`;
+        replacement(_content, node, options, lookup) {
+            return breakMarkFor(node, lookup) ?? lineBreakMarker(options.br);
         },
     },
 
@@ -302,12 +472,8 @@ const rules: Record<string, Rule> = {
     strong: {
         filter: ["strong", "b"],
 
-        replacement(content, _node, options) {
-            if (!content.trim()) {
-                return "";
-            }
-
-            return options.strongDelimiter + content + options.strongDelimiter;
+        replacement(content, node, options, lookup) {
+            return wrapRun(content, node, options, { intraword: "**", names: STRONG_NAMES, plain: options.strongDelimiter }, lookup);
         },
     },
 };
@@ -470,6 +636,670 @@ function soleCodeElement(parent: Node, lookup: RuleLookup): Element | null {
     return WRAPPER_ELEMENTS.has(only.nodeName) && !lookup.hasRuleFor(only) ? soleCodeElement(only, lookup) : null;
 }
 
+type Side = "left" | "right";
+
+interface EmphasisRun {
+    /** Emphasis elements next to this one, with no text, space or break between them. */
+    count: number;
+    /** True when the output past them touches a word character. */
+    wordEdge: boolean;
+}
+
+/**
+ * Wraps an emphasis or strong element. Adjacent elements of the same kind form one
+ * run: only the first opens it and only the last closes it, so `<i>1</i><em>2</em>`
+ * gives `_12_`. A run that touches a word character uses `*` (or `**`), because `_`
+ * cannot open or close inside a word.
+ */
+function wrapRun(content: string, node: AnnotatedNode, options: Options, style: RunStyle, lookup: RuleLookup): string {
+    // A same-kind parent writes the delimiters for the whole run, so a nested element writes none. That holds only
+    // when the built-in rule renders the parent: a custom rule writes its own output and no delimiters.
+    // A parent with a block (even a blank one, which prints a break) never shares its delimiters, so the nested element keeps its own.
+    if (hasSharingParent(node.parentNode, style, options, lookup)) {
+        return wrapInline(content, options, "", "", breakMarkFor(node, lookup));
+    }
+
+    const before = emphasisRun(node, "left", style.names, options, lookup);
+    const after = emphasisRun(node, "right", style.names, options, lookup);
+    // An empty delimiter asks for no markup, so a word edge must not bring the asterisk back.
+    const delimiter = style.plain !== "" && (before.wordEdge || after.wordEdge) ? style.intraword : style.plain;
+    const breakMark = breakMarkFor(node, lookup);
+
+    return wrapInline(content, options, before.count === 0 ? delimiter : "", after.count === 0 ? delimiter : "", breakMark);
+}
+
+/**
+ * Wraps content in an opening and a closing delimiter (either may be empty). The
+ * line breaks at its ends go outside the delimiters, where a break is valid.
+ */
+function wrapInline(content: string, options: Options, open: string, close: string, breakMark?: string): string {
+    const { core, lead, trail } = splitBreaks(content, lineBreakMarker(options.br), breakMark);
+
+    if (!core.trim()) {
+        return lead + trail;
+    }
+
+    return lead + open + core + close + trail;
+}
+
+/**
+ * Splits the line break markers off both ends of content. `breakMark` is a heading's break mark (see
+ * headingBreakMark), which splits off the same way, so a break inside emphasis stays outside its delimiters.
+ */
+function splitBreaks(content: string, marker: string, breakMark?: string): { core: string; lead: string; trail: string } {
+    const tokens = breakMark === undefined ? [marker] : [marker, breakMark];
+    let start = 0;
+    let length = tokenStartingAt(content, tokens, start);
+
+    while (length > 0) {
+        start += length;
+        length = tokenStartingAt(content, tokens, start);
+    }
+
+    let end = content.length;
+
+    length = tokenEndingAt(content, tokens, end, start);
+
+    while (length > 0) {
+        end -= length;
+        length = tokenEndingAt(content, tokens, end, start);
+    }
+
+    return { core: content.slice(start, end), lead: content.slice(0, start), trail: content.slice(end) };
+}
+
+/** The length of the first token that starts at `position`, or 0. */
+function tokenStartingAt(content: string, tokens: ReadonlyArray<string>, position: number): number {
+    return tokens.find((token) => content.startsWith(token, position))?.length ?? 0;
+}
+
+/** The length of the first token that ends at `end` without reaching before `start`, or 0. */
+function tokenEndingAt(content: string, tokens: ReadonlyArray<string>, end: number, start: number): number {
+    return tokens.find((token) => end - token.length >= start && content.startsWith(token, end - token.length))?.length ?? 0;
+}
+
+/** Each member's walk to one side, per side, so a run is walked once rather than once from every member. */
+const leftRuns = new WeakMap<Node, EmphasisRun>();
+const rightRuns = new WeakMap<Node, EmphasisRun>();
+
+/**
+ * Walks from an emphasis element to one side, over the emphasis elements that
+ * are output directly beside it. The walk stops at whitespace, at a line break,
+ * and at the first node that outputs something else.
+ */
+function emphasisRun(node: AnnotatedNode, side: Side, names: ReadonlySet<string>, options: Options, lookup: RuleLookup): EmphasisRun {
+    const known = side === "left" ? leftRuns : rightRuns;
+    const chain: AnnotatedNode[] = [];
+    let current = node;
+    let run = known.get(current);
+
+    while (!run) {
+        const step = scanRun(current, side, names, options, lookup);
+
+        if ("run" in step) {
+            run = step.run;
+            known.set(current, run);
+        } else {
+            chain.push(current);
+            current = step.member;
+            run = known.get(current);
+        }
+    }
+
+    // Each node in the chain has one more member after it than the node that follows it.
+    for (let index = chain.length - 1; index >= 0; index -= 1) {
+        run = { count: run.count + 1, wordEdge: run.wordEdge };
+        known.set(chain[index] as AnnotatedNode, run);
+    }
+
+    return run;
+}
+
+/**
+ * One step of an emphasis walk: either the next member, whose own walk continues the run,
+ * or the end of the run. A member's answer depends only on that member, so `emphasisRun`
+ * can store it.
+ */
+function scanRun(
+    node: AnnotatedNode,
+    side: Side,
+    names: ReadonlySet<string>,
+    options: Options,
+    lookup: RuleLookup,
+): { member: AnnotatedNode } | { run: EmphasisRun } {
+    const gap = separation(node, side);
+    let sibling = neighbourThroughWrappers(node, side, options, lookup);
+    // An element merges only if it would be a run member itself: the walk from its neighbour applies the same test,
+    // so the two walks agree. That also keeps out an element with a block inside, which would end the delimiter.
+    const canMerge = isRunMember(node, names, options, lookup);
+
+    while (sibling && gap !== Infinity) {
+        if (canMerge && isRunMember(sibling, names, options, lookup)) {
+            const member = annotationOf(sibling, options);
+
+            // Two emphasis elements join across at most one break; two breaks would be a blank line. When a single
+            // break is itself written as a blank line (a `br` with a newline), they cannot join across any break.
+            if (gap + separation(member, opposite(side)) > maxJoinBreaks(options)) {
+                break;
+            }
+
+            return { member };
+        }
+
+        const inner = wrapperEntry(sibling, side, options, lookup);
+
+        // A wrapper that prints its content as is is invisible to the run: the walk steps into it.
+        if (inner) {
+            sibling = inner;
+            continue;
+        }
+
+        const edgeRun = siblingEdgeRun(sibling, side, options, lookup);
+
+        // A sibling that prints nothing (a comment, an empty span) is stepped over in both directions, so the two
+        // members' walks agree about the run. A printing sibling ends the run; after a break it cannot touch a word.
+        if (edgeRun) {
+            return { run: gap > 0 ? { count: 0, wordEdge: false } : edgeRun };
+        }
+
+        sibling = neighbourThroughWrappers(sibling, side, options, lookup);
+    }
+
+    return { run: { count: 0, wordEdge: false } };
+}
+
+/** How many hard breaks two emphasis elements may share delimiters across: none when a break writes a blank line. */
+function maxJoinBreaks(options: Options): number {
+    return lineBreakMarker(options.br).includes("\n\n") ? 0 : 1;
+}
+
+/**
+ * The run end that a printing sibling gives, or null when the sibling prints nothing. A custom rule writes its
+ * own output, so the DOM says nothing about its edge; the run then takes the asterisk, valid against any edge.
+ */
+function siblingEdgeRun(sibling: Node, side: Side, options: Options, lookup: RuleLookup): EmphasisRun | null {
+    // A caller's blankReplacement may print anything for a blank element, so the edge is unknown: take the asterisk.
+    if (options.blankReplacement !== defaultBlankReplacement && sibling.nodeType === 1 && annotationOf(sibling, options).isBlank) {
+        return { count: 0, wordEdge: true };
+    }
+
+    const rule = lookup.ruleFor(sibling);
+
+    // A removed element writes only its flanking whitespace, which ends the run like a space.
+    if (rule?.replacement === removeReplacement) {
+        // Whitespace on either side ends the run, so the walks from both members reach the same answer about it.
+        const text = sibling.textContent ?? "";
+
+        return WHITESPACE_EDGE.test(text.slice(0, 1)) || WHITESPACE_EDGE.test(text.slice(-1)) ? { count: 0, wordEdge: false } : null;
+    }
+
+    if (isCustomRendered(sibling, lookup, options)) {
+        return { count: 0, wordEdge: true };
+    }
+
+    const edge = edgeCharacter(sibling, side, options, lookup);
+
+    return edge === null ? null : { count: 0, wordEdge: WORD_CHARACTER.test(edge) };
+}
+
+/**
+ * The line breaks between a node and its neighbour on one side, or infinity when
+ * whitespace lies there, which keeps the two apart whatever comes next.
+ */
+function separation(node: AnnotatedNode, side: Side): number {
+    return flankOf(node, side) === "" ? edgeBreaks(node, side) : Infinity;
+}
+
+const BUILTIN_RULES = new Set<Rule>(Object.values(rules));
+
+/** True when a rule that is not one of the built-in rules renders the node, so its output is not known from the DOM. */
+function isCustomRendered(node: Node, lookup: RuleLookup, options: Options): boolean {
+    const rule = lookup.ruleFor(node);
+
+    // A blank element goes through the blank rule whatever its filter says, so its output is known from the DOM.
+    return rule !== undefined && !BUILTIN_RULES.has(rule) && !annotationOf(node, options).isBlank;
+}
+
+/** The built-in rule that renders a run's elements. Only its output writes the run's delimiters. */
+function builtinRunRule(names: ReadonlySet<string>): Rule | undefined {
+    return names === EMPHASIS_NAMES ? rules.emphasis : rules.strong;
+}
+
+/**
+ * True for an element of the same kind that can share a run with this one. It must be rendered by the
+ * built-in rule, so the run's delimiters are its own, and it must print something: an element with
+ * nothing to print (an image with no source, a word-break hint) would write no delimiter while its
+ * neighbour left its own out.
+ */
+function isRunMember(node: Node, names: ReadonlySet<string>, options: Options, lookup: RuleLookup): boolean {
+    if (node.nodeType !== 1 || !names.has(node.nodeName.toLowerCase())) {
+        return false;
+    }
+
+    if (lookup.ruleFor(node) !== builtinRunRule(names) || annotationOf(node, options).isBlank) {
+        return false;
+    }
+
+    return !hasOnlyBreaks(node) && !hasBlockDescendant(node) && childEdge(node as Element, "left", options, lookup) !== null;
+}
+
+/**
+ * True when a same-kind parent that the built-in rule renders writes the delimiters for the whole run, so
+ * a nested element writes none. A parent with a block (even a blank one, which prints a break) never shares
+ * its delimiters, and a parent that a custom rule renders writes no delimiters of its own.
+ */
+function hasSharingParent(parent: Node | null, style: RunStyle, options: Options, lookup: RuleLookup): boolean {
+    if (!parent || !style.names.has(parent.nodeName.toLowerCase())) {
+        return false;
+    }
+
+    return lookup.ruleFor(parent) === builtinRunRule(style.names) && !hasPrintingBlockDescendant(parent, options);
+}
+
+const annotations = new WeakMap<Node, AnnotatedNode>();
+
+/**
+ * The annotation of a node, computed once. A run walks the same siblings from each of its
+ * members, and annotating a node reads its text, so an uncached walk is quadratic.
+ */
+function annotationOf(node: Node, options: Options): AnnotatedNode {
+    let annotated = annotations.get(node);
+
+    if (!annotated) {
+        annotated = annotateNode(node, options);
+        annotations.set(node, annotated);
+    }
+
+    return annotated;
+}
+
+/**
+ * The text of a heading. A heading is one line, so a hard break in it becomes a space. Its breaks are written as
+ * a mark (see headingBreakMark) rather than the break marker, so neither block separators nor text that looks
+ * like a marker (a code line ending in two spaces) is taken for a break.
+ */
+function headingText(content: string, node: AnnotatedNode, lookup: RuleLookup): string {
+    const mark = headingMarkOf(node, lookup);
+
+    // The block's own separators at either end are not heading text, so the underline is not sized to them.
+    // A custom break rule writes no mark, so a heading whose content holds none is written as is.
+    return mark === undefined || !content.includes(mark) ? content : trimNewlines(joinAtMarks(content, mark).trim());
+}
+
+/**
+ * The break mark of a heading that the built-in heading rule renders and that holds a break, otherwise
+ * undefined. A custom heading rule never sees a mark: only the built-in rule turns it back into a space.
+ */
+function headingMarkOf(heading: Node, lookup: RuleLookup): string | undefined {
+    // Each break asks for its heading's mark. The mark serialises and scans the whole heading, so it is computed once.
+    if (headingMarks.has(heading)) {
+        return headingMarks.get(heading);
+    }
+
+    // Truthiness, not `!== null`: domino returns undefined when nothing matches.
+    const isMarked = lookup.ruleFor(heading) === rules.heading && Boolean((heading as Element).querySelector("br"));
+    const mark = isMarked ? headingBreakMark(heading) : undefined;
+
+    headingMarks.set(heading, mark);
+
+    return mark;
+}
+
+/**
+ * The break mark for a break in the node's heading, or undefined when the break is not in a marked heading.
+ * Uses the heading's cached mark, so each break does not serialise the whole heading again.
+ */
+function breakMarkFor(node: Node, lookup: RuleLookup): string | undefined {
+    for (let ancestor = node.parentNode; ancestor; ancestor = ancestor.parentNode) {
+        if (HEADING_NAMES.has(ancestor.nodeName)) {
+            return headingMarkOf(ancestor, lookup);
+        }
+    }
+
+    return undefined;
+}
+
+// The Unicode private-use area, U+E000 to U+F8FF, written as escapes so no editor can strip the characters.
+const PRIVATE_USE_START = "\u{E000}".codePointAt(0) ?? 0;
+const PRIVATE_USE_END = "\u{F8FF}".codePointAt(0) ?? 0;
+// A break mark is this many private-use characters, and at most this many candidates are tried.
+const MARK_LENGTH = 8;
+const MARK_CANDIDATES = 16;
+
+/**
+ * A mark that the heading's markup does not contain. A break in the heading is written as this mark, so text of
+ * the heading is never taken for a break. The mark is a run of private-use characters, long enough that neither
+ * the markup nor a custom rule's output holds the same run by chance.
+ */
+function headingBreakMark(heading: Node): string {
+    const markup = (heading as Element).outerHTML ?? "";
+
+    // Untrusted markup can hold every candidate (they share one step), so only a bounded number are tried.
+    for (let candidate = 0; candidate < MARK_CANDIDATES; candidate += 1) {
+        const mark = markCandidate(candidate);
+
+        if (!markup.includes(mark)) {
+            return mark;
+        }
+    }
+
+    return repeatedMark(markup);
+}
+
+/**
+ * A mark absent from the markup by construction: the first private-use character, repeated once more than its
+ * longest run in the markup and never shorter than a candidate. One pass over the markup, so it always ends.
+ */
+function repeatedMark(markup: string): string {
+    const first = String.fromCodePoint(PRIVATE_USE_START);
+    let longest = 0;
+    let current = 0;
+
+    for (const character of markup) {
+        current = character === first ? current + 1 : 0;
+        longest = Math.max(longest, current);
+    }
+
+    return first.repeat(Math.max(MARK_LENGTH, longest + 1));
+}
+
+/**
+ * The candidate mark with the given number: a run of private-use characters spread across the area by two large
+ * primes, so no candidate is a natural run such as one character repeated. The same number gives the same mark.
+ */
+function markCandidate(candidate: number): string {
+    const span = PRIVATE_USE_END - PRIVATE_USE_START + 1;
+    let mark = "";
+
+    for (let index = 0; index < MARK_LENGTH; index += 1) {
+        mark += String.fromCodePoint(PRIVATE_USE_START + ((candidate * 7919 + (index + 1) * 104_729) % span));
+    }
+
+    return mark;
+}
+
+/** Writes each mark as a space, dropping the spaces beside it. A piece that starts a new line takes no space. */
+function joinAtMarks(content: string, mark: string): string {
+    const [first = "", ...rest] = content.split(mark);
+    const pieces: string[] = [];
+    let carried = first;
+
+    // Only the piece just before a mark can end in a space, so only that piece is trimmed. Trimming the whole text
+    // each time would rescan everything written so far.
+    for (const piece of rest) {
+        // Marks with only spaces between them (two breaks in a row) write one space, not one each.
+        if (piece.trim() === "" && !piece.includes("\n")) {
+            continue;
+        }
+
+        const before = carried.replace(TRAILING_SPACE, "");
+
+        // A block's paragraph break on either side of the mark already separates the text, so no space is added.
+        pieces.push(before, piece.startsWith("\n") || before.endsWith("\n") ? "" : " ");
+        carried = piece.replace(LEADING_SPACE, "");
+    }
+
+    pieces.push(carried);
+
+    return pieces.join("");
+}
+
+/**
+ * A link's text in a heading, split into the break marks at its edges and the text between. The edge marks go
+ * outside the link's brackets, where the heading turns them into spaces between words, not spaces in the link.
+ */
+function headingLinkParts(content: string, mark: string | undefined): { lead: string; text: string; trail: string } {
+    if (mark === undefined) {
+        return { lead: "", text: content, trail: "" };
+    }
+
+    let start = 0;
+    let end = content.length;
+
+    while (content.startsWith(mark, start)) {
+        start += mark.length;
+    }
+
+    while (end - mark.length >= start && content.startsWith(mark, end - mark.length)) {
+        end -= mark.length;
+    }
+
+    return { lead: content.slice(0, start), text: content.slice(start, end), trail: content.slice(end) };
+}
+
+/** True when a block element sits inside the node, at any depth. */
+function hasBlockDescendant(node: Node): boolean {
+    for (const child of node.childNodes) {
+        if (child.nodeType === 1 && (isBlock(child) || hasBlockDescendant(child))) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/** Whether each node has a printing block descendant, stored because every child of a same-kind parent asks. */
+const printingBlockDescendants = new WeakMap<Node, boolean>();
+
+/**
+ * True when a block sits inside the node, at any depth. A blank block still counts: its
+ * separator (see `blankReplacement`) is a paragraph break, which splits the parent's
+ * delimiters. A blank element that is not a block is skipped, with its contents, because it
+ * prints nothing and so cannot split them.
+ */
+function hasPrintingBlockDescendant(node: Node, options: Options): boolean {
+    const known = printingBlockDescendants.get(node);
+
+    if (known !== undefined) {
+        return known;
+    }
+
+    let hasPrinting = false;
+
+    for (const child of node.childNodes) {
+        if (child.nodeType !== 1) {
+            continue;
+        }
+
+        if (isBlock(child) || (!annotationOf(child, options).isBlank && hasPrintingBlockDescendant(child, options))) {
+            hasPrinting = true;
+            break;
+        }
+    }
+
+    printingBlockDescendants.set(node, hasPrinting);
+
+    return hasPrinting;
+}
+
+/**
+ * A void element prints markup for a break (which ends a run) and for an image with a
+ * source. Any other void element, such as a word-break hint or an input, prints nothing,
+ * so the run looks past it to the text beyond.
+ */
+function voidEdge(element: Element): string | null {
+    if (element.nodeName === "BR") {
+        return "";
+    }
+
+    return element.nodeName === "IMG" && element.getAttribute("src") ? "" : null;
+}
+
+/**
+ * The character a node's output shows on the side facing the emphasis: "" when
+ * the output ends in markup, a void element that prints markup or a block boundary,
+ * and null when the node outputs nothing.
+ */
+function edgeCharacter(node: Node, side: Side, options: Options, lookup: RuleLookup): string | null {
+    // A CDATA section (type 4) prints its text, as a text node does.
+    if (node.nodeType === 3 || node.nodeType === 4) {
+        return textEdge(node.nodeValue ?? "", side);
+    }
+
+    if (node.nodeType !== 1) {
+        return null;
+    }
+
+    // A removed element prints none of its text, so an element holding only that prints nothing and is no run member.
+    if (lookup.ruleFor(node)?.replacement === removeReplacement) {
+        return null;
+    }
+
+    const element = node as Element;
+    const annotated = annotationOf(element, options);
+
+    if (annotated.isBlock) {
+        return "";
+    }
+
+    if (isVoid(element)) {
+        return voidEdge(element);
+    }
+
+    const name = element.nodeName.toLowerCase();
+
+    if (DELIMITED_NAMES.has(name) && (name !== "a" || isRenderedLink(element, options))) {
+        // A blank element that outputs a space ends a run like a space does; an empty one outputs nothing.
+        if (annotated.isBlank) {
+            return element.textContent ? " " : null;
+        }
+
+        // A nested same-kind element whose parent writes the delimiters prints none, so its edge is its text.
+        return isDelimitedByParent(element, options, lookup) ? childEdge(element, side, options, lookup) : "";
+    }
+
+    return childEdge(element, side, options, lookup);
+}
+
+/**
+ * True when an anchor renders as a Markdown link, with brackets. An anchor with no href,
+ * a link style that writes no link, or an unsafe destination under safe links renders
+ * only its text.
+ */
+export function isRenderedLink(element: Element, options: Options): boolean {
+    const href = element.getAttribute("href");
+
+    if (!href || (options.linkStyle !== "inlined" && options.linkStyle !== "referenced")) {
+        return false;
+    }
+
+    return !(options.safeLinks && isUnsafeDestination(href));
+}
+
+// The highest code point that fits in one UTF-16 unit.
+const LAST_SINGLE_UNIT = 65_535;
+
+/** The code point at one end of the text, read without copying the text: the last one for "left", the first for "right". */
+function textEdge(text: string, side: Side): string | null {
+    if (text === "") {
+        return null;
+    }
+
+    if (side === "right") {
+        return String.fromCodePoint(text.codePointAt(0) ?? 0);
+    }
+
+    // The last code point starts one unit back, or two when the last unit is the low half of a surrogate pair.
+    const pairStart = text.length - 2;
+
+    if (pairStart >= 0 && (text.codePointAt(pairStart) ?? 0) > LAST_SINGLE_UNIT) {
+        return text.slice(pairStart);
+    }
+
+    return text.slice(-1);
+}
+
+/** The edge of the first child, from the facing end, that outputs something. */
+function childEdge(element: Element, side: Side, options: Options, lookup: RuleLookup): string | null {
+    let child = side === "left" ? element.lastChild : element.firstChild;
+
+    while (child) {
+        const edge = edgeCharacter(child, side, options, lookup);
+
+        if (edge !== null) {
+            return edge;
+        }
+
+        child = side === "left" ? child.previousSibling : child.nextSibling;
+    }
+
+    return null;
+}
+
+function neighbour(node: Node, side: Side): Node | null {
+    return side === "left" ? node.previousSibling : node.nextSibling;
+}
+
+/**
+ * The next node on one side, climbing out of transparent wrappers (see isTransparentWrapper) at their edge. A
+ * wrapper with whitespace at that edge ends the walk: the space keeps the run apart from what follows.
+ */
+function neighbourThroughWrappers(node: Node, side: Side, options: Options, lookup: RuleLookup): Node | null {
+    let current = node;
+    let next = neighbour(current, side);
+
+    while (!next) {
+        const parent = current.parentNode;
+
+        if (!parent || !isTransparentWrapper(parent, options, lookup) || flankOf(annotationOf(parent, options), side) !== "") {
+            return null;
+        }
+
+        current = parent;
+        next = neighbour(current, side);
+    }
+
+    return next;
+}
+
+/** The child a walk steps into when it meets a transparent wrapper with no whitespace on the facing edge, else null. */
+function wrapperEntry(node: Node, side: Side, options: Options, lookup: RuleLookup): Node | null {
+    if (!isTransparentWrapper(node, options, lookup) || flankOf(annotationOf(node, options), opposite(side)) !== "") {
+        return null;
+    }
+
+    return side === "left" ? node.lastChild : node.firstChild;
+}
+
+/**
+ * True for an inline element that prints its content as is: no rule claims it and the default replacement writes
+ * it (a span, or an anchor that renders no link). Its text sits directly beside its neighbours in the output.
+ */
+function isTransparentWrapper(node: Node, options: Options, lookup: RuleLookup): boolean {
+    if (node.nodeType !== 1 || isBlock(node) || isVoid(node) || options.defaultReplacement !== defaultElementReplacement) {
+        return false;
+    }
+
+    const name = node.nodeName.toLowerCase();
+
+    if (DELIMITED_NAMES.has(name) && (name !== "a" || isRenderedLink(node as Element, options))) {
+        return false;
+    }
+
+    return lookup.ruleFor(node) === undefined && !annotationOf(node, options).isBlank;
+}
+
+/** True for an emphasis or strong element nested in a same-kind parent that writes the delimiters for both. */
+function isDelimitedByParent(element: Element, options: Options, lookup: RuleLookup): boolean {
+    const name = element.nodeName.toLowerCase();
+    const names = EMPHASIS_NAMES.has(name) ? EMPHASIS_NAMES : STRONG_NAMES;
+
+    if (!names.has(name) || lookup.ruleFor(element) !== builtinRunRule(names)) {
+        return false;
+    }
+
+    return hasSharingParent(element.parentNode, { intraword: "", names, plain: "" }, options, lookup);
+}
+
+function opposite(side: Side): Side {
+    return side === "left" ? "right" : "left";
+}
+
+/** The whitespace that the flanking rules move outside a node, on one side. */
+function flankOf(node: AnnotatedNode, side: Side): string {
+    return side === "left" ? node.flankingWhitespace.leading : node.flankingWhitespace.trailing;
+}
+
 function cleanAttribute(attribute: string | null): string {
     // `\n\s*` collapses each run of line breaks (and the blanks after them) to one
     // line break. It matches upstream's `(\n+\s*)+` without nested quantifiers.
@@ -477,14 +1307,128 @@ function cleanAttribute(attribute: string | null): string {
 }
 
 /**
+ * Link text sits on one line. A line that starts with a block marker (a list item, a
+ * quote, a heading underline, an ordered number) ends the paragraph, and the brackets
+ * stop being a link. A block element inside a link puts such lines there, so every
+ * line break becomes a space, except a hard break whose next line cannot open a block.
+ * CommonMark keeps a hard break inside link text.
+ *
+ * A space that already precedes the break is not doubled, so a marker that the block
+ * rule added (`> `) follows one space, not two.
+ *
+ * The closing `]` follows the text, so it is appended for the line checks and removed
+ * after. A lone `+` at the end of the text is then not a list item, and a hard break
+ * before it is kept.
+ */
+function linkText(content: string, hardBreak: string): string {
+    const hasHardBreaks = HARD_BREAK.test(hardBreak);
+    const closed = `${content}]`;
+    // A line break, with the marker that the rule writes in front of it when the marker is there.
+    // Only ASCII whitespace is indentation; a non-breaking space after a break is content.
+    const lineBreak = new RegExp(String.raw`(${escapeRegExp(hardBreak)})?\n[ \t\r\n]*`, "g");
+
+    return closed
+        .replaceAll(lineBreak, (match: string, marker: string | undefined, offset: number, whole: string) => {
+            const written = marker ?? "";
+
+            if (hasHardBreaks && written && isKeptHardBreak(match.slice(written.length), offset + written.length, whole, hardBreak)) {
+                return match;
+            }
+
+            // Spaces are harmless in text, so a space marker stays and the break becomes a space or nothing.
+            if (SPACES_ONLY.test(written)) {
+                return written + (whole.charAt(offset + written.length - 1) === " " ? "" : " ");
+            }
+
+            // A marker that ends in an unescaped backslash would show as a backslash once its break is gone, so it goes
+            // with the break. Any other match is kept: a marker such as `<br>` is valid in link text, and text that only
+            // looks like the marker (a literal `X`, an escaped backslash pair) is the link's own text.
+            // A newline in the marker itself would split the link, so it becomes a space too.
+            const inline = written.replaceAll(MARKER_NEWLINES, " ").trimEnd();
+
+            if (inline && !hasHardBreakEnding(whole, offset + written.length)) {
+                return `${inline} `;
+            }
+
+            return whole.charAt(offset - 1) === " " ? "" : " ";
+        })
+        .slice(0, -1);
+}
+
+/**
+ * True when the text up to `end` ends as CommonMark's hard break does: in two spaces, or in an
+ * unescaped backslash (an odd run of them). It reads back from `end` only, so it costs the length of
+ * that run, not of the text before it.
+ */
+function hasHardBreakEnding(text: string, end: number): boolean {
+    if (text.startsWith("  ", end - 2)) {
+        return true;
+    }
+
+    let start = end;
+
+    while (start > 0 && text.charAt(start - 1) === "\\") {
+        start -= 1;
+    }
+
+    return (end - start) % 2 === 1;
+}
+
+/**
+ * True for a single line break that directly follows the hard break marker, when the
+ * line after it cannot open a block. A break inside a blank line is not a hard break.
+ */
+function isKeptHardBreak(run: string, offset: number, whole: string, hardBreak: string): boolean {
+    const markerStart = offset - hardBreak.length;
+    const isAfterMarker = markerStart >= 0 && whole.startsWith(hardBreak, markerStart);
+    const isSingle = !run.includes("\n", 1);
+    // A line indented by four columns or more is a paragraph continuation, so it cannot open a block.
+    const isCannotOpenBlock = indentWidth(run) >= 4;
+
+    return isAfterMarker && isSingle && (isCannotOpenBlock || !isBlockStartAt(whole, offset + run.length));
+}
+
+/** The columns of indentation after a line break. A tab reaches the next multiple of four. */
+function indentWidth(run: string): number {
+    let width = 0;
+
+    for (let index = 1; index < run.length; index += 1) {
+        const char = run.charAt(index);
+
+        if (char === " ") {
+            width += 1;
+        } else if (char === "\t") {
+            width += 4 - (width % 4);
+        } else {
+            break;
+        }
+    }
+
+    return width;
+}
+
+function isBlockStartAt(text: string, index: number): boolean {
+    for (const opener of BLOCK_OPENERS) {
+        opener.lastIndex = index;
+
+        if (opener.test(text)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * With `safeLinks`, `\` and `&` are escaped too. CommonMark undoes those added escapes, so the rendered destination is
  * the raw attribute, not the decoded copy. The check already covers the raw attribute: `isUnsafeDestination` runs on a
  * decoded copy of that same text. Line breaks are dropped first, as a browser drops them from an `href`, so the
- * destination stays on one line and cannot start a reference definition.
+ * destination stays on one line and cannot start a reference definition. Every backslash is doubled in safe mode, so
+ * the punctuation rule is applied only outside it.
  */
 function escapeLinkDestination(destination: string, isSafeLinks = false): string {
     const oneLine = destination.replaceAll(LINE_BREAKS, "");
-    const escaped = (isSafeLinks ? oneLine.replaceAll("\\", "\\\\").replaceAll("&", "&amp;") : oneLine)
+    const escaped = (isSafeLinks ? oneLine.replaceAll("\\", "\\\\").replaceAll("&", "&amp;") : oneLine.replaceAll(BACKSLASH_BEFORE_PUNCTUATION, String.raw`\\`))
         .replaceAll("<", String.raw`\<`)
         .replaceAll(">", String.raw`\>`)
         .replaceAll("(", String.raw`\(`)

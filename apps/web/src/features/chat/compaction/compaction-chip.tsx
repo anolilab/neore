@@ -9,7 +9,7 @@ import { Shrink } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useState } from "react";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
 import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
@@ -27,8 +27,7 @@ const CompactionChip: FC = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const { thread, threadId } = useChatThread();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const validThreadId = getValidThreadId(threadId);
     // Only the owner can compact, and a visitor who is not signed in has no status to read: the request would be refused.
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;

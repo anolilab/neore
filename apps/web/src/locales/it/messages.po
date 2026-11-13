@@ -28390,6 +28390,10 @@ msgstr "Cerca dati..."
 msgid "Search depth: {0}"
 msgstr "Profondità di ricerca: {0}"
 
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:912
+msgid "Search failed for \"{searchQuery}\". Try again."
+msgstr "La ricerca di \"{searchQuery}\" non è riuscita. Riprova."
+
 #: ../../packages/ui/src/components/data-grid/data-grid-sort-menu.tsx:262
 msgid "Search fields..."
 msgstr "Cerca campi..."

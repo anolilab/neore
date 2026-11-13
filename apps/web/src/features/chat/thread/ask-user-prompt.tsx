@@ -32,7 +32,7 @@ import { MessageCircleQuestion, Paperclip, Send, X } from "lucide-react";
 import type { FC, FormEvent, KeyboardEvent } from "react";
 import { useId, useRef, useState } from "react";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
@@ -63,8 +63,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const { thread, threadId } = useChatThread();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const headingId = useId();
     const answerId = useId();
     const hintId = useId();

@@ -100,6 +100,9 @@ vi.mock("@/features/chat/core/context/chat-context", async () => {
         useChatThread: () => {
             return { isNewThread: false, model: "test-model", thread: harness.thread, threadId: harness.threadId };
         },
+        useChatThreadIdentity: () => {
+            return { isNewThread: false, model: "test-model", threadId: harness.threadId };
+        },
     };
 });
 
@@ -249,16 +252,10 @@ vi.mock("@/lib/upload/upload-file", () => {
 });
 
 // The thread's owner is signed in, so prompts in it can be answered.
-vi.mock("@/features/auth/lib/auth-ui-provider", () => {
+vi.mock("@/features/auth/hooks/use-auth-session", () => {
     return {
-        useAuth: () => {
-            return {
-                hooks: {
-                    useSession: () => {
-                        return { data: { user: { id: "owner" } } };
-                    },
-                },
-            };
+        useAuthSession: () => {
+            return { data: { user: { id: "owner" } } };
         },
     };
 });

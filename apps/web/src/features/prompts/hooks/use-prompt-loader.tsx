@@ -6,7 +6,7 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import useFeatureFlaggedModels, { useFeatureFlaggedModelsSettled } from "@/hooks/use-feature-flagged-models";
@@ -34,9 +34,8 @@ const usePromptLoader = (promptId: string | undefined) => {
     const setPendingSettings = useModelStore((state) => state.setPendingSettings);
 
     // Get current user context for auto-populated variables
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
-    const { data: activeOrganization } = hooks.useActiveOrganization();
+    const { data: sessionData } = useAuthSession();
+    const { data: activeOrganization } = useAuthActiveOrganization();
 
     // Load prompt if promptId is provided
     // `promptId` is the raw `/chat?promptId=…` search param, so the row-id brand has to be applied here.

@@ -6,6 +6,7 @@ import { FlatList, Pressable, Text } from "react-native";
 import { useAuth } from "@/auth/auth-state";
 import { lastChatToReopen } from "@/chat/last-thread-store";
 import { canClaimLaunchReopen } from "@/chat/launch-reopen";
+import { withCatch, withFinally } from "@/lib/guarded";
 import { getClient } from "@/lib/lunora";
 import { listReady } from "@/lib/splash-gate";
 import { isNetworkFailure } from "@/offline/connectivity";
@@ -205,9 +206,7 @@ const ThreadList = () => {
 
         const startedAt = Date.now();
 
-        try {
-            const page: ThreadPage = await fetchThreadPage(cursor, startedAt);
-
+        const showPage = (page: ThreadPage) => {
             setThreads((current) => {
                 const known = new Set(current.map((thread) => thread.id));
 
@@ -217,16 +216,27 @@ const ThreadList = () => {
             setIsDone(page.isDone);
             // A later page says nothing about the threads of the pages before it: it saves, and never prunes.
             persistThreadPage(cache, page, { isComplete: false, startedAt });
-        } catch (error_: unknown) {
+        };
+        const showFailure = (error_: unknown) => {
             if (isNetworkFailure(error_)) {
                 // The rows already on screen stay; the offline banner says why more did not load.
                 reportRead("failed");
             } else {
                 setLoadError(error_ instanceof Error ? error_.message : "Could not load chats.");
             }
-        } finally {
-            setIsLoadingMore(false);
-        }
+        };
+
+        // `withFinally`, not `try … finally`: the React Compiler skips a component that holds a `finally`.
+        await withFinally(
+            async () => {
+                await withCatch(async () => {
+                    showPage(await fetchThreadPage(cursor, startedAt));
+                }, showFailure);
+            },
+            () => {
+                setIsLoadingMore(false);
+            },
+        );
     };
 
     const syncedAt = threads.length === 0 ? undefined : Math.max(...threads.map((thread) => thread.syncedAt));
