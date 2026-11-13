@@ -2,10 +2,10 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-import * as lunora_usage_gdpr_235 from "../../usage/gdpr.js";
+import * as lunora_usage_gdpr_236 from "../../usage/gdpr.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_usage_gdpr_235.releaseUsageKey.args, (source) => {
+installCompiledValidatorMap(lunora_usage_gdpr_236.releaseUsageKey.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
