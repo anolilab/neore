@@ -1660,6 +1660,7 @@ export interface Doc_subAgentRuns {
     reapAt?: number;
     result?: string;
     resultPostedAt?: number;
+    resumedBy?: string;
     runner?: { kind: "headless" } | { deviceId: Id<"devices">; kind: "host" };
     skillSlug?: string;
     startedAt?: number;
@@ -4804,6 +4805,7 @@ export interface Insert_subAgentRuns {
     reapAt?: number;
     result?: string;
     resultPostedAt?: number;
+    resumedBy?: string;
     runner?: { kind: "headless" } | { deviceId: Id<"devices">; kind: "host" };
     skillSlug?: string;
     startedAt?: number;

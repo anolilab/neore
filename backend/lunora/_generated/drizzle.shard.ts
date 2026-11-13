@@ -1384,6 +1384,7 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     reapAt: real("reapAt"),
     result: text("result"),
     resultPostedAt: real("resultPostedAt"),
+    resumedBy: text("resumedBy"),
     runner: text("runner", { mode: "json" }).$type<{ kind: "headless" } | { deviceId: Id<"devices">; kind: "host" }>(),
     skillSlug: text("skillSlug"),
     startedAt: real("startedAt"),

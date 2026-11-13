@@ -24287,6 +24287,12 @@
           "optional": true,
           "unique": false
         },
+        "resumedBy": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "runner": {
           "kind": "union",
           "nullable": false,

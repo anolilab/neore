@@ -1308,33 +1308,26 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
     return false;
 };
 
-/** Live streams of a child thread read per status when looking for a run's continuation: a thread has one or two. */
-const LIVE_STREAMS_CHECKED = 10;
-
 /**
- * The key of `runId`'s live continuation on its child thread, if one streams: an answer's stream is keyed on the request's
- * approval id (`resumeClaimedRun`), and that request's snapshot names the run.
+ * The key of a resumed run's live continuation on its child thread, if one streams: the approval id it last resumed with
+ * (`resumedBy`), which keys the stream its answer opened (`resumeClaimedRun`). Exact: one indexed read, however many
+ * other replies are live. Only the latest resume can still stream: an earlier continuation closed its stream before the
+ * run waited again.
  */
-const liveContinuationOf = async (ctx: Pick<QueryCtx, "db">, childThreadId: string, runId: Id<"subAgentRuns">): Promise<string | undefined> => {
-    for (const status of ["pending", "streaming"] as const) {
-        const live = await ctx.db
-            .query("persistentStreams")
-            .withIndex("by_threadId_status", (q) => q.eq("threadId", childThreadId).eq("status", status))
-            .take(LIVE_STREAMS_CHECKED);
+const liveContinuationOf = async (ctx: Pick<QueryCtx, "db">, run: Pick<RunDoc, "childThreadId" | "resumedBy">): Promise<string | undefined> => {
+    const { childThreadId, resumedBy } = run;
 
-        for (const stream of live) {
-            const request = await ctx.db
-                .query("toolApprovalRuns")
-                .withIndex("by_approvalId", (q) => q.eq("approvalId", stream.messageId))
-                .first();
-
-            if (request?.threadId === childThreadId && request.config.subAgentRunId === runId) {
-                return stream.messageId;
-            }
-        }
+    if (childThreadId === undefined || resumedBy === undefined) {
+        return undefined;
     }
 
-    return undefined;
+    // One stream per approval id: a claim happens once, and a retried answer returns the stream it opened.
+    const streams = await ctx.db
+        .query("persistentStreams")
+        .withIndex("by_threadId_messageId", (q) => q.eq("threadId", childThreadId as Id<"threads">).eq("messageId", resumedBy))
+        .collect();
+
+    return streams.some((stream) => stream.status === "pending" || stream.status === "streaming") ? resumedBy : undefined;
 };
 
 /**
@@ -1393,7 +1386,7 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     // abort. Only that stream: a reply the owner started in the child meanwhile keeps going. A continuation that ends
     // itself closes its stream before it settles (`continueAfterToolApproval`, every path), so nothing is found then.
     if (wasRunning && !hostRun && run.mode !== "worker" && run.reapAt !== undefined && outcome.kind !== "succeeded" && run.childThreadId !== undefined) {
-        const continuation = await liveContinuationOf(ctx, run.childThreadId, run._id);
+        const continuation = await liveContinuationOf(ctx, run);
 
         if (continuation !== undefined) {
             // The continuation may end before this runs: `onlyNamed` then stops nothing, not every live reply of the child.
@@ -1616,7 +1609,7 @@ export const awaitApproval = internalMutation
  * second answer to the same run is refused until the child waits again (`claimToolApproval`). The run gets a fresh run
  * window, with its reaper. A no-op for a run that is not waiting: stopped, failed by its reaper, or already resumed.
  */
-export const resumeRunForAnswer = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<boolean> => {
+export const resumeRunForAnswer = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, approvalId: string): Promise<boolean> => {
     const run = await ctx.db.get("subAgentRuns", runId);
 
     if (run?.status !== "awaiting") {
@@ -1626,7 +1619,8 @@ export const resumeRunForAnswer = async (ctx: MutationCtx, runId: Id<"subAgentRu
     const now = Date.now();
     const reapAt = now + SUB_AGENT_STALE_MS;
 
-    await patchById(ctx.db, "subAgentRuns", run._id, { reapAt, status: "running", updatedAt: now });
+    // `resumedBy` names the continuation's stream, so an end from outside can stop it (`liveContinuationOf`).
+    await patchById(ctx.db, "subAgentRuns", run._id, { reapAt, resumedBy: approvalId, status: "running", updatedAt: now });
     await scheduleReaperAt(ctx, run._id, reapAt, now);
 
     return true;

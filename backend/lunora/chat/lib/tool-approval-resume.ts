@@ -46,7 +46,7 @@ export const resumeClaimedRun = async (ctx: MutationCtx, args: ResumeClaimedRunA
     if (config.subAgentRunId !== undefined) {
         const { resumeRunForAnswer } = await import("../../sub-agents/functions");
 
-        if (!(await resumeRunForAnswer(ctx, config.subAgentRunId))) {
+        if (!(await resumeRunForAnswer(ctx, config.subAgentRunId, approvalId))) {
             throw new LunoraError("CONFLICT", "This sub-agent has already ended");
         }
     }

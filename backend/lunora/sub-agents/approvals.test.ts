@@ -888,6 +888,41 @@ describe("a resumed run ended from outside", () => {
         expect(await run(async (context) => await context.db.get("threadGoals", goalId))).toMatchObject({ status: "active" });
     });
 
+    it("finds its continuation exactly, behind more than ten earlier live replies in the child thread", async () => {
+        await run(async (context) => {
+            const [continuation] = await context.db
+                .query("persistentStreams")
+                .withIndex("by_threadId_messageId", (q: any) => q.eq("threadId", childId).eq("messageId", APPROVAL_ID))
+                .collect();
+            const { _creationTime, _id, ...fields } = continuation;
+
+            // Eleven replies live before it, then the continuation itself, last in storage order.
+            for (let index = 0; index < 11; index += 1) {
+                await context.db.insert("persistentStreams", { ...fields, messageId: `message-live-${String(index)}` });
+            }
+
+            await context.db.delete("persistentStreams", _id);
+            await context.db.insert("persistentStreams", fields);
+        });
+
+        expect(await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER))).toBe(1);
+        expect(stopJobs().map((job) => job.args)).toStrictEqual([{ messageId: APPROVAL_ID, onlyNamed: true, threadId: childId }]);
+    });
+
+    it("schedules no stop for a continuation whose stream has already ended", async () => {
+        await run(async (context) => {
+            const [continuation] = await context.db
+                .query("persistentStreams")
+                .withIndex("by_threadId_messageId", (q: any) => q.eq("threadId", childId).eq("messageId", APPROVAL_ID))
+                .collect();
+
+            await context.db.patch("persistentStreams", continuation._id, { status: "done" });
+        });
+
+        expect(await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER))).toBe(1);
+        expect(stopJobs()).toStrictEqual([]);
+    });
+
     it("stops its live continuation when the reaper fails it past its deadline", async () => {
         const { reapAt } = await runRow();
 

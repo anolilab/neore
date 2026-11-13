@@ -2712,6 +2712,8 @@ export const schema = defineSchema({
         // When the result was written to the parent thread, in the same transaction as the message.
         // The post waits while the parent is still streaming (`sub-agents/functions.ts:postRunResult`).
         resultPostedAt: v.optional(v.number()),
+        // The approval id the run last resumed with (`resumeRunForAnswer`): its continuation streams under that key.
+        resumedBy: v.optional(v.string()),
         runner: v.optional(vSubAgentRunner),
         skillSlug: v.optional(v.string()),
         startedAt: v.optional(v.number()),
