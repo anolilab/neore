@@ -42,6 +42,25 @@ pre.keep(["pre"]);
 pre.turndown("<pre><code>x</code></pre>"); // "<pre><code>x</code></pre>", raw HTML, not a code block
 ```
 
+## GitHub Flavored Markdown
+
+`gfm` is a plugin for tables, strikethrough and task list items:
+
+```ts
+import TurndownService, { gfm } from "@neore/html-to-markdown";
+
+new TurndownService().use(gfm).turndown("<table><tr><th>a</th></tr><tr><td><s>1</s></td></tr></table>");
+// "| a |\n| --- |\n| ~~1~~ |"
+```
+
+- A table's first row is its header. A cell that spans columns or rows leaves empty cells, so the cells after it stay
+  under their own headers. A cell spans down to the end of its row group at most. A caption goes above the table.
+- A cell is one line: a line break is a space, a list is its items joined by `; `, a heading is strong text, and every
+  pipe is escaped, inside code too. A table nested in a cell is the text of its cells.
+- A table whose spans would fill more than 100,000 cells is written as its cells' text, a line per row.
+- `<del>`, `<s>` and `<strike>` are `~~text~~`. A checkbox is `[x] ` or `[ ] `.
+- An element that a `remove` filter matches is left out, even where a gfm rule would write it.
+
 ## Status
 
 This is the first step of the fork: a behaviour-preserving TypeScript port, except for `keep` and `remove` on built-in
@@ -72,7 +91,7 @@ differential test covers each of them.
 2. An internal tree built from the DOM, DOMParser on the main thread, parse5 only for Node and offline use, domino removed.
 3. Upstream fixes and the known issues above (per-line escaping, `<br>` handling, list `start`/`value`, hidden content,
    safe hrefs).
-4. GFM: tables, strikethrough, task lists, and a paste preset with the rules the composer needs.
+4. GFM: tables, strikethrough and task lists (the `gfm` plugin), then a paste preset with the rules the composer needs.
 5. Use in the composer's paste path, loaded lazily.
 
 ## Scripts

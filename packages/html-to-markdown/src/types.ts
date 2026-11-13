@@ -49,6 +49,12 @@ export interface RuleLookup {
     hasRuleFor: (node: Node) => boolean;
 
     /**
+     * True when a remove filter matches the node. A rule added with `addRule` is matched before the remove filters, so
+     * an added rule that must let a removed element go asks this in its filter.
+     */
+    isRemoved: (node: Node) => boolean;
+
+    /**
      * The first rule whose filter matches the node, or undefined when none matches. Asked once per node, so the answer
      * does not change. A blank node is still written by `blankReplacement`, whatever this returns.
      */

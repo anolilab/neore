@@ -155,6 +155,9 @@ export default class Rules implements RuleLookup {
     /** Rules whose replacement ignores the children, so converting them is wasted work. */
     private readonly skipChildrenRules = new WeakSet<Rule>();
 
+    /** Each element's answer from the remove filters. Dropped when a remove filter is added. */
+    private removedAnswers = new WeakMap<Node, boolean>();
+
     private readonly options: Options;
 
     private readonly blankRule: Rule;
@@ -204,6 +207,7 @@ export default class Rules implements RuleLookup {
         this.skipChildrenRules.add(rule);
         this.removeList.unshift(rule);
         this.answers.undecided = new WeakSet();
+        this.removedAnswers = new WeakMap();
     }
 
     /**
@@ -251,6 +255,25 @@ export default class Rules implements RuleLookup {
         }
 
         return decideRule(this.answers, this.searchOrder, annotateNode(node, this.options), this.options, this);
+    }
+
+    isRemoved(node: Node): boolean {
+        if (node.nodeType !== 1 || this.removeList.length === 0) {
+            return false;
+        }
+
+        const known = this.removedAnswers.get(node);
+
+        if (known !== undefined) {
+            return known;
+        }
+
+        // Annotated once per element, as ruleFor does: annotating reads the element's whole text.
+        const isMatch = findRule(this.removeList, annotateNode(node, this.options), node.nodeName.toLowerCase(), this.options, this) !== undefined;
+
+        this.removedAnswers.set(node, isMatch);
+
+        return isMatch;
     }
 
     forEach(visit: (rule: Rule, index: number) => void): void {

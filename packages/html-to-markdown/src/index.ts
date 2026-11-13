@@ -1,3 +1,4 @@
+export { gfm } from "./gfm";
 export type { HTMLParser } from "./html-parser";
 export { setHTMLParser } from "./html-parser";
 export type { TurndownInput } from "./turndown";
