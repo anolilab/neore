@@ -34,6 +34,8 @@ const RUNS = Number(process.env.LOAD_TIMING_RUNS) || 7;
 const LABEL = process.env.LOAD_TIMING_LABEL ?? "build";
 const STATE_FILE = process.env.LOAD_TIMING_STATE;
 const MILESTONE_TIMEOUT_MS = 90_000;
+/** How long no new largest-contentful-paint candidate must arrive before the latest counts as final. */
+const LCP_SETTLE_MS = 1000;
 const THREAD_URL_RE = /\/chat\/[\w-]+$/;
 
 /** Chrome DevTools' legacy "Fast 3G" with Lighthouse's 0.9 factor: 562.5ms RTT, ~1.44 Mbps down, ~675 Kbps up. */
@@ -99,22 +101,34 @@ const readLoad = async (page: Page): Promise<LoadSample> => {
         })
         .toBe(3);
 
-    return await page.evaluate(async () => {
+    return await page.evaluate(async (settleMs: number) => {
         const at = (name: string): number | undefined => performance.getEntriesByName(`load-probe:${name}`, "mark")[0]?.startTime;
-        // The buffered entries arrive in the first callback; LCP stops updating at the first input, so the last one is final.
+        // LCP keeps updating while larger content paints: observe until no new candidate came for `settleMs` (at most
+        // six times that), then take the latest; the observer is disconnected only then.
         const lcp = await new Promise<number | undefined>((resolve) => {
-            try {
-                const observer = new PerformanceObserver((list) => {
-                    observer.disconnect();
-                    resolve(list.getEntries().at(-1)?.startTime);
-                });
+            let latest: number | undefined;
+            let settle: ReturnType<typeof setTimeout> | undefined;
+            let observer: PerformanceObserver | undefined;
+            let cap: ReturnType<typeof setTimeout> | undefined;
+            const finish = (): void => {
+                clearTimeout(settle);
+                clearTimeout(cap);
+                observer?.disconnect();
+                resolve(latest);
+            };
 
+            cap = setTimeout(finish, settleMs * 6);
+
+            try {
+                observer = new PerformanceObserver((list) => {
+                    latest = list.getEntries().at(-1)?.startTime ?? latest;
+                    clearTimeout(settle);
+                    settle = setTimeout(finish, settleMs);
+                });
                 observer.observe({ buffered: true, type: "largest-contentful-paint" });
-                setTimeout(() => {
-                    resolve(undefined);
-                }, 1000);
+                settle = setTimeout(finish, settleMs);
             } catch {
-                resolve(undefined);
+                finish();
             }
         });
 
@@ -125,7 +139,7 @@ const readLoad = async (page: Page): Promise<LoadSample> => {
             messages: at("messages"),
             sidebar: at("sidebar"),
         };
-    });
+    }, LCP_SETTLE_MS);
 };
 
 /** Click the sidebar row of `thread` from inside the page and time until its messages show. */

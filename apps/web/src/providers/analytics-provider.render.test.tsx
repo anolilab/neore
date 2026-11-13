@@ -375,3 +375,31 @@ describe("AnalyticsProvider", () => {
         expect(reportOrder).toBeGreaterThan(resetOrder);
     });
 });
+
+describe("load timing start", () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    });
+
+    it("starts the reporter as soon as the page is hidden, before the browser is idle", async () => {
+        const reportLoadTiming = vi.fn();
+
+        vi.stubGlobal("requestIdleCallback", vi.fn());
+
+        const modules = await loadModules();
+
+        vi.doMock("@/lib/analytics/load-timing/report-load-timing", () => {
+            return { reportLoadTiming };
+        });
+
+        modules.onPostHogLoaded(posthogMock as unknown as PostHogInterface);
+
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+        document.dispatchEvent(new Event("visibilitychange"));
+
+        await vi.waitFor(() => {
+            expect(reportLoadTiming).toHaveBeenCalled();
+        });
+    });
+});

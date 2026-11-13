@@ -81,7 +81,14 @@ export const POSTHOG_OPTIONS = {
  * Real-user load timing (`lib/analytics/load-timing/report-load-timing.ts`). Its code and `web-vitals` load once the
  * browser is idle, so they stay out of the first-load bundle; the browser buffers the entries it reads.
  */
+const loadTiming = { requested: false };
+
 const startLoadTiming = (): void => {
+    if (loadTiming.requested) {
+        return;
+    }
+
+    loadTiming.requested = true;
     void import("@/lib/analytics/load-timing/report-load-timing")
         .then(({ reportLoadTiming }) => reportLoadTiming())
         // A chunk that fails to load (offline, a deploy in between) only costs this page's timings.
@@ -102,7 +109,21 @@ export const onPostHogLoaded = (ph: PostHogInterface): void => {
         applyMeasurementConsent(ph, measurement);
     }
 
-    // Load timing's code and `web-vitals` load once the browser is idle, off the first load.
+    // Load timing's code and `web-vitals` load once the browser is idle, off the first load, or as soon as the page is
+    // hidden: a visit that ends first is still reported (the reporter sends at once on a hidden page).
+    const startWhenHidden = (event: Event): void => {
+        if (event.type !== "pagehide" && document.visibilityState !== "hidden") {
+            return;
+        }
+
+        document.removeEventListener("visibilitychange", startWhenHidden);
+        globalThis.removeEventListener("pagehide", startWhenHidden);
+        startLoadTiming();
+    };
+
+    document.addEventListener("visibilitychange", startWhenHidden);
+    globalThis.addEventListener("pagehide", startWhenHidden);
+
     if (typeof globalThis.requestIdleCallback === "function") {
         globalThis.requestIdleCallback(startLoadTiming, { timeout: 5000 });
     } else {

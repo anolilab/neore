@@ -2,7 +2,8 @@
  * Real-user load timing: one `page_load_timing` event per page load, with the Core Web Vitals and the app's own
  * load marks (`../load-marks.ts`).
  *
- * Loaded with a dynamic import once PostHog is set up and the browser is idle (`providers/analytics-provider.tsx`), so neither this file nor `web-vitals`
+ * Loaded with a dynamic import once PostHog is set up and the browser is idle, or the page is hidden first
+ * (`providers/analytics-provider.tsx`), so neither this file nor `web-vitals`
  * is in the first-load bundle. The browser buffers the paint, navigation and event-timing entries, so a late start
  * still sees the whole load.
  */
@@ -25,18 +26,69 @@ export interface LoadTimingInput {
     vitals: Partial<Record<VitalName, number>>;
 }
 
-const ROUTE_SEGMENT_RE = /^[a-z][\w-]*$/i;
+/**
+ * The app's static top-level path segments (`routeTree.gen.ts`; the test keeps them in step). Anything else (a
+ * mistyped or guessed address, which can be a name) is reported as `other`.
+ */
+export const ROUTE_SECTIONS: ReadonlySet<string> = new Set([
+    "admin",
+    "api",
+    "auth",
+    "chat",
+    "code",
+    "dashboard",
+    "datenschutz",
+    "develop",
+    "docs",
+    "download",
+    "evals",
+    "gateway",
+    "guest",
+    "impressum",
+    "invite",
+    "models",
+    "offline-shell",
+    "p",
+    "pages",
+    "prompts",
+    "skills",
+    "tasks",
+    "thread",
+    "tutorials",
+    "use-cases",
+    "vault",
+    "workflow",
+]);
 
 const roundMs = (value: number | undefined): number | undefined => (value === undefined ? undefined : Math.round(value));
 
 /**
- * Only the route's first path segment (`chat`, `settings`), never ids: a thread or page id in the address is
- * the user's own data.
+ * Only a known route's first path segment (`chat`, `dashboard`), never ids or names: a thread id or an unknown address
+ * is the user's own data.
  */
 export const routeSection = (pathname: string): string => {
     const segment = pathname.split("/").find((part) => part !== "");
 
-    return segment && ROUTE_SEGMENT_RE.test(segment) ? segment.toLowerCase() : "root";
+    if (segment === undefined) {
+        return "root";
+    }
+
+    return ROUTE_SECTIONS.has(segment) ? segment : "other";
+};
+
+/** The address the page was loaded at, not where a client-side navigation has taken it since. */
+export const loadedPathname = (): string => {
+    const navigation = performance.getEntriesByType("navigation")[0];
+
+    if (navigation?.name) {
+        try {
+            return new URL(navigation.name).pathname;
+        } catch {
+            // Fall through to the current address.
+        }
+    }
+
+    return globalThis.location.pathname;
 };
 
 /** The event's properties. A mark recorded after the user's first input timed an interaction, so it is left out. */
@@ -72,7 +124,20 @@ const readMarks = (): Partial<Record<string, number>> => {
 // Once per page load; an object, so the reporter can flip it.
 const reporter = { started: false };
 
-/** Start collecting; the event is sent the first time the page is hidden (tab switch, close, navigation away). */
+/** The vitals read from the entries: web-vitals reports nothing for a page already hidden when it starts. */
+const entryVitals = (): Partial<Record<VitalName, number>> => {
+    const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+
+    return {
+        FCP: performance.getEntriesByName("first-contentful-paint", "paint")[0]?.startTime,
+        TTFB: navigation && navigation.responseStart > 0 ? navigation.responseStart : undefined,
+    };
+};
+
+/**
+ * Start collecting; the event is sent the first time the page is hidden (tab switch, close, navigation away). Started
+ * on a page that was hidden in the meantime, it sends at once.
+ */
 export const reportLoadTiming = (): void => {
     if (reporter.started) {
         return;
@@ -80,8 +145,7 @@ export const reportLoadTiming = (): void => {
 
     reporter.started = true;
 
-    // Taken now: by the time the page is hidden, a client-side navigation may have changed it.
-    const { pathname } = globalThis.location;
+    const pathname = loadedPathname();
     const vitals: Partial<Record<VitalName, number>> = {};
     let navigationType: string | undefined;
     const record = (metric: Metric): void => {
@@ -95,8 +159,8 @@ export const reportLoadTiming = (): void => {
     onTTFB(record);
 
     let sent = false;
-    const send = (event: Event): void => {
-        if (sent || (event.type === "visibilitychange" && document.visibilityState !== "hidden")) {
+    const send = (event?: Event): void => {
+        if (sent || (event?.type !== "pagehide" && document.visibilityState !== "hidden")) {
             return;
         }
 
@@ -108,7 +172,7 @@ export const reportLoadTiming = (): void => {
                 marks: readMarks(),
                 navigationType,
                 pathname,
-                vitals,
+                vitals: { ...entryVitals(), ...vitals },
             }),
         );
     };
@@ -117,4 +181,7 @@ export const reportLoadTiming = (): void => {
     // final before this runs.
     document.addEventListener("visibilitychange", send);
     globalThis.addEventListener("pagehide", send);
+
+    // The page was hidden before this started (`providers/analytics-provider.tsx` starts it on that hide).
+    send();
 };

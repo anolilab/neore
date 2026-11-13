@@ -1,3 +1,4 @@
+import type { RefObject } from "react";
 import { useEffect } from "react";
 
 /**
@@ -13,14 +14,14 @@ export type LoadMark = (typeof LOAD_MARKS)[keyof typeof LOAD_MARKS];
 
 const recorded = new Set<LoadMark>();
 
-/** Record `name` once per page load; later calls (another composer, a remount) are ignored. */
-export const markLoadOnce = (name: LoadMark): void => {
+/** Record `name` once per page load, at `startTime` if given; later calls (another composer, a remount) are ignored. */
+export const markLoadOnce = (name: LoadMark, startTime?: number): void => {
     if (recorded.has(name) || typeof performance === "undefined" || typeof performance.mark !== "function") {
         return;
     }
 
     recorded.add(name);
-    performance.mark(name);
+    performance.mark(name, startTime === undefined ? undefined : { startTime });
 };
 
 /**
@@ -41,4 +42,37 @@ export const useLoadMark = (name: LoadMark, ready = true): void => {
             cancelAnimationFrame(frame);
         };
     }, [name, ready]);
+};
+
+/**
+ * Mark `name` the first time the element in `ref` is on screen. A mounted element can still be out of view (a
+ * collapsed off-canvas sidebar), so this waits for the frame where it intersects the viewport and uses that frame's time.
+ */
+export const useLoadMarkWhenVisible = (name: LoadMark, ref: RefObject<Element | null>): void => {
+    useEffect(() => {
+        const element = ref.current;
+
+        if (!element || recorded.has(name) || typeof IntersectionObserver === "undefined") {
+            return undefined;
+        }
+
+        const observer = new IntersectionObserver((entries) => {
+            const visible = entries.find((entry) => entry.isIntersecting);
+
+            if (visible) {
+                markLoadOnce(name, visible.time);
+            }
+
+            // Another row may have recorded it already: nothing left to watch for.
+            if (recorded.has(name)) {
+                observer.disconnect();
+            }
+        });
+
+        observer.observe(element);
+
+        return () => {
+            observer.disconnect();
+        };
+    }, [name, ref]);
 };
