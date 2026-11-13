@@ -288,11 +288,15 @@ describe("an older page", () => {
         await settle();
         answerNewest?.();
 
-        expect((await newest).kind).toBe("superseded");
+        const newestResult = await newest;
+
+        expect(newestResult.kind).toBe("superseded");
 
         finishForget?.();
 
-        expect((await older).kind).toBe("refused");
+        const olderResult = await older;
+
+        expect(olderResult.kind).toBe("refused");
 
         await settle();
 

@@ -63,8 +63,13 @@ export interface HistoryPage<R> {
 const EMPTY_RUN = "";
 
 /** Where the run that joins the newest row starts in `rows`, for a hole anchored at `anchorId`. */
-const anchorAt = (rows: ReadonlyArray<HistoryRow>, anchorId: string): number =>
-    anchorId === EMPTY_RUN ? rows.length : Math.max(0, rows.findIndex((row) => row.id === anchorId));
+const anchorAt = (rows: ReadonlyArray<HistoryRow>, anchorId: string): number => {
+    if (anchorId === EMPTY_RUN) {
+        return rows.length;
+    }
+
+    return Math.max(0, rows.findIndex((row) => row.id === anchorId));
+};
 
 /** A row the server holds: rows made on this screen (sending, or sent and not read back yet) are not. */
 const isServerRow = (row: HistoryRow): boolean => row.status !== "local" && row.finished !== true;

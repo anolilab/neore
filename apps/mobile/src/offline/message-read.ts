@@ -86,6 +86,7 @@ const failureOf = async (
         // Every read in flight is stale from here: one landing while the saved copy is dropped must neither show nor save
         // its rows, or the save could put them back after the deletion.
         gate.invalidate();
+
         // A chat that is locked shows no cached content, and nothing of it stays on the device.
         try {
             await cache?.forgetThreads([threadId]);

@@ -5,7 +5,6 @@ import {
     createFillRunner,
     createLoadingOwner,
     fillHistory,
-    hasOlder,
     MAX_FILL_PAGES,
     newestRun,
     nextOlderCursor,
