@@ -233,12 +233,29 @@ describe("emphasis beside an anchor that prints plain text", () => {
         expect(convert("<em>x</em><a>y</a>")).toBe("*x*y");
     });
 
+    // Both emphasis elements read the anchor's text, on their left and right sides. Each run keeps its own
+    // intraword delimiter, so the two spans stay apart. The left-hand read is pinned here, not only the right-hand one.
+    it("keeps two emphasis spans apart around an anchor with no href", () => {
+        expect(convert("<em>a</em><a>Q</a><em>b</em>")).toBe("*a*Q*b*");
+    });
+
     it("reads the text of an unsafe link when safe links are on", () => {
         expect(convert("<em>x</em><a href=javascript:alert(1)>y</a>", { safeLinks: true })).toBe("*x*y");
     });
 
     it("keeps the plain delimiter beside a link, which prints brackets", () => {
         expect(convert("<em>x</em><a href=/u>y</a>")).toBe("_x_[y](/u)");
+    });
+});
+
+describe("a leading break in emphasis, with trailing space, is written once", () => {
+    // The trailing space makes the edge trim run. The break must come out once, not twice.
+    it("writes the leading break of emphasis once, before the delimiter", () => {
+        expect(convert("<p>p<em><br>x </em>next</p>")).toBe("p  \n_x_ next");
+    });
+
+    it("writes the leading break of strong once, before the delimiter", () => {
+        expect(convert("<p>p<strong><br>x </strong>next</p>")).toBe("p  \n**x** next");
     });
 });
 
