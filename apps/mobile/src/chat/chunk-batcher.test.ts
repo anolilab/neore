@@ -137,4 +137,31 @@ describe(createChunkBatcher, () => {
 
         expect(apply).not.toHaveBeenCalled();
     });
+
+    it("writes nothing once the send is stopped, even from a frame scheduled before", () => {
+        const clock = frames();
+        const apply = vi.fn();
+        const controller = new AbortController();
+        const batcher = createChunkBatcher({ apply, cancelFrame: clock.cancelFrame, requestFrame: clock.requestFrame, signal: controller.signal });
+
+        batcher.add("reply", "queued before the stop");
+        controller.abort();
+        clock.tick();
+        batcher.add("reply", "arrived after it");
+        clock.tick();
+        batcher.flush();
+
+        expect(apply).not.toHaveBeenCalled();
+        expect(clock.pending()).toBe(0);
+    });
+
+    it("stops listening to the send once detached", () => {
+        const controller = new AbortController();
+        const removed = vi.spyOn(controller.signal, "removeEventListener");
+        const batcher = createChunkBatcher({ apply: () => {}, cancelFrame: () => {}, requestFrame: () => 1, signal: controller.signal });
+
+        batcher.detach();
+
+        expect(removed).toHaveBeenCalledOnce();
+    });
 });

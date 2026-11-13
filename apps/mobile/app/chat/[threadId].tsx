@@ -24,6 +24,7 @@ import type { SendSession } from "@/chat/send-sessions";
 import { sendSessions } from "@/chat/send-sessions";
 import type { HeldSend } from "@/chat/start-send";
 import { abortableSleep, afterStart, clientMessageIdFor, replyStreamOf, startWithRetries } from "@/chat/start-send";
+import type { StreamDelta } from "@/chat/stream";
 import { relayReply } from "@/chat/stream";
 import type { SendStage } from "@/chat/unsent-send";
 import { failedSendMessage, failedSendOutcome, giveBackDraft, shouldKeepClientMessageId, withoutUnsentRows } from "@/chat/unsent-send";
@@ -623,38 +624,45 @@ const Chat = () => {
                 },
                 cancelFrame: cancelAnimationFrame,
                 requestFrame: requestAnimationFrame,
-            });
-            const outcome = await relayReply({
-                fetch: streamingFetch,
-                gatewayUrl: config.gatewayUrl,
-                onDelta: ({ restart, text }) => {
-                    // A send that was stopped, by a refusal of its chat or by leaving the screen, writes nothing more.
-                    if (controller.signal.aborted) {
-                        chunks.discard();
-
-                        return;
-                    }
-
-                    if (restart) {
-                        // The text before the steer lands in its own row first.
-                        chunks.flush();
-                        isSteered = true;
-                        const previousId = activeId;
-
-                        steerCount += 1;
-                        activeId = `${assistantId}-${steerCount}`;
-                        const steered = localRow(activeId, "assistant", threadId ?? NEW_THREAD, text);
-
-                        writeRows((current) => withSteeredRow(current, previousId, steered));
-
-                        return;
-                    }
-
-                    chunks.add(activeId, text);
-                },
                 signal: controller.signal,
-                streamToken: replyStream.streamToken,
             });
+            const onDelta = ({ restart, text }: StreamDelta) => {
+                // A send that was stopped, by a refusal of its chat or by leaving the screen, writes nothing more.
+                if (controller.signal.aborted) {
+                    chunks.discard();
+
+                    return;
+                }
+
+                if (restart) {
+                    // The text before the steer lands in its own row first.
+                    chunks.flush();
+                    isSteered = true;
+                    const previousId = activeId;
+
+                    steerCount += 1;
+                    activeId = `${assistantId}-${steerCount}`;
+                    const steered = localRow(activeId, "assistant", threadId ?? NEW_THREAD, text);
+
+                    writeRows((current) => withSteeredRow(current, previousId, steered));
+
+                    return;
+                }
+
+                chunks.add(activeId, text);
+            };
+            // The batcher stops listening to the send once the stream has settled, however it ended.
+            const outcome = await withFinally(
+                async () =>
+                    await relayReply({
+                        fetch: streamingFetch,
+                        gatewayUrl: config.gatewayUrl,
+                        onDelta,
+                        signal: controller.signal,
+                        streamToken: replyStream.streamToken,
+                    }),
+                chunks.detach,
+            );
 
             // A send stopped on purpose has its notice on screen already, and gets no confirmation.
             if (controller.signal.aborted) {

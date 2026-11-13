@@ -26,6 +26,8 @@ export const appendTexts = <R extends ShownRow>(rows: R[], texts: ReadonlyMap<st
 export interface ChunkBatcher {
     /** Queues `text` for the row `id`; the first chunk after a flush schedules the next one. */
     add: (id: string, text: string) => void;
+    /** Stops listening to the send's abort signal: called once the reply has settled. */
+    detach: () => void;
     /** Drops what is queued and the scheduled flush: for a send that was stopped. */
     discard: () => void;
     /** Applies what is queued now, in one update: before a steer starts a new row and when the reply ends. */
@@ -40,10 +42,17 @@ export const createChunkBatcher = ({
     apply,
     cancelFrame,
     requestFrame,
+    signal,
 }: {
     apply: (texts: ReadonlyMap<string, string>) => void;
     cancelFrame: (handle: number) => void;
     requestFrame: (callback: () => void) => number;
+
+    /**
+     * The send's signal. A stopped send (leaving, sign-out, a refusal) writes nothing more: what is queued is dropped the
+     * moment it stops, not at the next delta or when the stream settles, so a frame already scheduled applies nothing.
+     */
+    signal?: AbortSignal;
 }): ChunkBatcher => {
     let pending = new Map<string, string>();
     let frame: number | undefined;
@@ -70,9 +79,16 @@ export const createChunkBatcher = ({
         apply(texts);
     };
 
+    const discard = () => {
+        cancelScheduled();
+        pending = new Map();
+    };
+
+    signal?.addEventListener("abort", discard, { once: true });
+
     return {
         add: (id, text) => {
-            if (text === "") {
+            if (text === "" || signal?.aborted === true) {
                 return;
             }
 
@@ -82,10 +98,10 @@ export const createChunkBatcher = ({
                 flush();
             });
         },
-        discard: () => {
-            cancelScheduled();
-            pending = new Map();
+        detach: () => {
+            signal?.removeEventListener("abort", discard);
         },
+        discard,
         flush,
     };
 };
