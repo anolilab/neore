@@ -17,12 +17,39 @@ export interface GatewayErrorBody {
     message?: string;
 }
 
+/** A machine-readable gateway code: no spaces, so never a message (which can carry the person's text). */
+const GATEWAY_CODE = /^[\w.:-]{1,64}$/u;
+
+/**
+ * A failed gateway response other than a rate limit: an `Error` as before (the chat maps its message as it always has),
+ * with the gateway's code and the HTTP status for analytics. Named apart from `AppError`'s `code`/`statusCode`, which
+ * `toAppError` would take as an app error already mapped.
+ */
+export class GatewayError extends Error {
+    /** The gateway's code (`error`, or `error.code`), when it sent one that is a code. */
+    public readonly gatewayCode: string | undefined;
+
+    public readonly status: number;
+
+    public constructor(message: string, status: number, gatewayCode: string | undefined) {
+        super(message);
+        this.status = status;
+        this.gatewayCode = gatewayCode;
+    }
+}
+
 /** The error for a failed gateway response. A 429 is a `RateLimitError`, so the chat shows the limit, not a server error. */
 export const gatewayError = (status: number, body: GatewayErrorBody): Error => {
     const nested = typeof body.error === "object" ? body.error : undefined;
     const message = body.message || nested?.message || (typeof body.error === "string" ? body.error : "") || `HTTP ${status}`;
 
-    return status === 429 ? new RateLimitError(message, (nested?.retryAfter ?? 60) * 1000) : new Error(message);
+    if (status === 429) {
+        return new RateLimitError(message, (nested?.retryAfter ?? 60) * 1000);
+    }
+
+    const code = typeof body.error === "string" ? body.error : nested?.code;
+
+    return new GatewayError(message, status, code !== undefined && GATEWAY_CODE.test(code) ? code : undefined);
 };
 
 export interface GatewayInfo {
