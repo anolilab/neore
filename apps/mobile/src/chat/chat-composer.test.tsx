@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-// eslint-disable-next-line testing-library/no-manual-cleanup -- vitest runs without globals here, so Testing Library registers no cleanup of its own
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { act, useState } from "react";
+import type { Root } from "react-dom/client";
+import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChatComposer } from "./chat-composer";
@@ -70,23 +70,55 @@ const ChatScreen = ({ onSend }: { onSend: () => void }) => {
     );
 };
 
+const mounted: { container?: HTMLElement; root?: Root } = {};
+
+const mount = (onSend: () => void) => {
+    act(() => {
+        mounted.root?.render(<ChatScreen onSend={onSend} />);
+    });
+};
+
+const messageBox = (): HTMLTextAreaElement => {
+    const box = mounted.container?.querySelector<HTMLTextAreaElement>("textarea[aria-label='Message']");
+
+    if (!box) {
+        throw new Error("The message box is not on screen.");
+    }
+
+    return box;
+};
+
+/** Types as a person does: the browser sets the value, then reports the input, which React turns into `onChange`. */
+const typeInto = (box: HTMLTextAreaElement, value: string) => {
+    act(() => {
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(box, value);
+        box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+};
+
 describe(ChatComposer, () => {
     beforeEach(() => {
         renders.list = 0;
         renders.screen = 0;
+        // React reads this to allow `act` outside a testing library.
+        Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
+        mounted.container = document.createElement("div");
+        mounted.root = createRoot(mounted.container);
     });
 
     afterEach(() => {
-        cleanup();
+        act(() => {
+            mounted.root?.unmount();
+        });
     });
 
     it("re-renders neither the screen nor its message list while typing", () => {
-        render(<ChatScreen onSend={() => {}} />);
+        mount(() => {});
 
-        const box = screen.getByLabelText<HTMLTextAreaElement>("Message");
+        const box = messageBox();
 
         for (const text of ["H", "He", "Hel", "Hell", "Hello"]) {
-            fireEvent.change(box, { target: { value: text } });
+            typeInto(box, text);
         }
 
         expect(box.value).toBe("Hello");
@@ -95,24 +127,26 @@ describe(ChatComposer, () => {
     });
 
     it("puts dictated words into the draft without re-rendering the screen", () => {
-        render(<ChatScreen onSend={() => {}} />);
-        fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Note:" } });
+        mount(() => {});
+        typeInto(messageBox(), "Note:");
 
         act(() => {
             dictation.onText?.("buy milk");
         });
 
         expect(rendered.store?.get()).toBe("Note: buy milk");
-        expect(screen.getByLabelText<HTMLTextAreaElement>("Message").value).toBe("Note: buy milk");
+        expect(messageBox().value).toBe("Note: buy milk");
         expect(renders).toStrictEqual({ list: 1, screen: 1 });
     });
 
     it("shows a draft the screen writes, as a cleared box after a send or a prompt given back", () => {
         const onSend = vi.fn();
 
-        render(<ChatScreen onSend={onSend} />);
-        fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Hi" } });
-        fireEvent.click(screen.getByText("Send"));
+        mount(onSend);
+        typeInto(messageBox(), "Hi");
+        act(() => {
+            mounted.container?.querySelector("button")?.click();
+        });
 
         expect(onSend).toHaveBeenCalledOnce();
 
@@ -120,13 +154,13 @@ describe(ChatComposer, () => {
             rendered.store?.set("");
         });
 
-        expect(screen.getByLabelText<HTMLTextAreaElement>("Message").value).toBe("");
+        expect(messageBox().value).toBe("");
 
         act(() => {
             rendered.store?.set("given back");
         });
 
-        expect(screen.getByLabelText<HTMLTextAreaElement>("Message").value).toBe("given back");
+        expect(messageBox().value).toBe("given back");
         expect(renders.screen).toBe(1);
     });
 });
