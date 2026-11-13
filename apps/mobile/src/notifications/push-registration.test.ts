@@ -6,6 +6,7 @@ import {
     createForegroundGate,
     createPendingWork,
     createPromptOffer,
+    createSerialSteps,
     createTokenChangeFilter,
     languageTag,
     LAST_ACCOUNT_KEY,
@@ -434,6 +435,64 @@ describe("noteAccountOnPhone", () => {
         expect(removeAlerts).not.toHaveBeenCalled();
         expect(store.write).not.toHaveBeenCalled();
         expect(items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
+    });
+    it("leaves a newer account's record alone when a removal that is no longer current fails", async () => {
+        const { items, store } = device("sha256:u1");
+
+        await expect(
+            noteAccountOnPhone(
+                "u2",
+                store,
+                async () => {
+                    items[LAST_ACCOUNT_KEY] = "sha256:u3";
+                    throw new Error("denied");
+                },
+                () => true,
+            ),
+        ).rejects.toThrow("denied");
+        expect(items[LAST_ACCOUNT_KEY]).toBe("sha256:u3");
+    });
+});
+
+describe("createSerialSteps", () => {
+    it("runs each step only once the one asked for before it has finished", async () => {
+        const run = createSerialSteps();
+        const order: string[] = [];
+        let release: () => void = () => undefined;
+        let markStarted: () => void = () => undefined;
+        const started = new Promise<void>((resolve) => {
+            markStarted = () => resolve();
+        });
+
+        const first = run(async () => {
+            order.push("first:start");
+            markStarted();
+            await new Promise<void>((resolve) => {
+                release = () => resolve();
+            });
+            order.push("first:end");
+        });
+        const second = run(async () => {
+            order.push("second");
+        });
+
+        await started;
+        expect(order).toEqual(["first:start"]);
+        release();
+        await Promise.all([first, second]);
+
+        expect(order).toEqual(["first:start", "first:end", "second"]);
+    });
+
+    it("keeps the next step running when one fails, and reports the failure to its own caller", async () => {
+        const run = createSerialSteps();
+        const failed = run(async () => {
+            throw new Error("denied");
+        });
+        const next = run(async () => "next");
+
+        await expect(failed).rejects.toThrow("denied");
+        await expect(next).resolves.toBe("next");
     });
 });
 

@@ -332,8 +332,12 @@ export const noteAccountOnPhone = async (
     try {
         await removeSwitchedAlerts();
     } catch (error) {
-        // Pending even when this check is no longer current: the next sign-in must remove the alerts whoever it is.
-        await store.write(LAST_ACCOUNT_KEY, PENDING_REMOVAL);
+        // Pending only while the record still names the account this check read: a newer check's record is never overwritten.
+        const isStillRecorded = (await store.read(LAST_ACCOUNT_KEY) ?? undefined) === previous;
+
+        if (isStillRecorded) {
+            await store.write(LAST_ACCOUNT_KEY, PENDING_REMOVAL);
+        }
 
         throw error;
     }
@@ -385,5 +389,33 @@ export const createAccountChecks = (timeoutMs: number, warn: (message: string, e
         },
         /** Resolves once every check queued so far has finished or timed out. */
         settled: (): Promise<void> => last,
+    };
+};
+
+/**
+ * Runs steps one after another, in the order they were asked for, and gives each caller its own step's result or error.
+ * A write asked for earlier always lands before a later one, so a delayed write from a check that timed out cannot
+ * overwrite a newer account's record.
+ */
+export const createSerialSteps = () => {
+    let last: Promise<void> = Promise.resolve();
+
+    return async <T>(step: () => Promise<T>): Promise<T> => {
+        const previous = last;
+        const run = (async () => {
+            await previous;
+
+            return await step();
+        })();
+
+        last = (async () => {
+            try {
+                await run;
+            } catch {
+                // The caller receives the error.
+            }
+        })();
+
+        return await run;
     };
 };
