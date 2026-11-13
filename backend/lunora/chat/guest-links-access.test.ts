@@ -87,7 +87,7 @@ let threadId: string;
 const asOwner = () => harness.withIdentity({ userId: OWNER } as never);
 const rows = async (table: string) => await harness.run(async (ctx: any) => await ctx.db.query(table).collect());
 const createLink = async () =>
-    (await asOwner().mutation(guestLinks.createGuestLink as never, { threadId } as never)) as { expiresAt: number; linkToken: string };
+    (await asOwner().mutation(guestLinks.createGuestLink as never, { threadId } as never)) as { expiresAt: number; id: string; linkToken: string };
 
 /** The owner-shard half of a post, with `BROWSER` as the token the first post binds. */
 const hold = async (linkToken: string, text: string, guestToken?: string) =>
@@ -478,8 +478,9 @@ describe("revoking a link", () => {
     it("removes the link, its messages and its route", async () => {
         const { linkToken } = await createLink();
 
-        await hold(linkToken, "bye");
-        await asOwner().mutation(guestLinks.revokeGuestLink as never, { threadId } as never);
+        const { messageId } = await hold(linkToken, "bye");
+
+        await asOwner().mutation(guestLinks.revokeGuestLink as never, { confirmedNotes: [messageId], threadId } as never);
 
         expect(await rows("threadGuestLinks")).toHaveLength(0);
         expect(await rows("threadGuestMessages")).toHaveLength(0);
@@ -487,5 +488,43 @@ describe("revoking a link", () => {
         await runRouteDrops();
         expect(await rows("shardRoutes")).toHaveLength(0);
         expect((await hold(linkToken, "after")).reason).toBe("closed");
+    });
+
+    it("names the link by its id, so the owner's panel tells it from a later one made in the same millisecond", async () => {
+        const made = await createLink();
+        const read = (await asOwner().query(guestLinks.getGuestLink as never, { threadId } as never)) as { link: { id: string } | null };
+
+        expect(read.link?.id).toBe(made.id);
+        expect(await rows("threadGuestLinks")).toMatchObject([{ _id: made.id }]);
+    });
+
+    const revoke = async (confirmedNotes: (string | undefined)[]) =>
+        await asOwner().mutation(guestLinks.revokeGuestLink as never, { confirmedNotes, threadId } as never);
+
+    it("never deletes a note left after the owner confirmed: it refuses with the count now waiting", async () => {
+        const { linkToken } = await createLink();
+        const first = await hold(linkToken, "first");
+
+        // The owner confirmed the one note they saw; a second came in before the revoke arrived.
+        await hold(linkToken, "second", BROWSER);
+        await expect(revoke([first.messageId])).rejects.toMatchObject({ data: { code: "GUEST_NOTES_WAITING", waiting: 2 } });
+        expect(await rows("threadGuestMessages")).toHaveLength(2);
+        expect(await rows("threadGuestLinks")).toHaveLength(1);
+    });
+
+    it("tells a note from the one the owner saw: one sent meanwhile and a new one left keep the count, but nothing is deleted", async () => {
+        const { linkToken } = await createLink();
+        const seen = await hold(linkToken, "the note the owner saw");
+
+        // Sent from the owner's phone, and a guest left another: one note still waits, but not the one confirmed.
+        await harness.run(async (ctx: any) => await ctx.db.patch("threadGuestMessages", seen.messageId, { status: "sent" }));
+        const unseen = await hold(linkToken, "a note the owner never saw", BROWSER);
+
+        await expect(revoke([seen.messageId])).rejects.toMatchObject({ data: { code: "GUEST_NOTES_WAITING", waiting: 1 } });
+        expect(await rows("threadGuestMessages")).toHaveLength(2);
+
+        await revoke([unseen.messageId]);
+
+        expect(await rows("threadGuestMessages")).toHaveLength(0);
     });
 });
