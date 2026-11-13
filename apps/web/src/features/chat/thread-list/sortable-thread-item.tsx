@@ -20,7 +20,6 @@ interface SortableThreadItemProperties {
     isSelectionMode: boolean;
     loadingStates: import("./types").LoadingStates;
     node: BranchNode;
-    searchQuery: string;
     selectedThreadIds: Set<string>;
     toggleExpanded: (threadId: string) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
@@ -40,7 +39,6 @@ const SortableThreadItem: FC<SortableThreadItemProperties> = ({
     isSelectionMode,
     loadingStates,
     node,
-    searchQuery,
     selectedThreadIds,
     toggleExpanded,
     updateThread,
@@ -71,7 +69,6 @@ const SortableThreadItem: FC<SortableThreadItemProperties> = ({
                 isSelectionMode={isSelectionMode}
                 loadingStates={loadingStates}
                 node={node}
-                searchQuery={searchQuery}
                 selectedThreadIds={selectedThreadIds}
                 toggleExpanded={toggleExpanded}
                 updateThread={updateThread}

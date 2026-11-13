@@ -21,6 +21,8 @@ let trace: Entry[];
 let failOn: ((entry: Entry) => boolean) | undefined;
 let answer: (ref: string, round: number, args: Record<string, unknown>) => unknown;
 const rounds = new Map<string, number>();
+/** The durations of the workflow's sleeps, in order: a test of a wait checks that the wait happened, and how long. */
+const sleeps: string[] = [];
 
 const refOf = (reference: unknown): string => (reference as { __lunoraRef: string }).__lunoraRef;
 
@@ -50,6 +52,10 @@ const workflowContext = () => {
                 trace.push({ kind: "step", name });
 
                 return await callback();
+            },
+            sleep: async (name: string, duration: string) => {
+                sleeps.push(duration);
+                trace.push({ kind: "step", name });
             },
         },
     };
@@ -506,5 +512,69 @@ describe("account deletion workflow: replay", () => {
 
         expect(sweeps()).toBe(2);
         expect(request.status).toBe("completed");
+    });
+});
+
+describe("account deletion workflow: usage exports", () => {
+    beforeEach(() => {
+        sleeps.length = 0;
+    });
+
+    const isPurge = (ref: string): boolean => ref.endsWith("purgeUserUsageFiles");
+
+    it("waits while a usage export is live, purges again once it has ended, and then completes", async () => {
+        const base = answer;
+
+        answer = (ref, round, args) => (isPurge(ref) ? { waiting: round < 3 } : base(ref, round, args));
+
+        await execute();
+
+        const purges = runs().filter((entry) => isPurge(entry.ref));
+
+        expect(purges.map((entry) => entry.args["force"])).toStrictEqual([false, false, false]);
+        expect(sleeps).toStrictEqual(["1 minute", "1 minute"]);
+        expect(completionIndex()).toBeGreaterThan(-1);
+    });
+
+    it("follows the purge's cursor from call to call, so every page of keyed runs is purged before erasure completes", async () => {
+        const base = answer;
+        const next = new Map<string | null, string>([
+            ["page-2", "page-3"],
+            [null, "page-2"],
+        ]);
+
+        answer = (ref, round, args) => {
+            if (!isPurge(ref)) {
+                return base(ref, round, args);
+            }
+
+            const cursor = next.get(args["cursor"] as string | null);
+
+            return cursor === undefined ? { waiting: false } : { cursor, waiting: false };
+        };
+
+        await execute();
+
+        const purges = runs().filter((entry) => isPurge(entry.ref));
+
+        expect(purges.map((entry) => entry.args["cursor"])).toStrictEqual([null, "page-2", "page-3"]);
+        expect(completionIndex()).toBeGreaterThan(-1);
+    });
+
+    it("forces the purge once the wait is over, so erasure finishes while a long export is still live", async () => {
+        const base = answer;
+
+        // The export never ends on its own: after the bound, the forced purge deletes its stored object but keeps its record for the sweep.
+        answer = (ref, round, args) => (isPurge(ref) ? { waiting: args["force"] !== true } : base(ref, round, args));
+
+        await execute();
+
+        const purges = runs().filter((entry) => isPurge(entry.ref));
+
+        expect(purges).toHaveLength(121);
+        expect(purges.at(-1)?.args["force"]).toBe(true);
+        expect(sleeps).toHaveLength(120);
+        expect(sleeps.every((duration) => duration === "1 minute")).toBe(true);
+        expect(completionIndex()).toBeGreaterThan(-1);
     });
 });

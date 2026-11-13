@@ -12,9 +12,12 @@ import { describe, expect, it } from "vitest";
  * fails when one of these components is skipped again.
  */
 const MUST_COMPILE: Record<string, string[]> = {
+    "src/features/auth/components/organization/organization-switcher.tsx": ["OrganizationSwitcher"],
+    "src/features/auth/components/team/team-switcher.tsx": ["TeamSwitcher"],
     "src/features/chat/core/context/chat-context.tsx": ["ChatProvider"],
     "src/features/chat/core/hooks/use-threads.ts": ["useThreads"],
     "src/features/chat/thread-list/hierarchical-thread-list.tsx": ["HierarchicalThreadList"],
+    "src/features/chat/thread-list/hooks/use-thread-groups.ts": ["useThreadGroups"],
     "src/features/chat/thread-list/thread-list-header.tsx": ["ThreadListHeader"],
     "src/features/chat/thread-list/thread-list.tsx": ["ThreadList"],
     "src/features/chat/thread/thread.tsx": ["ThreadContent"],

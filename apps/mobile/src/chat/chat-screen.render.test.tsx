@@ -2,8 +2,8 @@
 
 /**
  * Renders the production chat screen (`app/chat/[threadId].tsx`) with its native modules and services stubbed at the
- * module boundary, and types and sends through its real composer: what is measured is the screen's own wiring of the
- * draft store, the composer and the send, not a copy of it.
+ * module boundary, and types, sends and streams a reply through its real composer and `send`: what is measured is the
+ * screen's own wiring of the draft store, the batcher, the row writes and the memoised rows, not a copy of it.
  */
 import type { ReactNode } from "react";
 import { act, createElement, Fragment } from "react";
@@ -15,11 +15,19 @@ import ChatScreen from "../../app/chat/[threadId]";
 
 const harness = vi.hoisted(() => {
     return {
+        /** The reply stream's end, settled by the test. */
+        finishReply: undefined as ((outcome: string) => void) | undefined,
+        /** Frames requested by the screen, run by the test. */
+        frames: [] as (() => void)[],
+        /** Whether the start waits for the test (`settleStart`) instead of answering with a reply stream. */
+        holdStart: false,
         /** One entry per render of the message list: it renders exactly when the screen does. */
         listRenders: [] as number[],
-        /** Settles the start the screen is waiting on, as the gateway would. */
+        /** The delta handler the screen gave the stream. */
+        onDelta: undefined as ((delta: { reasoning: string; text: string }) => void) | undefined,
+        /** Settles a held start, as the gateway would. */
         settleStart: undefined as ((outcome: Error) => void) | undefined,
-        /** What each `Text` rendered. */
+        /** What each `Text` rendered: a row skipped by its memo adds nothing. */
         textRenders: [] as string[],
     };
 });
@@ -135,19 +143,38 @@ vi.mock(import("@/auth/secure-store"), () => ({ secureGrantStore: {} } as never)
 // eslint-disable-next-line no-restricted-syntax -- secure storage is a native module
 vi.mock(import("@/chat/last-thread-store"), () => ({ forgetLastThread: async () => {}, rememberLastThread: async () => {} } as never));
 
-// The start waits until the test settles it; everything else of the chat API is the real module.
+// The start answers with a reply stream, or waits until the test settles it; everything else of the chat API is real.
 // eslint-disable-next-line no-restricted-syntax -- the start is a network call
 vi.mock(import("@/chat/chat-api"), async (importOriginal) => {
     const original = await importOriginal<typeof import("@/chat/chat-api")>();
+    const started = { contentType: "text/event-stream", messageId: "m2", streamId: "s1", streaming: true, streamToken: "token", threadId: "t1" };
 
     return {
         ...original,
-        startChat: async () =>
-            await new Promise((_resolve, reject) => {
+        startChat: async () => {
+            if (!harness.holdStart) {
+                return started;
+            }
+
+            return await new Promise((_resolve, reject) => {
                 harness.settleStart = reject;
-            }),
+            });
+        },
     } as never;
 });
+
+// The stream hands its delta handler to the test, which plays the reply, and ends when the test says so.
+// eslint-disable-next-line no-restricted-syntax -- the reply stream is a network call
+vi.mock(import("@/chat/stream"), async (importOriginal) => ({
+    ...await importOriginal<typeof import("@/chat/stream")>(),
+    relayReply: async ({ onDelta }: { onDelta: (delta: { reasoning: string; text: string }) => void }) => {
+        harness.onDelta = onDelta;
+
+        return await new Promise((resolve) => {
+            harness.finishReply = resolve;
+        });
+    },
+} as never));
 
 // eslint-disable-next-line no-restricted-syntax -- the build config is read from Expo's native constants
 vi.mock(import("@/lib/config"), () => {
@@ -176,6 +203,98 @@ vi.mock(import("@/voice/use-dictation"), () => ({ useDictation: () => stable.voi
 
 // eslint-disable-next-line no-restricted-syntax -- see above
 vi.mock(import("@/voice/voice-button"), () => ({ VoiceButton: () => null, VoiceStatus: () => null } as never));
+
+const rendered = (text: string): number => harness.textRenders.filter((entry) => entry === text).length;
+
+describe("the chat screen streaming a reply", () => {
+    const mounted: { container?: HTMLElement; root?: Root } = {};
+
+    beforeEach(() => {
+        harness.holdStart = false;
+        harness.frames = [];
+        harness.listRenders = [];
+        harness.textRenders = [];
+        harness.onDelta = undefined;
+        harness.finishReply = undefined;
+        vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
+            harness.frames.push(callback);
+
+            return harness.frames.length;
+        });
+        vi.stubGlobal("cancelAnimationFrame", () => {});
+        // React reads this to allow `act` outside a testing library.
+        Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
+        mounted.container = document.createElement("div");
+        mounted.root = createRoot(mounted.container);
+    });
+
+    afterEach(() => {
+        act(() => {
+            mounted.root?.unmount();
+        });
+        vi.unstubAllGlobals();
+    });
+
+    it("renders once for a frame of chunks, and only the row the text lands in", async () => {
+        act(() => {
+            mounted.root?.render(createElement(ChatScreen));
+        });
+        await vi.waitFor(() => {
+            expect(mounted.container?.textContent).toContain("An earlier answer");
+        });
+
+        const box = mounted.container?.querySelector<HTMLTextAreaElement>("textarea[aria-label='Message']");
+        const send = [...mounted.container?.querySelectorAll("button") ?? []].find((button) => button.textContent === "Send");
+
+        act(() => {
+            if (!box) {
+                return;
+            }
+
+            Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(box, "Go on");
+            box.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        await act(async () => {
+            send?.click();
+            await vi.waitFor(() => {
+                expect(harness.onDelta).toBeDefined();
+            });
+        });
+
+        const listBefore = harness.listRenders.length;
+        const questionBefore = rendered("Why?");
+        const earlierBefore = rendered("An earlier answer");
+
+        act(() => {
+            for (const text of ["Be", "cause ", "it ", "is", "."]) {
+                harness.onDelta?.({ reasoning: "", text });
+            }
+        });
+
+        // Nothing is written until the frame.
+        expect(harness.listRenders).toHaveLength(listBefore);
+
+        act(() => {
+            const due = [...harness.frames];
+
+            harness.frames.length = 0;
+
+            for (const frame of due) {
+                frame();
+            }
+        });
+
+        expect(mounted.container?.textContent).toContain("Because it is.");
+        expect(harness.listRenders).toHaveLength(listBefore + 1);
+        expect(rendered("Why?")).toBe(questionBefore);
+        expect(rendered("An earlier answer")).toBe(earlierBefore);
+
+        await act(async () => {
+            harness.finishReply?.("finished");
+            await Promise.resolve();
+        });
+    });
+});
 
 describe("the chat screen's composer", () => {
     const mounted: { container?: HTMLElement; root?: Root } = {};
@@ -212,6 +331,7 @@ describe("the chat screen's composer", () => {
         harness.listRenders = [];
         harness.textRenders = [];
         harness.settleStart = undefined;
+        harness.holdStart = true;
         // React reads this to allow `act` outside a testing library.
         Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
         mounted.container = document.createElement("div");
