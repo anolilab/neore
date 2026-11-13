@@ -954,8 +954,10 @@ export const useFeatureFlagEnabled = (flag: string): boolean | undefined => {
     const fallsBack = useSyncExternalStore(subscribeAvailability, readFallsBack, notKnown);
     const subscribe = useMemo(() => subscribeFlags(posthog), [posthog]);
     // A client whose flags have not arrived reads every flag as off: that is not an answer yet, so it stays pending.
-    // Once they have, a flag the response left out is off, so `undefined` means only "no flags yet".
-    const read = useCallback(() => (posthog && hasFlagsOf(posthog) ? (posthog.isFeatureEnabled(flag) ?? false) : undefined), [posthog, flag]);
+    // Once they have, a flag the response has no value for (one PostHog failed to evaluate, `errorsWhileComputingFlags`,
+    // with nothing cached) is the server-rendered flag, else off: decided at once, so `undefined` means only "no flags
+    // yet" and the bounded wait never flips a loaded answer later.
+    const read = useCallback(() => (posthog && hasFlagsOf(posthog) ? (posthog.isFeatureEnabled(flag) ?? readBootstrapFlag(flag)) : undefined), [posthog, flag]);
     const enabled = useSyncExternalStore(subscribe, read, notLoaded);
     const started = useStartedPostHog();
     const isFlagsWaitOver = useSyncExternalStore(subscribeStarted, readFlagsWaitOver, notKnown);

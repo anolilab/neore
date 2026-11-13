@@ -1138,17 +1138,20 @@ describe("useFeatureFlagsKnown on the client this module loads", () => {
 });
 
 describe("useFeatureFlagEnabled", () => {
-    it("reads a flag the loaded response left out as off, not as the server-rendered value once the wait is over", async () => {
+    it.each([
+        ["the server-rendered value", { "code-mode": true }, true],
+        ["off without one", undefined, false],
+    ])("reads a flag the loaded response has no value for as %s, at once and unchanged once the wait is over", async (_name, bootstrap, expected) => {
         vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 
         try {
             const client = await loadClientModule();
 
-            client.setBootstrapFlags({ "code-mode": true });
+            client.setBootstrapFlags(bootstrap);
 
             const loaded = await client.loadPostHog();
 
-            // Flags arrived (the mock answers at once), but this one is not in them.
+            // Flags arrived (the mock answers at once), but this one has no value in them (it failed to evaluate).
             Object.assign(loaded, { isFeatureEnabled: vi.fn((): boolean | undefined => undefined) });
 
             const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: loaded }, children);
@@ -1159,13 +1162,13 @@ describe("useFeatureFlagEnabled", () => {
                 client.startPostHog(loaded, () => {});
             });
 
-            expect(result.current).toBe(false);
+            expect(result.current).toBe(expected);
 
             act(() => {
                 vi.advanceTimersByTime(client.FLAGS_WAIT_MS);
             });
 
-            expect(result.current).toBe(false);
+            expect(result.current).toBe(expected);
         } finally {
             vi.useRealTimers();
         }
