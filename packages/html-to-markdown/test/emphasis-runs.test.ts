@@ -159,3 +159,19 @@ describe("emphasis beside an element holding only an empty link", () => {
         expect(markdown).toContain("[](/x)");
     });
 });
+
+/*
+ * A same-kind parent holding a block that a custom rule renders as nothing. The custom output is not known from the
+ * DOM, so the parent does not share its delimiters; the inner element takes the asterisk. The result is emphasis
+ * inside emphasis, as in the HTML, and never strong text.
+ */
+
+describe("nested emphasis beside a block that a custom rule renders as nothing", () => {
+    it("writes emphasis inside emphasis, not strong text", () => {
+        const service = new TurndownService();
+
+        service.addRule("p", { filter: "p", replacement: () => "" });
+
+        expect(service.turndown("<em><em>a</em><p>b</p></em>")).toBe("_*a*_");
+    });
+});
