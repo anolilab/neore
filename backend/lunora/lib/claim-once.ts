@@ -37,7 +37,7 @@
  * | `title-answer`      | the run's `title-charge` key | 24 h; deleted when the run's write settles, is refused, or the chat is locked | `agent/thread-title.ts` (`recordTitleAnswer`: the model's answer, in `result`, for a write that has not landed yet) |
  * | `title-dispatch`    | `<threadId>:<request id>` | 2 min, released once the request is answered | `agent/thread-title.ts` (`beginTitleDispatch`: a title model request being sent; `enableThreadLock` refuses while one is held) |
  * | `organization-policy-create` | `<organizationId>` | {@link ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS} | `auth/organization-policy.ts` (`setOrganizationPolicy`: one writer creates an organization's first policy row) |
- * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
+ * | `daily-charge`     | `<requestId>`; `chat-start:<userId>:<clientMessageId>:<fingerprint>` (`chat/start-claim.ts#startChargeKey`) | 24 h | `chat/daily-charge.ts` (`chargeDailyLimitOnce`: one charge per keyed `/chat/start` send, kept when its start claim is released after a failed save, so a retry is not charged again) |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
  * | `video-reservation` | `<requestId>`            | 24 h                          | `auth/billing.ts`            |
  * | `posthog-retry-scheduled` / `-started` / `-outcome` / `-erased` / `-deferred` | `<requestId>:<chain>:<attempt>` (`-erased`: `:<deleted\|no_profile>`, `-deferred`: `:<n>` appended; `posthog-retry-chain`: `<requestId>:<failureId>`) | 14 days (`-lease`: 10 min) | `gdpr/posthog-retry.ts` (not user-tagged: erasing the account must not reopen a finished attempt) |
