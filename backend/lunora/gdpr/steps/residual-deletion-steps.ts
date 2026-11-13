@@ -211,8 +211,11 @@ export const killUserSandboxes = internalAction
 /** One erasure batch: whether more remains, and where the run scan continues. */
 const vUsageErasure = v.object({ hasMore: v.boolean(), runCursor: v.union(v.string(), v.null()) });
 
-/** Pages of a user's keyed runs one purge call reads before it returns its cursor. */
-const PURGE_PAGES_PER_CALL = 50;
+/**
+ * Pages of a user's keyed runs one purge call reads before it returns its cursor. A page is ten runs, and each run costs a storage
+ * lookup, a delete and a record call, so one page keeps the call well under the Worker's subrequest cap. The workflow calls again.
+ */
+const PURGE_PAGES_PER_CALL = 1;
 
 /**
  * The usage page's per-day rollup (`usage/activity.ts`): one row per skill per
