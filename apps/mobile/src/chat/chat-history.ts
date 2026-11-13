@@ -31,6 +31,11 @@ export interface HistoryGap {
 }
 
 export interface ChatHistory<R extends HistoryRow> {
+    /**
+     * How many rows the fill after the newest page reads down to (a chat just opened), while that is not reached yet and
+     * something older is left. A fill that stops early leaves it, so the next read goes on filling.
+     */
+    fillTarget?: number;
     gap?: HistoryGap;
     olderCursor: string | null | undefined;
     rows: R[];
@@ -74,7 +79,7 @@ export const newestRun = <R extends HistoryRow>(history: ChatHistory<R>): R[] =>
  * - when the page is the whole chat, nothing older exists, and older rows on screen go.
  * Rows made on this screen are not kept: the page holds their server copies.
  */
-export const withNewestPage = <R extends HistoryRow>(history: ChatHistory<R>, page: HistoryPage<R>): ChatHistory<R> => {
+const newestPageOf = <R extends HistoryRow>(history: ChatHistory<R>, page: HistoryPage<R>): ChatHistory<R> => {
     const [oldest] = page.rows;
 
     if (oldest === undefined) {
@@ -108,15 +113,17 @@ export const withNewestPage = <R extends HistoryRow>(history: ChatHistory<R>, pa
             : { gap: { anchorId: oldest.id, cursor: page.olderCursor, keptCursor: undefined }, olderCursor: undefined, rows };
     }
 
-    // The page does not reach the rows on screen. Below an earlier hole, only that hole's run is kept: its cursor is known.
-    const run = history.gap === undefined ? history.rows : newestRun(history);
-    const kept = run.filter((row) => isServerRow(row) && !pageIds.has(row.id));
+    // The page does not reach the rows on screen. With no hole yet, all of them are kept below a new one. Below an earlier
+    // hole, the rows under it stay, with what is known of them, and only the run above it is replaced by the page: the
+    // hole now reaches from the page down to them, and the fill reads that run again on its way.
+    const below = history.gap === undefined ? history.rows : history.rows.slice(0, Math.max(0, history.rows.findIndex((row) => row.id === history.gap?.anchorId)));
+    const kept = below.filter((row) => isServerRow(row) && !pageIds.has(row.id));
 
     if (kept.length === 0 || page.olderCursor === null) {
         return { olderCursor: page.olderCursor, rows: page.rows };
     }
 
-    const keptCursor = history.gap === undefined ? history.olderCursor : history.gap.cursor;
+    const keptCursor = history.gap === undefined ? history.olderCursor : history.gap.keptCursor;
 
     return { gap: { anchorId: oldest.id, cursor: page.olderCursor, keptCursor }, olderCursor: undefined, rows: [...kept, ...page.rows] };
 };
@@ -133,7 +140,7 @@ export const withNewestPage = <R extends HistoryRow>(history: ChatHistory<R>, pa
  * moved the history meanwhile (a new hole, or a cursor kept from below), the page no longer belongs where it would go,
  * and the history stays as it is.
  */
-export const withOlderPage = <R extends HistoryRow>(history: ChatHistory<R>, page: HistoryPage<R>, from: string): ChatHistory<R> => {
+const olderPageApplied = <R extends HistoryRow>(history: ChatHistory<R>, page: HistoryPage<R>, from: string): ChatHistory<R> => {
     if (nextOlderCursor(history) !== from) {
         return history;
     }
@@ -171,6 +178,36 @@ export const withOlderPage = <R extends HistoryRow>(history: ChatHistory<R>, pag
     return { olderCursor: keptCursor === undefined ? page.olderCursor : keptCursor, rows: [...joined, ...between, ...run] };
 };
 
+/** Carries the fill target over a read, until it is reached or nothing older is left. */
+const withFillCarried = <R extends HistoryRow>(before: ChatHistory<R>, after: ChatHistory<R>): ChatHistory<R> => {
+    const { fillTarget, ...rest } = after;
+    const target = before.fillTarget ?? fillTarget;
+
+    if (target === undefined || after.rows.length >= target || nextOlderCursor(after) === null) {
+        return rest;
+    }
+
+    return { ...rest, fillTarget: target };
+};
+
+/** A fresh read of the newest page (see {@link newestPageOf}); an unfinished fill target is carried over. */
+export const withNewestPage = <R extends HistoryRow>(history: ChatHistory<R>, page: HistoryPage<R>): ChatHistory<R> =>
+    withFillCarried(history, newestPageOf(history, page));
+
+/** One older page read from `from` (see {@link olderPageApplied}); an unfinished fill target is carried over. */
+export const withOlderPage = <R extends HistoryRow>(history: ChatHistory<R>, page: HistoryPage<R>, from: string): ChatHistory<R> => {
+    const next = olderPageApplied(history, page, from);
+
+    return next === history ? history : withFillCarried(history, next);
+};
+
+/** Sets the rows the fill reads down to: a chat just opened fills to {@link OPEN_FILL_ROWS}. */
+export const withFillTarget = <R extends HistoryRow>(history: ChatHistory<R>, fillTarget: number): ChatHistory<R> =>
+    withFillCarried({ ...history, fillTarget }, history);
+
+/** Whether a fill should run after a read: a hole to close, or a fill target not reached with something older left. */
+export const requiresFill = (history: ChatHistory<HistoryRow>): boolean => history.gap !== undefined || history.fillTarget !== undefined;
+
 /** How many rows a chat fills to after it opens, the newest page painted first: as far back as it opened before. */
 export const OPEN_FILL_ROWS = 200;
 
@@ -180,12 +217,10 @@ export const MAX_FILL_PAGES = 10;
 /** The page reads of {@link fillHistory}. */
 const readFill = async <R extends HistoryRow>({
     fetchOlder,
-    fillTo,
     read,
     update,
 }: {
     fetchOlder: (cursor: string) => Promise<HistoryPage<R> | undefined>;
-    fillTo: number;
     read: () => ChatHistory<R>;
     update: (apply: (history: ChatHistory<R>) => ChatHistory<R>) => void;
 }): Promise<"filled" | "stopped"> => {
@@ -193,7 +228,7 @@ const readFill = async <R extends HistoryRow>({
         const history = read();
         const cursor = nextOlderCursor(history);
 
-        if (cursor === null || (history.gap === undefined && history.rows.length >= fillTo)) {
+        if (cursor === null || !requiresFill(history)) {
             break;
         }
 
@@ -211,26 +246,24 @@ const readFill = async <R extends HistoryRow>({
 };
 
 /**
- * Reads older pages after the newest one is painted: first down through a hole, then, while the screen holds fewer
- * than `fillTo` rows, below the run. Each page is applied to the history as it is when the page lands (`update`).
+ * Reads older pages after the newest one is painted: first down through a hole, then, while the history's fill target
+ * is not reached, below the run. Each page is applied to the history as it is when the page lands (`update`).
  * `fetchOlder` answers `undefined` when the fill must stop (the screen moved on, the chat was refused, the network
  * failed); the history then keeps its hole, if any, for the next fill. However it ends, `save` gets the run that joins
  * the newest row, the chat's newest messages as now read, for the cache.
  */
 export const fillHistory = async <R extends HistoryRow>({
     fetchOlder,
-    fillTo,
     read,
     save,
     update,
 }: {
     fetchOlder: (cursor: string) => Promise<HistoryPage<R> | undefined>;
-    fillTo: number;
     read: () => ChatHistory<R>;
     save: (rows: R[]) => void;
     update: (apply: (history: ChatHistory<R>) => ChatHistory<R>) => void;
 }): Promise<"filled" | "stopped"> => {
-    const outcome = await readFill({ fetchOlder, fillTo, read, update });
+    const outcome = await readFill({ fetchOlder, read, update });
 
     save(newestRun(read()));
 

@@ -15,7 +15,19 @@ import { secureGrantStore } from "@/auth/secure-store";
 import type { StartedChat } from "@/chat/chat-api";
 import { ChatError, startChat } from "@/chat/chat-api";
 import type { ChatHistory, HistoryGap, HistoryPage } from "@/chat/chat-history";
-import { createLoadingOwner, fillHistory, hasOlder, newestRun, nextOlderCursor, olderPageOf, OPEN_FILL_ROWS, withNewestPage, withOlderPage } from "@/chat/chat-history";
+import {
+    createLoadingOwner,
+    fillHistory,
+    hasOlder,
+    newestRun,
+    nextOlderCursor,
+    olderPageOf,
+    OPEN_FILL_ROWS,
+    requiresFill,
+    withFillTarget,
+    withNewestPage,
+    withOlderPage,
+} from "@/chat/chat-history";
 import type { ShownRow } from "@/chat/chunk-batcher";
 import { appendTexts, createChunkBatcher } from "@/chat/chunk-batcher";
 import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
@@ -185,7 +197,7 @@ const Chat = () => {
     }, []);
     // The history's cursor and hole (`chat-history.ts`); its rows are `rowsRef`. Every read that changes the history
     // goes through `writeHistory`, so the rows, the cursor and the hole never disagree.
-    const historyRef = useRef<{ gap?: HistoryGap; olderCursor: string | null | undefined }>({ olderCursor: undefined });
+    const historyRef = useRef<{ fillTarget?: number; gap?: HistoryGap; olderCursor: string | null | undefined }>({ olderCursor: undefined });
     const [canLoadOlder, setCanLoadOlder] = useState(false);
     const readHistory = useCallback((): ChatHistory<Row> => {
         return { ...historyRef.current, rows: rowsRef.current };
@@ -194,7 +206,7 @@ const Chat = () => {
         (apply: (history: ChatHistory<Row>) => ChatHistory<Row>) => {
             const next = apply(readHistory());
 
-            historyRef.current = { gap: next.gap, olderCursor: next.olderCursor };
+            historyRef.current = { fillTarget: next.fillTarget, gap: next.gap, olderCursor: next.olderCursor };
             writeRows(next.rows);
             setCanLoadOlder(hasOlder(next));
         },
@@ -302,7 +314,7 @@ const Chat = () => {
     // Older pages read after the newest one is painted (`fillHistory`): through a hole first, then, for a chat just opened,
     // down to as far back as a chat opened before. "Load older messages" waits meanwhile.
     const fillOlderRows = useCallback(
-        async (id: string, fillTo: number) => {
+        async (id: string) => {
             const isCurrent = readGate.current.watch();
             const startedAt = Date.now();
             const end = loadingOwner.begin();
@@ -317,7 +329,6 @@ const Chat = () => {
                                     setError(message);
                                 }
                             }),
-                        fillTo,
                         read: readHistory,
                         save: (run) => {
                             if (isCurrent()) {
@@ -367,10 +378,15 @@ const Chat = () => {
                     const isOpening = !hasOpened.current;
 
                     hasOpened.current = true;
-                    writeHistory((history) => withNewestPage(history, { olderCursor: result.olderCursor, rows: result.rows }));
+                    writeHistory((history) => {
+                        const next = withNewestPage(history, { olderCursor: result.olderCursor, rows: result.rows });
 
-                    if (isOpening || historyRef.current.gap !== undefined) {
-                        settleQuietly(fillOlderRows(id, isOpening ? OPEN_FILL_ROWS : 0));
+                        // A chat just opened fills to as far back as it opened before; a fill a read stopped goes on here.
+                        return isOpening ? withFillTarget(next, OPEN_FILL_ROWS) : next;
+                    });
+
+                    if (requiresFill(readHistory())) {
+                        settleQuietly(fillOlderRows(id));
                     }
 
                     setError(withoutRefusal);
@@ -394,7 +410,7 @@ const Chat = () => {
                 }
             }
         },
-        [accountId, cache, fillOlderRows, reportRead, showRefused, writeHistory],
+        [accountId, cache, fillOlderRows, readHistory, reportRead, showRefused, writeHistory],
     );
 
     // One older page: the rest of a hole first, then below the run (`nextOlderCursor`).

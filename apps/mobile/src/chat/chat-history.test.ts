@@ -9,6 +9,8 @@ import {
     nextOlderCursor,
     olderPageOf,
     OPEN_FILL_ROWS,
+    requiresFill,
+    withFillTarget,
     withNewestPage,
     withOlderPage,
 } from "./chat-history";
@@ -49,12 +51,18 @@ const screenOf = (initial: ChatHistory<HistoryRow>) => {
 
 const EMPTY: ChatHistory<HistoryRow> = { olderCursor: undefined, rows: [] };
 
+/** The history after a read of the newest page `rows`, whose older history starts at `olderCursor`. */
+const newest = (history: ChatHistory<HistoryRow>, olderCursor: string, rows: HistoryRow[]) => withNewestPage(history, { olderCursor, rows });
+
+/** A chat just opened on the newest page `rows`: it fills to as many rows as a chat opens with. */
+const opening = (history: ChatHistory<HistoryRow>, olderCursor: string, rows: HistoryRow[]) => withFillTarget(newest(history, olderCursor, rows), OPEN_FILL_ROWS);
+
 describe("a chat opened and filled", () => {
     it("fills to as many rows as it opened with before, and keeps the cursor below the oldest row through the next read", async () => {
         const fetchOlder = serverOf();
-        const { read, screen, update } = screenOf(withNewestPage(EMPTY, { olderCursor: "281", rows: run(281, 300) }));
+        const { read, screen, update } = screenOf(opening(EMPTY, "281", run(281, 300)));
 
-        await fillHistory({ fetchOlder, fillTo: OPEN_FILL_ROWS, read, save: () => {}, update });
+        await fillHistory({ fetchOlder, read, save: () => {}, update });
 
         expect(ids(screen.history.rows)).toStrictEqual(ids(run(101, 300)));
         expect(fetchOlder).toHaveBeenCalledTimes(9);
@@ -72,11 +80,11 @@ describe("a chat opened and filled", () => {
         const fetchOlder = serverOf();
         // The cache painted messages 251-300; the first read brings 281-300 with nothing known below the saved rows.
         const painted: ChatHistory<HistoryRow> = { olderCursor: undefined, rows: run(251, 300) };
-        const { read, screen, update } = screenOf(withNewestPage(painted, { olderCursor: "281", rows: run(281, 300) }));
+        const { read, screen, update } = screenOf(opening(painted, "281", run(281, 300)));
 
         expect(ids(screen.history.rows)).toStrictEqual(ids(run(251, 300)));
 
-        await fillHistory({ fetchOlder, fillTo: OPEN_FILL_ROWS, read, save: () => {}, update });
+        await fillHistory({ fetchOlder, read, save: () => {}, update });
 
         expect(ids(screen.history.rows)).toStrictEqual(ids(run(101, 300)));
         expect(screen.history.gap).toBeUndefined();
@@ -92,7 +100,7 @@ describe("a refresh that does not reach the rows on screen", () => {
 
         expect(screen.history.gap).toStrictEqual({ anchorId: "m61", cursor: "61", keptCursor: null });
 
-        await fillHistory({ fetchOlder, fillTo: 0, read, save: () => {}, update });
+        await fillHistory({ fetchOlder, read, save: () => {}, update });
 
         expect(ids(screen.history.rows)).toStrictEqual(ids(run(1, 80)));
         expect(screen.history.gap).toBeUndefined();
@@ -111,7 +119,7 @@ describe("a refresh that does not reach the rows on screen", () => {
             return { olderCursor: "80", rows: run(80, 99) };
         });
 
-        await fillHistory({ fetchOlder, fillTo: 0, read, save: () => {}, update });
+        await fillHistory({ fetchOlder, read, save: () => {}, update });
 
         expect(screen.history.gap).toStrictEqual({ anchorId: "m80", cursor: "80", keptCursor: null });
         expect(nextOlderCursor(screen.history)).toBe("80");
@@ -124,7 +132,7 @@ describe("a refresh that does not reach the rows on screen", () => {
         const shown: ChatHistory<HistoryRow> = { olderCursor: null, rows: run(1, 20) };
         const { read, screen, update } = screenOf(withNewestPage(shown, { olderCursor: "1001", rows: run(1001, 1020) }));
 
-        await fillHistory({ fetchOlder, fillTo: 0, read, save: () => {}, update });
+        await fillHistory({ fetchOlder, read, save: () => {}, update });
 
         expect(fetchOlder).toHaveBeenCalledTimes(MAX_FILL_PAGES);
         expect(screen.history.gap?.cursor).toBe("801");
@@ -141,7 +149,7 @@ describe("another branch of the chat", () => {
             b41: { olderCursor: "b31", rows: run(31, 40, "b") },
         };
 
-        await fillHistory({ fetchOlder: async (cursor) => pages[cursor], fillTo: 0, read, save: () => {}, update });
+        await fillHistory({ fetchOlder: async (cursor) => pages[cursor], read, save: () => {}, update });
 
         expect(ids(screen.history.rows)).toStrictEqual(ids([...run(1, 30), ...run(31, 60, "b")]));
     });
@@ -160,9 +168,9 @@ describe(newestRun, () => {
     it("is what the fill saves: the rows from the newest down to the hole, without rows made on the screen", async () => {
         const save = vi.fn();
         const fetchOlder = serverOf();
-        const { read, update } = screenOf(withNewestPage(EMPTY, { olderCursor: "41", rows: run(41, 60) }));
+        const { read, update } = screenOf(opening(EMPTY, "41", run(41, 60)));
 
-        await fillHistory({ fetchOlder, fillTo: OPEN_FILL_ROWS, read, save, update });
+        await fillHistory({ fetchOlder, read, save, update });
 
         expect(ids(save.mock.calls[0]?.[0] as HistoryRow[])).toStrictEqual(ids(run(1, 60)));
         const withHole: ChatHistory<HistoryRow> = {
@@ -240,5 +248,57 @@ describe("an older page that lands after the history moved", () => {
 
         expect(ids(landed.rows)).toStrictEqual(ids(run(61, 101)));
         expect(nextOlderCursor(landed)).toBe("61");
+    });
+});
+
+describe("a second refresh before a hole is closed", () => {
+    it("keeps the rows below the hole and fills from the newest page all the way down to them", async () => {
+        const fetchOlder = serverOf();
+        // Rows 1-20 were on screen; a refresh brought 61-80 and left a hole below them, still open.
+        const firstRefresh = withNewestPage({ olderCursor: null, rows: run(1, 20) }, { olderCursor: "61", rows: run(61, 80) });
+        // Before the hole is filled, 40 more messages come: the next newest page is 101-120.
+        const { read, screen, update } = screenOf(withNewestPage(firstRefresh, { olderCursor: "101", rows: run(101, 120) }));
+
+        expect(ids(screen.history.rows)).toStrictEqual(ids([...run(1, 20), ...run(101, 120)]));
+        expect(screen.history.gap).toStrictEqual({ anchorId: "m101", cursor: "101", keptCursor: null });
+
+        await fillHistory({ fetchOlder, read, save: () => {}, update });
+
+        expect(ids(screen.history.rows)).toStrictEqual(ids(run(1, 120)));
+        expect(screen.history.gap).toBeUndefined();
+    });
+});
+
+describe("an opening fill that stops early", () => {
+    it("is taken up again by the next read, until the chat holds as many rows as it opens with", async () => {
+        const fetchOlder = serverOf();
+        const opened = withFillTarget(withNewestPage(EMPTY, { olderCursor: "281", rows: run(281, 300) }), OPEN_FILL_ROWS);
+        const { read, screen, update } = screenOf(opened);
+        let reads = 0;
+
+        // The fill reads two pages, then a newer read supersedes it.
+        await fillHistory({
+            fetchOlder: async (cursor) => {
+                reads += 1;
+
+                return reads <= 2 ? await fetchOlder(cursor) : undefined;
+            },
+            read,
+            save: () => {},
+            update,
+        });
+
+        expect(screen.history.rows).toHaveLength(60);
+
+        // The next newest-page read (after a send) still asks for the fill, which goes on from where it stopped.
+        update((history) => withNewestPage(history, { olderCursor: "282", rows: run(282, 301) }));
+
+        expect(requiresFill(screen.history)).toBe(true);
+
+        await fillHistory({ fetchOlder, read, save: () => {}, update });
+
+        expect(ids(screen.history.rows)).toStrictEqual(ids(run(101, 301)));
+        expect(requiresFill(screen.history)).toBe(false);
+        expect(screen.history.fillTarget).toBeUndefined();
     });
 });
