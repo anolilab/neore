@@ -33,11 +33,8 @@ const STRONG_NAMES = new Set(["b", "strong"]);
 // Elements whose output starts or ends with a delimiter, so their edge is never a word character.
 const DELIMITED_NAMES = new Set(["a", "b", "code", "em", "i", "strong"]);
 const HEADING_NAMES = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
-// Marks a hard break in a heading that holds a block, when the break marker is a newline. With `br: "\n"` the marker
-// is "\n\n", the text a block separator writes too, so the heading could not tell them apart. A private-use character
-// is never a separator, and the heading writes it as a space. Text that holds this character is read as a break in such a heading.
-const HEADING_BREAK = "";
-const HEADING_BREAK_RUN = / ? ?/g;
+const TRAILING_SPACE = / $/;
+const LEADING_SPACE = /^ /;
 
 interface RunStyle {
     /** The delimiter for a run that touches a word character. */
@@ -272,7 +269,9 @@ const rules: Record<string, Rule> = {
         filter: "br",
 
         replacement(_content, node, options) {
-            return options.br.includes("\n") && isInBlockHeading(node) ? HEADING_BREAK : lineBreakMarker(options.br);
+            const heading = blockHeadingOf(node, options);
+
+            return heading ? headingBreakMark(heading) : lineBreakMarker(options.br);
         },
     },
 
@@ -519,22 +518,23 @@ function wrapRun(content: string, node: AnnotatedNode, options: Options, style: 
     // when the built-in rule renders the parent: a custom rule writes its own output and no delimiters.
     // A parent with a block (even a blank one, which prints a break) never shares its delimiters, so the nested element keeps its own.
     if (hasSharingParent(node.parentNode, style, options, lookup)) {
-        return wrapInline(content, options, "", "");
+        return wrapInline(content, options, "", "", breakMarkFor(node, options));
     }
 
     const before = emphasisRun(node, "left", style.names, options, lookup);
     const after = emphasisRun(node, "right", style.names, options, lookup);
     const delimiter = before.wordEdge || after.wordEdge ? style.intraword : style.plain;
+    const breakMark = breakMarkFor(node, options);
 
-    return wrapInline(content, options, before.count === 0 ? delimiter : "", after.count === 0 ? delimiter : "");
+    return wrapInline(content, options, before.count === 0 ? delimiter : "", after.count === 0 ? delimiter : "", breakMark);
 }
 
 /**
  * Wraps content in an opening and a closing delimiter (either may be empty). The
  * line breaks at its ends go outside the delimiters, where a break is valid.
  */
-function wrapInline(content: string, options: Options, open: string, close: string): string {
-    const { core, lead, trail } = splitBreaks(content, lineBreakMarker(options.br));
+function wrapInline(content: string, options: Options, open: string, close: string, breakMark?: string): string {
+    const { core, lead, trail } = splitBreaks(content, lineBreakMarker(options.br), breakMark);
 
     if (!core.trim()) {
         return lead + trail;
@@ -543,21 +543,40 @@ function wrapInline(content: string, options: Options, open: string, close: stri
     return lead + open + core + close + trail;
 }
 
-/** Splits the line break markers off both ends of content. */
-function splitBreaks(content: string, marker: string): { core: string; lead: string; trail: string } {
+/**
+ * Splits the line break markers off both ends of content. `breakMark` is a heading's break mark (see
+ * headingBreakMark), which splits off the same way, so a break inside emphasis stays outside its delimiters.
+ */
+function splitBreaks(content: string, marker: string, breakMark?: string): { core: string; lead: string; trail: string } {
+    const tokens = breakMark === undefined ? [marker] : [marker, breakMark];
     let start = 0;
+    let length = tokenStartingAt(content, tokens, start);
 
-    while (content.startsWith(marker, start)) {
-        start += marker.length;
+    while (length > 0) {
+        start += length;
+        length = tokenStartingAt(content, tokens, start);
     }
 
     let end = content.length;
 
-    while (end - marker.length >= start && content.startsWith(marker, end - marker.length)) {
-        end -= marker.length;
+    length = tokenEndingAt(content, tokens, end, start);
+
+    while (length > 0) {
+        end -= length;
+        length = tokenEndingAt(content, tokens, end, start);
     }
 
     return { core: content.slice(start, end), lead: content.slice(0, start), trail: content.slice(end) };
+}
+
+/** The length of the first token that starts at `position`, or 0. */
+function tokenStartingAt(content: string, tokens: ReadonlyArray<string>, position: number): number {
+    return tokens.find((token) => content.startsWith(token, position))?.length ?? 0;
+}
+
+/** The length of the first token that ends at `end` without reaching before `start`, or 0. */
+function tokenEndingAt(content: string, tokens: ReadonlyArray<string>, end: number, start: number): number {
+    return tokens.find((token) => end - token.length >= start && content.startsWith(token, end - token.length))?.length ?? 0;
 }
 
 /**
@@ -714,26 +733,73 @@ function annotationOf(node: Node, options: Options): AnnotatedNode {
 
 /**
  * The text of a heading. A heading is one line, so a hard break in it becomes a space. A heading that holds a
- * block has its breaks marked (see HEADING_BREAK), so only the block separators remain as newlines.
+ * block marks its breaks (see headingBreakMark), so the block separators are the only newlines left.
  */
 function headingText(content: string, node: AnnotatedNode, options: Options): string {
-    if (content.includes(HEADING_BREAK)) {
+    const mark = headingMarkOf(node, options);
+
+    if (mark !== undefined) {
         // The block's own separators at either end are not heading text, so the underline is not sized to them.
-        return trimNewlines(content.replaceAll(HEADING_BREAK_RUN, " "));
+        return trimNewlines(joinAtMarks(content, mark));
     }
 
     return node.querySelector("br") ? flattenBreaks(content, lineBreakMarker(options.br), hasBlockDescendant(node)) : content;
 }
 
-/** True when the node sits in a heading that holds a block, so its break is marked (see HEADING_BREAK). */
-function isInBlockHeading(node: Node): boolean {
+/** The break mark of a heading that holds a block when a break marker is a newline, otherwise undefined. */
+function headingMarkOf(heading: Node, options: Options): string | undefined {
+    return options.br.includes("\n") && hasBlockDescendant(heading) ? headingBreakMark(heading) : undefined;
+}
+
+/** The heading a break in the node is marked for, or null when no heading that holds a block contains it. */
+function blockHeadingOf(node: Node, options: Options): Element | null {
     for (let ancestor = node.parentNode; ancestor; ancestor = ancestor.parentNode) {
         if (HEADING_NAMES.has(ancestor.nodeName)) {
-            return hasBlockDescendant(ancestor);
+            return headingMarkOf(ancestor, options) === undefined ? null : (ancestor as Element);
         }
     }
 
-    return false;
+    return null;
+}
+
+/** The break mark for a break in the node's heading, or undefined when there is none. */
+function breakMarkFor(node: Node, options: Options): string | undefined {
+    const heading = blockHeadingOf(node, options);
+
+    return heading ? headingBreakMark(heading) : undefined;
+}
+
+const PRIVATE_USE_START = 0xe0_00;
+const PRIVATE_USE_END = 0xf8_ff;
+
+/**
+ * A private-use character that the heading's markup does not contain. A break in the heading is written as this
+ * character, so a literal character of the same code point in the text is never taken for a break.
+ */
+function headingBreakMark(heading: Node): string {
+    const markup = (heading as Element).outerHTML ?? "";
+
+    for (let code = PRIVATE_USE_START; code <= PRIVATE_USE_END; code += 1) {
+        const mark = String.fromCodePoint(code);
+
+        if (!markup.includes(mark)) {
+            return mark;
+        }
+    }
+
+    return String.fromCodePoint(PRIVATE_USE_START);
+}
+
+/** Writes each mark as a space, dropping the spaces beside it. A piece that starts a new line takes no space. */
+function joinAtMarks(content: string, mark: string): string {
+    const [first = "", ...rest] = content.split(mark);
+    let text = first;
+
+    for (const piece of rest) {
+        text = `${text.replace(TRAILING_SPACE, "")}${piece.startsWith("\n") ? "" : " "}${piece.replace(LEADING_SPACE, "")}`;
+    }
+
+    return text;
 }
 
 /** True when a block element sits inside the node, at any depth. */
