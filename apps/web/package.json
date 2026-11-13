@@ -222,6 +222,7 @@
         "jsdom": "catalog:test",
         "msw": "catalog:test",
         "msw-storybook-addon": "catalog:storybook",
+        "oxc-transform-react": "catalog:build",
         "playwright": "catalog:test",
         "prettier": "catalog:lint",
         "prettier-plugin-tailwindcss": "catalog:lint",

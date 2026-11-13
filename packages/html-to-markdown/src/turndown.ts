@@ -1,7 +1,7 @@
 import COMMONMARK_RULES, { isRenderedLink } from "./commonmark-rules";
 import annotateNode from "./node";
 import rootNode from "./root-node";
-import Rules from "./rules";
+import Rules, { defaultKeepReplacement } from "./rules";
 import type { AnnotatedNode, Options, Rule, RuleLookup } from "./types";
 import {
     defaultBlankReplacement,
@@ -27,9 +27,7 @@ export const DEFAULT_OPTIONS: Options = {
     fence: "```",
     headingStyle: "setext",
     hr: "* * *",
-    keepReplacement(_content, node) {
-        return node.isBlock ? `\n\n${node.outerHTML}\n\n` : node.outerHTML;
-    },
+    keepReplacement: defaultKeepReplacement,
     linkReferenceStyle: "full",
     linkStyle: "inlined",
     preformattedCode: false,
@@ -282,7 +280,7 @@ function postProcess(service: TurndownService, output: string[]): string {
  */
 function replacementForNode(service: TurndownService, node: AnnotatedNode): string {
     const rule = service.rules.forNode(node);
-    let content = process(service, node).join("");
+    let content = service.rules.skipsChildren(rule, node) ? "" : process(service, node).join("");
     const whitespace = node.flankingWhitespace;
 
     if (whitespace.leading || whitespace.trailing) {

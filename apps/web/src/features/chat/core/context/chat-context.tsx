@@ -26,7 +26,6 @@ import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { openLoginPrompt } from "@/features/auth/stores/login-prompt-store";
-import { holdForSignIn } from "@/features/chat/core/hooks/use-pending-send";
 import useLocalModelTurn from "@/features/local-models/hooks/use-local-model-turn";
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
@@ -58,7 +57,8 @@ import type {
 import type { GatewayInfo } from "./chat-gateway";
 import { NO_GATEWAY_INFO, pendingGatewayInfo } from "./chat-gateway";
 import { kickOffMediaGeneration } from "./media-kickoff";
-import { runSendMessage } from "./send-message";
+import type { SendMessageOptions, SendOutcome } from "./send-message";
+import { holdSendForSignIn, runSendMessage } from "./send-message";
 import { registerThreadErrorSink, takeUndeliveredThreadError } from "./thread-error-sinks";
 
 // The context objects, hooks and value types live in sibling files; importers keep this path.
@@ -680,16 +680,14 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     const { mustSignIn } = useInviteOnly();
 
     const sendMessage = useCallback(
-        async (text: string, attachments?: PendingAttachment[]) => {
+        async (text: string, attachments?: PendingAttachment[], options?: SendMessageOptions): Promise<SendOutcome> => {
             if (mustSignIn) {
-                useChatUIStore.getState().setComposerText(text);
-                useChatUIStore.getState().setIsSubmitting(false);
-                holdForSignIn(text);
+                holdSendForSignIn(text, options);
 
-                return;
+                return { refused: false, signIn: true, started: false };
             }
 
-            await runSendMessage(
+            return await runSendMessage(
                 {
                     authGate,
                     authHeader,
@@ -717,6 +715,15 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     streamingMessageRef,
                     texts: {
                         bannedContent: () => t`Your message contains inappropriate content that cannot be sent.`,
+                        guestLinkEnded: () => t`That guest link has ended.`,
+                        guestNoteAlreadySent: () => t`That message was already sent.`,
+                        guestNoteAsGoal: () => t`A guest's message cannot be sent as a goal.`,
+                        guestNoteBeingSent: () => t`That message is being sent.`,
+                        guestNoteNeedsTextModel: () => t`Switch to a text model to send this message.`,
+                        guestNoteNotLocal: () => t`A guest's message is sent through a hosted model only. Pick one and send it again.`,
+                        guestNoteNotSendable: () => t`This message cannot be sent in this chat.`,
+                        guestNoteSessionNotReady: () =>
+                            t`We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab.`,
                         localTextOnly: () => t`Local models are text only. Remove the attachments to send.`,
                         sessionNotReady: () =>
                             t`We could not confirm your session in time. Your message is still in the composer. Please try sending it again.`,
@@ -727,6 +734,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                 },
                 text,
                 attachments,
+                options,
             );
         },
         [

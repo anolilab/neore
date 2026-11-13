@@ -9,8 +9,6 @@ import { GitBranch } from "lucide-react";
 import type { FC } from "react";
 import { useState } from "react";
 
-import { useHoldRow } from "./row-pins";
-
 interface ForkBranchDialogProps {
     onCancel: () => void;
     onCreate: (title: string) => Promise<void>;
@@ -20,9 +18,6 @@ interface ForkBranchDialogProps {
 const ForkBranchDialog: FC<ForkBranchDialogProps> = ({ onCancel, onCreate, open }) => {
     const { t } = useLingui();
     const [title, setTitle] = useState("");
-
-    // The typed title lives in this dialog, whose row the list must not virtualize away while it is open.
-    useHoldRow(open);
     const [isCreating, setIsCreating] = useState(false);
 
     // Reset title when dialog opens. Adjusted during render rather than in an

@@ -13,7 +13,7 @@ export const VIRTUALIZE_THRESHOLD = 60;
 /** The newest N messages are always mounted, whatever the scroll position. */
 export const ALWAYS_MOUNTED_TAIL = 30;
 
-/** localStorage key that opts a browser OUT of virtualization when set to `"0"` (for debugging layout). */
+/** localStorage key that opts a browser into virtualization while it is unverified. */
 export const VIRTUALIZE_FLAG_KEY = "neore:virtualize-messages";
 
 export interface WindowPlan {
@@ -155,75 +155,10 @@ export const parseMessageHash = (hash: string): string | undefined => {
     }
 };
 
-/**
- * Keys that open, or step through, the BROWSER's find: Mod+F, and F3 and Mod+G with or without Shift, where Mod is
- * Command on a Mac (`isMac`) and Control elsewhere. On a Mac, Control+F moves the caret (an Emacs-style binding) and
- * Control+G is not find either. Mod+Shift+F is not one: it is the app's own Focus Search shortcut.
- * Find opened from a menu (Edit › Find, Firefox's quick find, mobile Safari) sends no key at all; the list's
- * "Show all earlier messages" control is the way to reach unmounted messages from there.
- */
-export const isBrowserFindKey = (event: Pick<KeyboardEvent, "ctrlKey" | "key" | "metaKey" | "shiftKey">, isMac: boolean): boolean => {
-    // Autofill and some IMEs send a keydown with no `key`.
-    const key = typeof event.key === "string" ? event.key : "";
-
-    if (key === "F3") {
-        return true;
-    }
-
-    if (!(isMac ? event.metaKey : event.ctrlKey)) {
-        return false;
-    }
-
-    const lower = key.toLowerCase();
-
-    return lower === "g" || (lower === "f" && !event.shiftKey);
-};
-
-/** The virtualizer's indexes plus the pinned ones below `count` (rows held mounted), ascending and without repeats. */
-export const withPinnedRows = (indexes: ReadonlyArray<number>, pinned: ReadonlyArray<number>, count: number): number[] => {
-    if (pinned.length === 0) {
-        return [...indexes];
-    }
-
-    const all = new Set(indexes);
-
-    for (const index of pinned) {
-        if (index >= 0 && index < count) {
-            all.add(index);
-        }
-    }
-
-    return [...all].toSorted((a, b) => a - b);
-};
-
-/**
- * Keeps held rows in the always-mounted tail. A new message moves the oldest tail rows into the head,
- * which React mounts afresh, losing what they hold (an unsent comment, a selection). `previousTailStart`
- * is where the last render's tail began (-1 when unknown); a held row from there on stays in the tail,
- * so the tail starts at the lowest such row until it is released. Held rows deeper in the head stay
- * mounted through the range extractor (`withPinnedRows`) and do not move the split.
- */
-export const holdPinnedTail = (plan: WindowPlan, previousTailStart: number, pinned: ReadonlyArray<number>): WindowPlan => {
-    if (!plan.virtualized || previousTailStart < 0) {
-        return plan;
-    }
-
-    let { headCount } = plan;
-
-    for (const index of pinned) {
-        if (index >= previousTailStart && index < headCount) {
-            headCount = index;
-        }
-    }
-
-    return headCount === plan.headCount ? plan : { headCount, virtualized: headCount > 0 };
-};
-
-/** On unless the browser opted out with `"0"`; storage that cannot be read keeps the default. */
 export const readVirtualizeFlag = (): boolean => {
     try {
-        return globalThis.localStorage?.getItem(VIRTUALIZE_FLAG_KEY) !== "0";
+        return globalThis.localStorage?.getItem(VIRTUALIZE_FLAG_KEY) === "1";
     } catch {
-        return true;
+        return false;
     }
 };

@@ -143,6 +143,9 @@ catalogs:
     "@vite-pwa/assets-generator": ^2.0.0
     "@vitejs/plugin-react": 6.2.1
     esbuild: 0.28.2
+    # The React Compiler's native port, run by `@vitejs/plugin-react` (`compiler` option); its peer range is
+    # >=0.152.0 <0.157.0, so move it together with the plugin.
+    oxc-transform-react: 0.156.0
     sharp: 0.35.5
     svgo: 4.1.0
     unplugin-fonts: 2.1.0

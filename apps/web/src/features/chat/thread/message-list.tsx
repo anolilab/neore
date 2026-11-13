@@ -14,30 +14,24 @@
  * Performance optimizations:
  * - Throttled updates during streaming (60fps max)
  * - Memoized message items
- * - Long threads (> VIRTUALIZE_THRESHOLD) virtualize their OLDER messages
- *   (`neore:virtualize-messages` = "0" in localStorage turns it off). The newest
+ * - Long threads (> VIRTUALIZE_THRESHOLD) virtualize their OLDER messages behind
+ *   the `neore:virtualize-messages` localStorage flag. The newest
  *   ALWAYS_MOUNTED_TAIL messages and the streaming placeholder are always real
  *   DOM, so stick-to-bottom (ThreadViewport) and the live region never see the
- *   virtualizer. The thread's own find bar searches the data and jumps, so it
- *   reaches unmounted rows. A find key the BROWSER gets (Cmd/Ctrl+F, F3,
- *   Cmd/Ctrl+G) or the "Show all earlier messages" control (keyboard,
- *   screen readers, find opened from a menu) mounts every loaded message
- *   for the rest of the visit.
+ *   virtualizer. Cmd/Ctrl+F turns virtualization off for the rest of the visit
+ *   so find-in-page can reach every loaded message.
  *
  * Jump to a message: `#message-<id>` in the URL, or `scrollToMessage(id, { threadId })`.
  * Pins and message-search results use the latter.
  */
 
-import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
-import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
-import { getPlatformModifierForEvents } from "@neore/ui/utils/keyboard-shortcuts";
 import type { Virtualizer } from "@tanstack/react-virtual";
-import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { AnimatePresence } from "motion/react";
 import type { FC, ReactNode } from "react";
-import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
@@ -54,27 +48,19 @@ import MessageItem from "./message-item";
 import type { MessagePosition, WindowPlan } from "./message-windowing";
 import {
     getWindowPlan,
-    holdPinnedTail,
-    isBrowserFindKey,
     parseMessageHash,
     readVirtualizeFlag,
     resolveJumpMessageId,
     resolveJumpTarget,
     shouldAnimateEntrance,
     shouldLoadOlderForJump,
-    withPinnedRows,
 } from "./message-windowing";
 import { RateLimitPauseNotice } from "./rate-limit-pause-notice";
-import { useEndReadAloudWithMessages } from "./read-aloud-speech";
-import { RowMessageIdContext, usePinnedRowIds } from "./row-pins";
 import { selectStreamIdToShow, selectStreamTokenFor } from "./stream-to-show";
 import { StreamingPlaceholder, ThinkingPlaceholder } from "./streaming-placeholder";
 
 // Rough height of an unmeasured row; the virtualizer corrects it on first measure.
 const ESTIMATED_ROW_HEIGHT = 160;
-
-/** Frames a jump into the virtualized head waits for its row to mount before giving up. */
-const HEAD_REVEAL_FRAMES = 30;
 
 /** How big each older page a jump pulls in looking for its target is. */
 const JUMP_PAGE_SIZE = 50;
@@ -112,242 +98,27 @@ const useInitialMessageIds = (messages: UIMessage[], messagesReady: boolean): Re
     return initialIds;
 };
 
-/**
- * Whether every loaded message is mounted for the rest of this visit: the browser's find can only find
- * text that is in the DOM, and keyboard and screen-reader users move through the DOM.
- *
- * Set by a find key the browser gets (`isBrowserFindKey`). On a thread page the find-in-thread shortcut
- * takes Cmd/Ctrl+F on `document` and prevents the default; this listener is on the window, so it runs
- * after that one and sees whether the browser still gets the key. Find opened from a menu sends no key:
- * the "Show all earlier messages" control at the top of the list (`showAll`) covers that, and keyboard use.
- */
-const useShowAllMessages = (): { isAllShown: boolean; showAll: () => void } => {
-    const [isAllShown, setIsAllShown] = useState(false);
+/** Cmd/Ctrl+F: the browser can only find text that is in the DOM, so mount everything. */
+const useFindInPageOverride = (): boolean => {
+    const [isFindRequested, setIsFindRequested] = useState(false);
 
     useEffect(() => {
-        if (isAllShown) {
+        if (isFindRequested) {
             return undefined;
         }
 
-        // The same platform test the app's own Mod shortcuts use.
-        const isMac = getPlatformModifierForEvents() === "cmd";
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (isBrowserFindKey(event, isMac) && !event.defaultPrevented) {
-                setIsAllShown(true);
+            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+                setIsFindRequested(true);
             }
         };
 
         globalThis.addEventListener("keydown", handleKeyDown);
 
         return () => globalThis.removeEventListener("keydown", handleKeyDown);
-    }, [isAllShown]);
+    }, [isFindRequested]);
 
-    const showAll = useCallback(() => setIsAllShown(true), []);
-
-    return { isAllShown, showAll };
-};
-
-/** The first and last row a text selection in the list touches, by message id. */
-interface SelectedRows {
-    firstId: string;
-    lastId: string;
-}
-
-const ROW_SELECTOR = "[data-list-message-id]";
-
-/** The message of the row a selection boundary sits in; undefined outside a row. */
-const rowIdOfNode = (node: Node): string | undefined => {
-    const element = node instanceof Element ? node : node.parentElement;
-
-    return element?.closest<HTMLElement>(ROW_SELECTOR)?.dataset.listMessageId;
-};
-
-const readSelectedRows = (list: HTMLElement): SelectedRows | null => {
-    const selection = document.getSelection();
-
-    if (!selection || selection.isCollapsed || selection.rangeCount === 0 || !selection.getRangeAt(0).intersectsNode(list)) {
-        return null;
-    }
-
-    // The range runs in document order and crosses the list, so a boundary that is not in a row lies before the rows
-    // (the start) or after them (the end), whatever node and offset name it: Cmd/Ctrl+A ends at the body, after its last child.
-    const range = selection.getRangeAt(0);
-    const rows = list.querySelectorAll<HTMLElement>(ROW_SELECTOR);
-    const rowOf = (node: Node): string | undefined => (list.contains(node) ? rowIdOfNode(node) : undefined);
-    const firstId = rowOf(range.startContainer) ?? rows[0]?.dataset.listMessageId;
-    const lastId = rowOf(range.endContainer) ?? rows[rows.length - 1]?.dataset.listMessageId;
-
-    return firstId === undefined || lastId === undefined ? null : { firstId, lastId };
-};
-
-/**
- * The rows a text selection in the list spans. The virtualizer keeps them mounted while it lasts, so
- * scrolling a selected older reply out of view does not cut the selection; windowing resumes once it clears.
- */
-const useSelectedRows = (list: HTMLElement | null): SelectedRows | null => {
-    const [selected, setSelected] = useState<SelectedRows | null>(null);
-
-    useEffect(() => {
-        const handleSelectionChange = () => {
-            const next = list ? readSelectedRows(list) : null;
-
-            setSelected((previous) => (previous?.firstId === next?.firstId && previous?.lastId === next?.lastId ? previous : next));
-        };
-
-        document.addEventListener("selectionchange", handleSelectionChange);
-
-        return () => document.removeEventListener("selectionchange", handleSelectionChange);
-    }, [list]);
-
-    return selected;
-};
-
-/**
- * Rows held mounted, as ascending indexes into `messages`: every row a text selection spans, and the
- * rows something inside them pinned (`row-pins.ts`).
- */
-const pinnedIndexes = (messages: ReadonlyArray<UIMessage>, selected: SelectedRows | null, pinnedIds: ReadonlySet<string>): number[] => {
-    const indexes: number[] = [];
-
-    if (pinnedIds.size > 0) {
-        for (const [index, message] of messages.entries()) {
-            if (pinnedIds.has(message.id)) {
-                indexes.push(index);
-            }
-        }
-    }
-
-    if (selected) {
-        const first = messages.findIndex((message) => message.id === selected.firstId);
-        const last = messages.findIndex((message) => message.id === selected.lastId);
-
-        if (first !== -1 && last !== -1) {
-            for (let index = Math.min(first, last); index <= Math.max(first, last); index += 1) {
-                indexes.push(index);
-            }
-        }
-    }
-
-    return [...new Set(indexes)].toSorted((a, b) => a - b);
-};
-
-const NO_PINS: ReadonlyArray<number> = [];
-
-const sameIndexes = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): boolean => a.length === b.length && a.every((index, at) => index === b[at]);
-
-/**
- * `next`, or the array the last render used when it holds the same indexes: the virtualizer's range
- * extractor depends on it, and streaming re-renders the list on every chunk.
- */
-const useStableIndexes = (next: ReadonlyArray<number>): ReadonlyArray<number> => {
-    const [kept, setKept] = useState(NO_PINS);
-    let value = next;
-
-    if (next.length === 0) {
-        value = NO_PINS;
-    } else if (sameIndexes(kept, next)) {
-        value = kept;
-    }
-
-    // Adjusted during render, like `useInitialMessageIds`, so this render already uses it.
-    if (value !== kept) {
-        setKept(value);
-    }
-
-    return value;
-};
-
-/**
- * The window plan with held rows kept in the tail (`holdPinnedTail`). Where the last render's tail began
- * is kept by message id, so older pages landing in front do not move it.
- */
-const useHeldTailPlan = (plan: WindowPlan, messages: ReadonlyArray<UIMessage>, pinned: ReadonlyArray<number>): WindowPlan => {
-    const [tailStartId, setTailStartId] = useState<string | undefined>(undefined);
-    const previousTailStart = tailStartId === undefined ? -1 : messages.findIndex((message) => message.id === tailStartId);
-    const held = holdPinnedTail(plan, previousTailStart, pinned);
-    const nextTailStartId = messages[held.virtualized ? held.headCount : 0]?.id;
-
-    if (nextTailStartId !== tailStartId) {
-        setTailStartId(nextTailStartId);
-    }
-
-    return held;
-};
-
-/**
- * The row that holds focus, by message id: anything focused in a row (an input, a button) keeps that row
- * mounted, so typing into or tabbing through a row never has it virtualized away underneath.
- */
-const useFocusedRowId = (list: HTMLElement | null): string | undefined => {
-    const [focusedId, setFocusedId] = useState<string | undefined>(undefined);
-
-    // Keyed by the element: an empty or loading thread renders no list, so the listeners attach once it appears.
-    useEffect(() => {
-        if (!list) {
-            return undefined;
-        }
-
-        // Focus on the row itself (a jump lands there) holds nothing: only a control inside the row, where input lives, does.
-        const rowIdOf = (target: EventTarget | null): string | undefined => {
-            if (!(target instanceof Element) || !list.contains(target)) {
-                return undefined;
-            }
-
-            const row = target.closest<HTMLElement>(ROW_SELECTOR);
-
-            return row && row !== target ? row.dataset.listMessageId : undefined;
-        };
-        const handleFocusIn = (event: FocusEvent) => setFocusedId(rowIdOf(event.target));
-        const handleFocusOut = (event: FocusEvent) => setFocusedId(rowIdOf(event.relatedTarget));
-
-        list.addEventListener("focusin", handleFocusIn);
-        list.addEventListener("focusout", handleFocusOut);
-
-        return () => {
-            list.removeEventListener("focusin", handleFocusIn);
-            list.removeEventListener("focusout", handleFocusOut);
-        };
-    }, [list]);
-
-    return focusedId;
-};
-
-/** Every message whose row is held: pinned from inside (`row-pins.ts`), being edited, or holding focus. */
-const useHeldRowIds = (pinnedRowIds: ReadonlySet<string>, editingMessageId: string | null, focusedRowId: string | undefined): ReadonlySet<string> =>
-    useMemo(() => {
-        if (editingMessageId === null && focusedRowId === undefined) {
-            return pinnedRowIds;
-        }
-
-        const held = new Set(pinnedRowIds);
-
-        if (editingMessageId !== null) {
-            held.add(editingMessageId);
-        }
-
-        if (focusedRowId !== undefined) {
-            held.add(focusedRowId);
-        }
-
-        return held;
-    }, [editingMessageId, focusedRowId, pinnedRowIds]);
-
-/**
- * Focuses a row the app moved to (a jump, "Show all earlier messages") and marks it, so it alone shows a focus ring
- * until focus leaves; a row focused by a click in its text is not marked.
- */
-const focusRowWithRing = (row: HTMLElement, options?: FocusOptions): void => {
-    const { dataset } = row;
-
-    dataset.jumped = "";
-    row.addEventListener(
-        "blur",
-        () => {
-            delete dataset.jumped;
-        },
-        { once: true },
-    );
-    row.focus(options);
+    return isFindRequested;
 };
 
 type RenderRow = (message: UIMessage, index: number) => ReactNode;
@@ -356,11 +127,7 @@ interface VirtualizedHeadProps {
     /** Changes whenever content above the list may have moved (e.g. the load-more spinner). */
     layoutKey: string;
     messages: UIMessage[];
-    /** Every row mounted ("Show all earlier messages", a browser find): the same rows under the same parent, none remounted. */
-    mountAll: boolean;
     onVirtualizer: (virtualizer: Virtualizer<HTMLElement, Element> | null) => void;
-    /** Rows held mounted wherever the scroll is: a text selection's, an open diff comment's (`pinnedIndexes`). */
-    pinned: ReadonlyArray<number>;
     renderRow: RenderRow;
 }
 
@@ -369,7 +136,7 @@ interface VirtualizedHeadProps {
  * spacer sized to the virtualizer's total, measured as they mount (heights vary
  * a lot). Scrolls with ThreadViewport's element, offset by `scrollMargin`.
  */
-const VirtualizedHead: FC<VirtualizedHeadProps> = ({ layoutKey, messages, mountAll, onVirtualizer, pinned, renderRow }) => {
+const VirtualizedHead: FC<VirtualizedHeadProps> = ({ layoutKey, messages, onVirtualizer, renderRow }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
     const [scrollMargin, setScrollMargin] = useState(0);
@@ -396,19 +163,12 @@ const VirtualizedHead: FC<VirtualizedHeadProps> = ({ layoutKey, messages, mountA
     const estimateSize = useCallback(() => ESTIMATED_ROW_HEIGHT, []);
     const getItemKey = useCallback((index: number) => messages[index]?.id ?? index, [messages]);
 
-    const rangeExtractor = useCallback(
-        (range: Parameters<typeof defaultRangeExtractor>[0]) =>
-            mountAll ? Array.from({ length: messages.length }, (_, index) => index) : withPinnedRows(defaultRangeExtractor(range), pinned, messages.length),
-        [messages.length, mountAll, pinned],
-    );
-
     const virtualizer = useVirtualizer<HTMLElement, Element>({
         count: messages.length,
         estimateSize,
         getItemKey,
         getScrollElement,
         overscan: 4,
-        rangeExtractor,
         scrollMargin,
     });
 
@@ -469,46 +229,11 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
     const initialIds = useInitialMessageIds(messages, messagesReady);
 
-    // Read aloud outlives its row (virtualization unmounts it); it ends with the thread, or with its message.
-    // Keyed by the ids, not the array: a streamed chunk changes a message's content, never which messages there are.
-    const messageIdsKey = threadMessages.map((message) => message.id).join("\n");
-    const messageIds = useMemo(() => (messageIdsKey === "" ? [] : messageIdsKey.split("\n")), [messageIdsKey]);
+    // The server snapshot is `false`: localStorage does not exist during SSR.
+    const isVirtualizeFlagOn = useSyncExternalStore(subscribeToNothing, readVirtualizeFlag, () => false);
 
-    useEndReadAloudWithMessages(messageIds);
-
-    // The server snapshot is the default (on): localStorage does not exist during SSR.
-    const isVirtualizeFlagOn = useSyncExternalStore(subscribeToNothing, readVirtualizeFlag, () => true);
-
-    const { isAllShown, showAll } = useShowAllMessages();
-    // The list element as state, not a ref: the listeners below attach once it renders, which an empty thread does not.
-    const [listElement, setListElement] = useState<HTMLDivElement | null>(null);
-    const selectedRows = useSelectedRows(listElement);
-    const focusedRowId = useFocusedRowId(listElement);
-    const heldRowIds = useHeldRowIds(usePinnedRowIds(), editingMessageId, focusedRowId);
-    const pinned = useStableIndexes(pinnedIndexes(messages, selectedRows, heldRowIds));
-    // "Show all" keeps the same split and mounts the whole head (`mountAll`), so no row changes parent and remounts.
-    const plan: WindowPlan = useHeldTailPlan(getWindowPlan(messages.length, { enabled: isVirtualizeFlagOn }), messages, pinned);
-
-    // After "Show all earlier messages", focus goes to the oldest loaded message, where the shown history starts.
-    const focusOldestRef = useRef(false);
-
-    useEffect(() => {
-        if (!focusOldestRef.current || !isAllShown) {
-            return;
-        }
-
-        focusOldestRef.current = false;
-        const oldest = document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(messages[0]?.id ?? "")}"]`);
-
-        if (oldest) {
-            focusRowWithRing(oldest);
-        }
-    });
-
-    const handleShowAll = useCallback(() => {
-        focusOldestRef.current = true;
-        showAll();
-    }, [showAll]);
+    const isFindRequested = useFindInPageOverride();
+    const plan: WindowPlan = getWindowPlan(messages.length, { enabled: isVirtualizeFlagOn && !isFindRequested });
 
     // Jump-to-message. Refs hold the latest plan/messages so the listener is attached once.
     const virtualizerRef = useRef<Virtualizer<HTMLElement, Element> | null>(null);
@@ -521,16 +246,6 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     const handleVirtualizer = useCallback((virtualizer: Virtualizer<HTMLElement, Element> | null) => {
         virtualizerRef.current = virtualizer;
     }, []);
-
-    // Each jump's generation: a newer jump, or unmounting, retires an older one's pending reveal so it cannot take focus later.
-    const jumpGenerationRef = useRef(0);
-
-    useEffect(
-        () => () => {
-            jumpGenerationRef.current += 1;
-        },
-        [],
-    );
 
     const jumpTo = useCallback((requestedId: string, position?: MessagePosition, focus = true): boolean => {
         const { messages: currentMessages, plan: currentPlan } = jumpStateRef.current;
@@ -550,45 +265,34 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
             return false;
         }
 
-        jumpGenerationRef.current += 1;
-        const generation = jumpGenerationRef.current;
-
-        // Whether the row was in the DOM to reveal.
-        const reveal = (): boolean => {
+        const reveal = () => {
             const element = document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(messageId)}"]`);
 
             if (!element) {
-                return false;
+                return;
             }
 
             element.scrollIntoView({ block: "center" });
 
             // Move focus too, so keyboard and screen-reader users land where sighted users do.
             if (focus) {
-                focusRowWithRing(element, { preventScroll: true });
+                // Marks the row a jump landed on, so it alone shows a focus ring; a row focused by a click in its text does not.
+                element.dataset.jumped = "";
+                element.addEventListener(
+                    "blur",
+                    () => {
+                        delete element.dataset.jumped;
+                    },
+                    { once: true },
+                );
+                element.focus({ preventScroll: true });
             }
-
-            return true;
         };
 
         if (target.kind === "head" && virtualizerRef.current) {
-            // Mount the row first, then reveal it once it has; under load the virtualizer can take several frames to settle.
+            // Mount the row first, then let it measure before the precise scroll.
             virtualizerRef.current.scrollToIndex(target.index, { align: "center" });
-
-            let framesLeft = HEAD_REVEAL_FRAMES;
-            const revealWhenMounted = () => {
-                if (jumpGenerationRef.current !== generation) {
-                    return;
-                }
-
-                framesLeft -= 1;
-
-                if (!reveal() && framesLeft > 0) {
-                    requestAnimationFrame(revealWhenMounted);
-                }
-            };
-
-            requestAnimationFrame(() => requestAnimationFrame(revealWhenMounted));
+            requestAnimationFrame(() => requestAnimationFrame(reveal));
         } else {
             reveal();
         }
@@ -609,8 +313,6 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     });
 
     const requestJump = useCallback(({ focus, messageId, position, threadId: targetThreadId }: ScrollToMessageDetail) => {
-        // A request retires the reveal an earlier jump still has pending, even before its own target loads.
-        jumpGenerationRef.current += 1;
         pendingJumpRef.current = { focus, messageId, pagesLoaded: 0, position, threadId: targetThreadId };
         setJumpRequest((value) => value + 1);
     }, []);
@@ -755,52 +457,32 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                 role="listitem"
                 tabIndex={-1}
             >
-                <RowMessageIdContext value={message.id}>
-                    {goal && threadId && goal.startMessageId === message.id && <GoalBanner goal={goal} maxWidth={maxWidth} threadId={threadId} />}
-                    {renderMessage(message, index)}
-                    {reviewNotes.get(message.id)?.map((reason, noteIndex) => (
-                        <GoalReviewNote key={`${message.id}-review-${String(noteIndex)}`} maxWidth={maxWidth} reason={reason} />
-                    ))}
-                    {goal &&
-                        verdictAnchors
-                            ?.get(message.id)
-                            ?.map((verdict) => <GoalVerdictNote goal={goal} key={verdict.round} maxWidth={maxWidth} verdict={verdict} />)}
-                </RowMessageIdContext>
+                {goal && threadId && goal.startMessageId === message.id && <GoalBanner goal={goal} maxWidth={maxWidth} threadId={threadId} />}
+                {renderMessage(message, index)}
+                {reviewNotes.get(message.id)?.map((reason, noteIndex) => (
+                    <GoalReviewNote key={`${message.id}-review-${String(noteIndex)}`} maxWidth={maxWidth} reason={reason} />
+                ))}
+                {goal &&
+                    verdictAnchors
+                        ?.get(message.id)
+                        ?.map((verdict) => <GoalVerdictNote goal={goal} key={verdict.round} maxWidth={maxWidth} verdict={verdict} />)}
             </div>
         );
     };
 
     const tailStart = plan.virtualized ? plan.headCount : 0;
-    const earlierCount = plan.headCount;
-    // Inside `t`: a bare `plural()` compiles to the global i18n, which this app never activates.
-    // eslint-disable-next-line no-restricted-syntax -- the macro compiles this to a message, not a string conversion
-    const showAllLabel = t`${plural(earlierCount, { one: "Show # earlier message", other: "Show all # earlier messages" })}`;
 
     return (
         <>
             {/* Loading indicator — trigger lives in ThreadViewport's scroll handler */}
             <LoadMoreTrigger status={messagesStatus} />
 
-            {/* Rows outside the window are not in the DOM, so Tab, a screen reader and menu-opened find would skip them. Shown on focus. */}
-            {plan.virtualized && !isAllShown && (
-                <Button className="sr-only mx-auto my-2 focus-visible:not-sr-only" onClick={handleShowAll} size="sm" type="button" variant="outline">
-                    {showAllLabel}
-                </Button>
-            )}
-
-            <div
-                className={cn("message-list flex flex-col", className)}
-                ref={setListElement}
-                role="list"
-                style={{ "--thread-max-width": maxWidth } as React.CSSProperties}
-            >
+            <div className={cn("message-list flex flex-col", className)} role="list" style={{ "--thread-max-width": maxWidth } as React.CSSProperties}>
                 {plan.virtualized && (
                     <VirtualizedHead
                         layoutKey={messagesStatus}
                         messages={messages.slice(0, plan.headCount)}
-                        mountAll={isAllShown}
                         onVirtualizer={handleVirtualizer}
-                        pinned={pinned}
                         renderRow={renderRow}
                     />
                 )}

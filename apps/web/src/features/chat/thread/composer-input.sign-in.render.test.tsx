@@ -15,6 +15,7 @@ import { useLoginPromptStore } from "@/features/auth/stores/login-prompt-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { clearSendStarting, markSendStarting } from "@/features/chat/core/utils/send-in-flight";
 
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import type { ComposerTiptapEditorRef } from "./composer-tiptap/composer-tiptap-editor";
@@ -402,6 +403,21 @@ describe("ComposerInput while the connection is down", () => {
         fireEvent.click(screen.getByRole("button", { name: "Send message" }));
 
         expect(harness.sendMessage).toHaveBeenCalledWith("a follow-up", []);
+    });
+
+    it("queues a follow-up while another send in the thread has begun, and does not send it beside that one", () => {
+        harness.threadId = "thread-1";
+        markSendStarting("thread-1");
+
+        try {
+            renderComposer();
+            fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+        } finally {
+            clearSendStarting("thread-1");
+        }
+
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues["thread-1"]?.items.map((item: QueuedChatPrompt) => item.text)).toStrictEqual(["a follow-up"]);
     });
 
     it("queues a follow-up offline while a reply streams", () => {

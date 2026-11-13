@@ -24,13 +24,6 @@ const harness = vi.hoisted(() => {
     };
 });
 
-// The long thread's "Show all earlier messages" label is a plural.
-vi.mock("@lingui/core/macro", () => {
-    return {
-        plural: (value: number, forms: { one: string; other: string }) => (value === 1 ? forms.one : forms.other).replace("#", () => String(value)),
-    };
-});
-
 vi.mock("@lingui/react/macro", () => {
     return {
         Trans: ({ children }: { children: ReactNode }) => children,

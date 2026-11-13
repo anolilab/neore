@@ -11,15 +11,63 @@ const markdown = new TurndownService().turndown("<p>Hello <strong>world</strong>
 // "Hello **world**"
 ```
 
-Options and extension points (`keep`, `remove`, `addRule`, `use`) are the same as upstream's, with three API differences:
+Options and extension points (`addRule`, `use`) are the same as upstream's, with four API differences:
 
 - `TurndownService` must be constructed with `new` (upstream also allowed a call without it).
 - `escape` is an instance property, so overriding `TurndownService.prototype.escape` has no effect.
 - Only own rules of `options.rules` are read, not inherited ones (upstream read inherited enumerable keys too).
+- Built-in rules no longer win over `keep` and `remove`, so `keep("p")` on `<p>Hello world</p>` gives `<p>Hello world</p>`,
+  where upstream gives `Hello world`, and `remove("i")` drops an `<i>` and its content. The order is: the blank rule,
+  rules added with `addRule` (newest first), then `keep`, then `remove`, then the built-in rules. A blank element goes to
+  the blank rule first, even past `addRule` and `keep`, so `keep(["p"])` on `<p></p>a` gives `a`. An `addRule` rule still
+  comes before `keep`, and a tag in both `keep` and `remove` is kept. `remove` does not convert the removed element's
+  children. `keep` does, so a custom `keepReplacement` receives the converted content. The default `keepReplacement`
+  ignores its content, so the children of a kept element are not converted either. With the default, a referenced link
+  inside a kept element leaves no orphan `[1]: x` definition. A custom `keepReplacement` that ignores `content` still
+  converts the children, so `<span><a href="x">l</a></span>` with `linkStyle: "referenced"` and
+  `keepReplacement: (c, n) => n.outerHTML` gives `<span><a href="x">l</a></span>\n\n[1]: x`.
+
+Keeping or removing a structural tag drops its Markdown. The tag is output as HTML, or removed, so no list markers or
+code fences are left:
+
+```ts
+const service = new TurndownService();
+
+service.keep(["li"]);
+service.turndown("<ul><li>a</li><li>b</li></ul>"); // "<li>a</li>\n\n<li>b</li>"
+
+const pre = new TurndownService();
+
+pre.keep(["pre"]);
+pre.turndown("<pre><code>x</code></pre>"); // "<pre><code>x</code></pre>", raw HTML, not a code block
+```
+
+## GitHub Flavored Markdown
+
+`gfm` is a plugin for tables, strikethrough and task list items:
+
+```ts
+import TurndownService, { gfm } from "@neore/html-to-markdown";
+
+new TurndownService().use(gfm).turndown("<table><tr><th>a</th></tr><tr><td><s>1</s></td></tr></table>");
+// "| a |\n| --- |\n| ~~1~~ |"
+```
+
+- A table's first row is its header. A cell that spans columns or rows leaves empty cells, so the cells after it stay
+  under their own headers. A cell spans down to the end of its row group at most. A caption goes above the table.
+- A cell is one line: a line break is a space, a list is its items joined by `; `, a heading is strong text, and every
+  pipe is escaped, inside code too. A table nested in a cell is the text of its cells.
+- A table whose spans would fill more than 100,000 cells is written as its cells' text, a line per row.
+- `<del>`, `<s>` and `<strike>` are `~~text~~`. A checkbox is `[x] ` or `[ ] `.
+- An element that a `remove` filter matches is left out, even where a gfm rule would write it.
+- The table is laid out from the text gfm's own rules keep for each cell and caption. A rule added after `gfm` for
+  `td`, `th` or `caption` takes those elements from it, and the table does not write what that rule returns: its output
+  reaches the row mixed with the other cells', with no place in the grid.
 
 ## Status
 
-This is the first step of the fork: a behaviour-preserving TypeScript port. Its output matches upstream 7.2.5 on:
+This is the first step of the fork: a behaviour-preserving TypeScript port, except for `keep` and `remove` on built-in
+tags (see the API differences). Its output matches upstream 7.2.5 on:
 
 - the 147 upstream golden cases, with their per-case options (`test/golden.test.ts`);
 - the upstream API tests, ported (`test/turndown.test.ts`) and the edge-whitespace internals (`test/edge-whitespace.test.ts`);
@@ -46,7 +94,7 @@ differential test covers each of them.
 2. An internal tree built from the DOM, DOMParser on the main thread, parse5 only for Node and offline use, domino removed.
 3. Upstream fixes and the known issues above (per-line escaping, `<br>` handling, list `start`/`value`, hidden content,
    safe hrefs).
-4. GFM: tables, strikethrough, task lists, and a paste preset with the rules the composer needs.
+4. GFM: tables, strikethrough and task lists (the `gfm` plugin), then a paste preset with the rules the composer needs.
 5. Use in the composer's paste path, loaded lazily.
 
 ## Scripts

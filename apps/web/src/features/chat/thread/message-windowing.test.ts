@@ -3,8 +3,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
     ALWAYS_MOUNTED_TAIL,
     getWindowPlan,
-    holdPinnedTail,
-    isBrowserFindKey,
     JUMP_MAX_PAGES,
     JUMP_MAX_PAGES_WITH_POSITION,
     parseMessageHash,
@@ -15,7 +13,6 @@ import {
     shouldLoadOlderForJump,
     VIRTUALIZE_FLAG_KEY,
     VIRTUALIZE_THRESHOLD,
-    withPinnedRows,
 } from "./message-windowing";
 
 describe(getWindowPlan, () => {
@@ -95,15 +92,11 @@ describe(readVirtualizeFlag, () => {
         localStorage.removeItem(VIRTUALIZE_FLAG_KEY);
     });
 
-    it("defaults on", () => {
-        expect(readVirtualizeFlag()).toBe(true);
+    it("defaults off", () => {
+        expect(readVirtualizeFlag()).toBe(false);
     });
 
-    it("is off only for the literal '0'", () => {
-        localStorage.setItem(VIRTUALIZE_FLAG_KEY, "0");
-
-        expect(readVirtualizeFlag()).toBe(false);
-
+    it("is on only for the literal '1'", () => {
         localStorage.setItem(VIRTUALIZE_FLAG_KEY, "1");
 
         expect(readVirtualizeFlag()).toBe(true);
@@ -181,82 +174,5 @@ describe(shouldLoadOlderForJump, () => {
 
     it("is bounded even with a position", () => {
         expect(shouldLoadOlderForJump(JUMP_MAX_PAGES_WITH_POSITION, loadedTurns(0), { order: 1 })).toBe(false);
-    });
-});
-
-describe(isBrowserFindKey, () => {
-    const key = (init: Partial<Pick<KeyboardEvent, "ctrlKey" | "key" | "metaKey" | "shiftKey">>) => {
-        return { ctrlKey: false, key: "", metaKey: false, shiftKey: false, ...init };
-    };
-
-    it("takes the keys that open or step through the browser's find, with Control off a Mac", () => {
-        expect(isBrowserFindKey(key({ ctrlKey: true, key: "f" }), false)).toBe(true);
-        expect(isBrowserFindKey(key({ key: "F3" }), false)).toBe(true);
-        expect(isBrowserFindKey(key({ key: "F3", shiftKey: true }), false)).toBe(true);
-        expect(isBrowserFindKey(key({ ctrlKey: true, key: "g" }), false)).toBe(true);
-        expect(isBrowserFindKey(key({ ctrlKey: true, key: "G", shiftKey: true }), false)).toBe(true);
-        // The Windows key is not find's modifier.
-        expect(isBrowserFindKey(key({ key: "f", metaKey: true }), false)).toBe(false);
-    });
-
-    it("takes Command, not Control, on a Mac", () => {
-        expect(isBrowserFindKey(key({ key: "F", metaKey: true }), true)).toBe(true);
-        expect(isBrowserFindKey(key({ key: "G", metaKey: true }), true)).toBe(true);
-        expect(isBrowserFindKey(key({ key: "F3" }), true)).toBe(true);
-        // Control+F moves the caret forward; Control+G is not find either.
-        expect(isBrowserFindKey(key({ ctrlKey: true, key: "f" }), true)).toBe(false);
-        expect(isBrowserFindKey(key({ ctrlKey: true, key: "g" }), true)).toBe(false);
-    });
-
-    it("leaves other keys alone", () => {
-        for (const isMac of [false, true]) {
-            const modifier = isMac ? { metaKey: true } : { ctrlKey: true };
-
-            expect(isBrowserFindKey(key({ key: "f" }), isMac)).toBe(false);
-            expect(isBrowserFindKey(key({ key: "g" }), isMac)).toBe(false);
-            expect(isBrowserFindKey(key({ ...modifier, key: "h" }), isMac)).toBe(false);
-            expect(isBrowserFindKey(key({ key: "F4" }), isMac)).toBe(false);
-            // The app's Focus Search shortcut, not the browser's find.
-            expect(isBrowserFindKey(key({ ...modifier, key: "F", shiftKey: true }), isMac)).toBe(false);
-        }
-    });
-
-    it("takes a keydown with no key (autofill) without throwing", () => {
-        const autofill = { ctrlKey: false, key: undefined, metaKey: false, shiftKey: false } as unknown as KeyboardEvent;
-        const withModifier = { ctrlKey: true, key: undefined, metaKey: false, shiftKey: false } as unknown as KeyboardEvent;
-
-        expect(() => isBrowserFindKey(autofill, false)).not.toThrow();
-        expect(isBrowserFindKey(autofill, false)).toBe(false);
-        expect(isBrowserFindKey(withModifier, false)).toBe(false);
-    });
-});
-
-describe(withPinnedRows, () => {
-    it("adds the pinned rows to the visible ones, in order", () => {
-        expect(withPinnedRows([10, 11, 12], [5, 3, 4, 11], 40)).toStrictEqual([3, 4, 5, 10, 11, 12]);
-    });
-
-    it("keeps the visible rows as they are without pins, and drops pins past the rows that exist", () => {
-        expect(withPinnedRows([1, 2], [], 40)).toStrictEqual([1, 2]);
-        expect(withPinnedRows([1, 2], [38, 39, 40, 45, -1], 40)).toStrictEqual([1, 2, 38, 39]);
-    });
-});
-
-describe(holdPinnedTail, () => {
-    const plan = { headCount: 172, virtualized: true };
-
-    it("keeps a held row that was in the tail there after new messages arrive", () => {
-        // The tail began at 170; two new messages would start it at 172; row 171 is held.
-        expect(holdPinnedTail(plan, 170, [171])).toStrictEqual({ headCount: 171, virtualized: true });
-    });
-
-    it("leaves the split alone for held rows deep in the head, none held, or no earlier tail", () => {
-        expect(holdPinnedTail(plan, 170, [12, 40])).toBe(plan);
-        expect(holdPinnedTail(plan, 170, [])).toBe(plan);
-        expect(holdPinnedTail(plan, -1, [171])).toBe(plan);
-    });
-
-    it("keeps everything in the tail when a held row was in it as the thread starts virtualizing", () => {
-        expect(holdPinnedTail({ headCount: 31, virtualized: true }, 0, [0])).toStrictEqual({ headCount: 0, virtualized: false });
     });
 });
