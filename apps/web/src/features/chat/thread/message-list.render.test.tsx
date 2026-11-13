@@ -35,6 +35,10 @@ const harness = vi.hoisted(() => {
         upload: (async () => "upload-1") as () => Promise<string>,
         /** What every cRPC mutation does; a test makes one hang or fail. */
         mutate: (async () => undefined) as (variables: unknown) => Promise<unknown>,
+        /** Renders the real fork dialog on assistant rows. */
+        withForkDialog: false,
+        /** Every id list the read-aloud scope was handed, in render order. */
+        readAloudIds: [] as unknown[],
         /** The edit composer the list renders for the message being edited. */
         editComposer: undefined as ((props: { message: UIMessage }) => ReactNode) | undefined,
         /** Extra content a test renders inside a message's row (a prompt card), by message id. */
@@ -234,8 +238,25 @@ vi.mock("@/features/chat/translation/translate-action", () => {
     return { default: () => null };
 });
 
-vi.mock("./fork-branch-dialog", () => {
-    return { default: () => null };
+vi.mock("./fork-branch-dialog", async (importOriginal) => {
+    const { createElement: create } = await import("react");
+    const actual = await importOriginal<typeof import("./fork-branch-dialog")>();
+
+    return {
+        default: (props: Parameters<typeof actual.default>[0]) => (harness.withForkDialog ? create(actual.default, props) : null),
+    };
+});
+
+vi.mock("./read-aloud-speech", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("./read-aloud-speech")>();
+
+    return {
+        ...actual,
+        useEndReadAloudWithMessages: (messageIds: ReadonlyArray<string>) => {
+            harness.readAloudIds.push(messageIds);
+            actual.useEndReadAloudWithMessages(messageIds);
+        },
+    };
 });
 
 // A question card's attach path reads `VITE_LUNORA_URL` at import time; CI runs without one.
@@ -617,6 +638,7 @@ const nextFrames = async (count: number): Promise<void> => {
 
 const SHOW_ALL_NAME = /earlier messages/;
 const SECRET_PLACEHOLDER = /Paste it here/;
+const BLANKS = " ".repeat(3);
 
 const viewport = (): HTMLElement => document.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')!;
 
@@ -686,6 +708,7 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
         harness.withHostChanges = false;
         harness.editComposer = undefined;
         harness.rowExtras.clear();
+        harness.withForkDialog = false;
         harness.thread = undefined;
         harness.mutate = async () => undefined;
         harness.action = async () => undefined;
@@ -874,6 +897,8 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
 
         expect(mountedIds()).toHaveLength(THREAD_LENGTH);
         expect(focusedMessageId()).toBe("m0");
+        // Marked like a jump's landing row, so the focus ring shows.
+        expect((document.activeElement as HTMLElement).dataset.jumped).toBe("");
         expect(screen.queryByRole("button", { name: SHOW_ALL_NAME })).toBeNull();
     });
 
@@ -967,6 +992,18 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
 
         expect(within(rowOf(replyId)).getByRole("textbox", { name: label })).toBe(box);
         expect((box as HTMLTextAreaElement).value).toBe("Rename this");
+    });
+
+    it("hands the read-aloud scope the same id list while a reply streams", () => {
+        mountInto();
+        harness.readAloudIds.length = 0;
+
+        for (let push = 0; push < 3; push += 1) {
+            pushLastMessageEdit(true, false);
+        }
+
+        expect(harness.readAloudIds.length).toBeGreaterThan(0);
+        expect(new Set(harness.readAloudIds).size).toBe(1);
     });
 
     it("hands the virtualizer the same range extractor while a reply streams and nothing is pinned", () => {
@@ -1182,6 +1219,59 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
             const attached = within(rowOf("m101")!).getByRole("list", { name: "Attached files" });
 
             expect(within(attached).getByText("plan.pdf")).toBeTruthy();
+        });
+
+        it("keeps an older reply's open fork dialog, with its typed title, when scrolled away", async () => {
+            const user = userEvent.setup();
+
+            harness.withForkDialog = true;
+            // The dialog waits for its animations, which jsdom does not have.
+            Element.prototype.getAnimations = () => [];
+            mountInto();
+
+            act(() => scrollToMessage("m101"));
+            await vi.waitFor(() => expect(focusedMessageId()).toBe("m101"), { timeout: 5000 });
+            await user.click(within(rowOf("m101")!).getByRole("button", { name: "Fork conversation" }));
+
+            const title = await screen.findByPlaceholderText("Enter branch title (optional)");
+
+            await user.type(title, "Try the other API");
+            await scrollToNewest();
+
+            expect(screen.getByPlaceholderText("Enter branch title (optional)")).toBe(title);
+            expect((title as HTMLInputElement).value).toBe("Try the other API");
+        });
+
+        it("keeps a blank-only answer typed into a question card when scrolled away", async () => {
+            const user = userEvent.setup();
+
+            harness.thread = { userId: "owner" };
+            harness.rowExtras.set("m101", () => createElement(AskUserPrompt, { part: waitingPart("tool-askUser", { question: "Which file?" }) }));
+            mountInto();
+
+            act(() => scrollToMessage("m101"));
+            await vi.waitFor(() => expect(focusedMessageId()).toBe("m101"), { timeout: 5000 });
+            await user.type(within(rowOf("m101")!).getByRole("textbox"), BLANKS);
+            act(() => (document.activeElement as HTMLElement).blur());
+            await scrollToNewest();
+
+            expect((within(rowOf("m101")!).getByRole("textbox") as HTMLTextAreaElement).value).toBe(BLANKS);
+        });
+
+        it("holds a row with focus inside it in a thread whose messages arrived after the list first rendered empty", async () => {
+            harness.messages = [];
+            mountInto();
+
+            harness.messages = Array.from({ length: THREAD_LENGTH }, (_, index) => makeMessage(index));
+            harness.rowExtras.set("m101", () => createElement("button", { type: "button" }, "Row tool"));
+            act(() => harness.publish?.());
+
+            act(() => scrollToMessage("m101"));
+            await vi.waitFor(() => expect(focusedMessageId()).toBe("m101"), { timeout: 5000 });
+            act(() => within(rowOf("m101")!).getByRole("button", { name: "Row tool" }).focus());
+            await scrollToNewest();
+
+            expect(rowOf("m101")).not.toBeNull();
         });
 
         it("holds no row for a card its viewer cannot answer, or one nobody has typed in", async () => {

@@ -85,7 +85,8 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const isWaiting = part.state === "approval-requested" && submitted === null;
 
     const canAnswer = isOwner && isWaiting && !!approvalId && !!threadId && !isPending;
-    const hasInput = draft.trim() !== "" || drafts.some((entry) => entry.note.trim() !== "" || entry.selected.length > 0) || files.length > 0;
+    // Raw, not trimmed: whatever was typed, blanks included, is the person's and must survive a scroll.
+    const hasInput = draft !== "" || drafts.some((entry) => entry.note !== "" || entry.selected.length > 0) || files.length > 0;
 
     // What is typed here lives only in this card. Held for the person who can answer it, while it holds their input or a
     // file is still uploading (unmounting would drop it), and while a send is in flight, so a failed send brings the form

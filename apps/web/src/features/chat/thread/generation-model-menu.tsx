@@ -22,6 +22,7 @@ import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import ComposerAudioSettings from "./composer-audio-settings";
 import ComposerImageSettings from "./composer-image-settings";
 import ComposerVideoSettings from "./composer-video-settings";
+import { useHoldRow } from "./row-pins";
 
 type GenerationMode = "image" | "video" | "speech-to-text";
 
@@ -43,6 +44,9 @@ interface GenerationModelMenuProps {
 const GenerationModelMenu = memo(({ disabled, icon, messageText, mode, threadId, tooltip }: GenerationModelMenuProps) => {
     const { t } = useLingui();
     const [open, setOpen] = useState(false);
+
+    // The choice made here lives in this row while the dialog is open: the list must not virtualize the row away.
+    useHoldRow(open);
     const [isGenerating, setIsGenerating] = useState(false);
 
     const flaggedModels = useFeatureFlaggedModels();

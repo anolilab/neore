@@ -36,7 +36,7 @@ import { getPlatformModifierForEvents } from "@neore/ui/utils/keyboard-shortcuts
 import type { Virtualizer } from "@tanstack/react-virtual";
 import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
 import { AnimatePresence } from "motion/react";
-import type { FC, ReactNode, RefObject } from "react";
+import type { FC, ReactNode } from "react";
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
@@ -184,12 +184,11 @@ const readSelectedRows = (list: HTMLElement): SelectedRows | null => {
  * The rows a text selection in the list spans. The virtualizer keeps them mounted while it lasts, so
  * scrolling a selected older reply out of view does not cut the selection; windowing resumes once it clears.
  */
-const useSelectedRows = (listRef: RefObject<HTMLElement | null>): SelectedRows | null => {
+const useSelectedRows = (list: HTMLElement | null): SelectedRows | null => {
     const [selected, setSelected] = useState<SelectedRows | null>(null);
 
     useEffect(() => {
         const handleSelectionChange = () => {
-            const list = listRef.current;
             const next = list ? readSelectedRows(list) : null;
 
             setSelected((previous) => (previous?.firstId === next?.firstId && previous?.lastId === next?.lastId ? previous : next));
@@ -198,7 +197,7 @@ const useSelectedRows = (listRef: RefObject<HTMLElement | null>): SelectedRows |
         document.addEventListener("selectionchange", handleSelectionChange);
 
         return () => document.removeEventListener("selectionchange", handleSelectionChange);
-    }, [listRef]);
+    }, [list]);
 
     return selected;
 };
@@ -279,12 +278,11 @@ const useHeldTailPlan = (plan: WindowPlan, messages: ReadonlyArray<UIMessage>, p
  * The row that holds focus, by message id: anything focused in a row (an input, a button) keeps that row
  * mounted, so typing into or tabbing through a row never has it virtualized away underneath.
  */
-const useFocusedRowId = (listRef: RefObject<HTMLElement | null>): string | undefined => {
+const useFocusedRowId = (list: HTMLElement | null): string | undefined => {
     const [focusedId, setFocusedId] = useState<string | undefined>(undefined);
 
+    // Keyed by the element: an empty or loading thread renders no list, so the listeners attach once it appears.
     useEffect(() => {
-        const list = listRef.current;
-
         if (!list) {
             return undefined;
         }
@@ -309,7 +307,7 @@ const useFocusedRowId = (listRef: RefObject<HTMLElement | null>): string | undef
             list.removeEventListener("focusin", handleFocusIn);
             list.removeEventListener("focusout", handleFocusOut);
         };
-    }, [listRef]);
+    }, [list]);
 
     return focusedId;
 };
@@ -333,6 +331,24 @@ const useHeldRowIds = (pinnedRowIds: ReadonlySet<string>, editingMessageId: stri
 
         return held;
     }, [editingMessageId, focusedRowId, pinnedRowIds]);
+
+/**
+ * Focuses a row the app moved to (a jump, "Show all earlier messages") and marks it, so it alone shows a focus ring
+ * until focus leaves; a row focused by a click in its text is not marked.
+ */
+const focusRowWithRing = (row: HTMLElement, options?: FocusOptions): void => {
+    const { dataset } = row;
+
+    dataset.jumped = "";
+    row.addEventListener(
+        "blur",
+        () => {
+            delete dataset.jumped;
+        },
+        { once: true },
+    );
+    row.focus(options);
+};
 
 type RenderRow = (message: UIMessage, index: number) => ReactNode;
 
@@ -454,7 +470,9 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     const initialIds = useInitialMessageIds(messages, messagesReady);
 
     // Read aloud outlives its row (virtualization unmounts it); it ends with the thread, or with its message.
-    const messageIds = useMemo(() => threadMessages.map((message) => message.id), [threadMessages]);
+    // Keyed by the ids, not the array: a streamed chunk changes a message's content, never which messages there are.
+    const messageIdsKey = threadMessages.map((message) => message.id).join("\n");
+    const messageIds = useMemo(() => (messageIdsKey === "" ? [] : messageIdsKey.split("\n")), [messageIdsKey]);
 
     useEndReadAloudWithMessages(messageIds);
 
@@ -462,9 +480,10 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     const isVirtualizeFlagOn = useSyncExternalStore(subscribeToNothing, readVirtualizeFlag, () => true);
 
     const { isAllShown, showAll } = useShowAllMessages();
-    const listRef = useRef<HTMLDivElement>(null);
-    const selectedRows = useSelectedRows(listRef);
-    const focusedRowId = useFocusedRowId(listRef);
+    // The list element as state, not a ref: the listeners below attach once it renders, which an empty thread does not.
+    const [listElement, setListElement] = useState<HTMLDivElement | null>(null);
+    const selectedRows = useSelectedRows(listElement);
+    const focusedRowId = useFocusedRowId(listElement);
     const heldRowIds = useHeldRowIds(usePinnedRowIds(), editingMessageId, focusedRowId);
     const pinned = useStableIndexes(pinnedIndexes(messages, selectedRows, heldRowIds));
     // "Show all" keeps the same split and mounts the whole head (`mountAll`), so no row changes parent and remounts.
@@ -479,7 +498,11 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
         }
 
         focusOldestRef.current = false;
-        document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(messages[0]?.id ?? "")}"]`)?.focus();
+        const oldest = document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(messages[0]?.id ?? "")}"]`);
+
+        if (oldest) {
+            focusRowWithRing(oldest);
+        }
     });
 
     const handleShowAll = useCallback(() => {
@@ -542,16 +565,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
             // Move focus too, so keyboard and screen-reader users land where sighted users do.
             if (focus) {
-                // Marks the row a jump landed on, so it alone shows a focus ring; a row focused by a click in its text does not.
-                element.dataset.jumped = "";
-                element.addEventListener(
-                    "blur",
-                    () => {
-                        delete element.dataset.jumped;
-                    },
-                    { once: true },
-                );
-                element.focus({ preventScroll: true });
+                focusRowWithRing(element, { preventScroll: true });
             }
 
             return true;
@@ -776,7 +790,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
             <div
                 className={cn("message-list flex flex-col", className)}
-                ref={listRef}
+                ref={setListElement}
                 role="list"
                 style={{ "--thread-max-width": maxWidth } as React.CSSProperties}
             >
