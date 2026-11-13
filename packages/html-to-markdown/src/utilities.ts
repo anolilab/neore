@@ -1,3 +1,5 @@
+import type { AnnotatedNode } from "./types";
+
 const TRAILING_NEWLINE_BLOCK_START = /^[\t\r\n]+/;
 
 export function repeat(character: string, count: number): string {
@@ -32,6 +34,14 @@ export function trimNewlines(string: string): string {
 /** Strips leading tabs and line breaks (not spaces), as upstream's postProcess does. */
 export function trimLeadingBreaks(string: string): string {
     return string.replace(TRAILING_NEWLINE_BLOCK_START, "");
+}
+
+/**
+ * The default replacement of a blank element: a paragraph break for a block, nothing for an inline element. Shared,
+ * so the emphasis code can tell it from a caller's own `blankReplacement`, whose output is not known from the DOM.
+ */
+export function defaultBlankReplacement(_content: string, node: AnnotatedNode): string {
+    return node.isBlock ? "\n\n" : "";
 }
 
 /**

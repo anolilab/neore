@@ -34,6 +34,13 @@ describe("an element that a rule claims but that prints nothing, between emphasi
         expect(service.turndown("<em>a</em><span>x</span><em>b</em>")).toBe(plain);
     });
 
+    // A caller's blankReplacement can print text for a blank element, so its output is not known from the DOM.
+    it("splits the run at a blank element when a custom blankReplacement prints text", () => {
+        const service = new TurndownService({ blankReplacement: () => "X" });
+
+        expect(service.turndown("<em>a</em><span></span><em>b</em>")).toBe("*a*X*b*");
+    });
+
     it("still splits the run at a custom rule that prints text", () => {
         const service = new TurndownService();
 

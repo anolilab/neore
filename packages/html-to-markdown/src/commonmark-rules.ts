@@ -2,6 +2,7 @@ import annotateNode from "./node";
 import type { AnnotatedNode, Options, Rule, RuleLookup } from "./types";
 import {
     codeText,
+    defaultBlankReplacement,
     edgeBreaks,
     escapeMarkdown,
     hasOnlyBreaks,
@@ -684,6 +685,11 @@ function maxJoinBreaks(options: Options): number {
  * own output, so the DOM says nothing about its edge; the run then takes the asterisk, valid against any edge.
  */
 function siblingEdgeRun(sibling: Node, side: Side, options: Options, lookup: RuleLookup): EmphasisRun | null {
+    // A caller's blankReplacement may print anything for a blank element, so the edge is unknown: take the asterisk.
+    if (options.blankReplacement !== defaultBlankReplacement && sibling.nodeType === 1 && annotationOf(sibling, options).isBlank) {
+        return { count: 0, wordEdge: true };
+    }
+
     const rule = lookup.ruleFor(sibling);
 
     // A removed element writes only its flanking whitespace, which ends the run like a space.
