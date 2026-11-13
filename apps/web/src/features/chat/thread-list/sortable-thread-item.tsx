@@ -27,7 +27,6 @@ interface SortableThreadItemProperties {
     keyboardThreadId?: string;
     loadingStates: import("./types").LoadingStates;
     node: BranchNode;
-    searchQuery: string;
     selectedThreadIds: Set<string>;
     // eslint-disable-next-line react/no-unused-prop-types
     selectedThreadIndex: number;
@@ -52,7 +51,6 @@ const SortableThreadItem: FC<SortableThreadItemProperties> = ({
     isSelectionMode,
     loadingStates,
     node,
-    searchQuery,
     selectedThreadIds,
     toggleExpanded,
     updateThread,
@@ -86,7 +84,6 @@ const SortableThreadItem: FC<SortableThreadItemProperties> = ({
                 keyboardThreadId={keyboardThreadId}
                 loadingStates={loadingStates}
                 node={node}
-                searchQuery={searchQuery}
                 selectedThreadIds={selectedThreadIds}
                 toggleExpanded={toggleExpanded}
                 updateThread={updateThread}

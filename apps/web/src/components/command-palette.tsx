@@ -55,6 +55,7 @@ import { compareByStateRank, parseStateQuery } from "@/features/chat/thread-list
 import { buildMatchSnippet } from "@/features/chat/thread-list/utilities";
 import convertShortcutToHotkeysHook from "@/features/keyboard/lib/shortcut-converter";
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
+import useDebouncedValue from "@/hooks/use-debounced-value";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import { useCommandDialogActions, useCommandDialogState, useCommandDialogStore } from "./command-dialog-store";
@@ -67,18 +68,6 @@ const MESSAGE_SEARCH_DEBOUNCE_MS = 250;
 const MAX_MESSAGE_HITS = 8;
 /** The longest delay setTimeout accepts; a timer capped by it re-arms when it fires (the effect reads `now`). */
 const MAX_TIMEOUT_MS = 2_147_483_647;
-
-const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
-    const [debounced, setDebounced] = useState(value);
-
-    useEffect(() => {
-        const timer = setTimeout(setDebounced, delayMs, value);
-
-        return () => clearTimeout(timer);
-    }, [value, delayMs]);
-
-    return debounced;
-};
 
 interface MessageSearchThread {
     _id: string;

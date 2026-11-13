@@ -27,6 +27,7 @@ import { useCRPC } from "@/lib/lunora/crpc";
 import { showError, showInfo } from "@/lib/toast";
 
 import ThreadGroupRenderer from "./components/thread-group-renderer";
+import { SearchQueryContext } from "./contexts/search-query-context";
 import GroupHeader from "./group-header";
 import useKeyboardNavigation from "./hooks/use-keyboard-navigation";
 import useThreadGroups from "./hooks/use-thread-groups";
@@ -234,7 +235,6 @@ const VirtualizedThreadList: FC<{
     isSelectionMode: boolean;
     loadingStates: any;
     projectsMap: Map<string, any>;
-    searchQuery: string;
     selectedThreadIds: Set<string>;
     selectedThreadIndex: number;
     toggleExpanded: (threadId: string) => void;
@@ -361,7 +361,6 @@ const VirtualizedThreadList: FC<{
                                     keyboardThreadId={keyboardThreadId}
                                     loadingStates={props.loadingStates}
                                     node={item.thread}
-                                    searchQuery={props.searchQuery}
                                     selectedThreadIds={props.selectedThreadIds}
                                     selectedThreadIndex={props.selectedThreadIndex}
                                     toggleExpanded={props.toggleExpanded}
@@ -1191,7 +1190,6 @@ const HierarchicalThreadList: FC<
                             isSelectionMode={isSelectionMode}
                             loadingStates={loadingStates}
                             projectPinnedAt={project?.pinnedAt}
-                            searchQuery={searchQuery}
                             selectedThreadIds={selectedThreadIds}
                             selectedThreadIndex={selectedThreadIndex}
                             toggleExpanded={toggleExpanded}
@@ -1239,7 +1237,6 @@ const HierarchicalThreadList: FC<
                                                     isSelectionMode={isSelectionMode}
                                                     loadingStates={loadingStates}
                                                     projectPinnedAt={project?.pinnedAt}
-                                                    searchQuery={searchQuery}
                                                     selectedThreadIds={selectedThreadIds}
                                                     selectedThreadIndex={selectedThreadIndex}
                                                     toggleExpanded={toggleExpanded}
@@ -1282,7 +1279,6 @@ const HierarchicalThreadList: FC<
                 isSelectionMode={isSelectionMode}
                 loadingStates={loadingStates}
                 projectsMap={projectsMap}
-                searchQuery={searchQuery}
                 selectedThreadIds={selectedThreadIds}
                 selectedThreadIndex={selectedThreadIndex}
                 toggleExpanded={toggleExpanded}
@@ -1298,71 +1294,73 @@ const HierarchicalThreadList: FC<
         // The list root stays mounted while the list is, so it is the fallback focus target when a row unmounts during a rename.
         // Focused as the fallback when a rename's row has unmounted: its ring is the only focus cue there, so it stays visible.
         <PullRequestCountsProvider threadIds={visibleThreadIds}>
-            <div
-                className="focus-visible:ring-ring/50 relative flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2"
-                ref={listRootReference}
-                tabIndex={-1}
-            >
-                {isSelectionMode && (
-                    <SelectionToolbar
-                        isAllSelected={isAllSelected}
-                        onClearSelection={handleClearSelection}
-                        onDeleteSelected={handleBulkDelete}
-                        onDone={onExitSelectionMode}
-                        onSelectAll={handleSelectAll}
-                        onSelectByDate={handleSelectByDate}
-                        selectedCount={selectedThreadIds.size}
-                    />
-                )}
-                <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd} sensors={sensors}>
-                    {renderThreadGroups()}
-                </DndContext>
-                {hasOpenedProjectForm && (
-                    <Suspense fallback={null}>
-                        <ProjectFormDialog editingProject={editingProject} onClose={() => setShowProjectFormDialog(false)} open={showProjectFormDialog} />
-                    </Suspense>
-                )}
-                <DeleteConfirmationDialog
-                    description={t`This will permanently delete the project and all associated threads. This action cannot be undone.`}
-                    isDeleting={isDeletingProject}
-                    itemName={projectToDelete?.name}
-                    onConfirm={handleConfirmDeleteProject}
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setProjectToDelete(null);
-                        }
-                    }}
-                    open={!!projectToDelete}
-                    title={t`Delete Project`}
-                />
-                {snoozeThread && (
-                    <SnoozeUntilDialog
-                        key={snoozeThread.threadId}
+            <SearchQueryContext value={searchQuery}>
+                <div
+                    className="focus-visible:ring-ring/50 relative flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2"
+                    ref={listRootReference}
+                    tabIndex={-1}
+                >
+                    {isSelectionMode && (
+                        <SelectionToolbar
+                            isAllSelected={isAllSelected}
+                            onClearSelection={handleClearSelection}
+                            onDeleteSelected={handleBulkDelete}
+                            onDone={onExitSelectionMode}
+                            onSelectAll={handleSelectAll}
+                            onSelectByDate={handleSelectByDate}
+                            selectedCount={selectedThreadIds.size}
+                        />
+                    )}
+                    <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd} sensors={sensors}>
+                        {renderThreadGroups()}
+                    </DndContext>
+                    {hasOpenedProjectForm && (
+                        <Suspense fallback={null}>
+                            <ProjectFormDialog editingProject={editingProject} onClose={() => setShowProjectFormDialog(false)} open={showProjectFormDialog} />
+                        </Suspense>
+                    )}
+                    <DeleteConfirmationDialog
+                        description={t`This will permanently delete the project and all associated threads. This action cannot be undone.`}
+                        isDeleting={isDeletingProject}
+                        itemName={projectToDelete?.name}
+                        onConfirm={handleConfirmDeleteProject}
                         onOpenChange={(open) => {
                             if (!open) {
-                                setSnoozeThreadId(null);
+                                setProjectToDelete(null);
                             }
                         }}
-                        open
-                        previousUntil={snoozeThread.snoozedUntil}
-                        restoreFocus={() => renameFocusTarget(listRootReference.current, snoozeThread.threadId)}
-                        threadId={snoozeThread.threadId}
+                        open={!!projectToDelete}
+                        title={t`Delete Project`}
                     />
-                )}
-                {renameThread && !isThreadLocked(renameThread.lockedAt) && (
-                    <RenameThreadDialog
-                        onOpenChange={(open) => {
-                            if (!open) {
-                                setRenameThreadId(null);
-                            }
-                        }}
-                        open
-                        restoreFocus={() => renameFocusTarget(listRootReference.current, renameThread.threadId)}
-                        storedTitle={renameThread.storedTitle ?? renameThread.title}
-                        threadId={renameThread.threadId}
-                    />
-                )}
-            </div>
+                    {snoozeThread && (
+                        <SnoozeUntilDialog
+                            key={snoozeThread.threadId}
+                            onOpenChange={(open) => {
+                                if (!open) {
+                                    setSnoozeThreadId(null);
+                                }
+                            }}
+                            open
+                            previousUntil={snoozeThread.snoozedUntil}
+                            restoreFocus={() => renameFocusTarget(listRootReference.current, snoozeThread.threadId)}
+                            threadId={snoozeThread.threadId}
+                        />
+                    )}
+                    {renameThread && !isThreadLocked(renameThread.lockedAt) && (
+                        <RenameThreadDialog
+                            onOpenChange={(open) => {
+                                if (!open) {
+                                    setRenameThreadId(null);
+                                }
+                            }}
+                            open
+                            restoreFocus={() => renameFocusTarget(listRootReference.current, renameThread.threadId)}
+                            storedTitle={renameThread.storedTitle ?? renameThread.title}
+                            threadId={renameThread.threadId}
+                        />
+                    )}
+                </div>
+            </SearchQueryContext>
         </PullRequestCountsProvider>
     );
 };

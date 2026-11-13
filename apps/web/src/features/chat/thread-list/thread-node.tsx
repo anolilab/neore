@@ -135,7 +135,6 @@ const ThreadNodeChildren: FC<{
     keyboardThreadId?: string;
     loadingStates: LoadingStates;
     nodes: BranchNode[];
-    searchQuery: string;
     selectedThreadIds: Set<string>;
     selectedThreadIndex: number;
     toggleExpanded: (threadId: string) => void;
@@ -155,7 +154,6 @@ const ThreadNodeChildren: FC<{
     keyboardThreadId,
     loadingStates,
     nodes: children,
-    searchQuery,
     selectedThreadIds,
     selectedThreadIndex,
     toggleExpanded,
@@ -182,7 +180,6 @@ const ThreadNodeChildren: FC<{
                 keyboardThreadId={keyboardThreadId}
                 loadingStates={loadingStates}
                 node={child}
-                searchQuery={searchQuery}
                 selectedThreadIds={selectedThreadIds}
                 selectedThreadIndex={selectedThreadIndex}
                 toggleExpanded={toggleExpanded}
@@ -210,7 +207,6 @@ interface ThreadNodeProperties {
     keyboardThreadId?: string;
     loadingStates: LoadingStates;
     node: BranchNode;
-    searchQuery: string;
     selectedThreadIds: Set<string>;
     toggleExpanded: (threadId: string) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
@@ -234,7 +230,6 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     keyboardThreadId,
     loadingStates,
     node,
-    searchQuery,
     selectedThreadIds,
     toggleExpanded,
     updateThread,
@@ -1162,7 +1157,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     <span className="sr-only">{t`Unread`}</span>
                 </>
             )}
-            {searchQuery.trim() && node.relevantMessages && node.relevantMessages.length > 0 && (
+            {node.relevantMessages && node.relevantMessages.length > 0 && (
                 <div className="bg-primary/10 text-primary-text shrink-0 rounded-full px-1.5 py-0.5 text-xs">
                     <Plural one="# match" other="# matches" value={node.relevantMessages.length} />
                 </div>
@@ -1245,8 +1240,9 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 </div>
             )}
 
-            {searchQuery.trim() && !isSelectionMode && node.relevantMessages && node.relevantMessages.length > 0 && (
-                <MessageSearchMatches matches={node.relevantMessages} searchQuery={searchQuery} threadId={node.threadId} />
+            {/* Only a message search's results carry matches. */}
+            {!isSelectionMode && node.relevantMessages && node.relevantMessages.length > 0 && (
+                <MessageSearchMatches matches={node.relevantMessages} threadId={node.threadId} />
             )}
 
             {hasOpenedMoveToProject && (
@@ -1276,7 +1272,6 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     keyboardThreadId={keyboardThreadId}
                     loadingStates={loadingStates}
                     nodes={node.children}
-                    searchQuery={searchQuery}
                     selectedThreadIds={selectedThreadIds}
                     selectedThreadIndex={-1}
                     toggleExpanded={toggleExpanded}

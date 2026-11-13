@@ -32,7 +32,6 @@ interface ThreadGroupRendererProps {
     isSelectionMode: boolean;
     loadingStates: LoadingStates;
     projectPinnedAt?: number | null;
-    searchQuery: string;
     selectedThreadIds: Set<string>;
     selectedThreadIndex: number;
     toggleExpanded: (threadId: string) => void;
@@ -71,7 +70,6 @@ const ThreadGroupRenderer: FC<ThreadGroupRendererProps> = memo(
         isSelectionMode,
         loadingStates,
         projectPinnedAt,
-        searchQuery,
         selectedThreadIds,
         selectedThreadIndex,
         toggleExpanded,
@@ -143,7 +141,6 @@ const ThreadGroupRenderer: FC<ThreadGroupRendererProps> = memo(
                                             keyboardThreadId={keyboardThreadId}
                                             loadingStates={loadingStates}
                                             node={thread}
-                                            searchQuery={searchQuery}
                                             selectedThreadIds={selectedThreadIds}
                                             selectedThreadIndex={selectedThreadIndex}
                                             toggleExpanded={toggleExpanded}
