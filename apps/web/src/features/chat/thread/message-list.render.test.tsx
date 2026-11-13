@@ -14,14 +14,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { UIMessage } from "@/lib/agent";
 import { shareUnchangedMessages } from "@/lib/agent/share-unchanged-messages";
 
+import { ALWAYS_MOUNTED_TAIL, VIRTUALIZE_FLAG_KEY } from "./message-windowing";
+
 const harness = vi.hoisted(() => {
     return {
         actions: {} as Record<string, unknown>,
         ActionsContext: undefined as Context<Record<string, unknown>> | undefined,
         contentRenders: new Map<string, number>(),
+        activeStreamId: null as string | null,
         goal: null as unknown,
+        /** Gives the scroller a layout; jsdom has none. */
+        layoutViewport: undefined as ((element: HTMLElement) => void) | undefined,
+        loadMore: (() => {}) as (count: number) => void,
         messages: [] as unknown[],
         MessagesContext: undefined as Context<unknown[]> | undefined,
+        messagesStatus: "Exhausted",
         publish: undefined as (() => void) | undefined,
         threadId: "thread-1",
     };
@@ -46,10 +53,16 @@ vi.mock("@/features/chat/core/context/chat-context", async () => {
     return {
         useChatActions: () => use(harness.ActionsContext!),
         useChatIsStreaming: () => {
-            return { activeStreamId: null, gatewayUrl: null, isStreaming: false, streamToken: null };
+            return { activeStreamId: harness.activeStreamId, gatewayUrl: null, isStreaming: harness.activeStreamId !== null, streamToken: null };
         },
         useChatMessages: () => {
-            return { isStreaming: false, loadMore: () => {}, messages: use(harness.MessagesContext!), messagesReady: true, messagesStatus: "Exhausted" };
+            return {
+                isStreaming: false,
+                loadMore: (count: number) => harness.loadMore(count),
+                messages: use(harness.MessagesContext!),
+                messagesReady: true,
+                messagesStatus: harness.messagesStatus,
+            };
         },
         useChatThread: () => {
             return { isNewThread: false, model: "test-model", thread: undefined, threadId: harness.threadId };
@@ -73,7 +86,10 @@ vi.mock("./message-content", () => {
 });
 
 vi.mock("./streaming-placeholder", () => {
-    return { StreamingPlaceholder: () => null, ThinkingPlaceholder: () => null };
+    return {
+        StreamingPlaceholder: ({ streamId }: { streamId: string }) => createElement("div", { "data-testid": "streaming-placeholder" }, streamId),
+        ThinkingPlaceholder: () => null,
+    };
 });
 
 vi.mock("@/features/chat/core/hooks/use-thread-manager", () => {
@@ -182,12 +198,22 @@ const Host = (): ReactNode => {
         harness.publish = () => setValue({ actions: harness.actions, messages: harness.messages });
     }, []);
 
+    // The scroller ThreadViewport renders around the list; the virtualized head finds it by this slot.
     return (
-        <MessagesContext value={value.messages}>
-            <ActionsContext value={value.actions}>
-                <MessageList />
-            </ActionsContext>
-        </MessagesContext>
+        <div
+            data-slot="scroll-area-viewport"
+            ref={(element) => {
+                if (element) {
+                    harness.layoutViewport?.(element);
+                }
+            }}
+        >
+            <MessagesContext value={value.messages}>
+                <ActionsContext value={value.actions}>
+                    <MessageList />
+                </ActionsContext>
+            </MessagesContext>
+        </div>
     );
 };
 
@@ -236,7 +262,13 @@ const pushLastMessageEdit = (share: boolean, freshActions: boolean): number => {
 const RENDER_TEST_TIMEOUT_MS = 60_000;
 
 describe("message list render cost", () => {
+    // Memoization is measured over every row, so all of them are mounted.
+    afterEach(() => {
+        localStorage.removeItem(VIRTUALIZE_FLAG_KEY);
+    });
+
     beforeEach(() => {
+        localStorage.setItem(VIRTUALIZE_FLAG_KEY, "0");
         harness.messages = Array.from({ length: THREAD_LENGTH }, (_, index) => makeMessage(index));
         harness.actions = { copyMessage: () => {}, reloadMessage: () => {} };
         harness.contentRenders.clear();
@@ -407,5 +439,194 @@ describe("message list goal", () => {
         expect(harness.contentRenders.has("m2")).toBe(false);
         expect(harness.contentRenders.has("m1")).toBe(true);
         expect(harness.contentRenders.has("m3")).toBe(true);
+    });
+});
+
+/* eslint-disable class-methods-use-this -- an inert stand-in */
+class InertResizeObserver {
+    public disconnect(): void {}
+
+    public observe(): void {}
+
+    public unobserve(): void {}
+}
+/* eslint-enable class-methods-use-this */
+
+/** A Cmd/Ctrl+F keydown, as it reaches the document. */
+const pressFind = (): void => {
+    act(() => {
+        document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ctrlKey: true, key: "f" }));
+    });
+};
+
+const focusedMessageId = (): string | undefined => (document.activeElement as HTMLElement | null)?.dataset.listMessageId;
+
+describe("a long thread", () => {
+    const VIEWPORT_HEIGHT = 800;
+    const ROW_HEIGHT = 100;
+    // How many frames late the scroller reports a programmatic scroll (a slow layout under load).
+    let scrollReportDelayFrames = 0;
+
+    const mountedIds = (): string[] => [...document.querySelectorAll<HTMLElement>("[data-list-message-id]")].map((row) => row.dataset.listMessageId!);
+
+    beforeEach(() => {
+        harness.messages = Array.from({ length: THREAD_LENGTH }, (_, index) => makeMessage(index));
+        harness.actions = { copyMessage: () => {}, reloadMessage: () => {} };
+        harness.messagesStatus = "Exhausted";
+        Element.prototype.scrollIntoView = vi.fn();
+        vi.stubGlobal("ResizeObserver", InertResizeObserver);
+        // Every row measures the same; the scroller gets a height, a scroll range and a scroll position that holds.
+        vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(ROW_HEIGHT);
+        harness.layoutViewport = (element: HTMLElement) => {
+            let position = 0;
+
+            Object.defineProperties(element, {
+                clientHeight: { configurable: true, value: VIEWPORT_HEIGHT },
+                scrollHeight: { configurable: true, value: THREAD_LENGTH * ROW_HEIGHT },
+                scrollTo: {
+                    configurable: true,
+                    value: (options: ScrollToOptions) => {
+                        position = options.top ?? position;
+
+                        let framesLeft = scrollReportDelayFrames;
+                        const report = () => {
+                            if (framesLeft > 0) {
+                                framesLeft -= 1;
+                                requestAnimationFrame(report);
+
+                                return;
+                            }
+
+                            element.dispatchEvent(new Event("scroll"));
+                        };
+
+                        report();
+                    },
+                },
+                scrollTop: {
+                    configurable: true,
+                    get: () => position,
+                    set: (value: number) => {
+                        position = value;
+                    },
+                },
+            });
+        };
+    });
+
+    afterEach(() => {
+        localStorage.removeItem(VIRTUALIZE_FLAG_KEY);
+        harness.activeStreamId = null;
+        harness.layoutViewport = undefined;
+        harness.loadMore = () => {};
+        scrollReportDelayFrames = 0;
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+    });
+
+    it("mounts the newest messages and only a window of the older ones by default", () => {
+        mountInto();
+
+        const mounted = mountedIds();
+
+        expect(mounted.length).toBeLessThan(THREAD_LENGTH / 2);
+
+        // The always-mounted tail: stick-to-bottom and the newest replies never depend on the virtualizer.
+        const tail = Array.from({ length: ALWAYS_MOUNTED_TAIL }, (_, offset) => `m${THREAD_LENGTH - ALWAYS_MOUNTED_TAIL + offset}`);
+
+        expect(mounted).toStrictEqual(expect.arrayContaining(tail));
+
+        expect(mounted).not.toContain("m100");
+        // Screen readers still hear the whole thread's length.
+        expect(
+            screen
+                .getByText(`message ${THREAD_LENGTH - 1}`)
+                .closest("[role=listitem]")
+                ?.getAttribute("aria-setsize"),
+        ).toBe(String(THREAD_LENGTH));
+    });
+
+    it("mounts every message when the browser opted out", () => {
+        localStorage.setItem(VIRTUALIZE_FLAG_KEY, "0");
+
+        mountInto();
+
+        expect(mountedIds()).toHaveLength(THREAD_LENGTH);
+    });
+
+    it("jumps to an older message that is not mounted, mounting and focusing it", async () => {
+        mountInto();
+
+        expect(mountedIds()).not.toContain("m100");
+
+        act(() => scrollToMessage("m100"));
+
+        await vi.waitFor(() => expect(focusedMessageId()).toBe("m100"), { timeout: 5000 });
+    });
+
+    it("still lands on an older message when its row mounts several frames after the jump scrolled", async () => {
+        scrollReportDelayFrames = 6;
+        mountInto();
+
+        act(() => scrollToMessage("m100"));
+
+        await vi.waitFor(() => expect(focusedMessageId()).toBe("m100"), { timeout: 5000 });
+    });
+
+    it("stays virtualized when the thread's own find takes Cmd/Ctrl+F", () => {
+        mountInto();
+
+        // The find-in-thread shortcut handles the chord on the document and keeps it from the browser.
+        const takeChord = (event: KeyboardEvent) => event.preventDefault();
+
+        document.addEventListener("keydown", takeChord);
+        pressFind();
+        document.removeEventListener("keydown", takeChord);
+
+        expect(mountedIds().length).toBeLessThan(THREAD_LENGTH / 2);
+    });
+
+    it("mounts every message once Cmd/Ctrl+F reaches the browser's find", () => {
+        mountInto();
+
+        pressFind();
+
+        expect(mountedIds()).toHaveLength(THREAD_LENGTH);
+    });
+
+    it("keeps the streaming reply and the newest messages mounted while a run streams", () => {
+        harness.activeStreamId = "stream-1";
+
+        mountInto();
+
+        expect(screen.getAllByRole("listitem").at(-1)?.querySelector("[data-testid=streaming-placeholder]")).not.toBeNull();
+        expect(mountedIds()).toContain(`m${THREAD_LENGTH - 1}`);
+    });
+
+    it("keeps the tail mounted and pulls in older pages for a jump into history not loaded yet", async () => {
+        const pages: number[] = [];
+
+        harness.messagesStatus = "CanLoadMore";
+        harness.loadMore = (count: number) => {
+            pages.push(count);
+        };
+        mountInto();
+
+        act(() => scrollToMessage("older-5"));
+        await vi.waitFor(() => expect(pages).toHaveLength(1));
+
+        // The older page lands in front of the loaded history.
+        const older = Array.from(
+            { length: 20 },
+            (_, index) => ({ ...makeMessage(index, `older ${index}`), id: `older-${index}`, key: `older-${index}` }) as UIMessage,
+        );
+
+        harness.messages = [...older, ...(harness.messages as UIMessage[])];
+        harness.messagesStatus = "Exhausted";
+        act(() => harness.publish?.());
+
+        await vi.waitFor(() => expect(focusedMessageId()).toBe("older-5"), { timeout: 5000 });
+        expect(mountedIds()).toContain(`m${THREAD_LENGTH - 1}`);
+        expect(mountedIds().length).toBeLessThan(THREAD_LENGTH / 2);
     });
 });

@@ -92,11 +92,15 @@ describe(readVirtualizeFlag, () => {
         localStorage.removeItem(VIRTUALIZE_FLAG_KEY);
     });
 
-    it("defaults off", () => {
-        expect(readVirtualizeFlag()).toBe(false);
+    it("defaults on", () => {
+        expect(readVirtualizeFlag()).toBe(true);
     });
 
-    it("is on only for the literal '1'", () => {
+    it("is off only for the literal '0'", () => {
+        localStorage.setItem(VIRTUALIZE_FLAG_KEY, "0");
+
+        expect(readVirtualizeFlag()).toBe(false);
+
         localStorage.setItem(VIRTUALIZE_FLAG_KEY, "1");
 
         expect(readVirtualizeFlag()).toBe(true);

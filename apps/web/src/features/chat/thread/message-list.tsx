@@ -14,12 +14,13 @@
  * Performance optimizations:
  * - Throttled updates during streaming (60fps max)
  * - Memoized message items
- * - Long threads (> VIRTUALIZE_THRESHOLD) virtualize their OLDER messages behind
- *   the `neore:virtualize-messages` localStorage flag. The newest
+ * - Long threads (> VIRTUALIZE_THRESHOLD) virtualize their OLDER messages
+ *   (`neore:virtualize-messages` = "0" in localStorage turns it off). The newest
  *   ALWAYS_MOUNTED_TAIL messages and the streaming placeholder are always real
  *   DOM, so stick-to-bottom (ThreadViewport) and the live region never see the
- *   virtualizer. Cmd/Ctrl+F turns virtualization off for the rest of the visit
- *   so find-in-page can reach every loaded message.
+ *   virtualizer. The thread's own find bar searches the data and jumps, so it
+ *   reaches unmounted rows; only Cmd/Ctrl+F that falls through to the BROWSER's
+ *   find turns virtualization off for the rest of the visit.
  *
  * Jump to a message: `#message-<id>` in the URL, or `scrollToMessage(id, { threadId })`.
  * Pins and message-search results use the latter.
@@ -62,6 +63,9 @@ import { StreamingPlaceholder, ThinkingPlaceholder } from "./streaming-placehold
 // Rough height of an unmeasured row; the virtualizer corrects it on first measure.
 const ESTIMATED_ROW_HEIGHT = 160;
 
+/** Frames a jump into the virtualized head waits for its row to mount before giving up. */
+const HEAD_REVEAL_FRAMES = 30;
+
 /** How big each older page a jump pulls in looking for its target is. */
 const JUMP_PAGE_SIZE = 50;
 
@@ -98,7 +102,11 @@ const useInitialMessageIds = (messages: UIMessage[], messagesReady: boolean): Re
     return initialIds;
 };
 
-/** Cmd/Ctrl+F: the browser can only find text that is in the DOM, so mount everything. */
+/**
+ * Cmd/Ctrl+F that reaches the browser's find: it can only find text that is in the DOM, so mount everything.
+ * On a thread page the find-in-thread shortcut takes the chord on `document` and prevents the default; this
+ * listener is on the window, so it runs after that one and sees whether the browser still gets the chord.
+ */
 const useFindInPageOverride = (): boolean => {
     const [isFindRequested, setIsFindRequested] = useState(false);
 
@@ -108,7 +116,7 @@ const useFindInPageOverride = (): boolean => {
         }
 
         const handleKeyDown = (event: KeyboardEvent) => {
-            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f" && !event.defaultPrevented) {
                 setIsFindRequested(true);
             }
         };
@@ -229,8 +237,8 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
     const initialIds = useInitialMessageIds(messages, messagesReady);
 
-    // The server snapshot is `false`: localStorage does not exist during SSR.
-    const isVirtualizeFlagOn = useSyncExternalStore(subscribeToNothing, readVirtualizeFlag, () => false);
+    // The server snapshot is the default (on): localStorage does not exist during SSR.
+    const isVirtualizeFlagOn = useSyncExternalStore(subscribeToNothing, readVirtualizeFlag, () => true);
 
     const isFindRequested = useFindInPageOverride();
     const plan: WindowPlan = getWindowPlan(messages.length, { enabled: isVirtualizeFlagOn && !isFindRequested });
@@ -265,11 +273,12 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
             return false;
         }
 
-        const reveal = () => {
+        // Whether the row was in the DOM to reveal.
+        const reveal = (): boolean => {
             const element = document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(messageId)}"]`);
 
             if (!element) {
-                return;
+                return false;
             }
 
             element.scrollIntoView({ block: "center" });
@@ -287,12 +296,24 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
                 );
                 element.focus({ preventScroll: true });
             }
+
+            return true;
         };
 
         if (target.kind === "head" && virtualizerRef.current) {
-            // Mount the row first, then let it measure before the precise scroll.
+            // Mount the row first, then reveal it once it has; under load the virtualizer can take several frames to settle.
             virtualizerRef.current.scrollToIndex(target.index, { align: "center" });
-            requestAnimationFrame(() => requestAnimationFrame(reveal));
+
+            let framesLeft = HEAD_REVEAL_FRAMES;
+            const revealWhenMounted = () => {
+                framesLeft -= 1;
+
+                if (!reveal() && framesLeft > 0) {
+                    requestAnimationFrame(revealWhenMounted);
+                }
+            };
+
+            requestAnimationFrame(() => requestAnimationFrame(revealWhenMounted));
         } else {
             reveal();
         }

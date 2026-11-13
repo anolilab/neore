@@ -13,7 +13,7 @@ export const VIRTUALIZE_THRESHOLD = 60;
 /** The newest N messages are always mounted, whatever the scroll position. */
 export const ALWAYS_MOUNTED_TAIL = 30;
 
-/** localStorage key that opts a browser into virtualization while it is unverified. */
+/** localStorage key that opts a browser OUT of virtualization when set to `"0"` (for debugging layout). */
 export const VIRTUALIZE_FLAG_KEY = "neore:virtualize-messages";
 
 export interface WindowPlan {
@@ -155,10 +155,11 @@ export const parseMessageHash = (hash: string): string | undefined => {
     }
 };
 
+/** On unless the browser opted out with `"0"`; storage that cannot be read keeps the default. */
 export const readVirtualizeFlag = (): boolean => {
     try {
-        return globalThis.localStorage?.getItem(VIRTUALIZE_FLAG_KEY) === "1";
+        return globalThis.localStorage?.getItem(VIRTUALIZE_FLAG_KEY) !== "0";
     } catch {
-        return false;
+        return true;
     }
 };
