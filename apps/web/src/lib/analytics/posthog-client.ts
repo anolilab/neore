@@ -598,7 +598,24 @@ const syncIdentity = (posthog: PostHog): void => {
 export const ORGANIZATION_WAIT_MS = 5000;
 
 /** The flags the server rendered into the page (`posthog-data`), for when PostHog itself never loads. */
-const bootstrapState: { flags?: Readonly<Record<string, boolean | string>> } = {};
+const bootstrapState: { flags?: Readonly<Record<string, boolean | string>>; listeners: Set<() => void>; version: number } = {
+    listeners: new Set(),
+    version: 0,
+};
+
+/** Replaces the server-rendered flags and tells the flag hooks, so a memo over a flag reader recomputes. */
+const changeBootstrapFlags = (flags: Readonly<Record<string, boolean | string>> | undefined): void => {
+    if (bootstrapState.flags === flags) {
+        return;
+    }
+
+    bootstrapState.flags = flags;
+    bootstrapState.version += 1;
+
+    for (const listener of bootstrapState.listeners) {
+        listener();
+    }
+};
 
 /** The bounded wait for one user's organization: another user starts a wait of their own. */
 const organizationWait: { isOver: boolean; timer?: ReturnType<typeof setTimeout>; userId?: string } = { isOver: false };
@@ -770,7 +787,7 @@ export const setAnalyticsIdentity = (identity: AnalyticsIdentity): void => {
         }
 
         // The server rendered the page's flags for the account that left: the next one's come only from PostHog.
-        bootstrapState.flags = undefined;
+        changeBootstrapFlags(undefined);
     }
 
     identityState.departedUserId = undefined;
@@ -836,6 +853,19 @@ const subscribeAvailability = (onChange: () => void): (() => void) => {
 const readUnavailable = (): boolean => availability.isUnavailable;
 /** With no client: whether flags answer from the server-rendered ones (a start failed, even while a retry runs). */
 const readFallsBack = (): boolean => availability.hasFailed;
+
+const subscribeBootstrap = (onChange: () => void): (() => void) => {
+    bootstrapState.listeners.add(onChange);
+
+    return () => {
+        bootstrapState.listeners.delete(onChange);
+    };
+};
+
+/** The server-rendered flags' version: it changes when they are replaced or dropped (an account switch). */
+const readBootstrapVersion = (): number => bootstrapState.version;
+
+const noBootstrapVersion = (): number => 0;
 const notKnown = (): false => false;
 
 interface FlagStore {
@@ -919,7 +949,7 @@ export const useFeatureFlagsKnown = (): boolean => {
 
 /** Keeps the server-rendered flags, so a page whose PostHog chunk is blocked or fails still answers them. */
 export const setBootstrapFlags = (flags: Readonly<Record<string, boolean | string>> | undefined): void => {
-    bootstrapState.flags = flags;
+    changeBootstrapFlags(flags);
 };
 
 /** As PostHog's `isFeatureEnabled` reads a bootstrapped flag: a variant counts as on, an absent flag as off. */
@@ -947,6 +977,8 @@ export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) 
     const isOwnClient = posthog !== undefined && posthog === getPostHog();
     const isAwaitingStart = isOwnClient && started !== posthog;
     const isFlagsWaitOver = useSyncExternalStore(subscribeStarted, readFlagsWaitOver, notKnown);
+    // The fallback flags it reads: a new version (an account switch dropped them) makes a new reader.
+    const bootstrapVersion = useSyncExternalStore(subscribeBootstrap, readBootstrapVersion, noBootstrapVersion);
 
     return useCallback(
         (flag: string) => {
@@ -970,7 +1002,7 @@ export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) 
         },
         // `loads` is the reader's version: the flags it reads changed.
 
-        [posthog, fallsBack, loads, isAwaitingStart, isOwnClient, isFlagsWaitOver],
+        [posthog, fallsBack, loads, isAwaitingStart, isOwnClient, isFlagsWaitOver, bootstrapVersion],
     );
 };
 
@@ -982,6 +1014,11 @@ export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) 
 export const useFeatureFlagEnabled = (flag: string): boolean | undefined => {
     const posthog = usePostHog();
     const fallsBack = useSyncExternalStore(subscribeAvailability, readFallsBack, notKnown);
+
+    // Renders again when the server-rendered flags are replaced or dropped (an account switch): every read below
+    // re-reads them on that render.
+    useSyncExternalStore(subscribeBootstrap, readBootstrapVersion, noBootstrapVersion);
+
     const subscribe = useMemo(() => subscribeFlags(posthog), [posthog]);
     // A client whose flags have not arrived reads every flag as off: that is not an answer yet, so it stays pending.
     // Once they have, a flag the response has no value for (one PostHog failed to evaluate, `errorsWhileComputingFlags`,

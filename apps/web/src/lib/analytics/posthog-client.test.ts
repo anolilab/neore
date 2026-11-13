@@ -1112,6 +1112,30 @@ describe("useFeatureFlagReader", () => {
         expect(result.current("other")).toBe(true);
     });
 
+    it("recomputes a memo over the reader when an account switch drops the server-rendered flags, without a forced render", async () => {
+        const client = await loadClientModule();
+
+        client.setBootstrapFlags({ "code-mode": true });
+        client.setAnalyticsIdentity({ user: { id: "user-1" } });
+        client.markPostHogUnavailable();
+
+        // As `useNavLinks`: a memo over the reader, rendered only by what the hooks subscribe to.
+        const { result } = renderHook(() => {
+            const read = client.useFeatureFlagReader();
+            const links = useMemo(() => ["chat", ...(read("code-mode") ? ["code"] : [])], [read]);
+
+            return [links, client.useFeatureFlagEnabled("code-mode")];
+        });
+
+        expect(result.current).toStrictEqual([["chat", "code"], true]);
+
+        act(() => {
+            client.setAnalyticsIdentity({ user: { id: "user-2" } });
+        });
+
+        expect(result.current).toStrictEqual([["chat"], false]);
+    });
+
     it("drops the server-rendered flags when the account changes, so the next one's come only from PostHog", async () => {
         const client = await loadClientModule();
 
