@@ -120,7 +120,13 @@ export interface ScopedCache {
      * newer than this answer and stays. Never call it for a partial page.
      */
     pruneThreads: (liveThreadIds: ReadonlyArray<string>, options: { readStartedAt: number }) => Promise<void>;
-    saveMessages: (threadId: string, messages: ReadonlyArray<CachedMessage>, options?: SaveOptions) => Promise<void>;
+
+    /**
+     * Saves messages. A message that carries its own `syncedAt` (when the read it came from started) is stamped with
+     * that, not with `options.syncedAt`: rows of different reads saved together keep their own times, so an older read's
+     * copy never looks newer than a later read's.
+     */
+    saveMessages: (threadId: string, messages: ReadonlyArray<CachedMessage & { syncedAt?: number }>, options?: SaveOptions) => Promise<void>;
     saveStatuses: (statuses: ReadonlyArray<CachedStatus>, options?: SaveOptions) => Promise<void>;
     saveThreads: (threads: ReadonlyArray<CachedThread>, options?: SaveOptions) => Promise<void>;
 }
@@ -341,10 +347,11 @@ export const createOfflineCache = (database: SqlDatabase, { now = Date.now }: { 
                         return;
                     }
 
-                    const syncedAt = options?.syncedAt ?? now();
+                    const savedAt = options?.syncedAt ?? now();
 
                     await database.withTransactionAsync(async () => {
                         for (const message of messages) {
+                            const syncedAt = message.syncedAt ?? savedAt;
                             const params: SqlParametereter[] = [
                                 message.id,
                                 threadId,

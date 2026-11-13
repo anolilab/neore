@@ -174,8 +174,31 @@ const olderPageApplied = <R extends HistoryRow>(history: ChatHistory<R>, page: H
     const joinedIds = new Set(joined.map((row) => row.id));
     const reachedInPage = page.rows.findLastIndex((row) => joinedIds.has(row.id));
     const between = page.rows.slice(reachedInPage + 1).filter((row) => !runIds.has(row.id));
+    // A page that reaches below the oldest kept row: its rows under the first one it shares go below them.
+    const firstReachedInPage = page.rows.findIndex((row) => joinedIds.has(row.id));
+    const beneath = firstReachedInPage > 0 && kept[0] !== undefined && pageIds.has(kept[0].id) ? page.rows.slice(0, firstReachedInPage).filter((row) => !onScreen.has(row.id)) : [];
+    const rows = [...beneath, ...joined, ...between, ...run];
 
-    return { olderCursor: keptCursor === undefined ? page.olderCursor : keptCursor, rows: [...joined, ...between, ...run] };
+    if (keptCursor !== undefined) {
+        return { olderCursor: keptCursor, rows };
+    }
+
+    // The kept rows are saved ones the cache painted: no cursor below them is known, and only the ones the page holds are
+    // confirmed now. Saved rows older than the page stay below the hole, which moves down to the page's oldest confirmed
+    // row; the cursor goes below the saved rows only once the server has confirmed down to them.
+    const firstConfirmed = joined.findIndex((row) => pageIds.has(row.id));
+    const confirmedOldest = joined[firstConfirmed];
+
+    if (confirmedOldest === undefined || firstConfirmed <= 0) {
+        return { olderCursor: page.olderCursor, rows };
+    }
+
+    if (page.olderCursor === null) {
+        // The chat starts here: saved rows below the page are not on it.
+        return { olderCursor: page.olderCursor, rows: rows.slice(firstConfirmed) };
+    }
+
+    return { gap: { anchorId: confirmedOldest.id, cursor: page.olderCursor, keptCursor: undefined }, olderCursor: undefined, rows };
 };
 
 /** Carries the fill target over a read, until it is reached or nothing older is left. */

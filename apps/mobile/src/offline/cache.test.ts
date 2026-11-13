@@ -598,3 +598,21 @@ describe("the version-one cache", () => {
         expect(saved?.shareText).toBe("Saved reply");
     });
 });
+
+describe("message read stamps", () => {
+    it("keeps a refresh's newer copy that lands after an older-page save of the same message", async () => {
+        const { cache } = makeCache();
+        const scoped = await owned(cache);
+
+        // A refresh starts at 100. Meanwhile an older-page read (started at 200) saves the run on screen: the message on
+        // screen came from a read at 50, the older page's rows from the read at 200.
+        await scoped.saveMessages("t", [{ ...message("m", "t", 5, { text: "partial" }), syncedAt: 50 }, { ...message("o", "t", 1), syncedAt: 200 }], { syncedAt: 200 });
+        // The refresh lands with the finished reply.
+        await scoped.saveMessages("t", [message("m", "t", 5, { text: "complete reply" })], { syncedAt: 100 });
+
+        const rows = await scoped.loadMessages("t");
+
+        expect(rows.find((row) => row.id === "m")).toMatchObject({ syncedAt: 100, text: "complete reply" });
+        expect(rows.find((row) => row.id === "o")?.syncedAt).toBe(200);
+    });
+});

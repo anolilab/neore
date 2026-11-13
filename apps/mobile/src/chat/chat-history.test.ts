@@ -302,3 +302,34 @@ describe("an opening fill that stops early", () => {
         expect(screen.history.fillTarget).toBeUndefined();
     });
 });
+
+describe("a chat opened on saved rows", () => {
+    it("confirms the saved rows against the server page by page, and never asks again for a row already confirmed", async () => {
+        const served = serverOf();
+        const confirmed = new Set(ids(run(281, 300)));
+        const asked: string[] = [];
+        const fetchOlder = async (cursor: string) => {
+            asked.push(cursor);
+
+            const page = await served(cursor);
+
+            expect(ids(page.rows).filter((id) => confirmed.has(id))).toStrictEqual([]);
+
+            for (const id of ids(page.rows)) {
+                confirmed.add(id);
+            }
+
+            return page;
+        };
+        // The cache painted the 50 newest messages, 251-300; the newest page is 281-300.
+        const { read, screen, update } = screenOf(newest({ olderCursor: undefined, rows: run(251, 300) }, "281", run(281, 300)));
+
+        await fillHistory({ fetchOlder, read, save: () => {}, update });
+
+        expect(asked).toStrictEqual(["281", "261"]);
+        expect(ids(screen.history.rows)).toStrictEqual(ids(run(241, 300)));
+        expect(screen.history.gap).toBeUndefined();
+        // Below the oldest row the server confirmed, not just below the first page it read.
+        expect(nextOlderCursor(screen.history)).toBe("241");
+    });
+});
