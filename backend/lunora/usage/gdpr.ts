@@ -33,9 +33,6 @@ const fullPieces = (pieces: ReadonlyArray<unknown>): boolean => pieces.length >=
  */
 export const EXPORT_PIECE_TTL_MS = 24 * 60 * 60 * 1000;
 
-/** Runs the sweep reads, metadata only, while it looks for dead runs; so live runs cannot fill a whole batch. */
-const SWEEP_SCAN_LIMIT = 500;
-
 /** Pages of a user's run rows one erasure call reads; the next call continues where this one stopped. */
 const RUN_PAGES_PER_ERASURE = 50;
 
@@ -281,13 +278,12 @@ export const sweepUsageExportPieces = internalMutation
             });
         let cursor: string | null = null;
         let handled = 0;
-        let scanned = 0;
         let piecesLeft = EXPORT_PIECE_BATCH;
 
-        while (handled < EXPORT_PIECE_BATCH && scanned < SWEEP_SCAN_LIMIT && piecesLeft > 0) {
+        // A live run counts toward the batch too, since its re-arm is a census write: a sweep handles at most one batch of runs, so a
+        // page of live runs ends the sweep, and the runs behind them are reached by the next sweep.
+        while (handled < EXPORT_PIECE_BATCH && piecesLeft > 0) {
             const result = await dueAt(cursor);
-
-            scanned += result.page.length;
 
             for (const run of result.page) {
                 if (handled >= EXPORT_PIECE_BATCH || piecesLeft === 0) {
