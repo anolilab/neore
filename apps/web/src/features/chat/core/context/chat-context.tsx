@@ -22,9 +22,9 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { openLoginPrompt } from "@/features/auth/stores/login-prompt-store";
 import { holdForSignIn } from "@/features/chat/core/hooks/use-pending-send";
 import useLocalModelTurn from "@/features/local-models/hooks/use-local-model-turn";
@@ -165,8 +165,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         return registerThreadErrorSink(threadId, handleError);
     }, [threadId, handleError]);
 
-    const { hooks } = useAuth();
-    const { data: sessionData, refetch: refetchSession } = hooks.useSession();
+    const { data: sessionData, refetch: refetchSession } = useAuthSession();
     const isAuthenticated = !!sessionData?.user;
 
     // A send that lands before the session query resolves WAITS on this rather

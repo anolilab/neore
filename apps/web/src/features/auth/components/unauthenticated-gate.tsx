@@ -4,8 +4,8 @@ import type { FC, ReactNode } from "react";
 import { useEffect, useState } from "react";
 
 import AutoGuestSignIn from "@/features/auth/components/auto-guest-signin";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useSignInMethods from "@/features/auth/hooks/use-sign-in-methods";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { adoptSessionTokenWhileShut } from "@/features/auth/lib/guest-session";
 import { useConnectionView } from "@/features/connection/hooks/use-connection";
 import { rereadFailedSession } from "@/lib/auth/client";
@@ -93,8 +93,7 @@ const useOutageReadPending = (connectionView: string, hasUnansweredRead: boolean
  */
 const UnauthenticatedGate: FC<{ loading: ReactNode; signedOut: ReactNode }> = ({ loading, signedOut }) => {
     const { inviteOnly } = useSignInMethods();
-    const { hooks } = useAuth();
-    const { data: sessionData, error: sessionError, isPending: isSessionPending } = hooks.useSession();
+    const { data: sessionData, error: sessionError, isPending: isSessionPending } = useAuthSession();
     const connectionView = useConnectionView();
     const hasUnansweredRead = !sessionData?.user && isUnanswered(sessionError);
     const isOutageReadPending = useOutageReadPending(connectionView, hasUnansweredRead);

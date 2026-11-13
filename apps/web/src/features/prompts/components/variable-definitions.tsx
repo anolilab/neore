@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/to
 import { Braces, HelpCircle, Trash2 } from "lucide-react";
 import { useCallback } from "react";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 
 import type { PromptVariable } from "../lib/prompt-variables";
 
@@ -25,8 +25,7 @@ interface VariableDefinitionsProps {
 
 const VariableDefinitions = ({ onChange, variables }: VariableDefinitionsProps) => {
     const { t } = useLingui();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const isLoggedIn = !!sessionData?.user;
 
     const handleUpdateVariable = useCallback(

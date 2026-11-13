@@ -6,8 +6,8 @@ import type { ContrastId } from "@/features/appearance/lib/display-preferences";
 import { DEFAULT_CONTRAST, DEFAULT_DENSITY, DEFAULT_MAIN_FONT, isContrastId, isDensityId, isMainFontId } from "@/features/appearance/lib/display-preferences";
 import type { ExplicitAppearance } from "@/features/appearance/lib/native-appearance";
 import { SYSTEM_ACCENT } from "@/features/appearance/lib/native-appearance";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
 import type { AppearanceSettings, KeyboardShortcuts, LayoutState, SearchState, SidebarStateValue, UserPreferences } from "../stores/ui-state-store";
 import { useUIStateStore } from "../stores/ui-state-store";
@@ -151,8 +151,7 @@ export const useAppearanceSettings = (): AppearanceSettingsHookReturn => {
     const appearance = useUIStateStore((state) => state.appearance);
     const resetAppearance = useUIStateStore((state) => state.resetAppearance);
     const setAppearance = useUIStateStore((state) => state.setAppearance);
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const userId = sessionData?.user?.id;
     const updateUserSettingsMutation = useUpdateUserSettings();
 
@@ -271,8 +270,7 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
     const resetUserPreferences = useUIStateStore((state) => state.resetUserPreferences);
     const setUserPreferencesAction = useUIStateStore((state) => state.setUserPreferences);
 
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const userId = sessionData?.user?.id;
     const { data: userSettings } = useUserSettings();
     const updateUserSettingsMutation = useUpdateUserSettings();
