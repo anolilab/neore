@@ -38,6 +38,16 @@ const SCROLL_THRESHOLD = 50;
 // Large enough that messages are loaded before the user reaches them.
 const LOAD_MORE_THRESHOLD = 600;
 
+/** Keys that scroll the view up when nothing else takes them. */
+const UPWARD_KEYS = new Set(["ArrowUp", "Home", "PageUp"]);
+
+const isEditable = (target: EventTarget | null): boolean =>
+    target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName));
+
+/** Whether a key press asks the view to scroll up. */
+const isUpwardKey = (event: KeyboardEvent): boolean =>
+    !event.defaultPrevented && !isEditable(event.target) && (UPWARD_KEYS.has(event.key) || (event.key === " " && event.shiftKey));
+
 /**
  * Custom ScrollBar component.
  */
@@ -76,6 +86,12 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
     // Where the last scroll event left the view, and whether a smooth scroll to the bottom is on its way there.
     const lastScrollTopRef = useRef(0);
     const smoothToBottomRef = useRef(false);
+    // The reader asked to scroll up (wheel, key, touch) and that scroll's event has not come yet. Content growing in the
+    // same frame can move the view down by more than they scrolled up, so the position alone would not show it.
+    const upwardInputRef = useRef(false);
+    // The row the reader last pressed in (a click, a key) and its height then. That row growing afterwards is the reader
+    // opening something in it (tool output, reasoning, a long code block): the view stays where they pressed.
+    const pressedRowRef = useRef<{ height: number; row: Element } | null>(null);
 
     // Scroll anchor: scrollHeight captured synchronously in the scroll handler at the
     // exact moment loadMore() is called — before any React state changes. This is the
@@ -150,9 +166,10 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
 
         const { scrollTop } = viewport;
         const atBottom = checkIsAtBottom();
-        const scrolledUp = scrollTop < lastScrollTopRef.current;
+        const scrolledUp = scrollTop < lastScrollTopRef.current || upwardInputRef.current;
 
         lastScrollTopRef.current = scrollTop;
+        upwardInputRef.current = false;
 
         if (atBottom) {
             smoothToBottomRef.current = false;
@@ -197,7 +214,42 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
         }
     }, [checkIsAtBottom, pinToBottom, setIsAtBottom]);
 
-    // Attach scroll listener
+    // Follows content that grew while the reader is at the bottom: a stream, rows settling, an image loading. Not when the
+    // view moved up since the last scroll event (a jump's `scrollIntoView`, the reader) or the reader is about to scroll up:
+    // that scroll's own event decides. Not when the growth is the row the reader pressed in: they opened something there.
+    const followGrowth = useCallback(
+        (viewport: HTMLElement) => {
+            if (!hasInitialScrolledRef.current || userScrolledRef.current || !isAtBottomRef.current || upwardInputRef.current) {
+                return;
+            }
+
+            if (viewport.scrollTop < lastScrollTopRef.current - 1 && !checkIsAtBottom()) {
+                userScrolledRef.current = true;
+                isAtBottomRef.current = false;
+
+                return;
+            }
+
+            const pressed = pressedRowRef.current;
+            const pressedHeight = pressed?.row.isConnected ? pressed.row.getBoundingClientRect().height : 0;
+
+            if (pressed && pressedHeight > pressed.height + 1) {
+                pressed.height = pressedHeight;
+
+                const atBottom = checkIsAtBottom();
+
+                isAtBottomRef.current = atBottom;
+                setIsAtBottom(atBottom);
+
+                return;
+            }
+
+            pinToBottom(viewport);
+        },
+        [checkIsAtBottom, pinToBottom, setIsAtBottom],
+    );
+
+    // Attach scroll listener, and the reader's input that scrolls the view or opens something in a row
     useEffect(() => {
         const viewport = viewportRef.current;
 
@@ -205,9 +257,69 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
             return undefined;
         }
 
-        viewport.addEventListener("scroll", handleScroll, { passive: true });
+        let touchY = 0;
+        let clearFrame = 0;
+        const markUpward = () => {
+            if (viewport.scrollTop <= 0) {
+                return;
+            }
 
-        return () => viewport.removeEventListener("scroll", handleScroll);
+            upwardInputRef.current = true;
+            // Its scroll event comes on the next frame; an input that scrolled nothing (a nested scroller took it) expires.
+            cancelAnimationFrame(clearFrame);
+            clearFrame = requestAnimationFrame(() => {
+                clearFrame = requestAnimationFrame(() => {
+                    upwardInputRef.current = false;
+                });
+            });
+        };
+        const press = (event: Event) => {
+            const row = event.target instanceof Element ? event.target.closest("[data-list-message-id]") : null;
+
+            pressedRowRef.current = row ? { height: row.getBoundingClientRect().height, row } : null;
+        };
+        const handleWheel = (event: WheelEvent) => {
+            if (event.deltaY < 0) {
+                markUpward();
+            }
+        };
+        const handleKeyDown = (event: KeyboardEvent) => {
+            press(event);
+
+            if (isUpwardKey(event)) {
+                markUpward();
+            }
+        };
+        const handleTouchStart = (event: TouchEvent) => {
+            touchY = event.touches[0]?.clientY ?? 0;
+        };
+        const handleTouchMove = (event: TouchEvent) => {
+            const y = event.touches[0]?.clientY ?? touchY;
+
+            // A finger moving down drags the content down: the view scrolls up.
+            if (y > touchY) {
+                markUpward();
+            }
+
+            touchY = y;
+        };
+
+        viewport.addEventListener("scroll", handleScroll, { passive: true });
+        viewport.addEventListener("wheel", handleWheel, { passive: true });
+        viewport.addEventListener("keydown", handleKeyDown);
+        viewport.addEventListener("pointerdown", press, { capture: true, passive: true });
+        viewport.addEventListener("touchstart", handleTouchStart, { passive: true });
+        viewport.addEventListener("touchmove", handleTouchMove, { passive: true });
+
+        return () => {
+            cancelAnimationFrame(clearFrame);
+            viewport.removeEventListener("scroll", handleScroll);
+            viewport.removeEventListener("wheel", handleWheel);
+            viewport.removeEventListener("keydown", handleKeyDown);
+            viewport.removeEventListener("pointerdown", press, { capture: true });
+            viewport.removeEventListener("touchstart", handleTouchStart);
+            viewport.removeEventListener("touchmove", handleTouchMove);
+        };
     }, [handleScroll]);
 
     // Initial scroll to bottom when messages become ready
@@ -224,6 +336,7 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
         if (!messagesReady) {
             hasInitialScrolledRef.current = false;
             userScrolledRef.current = false;
+            pressedRowRef.current = null;
             loadMoreTriggeredRef.current = false;
             anchorHeightRef.current = null;
         }
@@ -271,14 +384,7 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
         }
 
         // Use MutationObserver to detect content changes during streaming
-        const observer = new MutationObserver(() => {
-            if (!userScrolledRef.current && isAtBottomRef.current) {
-                viewport.scrollTo({
-                    behavior: "instant",
-                    top: viewport.scrollHeight,
-                });
-            }
-        });
+        const observer = new MutationObserver(() => followGrowth(viewport));
 
         observer.observe(viewport, {
             characterData: true,
@@ -287,7 +393,7 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
         });
 
         return () => observer.disconnect();
-    }, [activeStreamId]);
+    }, [activeStreamId, followGrowth]);
 
     // Stick to the bottom while the reader is there and the content changes height, streaming or not: the first page
     // settling, a row near the bottom taking its real height in place of its estimate (message rows skip layout off
@@ -300,11 +406,7 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
             return undefined;
         }
 
-        const resizes = new ResizeObserver(() => {
-            if (hasInitialScrolledRef.current && !userScrolledRef.current && isAtBottomRef.current) {
-                pinToBottom(viewport);
-            }
-        });
+        const resizes = new ResizeObserver(() => followGrowth(viewport));
         const observeChildren = () => {
             for (const child of viewport.children) {
                 resizes.observe(child);
@@ -320,7 +422,7 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
             childList.disconnect();
             resizes.disconnect();
         };
-    }, [pinToBottom]);
+    }, [followGrowth]);
 
     // Expose ref methods
     useImperativeHandle(ref, () => {

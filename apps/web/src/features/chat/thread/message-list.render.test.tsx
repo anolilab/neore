@@ -21,6 +21,7 @@ const harness = vi.hoisted(() => {
         activeStreamId: null as string | null,
         contentRenders: new Map<string, number>(),
         goal: null as unknown,
+        infos: [] as string[],
         messages: [] as unknown[],
         MessagesContext: undefined as Context<unknown[]> | undefined,
         publish: undefined as (() => void) | undefined,
@@ -156,11 +157,40 @@ vi.mock("./fork-branch-dialog", () => {
     return { default: () => null };
 });
 
-/** Waits for `count` animation frames. */
-const nextFrames = async (count: number): Promise<void> => {
+vi.mock("@/lib/toast", async (importOriginal) => {
+    return {
+        ...(await importOriginal<object>()),
+        showInfo: (message: string) => {
+            harness.infos.push(message);
+        },
+    };
+});
+
+/** Animation frames the jump tests run by hand, so none waits on the runner delivering real ones. */
+const frames = new Map<number, FrameRequestCallback>();
+const frameIds = { last: 0 };
+
+const stubAnimationFrames = (): void => {
+    frames.clear();
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+        frameIds.last += 1;
+        frames.set(frameIds.last, callback);
+
+        return frameIds.last;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
+};
+
+/** Runs `count` frames, each in its own `act` so the effects a frame causes are committed before the next one. */
+const runFrames = (count: number): void => {
     for (let frame = 0; frame < count; frame += 1) {
-        await new Promise<void>((resolve) => {
-            requestAnimationFrame(() => resolve());
+        const due = [...frames.values()];
+
+        frames.clear();
+        act(() => {
+            for (const callback of due) {
+                callback(performance.now());
+            }
         });
     }
 };
@@ -469,7 +499,15 @@ describe("a long thread", () => {
             scrolls.clear();
             tops.clear();
             onScroll = () => {};
+            harness.infos.length = 0;
+            stubAnimationFrames();
         });
+
+        afterEach(() => {
+            vi.unstubAllGlobals();
+        });
+
+        const rowOf = (id: string): HTMLElement => document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(id)}"]`)!;
 
         /** Gives every mounted row a scroll that is counted and a top that follows `tops`, frame after frame. */
         const stubRows = (): void => {
@@ -497,23 +535,27 @@ describe("a long thread", () => {
             }
         };
 
-        it("re-centres its row until rows above it stop pushing it", async () => {
+        it("re-centres its row until rows above it stop pushing it", () => {
             // Rows above render at their real height as they come into view: the row moves twice, then stays.
             tops.set("m100", [500, 300, 300]);
             mountInto();
             stubRows();
 
             act(() => scrollToMessage("m100"));
-
-            await vi.waitFor(() => expect(scrolls.get("m100")).toBe(3));
-            await act(async () => {
-                await nextFrames(3);
-            });
+            // The jump's own frame, then one per re-centring.
+            runFrames(4);
 
             expect(scrolls.get("m100")).toBe(3);
+            expect(document.activeElement).toBe(rowOf("m100"));
+
+            runFrames(3);
+
+            expect(scrolls.get("m100")).toBe(3);
+            // Re-centring moves the view, never focus: keyboard and screen-reader users stay on the message.
+            expect(document.activeElement).toBe(rowOf("m100"));
         });
 
-        it("stops re-centring an older jump once a newer one is asked for", async () => {
+        it("stops re-centring an older jump once a newer one is asked for", () => {
             // A row that never settles would be re-centred for every frame of the budget.
             tops.set("m100", [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100]);
             mountInto();
@@ -526,14 +568,31 @@ describe("a long thread", () => {
                 }
             };
             act(() => scrollToMessage("m100"));
-            await vi.waitFor(() => expect(scrolls.get("m150")).toBeGreaterThanOrEqual(1));
+            runFrames(14);
 
-            await act(async () => {
-                await nextFrames(12);
-            });
-
+            expect(scrolls.get("m150")).toBeGreaterThanOrEqual(1);
             // Its first scroll only: none of the re-centring frames ran.
             expect(scrolls.get("m100")).toBe(1);
+            // Focus went to the newer target and stayed there.
+            expect(document.activeElement).toBe(rowOf("m150"));
+        });
+
+        it("lands on the streaming item for the reply still streaming, without paging or a not-found notice", () => {
+            const last = THREAD_LENGTH - 1;
+
+            harness.activeStreamId = "stream-1";
+            harness.messages = [...(harness.messages as UIMessage[]).slice(0, last), { ...makeMessage(last), status: "pending" } as UIMessage];
+            mountInto();
+
+            const streaming = screen.getAllByRole("listitem").at(-1)!;
+
+            streaming.scrollIntoView = vi.fn();
+            act(() => scrollToMessage(`m${String(last)}`));
+            runFrames(4);
+
+            expect(streaming.scrollIntoView).toHaveBeenCalled();
+            expect(document.activeElement).toBe(streaming);
+            expect(harness.infos).toStrictEqual([]);
         });
     });
 });

@@ -87,6 +87,17 @@ const useInitialMessageIds = (messages: UIMessage[], messagesReady: boolean): Re
     return initialIds;
 };
 
+/** Where a jump to a loaded message lands: its row, or the streaming item for the reply still streaming (it has no row). */
+const findJumpTarget = (list: HTMLElement | null, messages: ReadonlyArray<{ id: string }>, messageId: string): HTMLElement | null => {
+    const row = document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(messageId)}"]`);
+
+    if (row || messages.at(-1)?.id !== messageId) {
+        return row;
+    }
+
+    return list?.querySelector<HTMLElement>("[data-list-streaming]") ?? null;
+};
+
 type RenderRow = (message: UIMessage, index: number) => ReactNode;
 
 interface MessageListProps {
@@ -122,6 +133,8 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
         jumpStateRef.current = { messages, threadId };
     });
 
+    const listRef = useRef<HTMLDivElement>(null);
+
     // Each jump's generation: a newer request, or unmounting, stops an older jump still re-centring its row.
     const jumpGenerationRef = useRef(0);
 
@@ -134,7 +147,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
     const jumpTo = useCallback((requestedId: string, position?: MessagePosition, focus = true): boolean => {
         const messageId = resolveJumpMessageId(jumpStateRef.current.messages, requestedId, position);
-        const element = messageId ? document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(messageId)}"]`) : null;
+        const element = messageId ? findJumpTarget(listRef.current, jumpStateRef.current.messages, messageId) : null;
 
         if (!element) {
             return false;
@@ -368,14 +381,26 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
             {/* Loading indicator — trigger lives in ThreadViewport's scroll handler */}
             <LoadMoreTrigger status={messagesStatus} />
 
-            <div className={cn("message-list flex flex-col", className)} role="list" style={{ "--thread-max-width": maxWidth } as React.CSSProperties}>
+            <div
+                className={cn("message-list flex flex-col", className)}
+                ref={listRef}
+                role="list"
+                style={{ "--thread-max-width": maxWidth } as React.CSSProperties}
+            >
                 {messages.map((message, index) => (
                     <Fragment key={message.id}>{renderRow(message, index)}</Fragment>
                 ))}
 
                 {/* The placeholder is not a message row: its live region is never skipped (`content-visibility` is on rows only). */}
                 {showPlaceholder && (
-                    <div aria-posinset={setSize} aria-setsize={setSize} role="listitem">
+                    <div
+                        aria-posinset={setSize}
+                        aria-setsize={setSize}
+                        className="data-jumped:focus-visible:ring-ring rounded-lg outline-none data-jumped:focus-visible:ring-2 data-jumped:focus-visible:ring-inset"
+                        data-list-streaming=""
+                        role="listitem"
+                        tabIndex={-1}
+                    >
                         {/* Gateway streaming placeholder - uses MessageContent for identical rendering */}
                         {/* Without a gateway token (a host-run turn, or a stream another client started) it reads the persisted body. */}
                         {streamIdToShow && (

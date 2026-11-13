@@ -55,18 +55,38 @@ class RecordingResizeObserver {
     }
 }
 
-const nextFrames = async (count: number): Promise<void> => {
+/** Animation frames the test runs by hand, so no case waits on the runner delivering real ones. */
+const frames = new Map<number, FrameRequestCallback>();
+const frameIds = { last: 0 };
+
+const runFrames = (count: number): void => {
     for (let frame = 0; frame < count; frame += 1) {
-        await new Promise<void>((resolve) => {
-            requestAnimationFrame(() => resolve());
+        const due = [...frames.values()];
+
+        frames.clear();
+        act(() => {
+            for (const callback of due) {
+                callback(performance.now());
+            }
         });
     }
 };
 
-const mount = async (): Promise<HTMLElement> => {
+/** Plays every resize the viewport observes. */
+const playResize = (): void => {
+    act(() => {
+        for (const callback of resized) {
+            callback();
+        }
+    });
+};
+
+const mount = (): HTMLElement => {
     render(
         <ThreadViewport>
-            <div>content</div>
+            <div data-list-message-id="m1">
+                <button type="button">Show output</button>
+            </div>
         </ThreadViewport>,
     );
 
@@ -95,9 +115,7 @@ const mount = async (): Promise<HTMLElement> => {
     });
 
     // The first scroll to the bottom runs a frame after the messages are ready.
-    await act(async () => {
-        await nextFrames(2);
-    });
+    runFrames(1);
 
     return viewport;
 };
@@ -117,7 +135,15 @@ describe("thread viewport while message rows settle", () => {
         layout.scrollHeight = 10_000;
         layout.scrollTop = 0;
         resized.length = 0;
+        frames.clear();
         vi.stubGlobal("ResizeObserver", RecordingResizeObserver);
+        vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+            frameIds.last += 1;
+            frames.set(frameIds.last, callback);
+
+            return frameIds.last;
+        });
+        vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
         // The scroll area's scrollbar waits for animations, which jsdom does not have; removed again after each test.
         Object.defineProperty(Element.prototype, "getAnimations", { configurable: true, value: () => [] });
     });
@@ -127,8 +153,8 @@ describe("thread viewport while message rows settle", () => {
         Reflect.deleteProperty(Element.prototype, "getAnimations");
     });
 
-    it("keeps the reader at the bottom when rows above them take their real height", async () => {
-        const viewport = await mount();
+    it("keeps the reader at the bottom when rows above them take their real height", () => {
+        const viewport = mount();
 
         expect(gap()).toBe(0);
 
@@ -140,17 +166,13 @@ describe("thread viewport while message rows settle", () => {
 
         // Not mistaken for the reader leaving: the next growth is followed as well.
         layout.scrollHeight += 600;
-        act(() => {
-            for (const callback of resized) {
-                callback();
-            }
-        });
+        playResize();
 
         expect(gap()).toBe(0);
     });
 
-    it("closes even a small gap the content leaves at the bottom, inside the at-bottom threshold", async () => {
-        const viewport = await mount();
+    it("closes even a small gap the content leaves at the bottom, inside the at-bottom threshold", () => {
+        const viewport = mount();
 
         // 40 px: still "at the bottom" by the threshold, but the last lines would sit under the edge.
         layout.scrollHeight += 40;
@@ -159,34 +181,94 @@ describe("thread viewport while message rows settle", () => {
         expect(gap()).toBe(0);
     });
 
-    it("follows content that grows beneath the reader without a scroll event", async () => {
-        await mount();
+    it("follows content that grows beneath the reader without a scroll event", () => {
+        mount();
 
         layout.scrollHeight += 900;
-        act(() => {
-            for (const callback of resized) {
-                callback();
-            }
-        });
+        playResize();
 
         expect(gap()).toBe(0);
     });
 
-    it("lets the reader scroll up, and then leaves them where they are as the content grows", async () => {
-        const viewport = await mount();
+    it("lets the reader scroll up, and then leaves them where they are as the content grows", () => {
+        const viewport = mount();
 
         scrolledTo(viewport, layout.scrollTop - 2000);
 
         const readingAt = layout.scrollTop;
 
         layout.scrollHeight += 900;
-        act(() => {
-            for (const callback of resized) {
-                callback();
-            }
-        });
+        playResize();
 
         expect(layout.scrollTop).toBe(readingAt);
+    });
+
+    it("keeps a scroll up the reader asked for when rows above grow by more in the same frame", () => {
+        const viewport = mount();
+
+        // The wheel moves the view up 100 px while rows above grow by 1400 px and scroll anchoring moves it down by
+        // as much: the one scroll event sees the view 1300 px further down.
+        act(() => {
+            viewport.dispatchEvent(new WheelEvent("wheel", { deltaY: -100 }));
+        });
+        layout.scrollHeight += 1400;
+        scrolledTo(viewport, layout.scrollTop + 1300);
+
+        expect(gap()).toBe(100);
+
+        layout.scrollHeight += 600;
+        playResize();
+
+        expect(gap()).toBe(700);
+    });
+
+    it("leaves the view where a jump put it when rows resize before the jump's scroll event", () => {
+        mount();
+
+        // `scrollIntoView` moved the view up; the rows it brought on screen take their real height in the same frame,
+        // and the resize is observed before the browser fires the scroll event.
+        layout.scrollTop -= 3000;
+
+        const landedAt = layout.scrollTop;
+
+        layout.scrollHeight += 500;
+        playResize();
+
+        expect(layout.scrollTop).toBe(landedAt);
+    });
+
+    it("does not scroll past a block the reader opens in the last row", () => {
+        const viewport = mount();
+
+        const row = document.querySelector<HTMLElement>("[data-list-message-id]")!;
+        let rowHeight = 300;
+
+        row.getBoundingClientRect = () => ({ height: rowHeight }) as DOMRect;
+
+        const pressedAt = layout.scrollTop;
+
+        act(() => {
+            row.querySelector("button")!.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+        });
+
+        // The block opens beneath the button, in two steps of its animation.
+        for (const grown of [400, 1200]) {
+            rowHeight += grown;
+            layout.scrollHeight += grown;
+            playResize();
+        }
+
+        expect(layout.scrollTop).toBe(pressedAt);
+
+        // A press that grows nothing (copy) leaves the following on for growth elsewhere.
+        scrolledTo(viewport, layout.scrollHeight - CLIENT_HEIGHT);
+        act(() => {
+            row.querySelector("button")!.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+        });
+        layout.scrollHeight += 200;
+        playResize();
+
+        expect(gap()).toBe(0);
     });
 });
 
