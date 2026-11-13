@@ -17,7 +17,8 @@
   token mint answers (`session-state.ts`, `isConfirming`: not offline yet, but every write control waits for the token like a
   connection being checked; the splash holds until the chat list has read its saved rows, at most 2 s,
   `splash-gate.ts`). A mint still out when a sign-in or sign-out starts applies nothing (`createAuthEpoch`). A mint with no answer keeps them signed in without a JWT, which counts as offline; an answered "no session"
-  signs out and empties the cache. Live queries wait for a JWT.
+  signs out and empties the cache. Live queries wait for a JWT. A project subscription also counts as answered when the
+  client's `onSyncStatus` reaches `synced` after registering (a reconnect's `resume` frame calls no rows callback).
   **Stamps and races:** a read stamps its rows with the moment it STARTED (`syncedAt`), and only the newest read of a
   screen may paint or save (`createMessageReadGate`), because messages carry no server version. A thread missing from
   a COMPLETE first-page list read is pruned (`pruneThreads`, rows synced by a later read stay); a partial page never
@@ -36,6 +37,8 @@
   - 200 with `duplicate: true`: the first send's ids. Open that chat like any start.
   - 422 `CLIENT_MESSAGE_ID_REUSED`: show it, never retry, drop the id.
   - A send that still fails gives its prompt back with its id held; the same text sent again is the same send.
+  - A prompt given back ahead of text typed meanwhile is a different message (new id): the notice says to send it alone.
+  - A start with `streaming: false` (no `streamToken`) follows no stream: the chat's saved reply is read instead.
   - Match codes lower-cased: the gateway passes `/chat/start`'s SCREAMING_CASE, the public API uses snake_case.
   - Nothing is held and polled for: the resend is idempotent.
 - **Voice input paths** (`src/voice/`) — the cloud by default; "Transcribe on this device" (secure store, read on every

@@ -2,7 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { StartedChat } from "./chat-api";
 import { ChatError } from "./chat-api";
-import { clientMessageIdFor, START_IN_PROGRESS_RETRY_MS, START_IN_PROGRESS_WAIT_MS, START_UNKNOWN_RETRY_DELAYS_MS, startWithRetries } from "./start-send";
+import {
+    clientMessageIdFor,
+    replyStreamOf,
+    START_IN_PROGRESS_RETRY_MS,
+    START_IN_PROGRESS_WAIT_MS,
+    START_UNKNOWN_RETRY_DELAYS_MS,
+    startWithRetries,
+} from "./start-send";
 
 const STARTED: StartedChat = { contentType: "text", messageId: "m1", streamId: "s1", streaming: true, streamToken: "t", threadId: "t1" };
 const IN_PROGRESS = new ChatError("This message is still being sent.", { code: "chat_start_in_progress" });
@@ -96,5 +103,18 @@ describe(startWithRetries, () => {
 
         await expect(startWithRetries({ attempt, signal: controller.signal, ...fakeClock() })).rejects.toBe(IN_PROGRESS);
         expect(attempt).toHaveBeenCalledOnce();
+    });
+});
+
+describe(replyStreamOf, () => {
+    it("follows the reply stream of a start that has one", () => {
+        expect(replyStreamOf(STARTED)).toStrictEqual({ streamId: "s1", streamToken: "t" });
+        expect(replyStreamOf({ ...STARTED, duplicate: true })).toStrictEqual({ streamId: "s1", streamToken: "t" });
+    });
+
+    it("follows nothing for a resend answered with no stream, whose reply the chat's saved messages show", () => {
+        const delivered: StartedChat = { contentType: "text", duplicate: true, messageId: "m1", streamId: null, streaming: false, threadId: "t1" };
+
+        expect(replyStreamOf(delivered)).toBeUndefined();
     });
 });

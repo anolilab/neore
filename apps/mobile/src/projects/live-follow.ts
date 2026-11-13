@@ -13,6 +13,11 @@ export interface Scoped<T> extends Live<T> {
 
 export const EMPTY_LIVE: Live<never> = { error: undefined, rows: undefined };
 
+/** What `followLive` reads of the Lunora client's `syncStatus()`: `true` once the live connection has every subscription answered. */
+export interface SyncState {
+    synced: boolean;
+}
+
 /**
  * What a screen may show: the state only when it belongs to the current scope.
  * Between a user change and the new subscription's effect, the old user's rows
@@ -32,12 +37,18 @@ export const liveFor = <T>(state: Scoped<T>, scope: string | undefined): Live<T>
  * Rows handed over while `watch` is still subscribing are not: that is the Lunora client replaying a value it held (a
  * joined subscription or the read cache), from before the server was asked, and the server may still refuse the
  * subscription. An error is a refusal by the server, not a lost connection, so it reports nothing.
+ *
+ * After a reconnect the server may answer an unchanged subscription with a `resume` frame, which calls no rows callback.
+ * `watchSync` (the client's `onSyncStatus`) covers it: the client counts the subscription answered then, so a later
+ * report of `synced` is reported too. Its first report, made while it is being registered, is the state as it already
+ * stood (a held or cached value counts as unanswered there, and nothing was asked since), so it is not.
  */
 export const followLive = <T>(
     scope: string,
     watch: (onRows: (rows: T[]) => void, onError: (message: string) => void) => Unsubscribe,
     publish: (next: Scoped<T>) => void,
     onAnswered: () => void = () => {},
+    watchSync?: (listener: (status: SyncState) => void) => Unsubscribe,
 ): Unsubscribe => {
     publish({ ...EMPTY_LIVE, scope });
 
@@ -53,7 +64,18 @@ export const followLive = <T>(
         (message) => publish({ error: message, rows: undefined, scope }),
     );
 
+    let isRegistering = true;
+    const stopSync = watchSync?.((status) => {
+        if (!isRegistering && status.synced) {
+            onAnswered();
+        }
+    });
+
+    isRegistering = false;
     isSubscribing = false;
 
-    return stop;
+    return () => {
+        stopSync?.();
+        stop();
+    };
 };

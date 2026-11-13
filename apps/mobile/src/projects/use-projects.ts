@@ -27,7 +27,14 @@ const useLive = <T>(watch: (onRows: (rows: T[]) => void, onError: (message: stri
             return undefined;
         }
 
-        return followLive(scope, watch, setLive, () => reportRead("succeeded"));
+        // The client's sync status also reports an answer that calls no rows callback (a reconnect's `resume` frame).
+        return followLive(
+            scope,
+            watch,
+            setLive,
+            () => reportRead("succeeded"),
+            (listener) => getClient().onSyncStatus(listener),
+        );
         // `scope` stands for the user and everything `watch` closes over; `reportRead` is stable.
     }, [reportRead, scope]);
 

@@ -92,3 +92,16 @@ export const startWithRetries = async ({
 
     return await tryFrom(0);
 };
+
+/**
+ * The reply stream to follow after a start, or `undefined` when there is none (`streaming: false`): a resend whose reply
+ * has no stream left to follow, which the chat's saved messages show instead. Following an absent token would fail and
+ * call a delivered message's reply unfinished.
+ */
+export const replyStreamOf = (started: StartedChat): { streamId: string; streamToken: string } | undefined => {
+    if (!started.streaming || started.streamId === null || started.streamToken === undefined) {
+        return undefined;
+    }
+
+    return { streamId: started.streamId, streamToken: started.streamToken };
+};

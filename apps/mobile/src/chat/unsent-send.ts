@@ -12,6 +12,17 @@ export const draftAfterUnsent = (current: string, prompt: string): string => {
     return `${prompt}\n\n${current}`;
 };
 
+/**
+ * The composer after a failed send, and whether its prompt landed ahead of text typed meanwhile. A merged draft is not
+ * the prompt that went back, so it is sent under a new `clientMessageId` (`clientMessageIdFor`) and the notice says so
+ * ({@link failedSendMessage}).
+ */
+export const giveBackDraft = (current: string, prompt: string): { draft: string; isMerged: boolean } => {
+    const draft = draftAfterUnsent(current, prompt);
+
+    return { draft, isMerged: draft !== prompt };
+};
+
 /** The rows after a send the server never accepted: its local prompt and reply rows go, since no read will ever confirm them. */
 export const withoutUnsentRows = <T extends { id: string }>(rows: T[], ids: ReadonlyArray<string>): T[] => rows.filter((row) => !ids.includes(row.id));
 
@@ -38,17 +49,29 @@ export const shouldKeepClientMessageId = (error: unknown): boolean => !isClientM
 /** Ends the message of a send that may have reached the server: its prompt is back, and sending it again is safe. */
 export const MAY_HAVE_BEEN_SENT_NOTICE = "It may have been sent: it is back in the message box, and sending it again will not send it twice.";
 
+/**
+ * The same, when the prompt went back ahead of text typed meanwhile: only the prompt alone and unchanged is the same send,
+ * so sending the whole box may save the prompt a second time.
+ */
+export const MAY_HAVE_BEEN_SENT_MERGED_NOTICE
+    = "It may have been sent: it is back at the top of the message box, ahead of what you typed. Send it alone and unchanged to be sure it is not sent twice.";
+
 /** A send whose first try was still being saved when the wait ran out. */
 export const STILL_SENDING_MESSAGE = `The message is still being sent. ${MAY_HAVE_BEEN_SENT_NOTICE}`;
 
-/** The error shown for a failed send. One that may have reached the server says it is safe to send again. */
-export const failedSendMessage = (error: unknown, stage: SendStage): string => {
+/**
+ * The error shown for a failed send. One that may have reached the server says whether sending again is safe as it
+ * stands: it is when the prompt went back alone (its `clientMessageId` is reused), not when it went back merged.
+ */
+export const failedSendMessage = (error: unknown, stage: SendStage, { isMerged = false }: { isMerged?: boolean } = {}): string => {
+    const notice = isMerged ? MAY_HAVE_BEEN_SENT_MERGED_NOTICE : MAY_HAVE_BEEN_SENT_NOTICE;
+
     if (isStartInProgress(error)) {
-        return STILL_SENDING_MESSAGE;
+        return `The message is still being sent. ${notice}`;
     }
 
     const message = error instanceof Error ? error.message : "Could not send.";
     const isPossiblySent = stage === "requested" && !(error instanceof ChatError && error.isRefusal);
 
-    return isPossiblySent ? `${message} ${MAY_HAVE_BEEN_SENT_NOTICE}` : message;
+    return isPossiblySent ? `${message} ${notice}` : message;
 };

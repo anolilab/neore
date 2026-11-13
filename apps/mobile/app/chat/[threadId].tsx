@@ -18,10 +18,10 @@ import { displayTextOf, shareTextOf } from "@/chat/message-parts";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import type { HeldSend } from "@/chat/start-send";
-import { clientMessageIdFor, startWithRetries } from "@/chat/start-send";
+import { clientMessageIdFor, replyStreamOf, startWithRetries } from "@/chat/start-send";
 import { relayReply } from "@/chat/stream";
 import type { SendStage } from "@/chat/unsent-send";
-import { draftAfterUnsent, failedSendMessage, failedSendOutcome, shouldKeepClientMessageId, withoutUnsentRows } from "@/chat/unsent-send";
+import { failedSendMessage, failedSendOutcome, giveBackDraft, shouldKeepClientMessageId, withoutUnsentRows } from "@/chat/unsent-send";
 import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
 import { loadConfig } from "@/lib/config";
 import { DEFAULT_CHAT_MODEL } from "@/lib/defaults";
@@ -148,13 +148,6 @@ const Chat = () => {
     // Whether this chat is the one on screen: a read that lands after another chat was pushed over it must not save it.
     const isFocusedRef = useRef(false);
     const [threadId, setThreadId] = useState<string | undefined>(routeThreadId === NEW_THREAD ? undefined : routeThreadId);
-    // The chat on screen for listeners that outlive a render: a found prompt opens only on the screen of its chat.
-    const threadIdRef = useRef(threadId);
-
-    // After commit: a render React drops must not name the chat a listener compares against.
-    useEffect(() => {
-        threadIdRef.current = threadId;
-    }, [threadId]);
     const [rows, setRows] = useState<Row[]>([]);
     // The prompt that went back to the composer with its `clientMessageId`: sending that prompt again reuses the id, so a
     // send the server took on a try whose answer was lost is saved once (`start-send.ts`).
@@ -171,7 +164,16 @@ const Chat = () => {
     // Where the next older page starts; null once the whole history is loaded.
     const [olderCursor, setOlderCursor] = useState<string | null>(null);
     const [isLoadingOlder, setIsLoadingOlder] = useState(false);
-    const [draft, setDraft] = useState("");
+    const [draft, setDraftState] = useState("");
+    // The composer as the last write left it, like `rowsRef`: a failed send decides whether its prompt lands alone or ahead
+    // of text typed meanwhile against the composer as it is, not as it was when the send started.
+    const draftRef = useRef("");
+    const setDraft = useCallback((update: string | ((current: string) => string)) => {
+        const next = typeof update === "function" ? update(draftRef.current) : update;
+
+        draftRef.current = next;
+        setDraftState(next);
+    }, []);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     // The words land in the draft, after anything typed meanwhile; they are never sent on their own.
@@ -436,15 +438,19 @@ const Chat = () => {
         prompt: string;
         stage: SendStage;
     }) => {
-        const outcome = failedSendOutcome(stage);
-
-        if (outcome === "give-back") {
-            setDraft((current) => draftAfterUnsent(current, prompt));
-            writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
-            heldSend.current = shouldKeepClientMessageId(failure) ? { clientMessageId, prompt } : null;
+        if (failedSendOutcome(stage) === "accepted") {
+            return { isMerged: false };
         }
 
-        return outcome;
+        // Ahead of anything typed meanwhile: the held id stays the original prompt's, so only that prompt sent alone and
+        // unchanged is the same send, which the notice then says (`failedSendMessage`).
+        const { draft: given, isMerged } = giveBackDraft(draftRef.current, prompt);
+
+        setDraft(given);
+        writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
+        heldSend.current = shouldKeepClientMessageId(failure) ? { clientMessageId, prompt } : null;
+
+        return { isMerged };
     };
 
     const send = async () => {
@@ -536,6 +542,18 @@ const Chat = () => {
                 router.setParams({ threadId: started.threadId });
             }
 
+            const replyStream = replyStreamOf(started);
+
+            // No reply stream to follow (`streaming: false`): the message went through, and its saved reply is read from the
+            // chat instead (the confirmation's read once `sending` ends). Its empty placeholder row goes.
+            if (replyStream === undefined) {
+                writeRows((current) => withoutUnsentRows(current, [assistantId]));
+                addConfirmation({ holdsSend: false, messageId: started.messageId, steers: 0, threadId: started.threadId });
+                AccessibilityInfo.announceForAccessibility("Reply finished");
+
+                return;
+            }
+
             let isSteered = false;
             // The row the text goes into. A steer starts a new row, so the text before it stays on screen; the server
             // saves that text as a message of its own.
@@ -569,7 +587,7 @@ const Chat = () => {
                     writeRows((current) => appendToRow(current, activeId, text));
                 },
                 signal: controller.signal,
-                streamToken: started.streamToken,
+                streamToken: replyStream.streamToken,
             });
 
             // A send stopped on purpose has its notice on screen already, and gets no confirmation.
@@ -591,11 +609,11 @@ const Chat = () => {
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
-            settleFailedSend({ clientMessageId, error: error_, ids: { assistant: assistantId, user: userId }, prompt, stage });
+            const { isMerged } = settleFailedSend({ clientMessageId, error: error_, ids: { assistant: assistantId, user: userId }, prompt, stage });
 
             // The abort error of a send stopped on purpose is not shown: its notice is.
             if (!controller.signal.aborted) {
-                setError(failedSendMessage(error_, stage));
+                setError(failedSendMessage(error_, stage, { isMerged }));
             }
         } finally {
             setSending(false);
@@ -645,7 +663,6 @@ const Chat = () => {
 
     // The home indicator's inset, which the open keyboard already covers.
     const safeBottom = keyboardShown ? 0 : insets.bottom;
-    const shownRows = rows;
     const syncedTimes = rows.filter((row) => row.status !== "local" && row.finished !== true).map((row) => row.syncedAt);
     const syncedAt = syncedTimes.length === 0 ? undefined : Math.max(...syncedTimes);
 
@@ -665,7 +682,7 @@ const Chat = () => {
                     style={{ flex: 1 }}
                 >
                     <LegendList
-                        data={shownRows}
+                        data={rows}
                         estimatedItemSize={72}
                         keyExtractor={(row) => row.id}
                         ListHeaderComponent={olderHeader}

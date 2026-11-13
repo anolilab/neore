@@ -5,9 +5,10 @@ export interface StartedChat {
     /** A resend of a send the server already took (same `clientMessageId`): these are that send's ids, and nothing was saved again. */
     duplicate?: boolean;
     messageId: string;
-    streamId: string;
+    /** `null`, with no `streamToken` and `streaming: false`, when the start answered with no reply stream to follow. */
+    streamId: string | null;
     streaming: boolean;
-    streamToken: string;
+    streamToken?: string;
     threadId: string;
 }
 

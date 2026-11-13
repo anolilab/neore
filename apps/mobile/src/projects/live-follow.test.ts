@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Scoped } from "./live-follow";
+import type { Scoped, SyncState } from "./live-follow";
 import { EMPTY_LIVE, followLive, liveFor } from "./live-follow";
 
 /** A watch the test drives by hand. */
@@ -94,6 +94,43 @@ describe("followLive", () => {
 
         onRows?.(["p1"]);
         expect(answered).toBe(1);
+    });
+
+    it("reports a reconnect the server answers with no rows callback (a resume frame), but not the state at subscribing", () => {
+        let answered = 0;
+        let report: ((status: SyncState) => void) | undefined;
+        let syncStopped = 0;
+        const fake = fakeWatch();
+
+        const stop = followLive(
+            "a:projects",
+            fake.watch,
+            recorder().publish,
+            () => {
+                answered += 1;
+            },
+            (listener) => {
+                report = listener;
+                // `onSyncStatus` reports the current state at once, while it is being registered.
+                listener({ synced: true });
+
+                return () => {
+                    syncStopped += 1;
+                };
+            },
+        );
+
+        expect(answered).toBe(0);
+
+        // The connection drops and comes back; the server acknowledges the unchanged subscription and no rows arrive.
+        report?.({ synced: false });
+        expect(answered).toBe(0);
+        report?.({ synced: true });
+        expect(answered).toBe(1);
+
+        stop();
+        expect(syncStopped).toBe(1);
+        expect(fake.stopped()).toBe(1);
     });
 
     it("drops the rows when the subscription fails", () => {
