@@ -33,6 +33,8 @@ const STRONG_NAMES = new Set(["b", "strong"]);
 // Elements whose output starts or ends with a delimiter, so their edge is never a word character.
 const DELIMITED_NAMES = new Set(["a", "b", "code", "em", "i", "strong"]);
 const HEADING_NAMES = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
+// Each heading's break mark, or undefined for a heading without one. Filled by headingMarkOf.
+const headingMarks = new WeakMap<Node, string | undefined>();
 const TRAILING_SPACE = / $/;
 const LEADING_SPACE = /^ /;
 
@@ -763,7 +765,16 @@ function headingText(content: string, node: AnnotatedNode, options: Options): st
 
 /** The break mark of a heading that holds a block when a break marker is a newline, otherwise undefined. */
 function headingMarkOf(heading: Node, options: Options): string | undefined {
-    return options.br.includes("\n") && hasBlockDescendant(heading) ? headingBreakMark(heading) : undefined;
+    // Each break asks for its heading's mark. The mark serialises and scans the whole heading, so it is computed once.
+    if (headingMarks.has(heading)) {
+        return headingMarks.get(heading);
+    }
+
+    const mark = options.br.includes("\n") && hasBlockDescendant(heading) ? headingBreakMark(heading) : undefined;
+
+    headingMarks.set(heading, mark);
+
+    return mark;
 }
 
 /** The heading a break in the node is marked for, or null when no heading that holds a block contains it. */
@@ -809,13 +820,19 @@ function headingBreakMark(heading: Node): string {
 /** Writes each mark as a space, dropping the spaces beside it. A piece that starts a new line takes no space. */
 function joinAtMarks(content: string, mark: string): string {
     const [first = "", ...rest] = content.split(mark);
-    let text = first;
+    const pieces: string[] = [];
+    let carried = first;
 
+    // Only the piece just before a mark can end in a space, so only that piece is trimmed. Trimming the whole text
+    // each time would rescan everything written so far.
     for (const piece of rest) {
-        text = `${text.replace(TRAILING_SPACE, "")}${piece.startsWith("\n") ? "" : " "}${piece.replace(LEADING_SPACE, "")}`;
+        pieces.push(carried.replace(TRAILING_SPACE, ""), piece.startsWith("\n") ? "" : " ");
+        carried = piece.replace(LEADING_SPACE, "");
     }
 
-    return text;
+    pieces.push(carried);
+
+    return pieces.join("");
 }
 
 /** True when a block element sits inside the node, at any depth. */
