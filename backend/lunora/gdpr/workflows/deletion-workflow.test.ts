@@ -536,6 +536,31 @@ describe("account deletion workflow: usage exports", () => {
         expect(completionIndex()).toBeGreaterThan(-1);
     });
 
+    it("follows the purge's cursor from call to call, so every page of keyed runs is purged before erasure completes", async () => {
+        const base = answer;
+        const next = new Map<string | null, string>([
+            ["page-2", "page-3"],
+            [null, "page-2"],
+        ]);
+
+        answer = (ref, round, args) => {
+            if (!isPurge(ref)) {
+                return base(ref, round, args);
+            }
+
+            const cursor = next.get(args["cursor"] as string | null);
+
+            return cursor === undefined ? { waiting: false } : { cursor, waiting: false };
+        };
+
+        await execute();
+
+        const purges = runs().filter((entry) => isPurge(entry.ref));
+
+        expect(purges.map((entry) => entry.args["cursor"])).toStrictEqual([null, "page-2", "page-3"]);
+        expect(completionIndex()).toBeGreaterThan(-1);
+    });
+
     it("forces the purge once the wait is over, so erasure finishes while a long export is still live", async () => {
         const base = answer;
 

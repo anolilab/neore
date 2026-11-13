@@ -184,8 +184,9 @@ export const eraseUsageForUser = async (
 };
 
 /**
- * One page of the user's export runs that still hold a stored usage object, for the erasure's purge. Each keyed run says whether its
- * export is still live: a live run's record stays until its export ends, so its write cannot land after the record is released.
+ * One page of the user's export runs that hold a stored usage object, or are still live, for the erasure's purge. Each run says whether
+ * its export is still live: a live run's record stays until its export ends, so its write cannot land after the record is released.
+ * A live run with no object yet is listed so the purge waits for it, since its export may still store one.
  * `cursor` is null once the runs are read through.
  */
 export const keyedUsageRuns = internalQuery
@@ -193,7 +194,7 @@ export const keyedUsageRuns = internalQuery
     .output(
         v.object({
             cursor: v.union(v.string(), v.null()),
-            keyed: v.array(v.object({ key: v.string(), live: v.boolean(), runId: v.id("usageExportRuns") })),
+            keyed: v.array(v.object({ key: v.optional(v.string()), live: v.boolean(), runId: v.id("usageExportRuns") })),
         }),
     )
     .query(async ({ args: { cursor, userId }, ctx }) => {
@@ -206,8 +207,11 @@ export const keyedUsageRuns = internalQuery
         const keyed = [];
 
         for (const run of result.page) {
-            if (run.usageKey !== undefined) {
-                keyed.push({ key: run.usageKey, live: await isRunLive(ctx, run.requestId, userId), runId: run._id });
+            const live = await isRunLive(ctx, run.requestId, userId);
+
+            // A live run without an object is listed too: its export may still store one, so the purge waits for it to end.
+            if (run.usageKey !== undefined || live) {
+                keyed.push({ key: run.usageKey, live, runId: run._id });
             }
         }
 

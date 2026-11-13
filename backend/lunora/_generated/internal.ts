@@ -1302,7 +1302,7 @@ export interface InternalApiTypes {
         };
         gdpr: {
             clearUsageExportPieces: FunctionReference<"mutation", { requestId: string; userId: string }, { hasMore: boolean }>;
-            keyedUsageRuns: FunctionReference<"query", { cursor: string | null; userId: string }, { cursor: string | null; keyed: Array<{ key: string; live: boolean; runId: Id<"usageExportRuns"> }> }>;
+            keyedUsageRuns: FunctionReference<"query", { cursor: string | null; userId: string }, { cursor: string | null; keyed: Array<{ key?: string; live: boolean; runId: Id<"usageExportRuns"> }> }>;
             purgeUsageFile: FunctionReference<"action", { key: string; runId: Id<"usageExportRuns"> }, null>;
             releaseUsageKey: FunctionReference<"mutation", { runId: Id<"usageExportRuns"> }, null>;
             sweepUsageExportPieces: FunctionReference<"mutation", {}, null>;

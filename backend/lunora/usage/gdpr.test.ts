@@ -71,12 +71,12 @@ const dueAtOf = async (userId: string): Promise<number | undefined> =>
     });
 
 /** Every keyed run of the user, read page by page as the erasure's purge reads them. */
-const keyedRunsOf = async (userId: string): Promise<{ key: string; live: boolean; runId: string }[]> => {
-    const keyed: { key: string; live: boolean; runId: string }[] = [];
+const keyedRunsOf = async (userId: string): Promise<{ key?: string; live: boolean; runId: string }[]> => {
+    const keyed: { key?: string; live: boolean; runId: string }[] = [];
     let cursor: string | null = null;
 
     do {
-        const page: { cursor: string | null; keyed: { key: string; live: boolean; runId: string }[] } = await harness.run(
+        const page: { cursor: string | null; keyed: { key?: string; live: boolean; runId: string }[] } = await harness.run(
             async (ctx: any) => await ctx.runQuery(keyedUsageRuns, { cursor, userId }),
         );
 
@@ -300,6 +300,23 @@ describe("the purge's record", () => {
         await harness.run(async (ctx: any) => await ctx.runMutation(releaseUsageKey, { runId }));
 
         expect(await countOf("usageExportRuns", A)).toBe(0);
+    });
+
+    it("lists a live run that has no object yet, so the purge waits for its export to end", async () => {
+        const request = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("gdprRequests", { requestedAt: 1, requestType: "export", status: "processing", userEmail: "a@example.com", userId: A }),
+        );
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("usageExportRuns", { createdAt: 1, deleteAt: 0, requestId: `${request}:1`, userId: A });
+            await ctx.db.insert("usageExportRuns", { createdAt: 2, deleteAt: 0, requestId: "plain:dead", userId: A });
+        });
+
+        // The dead unkeyed run is not listed: erasure removes it. The live one is, with no key.
+        const listed = await keyedRunsOf(A);
+
+        expect(listed).toEqual([{ key: undefined, live: true, runId: expect.any(String) }]);
     });
 
     it("finds keyed runs past a page of unkeyed ones, so erasure reaches every stored object", async () => {

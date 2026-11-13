@@ -247,6 +247,11 @@ export const purgeUserUsageFiles = internalAction
                     continue;
                 }
 
+                // A live run with no object yet has nothing to purge; a forced purge leaves it for the sweep.
+                if (run.key === undefined) {
+                    continue;
+                }
+
                 await purgeObject(context.storage, run.key, async () => await context.runMutation(internal.usage.gdpr.releaseUsageKey, { runId: run.runId }));
             }
 
