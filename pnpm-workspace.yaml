@@ -354,6 +354,9 @@ catalogs:
     "@onboardjs/posthog-plugin": 1.0.6
     "@onboardjs/react": 1.0.0-rc.5
   react:
+    # `apps/mobile`'s compiler check (`react-compiler.test.ts`) runs the compiler through this; Metro's
+    # own transform uses babel-preset-expo's copy. Kept on the 7.x line the compiler needs.
+    "@babel/core": 7.29.7
     babel-plugin-react-compiler: ^1.0.0
     react: 19.3.1
     react-compiler-runtime: ^1.0.0
@@ -484,6 +487,7 @@ catalogs:
     # (the pre-push hook). CI and `lint:types` stay on `typescript` above.
     tsrs: 0.23.0-ts7.1.0-beta
   types:
+    "@types/babel__core": 7.20.5
     "@types/chrome": 0.3.7
     "@types/json-schema": ^7.0.15
     "@types/node": 26.6.6
