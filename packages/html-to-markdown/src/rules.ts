@@ -1,3 +1,4 @@
+import { isUnsafeDestination } from "./commonmark-rules";
 import annotateNode from "./node";
 import type { AnnotatedNode, Options, ReplacementFunction, Rule, RuleLookup } from "./types";
 import { removeReplacement } from "./utilities";
@@ -17,21 +18,120 @@ function newAnswers(): Answers {
     return { decided: new WeakMap(), undecided: new WeakSet() };
 }
 
+/** The attributes that carry a link destination: `href`, and `xlink:href` on an SVG `<a>`. */
+const LINK_ATTRIBUTES = ["href", "xlink:href"];
+
 /**
- * Manages the rules used to convert HTML to Markdown: the built-in rules, then
- * the ones added with `addRule`, then keep/remove filters.
+ * The default `keepReplacement`. It ignores its content and outputs the
+ * element's HTML, so the converter skips the children of a kept element when
+ * this is the replacement in use. A custom `keepReplacement` still gets the
+ * converted children.
+ *
+ * With `safeLinks`, an `<a>` inside the element whose destination is unsafe is
+ * written without its link: its content stays and its destination goes. Kept
+ * markup with only safe links is output unchanged.
+ */
+export function defaultKeepReplacement(_content: string, node: AnnotatedNode, options: Options): string {
+    const html = options.safeLinks ? htmlWithoutUnsafeLinks(node) : node.outerHTML;
+
+    if (node.isBlock) {
+        return `\n\n${html}\n\n`;
+    }
+
+    return html;
+}
+
+/**
+ * The element's HTML with every unsafe anchor unwrapped, so its text and its
+ * inner markup stay. The element is returned as is when it has no unsafe anchor.
+ */
+function htmlWithoutUnsafeLinks(node: AnnotatedNode): string {
+    const hasUnsafeLink = isUnsafeAnchor(node) || anchorsWithin(node).some((anchor) => isUnsafeAnchor(anchor));
+
+    if (!hasUnsafeLink) {
+        return node.outerHTML;
+    }
+
+    const copy = node.cloneNode(true) as Element;
+    const isRootUnsafe = isUnsafeAnchor(copy);
+
+    for (const anchor of anchorsWithin(copy)) {
+        if (isUnsafeAnchor(anchor)) {
+            unwrap(anchor);
+        }
+    }
+
+    // A root anchor has no parent to unwrap into, so only its inner markup is output.
+    // eslint-disable-next-line unicorn/prefer-dom-node-html-methods -- domino, the Node and Workers parser, has no getHTML, so innerHTML is the serialiser here.
+    return isRootUnsafe ? copy.innerHTML : copy.outerHTML;
+}
+
+/** The `<a>` elements inside the element, in document order. Copied by index, since domino's NodeList is not iterable. */
+function anchorsWithin(element: Element): Element[] {
+    const found = element.querySelectorAll("a");
+
+    return Array.from({ length: found.length }, (_unused, index) => found[index]).filter((anchor) => anchor !== undefined);
+}
+
+function isUnsafeAnchor(element: Element): boolean {
+    if (element.localName !== "a") {
+        return false;
+    }
+
+    return LINK_ATTRIBUTES.some((name) => {
+        const href = element.getAttribute(name);
+
+        return href !== null && isUnsafeDestination(href);
+    });
+}
+
+function unwrap(element: Element): void {
+    const parent = element.parentNode;
+
+    if (!parent) {
+        return;
+    }
+
+    while (element.firstChild) {
+        parent.insertBefore(element.firstChild, element);
+    }
+
+    element.remove();
+}
+
+/**
+ * Manages the rules used to convert HTML to Markdown. The first match wins, in
+ * this order:
+ *
+ * 1. the blank rule, for a blank element (only whitespace, no meaningful content);
+ * 2. rules added with `addRule`, newest first;
+ * 3. keep filters, newest first (rendered as HTML);
+ * 4. remove filters, newest first (dropped with their content);
+ * 5. the built-in rules;
+ * 6. the default rule.
+ *
+ * Keep and remove sit above the built-in rules, so `keep(['b'])` and
+ * `remove(['i'])` also work for built-in tags (upstream #455). Upstream's
+ * documentation says the built-in rules win, and this changes that on purpose.
+ * The blank rule comes first, as upstream documents, because a blank element
+ * has no content to keep or remove.
  */
 export default class Rules implements RuleLookup {
-    private readonly array: Rule[] = [];
+    private readonly customRules: Rule[] = [];
+
+    private readonly builtInRules: Rule[] = [];
 
     private readonly keepList: Rule[] = [];
 
     private readonly removeList: Rule[] = [];
 
-    // The lists a node is searched in, in order: added and built-in rules, then keep, then remove.
-    private readonly searchOrder: ReadonlyArray<ReadonlyArray<Rule>> = [this.array, this.keepList, this.removeList];
+    // The lists a node is searched in, in order: added rules, then keep, then remove, then the built-in rules.
+    private readonly searchOrder: ReadonlyArray<ReadonlyArray<Rule>> = [this.customRules, this.keepList, this.removeList, this.builtInRules];
 
     private readonly answers = newAnswers();
+
+    /** Rules whose replacement ignores the children, so converting them is wasted work. */
+    private readonly skipChildrenRules = new WeakSet<Rule>();
 
     private readonly options: Options;
 
@@ -50,29 +150,48 @@ export default class Rules implements RuleLookup {
         const ruleTable: Record<string, Rule> = options.rules ?? {};
 
         for (const rule of Object.values(ruleTable)) {
-            this.array.push(rule);
+            this.builtInRules.push(rule);
         }
     }
 
     add(_key: string, rule: Rule): void {
-        this.array.unshift(rule);
+        this.customRules.unshift(rule);
         this.answers.undecided = new WeakSet();
     }
 
     keep(filter: Rule["filter"]): void {
-        this.keepList.unshift({
+        const rule: Rule = {
             filter,
             replacement: this.keepReplacement,
-        });
+        };
+
+        if (this.keepReplacement === defaultKeepReplacement) {
+            this.skipChildrenRules.add(rule);
+        }
+
+        this.keepList.unshift(rule);
         this.answers.undecided = new WeakSet();
     }
 
     remove(filter: Rule["filter"]): void {
-        this.removeList.unshift({
+        const rule: Rule = {
             filter,
             replacement: removeReplacement,
-        });
+        };
+
+        this.skipChildrenRules.add(rule);
+        this.removeList.unshift(rule);
         this.answers.undecided = new WeakSet();
+    }
+
+    /**
+     * True when the converter should not convert the element's children: a
+     * removed element, or a kept one with the default `keepReplacement`, since
+     * neither uses them. Converting them would only throw the output away, and
+     * could still leave side effects such as reference-link definitions.
+     */
+    skipsChildren(rule: Rule): boolean {
+        return this.skipChildrenRules.has(rule);
     }
 
     forNode(node: AnnotatedNode): Rule {
@@ -113,7 +232,7 @@ export default class Rules implements RuleLookup {
     }
 
     forEach(visit: (rule: Rule, index: number) => void): void {
-        this.array.forEach((rule, index) => {
+        [...this.customRules, ...this.builtInRules].forEach((rule, index) => {
             visit(rule, index);
         });
     }

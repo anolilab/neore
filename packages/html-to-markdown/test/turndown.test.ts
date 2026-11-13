@@ -123,11 +123,11 @@ describe("turndown service API", () => {
         expect(service.keep(["del", "ins"])).toBe(service);
     });
 
-    it("keep rules are overridden by the standard rules", () => {
+    it("keep rules override the standard rules (upstream #455)", () => {
         const service = new TurndownService();
 
         service.keep("p");
-        expect(service.turndown("<p>Hello world</p>")).toBe("Hello world");
+        expect(service.turndown("<p>Hello world</p>")).toBe("<p>Hello world</p>");
     });
 
     it("keeping elements that have a blank textContent but contain significant elements", () => {
@@ -166,11 +166,11 @@ describe("turndown service API", () => {
         expect(service.remove(["del", "ins"])).toBe(service);
     });
 
-    it("remove elements are overridden by rules", () => {
+    it("remove elements override the standard rules (upstream #455)", () => {
         const service = new TurndownService();
 
         service.remove("p");
-        expect(service.turndown("<p>Hello world</p>")).toBe("Hello world");
+        expect(service.turndown("<p>Hello world</p>")).toBe("");
     });
 
     it("remove elements are overridden by keep", () => {
