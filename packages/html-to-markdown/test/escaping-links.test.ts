@@ -383,3 +383,33 @@ describe("review: turning escaping off", () => {
         expect(service.turndown("<p>a&lt;<span>b</span></p>")).toBe("a<b");
     });
 });
+
+/*
+ * Flattening link text replaces only line breaks and their ASCII indentation. Text before a break that looks like a
+ * custom marker is the link's own text, and a non-breaking space after a break is content, so both stay.
+ */
+
+describe("link text around a flattened line break", () => {
+    it.each([
+        ["an inline link", {}, "[ aX b ](/x)"],
+        ["a reference link", { linkStyle: "referenced" as const }, "[ aX b ][1]\n\n[1]: /x"],
+    ])("keeps literal text that matches a custom marker in %s", (_name, options, expected) => {
+        expect(convert("<a href=/x><p>aX</p><p>b</p></a>", { br: "X", ...options }).trim()).toBe(expected);
+    });
+
+    it("keeps an inline-tag marker, which is valid in link text, and flattens only the line break", () => {
+        expect(convert("<a href=/x>a<br>b</a>", { br: "<br>" })).toBe("[a<br> b](/x)");
+    });
+
+    it("guard: drops a backslash marker that is not kept, which would show as a backslash", () => {
+        expect(convert("<a href=/x>a<br><h1>b</h1></a>", { br: "\\" })).not.toContain("a\\");
+    });
+
+    it("keeps non-breaking spaces after a paragraph break", () => {
+        expect(convert("<a href=/x><p>one</p><p>&nbsp;&nbsp;two</p></a>")).toBe("[ one \u{A0}\u{A0}two ](/x)");
+    });
+
+    it("keeps a hard break before a non-breaking space, which cannot open a list", () => {
+        expect(convert("<a href=/x>a<br>&nbsp;- b</a>")).toBe("[a  \n\u{A0}- b](/x)");
+    });
+});

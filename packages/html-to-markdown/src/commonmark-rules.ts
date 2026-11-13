@@ -1330,7 +1330,8 @@ function linkText(content: string, hardBreak: string): string {
     const hasHardBreaks = HARD_BREAK.test(hardBreak);
     const closed = `${content}]`;
     // A line break, with the marker that the rule writes in front of it when the marker is there.
-    const lineBreak = new RegExp(String.raw`(${escapeRegExp(hardBreak)})?\n\s*`, "g");
+    // Only ASCII whitespace is indentation; a non-breaking space after a break is content.
+    const lineBreak = new RegExp(String.raw`(${escapeRegExp(hardBreak)})?\n[ \t\r\n]*`, "g");
 
     return closed
         .replaceAll(lineBreak, (match: string, marker: string | undefined, offset: number, whole: string) => {
@@ -1340,10 +1341,16 @@ function linkText(content: string, hardBreak: string): string {
                 return match;
             }
 
-            // Spaces are harmless in text, so a space marker stays and the break becomes a space or nothing. Any other
-            // marker, such as a backslash, would show in the link text, so it goes with the break.
+            // Spaces are harmless in text, so a space marker stays and the break becomes a space or nothing.
             if (SPACES_ONLY.test(written)) {
                 return written + (whole.charAt(offset + written.length - 1) === " " ? "" : " ");
+            }
+
+            // A marker that ends in an unescaped backslash would show as a backslash once its break is gone, so it goes
+            // with the break. Any other match is kept: a marker such as `<br>` is valid in link text, and text that only
+            // looks like the marker (a literal `X`, an escaped backslash pair) is the link's own text.
+            if (written && !HARD_BREAK.test(whole.slice(0, offset + written.length))) {
+                return `${written} `;
             }
 
             return whole.charAt(offset - 1) === " " ? "" : " ";
