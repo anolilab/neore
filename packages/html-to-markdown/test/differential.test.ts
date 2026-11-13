@@ -17,6 +17,17 @@ import { hasVoidOrMeaningfulDescendant, isBlock, isMeaningfulWhenBlank, isVoid }
  * Several regular expressions were replaced by linear scans (edge whitespace,
  * code padding, attribute line breaks, trailing whitespace); this test is the
  * evidence that the output did not change.
+ *
+ * Some fixes change output on purpose, so the comparison is exact only for inputs that
+ * avoid them. The generator avoids two of them: a `<` or a bare number that ends a text
+ * node (the `< x` and `1. x` pieces end in a letter, since block-end and `<br>` trimming
+ * would otherwise strip the space after the `<` or the number), and block elements and
+ * `<hr>` inside a link (link content uses inline elements only). It does not avoid a
+ * line break inside link text, which now becomes a space. For example,
+ * `<pre><a href="/x">one\ntwo</a></pre>` gives `[one\ntwo](/x)` upstream and
+ * `[one two](/x)` here. The first 1,500 cases contain no such input, so they match
+ * exactly. With 20,000 cases from the same seed, 8 differ, all of this kind; the seed
+ * and count are kept so the test stays stable. escaping-links.test.ts covers the fixes.
  */
 
 const SEED = 20_261_112;
@@ -42,14 +53,21 @@ const EDGE_WHITESPACE = /^\s|\s$/;
  * the changes pinned in test/inline-breaks.test.ts: a break inside code or a heading; a
  * break at the edge of emphasis (or of an element whose text is trimmed); emphasis next to
  * other emphasis, which merges into a run; emphasis that touches a word character, which
- * uses `*`; and emphasis nested directly in the same kind inside a parent with no printing
- * block, which writes no delimiters. Every other document must match upstream.
+ * uses `*`; emphasis nested directly in the same kind inside a parent with no printing
+ * block, which writes no delimiters; and links that share a reference label with different
+ * destinations, which get their own ids (test/escaping-links.test.ts). Every other document
+ * must match upstream.
  */
 function isChangedOnPurpose(html: string, options: Partial<Options>): boolean {
     // The converter's own DOM, with whitespace collapsed, so the checks see the same text it does.
     const root = rootNode(html, new TurndownService(options).options) as Element;
 
     if (root.querySelector(BREAK_IN_CODE_OR_HEADING)) {
+        return true;
+    }
+
+    // Two links that share a label but not a destination: upstream sends both to the first definition.
+    if (isNamedReference(options) && hasSharedLabel(root)) {
         return true;
     }
 
@@ -65,10 +83,37 @@ function isChangedOnPurpose(html: string, options: Partial<Options>): boolean {
             return true;
         }
 
-        // A run that touches another emphasis element or a word changes output; an empty one has no run to change.
-        if (EMPHASIS_NAMES.has(element.nodeName) && element.textContent !== "" && hasChangedNeighbour(element)) {
+        // A run that touches another emphasis element or a word changes output; an element with no output has no run to change.
+        if (EMPHASIS_NAMES.has(element.nodeName) && hasOutput(element) && hasChangedNeighbour(element)) {
             return true;
         }
+    }
+
+    return false;
+}
+
+function isNamedReference(options: Partial<Options>): boolean {
+    return options.linkStyle === "referenced" && (options.linkReferenceStyle === "collapsed" || options.linkReferenceStyle === "shortcut");
+}
+
+/**
+ * True when two links with a destination have the same text, ignoring case and whitespace runs, but
+ * different destinations or titles. The text is the DOM's, which only over-matches the label the rule
+ * writes, so a document is skipped only when a shared label could occur.
+ */
+function hasSharedLabel(root: Element): boolean {
+    const definitions = new Map<string, string>();
+
+    for (const link of root.querySelectorAll("a[href]")) {
+        const label = (link.textContent ?? "").replaceAll(/\s+/g, " ").trim().toLowerCase();
+        const definition = `${link.getAttribute("href") ?? ""}\u{0}${link.getAttribute("title") ?? ""}`;
+        const seen = definitions.get(label);
+
+        if (seen !== undefined && seen !== definition) {
+            return true;
+        }
+
+        definitions.set(label, definition);
     }
 
     return false;
@@ -196,6 +241,15 @@ function nearestThroughWrappers(node: Node, side: (typeof SIDES)[number]): Node 
     return next;
 }
 
+/**
+ * True when the element has text, or an image with a source. The image rule writes nothing without a `src`, and an
+ * image with one writes output that the delimiter choice sees (`x<i><img src="i.png"></i>`). A `<br>` or a list item
+ * alone does not change output there, so they are not counted.
+ */
+function hasOutput(element: Element): boolean {
+    return element.textContent !== "" || [...element.querySelectorAll("img[src]")].some((image) => image.getAttribute("src") !== "");
+}
+
 function hasChangedNeighbour(element: Element): boolean {
     return SIDES.some((side) => {
         const next = nearestThroughWrappers(element, side);
@@ -223,11 +277,13 @@ function isWordNeighbour(sibling: Node | null, side: (typeof SIDES)[number]): bo
     return facing !== undefined && WORD_CHARACTER.test(facing);
 }
 
-// Measured: 1398 of the 1500 documents are compared (emphasis next to a wrapper is excluded, see isWrapper). A blank block counts as a printing block
-// in the predicate too, so a parent with one keeps its delimiters and is compared like upstream.
-// The floor is that count, so an exclusion that grows (a regression hidden as an intended
-// change) fails the test.
-const MIN_COMPARED = 1398;
+// Measured: 1372 of the 1500 documents are compared (emphasis next to a wrapper is excluded, see isWrapper). A blank
+// block counts as a printing block in the predicate too, so a parent with one keeps its delimiters and is compared like
+// upstream. The floor is that count, so an exclusion that grows (a regression hidden as an intended change) fails the
+// test. The generator avoids the escape changes (see the note at the top), which gives a different corpus than before;
+// of it, links that share a label with another destination (case 916) and emphasis around an image (case 893) are the
+// intended changes, and each fails the test when its exclusion is turned off.
+const MIN_COMPARED = 1372;
 
 // Mulberry32: a small seeded PRNG, so a failure reproduces exactly.
 function createRandom(seed: number): () => number {
@@ -264,11 +320,11 @@ const TEXT_PIECES = [
     "#",
     "-",
     "+ ",
-    "1. ",
+    "1. x",
     ">",
     "=",
     "~~~",
-    "<",
+    "< x",
     "&amp;",
     "\u{2028}",
     "\u{2029}",
@@ -317,20 +373,29 @@ const HREFS = ["https://x.y/z", "a b", "(x)", "<y>", "", "javascript:alert(1)"];
 const TITLES = ["", `a "quoted" title`, "line\nbreak\n\n  title"];
 const VOID_ELEMENTS = ["<br>", "<hr>", `<img alt="a_b" src="i.png">`, `<img src="">`];
 
+// Inside a link, `<hr>` and the block elements are left out (see the note at the top).
+// Inside `script` and `iframe` the content is raw text, so only text is generated there.
+const BLOCK_ELEMENTS = new Set(["blockquote", "div", "figure", "h1", "h2", "h3", "li", "ol", "p", "pre", "section", "table", "td", "th", "tr", "ul"]);
+const INLINE_ELEMENTS = ELEMENTS.filter((tag) => !BLOCK_ELEMENTS.has(tag));
+const INLINE_VOID_ELEMENTS = VOID_ELEMENTS.filter((element) => element !== "<hr>");
+const RAW_TEXT_ELEMENTS = new Set(["iframe", "script"]);
+
+type Context = "flow" | "link" | "raw";
+
 function pick<T>(items: ReadonlyArray<T>, random: () => number): T {
     return items[Math.floor(random() * items.length)] as T;
 }
 
-function randomHtml(random: () => number, depth: number): string {
-    if (depth > 3 || random() < 0.35) {
+function randomHtml(random: () => number, depth: number, context: Context = "flow"): string {
+    if (context === "raw" || depth > 3 || random() < 0.35) {
         return pick(TEXT_PIECES, random);
     }
 
     if (random() < 0.06) {
-        return pick(VOID_ELEMENTS, random);
+        return pick(context === "link" ? INLINE_VOID_ELEMENTS : VOID_ELEMENTS, random);
     }
 
-    const tag = pick(ELEMENTS, random);
+    const tag = pick(context === "link" ? INLINE_ELEMENTS : ELEMENTS, random);
     let attributes = "";
 
     switch (tag) {
@@ -354,11 +419,19 @@ function randomHtml(random: () => number, depth: number): string {
         }
     }
 
+    let childContext: Context = context;
+
+    if (tag === "a") {
+        childContext = "link";
+    } else if (RAW_TEXT_ELEMENTS.has(tag)) {
+        childContext = "raw";
+    }
+
     const childCount = Math.floor(random() * 4);
     let inner = "";
 
     for (let index = 0; index < childCount; index += 1) {
-        inner += randomHtml(random, depth + 1);
+        inner += randomHtml(random, depth + 1, childContext);
     }
 
     return `<${tag}${attributes}>${inner}</${tag}>`;

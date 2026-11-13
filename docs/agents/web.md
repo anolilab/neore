@@ -149,10 +149,19 @@ and there is no separate `*_SITE_URL`: one Lunora Worker serves both
   build.** It runs the compiler over RAW source without this app's babel plugins.
   The Lingui macro is one of those, so every `` t`...${x}...` `` reads as an
   unlowerable tagged template — 186 of 243 such findings, ~37% of its error
-  count. **Do not "fix" these**, and in particular do not split the babel passes
-  in `vite.config.ts` to chase them: the passes are already correct, and
-  rewriting `t` templates by hand changes extracted message IDs and breaks the
-  translation catalogs.
+  count. **Do not "fix" these**: rewriting `t` templates by hand changes
+  extracted message IDs and breaks the translation catalogs.
+- **The build runs the React Compiler's native port** (`react({ compiler })`,
+  package `oxc-transform-react`), not the Babel plugin: ~15x less compile time
+  (a full `vite build` 9m04s → 4m33s, cold dev transforms ~3.5x faster). Babel
+  only lowers the Lingui macro, in files that import one, and must run first:
+  `babel()` stays above `react()` (both are `pre` plugins, so array order is
+  run order). `validateExhaustiveMemoizationDependencies: false` matches the
+  Babel version, which does not run that check; with it on, the port skips
+  hand-memoized hooks such as `useThreadGroups` and `DataGridRow`. Against the
+  Babel compiler on every client file, the port compiles every function Babel
+  does, plus 64 files Babel bails on (value blocks or `finally` in `try`).
+  Storybook (`.storybook/vite.config.ts`) and the ESLint plugin still use Babel.
 - **A `todo` finding means the compiler bailed out**, so that component's manual
   `useMemo`/`useCallback` is the ONLY memoization it has. Removing it because
   `react-compiler-no-manual-memoization` also fires is a performance regression,
@@ -164,10 +173,10 @@ and there is no separate `*_SITE_URL`: one Lunora Worker serves both
   `@babel/traverse@7`, whose `@babel/types` the global `"@babel/types"` 8.x
   override would replace (Babel 8 dropped `AssignmentPattern` from `LVal`); the
   `babel-plugin-react-compiler>@babel/types` override does not reach it. Check a
-  component in the served dev module (`curl localhost:5173/src/…tsx`): compiled
-  code starts with `const $ = _c(n)`. The other common bail-outs are cheap to
-  avoid — no `throw`, `finally`, or `?:`/`&&`/`??`/`?.` inside a `try`/`catch`
-  in a component (move it into a module-level helper), no ref read during render.
+  component in Storybook's served module: compiled code starts with
+  `const $ = _c(n)`. The other common Babel bail-outs are cheap to avoid — no
+  `throw`, `finally`, or `?:`/`&&`/`??`/`?.` inside a `try`/`catch` in a
+  component (move it into a module-level helper), no ref read during render.
 - **Chat rows are memoized on message IDENTITY.** `useUIMessages` structurally
   shares unchanged messages across live pushes (`lib/agent/share-unchanged-messages.ts`),
   and the chat action callbacks read `messagesRef`, not `messages` — a callback

@@ -76,7 +76,7 @@ import ThreadOptionsMenu from "./thread-options-menu";
 import ThreadStatusIcon, { NEEDS_YOU_TEXT_CLASS } from "./thread-status-icon";
 import type { BranchNode, LoadingStates } from "./types";
 
-// Lazy: its project icons pull `lucide-react/dynamic`'s import map of every icon (~190KB).
+// Lazy: a dialog opened on demand.
 const MoveToProjectDialog = lazy(() => import("@/features/projects/components/move-to-project-dialog"));
 
 /** Colour, icon and display name of the badge for threads that came in through a messenger. */
@@ -136,7 +136,6 @@ const ThreadNodeChildren: FC<{
     isSelectionMode: boolean;
     loadingStates: LoadingStates;
     nodes: BranchNode[];
-    searchQuery: string;
     selectedThreadIds: Set<string>;
     toggleExpanded: (threadId: string) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
@@ -152,7 +151,6 @@ const ThreadNodeChildren: FC<{
     isSelectionMode,
     loadingStates,
     nodes: children,
-    searchQuery,
     selectedThreadIds,
     toggleExpanded,
     updateThread,
@@ -174,7 +172,6 @@ const ThreadNodeChildren: FC<{
                 key={child.threadId}
                 loadingStates={loadingStates}
                 node={child}
-                searchQuery={searchQuery}
                 selectedThreadIds={selectedThreadIds}
                 toggleExpanded={toggleExpanded}
                 updateThread={updateThread}
@@ -198,7 +195,6 @@ interface ThreadNodeProperties {
     isSelectionMode: boolean;
     loadingStates: LoadingStates;
     node: BranchNode;
-    searchQuery: string;
     selectedThreadIds: Set<string>;
     toggleExpanded: (threadId: string) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
@@ -219,7 +215,6 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     isSelectionMode,
     loadingStates,
     node,
-    searchQuery,
     selectedThreadIds,
     toggleExpanded,
     updateThread,
@@ -1140,7 +1135,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     <span className="sr-only">{t`Unread`}</span>
                 </>
             )}
-            {searchQuery.trim() && node.relevantMessages && node.relevantMessages.length > 0 && (
+            {node.relevantMessages && node.relevantMessages.length > 0 && (
                 <div className="bg-primary/10 text-primary-text shrink-0 rounded-full px-1.5 py-0.5 text-xs">
                     <Plural one="# match" other="# matches" value={node.relevantMessages.length} />
                 </div>
@@ -1219,8 +1214,9 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 </div>
             )}
 
-            {searchQuery.trim() && !isSelectionMode && node.relevantMessages && node.relevantMessages.length > 0 && (
-                <MessageSearchMatches matches={node.relevantMessages} searchQuery={searchQuery} threadId={node.threadId} />
+            {/* Only a message search's results carry matches. */}
+            {!isSelectionMode && node.relevantMessages && node.relevantMessages.length > 0 && (
+                <MessageSearchMatches matches={node.relevantMessages} threadId={node.threadId} />
             )}
 
             {hasOpenedMoveToProject && (
@@ -1247,7 +1243,6 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     isSelectionMode={isSelectionMode}
                     loadingStates={loadingStates}
                     nodes={node.children}
-                    searchQuery={searchQuery}
                     selectedThreadIds={selectedThreadIds}
                     toggleExpanded={toggleExpanded}
                     updateThread={updateThread}

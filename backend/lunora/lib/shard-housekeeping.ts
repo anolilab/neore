@@ -78,6 +78,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "sweepDeviceCalls", ref: internal.devices.internal.sweepDeviceCalls },
     { name: "sweepKnowledgeFiles", ref: internal.knowledge.housekeeping.sweepKnowledgeFiles },
     { name: "pruneRetainedActivity", ref: internal.gdpr.retention.pruneRetainedActivity },
+    // An export whose workflow died leaves its pieces and usage object on the shard; past their time to live, the sweep removes them.
+    { name: "sweepUsageExportPieces", ref: internal.usage.gdpr.sweepUsageExportPieces },
     { name: "sweepUsageRollup", ref: internal.usage.backfill.sweepUsageRollup },
     { name: "sweepStagedChatUploads", ref: internal.file.sweepStagedChatUploads },
     { name: "pruneExpiredToolPermissionGrants", ref: internal.chat.tool_permissions.pruneExpiredToolPermissionGrants },
@@ -230,6 +232,10 @@ export const runShardTick = internalMutation
     .mutation(async ({ ctx }) => {
         // Also schedules `checkDueTasks` (see `triggers/schedule.ts`).
         await ctx.runMutation(internal.triggers.schedule.checkDueTriggers, {});
+        // The export runs due on this shard (`usage/gdpr.ts`): the tick reaches an idle shard, so its runs are not left to the daily sweep.
+        await bestEffort("sweepUsageExportPieces", async () => {
+            await ctx.runMutation(internal.usage.gdpr.sweepUsageExportPieces, {});
+        });
         // Event watchers whose next check is due; their checks run as actions. A failure here must not stop the reaping
         // and the re-arming below, or the shard's other schedules stall with it.
         await bestEffort("dispatchDueEventTriggers", async () => {
@@ -245,6 +251,19 @@ export const runShardTick = internalMutation
         });
 
         const { now } = ctx;
+        // The earliest export run due here. A read that fails must not stop the re-arming below: the shard is then armed for now, as
+        // a reap that failed is.
+        const exportRunRead = await (async () => {
+            try {
+                const { page } = await ctx.db.usageExportRuns.findMany({ consistency: "primary", limit: 1, orderBy: [{ deleteAt: "asc" }] });
+
+                return { deleteAt: page[0]?.deleteAt };
+            } catch (error) {
+                cronsLogger.warn("[housekeeping] the export run read failed:", error);
+
+                return undefined;
+            }
+        })();
         const [trigger, task, repoPoll] = await Promise.all([
             // Only triggers with a next run armed: a schedule's first run or an event watcher's next check.
             // A webhook trigger has no `nextTriggerAt`, and `.first()` on the enabled prefix could return
@@ -273,12 +292,16 @@ export const runShardTick = internalMutation
                     .first(),
             ),
         );
-        const candidates = [trigger?.nextTriggerAt, task?.nextRunAt, repoPoll?.nextPollAt, ...stuckChecks.map((row) => row?.stuckCheckAt)].filter(
-            (at): at is number => at !== undefined,
-        );
+        const candidates = [
+            trigger?.nextTriggerAt,
+            task?.nextRunAt,
+            repoPoll?.nextPollAt,
+            exportRunRead?.deleteAt,
+            ...stuckChecks.map((row) => row?.stuckCheckAt),
+        ].filter((at): at is number => at !== undefined);
 
-        // The dispatch cleared this shard's due time; a reap that failed never recorded the next expiry, so try again.
-        if (!reaped) {
+        // The dispatch cleared this shard's due time; a reap or an export-run read that failed recorded no next time, so try again.
+        if (!reaped || exportRunRead === undefined) {
             candidates.push(now);
         }
 
