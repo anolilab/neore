@@ -2,7 +2,7 @@ import { LUNORA_ID_SOURCE } from "@neore/client-runtime";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useLocation } from "@tanstack/react-router";
 import type { FC } from "react";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
@@ -22,6 +22,9 @@ import type { GroupType, LoadingStates } from "./types";
 const ProjectFormDialog = lazy(() => import("@/features/projects/components/project-form-dialog"));
 
 const CHAT_THREAD_PATH_RE = new RegExp(`^/chat/(${LUNORA_ID_SOURCE})$`);
+
+const sameMembers = (left: ReadonlySet<string>, right: ReadonlySet<string>): boolean =>
+    left.size === right.size && [...left].every((member) => right.has(member));
 
 const ThreadList: FC = () => {
     const crpc = useCRPC();
@@ -156,7 +159,8 @@ const ThreadList: FC = () => {
                 cursor = parent;
             }
 
-            setExpandedThreads(ancestors);
+            // The same ancestors keep the same set: a new one would re-render every row for nothing.
+            setExpandedThreads((previous) => (sameMembers(previous, ancestors) ? previous : ancestors));
         }
     }
 
@@ -165,7 +169,8 @@ const ThreadList: FC = () => {
         searchQuery.trim() && ((searchType === "threads" && !threadSearchResults) || (searchType === "messages" && !messageSearchResults)),
     );
 
-    const toggleExpanded = (threadId: string) => {
+    // Every row gets this: one function for the list's whole life.
+    const toggleExpanded = useCallback((threadId: string) => {
         setExpandedThreads((previous) => {
             const next = new Set(previous);
 
@@ -177,7 +182,7 @@ const ThreadList: FC = () => {
 
             return next;
         });
-    };
+    }, []);
 
     const toggleGroupCollapsed = (groupType: GroupType, projectId?: string) => {
         if (groupType === "project" && projectId) {
