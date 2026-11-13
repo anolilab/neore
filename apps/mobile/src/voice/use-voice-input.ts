@@ -5,9 +5,8 @@ import { createRecordingOptions } from "expo-audio/build/utils/options";
 import { File } from "expo-file-system";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { getClient } from "@/lib/lunora";
-import { settleQuietly } from "@/offline/quietly";
-
+import { getClient } from "../lib/lunora";
+import { settleQuietly } from "../offline/quietly";
 import { createLazyResource } from "./lazy-resource";
 import type { VoicePhase } from "./voice-input";
 import {
@@ -136,7 +135,17 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
         ),
     );
 
-    useEffect(() => () => recorders.release(), [recorders]);
+    // Whether a press is preparing the recorder: a native object is not released mid-prepare; that press releases it.
+    const isPreparing = useRef(false);
+
+    useEffect(
+        () => () => {
+            if (!isPreparing.current) {
+                recorders.release();
+            }
+        },
+        [recorders],
+    );
     const [phase, setPhase] = useState<VoicePhase>("idle");
     const [error, setError] = useState<string | undefined>(undefined);
     // Whether the finger is still on the button: a release during the permission prompt or the recorder's start records nothing.
@@ -279,6 +288,13 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
 
             await session.last;
 
+            // The screen went while the permission was asked or an earlier press let go of the mic: nothing was taken yet.
+            if (!isMounted.current) {
+                isBusy.current = false;
+
+                return;
+            }
+
             // Another screen's press is still recording (a chat opened over it during the hold): this press is dropped.
             if (session.owner !== undefined) {
                 report(MIC_BUSY_MESSAGE);
@@ -290,9 +306,30 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
             session.owner = token;
             await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
 
+            // The screen went while the session switched to recording: it already released its recorder, so none is made
+            // now (nobody would release it), and the session goes back.
+            if (!isMounted.current) {
+                await leaveRecordingMode(token);
+                isBusy.current = false;
+
+                return;
+            }
+
             const recorder = recorders.get();
 
-            await recorder.prepareToRecordAsync();
+            isPreparing.current = true;
+
+            try {
+                await recorder.prepareToRecordAsync();
+            } finally {
+                isPreparing.current = false;
+
+                // The screen went while the recorder was preparing: it is released now that the prepare has settled.
+                if (!isMounted.current) {
+                    recorders.release();
+                }
+            }
+
             clipUri.current = recorder.uri ?? undefined;
 
             // Released while the recorder was starting (or while the first permission prompt was up): nothing to record.
