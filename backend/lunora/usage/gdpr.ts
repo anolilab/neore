@@ -11,6 +11,7 @@ import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalAction, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
 import { BATCH, full, type BatchResult } from "../gdpr/batch";
+import { isExportRequestInFlight } from "../gdpr/export-requests";
 import { patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { runAfterOnShard } from "../lib/shard-scheduler";
@@ -218,18 +219,8 @@ export const keyedUsageRuns = internalQuery
         return { cursor: result.isDone ? null : result.continueCursor, keyed };
     });
 
-/**
- * Whether an export run is still live: its request is pending or processing. A run's request is the part of its key before the
- * workflow instance. A request that is gone is not live.
- */
-const isRunLive = async (ctx: MutationCtx | QueryCtx, runKey: string, userId: string): Promise<boolean> => {
-    const request = await ctx.db.gdprRequests.findFirst({
-        consistency: "primary",
-        where: { _id: runKey.split(":", 1)[0] as Id<"gdprRequests">, userId },
-    });
-
-    return request?.status === "pending" || request?.status === "processing";
-};
+/** Whether an export run is still live: its export request is in flight (`gdpr/export-requests.ts`). */
+const isRunLive = async (ctx: MutationCtx | QueryCtx, runKey: string, userId: string): Promise<boolean> => await isExportRequestInFlight(ctx, runKey, userId);
 
 /**
  * Sets a run's due time, and arms its shard for the root tick at that time. The tick reaches a shard by its due time, not by its

@@ -228,8 +228,9 @@ export const deleteUserUsageDaily = internalMutation
 /**
  * Deletes the stored usage JSON of the user's export runs, and releases the record of each run whose export has ended, a bounded part
  * of the runs at a time: `cursor` continues the scan from the previous call. A run whose export is still live keeps its record, so its
- * write cannot land after the record is gone: `waiting` tells the workflow to purge again once that export has ended. `force` releases
- * the live runs too, once the workflow's wait is over. A failed delete throws, so the workflow retries the step.
+ * write cannot land after the record is gone: `waiting` tells the workflow to purge again once that export has ended. `force` deletes the
+ * stored object of a live run too, once the workflow's wait is over, but keeps its record, so the sweep finds whatever the export stores
+ * later. A failed delete throws, so the workflow retries the step.
  */
 export const purgeUserUsageFiles = internalAction
     .input({ cursor: v.optional(v.union(v.string(), v.null())), force: v.optional(v.boolean()), userId: v.string() })

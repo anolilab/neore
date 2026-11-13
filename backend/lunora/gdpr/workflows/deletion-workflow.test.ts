@@ -564,7 +564,7 @@ describe("account deletion workflow: usage exports", () => {
     it("forces the purge once the wait is over, so erasure finishes while a long export is still live", async () => {
         const base = answer;
 
-        // The export never ends on its own: only the forced purge, after the bound, removes its object and record.
+        // The export never ends on its own: after the bound, the forced purge deletes its stored object but keeps its record for the sweep.
         answer = (ref, round, args) => (isPurge(ref) ? { waiting: args["force"] !== true } : base(ref, round, args));
 
         await execute();
