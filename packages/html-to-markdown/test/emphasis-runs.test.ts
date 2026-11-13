@@ -275,3 +275,17 @@ describe("emphasis beside a character outside the Basic Multilingual Plane", () 
         expect(new TurndownService().turndown(html)).toBe(expected);
     });
 });
+
+/*
+ * An empty delimiter option asks for no emphasis markup. A run beside a word character must keep it empty rather
+ * than switch to the asterisk, which would add markup the caller turned off.
+ */
+
+describe("an empty emphasis or strong delimiter", () => {
+    it.each([
+        ["emphasis", { emDelimiter: "" }, "x<em>a</em>y"],
+        ["strong text", { strongDelimiter: "" }, "x<strong>a</strong>y"],
+    ])("writes no %s markup beside a word character", (_name, options, html) => {
+        expect(new TurndownService(options).turndown(html)).toBe("xay");
+    });
+});

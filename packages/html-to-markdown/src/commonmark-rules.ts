@@ -533,7 +533,8 @@ function wrapRun(content: string, node: AnnotatedNode, options: Options, style: 
 
     const before = emphasisRun(node, "left", style.names, options, lookup);
     const after = emphasisRun(node, "right", style.names, options, lookup);
-    const delimiter = before.wordEdge || after.wordEdge ? style.intraword : style.plain;
+    // An empty delimiter asks for no markup, so a word edge must not bring the asterisk back.
+    const delimiter = style.plain !== "" && (before.wordEdge || after.wordEdge) ? style.intraword : style.plain;
     const breakMark = breakMarkFor(node, lookup);
 
     return wrapInline(content, options, before.count === 0 ? delimiter : "", after.count === 0 ? delimiter : "", breakMark);
