@@ -3512,6 +3512,72 @@ export const schema = defineSchema({
         // The retention sweep (`gdpr/retention.ts`), which serves a whole shard.
         .index("by_date", ["date"]),
 
+    // The export's pieces: one per rows page, projects page and title or verification step of a run. The export's clear step
+    // removes them after the usage object, and the sweep and erasure remove the rest.
+    usageExportPieces: defineTable({
+        // The user's backfill row when the rows were read: a change to it during the export means history was written meanwhile.
+        backfill: v.optional(v.string()),
+        bytes: v.number(),
+        // The same rows' totals: a backfill can patch a closed day's row without adding one, and the totals catch that.
+        closed: v.optional(v.object({ cost: v.number(), replies: v.number(), rows: v.number(), tokens: v.number() })),
+        // Rows of the page dated before the cutoff, which the recount of the pass must match.
+        closedRows: v.optional(v.number()),
+        // When the piece was written. The sweep does not read it: a run's pieces go at the run's `deleteAt`.
+        createdAt: v.optional(v.number()),
+        // The day the export's recount is taken before (YYYY-MM-DD): rows dated before it are counted, later ones are not.
+        cutoff: v.optional(v.string()),
+        kind: v.union(v.literal("projects"), v.literal("rows"), v.literal("titles"), v.literal("verified")),
+        // The rows page's cursor for the next page (unset on the last page).
+        nextCursor: v.optional(v.string()),
+        pass: v.number(),
+        // The exported JSON of the piece: rows, or a map of project id to a title and its grant.
+        payload: v.string(),
+        // The rows page's distinct project ids, which the title steps read.
+        projectIds: v.array(v.string()),
+        // The export run that wrote the piece, `<request id>:<workflow instance id>`: a run reads and clears only its own.
+        requestId: v.string(),
+        // Rows the piece holds, or titles it names.
+        rowCount: v.number(),
+        // The page's (or the group's) order within its pass and kind.
+        seq: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId", ["userId"])
+        .index("by_createdAt", ["createdAt"])
+        // A run's pieces of one pass and kind, in their order: what the usage action reads them by.
+        .index("by_request", ["requestId", "pass", "kind", "seq"]),
+
+    // One row per project a pass names, written once per pass: a project on several rows pages is read once. Cleared with the pass.
+    usageExportProjects: defineTable({
+        pass: v.number(),
+        projectId: v.string(),
+        requestId: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId", ["userId"])
+        .index("by_request_project", ["requestId", "pass", "projectId"]),
+    // One small row per export run: its key, its owner, when it began, and the key of the usage JSON object it stored, if any. The
+    // row is that object's record: kept until the object is confirmed deleted, so the sweep can retry the purge from it. `deleteAt` is
+    // the time the sweep next acts on the run: each sweep that finds the run live sets it one time to live ahead, so a dead run's pieces
+    // go at that time. A run the account erasure re-armed (`erasingSince`) is checked a minute ahead instead, so its object goes soon after its
+    // export ends. A run is stored with its `deleteAt`, so the sweep finds every run. The sweep reads these rows, which hold no payloads.
+    usageExportRuns: defineTable({
+        createdAt: v.number(),
+        deleteAt: v.number(),
+        // When the erasure re-armed a live run it could not finish. Such a run is checked a minute ahead while live, for an hour from then.
+        erasingSince: v.optional(v.number()),
+        requestId: v.string(),
+        usageKey: v.optional(v.string()),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_createdAt", ["createdAt"])
+        .index("by_deleteAt", ["deleteAt"])
+        .index("by_userId", ["userId"])
+        .index("by_requestId", ["requestId"]),
+
     // The replies already in `usageDaily`, keyed by the reply's first row id:
     // what makes `recordReplyUsage` and the backfill count a reply once.
     // Pruned by `usage/backfill.ts#sweepUsageRollup` once the backfill is done.
