@@ -39,6 +39,17 @@ vi.mock("@c15t/react", () => {
 const loadPostHog = vi.hoisted(() => vi.fn());
 
 const reportFirstNativeLaunch = vi.hoisted(() => vi.fn());
+const reportLoadTiming = vi.hoisted(() => vi.fn());
+/** Holds the load-timing chunk "in flight" until a test lets it arrive. */
+const loadTimingChunk = vi.hoisted(() => {
+    return { arrived: Promise.resolve() };
+});
+
+vi.mock("@/lib/analytics/load-timing/report-load-timing", async () => {
+    await loadTimingChunk.arrived;
+
+    return { reportLoadTiming };
+});
 
 vi.mock("@/lib/analytics/first-native-launch", () => {
     return { reportFirstNativeLaunch };
@@ -249,6 +260,55 @@ describe("AnalyticsProvider", () => {
         expect(screen.getByText("flags pending")).toBeTruthy();
     });
 
+    it("loads the load-timing reporter at mount, alongside PostHog rather than after it", async () => {
+        reportLoadTiming.mockClear();
+        loadPostHog.mockReturnValue(new Promise(() => {}));
+
+        render(<AnalyticsProvider>{null}</AnalyticsProvider>);
+
+        await vi.waitFor(() => {
+            expect(reportLoadTiming).toHaveBeenCalledExactlyOnceWith({ exited: false });
+        });
+    });
+
+    it("tells the reporter about a page exit that came while its chunk was loading", async () => {
+        reportLoadTiming.mockClear();
+        loadPostHog.mockReturnValue(new Promise(() => {}));
+
+        let arrive: () => void = () => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- not in this project's TypeScript lib (es2023)
+        loadTimingChunk.arrived = new Promise((resolve) => {
+            arrive = resolve;
+        });
+
+        render(<AnalyticsProvider>{null}</AnalyticsProvider>);
+        globalThis.dispatchEvent(new Event("pagehide"));
+        arrive();
+
+        await vi.waitFor(() => {
+            expect(reportLoadTiming).toHaveBeenCalledExactlyOnceWith({ exited: true });
+        });
+
+        loadTimingChunk.arrived = Promise.resolve();
+    });
+
+    it("logs a load-timing reporter that fails to start instead of dropping the error", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const failure = new Error("observer failed");
+
+        reportLoadTiming.mockImplementationOnce(() => {
+            throw failure;
+        });
+        loadPostHog.mockReturnValue(new Promise(() => {}));
+
+        render(<AnalyticsProvider>{null}</AnalyticsProvider>);
+
+        await vi.waitFor(() => {
+            expect(warn).toHaveBeenCalledWith("[PostHog] Load timing did not start:", failure);
+        });
+    });
+
     it("records the landing page view before what a descendant queues on mount", async () => {
         // The chunk never arrives here: the queue is flushed by hand below.
         loadPostHog.mockReturnValue(new Promise(() => {}));
@@ -373,33 +433,5 @@ describe("AnalyticsProvider", () => {
         const [reportOrder = 0] = reportFirstNativeLaunch.mock.invocationCallOrder;
 
         expect(reportOrder).toBeGreaterThan(resetOrder);
-    });
-});
-
-describe("load timing start", () => {
-    afterEach(() => {
-        vi.unstubAllGlobals();
-        Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
-    });
-
-    it("starts the reporter as soon as the page is hidden, before the browser is idle", async () => {
-        const reportLoadTiming = vi.fn();
-
-        vi.stubGlobal("requestIdleCallback", vi.fn());
-
-        const modules = await loadModules();
-
-        vi.doMock("@/lib/analytics/load-timing/report-load-timing", () => {
-            return { reportLoadTiming };
-        });
-
-        modules.onPostHogLoaded(posthogMock as unknown as PostHogInterface);
-
-        Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
-        document.dispatchEvent(new Event("visibilitychange"));
-
-        await vi.waitFor(() => {
-            expect(reportLoadTiming).toHaveBeenCalled();
-        });
     });
 });

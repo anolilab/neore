@@ -157,7 +157,7 @@ export interface PageLoadTimingProperties {
     lcp_ms?: number;
     /** web-vitals' navigation type: navigate, reload, back-forward, back-forward-cache, prerender, restore. */
     navigation_type?: string;
-    /** The first path segment only (`chat`, `settings`); ids never leave the browser. */
+    /** A known route's first path segment only (`chat`, `dashboard`; `other` for any other), never an id. */
     route_section: string;
     /** The sidebar thread list first painted rows, before any user input. */
     sidebar_list_visible_ms?: number;

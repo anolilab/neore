@@ -44,6 +44,31 @@ export const useLoadMark = (name: LoadMark, ready = true): void => {
     }, [name, ready]);
 };
 
+// One viewport watcher per mark, shared by every element that can record it, dropped once the mark is recorded.
+const watchers = new Map<LoadMark, IntersectionObserver>();
+
+const watcherFor = (name: LoadMark): IntersectionObserver => {
+    const existing = watchers.get(name);
+
+    if (existing) {
+        return existing;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+        const visible = entries.find((entry) => entry.isIntersecting);
+
+        if (visible) {
+            markLoadOnce(name, visible.time);
+            observer.disconnect();
+            watchers.delete(name);
+        }
+    });
+
+    watchers.set(name, observer);
+
+    return observer;
+};
+
 /**
  * Mark `name` the first time the element in `ref` is on screen. A mounted element can still be out of view (a
  * collapsed off-canvas sidebar), so this waits for the frame where it intersects the viewport and uses that frame's time.
@@ -56,23 +81,12 @@ export const useLoadMarkWhenVisible = (name: LoadMark, ref: RefObject<Element | 
             return undefined;
         }
 
-        const observer = new IntersectionObserver((entries) => {
-            const visible = entries.find((entry) => entry.isIntersecting);
-
-            if (visible) {
-                markLoadOnce(name, visible.time);
-            }
-
-            // Another row may have recorded it already: nothing left to watch for.
-            if (recorded.has(name)) {
-                observer.disconnect();
-            }
-        });
+        const observer = watcherFor(name);
 
         observer.observe(element);
 
         return () => {
-            observer.disconnect();
+            observer.unobserve(element);
         };
     }, [name, ref]);
 };

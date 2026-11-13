@@ -2,7 +2,7 @@
  * Real-user load timing: one `page_load_timing` event per page load, with the Core Web Vitals and the app's own
  * load marks (`../load-marks.ts`).
  *
- * Loaded with a dynamic import once PostHog is set up and the browser is idle, or the page is hidden first
+ * Loaded with a dynamic import when the analytics provider mounts, alongside PostHog's own chunk
  * (`providers/analytics-provider.tsx`), so neither this file nor `web-vitals`
  * is in the first-load bundle. The browser buffers the paint, navigation and event-timing entries, so a late start
  * still sees the whole load.
@@ -17,6 +17,8 @@ import { trackEvent } from "../track";
 type VitalName = "FCP" | "INP" | "LCP" | "TTFB";
 
 export interface LoadTimingInput {
+    /** When the page was first hidden, if it was; 0 for a load that started hidden. A frame-timed mark after it holds the reveal. */
+    firstHiddenAt: number | undefined;
     /** When the user first clicked or typed, if they have; a mark after it belongs to an interaction, not the load. */
     firstInputAt: number | undefined;
     /** `performance.mark` start times by name. */
@@ -91,12 +93,16 @@ export const loadedPathname = (): string => {
     return globalThis.location.pathname;
 };
 
-/** The event's properties. A mark recorded after the user's first input timed an interaction, so it is left out. */
-export const loadTimingProperties = ({ firstInputAt, marks, navigationType, pathname, vitals }: LoadTimingInput): PageLoadTimingProperties => {
+/**
+ * The event's properties. A mark recorded after the user's first input timed an interaction, and one recorded after the
+ * page was first hidden timed the reveal (frames do not run in a hidden tab), so both are left out.
+ */
+export const loadTimingProperties = ({ firstHiddenAt, firstInputAt, marks, navigationType, pathname, vitals }: LoadTimingInput): PageLoadTimingProperties => {
+    const cutoff = Math.min(firstInputAt ?? Infinity, firstHiddenAt ?? Infinity);
     const loadMark = (name: string): number | undefined => {
         const at = marks[name];
 
-        return at !== undefined && (firstInputAt === undefined || at <= firstInputAt) ? Math.round(at) : undefined;
+        return at !== undefined && at <= cutoff ? Math.round(at) : undefined;
     };
 
     return {
@@ -124,21 +130,41 @@ const readMarks = (): Partial<Record<string, number>> => {
 // Once per page load; an object, so the reporter can flip it.
 const reporter = { started: false };
 
-/** The vitals read from the entries: web-vitals reports nothing for a page already hidden when it starts. */
-const entryVitals = (): Partial<Record<VitalName, number>> => {
-    const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+/**
+ * Watch `type` from navigation start (buffered). `flush` hands over what the browser has not delivered yet, so a send
+ * right after starting still sees the buffered entries.
+ */
+const watchEntries = (type: string, onEntries: (entries: PerformanceEntryList) => void): (() => void) => {
+    try {
+        const observer = new PerformanceObserver((list) => {
+            onEntries(list.getEntries());
+        });
 
-    return {
-        FCP: performance.getEntriesByName("first-contentful-paint", "paint")[0]?.startTime,
-        TTFB: navigation && navigation.responseStart > 0 ? navigation.responseStart : undefined,
-    };
+        observer.observe({ buffered: true, type });
+
+        return () => {
+            onEntries(observer.takeRecords());
+        };
+    } catch {
+        // No PerformanceObserver, or this entry type is not supported here.
+        return () => undefined;
+    }
 };
 
+/** The navigation type, spelled as web-vitals does, for a send that comes before web-vitals reported. */
+const entryNavigationType = (navigation: PerformanceNavigationTiming | undefined): string | undefined => navigation?.type.replaceAll("_", "-");
+
+export interface ReportLoadTimingOptions {
+    /** A `pagehide` came before this started (`providers/analytics-provider.tsx`): send now, the page is going away. */
+    exited?: boolean;
+}
+
 /**
- * Start collecting; the event is sent the first time the page is hidden (tab switch, close, navigation away). Started
- * on a page that was hidden in the meantime, it sends at once.
+ * Start collecting; the event is sent the first time the page is hidden (tab switch, close, navigation away) after it
+ * has been visible. Started on a page that was shown and then hidden (or left) in the meantime, it sends at once; a page
+ * that has never been visible (a tab opened in the background) waits until it has been.
  */
-export const reportLoadTiming = (): void => {
+export const reportLoadTiming = ({ exited = false }: ReportLoadTimingOptions = {}): void => {
     if (reporter.started) {
         return;
     }
@@ -146,6 +172,11 @@ export const reportLoadTiming = (): void => {
     reporter.started = true;
 
     const pathname = loadedPathname();
+    const visibilityEntries = performance.getEntriesByType("visibility-state");
+    let hasBeenVisible = document.visibilityState === "visible" || visibilityEntries.some((entry) => entry.name === "visible");
+    let firstHiddenAt: number | undefined =
+        visibilityEntries.find((entry) => entry.name === "hidden")?.startTime ?? (document.visibilityState === "hidden" ? 0 : undefined);
+
     const vitals: Partial<Record<VitalName, number>> = {};
     let navigationType: string | undefined;
     const record = (metric: Metric): void => {
@@ -158,30 +189,66 @@ export const reportLoadTiming = (): void => {
     onINP(record);
     onTTFB(record);
 
+    // Read directly as well: web-vitals reports through callbacks that have not run when the page is already hidden.
+    let firstInputAt: number | undefined;
+    let latestPaint: number | undefined;
+    const flushInputs = watchEntries("first-input", (entries) => {
+        for (const entry of entries) {
+            firstInputAt = Math.min(firstInputAt ?? Infinity, entry.startTime);
+        }
+    });
+    const flushPaints = watchEntries("largest-contentful-paint", (entries) => {
+        latestPaint = entries.at(-1)?.startTime ?? latestPaint;
+    });
+
+    const onVisibility = (): void => {
+        if (document.visibilityState === "visible") {
+            hasBeenVisible = true;
+        } else {
+            firstHiddenAt ??= performance.now();
+        }
+    };
+
     let sent = false;
     const send = (event?: Event): void => {
-        if (sent || (event?.type !== "pagehide" && document.visibilityState !== "hidden")) {
+        const leaving = exited || event?.type === "pagehide";
+
+        if (sent || !hasBeenVisible || (!leaving && document.visibilityState !== "hidden")) {
             return;
         }
 
         sent = true;
+        flushInputs();
+        flushPaints();
+
+        const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+        // Only what painted before the page was first hidden: a later paint is the reveal of a background tab.
+        const beforeHidden = (at: number | undefined): number | undefined => (at !== undefined && at < (firstHiddenAt ?? Infinity) ? at : undefined);
+        const firstPaint = performance.getEntriesByName("first-contentful-paint", "paint")[0]?.startTime;
+        const entryVitals: Partial<Record<VitalName, number>> = {
+            FCP: beforeHidden(firstPaint),
+            LCP: beforeHidden(latestPaint),
+            TTFB: navigation && navigation.responseStart > 0 ? navigation.responseStart : undefined,
+        };
+
         trackEvent(
             "page_load_timing",
             loadTimingProperties({
-                firstInputAt: performance.getEntriesByType("first-input")[0]?.startTime,
+                firstHiddenAt,
+                firstInputAt,
                 marks: readMarks(),
-                navigationType,
+                navigationType: navigationType ?? entryNavigationType(navigation),
                 pathname,
-                vitals: { ...entryVitals(), ...vitals },
+                vitals: { ...entryVitals, ...vitals },
             }),
         );
     };
 
-    // On `document`, in the bubble phase: web-vitals listens on `window` in the capture phase, so LCP and INP are
-    // final before this runs.
+    // Before `send`: a hide records its time first. On `document`, in the bubble phase: web-vitals listens on `window` in
+    // the capture phase, so LCP and INP are final before `send` runs.
+    document.addEventListener("visibilitychange", onVisibility);
     document.addEventListener("visibilitychange", send);
     globalThis.addEventListener("pagehide", send);
 
-    // The page was hidden before this started (`providers/analytics-provider.tsx` starts it on that hide).
     send();
 };

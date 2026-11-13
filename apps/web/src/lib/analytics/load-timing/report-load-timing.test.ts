@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import routeTree from "../../../routeTree.gen.ts?raw";
 import { LOAD_MARKS } from "../load-marks";
@@ -39,8 +39,38 @@ describe(routeSection, () => {
 });
 
 describe("reportLoadTiming", () => {
+    /** Entries the page "recorded", by type; `PerformanceObserver` hands the buffered ones over through `takeRecords`. */
+    let entries: Record<string, Partial<PerformanceEntry & PerformanceNavigationTiming>[]> = {};
+
+    const entriesOf = (type: string): PerformanceEntryList => (entries[type] ?? []) as PerformanceEntryList;
+    // Only an observer sees these, never `performance.getEntriesByType`.
+    const observerOnly = new Set(["first-input", "largest-contentful-paint"]);
+
+    beforeEach(() => {
+        entries = {};
+        vi.spyOn(performance, "getEntriesByType").mockImplementation(((type: string) =>
+            observerOnly.has(type) ? [] : entriesOf(type)) as typeof performance.getEntriesByType);
+        vi.spyOn(performance, "getEntriesByName").mockImplementation(((name: string, type?: string) =>
+            [...entriesOf(type ?? "mark")].filter((entry) => entry.name === name)) as typeof performance.getEntriesByName);
+        vi.stubGlobal(
+            "PerformanceObserver",
+            class {
+                private type = "";
+
+                public observe({ type }: { type: string }): void {
+                    this.type = type;
+                }
+
+                public takeRecords(): PerformanceEntryList {
+                    return entriesOf(this.type);
+                }
+            },
+        );
+    });
+
     afterEach(() => {
         vi.restoreAllMocks();
+        vi.unstubAllGlobals();
         vi.resetModules();
         trackEvent.mockReset();
         Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
@@ -48,8 +78,19 @@ describe("reportLoadTiming", () => {
 
     const loadReporter = async () => await import("./report-load-timing");
 
-    it("sends at once when the page was hidden before it started", async () => {
+    const setVisibility = (state: DocumentVisibilityState): void => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: state });
+        document.dispatchEvent(new Event("visibilitychange"));
+    };
+
+    const sentProperties = (): Record<string, unknown> => trackEvent.mock.calls[0]?.[1] as Record<string, unknown>;
+
+    it("sends at once when the page was shown and then hidden before it started", async () => {
         Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+        entries["visibility-state"] = [
+            { name: "visible", startTime: 0 },
+            { name: "hidden", startTime: 3000 },
+        ];
 
         const { reportLoadTiming } = await loadReporter();
 
@@ -59,13 +100,76 @@ describe("reportLoadTiming", () => {
         expect(trackEvent).toHaveBeenCalledWith("page_load_timing", expect.objectContaining({ route_section: "root" }));
     });
 
+    it("waits for a tab opened in the background to be shown, then hidden, before it sends", async () => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+        entries["visibility-state"] = [{ name: "hidden", startTime: 0 }];
+
+        const { reportLoadTiming } = await loadReporter();
+
+        reportLoadTiming();
+
+        expect(trackEvent).not.toHaveBeenCalled();
+
+        setVisibility("visible");
+        setVisibility("hidden");
+
+        expect(trackEvent).toHaveBeenCalledOnce();
+    });
+
+    it("leaves out the paint and the marks of a background tab, which hold when it was revealed", async () => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+        entries["visibility-state"] = [{ name: "hidden", startTime: 0 }];
+        entries.paint = [{ name: "first-contentful-paint", startTime: 90_000 }];
+        entries.mark = [{ name: LOAD_MARKS.composerVisible, startTime: 90_050 }];
+
+        const { reportLoadTiming } = await loadReporter();
+
+        reportLoadTiming();
+        setVisibility("visible");
+        setVisibility("hidden");
+
+        expect(sentProperties()).toMatchObject({ composer_visible_ms: undefined, fcp_ms: undefined });
+    });
+
+    it("sends at once when the page was left before it started", async () => {
+        const { reportLoadTiming } = await loadReporter();
+
+        reportLoadTiming({ exited: true });
+
+        expect(trackEvent).toHaveBeenCalledOnce();
+    });
+
+    it("leaves out a mark made after the first input, read from the buffered first-input entry", async () => {
+        entries["first-input"] = [{ name: "pointerdown", startTime: 1000 }];
+        entries.mark = [
+            { name: LOAD_MARKS.composerVisible, startTime: 800 },
+            { name: LOAD_MARKS.sidebarListVisible, startTime: 1500 },
+        ];
+
+        const { reportLoadTiming } = await loadReporter();
+
+        reportLoadTiming();
+        globalThis.dispatchEvent(new Event("pagehide"));
+
+        expect(sentProperties()).toMatchObject({ composer_visible_ms: 800, sidebar_list_visible_ms: undefined });
+    });
+
+    it("sends the buffered LCP and the navigation type when it sends before web-vitals reported", async () => {
+        entries.navigation = [{ name: `${globalThis.location.origin}/chat`, responseStart: 120, type: "back_forward" }];
+        entries["largest-contentful-paint"] = [
+            { name: "", startTime: 600 },
+            { name: "", startTime: 950 },
+        ];
+
+        const { reportLoadTiming } = await loadReporter();
+
+        reportLoadTiming({ exited: true });
+
+        expect(sentProperties()).toMatchObject({ lcp_ms: 950, navigation_type: "back-forward", ttfb_ms: 120 });
+    });
+
     it("names the section the page was loaded at, not where a client-side navigation took it since", async () => {
-        const getEntriesByType = performance.getEntriesByType.bind(performance);
-
-        const loadedAt = [{ name: `${globalThis.location.origin}/chat/k57abc123def`, responseStart: 0 }] as unknown as PerformanceEntryList;
-
-        vi.spyOn(performance, "getEntriesByType").mockImplementation(((type: string) =>
-            type === "navigation" ? loadedAt : getEntriesByType(type)) as typeof performance.getEntriesByType);
+        entries.navigation = [{ name: `${globalThis.location.origin}/chat/k57abc123def`, responseStart: 0, type: "navigate" }];
         globalThis.history.pushState({}, "", "/dashboard");
 
         const { reportLoadTiming } = await loadReporter();
@@ -85,6 +189,7 @@ describe(loadTimingProperties, () => {
     it("rounds the vitals and keeps marks painted before the first input", () => {
         expect(
             loadTimingProperties({
+                firstHiddenAt: undefined,
                 firstInputAt: 2000,
                 marks: { [LOAD_MARKS.composerVisible]: 1100.7, [LOAD_MARKS.sidebarListVisible]: 1500.2 },
                 navigationType: "reload",
@@ -105,6 +210,7 @@ describe(loadTimingProperties, () => {
 
     it("drops a mark recorded after the first input, which timed an interaction, not the load", () => {
         const properties = loadTimingProperties({
+            firstHiddenAt: undefined,
             firstInputAt: 1200,
             marks: { [LOAD_MARKS.composerVisible]: 1100, [LOAD_MARKS.sidebarListVisible]: 5000 },
             navigationType: "navigate",

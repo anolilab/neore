@@ -78,10 +78,20 @@ export const POSTHOG_OPTIONS = {
 } as const satisfies Partial<PostHogConfig>;
 
 /**
- * Real-user load timing (`lib/analytics/load-timing/report-load-timing.ts`). Its code and `web-vitals` load once the
- * browser is idle, so they stay out of the first-load bundle; the browser buffers the entries it reads.
+ * Real-user load timing (`lib/analytics/load-timing/report-load-timing.ts`). Its code and `web-vitals` load when this
+ * provider mounts, alongside PostHog's chunk, so they stay out of the first-load bundle and are ready by the time PostHog
+ * is; the browser buffers the entries it reads, and `trackEvent` queues the event until PostHog has started.
  */
 const loadTiming = { requested: false };
+
+const startReporter = (reportLoadTiming: (options: { exited: boolean }) => void, exited: boolean): void => {
+    try {
+        reportLoadTiming({ exited });
+    } catch (error: unknown) {
+        // eslint-disable-next-line no-console -- the only trace of why this page sends no load timing
+        console.warn("[PostHog] Load timing did not start:", error);
+    }
+};
 
 const startLoadTiming = (): void => {
     if (loadTiming.requested) {
@@ -89,10 +99,27 @@ const startLoadTiming = (): void => {
     }
 
     loadTiming.requested = true;
+
+    // A page left while the chunk loads is still reported, if the document lives long enough for it to arrive.
+    const exit = { happened: false };
+    const onExit = (): void => {
+        exit.happened = true;
+    };
+
+    globalThis.addEventListener("pagehide", onExit);
+
     void import("@/lib/analytics/load-timing/report-load-timing")
-        .then(({ reportLoadTiming }) => reportLoadTiming())
-        // A chunk that fails to load (offline, a deploy in between) only costs this page's timings.
-        .catch(() => undefined);
+        .then(({ reportLoadTiming }) => {
+            globalThis.removeEventListener("pagehide", onExit);
+            startReporter(reportLoadTiming, exit.happened);
+
+            return undefined;
+        })
+        // Only the import can reject here: `startReporter` handles the reporter's own failure. A chunk that fails to load
+        // (offline, a deploy in between) only costs this page's timings.
+        .catch(() => {
+            globalThis.removeEventListener("pagehide", onExit);
+        });
 };
 
 /** PostHog's `loaded` callback: applies the consent state that arrived before `posthog.init` finished. */
@@ -107,27 +134,6 @@ export const onPostHogLoaded = (ph: PostHogInterface): void => {
 
     if (measurement !== undefined) {
         applyMeasurementConsent(ph, measurement);
-    }
-
-    // Load timing's code and `web-vitals` load once the browser is idle, off the first load, or as soon as the page is
-    // hidden: a visit that ends first is still reported (the reporter sends at once on a hidden page).
-    const startWhenHidden = (event: Event): void => {
-        if (event.type !== "pagehide" && document.visibilityState !== "hidden") {
-            return;
-        }
-
-        document.removeEventListener("visibilitychange", startWhenHidden);
-        globalThis.removeEventListener("pagehide", startWhenHidden);
-        startLoadTiming();
-    };
-
-    document.addEventListener("visibilitychange", startWhenHidden);
-    globalThis.addEventListener("pagehide", startWhenHidden);
-
-    if (typeof globalThis.requestIdleCallback === "function") {
-        globalThis.requestIdleCallback(startLoadTiming, { timeout: 5000 });
-    } else {
-        setTimeout(startLoadTiming, 3000);
     }
 };
 
@@ -174,6 +180,7 @@ const AnalyticsProvider: FC<PropsWithChildren> = ({ children }) => {
         }
 
         setBootstrapFlags(flagData);
+        startLoadTiming();
 
         let isCancelled = false;
 
