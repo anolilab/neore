@@ -19,7 +19,7 @@ import type { FileRendererType } from "@neore/ui/components/file-renderers/file-
 import { getFileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { useFocusableCodeBlocks } from "@neore/ui/hooks/use-focusable-code-blocks";
 import useStreamdownAppearance from "@neore/ui/hooks/use-streamdown-appearance";
-import useStreamdownPlugins from "@neore/ui/hooks/use-streamdown-plugins";
+import useStreamdownPlugins, { streamdownRehypePlugins } from "@neore/ui/hooks/use-streamdown-plugins";
 import { AlertCircle, ChevronDown, ChevronRight, FileIcon, Globe, Loader2, Play, Presentation, Terminal } from "lucide-react";
 import type { ComponentType, FC, ReactNode } from "react";
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -140,6 +140,7 @@ const DefaultText: FC<{ isAnimating: boolean; literalImages?: boolean; text: str
                 lineNumbers={codeLineNumbers}
                 mermaid={mermaid}
                 plugins={plugins}
+                rehypePlugins={streamdownRehypePlugins(text)}
                 shikiTheme={shikiTheme}
             >
                 {text}
