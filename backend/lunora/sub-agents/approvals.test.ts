@@ -1028,6 +1028,28 @@ describe("a result for a parent that waits on its own request", () => {
         ).toStrictEqual([{ attempt: 0, runId }]);
     });
 
+    it("is released by a reply that closed a secret request, though no request is pending any more", async () => {
+        // The reply's own send denied the secret request it moved past (`discardPausedThreadSecrets`) before this runs.
+        await run(async (context) => {
+            const [row] = await context.db
+                .query("toolApprovalRuns")
+                .withIndex("by_approvalId", (q: any) => q.eq("approvalId", PARENT_REQUEST))
+                .collect();
+
+            await context.db.patch("toolApprovalRuns", row._id, { resolvedAt: Date.now(), resolvedBy: "abandoned", secretRequest: true, status: "denied" });
+        });
+
+        const before = heldPosts().length;
+
+        await internalCall(afterOwnerMessage, { threadId: parentId });
+
+        expect(
+            heldPosts()
+                .slice(before)
+                .map((job) => job.args),
+        ).toStrictEqual([{ attempt: 0, runId }]);
+    });
+
     it("is released when the owner answers the request, to post after the reply the answer starts", async () => {
         const before = heldPosts().length;
 
@@ -1108,6 +1130,56 @@ describe("deleting a thread", () => {
         expect(await parentReplies()).toHaveLength(0);
     });
 
+    it("schedules nothing for a thread with no runs", async () => {
+        const lone = await run(async (context) => await context.db.insert("threads", { status: "active", title: "Lone", userId: OWNER }));
+        const before = harness.scheduler.list().length;
+
+        await deleteThread(lone);
+
+        expect(
+            harness.scheduler
+                .list()
+                .slice(before)
+                .filter((job) => JSON.stringify(job.args).includes(lone)),
+        ).toStrictEqual([]);
+    });
+
+    it("cancels every queued message of a deleted worker, past the first page", async () => {
+        const worker = await run(async (context) => {
+            const now = Date.now();
+            const thread = await context.db.insert("threads", { status: "active", title: "Worker", userId: OWNER });
+
+            for (let index = 0; index < 25; index += 1) {
+                await context.db.insert("subAgentRuns", {
+                    childThreadId: thread,
+                    createdAt: now + index,
+                    depth: 1,
+                    mode: "worker",
+                    parentThreadId: parentId,
+                    status: "queued",
+                    task: `Message ${String(index)}`,
+                    toolCallId: `call-queued-${String(index)}`,
+                    updatedAt: now,
+                    userId: OWNER,
+                });
+            }
+
+            return thread;
+        });
+
+        await deleteThread(worker);
+
+        const left = await run(
+            async (context) =>
+                await context.db
+                    .query("subAgentRuns")
+                    .withIndex("by_childThreadId_and_status", (q: any) => q.eq("childThreadId", worker).eq("status", "queued"))
+                    .collect(),
+        );
+
+        expect(left).toStrictEqual([]);
+    });
+
     it("marks every unposted result bound for it gone, past the first page of runs that posted", async () => {
         const unposted = await run(async (context) => {
             const now = Date.now();
@@ -1131,10 +1203,15 @@ describe("deleting a thread", () => {
 
         await deleteThread(parentId);
 
-        // Past one call's pages, the marking goes on in continuations, each from where the last stopped.
+        // Past one call's budget, the marking goes on in continuations, each from where the last stopped.
+        let continued = 0;
+
         for (let job = continuation(); job !== undefined; job = continuation()) {
+            continued += 1;
             await internalCall(markDeletedThreadResults, job);
         }
+
+        expect(continued).toBeGreaterThan(0);
 
         expect(await run(async (context) => await context.db.get("subAgentRuns", unposted))).toMatchObject({ postFailed: expect.stringMatching(GONE) });
     });

@@ -72,6 +72,8 @@ let activeLeafCalls: { runModel?: string }[] = [];
 /** Every mutation a send made, by reference, and whether the sub-agent side's call after the save fails. */
 let mutationCalls: { args: unknown; ref: string }[] = [];
 let failAfterMessage = false;
+/** What the send's claim answers (`claimChatStart`), for a send with a `clientMessageId`. */
+let claimOutcome: unknown = null;
 
 const run = async <T>(body: (ctx: any) => Promise<T>): Promise<T> => await harness.run(body);
 
@@ -104,6 +106,14 @@ const fakeContext = (): any => {
 
             if (reference.__lunoraRef === "sub_agents_functions:afterOwnerMessage" && failAfterMessage) {
                 throw new Error("afterOwnerMessage failed");
+            }
+
+            if (reference.__lunoraRef === "chat_start_claim:claimChatStart") {
+                return claimOutcome;
+            }
+
+            if (reference.__lunoraRef === "chat_goals_internal:startGoal") {
+                return { error: "A goal is already running here.", ok: false };
             }
 
             if (reference.__lunoraRef === "chat_streaming:createStreamWithMessage") {
@@ -168,6 +178,7 @@ beforeEach(async () => {
     activeLeafCalls = [];
     mutationCalls = [];
     failAfterMessage = false;
+    claimOutcome = null;
     harness = lunoraTest(schema as never);
     threadId = await run(async (ctx) => await ctx.db.insert("threads", { model: A, status: "active", title: "T", userId: OWNER }));
     await insertRow("u1", 0, 0, "user", "hello");
@@ -412,6 +423,35 @@ describe("/chat/start and a sub-agent's wait", () => {
 
         expect([text.status, image.status]).toStrictEqual([200, 200]);
         expect(afterMessageCalls()).toStrictEqual([{ threadId }, { threadId }]);
+    });
+
+    it("tells it again on a resend of a send whose stream never ran, which may have died before its own call", async () => {
+        claimOutcome = { messageId: "m-first", outcome: "duplicate", streamId: "stream-first", streamUnclaimed: true, threadId };
+
+        const response = await start({ clientMessageId: "client-1", model: A });
+
+        expect(response.status).toBe(200);
+        expect(afterMessageCalls()).toStrictEqual([{ threadId }]);
+    });
+
+    it("tells it nothing for a send the claim refuses, which saved nothing, nor for a send that starts a thread", async () => {
+        claimOutcome = { outcome: "in_progress" };
+
+        const refused = await start({ clientMessageId: "client-2", model: A });
+
+        claimOutcome = null;
+
+        const fresh = await start({ model: A, threadId: undefined });
+
+        expect([refused.status, fresh.status]).toStrictEqual([409, 200]);
+        expect(afterMessageCalls()).toStrictEqual([]);
+    });
+
+    it("tells it about a prompt saved though its goal is refused", async () => {
+        const response = await start({ goal: { text: "Ship the release" }, model: A });
+
+        expect(response.status).toBe(400);
+        expect(afterMessageCalls()).toStrictEqual([{ threadId }]);
     });
 
     it("does not fail the send when that call fails", async () => {

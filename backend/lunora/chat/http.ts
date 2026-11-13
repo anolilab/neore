@@ -1054,6 +1054,22 @@ const runChatStartOnShard = async (
         });
     };
 
+    /**
+     * The message is saved, whatever its content: a sub-agent waiting on this thread ends its wait, and a result held for
+     * the owner's own request here is released (`afterOwnerMessage`, idempotent). Its own transaction, after the save and
+     * its claim: a failure is logged and never fails this send, whose prompt is saved and charged. A new thread can be
+     * neither a sub-agent's child nor hold a request, so it costs nothing.
+     */
+    const afterSave = async (savedThreadId: string): Promise<void> => {
+        if (validThreadId === undefined) {
+            return;
+        }
+
+        await context.runMutation(internal.sub_agents.functions.afterOwnerMessage, { threadId: savedThreadId }).catch((error: unknown) => {
+            chatLogger.error("[chat] Could not end a sub-agent's wait or release its held results", error);
+        });
+    };
+
     if (startOutcome?.outcome === "duplicate") {
         // The stream token attaches to the first send's run as a reconnect does; a run that ended reads from the thread.
         const { messageId, streamId: duplicateStreamId, threadId } = startOutcome;
@@ -1075,6 +1091,9 @@ const runChatStartOnShard = async (
                 await recordTitlesScheduled(pending.claim, messageId, await runTitleJobs());
             }
         }
+
+        // The first try may have died before its own call: a resend makes it (it is idempotent).
+        await afterSave(threadId);
 
         return Response.json(
             {
@@ -1372,6 +1391,9 @@ const runChatStartOnShard = async (
             });
 
             if (!started.ok) {
+                // The prompt is saved though its goal is refused: it moved the thread past what it waited on all the same.
+                await afterSave(threadId);
+
                 return Response.json({ error: started.error }, { status: 400 });
             }
 
@@ -1398,15 +1420,8 @@ const runChatStartOnShard = async (
         // `createStreamWithMessage`.
     }
 
-    // The message is saved, whatever its content: a sub-agent waiting on this thread ends its wait, and a result held for
-    // the owner's own request here is released (`afterOwnerMessage`). Its own transaction, after the save and its claim:
-    // a failure is logged and never fails this send, whose prompt is saved and charged.
-    await context.runMutation(internal.sub_agents.functions.afterOwnerMessage, { threadId }).catch((error: unknown) => {
-        chatLogger.error("[chat] Could not end a sub-agent's wait or release its held results", error);
-    });
-
     // A claimed send records each title job it scheduled, so a resend schedules only one it could not.
-    const scheduledTitleJobs = await runTitleJobs();
+    const [, scheduledTitleJobs] = await Promise.all([afterSave(threadId), runTitleJobs()]);
 
     if (startClaim !== undefined) {
         await recordTitlesScheduled(startClaim, messageId, scheduledTitleJobs);
