@@ -46,7 +46,7 @@ import type { BranchNode, GroupType, HierarchicalThreadListProperties, MinimalTh
 import type { ThreadDateRange } from "./utilities";
 import { getGroupType, isDragBlocked, isGroupFullySelected, selectThreadIdsByDate } from "./utilities";
 
-// Lazy: it pulls `lucide-react/dynamic`'s import map of every icon (~190KB) for its icon picker.
+// Lazy: a dialog opened on demand, with its icon picker and project panels.
 const ProjectFormDialog = lazy(() => import("@/features/projects/components/project-form-dialog"));
 
 // ============================================================================
