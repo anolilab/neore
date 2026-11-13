@@ -13,6 +13,8 @@ const posthogMock = vi.hoisted(() => {
         capture: vi.fn(),
         captureException: vi.fn(),
         debug: vi.fn(),
+        get_distinct_id: vi.fn(() => "anonymous-1"),
+        get_property: vi.fn((_key: string): unknown => undefined),
         group: vi.fn(),
         has_opted_out_capturing: vi.fn(() => false),
         identify: vi.fn(),

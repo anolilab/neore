@@ -285,6 +285,20 @@ describe("events tracked before PostHog initialises", () => {
         });
     });
 
+    it("stores no invitation token from a sign-up address", async () => {
+        const client = await loadClientModule();
+
+        client.setMeasurementConsent(true);
+        globalThis.history.replaceState(null, "", "/auth/sign-up?invite=tok-private&lang=de");
+        client.queueEvent("signup_started", {});
+        globalThis.history.replaceState(null, "", "/");
+
+        const stored = sessionStorage.getItem(client.PENDING_EVENTS_KEY) ?? "";
+
+        expect(stored).not.toContain("tok-private");
+        expect(stored).toContain("invite=redacted&lang=de");
+    });
+
     it("stores no prompt link's text or fragment, from the address, the referrer or a property", async () => {
         const client = await loadClientModule();
 
@@ -1044,6 +1058,28 @@ describe("useFeatureFlagReader", () => {
 
         expect(result.current("code-mode")).toBe(false);
         expect(result.current("other")).toBe(true);
+    });
+});
+
+describe("flag reads on the client this module loads", () => {
+    it("stay pending until PostHog has started, as the stored flags may be another account's", async () => {
+        const client = await loadClientModule();
+        const loaded = await client.loadPostHog();
+
+        Object.assign(loaded, { isFeatureEnabled: vi.fn(() => true) });
+
+        const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: loaded }, children);
+        const { result } = renderHook(() => [client.useFeatureFlagEnabled("code-mode"), client.useFeatureFlagReader()("code-mode")], { wrapper });
+
+        // Initialised with flags, but startup has not reset the stored identity yet.
+        expect(result.current).toStrictEqual([undefined, undefined]);
+
+        act(() => {
+            client.setAnalyticsIdentity({ user: { id: "user-1" } });
+            client.startPostHog(loaded, () => {});
+        });
+
+        expect(result.current).toStrictEqual([true, true]);
     });
 });
 

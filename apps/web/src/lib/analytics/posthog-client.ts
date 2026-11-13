@@ -922,9 +922,16 @@ export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) 
     // Read only: the listener is registered by `subscribe`, never by a render React may throw away.
     const readLoads = useCallback(() => (posthog ? (flagStores.get(posthog)?.loads ?? 0) : 0), [posthog]);
     const loads = useSyncExternalStore(subscribe, readLoads, noLoads);
+    // The client this module loads holds the stored identity's flags (perhaps another account's) until it has started.
+    const started = useStartedPostHog();
+    const isAwaitingStart = posthog !== undefined && posthog === getPostHog() && started !== posthog;
 
     return useCallback(
         (flag: string) => {
+            if (isAwaitingStart) {
+                return undefined;
+            }
+
             if (posthog) {
                 return posthog.isFeatureEnabled(flag);
             }
@@ -933,7 +940,7 @@ export const useFeatureFlagReader = (): ((flag: string) => boolean | undefined) 
         },
         // `loads` is the reader's version: the flags it reads changed.
 
-        [posthog, fallsBack, loads],
+        [posthog, fallsBack, loads, isAwaitingStart],
     );
 };
 
@@ -956,9 +963,16 @@ export const useFeatureFlagEnabled = (flag: string): boolean | undefined => {
         return fallsBack ? readBootstrapFlag(flag) : enabled;
     }
 
+    const isOwnClient = posthog === getPostHog();
+
+    // Before startup has reset the stored identity and applied the session, its flags may be another account's.
+    if (isOwnClient && started !== posthog) {
+        return undefined;
+    }
+
     // Started, and its flags did not come within `FLAGS_WAIT_MS`: the server-rendered flag answers (else off), so what
     // is gated shows instead of staying blank. Flags that arrive later still take over.
-    if (enabled === undefined && posthog === getPostHog() && started === posthog && isFlagsWaitOver) {
+    if (enabled === undefined && isOwnClient && isFlagsWaitOver) {
         return readBootstrapFlag(flag);
     }
 
