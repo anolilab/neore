@@ -6,6 +6,7 @@ import { defaultRehypePlugins, defaultRemarkPlugins, Streamdown } from "streamdo
 import type { PluggableList } from "unified";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { streamdownRehypePlugins } from "../hooks/use-streamdown-plugins";
 import { clearMarkdownBlockCache, MarkdownBlockCacheContext } from "../utils/markdown-block-cache";
 import CachedMarkdownBlock from "./cached-markdown-block";
 
@@ -118,5 +119,25 @@ describe(CachedMarkdownBlock, () => {
 
         expect(streamdown).toContain("&lt;b&gt;");
         expect(render(true, "Inline <b>html</b> here.", withoutRaw)).toBe(streamdown);
+    });
+
+    it("never serves a block cached for the plain-text plugin list to the raw-HTML list, or back", () => {
+        expect.assertions(5);
+
+        const block = "Inline <b>html</b> here.";
+        const plainList = streamdownRehypePlugins("plain text");
+        const htmlList = streamdownRehypePlugins(block);
+
+        // The same block text, finished, under each list the chat can pick.
+        const asText = render(true, block, plainList);
+        const asHtml = render(true, block, htmlList);
+
+        expect(asText).toContain("&lt;b&gt;html&lt;/b&gt;");
+        expect(asHtml).toContain("<b>html</b>");
+        expect(parses.count).toBe(2);
+
+        // Both are cached now, each under its own list.
+        expect(render(true, block, plainList)).toBe(asText);
+        expect(render(true, block, htmlList)).toBe(asHtml);
     });
 });
