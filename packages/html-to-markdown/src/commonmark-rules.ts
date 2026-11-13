@@ -687,7 +687,10 @@ function siblingEdgeRun(sibling: Node, side: Side, options: Options, lookup: Rul
 
     // A removed element writes only its flanking whitespace, which ends the run like a space.
     if (rule?.replacement === removeReplacement) {
-        return WHITESPACE_EDGE.test(textEdge(sibling.textContent ?? "", side) ?? "") ? { count: 0, wordEdge: false } : null;
+        // Whitespace on either side ends the run, so the walks from both members reach the same answer about it.
+        const text = sibling.textContent ?? "";
+
+        return WHITESPACE_EDGE.test(textEdge(text, "left") ?? "") || WHITESPACE_EDGE.test(textEdge(text, "right") ?? "") ? { count: 0, wordEdge: false } : null;
     }
 
     if (isCustomRendered(sibling, lookup, options)) {
@@ -779,7 +782,8 @@ function headingText(content: string, node: AnnotatedNode, lookup: RuleLookup): 
     const mark = headingMarkOf(node, lookup);
 
     // The block's own separators at either end are not heading text, so the underline is not sized to them.
-    return mark === undefined ? content : trimNewlines(joinAtMarks(content, mark).trim());
+    // A custom break rule writes no mark, so a heading whose content holds none is written as is.
+    return mark === undefined || !content.includes(mark) ? content : trimNewlines(joinAtMarks(content, mark).trim());
 }
 
 /**
@@ -815,9 +819,9 @@ function breakMarkFor(node: Node, lookup: RuleLookup): string | undefined {
     return undefined;
 }
 
-// The Unicode private-use area, U+E000 to U+F8FF.
-const PRIVATE_USE_START = "".codePointAt(0) ?? 0;
-const PRIVATE_USE_END = "".codePointAt(0) ?? 0;
+// The Unicode private-use area, U+E000 to U+F8FF, written as escapes so no editor can strip the characters.
+const PRIVATE_USE_START = "\u{E000}".codePointAt(0) ?? 0;
+const PRIVATE_USE_END = "\u{F8FF}".codePointAt(0) ?? 0;
 
 /**
  * A mark that the heading's markup does not contain. A break in the heading is written as this mark, so text of

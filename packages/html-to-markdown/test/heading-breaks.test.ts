@@ -126,3 +126,14 @@ describe("a heading with many breaks and a block", () => {
         expect(markdown).toBe(`# ${words.join(" ")}\n\nc`);
     });
 });
+
+describe("a heading whose breaks a custom rule renders", () => {
+    it("keeps the custom break output, since no break mark was written", () => {
+        const service = new TurndownService({ headingStyle: "atx" });
+
+        service.addRule("br", { filter: "br", replacement: () => "\n" });
+
+        expect(service.turndown("<h1>a<br>b</h1>")).toBe("# a\nb");
+        expect(service.turndown("<h1><br>a</h1>")).toBe("# \na");
+    });
+});

@@ -193,3 +193,24 @@ describe("text that looks like the break marker inside emphasis", () => {
         expect(new TurndownService({ br: "X" }).turndown("<em><br>foo</em>")).toBe("X\n_foo_");
     });
 });
+
+/*
+ * A removed element writes only its flanking whitespace. Both members' walks must reach the same answer about it,
+ * so whitespace on either side of it ends the run for both, not only whitespace on the side a walk faces.
+ */
+
+describe("emphasis around a removed element with whitespace on one side", () => {
+    it.each([
+        ["leading whitespace", "<em>a</em><span> y</span><em>b</em>"],
+        ["trailing whitespace", "<em>a</em><span>y </span><em>b</em>"],
+    ])("pairs every delimiter with %s", (_name, html) => {
+        const service = new TurndownService();
+
+        service.remove("span");
+
+        const markdown = service.turndown(html);
+
+        expect(markdown.split("_").length % 2).toBe(1);
+        expect(markdown).toBe("_a_ _b_");
+    });
+});
