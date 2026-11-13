@@ -8,6 +8,13 @@ function convert(html: string, options: Partial<Options> = {}): string {
     return new TurndownService(options).turndown(html);
 }
 
+function trimLines(markdown: string): string {
+    return markdown
+        .split("\n")
+        .map((line) => line.trim())
+        .join("\n");
+}
+
 function upstream(html: string): string {
     return new TurndownUpstream().turndown(html);
 }
@@ -51,7 +58,7 @@ describe("adjacent emphasis (#512, #442)", () => {
     });
 });
 
-describe("runs stop at block edges (review)", () => {
+describe("runs stop at block edges", () => {
     // The block-containing element keeps the delimiters upstream writes around it, so these
     // outputs match upstream. The run itself never reaches past the block.
     it("does not merge strong across a block", () => {
@@ -63,7 +70,7 @@ describe("runs stop at block edges (review)", () => {
     });
 });
 
-describe("nested emphasis of the same kind (review)", () => {
+describe("nested emphasis of the same kind", () => {
     it("writes an inner element of a merged run without delimiters", () => {
         expect(convert("<em>a</em><em><em>b</em></em>")).toBe("_ab_");
     });
@@ -90,7 +97,7 @@ describe("nested emphasis of the same kind (review)", () => {
     });
 });
 
-describe("blank blocks split nested emphasis (review)", () => {
+describe("blank blocks split nested emphasis", () => {
     // A blank block prints a paragraph break, so it splits the parent's delimiters, as upstream does.
     it.each([
         "<em><em>a</em><p></p>b</em>",
@@ -102,7 +109,7 @@ describe("blank blocks split nested emphasis (review)", () => {
     });
 });
 
-describe("whitespace-only emphasis (review)", () => {
+describe("whitespace-only emphasis", () => {
     it("ends a run, as upstream does", () => {
         expect(convert("<b>a</b><strong> </strong><b>c</b>")).toBe("**a** **c**");
     });
@@ -112,7 +119,7 @@ describe("whitespace-only emphasis (review)", () => {
     });
 });
 
-describe("inline code keeps upstream's trim (review)", () => {
+describe("inline code keeps upstream's trim", () => {
     it("drops an edge break in a code span, as upstream does", () => {
         expect(convert("x<code> y<br></code>z")).toBe("x `y`z");
     });
@@ -171,16 +178,16 @@ describe("line breaks in headings (#555)", () => {
         expect(convert("<h1>Chapter 1<br>The Beginning</h1>")).toBe(`Chapter 1 The Beginning\n${"=".repeat(23)}`);
     });
 
-    it("keeps the block separators when a break comes before a block (review)", () => {
+    it("keeps the block separators when a break comes before a block", () => {
         // The underline is sized to the heading text, not to the block's trailing separators.
         expect(convert("<h2>a<br><p>b</p></h2>")).toBe("a\n\nb\n----");
     });
 
-    it("keeps a horizontal rule on its own line when a break comes before it (review)", () => {
+    it("keeps a horizontal rule on its own line when a break comes before it", () => {
         expect(convert("<h2>x<br><hr>y</h2>")).toContain("x\n\n* * *\n\ny");
     });
 
-    it("drops the spaces that touch a trailing break (review)", () => {
+    it("drops the spaces that touch a trailing break", () => {
         expect(convert("<h3>a<br></h3>")).toBe("### a");
     });
 });
@@ -197,7 +204,7 @@ describe("line breaks inside code blocks (#514)", () => {
     });
 });
 
-describe("edge breaks are restored only when trimming removed them (Qodo)", () => {
+describe("edge breaks are restored only when trimming removed them", () => {
     it("does not add a break before a link that already starts with one", () => {
         expect(convert("x<span><a href=/u><br>foo</a> </span>y")).toBe("x[  \nfoo](/u) y");
     });
@@ -207,7 +214,7 @@ describe("edge breaks are restored only when trimming removed them (Qodo)", () =
     });
 });
 
-describe("emphasis looks past void elements that print nothing (Qodo)", () => {
+describe("emphasis looks past void elements that print nothing", () => {
     it("reads the word on the far side of a word-break hint", () => {
         expect(convert("Brus<wbr><em>sel</em><wbr>s")).toBe("Brus*sel*s");
     });
@@ -221,7 +228,7 @@ describe("emphasis looks past void elements that print nothing (Qodo)", () => {
     });
 });
 
-describe("emphasis beside an anchor that prints plain text (Qodo)", () => {
+describe("emphasis beside an anchor that prints plain text", () => {
     it("reads the text of an anchor with no href", () => {
         expect(convert("<em>x</em><a>y</a>")).toBe("*x*y");
     });
@@ -235,7 +242,7 @@ describe("emphasis beside an anchor that prints plain text (Qodo)", () => {
     });
 });
 
-describe("headings keep the block separators when the break marker is empty (Qodo)", () => {
+describe("headings keep the block separators when the break marker is empty", () => {
     it("flattens a break in a heading but keeps the paragraph breaks around a block", () => {
         expect(convert("<h2>a<p>b</p>c<br>d</h2>", { br: "" })).toBe("a\n\nb\n\nc d\n---------");
     });
@@ -256,5 +263,29 @@ describe("headings keep the block separators when the break marker is empty (Qod
 
     it("still flattens a break in a heading with no block when the break marker is a blank line", () => {
         expect(convert("<h1>a<br>b</h1>", { br: "\n" })).toBe("a b\n===");
+    });
+});
+
+/*
+ * A void element that prints nothing (a word-break hint, a form input) sits beside a hard break at the edge of an
+ * element with flanking whitespace. It writes no Markdown, so the break must be kept as if it were not there.
+ */
+
+describe("a hard break beside a void element that prints nothing", () => {
+    it.each([
+        ["a leading word-break hint", "x<span> <wbr><br>foo</span>y", "x<span> <br>foo</span>y"],
+        ["a leading input", "x<span> <input><br>foo</span>y", "x<span> <br>foo</span>y"],
+        ["a trailing word-break hint", "x<span>foo<br><wbr> </span>y", "x<span>foo<br> </span>y"],
+    ])("keeps the break with %s", (_name, html, without) => {
+        const markdown = new TurndownService().turndown(html);
+
+        // The space beside the void element may stay next to the break; it renders the same either way, since
+        // extra trailing spaces still make a hard break and a leading space on the next line is dropped.
+        expect(markdown).toContain("  \n");
+        expect(trimLines(markdown)).toBe(trimLines(new TurndownService().turndown(without)));
+    });
+
+    it("still treats an image with a source as output", () => {
+        expect(new TurndownService().turndown("x<span> <img src=a.png><br>foo</span>y")).toContain("![](a.png)");
     });
 });

@@ -20,7 +20,7 @@ function convertCountingSteps(html: string): { output: string; steps: number } {
     return { output, steps: emphasisSteps.count };
 }
 
-describe("long emphasis runs stay linear (Qodo)", () => {
+describe("long emphasis runs stay linear", () => {
     it.each([1000, 4000])("walks a run of %i adjacent elements in a bounded number of steps", (count) => {
         const result = convertCountingSteps("<em>x</em>".repeat(count));
 
