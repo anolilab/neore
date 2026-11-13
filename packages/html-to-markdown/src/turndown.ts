@@ -142,12 +142,6 @@ const TRAILING_OPENER = /<[a-z0-9.!#$%&'+/=?^{|}~-]*$/i;
 const WHITESPACE_CHAR = /\s/;
 
 /**
- * Steps taken while reading the text after a `<`: each node visited. The scale test reads it to show
- * that a deeply nested run costs work in proportion to its size.
- */
-export const htmlOpenerSteps = { count: 0 };
-
-/**
  * Escapes a text node. `escapeMarkdown` sees only this node, so a `<` at its end is
  * left alone there. Here the next output is known from the DOM: a `<` is escaped when
  * that output may begin with one of the characters that open raw HTML or an autolink.
@@ -255,8 +249,6 @@ function* followingText(node: Node, options: Options): Generator<string> {
 
 /** The text nodes under a node, in order. A comment prints nothing, so it is skipped. */
 function* textOf(node: Node): Generator<string> {
-    htmlOpenerSteps.count += 1;
-
     if (node.nodeType === 3 || node.nodeType === 4) {
         yield node.nodeValue ?? "";
     } else if (node.nodeType === 1) {
