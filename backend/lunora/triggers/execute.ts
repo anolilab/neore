@@ -17,7 +17,7 @@ import { agentPromptText } from "../chat/lib/agent-prompt";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { MAX_LENGTH } from "../lib/validators";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
-import { isModelUnavailableRefusal, USER_FIXABLE_RUN_ERRORS } from "./failure-streak";
+import { isLeftOrganizationRefusal, isModelUnavailableRefusal, PERMANENT_RUN_ERRORS, USER_FIXABLE_RUN_ERRORS } from "./failure-streak";
 import { releaseRetryDelayMs } from "../lib/claim-once";
 import { filterTextOf } from "./filters";
 import { eventInputMessage } from "./event-sources";
@@ -302,12 +302,18 @@ export const executeTrigger = internalAction
             }
 
             if (refusal) {
+                const leftOrganization = isLeftOrganizationRefusal(refusal);
+
                 await ctx.runMutation(internal.triggers.functions.updateExecution, {
                     error: refusal,
                     executionId,
+                    ...(leftOrganization && { permanent: true }),
                     status: "failed",
-                    userFixable: isModelUnavailableRefusal(refusal),
+                    userFixable: leftOrganization || isModelUnavailableRefusal(refusal),
                 });
+
+                // A permanent refusal also names its cause on the trigger, in the settlement's own write (`updateExecution`).
+
                 await releaseWindow();
 
                 return;
@@ -360,6 +366,7 @@ export const executeTrigger = internalAction
                     // Kept for a failure below: its run log links the thread, and the prompt is hidden while that thread is locked.
                     runThreadId = id;
                 },
+                organizationId: trigger.organizationId ?? null,
                 origin: "trigger",
                 personalization: "full",
                 prompt: inputMessage,
@@ -427,6 +434,7 @@ export const executeTrigger = internalAction
             await ctx.runMutation(internal.triggers.functions.updateExecution, {
                 error: [errorMessage, note].filter(Boolean).join(" ").slice(0, 2000),
                 executionId,
+                ...(userFixable && PERMANENT_RUN_ERRORS.has(error.kind) && { permanent: true }),
                 prompt: loggedPrompt,
                 status: "failed",
                 threadId: runThreadId,

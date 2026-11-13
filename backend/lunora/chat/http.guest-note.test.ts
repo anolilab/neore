@@ -121,6 +121,10 @@ const run = async <T>(body: (ctx: any) => Promise<T>): Promise<T> => await harne
 
 /** The guest-link internals and the thread gate read and write the harness; everything else answers as nothing. */
 const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
+    // The caller's sign-in is a valid session in the personal space.
+    "auth_session_organization:getSessionOrganizationForCap": async () => {
+        return { organizationId: null };
+    },
     "chat_functions:gateThreadAction": async (args) => await run(async (ctx) => await gateThreadActionHandler(ctx, args)),
     "chat_guest_links:claimGuestNoteSend": async (args) => await run(async (ctx) => await ctx.runMutation(claimGuestNoteSend, args)),
     "chat_guest_links:getGuestNoteForSend": async (args) => await run(async (ctx) => await ctx.runQuery(getGuestNoteForSend, args)),
@@ -146,7 +150,15 @@ const fakeContext = (extra: typeof HANDLERS = {}): any => {
     const handlers = { ...HANDLERS, ...extra };
     const call = async (reference: { __lunoraRef: string }, args: unknown) => await (handlers[reference.__lunoraRef]?.(args) ?? null);
 
-    return { auth: { getIdentity: async () => null }, runMutation: call, runQuery: call };
+    return {
+        auth: {
+            getIdentity: async () => {
+                return { sessionId: "session-1" };
+            },
+        },
+        runMutation: call,
+        runQuery: call,
+    };
 };
 
 /**

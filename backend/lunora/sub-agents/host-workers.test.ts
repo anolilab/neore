@@ -8,12 +8,17 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { sessionFrom } = vi.hoisted(() => {
+const { activeSpace, sessionFrom } = vi.hoisted(() => {
+    // The caller's verified active organization; `null` is the personal space.
+    const space = { organizationId: null as string | null };
+
     return {
+        activeSpace: space,
         sessionFrom: async (context: { auth: { userId?: string | null } }) => {
             const { userId } = context.auth;
+            const activeOrganization = space.organizationId ? { id: space.organizationId, name: space.organizationId } : null;
 
-            return userId ? { activeOrganization: null, email: `${userId}@example.com`, id: userId, isAdmin: false, name: userId, userId } : null;
+            return userId ? { activeOrganization, email: `${userId}@example.com`, id: userId, isAdmin: false, name: userId, userId } : null;
         },
     };
 });
@@ -36,10 +41,17 @@ vi.mock("../auth", async (importOriginal) => {
     };
 });
 
-// `user` is a `.global()` (D1) table the in-memory harness cannot write.
+// The organizations the owner has left; every other one counts them as a member.
+const { leftOrganizations } = vi.hoisted(() => {
+    return { leftOrganizations: new Set<string>() };
+});
+
+// `user` and `member` are `.global()` (D1) tables the in-memory harness cannot write.
 vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../auth/lib/better-auth-queries")>()),
+        getMemberByOrganizationAndUser: async (_ctx: unknown, organizationId: string, userId: string) =>
+            leftOrganizations.has(organizationId) ? null : { organizationId, userId },
         getUser: async (_ctx: unknown, userId: string) => {
             return { _id: userId };
         },
@@ -73,6 +85,8 @@ const NOT_ONLINE = /not online/iu;
 const OUT_OF_DATE = /out of date/iu;
 const NOT_ANSWERED = /host did not answer/iu;
 const NEEDS_A_PERSON = /needs a person/iu;
+const NOT_ALLOWED_BY_CAP = /does not allow agents on your computer/iu;
+const LEFT_ORGANIZATION = /no longer a member of the organization/iu;
 const SESSION_ENDED = /session has ended/iu;
 const REFUSED_THREAD = /alone|own|computer/iu;
 const KEEPS_RUNNER = /keeps the runner/iu;
@@ -298,6 +312,73 @@ describe("creating a worker on a computer", () => {
         await expect(createHostWorker(device)).rejects.toMatchObject({ message: expect.stringMatching(HOST_OUT_OF_SCOPE) });
         expect(await table("subAgentRuns")).toHaveLength(0);
         expect(await table("deviceCalls")).toHaveLength(0);
+    });
+
+    it("refuses a worker on a computer when the organization's cap is below auto, creating nothing", async () => {
+        const device = await pairedDevice();
+        const lead = await newThread({ organizationId: "org-capped" });
+
+        await run(
+            async (context) =>
+                await context.db.insert("organizationPolicies", {
+                    document: JSON.stringify({ permissionCap: "ask", schemaVersion: 1 }),
+                    organizationId: "org-capped",
+                    revision: 1,
+                    schemaVersion: 1,
+                    updatedAt: Date.now(),
+                }),
+        );
+
+        await expect(createHostWorker(device, { leadThreadId: lead })).rejects.toMatchObject({
+            message: expect.stringMatching(NOT_ALLOWED_BY_CAP),
+        });
+        expect(await table("subAgentRuns")).toHaveLength(0);
+        expect(await table("acpSessions")).toHaveLength(0);
+    });
+
+    it("refuses a former member a worker on a computer under their organization's lead, opening nothing", async () => {
+        const device = await pairedDevice();
+        const lead = await newThread({ organizationId: "org-former" });
+
+        leftOrganizations.add("org-former");
+
+        try {
+            await expect(createHostWorker(device, { leadThreadId: lead })).rejects.toMatchObject({
+                message: expect.stringMatching(LEFT_ORGANIZATION),
+            });
+            expect(await table("subAgentRuns")).toHaveLength(0);
+            expect(await table("acpSessions")).toHaveLength(0);
+            expect(await table("deviceCalls")).toHaveLength(0);
+        } finally {
+            leftOrganizations.delete("org-former");
+        }
+    });
+
+    it("refuses a worker on a computer under an unstamped lead when the member's active organization is capped", async () => {
+        const device = await pairedDevice();
+        // A bot, comparison or temporary chat: no stored organization.
+        const lead = await newThread();
+
+        await run(
+            async (context) =>
+                await context.db.insert("organizationPolicies", {
+                    document: JSON.stringify({ permissionCap: "ask", schemaVersion: 1 }),
+                    organizationId: "org-active",
+                    revision: 1,
+                    schemaVersion: 1,
+                    updatedAt: Date.now(),
+                }),
+        );
+        activeSpace.organizationId = "org-active";
+
+        try {
+            await expect(createHostWorker(device, { leadThreadId: lead })).rejects.toMatchObject({
+                message: expect.stringMatching(NOT_ALLOWED_BY_CAP),
+            });
+            expect(await table("subAgentRuns")).toHaveLength(0);
+        } finally {
+            activeSpace.organizationId = null;
+        }
     });
 
     it("refuses a pair the computer did not offer, creating nothing", async () => {
@@ -545,6 +626,56 @@ describe("the end of a host turn", () => {
         expect(await runRow(queued.runId)).toMatchObject({ status: "running" });
         expect(await sendCalls()).toHaveLength(2);
         expect((await sessionOf(receipt.workerId)).status).toBe("busy");
+    });
+
+    it("fails a queued message, sending nothing, when its owner leaves the organization while it waits", async () => {
+        const device = await pairedDevice();
+        const lead = await newThread({ organizationId: "org-left" });
+        const receipt = await createHostWorker(device, { leadThreadId: lead });
+
+        await sessionOpen(device, receipt.workerId);
+
+        const queued = await dispatchFromUser(receipt.workerId, "second");
+
+        expect(queued.state).toBe("queued");
+
+        leftOrganizations.add("org-left");
+
+        try {
+            await finishTurn(device, receipt.workerId);
+
+            expect(await runRow(queued.runId)).toMatchObject({ error: expect.stringMatching(LEFT_ORGANIZATION), status: "failed" });
+            expect(await sendCalls()).toHaveLength(1);
+        } finally {
+            leftOrganizations.delete("org-left");
+        }
+    });
+
+    it("fails a queued message, sending nothing, when the organization's cap drops below auto while it waits", async () => {
+        const device = await pairedDevice();
+        const lead = await newThread({ organizationId: "org-tightened" });
+        const receipt = await createHostWorker(device, { leadThreadId: lead });
+
+        await sessionOpen(device, receipt.workerId);
+
+        const queued = await dispatchFromUser(receipt.workerId, "second");
+
+        expect(queued.state).toBe("queued");
+
+        await run(
+            async (context) =>
+                await context.db.insert("organizationPolicies", {
+                    document: JSON.stringify({ permissionCap: "ask", schemaVersion: 1 }),
+                    organizationId: "org-tightened",
+                    revision: 1,
+                    schemaVersion: 1,
+                    updatedAt: Date.now(),
+                }),
+        );
+        await finishTurn(device, receipt.workerId);
+
+        expect(await runRow(queued.runId)).toMatchObject({ error: expect.stringMatching(NOT_ALLOWED_BY_CAP), status: "failed" });
+        expect(await sendCalls()).toHaveLength(1);
     });
 });
 

@@ -10,9 +10,10 @@ import type { ActionCtx as ActionContext, AgentComponent, MutationCtx as Mutatio
 export const createThread = async (
     ctx: MutationContext | ActionContext,
     _component: AgentComponent,
-    args?: { summary?: string; tags?: string[]; title?: string; userId?: string | null },
+    args?: { organizationId?: string | null; summary?: string; tags?: string[]; title?: string; userId?: string | null },
 ) => {
     const { _id: threadId } = await ctx.runMutation(internal.agent.threads.createThread, {
+        organizationId: args?.organizationId ?? undefined,
         summary: args?.summary,
         tags: args?.tags,
         title: args?.title,

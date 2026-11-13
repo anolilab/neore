@@ -9,6 +9,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { isHostRunThread } from "../acp/lib/host-thread";
 import { getFile } from "../agent/client";
+import { requestSignIn } from "../auth/lib/request-sign-in";
 import { getCurrentUserInternal } from "../auth/lib/helper";
 import type { BetterAuthUser } from "../auth/lib/types";
 import { assertPaidModel } from "./lib/enabled-model";
@@ -630,26 +631,33 @@ const runChatStartOnShard = async (
         }
     }
 
-    // Scopes organization-shared skills. `user.activeOrganization` is always
-    // null here (no session read from an HTTP action), so resolve it from the
-    // session row, which also re-checks membership. It depends on nothing
-    // below, so it is read alongside the rest instead of just before enqueueing
-    // the run. Only a text run has one.
-    const activeOrganizationPromise = (async (): Promise<string | null> => {
-        if (contentType !== "text") {
-            return null;
-        }
+    // The sign-in the request comes from: the web app's session (`sid`) or the extension's, desktop's or phone's grant
+    // (`gsid`, which never becomes `sessionId`, `src/bearer-identity.ts`). It places the chat in its organization, so a
+    // signed-in caller with neither cannot be placed and must not read as the personal space, whose cap is `auto`. A
+    // public API key caller has neither; its run is held at `ask` by its origin (`apiKeyOrigin`).
+    const signIn = requestSignIn(await context.auth.getIdentity());
 
-        const identity = await context.auth.getIdentity();
-        const sessionId = identity?.sessionId;
+    if (signIn === undefined && origin !== "outside_agent") {
+        return Response.json({ error: "Your sign-in could not be confirmed. Sign in again, then retry." }, { status: 401 });
+    }
 
-        return typeof sessionId === "string"
-            ? await context.runQuery(internal.auth.session_organization.getActiveOrganizationIdForSession, { sessionId, userId })
-            : null;
-    })();
+    // The caller's active organization, from that sign-in's session row (`user.activeOrganization` is always null here:
+    // no session read from an HTTP action), with its membership re-checked. A sign-in whose session is gone, expired or
+    // another user's cannot be placed either, so it is refused before anything is spent or saved (below, at the first
+    // write), rather than read as the personal space (`getSessionOrganizationForCap`). One that still names an
+    // organization its user left is personal. It depends on nothing below, so it is read alongside the rest.
+    const placedPromise =
+        signIn === undefined
+            ? Promise.resolve(undefined)
+            : context.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId: signIn, userId });
+    const sessionOrganizationPromise = placedPromise.then((placed) => placed?.organizationId ?? null);
 
-    // A request refused below never awaits it; it is only a read.
-    activeOrganizationPromise.catch(() => undefined);
+    // A request refused before the first write never awaits these; they are only reads.
+    placedPromise.catch(() => undefined);
+    sessionOrganizationPromise.catch(() => undefined);
+
+    // Scopes organization-shared skills and goals. Only a text run has one.
+    const activeOrganizationPromise = contentType === "text" ? sessionOrganizationPromise : Promise.resolve(null);
 
     const validThreadId = body.threadId && body.threadId !== "default" ? body.threadId : undefined;
     const isGuestSend = body.guestMessageId !== undefined;
@@ -894,6 +902,11 @@ const runChatStartOnShard = async (
 
     if (goalConfig && !goalConfig.ok) {
         return Response.json({ error: "These chat settings cannot be used with a goal." }, { status: 400 });
+    }
+
+    // The sign-in check, read alongside the rest: an unconfirmed sign-in is refused here, before the first write.
+    if ((await placedPromise) === null) {
+        return Response.json({ error: "Your sign-in could not be confirmed. Sign in again, then retry." }, { status: 401 });
     }
 
     // Rate limiting. Media prompts are charged where the paid generation actually
@@ -1297,6 +1310,10 @@ const runChatStartOnShard = async (
             scheduleTitleJobs(threadId, messageId, startTitleJobs(contentType, false));
         }
     } else {
+        // The organization goes in with the insert, so no chat exists without it. Read first: a failed lookup refuses the
+        // request before anything is saved, rather than leaving a chat a later run would cap by a broader space.
+        const threadOrganizationId = await sessionOrganizationPromise;
+
         // New thread: batched creation
         const result = await context
             .runMutation(internal.chat.functions.createThreadWithInitialMessage, {
@@ -1309,6 +1326,7 @@ const runChatStartOnShard = async (
                 messageContent,
                 mode: body.mode,
                 model: effectiveModel,
+                ...(threadOrganizationId && { organizationId: threadOrganizationId }),
                 reasoningEffort: body.reasoningEffort,
                 statelessMode: body.statelessMode,
                 // Temporary only when the client asked for it; the composer applies the user's default itself.

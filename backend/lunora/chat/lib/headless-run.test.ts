@@ -24,6 +24,8 @@ const seen = vi.hoisted(() => {
         filterRules: undefined as Record<string, string[]> | undefined,
         filters: [] as unknown[],
         met: [] as boolean[],
+        /** The owner has left the run's organization. */
+        notMember: false,
         prepareSteps: [] as unknown[],
         prompts: [] as (string | undefined)[],
         providerOptions: [] as unknown[],
@@ -156,6 +158,10 @@ const fakeCtx = (prefs: typeof PREFS = PREFS) =>
                 return { modelFilterRules: seen.filterRules };
             }
 
+            if (reference === "auth_organization_policy:isOrganizationMemberQuery") {
+                return !seen.notMember;
+            }
+
             if (reference === "auth_functions:getDecryptedProviderKeysQuery") {
                 if (seen.failAt === "keys") {
                     throw new Error("provider keys unavailable");
@@ -181,6 +187,7 @@ describe("runHeadlessAgent personalization", () => {
             maxSteps: 3,
             memory: false,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             thread: { threadId: "thread-1" },
@@ -199,6 +206,7 @@ describe("runHeadlessAgent personalization", () => {
         await runHeadlessAgent(fakeCtx(), {
             memory: false,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "full",
             prompt: "Do the thing",
@@ -218,6 +226,7 @@ describe("runHeadlessAgent hidden characters", () => {
         runHeadlessAgent(fakeCtx(), {
             memory: false,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt,
@@ -267,6 +276,7 @@ describe("runHeadlessAgent backup model", () => {
         await runHeadlessAgent(ctx as never, {
             memory: false,
             model: PRIMARY,
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt: "Do the thing",
@@ -350,6 +360,7 @@ describe("runHeadlessAgent context sizing for a backup", () => {
             maxSteps: 5,
             memory: false,
             model: PRIMARY,
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt: "go",
@@ -376,12 +387,14 @@ describe("runHeadlessAgent context sizing for a backup", () => {
 describe("runHeadlessAgent thread tags", () => {
     beforeEach(() => {
         seen.created = [];
+        seen.notMember = false;
     });
 
     const run = async (ctx: unknown, extra: Partial<Parameters<typeof runHeadlessAgent>[1]> = {}) =>
         await runHeadlessAgent(ctx as never, {
             memory: false,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt: "Do the thing",
@@ -414,6 +427,38 @@ describe("runHeadlessAgent thread tags", () => {
 
         expect(patches[0]).toEqual({ botId: "bot-1" });
     });
+
+    it("creates a new thread with the run's organization, so no linked thread exists without it", async () => {
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await run(ctx, { organizationId: "org-a" });
+
+        expect(seen.created).toEqual([{ organizationId: "org-a", tags: ["trigger"], title: "Trigger: x", userId: "owner" }]);
+
+        const patches = ctx.runMutation.mock.calls.map(([, args]) => (args as { patch?: object }).patch);
+
+        expect(patches.some((patch) => patch && "organizationId" in patch)).toBe(false);
+    });
+
+    it("refuses a run whose owner left its organization, filing no thread under it", async () => {
+        const ctx = fakeCtx();
+
+        seen.notMember = true;
+
+        // The run's own kind, so a trigger or task stops instead of failing on every later run.
+        await expect(run(ctx, { organizationId: "org-left" })).rejects.toMatchObject({ kind: "left-organization", name: "AgentRunError" });
+        expect(seen.created).toEqual([]);
+    });
+
+    it("never moves an existing thread into another organization", async () => {
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await run(ctx, { organizationId: "org-b", thread: { threadId: "thread-1" } });
+
+        const patches = ctx.runMutation.mock.calls.map(([, args]) => (args as { patch?: object }).patch);
+
+        expect(patches.some((patch) => patch && "organizationId" in patch)).toBe(false);
+    });
 });
 
 describe("runHeadlessAgent fresh context and reasoning effort", () => {
@@ -444,6 +489,7 @@ describe("runHeadlessAgent fresh context and reasoning effort", () => {
         await runHeadlessAgent(paidCtx() as never, {
             memory: false,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt: "Run the report",
@@ -494,6 +540,7 @@ describe("runHeadlessAgent tool allowlist", () => {
             maxSteps: 5,
             memory: false,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             thread: { threadId: "thread-1" },
@@ -501,6 +548,12 @@ describe("runHeadlessAgent tool allowlist", () => {
             userId: "owner",
             ...extra,
         });
+
+    it("builds its tools under the run's organization, whose cap the tool assembly reads", async () => {
+        await run({ organizationId: "org-a" });
+
+        expect(seen.buildOptions).toMatchObject([{ headless: true, organizationId: "org-a" }]);
+    });
 
     it("narrows to the allowlist and drops MCP tools unless told to keep them", async () => {
         await run({ toolAllowlist: ["webSearch", "imageGeneration"] });
@@ -525,6 +578,7 @@ describe("runHeadlessAgent onGenerationStart", () => {
             memory: false,
             model: "test-model",
             onGenerationStart,
+            organizationId: null,
             origin: "lead",
             personalization: "full",
             prompt: "Do the thing",
@@ -591,6 +645,7 @@ describe("runHeadlessAgent with a goal and memory", () => {
             goal: { text: "Ship it" },
             memory: true,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt: "Do the thing",
@@ -611,6 +666,7 @@ describe("runHeadlessAgent with a goal and memory", () => {
         await runHeadlessAgent(ctx, {
             memory: true,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt: "Do the thing",
@@ -646,6 +702,7 @@ describe("runHeadlessAgent failure on a thread it continues", () => {
                 goal: { text: "Ship it" },
                 memory: false,
                 model: "test-model",
+                organizationId: null,
                 origin: "lead",
                 personalization: "none",
                 prompt: "Run the report",
@@ -685,6 +742,7 @@ describe("runHeadlessAgent pauseForApproval", () => {
         await runHeadlessAgent(ctx as never, {
             memory: false,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "full",
             prompt: "Do the thing",
@@ -752,6 +810,18 @@ describe("runHeadlessAgent pauseForApproval", () => {
         const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
 
         expect(recorded!.config.dispatchOrigin).toBe("trigger");
+    });
+
+    it("saves the run's organization, whose cap the continuation reads when the thread has none", async () => {
+        seen.saved = [approvalRequest];
+
+        const ctx = fakeCtx();
+
+        await run(ctx, { organizationId: "org-a", pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+        expect(recorded!.config.organizationId).toBe("org-a");
     });
 
     it("labels the saved MCP calls with their real server before recording the request, as an interactive pause does", async () => {

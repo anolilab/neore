@@ -38,7 +38,11 @@ const { runChatStart } = await import("./http");
 
 const context = () =>
     ({
-        auth: { getIdentity: async () => null },
+        auth: {
+            getIdentity: async () => {
+                return { sessionId: "session-1" };
+            },
+        },
         runMutation: async (reference: { __lunoraRef?: string }, args?: Record<string, unknown>) => {
             const name = String(reference.__lunoraRef ?? reference);
 
@@ -61,6 +65,11 @@ const context = () =>
             const name = String(reference.__lunoraRef ?? reference);
 
             state.calls.push(name);
+
+            // The caller's sign-in is a valid session in the personal space.
+            if (name.includes("getSessionOrganizationForCap")) {
+                return { organizationId: null };
+            }
 
             if (name.includes("gateThreadAction")) {
                 return { isWorker: false, outcome: "ok" };

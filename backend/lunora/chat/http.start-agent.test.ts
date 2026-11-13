@@ -13,7 +13,7 @@ import { switchThreadAgentHandler } from "./agent-switch";
 import { runChatStart } from "./http";
 
 const savedPrompts: unknown[] = [];
-const createdThreads: { language?: string }[] = [];
+const createdThreads: { language?: string; organizationId?: string }[] = [];
 
 vi.mock("../auth/lib/helper", () => {
     return {
@@ -91,7 +91,11 @@ const insertRow = async (name: string, order: number, stepOrder: number, role: "
 /** A runtime ctx whose lookups read the harness's rows. */
 const fakeContext = (): any => {
     return {
-        auth: { getIdentity: async () => null },
+        auth: {
+            getIdentity: async () => {
+                return { sessionId: "session-1" };
+            },
+        },
         runMutation: async (reference: { __lunoraRef: string }, args: any) => {
             if (reference.__lunoraRef === "chat_streaming:createStreamWithMessage") {
                 streamingConfigs.push(args.streamingConfig);
@@ -123,6 +127,10 @@ const fakeContext = (): any => {
                 }
                 case "agent_threads:getThreadInternal": {
                     return await run(async (ctx) => await ctx.db.get("threads", args.threadId));
+                }
+                // The caller's sign-in is a valid session in the personal space.
+                case "auth_session_organization:getSessionOrganizationForCap": {
+                    return { organizationId: null };
                 }
                 case "chat_functions:gateThreadAction": {
                     return await run(async (ctx) => await gateThreadActionHandler(ctx, args));
@@ -276,5 +284,110 @@ describe("/chat/start hidden characters", () => {
 
         expect(response.status).toBe(200);
         expect(createdThreads.map((created) => created.language)).toStrictEqual(["english"]);
+    });
+});
+
+describe("/chat/start organization", () => {
+    /**
+     * A caller whose session names an organization; `failSession` makes that lookup throw. `identity` replaces the web
+     * session's, and `sessionsRead` records the session ids the lookup was asked for.
+     */
+    const inOrganization = (failSession = false, identity?: Record<string, unknown>, unconfirmed = false): any => {
+        const base = fakeContext();
+        const mutations: string[] = [];
+        const sessionsRead: string[] = [];
+
+        return {
+            ...base,
+            auth: {
+                getIdentity: async () => identity ?? { sessionId: "session-1", userId: OWNER },
+            },
+            mutations,
+            runMutation: async (reference: { __lunoraRef: string }, args: any) => {
+                mutations.push(reference.__lunoraRef);
+
+                return await base.runMutation(reference, args);
+            },
+            runQuery: async (reference: { __lunoraRef: string }, args: any) => {
+                if (reference.__lunoraRef === "auth_session_organization:getSessionOrganizationForCap") {
+                    sessionsRead.push(args.sessionId);
+
+                    if (failSession) {
+                        throw new Error("session read failed");
+                    }
+
+                    // A session that is gone, expired, another user's or in an organization its user left.
+                    return unconfirmed ? null : { organizationId: "org-1" };
+                }
+
+                return await base.runQuery(reference, args);
+            },
+            sessionsRead,
+        };
+    };
+
+    it("creates a new chat with the caller's organization in the insert, with no later stamp", async () => {
+        createdThreads.length = 0;
+
+        const context = inOrganization();
+        const response = await runChatStart(context, { model: A, prompt: "hi" } as never, "secret");
+
+        expect(response.status).toBe(200);
+        expect(createdThreads).toMatchObject([{ organizationId: "org-1" }]);
+        expect(context.mutations).not.toContain("agent_threads:updateThread");
+    });
+
+    it("places an app's chat in the organization its grant's sign-in names", async () => {
+        createdThreads.length = 0;
+
+        // The extension, desktop and phone carry their sign-in as `gsid`, which reaches here as `grantSessionId`.
+        const context = inOrganization(false, { grantSessionId: "grant-session-1", userId: OWNER });
+        const response = await runChatStart(context, { model: A, prompt: "hi" } as never, "secret");
+
+        expect(response.status).toBe(200);
+        expect(context.sessionsRead).toStrictEqual(["grant-session-1"]);
+        expect(createdThreads).toMatchObject([{ organizationId: "org-1" }]);
+    });
+
+    it("refuses a signed-in caller whose identity names no sign-in, before saving anything, instead of using the personal space", async () => {
+        createdThreads.length = 0;
+
+        const context = inOrganization(false, { userId: OWNER });
+        const response = await runChatStart(context, { model: A, prompt: "hi" } as never, "secret");
+
+        expect(response.status).toBe(401);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("Sign in again") });
+        expect(createdThreads).toStrictEqual([]);
+        expect(context.mutations).toStrictEqual([]);
+    });
+
+    it("still starts a public API key caller's chat, whose run is held at ask by its origin", async () => {
+        createdThreads.length = 0;
+
+        const context = inOrganization(false, { userId: OWNER });
+        const response = await runChatStart(context, { model: A, prompt: "hi" } as never, "secret", "outside_agent");
+
+        expect(response.status).toBe(200);
+        expect(context.sessionsRead).toStrictEqual([]);
+        expect(createdThreads).toHaveLength(1);
+    });
+
+    it("refuses a sign-in whose session cannot be confirmed, before saving anything, instead of using the personal space", async () => {
+        createdThreads.length = 0;
+
+        const context = inOrganization(false, undefined, true);
+        const response = await runChatStart(context, { model: A, prompt: "hi" } as never, "secret");
+
+        expect(response.status).toBe(401);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("Sign in again") });
+        expect(createdThreads).toStrictEqual([]);
+        expect(context.mutations).toStrictEqual([]);
+    });
+
+    it("saves nothing when the organization cannot be read", async () => {
+        createdThreads.length = 0;
+
+        await expect(runChatStart(inOrganization(true), { model: A, prompt: "hi" } as never, "secret")).rejects.toThrow("session read failed");
+        expect(createdThreads).toStrictEqual([]);
     });
 });

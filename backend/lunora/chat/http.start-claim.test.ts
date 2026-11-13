@@ -199,6 +199,10 @@ const textUnitsLeft = async (): Promise<number> => {
 const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
     "agent_agent_switch:getRunAgentModel": async () => state.agentModel,
     "agent_threads:getThreadInternal": async (args) => await run(async (ctx) => await ctx.db.get("threads", args.threadId)),
+    // The caller's sign-in is a valid session in the personal space.
+    "auth_session_organization:getSessionOrganizationForCap": async () => {
+        return { organizationId: null };
+    },
     "chat_daily_charge:chargeDailyLimitOnce": async (args) => await run(async (ctx) => await ctx.runMutation(chargeDailyLimitOnce, args)),
     "chat_functions:createThreadWithInitialMessage": async (args) => {
         failSaveOnce();
@@ -240,7 +244,15 @@ const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
 const fakeContext = (): any => {
     const call = async (reference: { __lunoraRef: string }, args: unknown) => await (HANDLERS[reference.__lunoraRef]?.(args) ?? null);
 
-    return { auth: { getIdentity: async () => null }, runMutation: call, runQuery: call };
+    return {
+        auth: {
+            getIdentity: async () => {
+                return { sessionId: "session-1" };
+            },
+        },
+        runMutation: call,
+        runQuery: call,
+    };
 };
 
 const send = async (body: Record<string, unknown>): Promise<{ json: any; status: number }> => {

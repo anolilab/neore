@@ -38,7 +38,9 @@ import type { SkillConfig } from "../../skills/validators";
 import type { DispatchOrigin } from "../../sub-agents/logic";
 import { defaultModelUnderRules, readsImagesAndCallsTools } from "../../lib/utility-model";
 import {
+    AgentRunError,
     buildRunStreamArgs,
+    LEFT_ORGANIZATION_MESSAGE,
     loadModelFilterRules,
     loadUserProviderKeys,
     resolveBackupModelId,
@@ -46,6 +48,7 @@ import {
     retrieveMemoryContext,
     setDispatchOrigin,
     setHeadlessRun,
+    setRunOrganizationId,
     setResearchDepth,
     stampSavedToolCalls,
     toPersonalization,
@@ -115,6 +118,11 @@ export interface HeadlessRunOptions {
     onGenerationStart?: () => Promise<void> | void;
     /** Called with the new thread's id before generation starts, so a failure can still point at it. */
     onThread?: (threadId: string) => Promise<void> | void;
+    /**
+     * The organization whose policy caps this run's tools (`org-policy.md` §6a); `null` for the personal space. Required,
+     * so each caller states the space its run belongs to.
+     */
+    organizationId: string | null;
     /**
      * What started this run. A dispatch to a worker from its tools carries it as `dispatchedBy`, and the
      * lead's policy decides on it: an unattended cause is refused unless the policy lists it.
@@ -225,6 +233,17 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
     }
 
     const { prompt, skill, userId } = options;
+
+    // A run outlives its owner's membership (a scheduled trigger, a task, a sub-agent). Refused here, before any thread is
+    // filed under an organization the owner can no longer open, or any tool is built under its cap. The kind tells a
+    // trigger or task to stop instead of failing on every later run.
+    if (
+        options.organizationId &&
+        !(await ctx.runQuery(internal.auth.organization_policy.isOrganizationMemberQuery, { organizationId: options.organizationId, userId }))
+    ) {
+        throw new AgentRunError("left-organization", LEFT_ORGANIZATION_MESSAGE);
+    }
+
     // The Workers AI default cannot keep to a region rule: a user with one runs on a default their rules allow.
     const model =
         options.model === DEFAULT_CHAT_MODEL
@@ -247,6 +266,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                   ...(options.approvedTools && { headlessApproved: options.approvedTools }),
                   ...(options.pauseForApproval && { headlessCanAsk: true }),
                   model,
+                  organizationId: options.organizationId,
                   searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
                   skillTools: headlessSkillTools(skill?.config, options.additionalTools, options.withheldTools),
                   userId,
@@ -267,6 +287,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         setResearchDepth(ctx, "balanced");
         setDispatchOrigin(ctx, options.origin);
         setHeadlessRun(ctx);
+        setRunOrganizationId(ctx, options.organizationId);
 
         const existingThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
         const personal = options.personalization === "full";
@@ -323,6 +344,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // The tags go in with the insert, so a reader (a quiet routine's workspace check) never sees the thread untagged,
             // even while it runs or if the run fails.
             const created = await agent.createThread(ctx, {
+                // With the insert: a separate patch could fail after the thread is linked and leave it uncapped.
+                ...(options.organizationId && { organizationId: options.organizationId }),
                 title: (options.thread as { title: string }).title,
                 userId,
                 ...("tags" in options.thread && options.thread.tags && { tags: options.thread.tags }),
@@ -334,7 +357,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // As soon as the thread exists, so a failed bot patch below cannot leave it unrecorded.
             await options.onThread?.(threadId);
 
-            // Before the run: a tool call reads `thread.botId` to find the bot's computer.
+            // Before the run: a tool call reads `thread.botId` to find the bot's computer, and a later threaded run reads the
+            // thread's organization, which went in with the insert above. A thread that already exists is never moved.
             if (options.botId) {
                 await ctx.runMutation(internal.agent.threads.updateThread, {
                     patch: { botId: options.botId },
@@ -414,6 +438,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 // The pause extracted the prompt; the continuation extracts only what is steered into it, as an interactive run's does.
                 ...(extractMemory && prompt && { memory: { ...(options.botId && { botId: options.botId }) } }),
                 model,
+                // The continuation's cap reads it when the thread has no stored organization (`readRunPermissionCap`).
+                ...(options.organizationId && { organizationId: options.organizationId }),
                 ...((options.reasoningEffort ?? skill?.config?.reasoningEffort) !== undefined && {
                     reasoningEffort: options.reasoningEffort ?? skill?.config?.reasoningEffort,
                 }),
