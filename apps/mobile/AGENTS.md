@@ -18,7 +18,10 @@
   connection being checked; the splash holds until the chat list has read its saved rows, at most 2 s,
   `splash-gate.ts`). A mint still out when a sign-in or sign-out starts applies nothing (`createAuthEpoch`). A mint with no answer keeps them signed in without a JWT, which counts as offline; an answered "no session"
   signs out and empties the cache. Live queries wait for a JWT. A project subscription also counts as answered when the
-  client's `onSyncStatus` reaches `synced` after registering (a reconnect's `resume` frame calls no rows callback).
+  client's `onSyncStatus` reaches `synced` after registering (a reconnect's `resume` frame calls no rows callback). That
+  report waits a microtask: Lunora reports a refused subscription `synced` before its error callback, so an error in
+  between drops it, and a refused subscription counts no `synced` until its rows arrive. A 401/403 mint clears the stored
+  grant only while it still holds the grant that mint sent (a new sign-in's grant survives an old mint's refusal).
   **Stamps and races:** a read stamps its rows with the moment it STARTED (`syncedAt`), and only the newest read of a
   screen may paint or save (`createMessageReadGate`), because messages carry no server version. A thread missing from
   a COMPLETE first-page list read is pruned (`pruneThreads`, rows synced by a later read stay); a partial page never
@@ -37,7 +40,9 @@
   - 200 with `duplicate: true`: the first send's ids. Open that chat like any start.
   - 422 `CLIENT_MESSAGE_ID_REUSED`: show it, never retry, drop the id.
   - A send that still fails gives its prompt back with its id held; the same text sent again is the same send.
-  - A prompt given back ahead of text typed meanwhile is a different message (new id): the notice says to send it alone.
+  - A held prompt is only ever resent alone under its held id (`planSend`): given back ahead of text typed meanwhile,
+    Send sends it first and keeps the rest for the next send; editing the prompt itself makes a new message.
+  - A send stopped before its first try sends nothing; sign-out ends the mint epoch before its first await (`runSignOut`).
   - A start with `streaming: false` (no `streamToken`) follows no stream: the chat's saved reply is read instead.
   - Match codes lower-cased: the gateway passes `/chat/start`'s SCREAMING_CASE, the public API uses snake_case.
   - Nothing is held and polled for: the resend is idempotent.

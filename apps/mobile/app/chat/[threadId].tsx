@@ -18,7 +18,7 @@ import { displayTextOf, shareTextOf } from "@/chat/message-parts";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import type { HeldSend } from "@/chat/start-send";
-import { clientMessageIdFor, replyStreamOf, startWithRetries } from "@/chat/start-send";
+import { planSend, replyStreamOf, startWithRetries } from "@/chat/start-send";
 import { relayReply } from "@/chat/stream";
 import type { SendStage } from "@/chat/unsent-send";
 import { failedSendMessage, failedSendOutcome, giveBackDraft, shouldKeepClientMessageId, withoutUnsentRows } from "@/chat/unsent-send";
@@ -454,7 +454,10 @@ const Chat = () => {
     };
 
     const send = async () => {
-        const prompt = draft.trim();
+        // A held prompt, which may already be saved, goes again only under its own id and alone (`planSend`): text typed
+        // after it stays in the composer for the next send.
+        const plan = planSend(heldSend.current, draft);
+        const { prompt } = plan;
 
         if (!prompt || sending || sendControl.disabled) {
             return;
@@ -469,8 +472,8 @@ const Chat = () => {
         const controller = new AbortController();
         // The account that sends: the offer below is its, even if another account is signed in by the time it lands.
         const sender = accountId;
-        // One id per composed message: the held one when this is the prompt that went back, so the resend is the same send.
-        const clientMessageId = clientMessageIdFor(heldSend.current, prompt, randomUUID);
+        // One id per composed message: the held one when this press retries the prompt that went back.
+        const clientMessageId = plan.heldId ?? randomUUID();
 
         heldSend.current = null;
 
@@ -479,7 +482,7 @@ const Chat = () => {
         setError(null);
         // Announced when a reply starts and when it finishes. The deltas stay silent: an announcement on each would flood the reader.
         AccessibilityInfo.announceForAccessibility("Assistant is replying");
-        setDraft("");
+        setDraft(plan.rest);
         const stamp = Date.now();
         const userId = `user-${stamp}`;
         const assistantId = `pending-${stamp}`;

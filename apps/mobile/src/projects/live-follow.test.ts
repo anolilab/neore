@@ -96,7 +96,7 @@ describe("followLive", () => {
         expect(answered).toBe(1);
     });
 
-    it("reports a reconnect the server answers with no rows callback (a resume frame), but not the state at subscribing", () => {
+    it("reports a reconnect the server answers with no rows callback (a resume frame), but not the state at subscribing", async () => {
         let answered = 0;
         let report: ((status: SyncState) => void) | undefined;
         let syncStopped = 0;
@@ -124,13 +124,51 @@ describe("followLive", () => {
 
         // The connection drops and comes back; the server acknowledges the unchanged subscription and no rows arrive.
         report?.({ synced: false });
+        await Promise.resolve();
         expect(answered).toBe(0);
         report?.({ synced: true });
+        await Promise.resolve();
         expect(answered).toBe(1);
 
         stop();
         expect(syncStopped).toBe(1);
         expect(fake.stopped()).toBe(1);
+    });
+
+    it("keeps writes blocked for a subscription the server refuses after a reconnect, which the client reports synced first", async () => {
+        let answered = 0;
+        let report: ((status: SyncState) => void) | undefined;
+        const fake = fakeWatch();
+
+        followLive(
+            "a:projects",
+            fake.watch,
+            recorder().publish,
+            () => {
+                answered += 1;
+            },
+            (listener) => {
+                report = listener;
+
+                return () => {};
+            },
+        );
+
+        // `markQueryRejected` marks the refused subscription answered and emits `synced`, then `failSubscription` calls the error callback.
+        report?.({ synced: true });
+        fake.error("FORBIDDEN");
+        await Promise.resolve();
+        expect(answered).toBe(0);
+
+        // Other subscriptions settling later report `synced` again: the refused one still counts as no answer.
+        report?.({ synced: false });
+        report?.({ synced: true });
+        await Promise.resolve();
+        expect(answered).toBe(0);
+
+        // Its rows arriving again are an answer.
+        fake.push(["p1"]);
+        expect(answered).toBe(1);
     });
 
     it("drops the rows when the subscription fails", () => {

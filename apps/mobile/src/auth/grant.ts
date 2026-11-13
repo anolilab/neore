@@ -240,10 +240,23 @@ export const exchangeGrant = async (input: {
 };
 
 /**
+ * Forgets `token`'s grant, only while the store still holds it: a sign-in that stored a new grant while this one was being
+ * refused keeps its own. The secure store has no compare-and-delete, so this narrows the race to a read and a delete
+ * rather than a whole request.
+ */
+const clearGrantIfCurrent = async (store: GrantStore, token: string): Promise<void> => {
+    const current = await store.get();
+
+    if (current?.token === token) {
+        await store.clear();
+    }
+};
+
+/**
  * A short-lived JWT for the stored grant, or `null` when the user is signed out:
  * no grant, a 401 (the session is gone), or a 403 (the account is refused, as a
- * guest or a suspended account is). Either drops the grant, so the provider does not
- * retry a session the server will not accept. Any other failure throws and keeps the grant.
+ * guest or a suspended account is). Either drops the grant it sent, so the provider does not
+ * retry a session the server will not accept, but never a newer one stored meanwhile. Any other failure throws and keeps the grant.
  */
 export const fetchAccessToken = async (input: { fetch: Fetch; lunoraUrl: string; store: GrantStore }): Promise<string | null> => {
     const grant = await input.store.get();
@@ -262,7 +275,7 @@ export const fetchAccessToken = async (input: { fetch: Fetch; lunoraUrl: string;
     }
 
     if (response.status === 401 || response.status === 403) {
-        await input.store.clear();
+        await clearGrantIfCurrent(input.store, grant.token);
 
         // eslint-disable-next-line unicorn/no-null -- a signed-out result is null by contract; auth-context compares with null
         return null;

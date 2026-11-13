@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { StartedChat } from "./chat-api";
 import { ChatError } from "./chat-api";
 import {
-    clientMessageIdFor,
+    GIVE_BACK_SEPARATOR,
+    planSend,
     replyStreamOf,
     START_IN_PROGRESS_RETRY_MS,
     START_IN_PROGRESS_WAIT_MS,
@@ -29,16 +30,22 @@ const fakeClock = () => {
     };
 };
 
-describe(clientMessageIdFor, () => {
-    const newId = vi.fn(() => "new-id");
+describe(planSend, () => {
+    const held = { clientMessageId: "first-id", prompt: "hello" };
 
-    it("reuses the held id when the same prompt is sent again", () => {
-        expect(clientMessageIdFor({ clientMessageId: "first-id", prompt: "hello" }, "hello", newId)).toBe("first-id");
+    it("retries the held prompt under its held id when the draft is that prompt", () => {
+        expect(planSend(held, "hello")).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "" });
+        expect(planSend(held, "  hello \n")).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "" });
     });
 
-    it("gives a new id to a different prompt, and to a send with nothing held", () => {
-        expect(clientMessageIdFor({ clientMessageId: "first-id", prompt: "hello" }, "hello again", newId)).toBe("new-id");
-        expect(clientMessageIdFor(null, "hello", newId)).toBe("new-id");
+    it("sends the held prompt alone under its held id ahead of text typed meanwhile, and keeps that text for the next send", () => {
+        expect(planSend(held, `hello${GIVE_BACK_SEPARATOR}and more`)).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "and more" });
+    });
+
+    it("sends an edited held prompt, or a draft with nothing held, as a new message", () => {
+        expect(planSend(held, `hello there${GIVE_BACK_SEPARATOR}and more`)).toStrictEqual({ prompt: `hello there${GIVE_BACK_SEPARATOR}and more`, rest: "" });
+        expect(planSend(held, "hello again")).toStrictEqual({ prompt: "hello again", rest: "" });
+        expect(planSend(null, "hello")).toStrictEqual({ prompt: "hello", rest: "" });
     });
 });
 
@@ -91,6 +98,16 @@ describe(startWithRetries, () => {
 
         await expect(startWithRetries({ attempt: failing, ...fakeClock() })).rejects.toThrow("Network request failed");
         expect(failing).toHaveBeenCalledTimes(START_UNKNOWN_RETRY_DELAYS_MS.length + 1);
+    });
+
+    it("sends nothing when the send was stopped before its first try", async () => {
+        const controller = new AbortController();
+        const attempt = vi.fn<() => Promise<StartedChat>>().mockResolvedValue(STARTED);
+
+        controller.abort();
+
+        await expect(startWithRetries({ attempt, signal: controller.signal, ...fakeClock() })).rejects.toThrow("The send was stopped.");
+        expect(attempt).not.toHaveBeenCalled();
     });
 
     it("stops at once when the send is stopped", async () => {

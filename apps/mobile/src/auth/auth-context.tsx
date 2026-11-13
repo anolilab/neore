@@ -14,7 +14,7 @@ import { fetchAccessToken, readStoredUser, signOutGrant } from "./grant";
 import { secureGrantStore } from "./secure-store";
 import { createAuthEpoch, INITIAL_SESSION, reduceSession } from "./session-state";
 import { signInWithBrowser } from "./sign-in";
-import { emptyCacheWhileSignedOut, signOutOnDevice } from "./sign-out";
+import { emptyCacheWhileSignedOut, runSignOut, signOutOnDevice } from "./sign-out";
 
 /** Re-mint the JWT this long before the client's own refresh point, if `exp` is unknown. */
 const FALLBACK_REFRESH_MS = 60_000;
@@ -147,23 +147,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // From here on, no prompt and no registration for the account that is leaving.
         endPhonePushForAccount();
 
-        try {
+        // A mint still out when sign-out starts applies nothing: the epoch ends before the first await (`runSignOut`).
+        await runSignOut({
+            endMints: () => epoch.end(),
+            finish: () => {
+                client.setAuthToken(null);
+                dispatch({ type: "signed-out" });
+            },
             // The cache holds this person's chats: it is emptied FIRST and locally, so a sign-out request that fails or
             // hangs offline cannot leave them behind. Then the server is told and the stored grant cleared.
-            await signOutOnDevice({
-                clearCache: () => getOfflineCache().clear(),
-                forgetLastChat: clearLastThread,
-                releasePush: async () =>
-                    await releaseOnSignOut({ platform: devicePushPlatform, registrations: pushRegistrations, server: backendPushServer(client) }),
-                revokeGrant: () => signOutGrant({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore }),
-                // eslint-disable-next-line no-console -- no logger in the app; a failed clear must not be silent
-                warn: console.warn,
-            });
-        } finally {
-            epoch.end();
-            client.setAuthToken(null);
-            dispatch({ type: "signed-out" });
-        }
+            teardown: async () =>
+                await signOutOnDevice({
+                    clearCache: () => getOfflineCache().clear(),
+                    forgetLastChat: clearLastThread,
+                    releasePush: async () =>
+                        await releaseOnSignOut({ platform: devicePushPlatform, registrations: pushRegistrations, server: backendPushServer(client) }),
+                    revokeGrant: () => signOutGrant({ fetch, lunoraUrl: config.lunoraUrl, store: secureGrantStore }),
+                    // eslint-disable-next-line no-console -- no logger in the app; a failed clear must not be silent
+                    warn: console.warn,
+                }),
+        });
     }, [client, config.lunoraUrl, epoch]);
 
     const retryToken = useCallback(

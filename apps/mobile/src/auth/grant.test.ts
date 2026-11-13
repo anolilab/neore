@@ -178,6 +178,19 @@ describe("grant storage", () => {
         expect(store.value).toBeNull();
     });
 
+    it("a 401 for an old grant keeps the new grant a sign-in stored while it was asked", async () => {
+        const store = memoryStore({ token: "session-old", user: USER });
+        const fetch: Fetch = async () => {
+            // A browser sign-in finishes while the old mint's request is out.
+            await store.set({ token: "session-new", user: USER });
+
+            return json({ error: "invalid_token" }, 401);
+        };
+
+        expect(await fetchAccessToken({ fetch, lunoraUrl: LUNORA, store })).toBeNull();
+        expect(store.value).toEqual({ token: "session-new", user: USER });
+    });
+
     it("a 500 from the token route throws and keeps the grant", async () => {
         const store = memoryStore({ token: "session-1", user: USER });
         const fetch: Fetch = async () => json({ error: "server_error" }, 500);

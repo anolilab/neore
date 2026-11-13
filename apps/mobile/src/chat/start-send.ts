@@ -7,16 +7,42 @@ export interface HeldSend {
     prompt: string;
 }
 
+/** What `draftAfterUnsent` puts between a prompt given back and text typed meanwhile. */
+export const GIVE_BACK_SEPARATOR = "\n\n";
+
+/** What one press of Send sends (`prompt`, under `heldId` when it is a retry), and what stays in the composer (`rest`). */
+export interface SendPlan {
+    /** The held send's `clientMessageId` when this press retries it; otherwise the send takes a new one. */
+    heldId?: string;
+    prompt: string;
+    rest: string;
+}
+
 /**
- * The `clientMessageId` of a send of `prompt`: the held one when the prompt is the one that went back to the composer (a
- * retry, which the server answers with the first send's ids if that one was saved), a new one for anything else.
+ * Plans a press of Send so a held prompt, which may already be saved, is only ever sent again under its own
+ * `clientMessageId`, never folded into a new message that would save it a second time. A draft that is the held prompt
+ * is sent under its held id. A draft that is the held prompt, the separator and text typed meanwhile (as the give-back
+ * left it) sends the held prompt alone under its held id and keeps the rest in the composer for the next send. Anything
+ * else (no hold, or the held prompt itself was edited) is a new message, and the hold ends.
  */
-export const clientMessageIdFor = (held: HeldSend | null, prompt: string, newId: () => string): string => {
-    if (held !== null && held.prompt === prompt) {
-        return held.clientMessageId;
+export const planSend = (held: HeldSend | null, draft: string): SendPlan => {
+    const prompt = draft.trim();
+
+    if (held === null) {
+        return { prompt, rest: "" };
     }
 
-    return newId();
+    if (prompt === held.prompt) {
+        return { heldId: held.clientMessageId, prompt, rest: "" };
+    }
+
+    const leading = draft.trimStart();
+
+    if (leading.startsWith(`${held.prompt}${GIVE_BACK_SEPARATOR}`)) {
+        return { heldId: held.clientMessageId, prompt: held.prompt, rest: leading.slice(held.prompt.length + GIVE_BACK_SEPARATOR.length).trim() };
+    }
+
+    return { prompt, rest: "" };
 };
 
 /** How long a send whose first try is still being saved (409) is waited for: past the server's 2-minute lease, after which it is resumed. */
@@ -69,6 +95,11 @@ export const startWithRetries = async ({
     signal?: AbortSignal;
     sleep: (ms: number) => Promise<void>;
 }): Promise<StartedChat> => {
+    // A send stopped before its first try (the screen left while the token was fetched) sends nothing at all.
+    if (signal?.aborted) {
+        throw new ChatError("The send was stopped.");
+    }
+
     const startedAt = now();
     const tryFrom = async (unknownRetries: number): Promise<StartedChat> => {
         try {

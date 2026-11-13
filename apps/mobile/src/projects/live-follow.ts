@@ -41,7 +41,10 @@ export const liveFor = <T>(state: Scoped<T>, scope: string | undefined): Live<T>
  * After a reconnect the server may answer an unchanged subscription with a `resume` frame, which calls no rows callback.
  * `watchSync` (the client's `onSyncStatus`) covers it: the client counts the subscription answered then, so a later
  * report of `synced` is reported too. Its first report, made while it is being registered, is the state as it already
- * stood (a held or cached value counts as unanswered there, and nothing was asked since), so it is not.
+ * stood (a held or cached value counts as unanswered there, and nothing was asked since), so it is not. A refusal is
+ * reported `synced` too: the client marks the subscription answered (`markQueryRejected`, which emits the sync status)
+ * BEFORE it calls the error callback (`failSubscription`), in one call. So a `synced` report waits a microtask and is
+ * dropped when the error came in between, and a refused subscription counts no `synced` until its rows arrive again.
  */
 export const followLive = <T>(
     scope: string,
@@ -53,28 +56,45 @@ export const followLive = <T>(
     publish({ ...EMPTY_LIVE, scope });
 
     let isSubscribing = true;
+    let isRefused = false;
+    let isStopped = false;
     const stop = watch(
         (rows) => {
+            isRefused = false;
             publish({ error: undefined, rows, scope });
 
             if (!isSubscribing) {
                 onAnswered();
             }
         },
-        (message) => publish({ error: message, rows: undefined, scope }),
+        (message) => {
+            isRefused = true;
+            publish({ error: message, rows: undefined, scope });
+        },
     );
 
     let isRegistering = true;
+    let isReportPending = false;
     const stopSync = watchSync?.((status) => {
-        if (!isRegistering && status.synced) {
-            onAnswered();
+        if (isRegistering || isReportPending || !status.synced) {
+            return;
         }
+
+        isReportPending = true;
+        queueMicrotask(() => {
+            isReportPending = false;
+
+            if (!isRefused && !isStopped) {
+                onAnswered();
+            }
+        });
     });
 
     isRegistering = false;
     isSubscribing = false;
 
     return () => {
+        isStopped = true;
         stopSync?.();
         stop();
     };

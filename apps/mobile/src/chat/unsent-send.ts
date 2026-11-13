@@ -1,4 +1,5 @@
 import { ChatError, isClientMessageIdReused, isStartInProgress } from "./chat-api";
+import { GIVE_BACK_SEPARATOR } from "./start-send";
 
 /**
  * The composer after a send the server never accepted: the prompt goes back, ahead of anything typed since, so a
@@ -9,13 +10,13 @@ export const draftAfterUnsent = (current: string, prompt: string): string => {
         return prompt;
     }
 
-    return `${prompt}\n\n${current}`;
+    return `${prompt}${GIVE_BACK_SEPARATOR}${current}`;
 };
 
 /**
- * The composer after a failed send, and whether its prompt landed ahead of text typed meanwhile. A merged draft is not
- * the prompt that went back, so it is sent under a new `clientMessageId` (`clientMessageIdFor`) and the notice says so
- * ({@link failedSendMessage}).
+ * The composer after a failed send, and whether its prompt landed ahead of text typed meanwhile. Merged, the next press
+ * of Send still sends the prompt alone under its held id and keeps the rest for the next message (`planSend`); the
+ * notice says so ({@link failedSendMessage}).
  */
 export const giveBackDraft = (current: string, prompt: string): { draft: string; isMerged: boolean } => {
     const draft = draftAfterUnsent(current, prompt);
@@ -50,18 +51,18 @@ export const shouldKeepClientMessageId = (error: unknown): boolean => !isClientM
 export const MAY_HAVE_BEEN_SENT_NOTICE = "It may have been sent: it is back in the message box, and sending it again will not send it twice.";
 
 /**
- * The same, when the prompt went back ahead of text typed meanwhile: only the prompt alone and unchanged is the same send,
- * so sending the whole box may save the prompt a second time.
+ * The same, when the prompt went back ahead of text typed meanwhile: Send sends it again on its own (`planSend`), and the
+ * text typed meanwhile stays for the next message. Editing the prompt itself makes it a new message.
  */
 export const MAY_HAVE_BEEN_SENT_MERGED_NOTICE
-    = "It may have been sent: it is back at the top of the message box, ahead of what you typed. Send it alone and unchanged to be sure it is not sent twice.";
+    = "It may have been sent: it is back at the top of the message box. Send sends it again on its own, so it is not saved twice, and keeps what you typed after it for your next message.";
 
 /** A send whose first try was still being saved when the wait ran out. */
 export const STILL_SENDING_MESSAGE = `The message is still being sent. ${MAY_HAVE_BEEN_SENT_NOTICE}`;
 
 /**
- * The error shown for a failed send. One that may have reached the server says whether sending again is safe as it
- * stands: it is when the prompt went back alone (its `clientMessageId` is reused), not when it went back merged.
+ * The error shown for a failed send. One that may have reached the server says that sending it again is safe, and, when
+ * it went back ahead of text typed meanwhile, that Send sends it on its own first.
  */
 export const failedSendMessage = (error: unknown, stage: SendStage, { isMerged = false }: { isMerged?: boolean } = {}): string => {
     const notice = isMerged ? MAY_HAVE_BEEN_SENT_MERGED_NOTICE : MAY_HAVE_BEEN_SENT_NOTICE;

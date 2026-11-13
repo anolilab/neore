@@ -78,3 +78,19 @@ export const emptyCacheWhileSignedOut = async ({ clearCache, forgetLastChat, war
         warn("Could not forget the last viewed chat.", lastChat.reason);
     }
 };
+
+/**
+ * The order of a sign-out: every token mint still out is ended (`endMints`, the auth epoch) BEFORE the first await of the
+ * teardown, so one answering while the cache is emptied or the grant revoked applies nothing; then the teardown; then,
+ * whatever it did, the mints are ended again (one started during the teardown) and the session is finished.
+ */
+export const runSignOut = async ({ endMints, finish, teardown }: { endMints: () => void; finish: () => void; teardown: () => Promise<void> }): Promise<void> => {
+    endMints();
+
+    try {
+        await teardown();
+    } finally {
+        endMints();
+        finish();
+    }
+};
