@@ -119,3 +119,54 @@ describe("paste lists: a list placed straight in a list", () => {
         expect(convert("<ul><ul><li>b</li></ul><li>a</li></ul>")).toBe("- b\n\n- a");
     });
 });
+
+describe("paste lists: review cases", () => {
+    /** A Word list paragraph of list `id`, with styles added to its marker. */
+    function listParagraph(id: string, level: number, marker: string, text: string, markerStyle = ""): string {
+        return `<p style="mso-list:${id} level${String(level)} lfo1"><span style="mso-list:Ignore${markerStyle}">${marker}</span>${text}</p>`;
+    }
+
+    it("takes no number from a marker the page hides for a reason of its own", () => {
+        expect(convert(listParagraph("l0", 1, "9.", "visible", ";display:none"))).toBe("- visible");
+    });
+
+    it("leaves nothing for a list placed straight in a list whose items are all hidden", () => {
+        expect(convert(`<ul><li>a</li><ul><li style="display:none">x</li></ul><li>b</li></ul>`)).toBe("- a\n- b");
+    });
+
+    it("parts two Word lists side by side, each placed from its own top level", () => {
+        expect(
+            convert(
+                listParagraph("l0", 1, "·", "a") + listParagraph("l0", 2, "o", "a2") + listParagraph("l1", 2, "o", "b") + listParagraph("l1", 3, "o", "b2"),
+            ),
+        ).toBe("- a\n  - a2\n\n- b\n  - b2");
+    });
+
+    it("keeps bold set to the relative weight lighter, which a heavy weight leaves bold", () => {
+        expect(convert(`<b style="font-weight:lighter">x</b> <strong style="font-weight:normal">y</strong>`)).toBe("**x** y");
+    });
+
+    it("keeps the number of a Word numbered heading, which is no list item", () => {
+        expect(convert(`<h1 style="mso-list:l0 level1 lfo1"><span style="mso-list:Ignore">1.</span> Intro</h1>`)).toBe(String.raw`# 1\. Intro`);
+    });
+
+    it("keeps Word marker text that is no Markdown number after a bullet, escaped as text", () => {
+        expect(
+            convert(
+                [
+                    listParagraph("l0", 1, "1.1.", "one"),
+                    listParagraph("l0", 1, "(a)", "two"),
+                    listParagraph("l0", 1, "Article 1.", "three"),
+                    listParagraph("l0", 1, "1000000000.", "four"),
+                ].join(""),
+            ),
+        ).toBe(String.raw`- 1.1. one
+- (a) two
+- Article 1. three
+- 1000000000\. four`);
+    });
+
+    it("writes a number of more than nine digits as text after a bullet, since a marker takes nine", () => {
+        expect(convert(`<ol start="1000000000"><li>a</li><li aria-level="2">b</li></ol>`)).toBe("- 1000000000. a\n  1. b");
+    });
+});

@@ -92,7 +92,7 @@ new TurndownService(PASTE_OPTIONS).use(paste).turndown(html);
 - Google Docs writes a nested item as an item of the same list with a deeper `aria-level`; Word writes a list as
   paragraphs with `mso-list` styles and hides the marker. Both are written as nested lists, each depth numbered on its
   own, and a copy that starts at a nested item starts at the left edge. Word's numbers (up to nine digits) are kept,
-  and a lettered or roman marker is written after a bullet. A list placed straight in a list goes under the item
+  other marker text (`a.`, `1.1.`, `(iv)`) is written after a bullet, and two Word lists side by side stay apart. A list placed straight in a list goes under the item
   before it.
 - `<b>` or `<strong>` set back to normal weight is not bold: Google Docs wraps a whole copy in one.
 

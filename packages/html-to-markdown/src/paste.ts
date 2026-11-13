@@ -95,17 +95,20 @@ const CONTENT_VISIBILITY_VALUES = new Set(["auto", "hidden", "visible", ...GLOBA
 // `collapse` hides an element as `hidden` does, except in a table, where it also takes the row's or column's space.
 const HIDING_VISIBILITY = new Set(["collapse", "hidden"]);
 const OUTER_DISPLAY = new Set(["block", "inline", "run-in"]);
-const NORMAL_WEIGHT = new Set(["100", "200", "300", "400", "lighter", "normal"]);
+// `lighter` is not here: it is relative, and under a heavy weight it is still bold.
+const NORMAL_WEIGHT = new Set(["100", "200", "300", "400", "normal"]);
 const INNER_DISPLAY = new Set(["flex", "flow", "flow-root", "grid", "ruby", "table"]);
 
-/** True when the page does not show the element: hidden by an attribute, a style or a screen-reader class, or no text. */
+/**
+ * True when the page does not show the element: hidden by an attribute, a style or a screen-reader class, or no text.
+ * Word's list marker is left out too: the preset writes it as the item's marker.
+ */
 export function isHiddenElement(node: Node): boolean {
-    if (node.nodeType !== 1) {
-        return false;
-    }
+    return node.nodeType === 1 && (isWordMarker(node as Element) || isHiddenOnPage(node as Element));
+}
 
-    const element = node as Element;
-
+/** True when the page does not show the element. */
+function isHiddenOnPage(element: Element): boolean {
     if (SKIPPED.has(element.localName) || element.hasAttribute("hidden") || isClosedContent(element)) {
         return true;
     }
@@ -120,7 +123,7 @@ export function isHiddenElement(node: Node): boolean {
         return false;
     }
 
-    if (isWordMarker(element) || declaredStyle(style, "display", isDisplayValue) === "none") {
+    if (declaredStyle(style, "display", isDisplayValue) === "none") {
         return true;
     }
 
@@ -331,7 +334,7 @@ function texSource(node: Element): string {
 export function paste(service: TurndownService): void {
     service.remove(isHiddenElement);
 
-    const rules = { ...pasteRules, ...listRules };
+    const rules = { ...pasteRules, ...listRules(isHiddenOnPage) };
 
     for (const [key, rule] of Object.entries(rules)) {
         service.addRule(key, rule);

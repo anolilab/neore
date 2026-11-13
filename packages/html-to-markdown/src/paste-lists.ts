@@ -4,7 +4,7 @@
  */
 import { declaredStyle } from "./inline-style";
 import type { FilterFunction, Options, Rule, RuleLookup } from "./types";
-import { parseListStart, trimNewlines } from "./utilities";
+import { escapeMarkdown, parseListStart, trimNewlines } from "./utilities";
 
 /**
  * An item's marker and the width Markdown reads as the marker: a letter after a bullet (`- a. `) is text, so only the
@@ -18,6 +18,8 @@ interface Marker {
 /** Where an item is written: the spaces before it and its marker. */
 interface ItemPlace {
     indent: number;
+    /** The first item of a Word list that follows another one: a blank line parts the two. */
+    isListStart?: boolean;
     marker: Marker;
 }
 
@@ -30,10 +32,12 @@ interface ListLayout {
 // Google Docs writes a nested item as an item of the same list with a deeper aria-level.
 const MAX_ARIA_LEVEL = 6;
 const WORD_LEVEL = /(?:^|\s)level(\d)(?:\s|$)/;
+// The list a Word paragraph belongs to: `l0` in `mso-list:l0 level1 lfo1`.
+const WORD_LIST_ID = /(?:^|\s)(l\d+)(?:\s|$)/;
 // Up to nine digits, the most a Markdown marker takes, so a Word list numbered past 9999 keeps its numbers.
 const WORD_NUMBER = /^\d{1,9}[.)]$/;
-// A letter or roman numeral Word numbers a level with (`a.`, `iv)`). Markdown numbers only in digits, so it stays text.
-const WORD_LETTER = /^[a-z]{1,9}[.)]$/i;
+// CommonMark reads at most nine digits as a list number.
+const MAX_MARKER_DIGITS = 9;
 const LETTER_TYPES = new Set(["A", "a"]);
 const ROMAN_TYPES = new Set(["I", "i"]);
 const MAX_ROMAN = 3999n;
@@ -65,20 +69,38 @@ function isList(node: Node | null): node is Element {
     return node?.nodeName === "OL" || node?.nodeName === "UL";
 }
 
-/** The level Word gives a list paragraph in its `mso-list` style, or 0 for any other element. */
-function wordLevel(node: Node): number {
-    if (node.nodeName !== "P") {
-        return 0;
-    }
+function msoList(node: Node): string {
+    return node.nodeType === 1 ? declaredStyle((node as Element).getAttribute("style") ?? "", "mso-list") : "";
+}
 
-    const match = WORD_LEVEL.exec(declaredStyle((node as Element).getAttribute("style") ?? "", "mso-list"));
+/** The level an `mso-list` style gives an element, or 0. */
+function msoLevel(node: Node): number {
+    const match = WORD_LEVEL.exec(msoList(node));
 
     return match ? Number(match[1]) : 0;
 }
 
-/** True for the text Word writes an item's marker in: shown in Word, hidden on the page. */
+/** The level Word gives a list paragraph, or 0 for any other element. A numbered heading keeps its number as text. */
+function wordLevel(node: Node): number {
+    return node.nodeName === "P" ? msoLevel(node) : 0;
+}
+
+/**
+ * True for the text Word writes a list paragraph's marker in, which the preset writes as the item's marker. A marker
+ * in a numbered heading, or outside any list paragraph, is the element's own text.
+ */
 export function isWordMarker(element: Element): boolean {
-    return element.localName === "span" && declaredStyle(element.getAttribute("style") ?? "", "mso-list") === "ignore";
+    if (element.localName !== "span" || msoList(element) !== "ignore") {
+        return false;
+    }
+
+    for (let above = element.parentElement; above; above = above.parentElement) {
+        if (msoLevel(above) > 0) {
+            return above.nodeName === "P";
+        }
+    }
+
+    return false;
 }
 
 /** `number` in letters, as `<ol type="a">` shows it: `a` to `z`, then `aa`. */
@@ -115,7 +137,10 @@ function orderedMarker(type: string, number: bigint): Marker {
         return bulletWithLabel(`${listLabel(type, number)}.`);
     }
 
-    return number < 0n ? bulletWithLabel(`${number}.`) : numbered(`${number}.`);
+    const label = `${number}.`;
+
+    // Below 0, or too long a number for a marker.
+    return number < 0n || label.length > MAX_MARKER_DIGITS + 1 ? bulletWithLabel(label) : numbered(label);
 }
 
 /** `number` as a lettered or roman list shows it. Numbers they have no form for (below 1, roman past 3999) are digits. */
@@ -235,21 +260,23 @@ function listLayout(list: Element, options: Options, lookup: RuleLookup): ListLa
     return layout;
 }
 
-/** The marker Word shows for a list paragraph: the first marker text in it that is not inside other hidden text. */
-function wordMarker(paragraph: Element, lookup: RuleLookup): Marker {
+/**
+ * The marker Word shows for a list paragraph: the first marker text in it that the page would show but for being a
+ * marker. A number of up to nine digits is a Markdown number. Other text, such as `a.`, `1.1.` or `(iv)`, is kept after
+ * a bullet. A single character is Word's bullet symbol.
+ */
+function wordMarker(paragraph: Element, lookup: RuleLookup, isHiddenOnPage: (element: Element) => boolean): Marker {
     const pending: Element[] = [paragraph];
 
     while (pending.length > 0) {
         const element = pending.pop() as Element;
 
         if (element !== paragraph && isWordMarker(element)) {
-            const text = element.textContent?.trim() ?? "";
-
-            if (WORD_NUMBER.test(text)) {
-                return numbered(`${text.slice(0, -1)}.`);
+            if (isHiddenOnPage(element)) {
+                continue;
             }
 
-            return WORD_LETTER.test(text) ? bulletWithLabel(text) : BULLET;
+            return wordMarkerFrom(element.textContent?.trim() ?? "");
         }
 
         if (element === paragraph || !lookup.isRemoved(element)) {
@@ -263,6 +290,14 @@ function wordMarker(paragraph: Element, lookup: RuleLookup): Marker {
     return BULLET;
 }
 
+function wordMarkerFrom(text: string): Marker {
+    if (WORD_NUMBER.test(text)) {
+        return numbered(`${text.slice(0, -1)}.`);
+    }
+
+    return [...text].length > 1 ? bulletWithLabel(escapeMarkdown(text)) : BULLET;
+}
+
 /** True for what may sit between two paragraphs of one Word list: blank text, a comment or a hidden element. */
 function isBetweenWordItems(node: Node, lookup: RuleLookup): boolean {
     if (node.nodeType === 3) {
@@ -274,8 +309,11 @@ function isBetweenWordItems(node: Node, lookup: RuleLookup): boolean {
 
 const wordPlaces = new WeakMap<Element, ItemPlace>();
 
-/** Places every paragraph of the Word list `paragraph` is in, once for the list. */
-function wordPlace(paragraph: Element, lookup: RuleLookup): ItemPlace {
+/**
+ * Places every paragraph of the Word lists `paragraph` is in, once for the run of paragraphs. Paragraphs of different
+ * lists (their `mso-list` ids differ) are placed apart, each list from its own top level.
+ */
+function wordPlace(paragraph: Element, lookup: RuleLookup, isHiddenOnPage: (element: Element) => boolean): ItemPlace {
     const cached = wordPlaces.get(paragraph);
 
     if (cached) {
@@ -302,16 +340,37 @@ function wordPlace(paragraph: Element, lookup: RuleLookup): ItemPlace {
         }
     }
 
-    const placed = placeItems(
-        items.map((item) => wordLevel(item)),
-        items.map((item) => wordMarker(item, lookup)),
-    );
+    for (const list of splitByListId(items)) {
+        const placed = placeItems(
+            list.map((item) => wordLevel(item)),
+            list.map((item) => wordMarker(item, lookup, isHiddenOnPage)),
+        );
 
-    for (const [index, item] of items.entries()) {
-        wordPlaces.set(item, placed[index] as ItemPlace);
+        for (const [index, item] of list.entries()) {
+            wordPlaces.set(item, { ...(placed[index] as ItemPlace), isListStart: index === 0 && list !== items && item !== items[0] });
+        }
     }
 
     return wordPlaces.get(paragraph) ?? { indent: 0, marker: BULLET };
+}
+
+/** The paragraphs grouped by the Word list each belongs to, in order. One without an id stays with the one before. */
+function splitByListId(items: Element[]): Element[][] {
+    const lists: Element[][] = [];
+    let currentId: string | undefined;
+
+    for (const item of items) {
+        const id = WORD_LIST_ID.exec(msoList(item))?.[1];
+
+        if (lists.length === 0 || (id !== undefined && currentId !== undefined && id !== currentId)) {
+            lists.push([]);
+        }
+
+        currentId = id ?? currentId;
+        lists.at(-1)?.push(item);
+    }
+
+    return lists.length === 1 ? [items] : lists;
 }
 
 /** The item's place: its list's, or a bullet at the left edge for an item outside a list. */
@@ -332,41 +391,56 @@ function writeItem(place: ItemPlace, content: string): string {
     return `${" ".repeat(place.indent)}${place.marker.text}${content.replaceAll("\n", () => `\n${indent}`)}`;
 }
 
-export const listRules: Record<string, Rule> = {
-    // A list placed straight in a list, not in an item, as some editors write a nested list: it goes under the item
-    // before it, as it would inside that item.
-    listInList: {
-        filter: unlessRemoved((node) => isList(node) && isList(node.parentNode)),
-        replacement(content, node, options, lookup) {
-            const anchor = listLayout(node.parentNode as Element, options, lookup).anchors.get(node);
+/**
+ * The list rules. `isHiddenOnPage` tells whether the page hides an element for a reason of its own, apart from being a
+ * Word marker (which the preset hides because it writes the marker itself).
+ */
+export function listRules(isHiddenOnPage: (element: Element) => boolean): Record<string, Rule> {
+    return {
+        // A list placed straight in a list, not in an item, as some editors write a nested list: it goes under the item
+        // before it, as it would inside that item.
+        listInList: {
+            filter: unlessRemoved((node) => isList(node) && isList(node.parentNode)),
+            replacement(content, node, options, lookup) {
+                const anchor = listLayout(node.parentNode as Element, options, lookup).anchors.get(node);
 
-            if (!anchor) {
-                return `\n\n${content}\n\n`;
-            }
+                if (!anchor) {
+                    return `\n\n${content}\n\n`;
+                }
 
-            const place = itemPlace(anchor, options, lookup);
-            const indent = " ".repeat(place.indent + place.marker.width);
-            // Blank lines stay blank: no trailing spaces.
-            const indented = trimNewlines(content).replaceAll(LINE_WITH_TEXT, () => indent);
+                const items = trimNewlines(content);
 
-            return `\n${indented}${node.nextSibling ? "\n" : ""}`;
+                // A list whose items are all hidden leaves nothing, not a line that would part the items around it.
+                if (items.trim() === "") {
+                    return "";
+                }
+
+                const place = itemPlace(anchor, options, lookup);
+                const indent = " ".repeat(place.indent + place.marker.width);
+                // Blank lines stay blank: no trailing spaces.
+                const indented = items.replaceAll(LINE_WITH_TEXT, () => indent);
+
+                return `\n${indented}${node.nextSibling ? "\n" : ""}`;
+            },
         },
-    },
 
-    // A list item written with the marker and one space, as people type it.
-    listItem: {
-        filter: unlessRemoved((node) => node.nodeName === "LI"),
-        replacement(content, node, options, lookup) {
-            return `${writeItem(itemPlace(node, options, lookup), trimNewlines(content))}${node.nextSibling ? "\n" : ""}`;
+        // A list item written with the marker and one space, as people type it.
+        listItem: {
+            filter: unlessRemoved((node) => node.nodeName === "LI"),
+            replacement(content, node, options, lookup) {
+                return `${writeItem(itemPlace(node, options, lookup), trimNewlines(content))}${node.nextSibling ? "\n" : ""}`;
+            },
         },
-    },
 
-    // Word writes a list as paragraphs with `mso-list` styles, the marker in text it hides. Its items are on lines of
-    // their own, with no blank line between them. The spaces Word puts after the marker are not the item's text.
-    wordListItem: {
-        filter: unlessRemoved((node) => wordLevel(node) > 0),
-        replacement(content, node, _options, lookup) {
-            return `\n${writeItem(wordPlace(node, lookup), content.trim())}\n`;
+        // Word writes a list as paragraphs with `mso-list` styles, the marker in text it hides. Its items are on lines of
+        // their own, with no blank line between them. The spaces Word puts after the marker are not the item's text.
+        wordListItem: {
+            filter: unlessRemoved((node) => wordLevel(node) > 0),
+            replacement(content, node, _options, lookup) {
+                const place = wordPlace(node, lookup, isHiddenOnPage);
+
+                return `${place.isListStart ? "\n\n" : "\n"}${writeItem(place, content.trim())}\n`;
+            },
         },
-    },
-};
+    };
+}
