@@ -253,16 +253,20 @@ const seed = async (page: Page): Promise<Seed> => {
     return result;
 };
 
-const median = (values: (number | undefined)[]): number | undefined => {
+/** The median of the runs that produced a reading, with how many did: a run without one (no LCP, say) is not counted. */
+const median = (values: (number | undefined)[]): { count: number; value: number | undefined } => {
     const sorted = values.filter((value): value is number => value !== undefined && Number.isFinite(value)).toSorted((a, b) => a - b);
 
     if (sorted.length === 0) {
-        return undefined;
+        return { count: 0, value: undefined };
     }
 
     const middle = Math.floor(sorted.length / 2);
 
-    return sorted.length % 2 === 1 ? sorted[middle] : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
+    return {
+        count: sorted.length,
+        value: sorted.length % 2 === 1 ? sorted[middle] : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2,
+    };
 };
 
 /** One run: a fresh context loads thread A cold, switches to B (uncached) and back to A (cached), reloads A warm, then C and A. */
@@ -340,7 +344,14 @@ test.describe("Load timing (benchmark)", () => {
         const columns = Object.keys(samples);
 
         expect(columns).toHaveLength(PROFILES.length * 2);
-        const format = (value: number | undefined): string => (value === undefined ? "–" : String(Math.round(value)));
+        // A median over fewer runs than `n` says so, so two builds are not compared over different sample sizes unseen.
+        const format = ({ count, value }: { count: number; value: number | undefined }): string => {
+            if (value === undefined) {
+                return "–";
+            }
+
+            return count < RUNS ? `${String(Math.round(value))} (n=${String(count)})` : String(Math.round(value));
+        };
         const table = [
             `| ${LABEL} (median ms, n=${String(RUNS)}) | ${columns.join(" | ")} |`,
             `| --- | ${columns.map(() => "---:").join(" | ")} |`,
