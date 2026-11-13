@@ -295,7 +295,12 @@ const Sidebar = <T extends string>({
             {/* This is what handles the sidebar gap on desktop */}
             <div
                 className={cn(
-                    "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+                    "relative w-(--sidebar-width) bg-transparent",
+                    collapsible === "offcanvas"
+                        ? // The gap sets the page's width, so it changes once rather than every frame: at once when the sidebar opens (it slides
+                          // in over the room it got), and when it has slid out on closing (the room stays until then).
+                          "[transition:width_0s_linear] group-data-[collapsible=offcanvas]:[transition-delay:200ms] motion-reduce:group-data-[collapsible=offcanvas]:[transition-delay:0s]"
+                        : "transition-[width] duration-200 ease-linear",
                     "group-data-[collapsible=offcanvas]:w-0",
                     "group-data-[side=right]:rotate-180",
                     variant === "floating" || variant === "inset"
@@ -306,10 +311,14 @@ const Sidebar = <T extends string>({
             />
             <div
                 className={cn(
-                    "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
+                    "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) md:flex",
+                    collapsible === "offcanvas"
+                        ? // Slides on the compositor (translate); its resting place off screen is set once the slide has ended, or at once on opening.
+                          "[transition:translate_200ms_linear,left_0s_linear,right_0s_linear] group-data-[collapsible=offcanvas]:[transition-delay:0s,200ms,200ms] motion-reduce:group-data-[collapsible=offcanvas]:[transition-delay:0s]"
+                        : "transition-[left,right,width] duration-200 ease-linear",
                     side === "left"
-                        ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
-                        : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
+                        ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] group-data-[collapsible=offcanvas]:-translate-x-full"
+                        : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] group-data-[collapsible=offcanvas]:translate-x-full",
                     // Adjust the padding for floating and inset variants.
                     variant === "floating" || variant === "inset"
                         ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
