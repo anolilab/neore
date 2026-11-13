@@ -4,7 +4,7 @@
  * browser extension mounts.
  */
 import type { GatewayModel } from "@neore/ai/models";
-import { render, screen } from "@testing-library/react";
+import { render, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps, ReactNode } from "react";
 import { createElement } from "react";
@@ -115,23 +115,26 @@ const MODELS = [
 ];
 
 // The model rows only: the web picker's sort control has options of its own.
-const listedRows = () => screen.getAllByRole("option").filter((option: HTMLElement) => option.dataset.modelId !== undefined);
+const listedRows = (root: HTMLElement = document.body) =>
+    within(root)
+        .getAllByRole("option")
+        .filter((option: HTMLElement) => option.dataset.modelId !== undefined);
 
-const listedIds = () => listedRows().map((row: HTMLElement) => row.dataset.modelId ?? "");
+const listedIds = (root?: HTMLElement) => listedRows(root).map((row: HTMLElement) => row.dataset.modelId ?? "");
 
 /**
  * Types `text` one key at a time. After each key, a row that was listed before it and still is was not rendered
  * again, and while the listed rows stay the same no group was rendered again either.
  */
-const typeChecked = async (user: ReturnType<typeof userEvent.setup>, text: string) => {
+const typeChecked = async (user: ReturnType<typeof userEvent.setup>, text: string, root: HTMLElement = document.body) => {
     for (const key of text) {
-        const before = listedIds();
+        const before = listedIds(root);
 
         rowRenders.clear();
         groupRenders.count = 0;
-        await user.type(screen.getByPlaceholderText("Search models..."), key);
+        await user.type(within(root).getByPlaceholderText("Search models..."), key);
 
-        const after = listedIds();
+        const after = listedIds(root);
         const kept = after.filter((id: string) => before.includes(id));
 
         for (const id of kept) {
@@ -144,8 +147,9 @@ const typeChecked = async (user: ReturnType<typeof userEvent.setup>, text: strin
     }
 };
 
-// Base UI's scroll area constructs a ResizeObserver.
+// Base UI's scroll area constructs a ResizeObserver, and its transitions call getAnimations, which jsdom lacks.
 beforeEach(() => {
+    Element.prototype.getAnimations = () => [];
     vi.stubGlobal(
         "ResizeObserver",
         class {
@@ -175,5 +179,29 @@ describe.each([
         await typeChecked(user, "-4");
 
         expect(listedIds()).toStrictEqual(["openai/gpt-4o"]);
+    });
+
+    it("keeps its groups while another picker shows the same models differently", async () => {
+        const user = userEvent.setup();
+        const { container } = render(
+            <>
+                <div data-testid="all">
+                    <ModelPicker defaultModeFilter="text" defaultTab="all" footer={null} models={MODELS} />
+                </div>
+                <div data-testid="without-gpt-4o">
+                    <ModelPicker defaultModeFilter="text" defaultTab="all" footer={null} models={MODELS.filter((entry) => entry.id !== "openai/gpt-4o")} />
+                </div>
+            </>,
+        );
+        const root = within(container).getByTestId("all");
+        const other = within(container).getByTestId("without-gpt-4o");
+
+        // The other picker's OpenAI group starts with the same GPT-5 row but holds other rows; searching there in
+        // between must not cost this picker its groups.
+        await typeChecked(user, "gp", root);
+        await typeChecked(user, "gp", other);
+        await typeChecked(user, "t", root);
+
+        expect(listedIds(root)).toStrictEqual(["openai/gpt-5", "openai/gpt-4o"]);
     });
 });

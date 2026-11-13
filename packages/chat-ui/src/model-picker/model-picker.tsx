@@ -87,10 +87,13 @@ const stableModelItem = (model: GatewayModel): ModelItem => {
     return item;
 };
 
-/** The last group built with each first row; a group is reused while its label and rows are the same. */
-const groupsByFirstItem = new WeakMap<ModelItem, ModelGroup>();
+/**
+ * The last group built with each first row, per picker: a group is reused while its label and rows are the same. Two
+ * pickers showing different groups that start with the same row would replace each other's entries if they shared one.
+ */
+type GroupCache = WeakMap<ModelItem, ModelGroup>;
 
-const stableModelGroup = (value: string, items: ModelItem[], isFavorite: boolean): ModelGroup => {
+const stableModelGroup = (groupsByFirstItem: GroupCache, value: string, items: ModelItem[], isFavorite: boolean): ModelGroup => {
     const [first] = items;
     const previous = first ? groupsByFirstItem.get(first) : undefined;
 
@@ -437,6 +440,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     const [selectedModelId, setSelectedModelId] = useState<string | undefined>(initialModelId);
     const [parallelSelectedIds, setParallelSelectedIds] = useState<Set<string>>(() => new Set(initialModelIds));
     const [searchQuery, setSearchQuery] = useState("");
+    const [groupCache] = useState((): GroupCache => new WeakMap());
     const [activeTab, setActiveTab] = useState<ModelPickerTab>(defaultTab);
     const [selectionMode, setSelectionMode] = useState<"parallel" | "single">(() => ((initialModelIds?.length ?? 0) > 0 ? "parallel" : "single"));
     const [modeFilter, setModeFilter] = useState<ModelModeFilter>(defaultModeFilter);
@@ -555,11 +559,11 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         for (const [creator, creatorModels] of grouped.entries()) {
             const items = creatorModels.map((model) => stableModelItem(model));
 
-            groups.push(stableModelGroup(creator, items, isStarred));
+            groups.push(stableModelGroup(groupCache, creator, items, isStarred));
         }
 
         return groups;
-    }, [favoriteModels, regularModels, activeTab]);
+    }, [favoriteModels, regularModels, activeTab, groupCache]);
 
     const isParallelMaxReached = parallelSelectedIds.size >= MAX_PARALLEL;
     const isShowProviderSidebar = activeTab === "all" && !searchQuery.trim();

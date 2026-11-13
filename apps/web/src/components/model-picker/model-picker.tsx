@@ -151,19 +151,13 @@ const stableModelItem = (model: GatewayModel, label: string): ModelItem => {
 };
 
 /**
- * The last group built with each first row; a group is reused while its label, kind and rows are the same. Complete
- * and search-filtered groups keep separate entries: a search rebuilds the complete groups too, and a shared entry
- * would let a complete group evict the unchanged filtered group that starts with the same row.
+ * The last group built with each first row, per picker: a group is reused while its label, kind and rows are the
+ * same. Complete and search-filtered groups keep separate caches, as do separate pickers: a search rebuilds the
+ * complete groups too, and a shared entry would let one group evict an unchanged one that starts with the same row.
  */
-const completeGroupsByFirstItem = new WeakMap<ModelItem, ModelGroup>();
-const filteredGroupsByFirstItem = new WeakMap<ModelItem, ModelGroup>();
+type GroupCache = WeakMap<ModelItem, ModelGroup>;
 
-const stableModelGroup = (
-    value: string,
-    items: ModelItem[],
-    isFavorite: boolean,
-    groupsByFirstItem: WeakMap<ModelItem, ModelGroup> = completeGroupsByFirstItem,
-): ModelGroup => {
+const stableModelGroup = (groupsByFirstItem: GroupCache, value: string, items: ModelItem[], isFavorite: boolean): ModelGroup => {
     const [first] = items;
     const previous = first ? groupsByFirstItem.get(first) : undefined;
 
@@ -754,6 +748,9 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const [selectedModelId, setSelectedModelId] = useState<string | undefined>(initialModelId);
     const [parallelSelectedIds, setParallelSelectedIds] = useState<Set<string>>(() => new Set(initialModelIds));
     const [searchQuery, setSearchQuery] = useState("");
+    const [groupCaches] = useState(() => {
+        return { complete: new WeakMap() as GroupCache, filtered: new WeakMap() as GroupCache };
+    });
     // Read out after a starred move, so a screen-reader user hears the result and the model's new place.
     const [moveAnnouncement, setMoveAnnouncement] = useState("");
     const [activeTab, setActiveTab] = useState<ModelPickerTab>(defaultTab);
@@ -927,12 +924,12 @@ const ModelPicker: FC<ModelPickerProps> = ({
         if (sort !== "default") {
             const listed = activeTab === "starred" ? favoriteModels : [...favoriteModels, ...regularModels];
 
-            return [stableModelGroup(sort, itemsFor(sortModels(listed, sort, nicknames)), false)];
+            return [stableModelGroup(groupCaches.complete, sort, itemsFor(sortModels(listed, sort, nicknames)), false)];
         }
 
         if (activeTab === "starred") {
             // One group in the user's own order; grouping by creator would split it.
-            return [stableModelGroup("starred", itemsFor(favoriteModels), true)];
+            return [stableModelGroup(groupCaches.complete, "starred", itemsFor(favoriteModels), true)];
         }
 
         const groups: ModelGroup[] = [];
@@ -940,11 +937,11 @@ const ModelPicker: FC<ModelPickerProps> = ({
         const grouped = groupModelsByCreator(allModels);
 
         for (const [creator, creatorModels] of grouped.entries()) {
-            groups.push(stableModelGroup(creator, itemsFor(creatorModels), false));
+            groups.push(stableModelGroup(groupCaches.complete, creator, itemsFor(creatorModels), false));
         }
 
         return groups;
-    }, [favoriteModels, regularModels, activeTab, sort, nicknames]);
+    }, [favoriteModels, regularModels, activeTab, sort, nicknames, groupCaches]);
 
     // One search text per model per locale (`i18n` is a new object on every
     // locale change), so a keystroke only runs `includes` over prebuilt strings.
@@ -974,12 +971,12 @@ const ModelPicker: FC<ModelPickerProps> = ({
             const filteredItems = filterModelsByQuery(group.items, searchQuery, searchTexts);
 
             if (filteredItems.length > 0) {
-                filtered.push(stableModelGroup(group.value, filteredItems, Boolean(group.isFavorite), filteredGroupsByFirstItem));
+                filtered.push(stableModelGroup(groupCaches.filtered, group.value, filteredItems, Boolean(group.isFavorite)));
             }
         }
 
         return filtered;
-    }, [groupedItems, searchQuery, searchTexts]);
+    }, [groupedItems, searchQuery, searchTexts, groupCaches]);
 
     const infoModel = useMemo(() => {
         if (!infoModelId) {
