@@ -23407,12 +23407,16 @@
                     "expiresAt": {
                       "type": "number"
                     },
+                    "id": {
+                      "type": "string"
+                    },
                     "linkToken": {
                       "type": "string"
                     }
                   },
                   "required": [
                     "expiresAt",
+                    "id",
                     "linkToken"
                   ],
                   "type": "object"
@@ -23574,11 +23578,15 @@
                             },
                             "expiresAt": {
                               "type": "number"
+                            },
+                            "id": {
+                              "type": "string"
                             }
                           },
                           "required": [
                             "bound",
-                            "expiresAt"
+                            "expiresAt",
+                            "id"
                           ],
                           "type": "object"
                         },
@@ -23845,6 +23853,19 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "confirmedNotes": {
+                        "items": {
+                          "description": "Id<\"threadGuestMessages\">",
+                          "type": "string",
+                          "x-lunora-table": "threadGuestMessages"
+                        },
+                        "type": "array"
+                      },
+                      "linkId": {
+                        "description": "Id<\"threadGuestLinks\">",
+                        "type": "string",
+                        "x-lunora-table": "threadGuestLinks"
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",
@@ -23852,6 +23873,7 @@
                       }
                     },
                     "required": [
+                      "linkId",
                       "threadId"
                     ],
                     "type": "object"
