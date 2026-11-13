@@ -5,7 +5,7 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -34,14 +34,30 @@ vi.mock("@tanstack/react-router", () => {
 // The chat-ui switcher is replaced by a plain list, one button per organization, so the test drives `onSwitch` directly.
 vi.mock("@neore/chat-ui/org-switcher/org-switcher", () => {
     return {
-        default: ({ onSwitch, organizations }: { onSwitch: (id: string) => void; organizations: { id: string; name: string }[] }) =>
+        default: ({
+            isPending,
+            onSwitch,
+            organizations,
+        }: {
+            isPending: boolean;
+            onSwitch: (id: string) => void;
+            organizations: { id: string; name: string }[];
+        }) =>
             createElement(
                 "div",
                 null,
+                createElement("output", null, isPending ? "switching" : "idle"),
                 organizations.map((organization) =>
                     createElement("button", { key: organization.id, onClick: () => onSwitch(organization.id), type: "button" }, organization.name),
                 ),
             ),
+    };
+});
+
+vi.mock("@/features/auth/lib/utilities", async (importOriginal: () => Promise<Record<string, unknown>>) => {
+    return {
+        ...(await importOriginal()),
+        getLocalizedError: ({ error }: { error: Error }) => `localized:${error.message}`,
     };
 });
 
@@ -96,6 +112,22 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 });
 
+type HeldCall<T> = { promise: Promise<T>; reject: (error: Error) => void; resolve: (value: T) => void };
+
+/** A call that stays open until the test settles it. */
+const holdCall = <T,>(): HeldCall<T> => {
+    const held = {} as HeldCall<T>;
+
+    // The tsconfig lib and the configured Node range predate `Promise.withResolvers`.
+
+    held.promise = new Promise<T>((resolve: (value: T) => void, reject: (error: Error) => void) => {
+        held.reject = reject;
+        held.resolve = resolve;
+    });
+
+    return held;
+};
+
 const { default: OrganizationSwitcher } = await import("./organization-switcher");
 
 afterEach(() => {
@@ -122,5 +154,26 @@ describe("OrganizationSwitcher", () => {
         });
         expect(harness.setActive).toHaveBeenCalledWith(expect.objectContaining({ organizationId: "org_b" }));
         expect(queryClient.getQueryState(["other-read"])?.isInvalidated).toBe(false);
+    });
+
+    it("shows the localized error and stops switching when the switch is rejected", async () => {
+        const pendingSwitch = holdCall<unknown>();
+
+        harness.setActive.mockImplementationOnce(() => pendingSwitch.promise);
+
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+        render(createElement(QueryClientProvider, { client: queryClient }, createElement(OrganizationSwitcher)));
+
+        fireEvent.click(screen.getByRole("button", { name: "Beta" }));
+
+        expect(screen.getByText("switching")).toBeTruthy();
+
+        await act(async () => {
+            pendingSwitch.reject(new Error("forbidden"));
+        });
+
+        expect(screen.getByText("idle")).toBeTruthy();
+        expect(harness.toast).toHaveBeenCalledExactlyOnceWith({ message: "localized:forbidden", variant: "error" });
     });
 });

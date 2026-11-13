@@ -61,8 +61,9 @@ const TeamSwitcher = ({ className, showAllOrganization = true, ...props }: TeamS
 
             setIsChangingTeam(true);
 
-            // Chosen before the `try`: the React Compiler cannot lower a conditional inside one.
-            const switchedMessage = teamId ? t`Switched to team view` : t`Switched to organization view`;
+            // Chosen before the `try` (the React Compiler cannot lower a conditional inside one), translated when the toast
+            // posts, so a language change during the switch is the one it shows.
+            const switchedMessage = teamId ? () => t`Switched to team view` : () => t`Switched to organization view`;
 
             await settle(
                 async () => {
@@ -77,7 +78,7 @@ const TeamSwitcher = ({ className, showAllOrganization = true, ...props }: TeamS
                         await queryClient.invalidateQueries({ queryKey: ["chat", "threads"] });
 
                         toast({
-                            message: switchedMessage,
+                            message: switchedMessage(),
                             variant: "success",
                         });
                     } catch (error) {
