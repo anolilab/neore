@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import { titleOnScreen, useTitleSaveRevision } from "@/features/chat/core/lib/thread-title-saves";
@@ -47,6 +47,24 @@ const sortThreadsInGroup = (threads: BranchNode[]): BranchNode[] => {
         return b.createdAt - a.createdAt;
     });
 };
+
+/** The nodes of one build, shared with the build before it, and the build they came from. */
+interface SharedNodes {
+    built: BranchNode[][];
+    byId: NodesById;
+    lists: BranchNode[][];
+}
+
+const NO_NODES: NodesById = new Map();
+
+/** The same nodes, in the same order, in every list. */
+const sameNodeLists = (left: ReadonlyArray<ReadonlyArray<BranchNode>>, right: ReadonlyArray<ReadonlyArray<BranchNode>>): boolean =>
+    left.length === right.length &&
+    left.every((list, index) => {
+        const other = right[index];
+
+        return other !== undefined && list.length === other.length && list.every((node, position) => node === other[position]);
+    });
 
 /** The longest delay setTimeout accepts; a snooze further out simply re-arms when this one fires. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
@@ -112,9 +130,8 @@ const useThreadGroups = (
 
     // Snoozes end on their own (the timer below re-arms per wake); idle rows read the same clock.
     const [now, setNow] = useState(() => Date.now());
-    // The nodes the COMMITTED list shows: an unchanged thread gets its node back, so only changed rows re-render. Read during
-    // render, replaced only in the layout effect below, so a render React throws away cannot change what later ones compare against.
-    const committedNodesReference = useRef<NodesById>(new Map());
+    // The last build's nodes, shared with the one before (see the sharing step below).
+    const [sharedNodes, setSharedNodes] = useState<SharedNodes | null>(null);
 
     // --- Stage 1: Build lookup maps (only recomputes when raw data changes) ---
     const lookupMaps = useMemo(() => {
@@ -193,7 +210,7 @@ const useThreadGroups = (
     ]);
 
     // --- Stage 2: Build thread hierarchy trees (only recomputes when maps or optimistic state changes) ---
-    const hierarchyData = useMemo(() => {
+    const builtNodes = useMemo(() => {
         if (!lookupMaps) {
             return null;
         }
@@ -270,16 +287,39 @@ const useThreadGroups = (
             };
         };
 
-        const builtThreadsList = rootThreads
-            .map((thread: any) => buildHierarchy(thread._id))
-            .filter((node: BranchNode | null): node is BranchNode => node !== null);
+        const threads = rootThreads.map((thread: any) => buildHierarchy(thread._id)).filter((node: BranchNode | null): node is BranchNode => node !== null);
 
         // Build temporary threads hierarchy separately
-        const builtTemporaryThreadsList: BranchNode[] = temporaryRootThreads
+        const temporaryNodes: BranchNode[] = temporaryRootThreads
             .map((thread: any) => buildHierarchy(thread._id))
             .filter((node: BranchNode | null): node is BranchNode => node !== null && node.expiresAt !== undefined);
-        const shared = shareUnchangedNodes(committedNodesReference.current, [builtThreadsList, builtTemporaryThreadsList]);
-        const [allThreadsList = [], temporaryThreadsList = []] = shared.lists;
+
+        return [threads, temporaryNodes];
+    }, [lookupMaps, optimisticPins, optimisticStatuses, optimisticDeletions, compositeData?.tags, titleRevision, now, t]);
+
+    // --- Sharing: an unchanged thread gets the node it had, so only the rows whose thread changed re-render ---
+    // Kept in state and adjusted during render, not in a ref: an update made during a render is thrown away with that render, so the
+    // nodes compared against are always those of the last render React kept, and the hook stays compiled.
+    let currentShared = sharedNodes;
+
+    if (builtNodes !== null && currentShared?.built !== builtNodes) {
+        const shared = shareUnchangedNodes(currentShared?.byId ?? NO_NODES, builtNodes);
+
+        // A build that changed no node keeps the state it has: no update, so a rebuild can never loop through this.
+        if (!currentShared || !sameNodeLists(currentShared.lists, shared.lists)) {
+            currentShared = { built: builtNodes, byId: shared.byId, lists: shared.lists };
+            setSharedNodes(currentShared);
+        }
+    }
+
+    const sharedLists = builtNodes === null ? null : (currentShared?.lists ?? null);
+
+    const hierarchyData = useMemo(() => {
+        if (!sharedLists) {
+            return null;
+        }
+
+        const [allThreadsList = [], temporaryThreadsList = []] = sharedLists;
 
         // Single pass: separate threads by type (more efficient than multiple filters)
         // Apply category + tag filters if selected
@@ -312,18 +352,11 @@ const useThreadGroups = (
 
         return {
             allThreadsList,
-            nodesById: shared.byId,
             regularThreads,
             statelessThreads,
             temporaryThreadsList: filteredTemporaryThreadsList,
         };
-    }, [lookupMaps, optimisticPins, optimisticStatuses, optimisticDeletions, selectedCategory, selectedTagIds, compositeData?.tags, titleRevision, now, t]);
-
-    useLayoutEffect(() => {
-        if (hierarchyData) {
-            committedNodesReference.current = hierarchyData.nodesById;
-        }
-    }, [hierarchyData]);
+    }, [sharedLists, selectedCategory, selectedTagIds]);
 
     // --- Stage 3: Sort callback for search results (stable reference) ---
     const sortThreadsByPriority = useCallback(

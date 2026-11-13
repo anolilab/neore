@@ -345,4 +345,29 @@ describe("node identity across rebuilds", () => {
         expect(after.get("c")).toBe(before.get("c"));
         expect(after.get("a")).toBe(before.get("a"));
     });
+
+    it("commits once per push: keeping the shared nodes adds no render to the screen", () => {
+        const collapsedGroups = new Set<GroupType>();
+        const collapsedProjects = new Set<string>();
+        const commits = { count: 0 };
+        const List = () => {
+            useThreadGroups(collapsedGroups, collapsedProjects, "", "threads", undefined, [], undefined, undefined);
+
+            useLayoutEffect(() => {
+                commits.count += 1;
+            });
+
+            return null;
+        };
+        const { rerender } = render(<List />);
+
+        expect(commits.count).toBe(1);
+
+        composite.threads.page = (structuredClone(composite.threads.page) as { _id: string; status: string }[]).map((thread) =>
+            thread._id === "c" ? { ...thread, status: "running" } : thread,
+        ) as never;
+        rerender(<List />);
+
+        expect(commits.count).toBe(2);
+    });
 });
