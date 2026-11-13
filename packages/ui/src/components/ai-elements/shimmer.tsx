@@ -14,10 +14,42 @@ export interface TextShimmerProps {
 }
 
 /**
+ * Reports whether `target` is on screen until the returned function stops it. Best-effort: where the observer is
+ * missing, is not a constructor (a test stub), or throws, it reports nothing and the shimmer keeps animating.
+ */
+const watchOnScreen = (target: Element, onChange: (onScreen: boolean) => void): (() => void) | undefined => {
+    if (typeof IntersectionObserver !== "function") {
+        return undefined;
+    }
+
+    try {
+        const observer = new IntersectionObserver((entries: IntersectionObserverEntry[]) => {
+            const last = entries.at(-1);
+
+            if (last) {
+                onChange(last.isIntersecting);
+            }
+        });
+
+        observer.observe(target);
+
+        return () => {
+            try {
+                observer.disconnect();
+            } catch {
+                // Nothing left to stop.
+            }
+        };
+    } catch {
+        return undefined;
+    }
+};
+
+/**
  * Text with a highlight sweeping across it. A CSS keyframe (`animate-text-shimmer` in `global.css`) moves the
  * background in 30 steps per sweep, so no script runs per frame and the text repaints 30 times a cycle, not on every
  * frame. An endless loop is motion the user cannot pause (WCAG 2.2.2): with reduced motion it does not run, and the
- * text stays at the sweep's end position. Off-screen it pauses (`data-paused`), where IntersectionObserver exists.
+ * text stays at the sweep's end position. Off-screen it pauses (`data-paused`) where an IntersectionObserver can start.
  */
 const ShimmerComponent = ({ as = "p", children, className, duration = 2, spread = 2 }: TextShimmerProps) => {
     // A callback ref into state: the effect runs again for a new element (another `as`).
@@ -25,21 +57,11 @@ const ShimmerComponent = ({ as = "p", children, className, duration = 2, spread 
     const [offScreen, setOffScreen] = useState(false);
 
     useEffect(() => {
-        if (!target || typeof IntersectionObserver === "undefined") {
+        if (!target) {
             return undefined;
         }
 
-        const observer = new IntersectionObserver((entries: IntersectionObserverEntry[]) => {
-            const last = entries.at(-1);
-
-            if (last) {
-                setOffScreen(!last.isIntersecting);
-            }
-        });
-
-        observer.observe(target);
-
-        return () => observer.disconnect();
+        return watchOnScreen(target, (onScreen: boolean) => setOffScreen(!onScreen));
     }, [target]);
 
     return createElement(

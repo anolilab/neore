@@ -69,6 +69,11 @@ describe("Shimmer", () => {
     });
 });
 
+/** An observer that cannot start: a plain function can be `new`-ed, and this one throws when it is. */
+function ThrowingObserver(): never {
+    throw new Error("observer unavailable");
+}
+
 describe("Shimmer off-screen", () => {
     const observers: { callback: IntersectionObserverCallback; disconnected: boolean; targets: Element[] }[] = [];
 
@@ -129,6 +134,30 @@ describe("Shimmer off-screen", () => {
         const { element, unmount } = renderShimmer();
 
         expect("paused" in element.dataset).toBe(false);
+        expect(element.classList.contains("animate-text-shimmer")).toBe(true);
+        unmount();
+    });
+    it("keeps running when IntersectionObserver throws on construction", () => {
+        vi.stubGlobal("IntersectionObserver", ThrowingObserver);
+        const { element, unmount } = renderShimmer();
+
+        expect(element.textContent).toBe("Thinking...");
+        expect("paused" in element.dataset).toBe(false);
+        expect(element.classList.contains("animate-text-shimmer")).toBe(true);
+        unmount();
+    });
+
+    it("keeps running under a stub that is not a constructor", () => {
+        // Like the web test setup's `vi.fn().mockImplementation(() => ({ … }))`: an arrow implementation cannot be `new`-ed.
+        vi.stubGlobal(
+            "IntersectionObserver",
+            vi.fn().mockImplementation(() => {
+                return { disconnect: vi.fn(), observe: vi.fn() };
+            }),
+        );
+        const { element, unmount } = renderShimmer();
+
+        expect(element.textContent).toBe("Thinking...");
         expect(element.classList.contains("animate-text-shimmer")).toBe(true);
         unmount();
     });
