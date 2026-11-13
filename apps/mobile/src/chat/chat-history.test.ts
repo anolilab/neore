@@ -252,20 +252,55 @@ describe("an older page that lands after the history moved", () => {
 });
 
 describe("a second refresh before a hole is closed", () => {
-    it("keeps the rows below the hole and fills from the newest page all the way down to them", async () => {
+    it("keeps every row on screen, both holes marked, and fills from the newest page all the way down", async () => {
         const fetchOlder = serverOf();
         // Rows 1-20 were on screen; a refresh brought 61-80 and left a hole below them, still open.
         const firstRefresh = withNewestPage({ olderCursor: null, rows: run(1, 20) }, { olderCursor: "61", rows: run(61, 80) });
         // Before the hole is filled, 40 more messages come: the next newest page is 101-120.
         const { read, screen, update } = screenOf(withNewestPage(firstRefresh, { olderCursor: "101", rows: run(101, 120) }));
 
-        expect(ids(screen.history.rows)).toStrictEqual(ids([...run(1, 20), ...run(101, 120)]));
-        expect(screen.history.gap).toStrictEqual({ anchorId: "m101", cursor: "101", keptCursor: null });
+        expect(ids(screen.history.rows)).toStrictEqual(ids([...run(1, 20), ...run(61, 80), ...run(101, 120)]));
+        expect(screen.history.gap).toStrictEqual({
+            anchorId: "m101",
+            cursor: "101",
+            keptCursor: undefined,
+            keptGap: { anchorId: "m61", cursor: "61", keptCursor: null },
+        });
 
         await fillHistory({ fetchOlder, read, save: () => {}, update });
 
         expect(ids(screen.history.rows)).toStrictEqual(ids(run(1, 120)));
         expect(screen.history.gap).toBeUndefined();
+    });
+
+    it("keeps the run above the first hole on screen when the read below the second one fails", async () => {
+        const served = serverOf();
+        const asked: string[] = [];
+        let isOnline = false;
+        const fetchOlder = async (cursor: string) => {
+            if (!isOnline) {
+                return undefined;
+            }
+
+            asked.push(cursor);
+
+            return await served(cursor);
+        };
+        const firstRefresh = withNewestPage({ olderCursor: null, rows: run(1, 20) }, { olderCursor: "61", rows: run(61, 80) });
+        const { read, screen, update } = screenOf(withNewestPage(firstRefresh, { olderCursor: "101", rows: run(101, 120) }));
+
+        await expect(fillHistory({ fetchOlder, read, save: () => {}, update })).resolves.toBe("stopped");
+
+        // 61-80, served by the first refresh, stay shown although no page has reached them since.
+        expect(ids(screen.history.rows)).toStrictEqual(ids([...run(1, 20), ...run(61, 80), ...run(101, 120)]));
+        expect(nextOlderCursor(screen.history)).toBe("101");
+
+        isOnline = true;
+        await fillHistory({ fetchOlder, read, save: () => {}, update });
+
+        // The page that reaches 61 joins the first hole, so the fill goes on from its cursor, not from inside 61-80.
+        expect(asked).toStrictEqual(["101", "81", "61", "41", "21"]);
+        expect(ids(screen.history.rows)).toStrictEqual(ids(run(1, 120)));
     });
 });
 
@@ -392,7 +427,7 @@ const randomOf = (seed: number) => {
 };
 
 describe("any split of a chat into pages", () => {
-    it("never reads a row of the run again, loses no row, keeps the order, and drops rows not on the chat", async () => {
+    it("never reads a row of the run again, loses no row, keeps the order, and drops rows not on the chat, through refreshes and failed reads", async () => {
         for (let seed = 1; seed <= 400; seed += 1) {
             const random = randomOf(seed);
             let last = 20 + random(100);
@@ -409,12 +444,28 @@ describe("any split of a chat into pages", () => {
             const cached = run(cacheFrom, Math.min(last, cacheFrom + random(60))).filter(() => random(5) !== 0);
             const painted = cached.flatMap((shown) => [...random(8) === 0 ? [row(`x${shown.id}`)] : [], shown]);
             const { read, screen, update } = screenOf({ olderCursor: undefined, rows: painted });
+            /** Rows a read of the server showed in the run that joins the newest row: they stay on screen. */
+            const confirmed = new Set<string>();
+            /** Rows on screen an older page held since the last newest-page read: one page may read a row again, to join it. */
+            let readAgain = new Set<string>();
+            let isFailing = false;
+            const refresh = () => {
+                readAgain = new Set();
+                update((history) => withNewestPage(history, newestPage()));
+            };
             const check = () => {
-                const shown = ids(screen.history.rows).filter((id) => id.startsWith("m")).map((id) => Number(id.slice(1)));
+                const shownIds = ids(screen.history.rows);
+                const shown = shownIds.filter((id) => id.startsWith("m")).map((id) => Number(id.slice(1)));
 
                 expect(shown, `seed ${seed}: order`).toStrictEqual(shown.toSorted((a, b) => a - b));
+                expect([...confirmed].filter((id) => !shownIds.includes(id)), `seed ${seed}: a confirmed row lost`).toStrictEqual([]);
 
                 const newestRunIds = ids(newestRun(screen.history));
+
+                for (const id of newestRunIds) {
+                    confirmed.add(id);
+                }
+
                 const oldest = Number(newestRunIds[0]?.slice(1) ?? last + 1);
 
                 expect(newestRunIds, `seed ${seed}: the run joins the newest row`).toStrictEqual(ids(run(oldest, last)));
@@ -423,10 +474,23 @@ describe("any split of a chat into pages", () => {
                 expect(nextOlderCursor(screen.history), `seed ${seed}: the cursor is below the run`).toBe(isUnread || oldest === 1 ? null : String(oldest));
             };
             const fetchOlder = async (cursor: string) => {
+                if (isFailing && random(3) === 0) {
+                    return undefined;
+                }
+
                 const runIds = new Set(ids(newestRun(screen.history)));
+                const onScreen = new Set(ids(screen.history.rows));
                 const page = fetchFrom(Number(cursor));
 
                 expect(ids(page.rows).filter((id) => runIds.has(id)), `seed ${seed}: a row of the run read again`).toStrictEqual([]);
+
+                const shownAgain = ids(page.rows).filter((id) => onScreen.has(id));
+
+                expect(shownAgain.filter((id) => readAgain.has(id)), `seed ${seed}: a row on screen read again twice`).toStrictEqual([]);
+
+                for (const id of shownAgain) {
+                    readAgain.add(id);
+                }
 
                 return page;
             };
@@ -434,10 +498,13 @@ describe("any split of a chat into pages", () => {
             update((history) => withFillTarget(withNewestPage(history, newestPage()), Infinity));
             check();
 
-            for (let step = 0; step < 4; step += 1) {
-                if (random(2) === 0) {
-                    last += random(30);
-                    update((history) => withNewestPage(history, newestPage()));
+            isFailing = true;
+
+            for (let step = 0; step < 8; step += 1) {
+                // Newest-page reads, sometimes several in a row, while a hole may be open.
+                while (random(2) === 0) {
+                    last += random(40);
+                    refresh();
                     check();
                 }
 
@@ -445,6 +512,8 @@ describe("any split of a chat into pages", () => {
                 await fillHistory({ fetchOlder, read, save: () => {}, update });
                 check();
             }
+
+            isFailing = false;
 
             while (nextOlderCursor(screen.history) !== null) {
                 // eslint-disable-next-line no-await-in-loop -- each fill goes on from where the one before stopped

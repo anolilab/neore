@@ -12,6 +12,9 @@ import type { MessageRow } from "../offline/types";
  * - `gap`: older rows are kept below a hole. The run from the newest row stops at `anchorId`, and the history below it
  * is read from `cursor` until a page reaches the kept rows. A fill that stops early leaves the gap in place, so the
  * next fill or "Load older messages" goes on from there instead of from a cursor inside the hole.
+ * - A refresh that opens a hole while one is open keeps every row on screen: the rows below the new hole hold the old
+ * one (`keptGap`), so the run above the old hole stays shown until a page reaches it, and the fill then goes on from the
+ * old hole's cursor instead of reading that run again.
  */
 
 /** The part of a row the history reads. */
@@ -28,6 +31,12 @@ export interface HistoryGap {
     cursor: string;
     /** The cursor below the kept rows, when they were a run of their own; `undefined` for saved rows painted from the cache. */
     keptCursor: string | null | undefined;
+
+    /**
+     * A hole within the kept rows: they are a run the server served down to its `anchorId`, above older rows kept below
+     * it. Set when a refresh opened this hole while that one was open; `keptCursor` is then `undefined`.
+     */
+    keptGap?: HistoryGap;
 }
 
 export interface ChatHistory<R extends HistoryRow> {
@@ -76,24 +85,40 @@ interface Split<R> {
     kept: R[];
     /** The cursor below `kept[0]` when the kept rows are one run the server served; `undefined` when not known (saved rows). */
     keptCursor: string | null | undefined;
+    /** A hole within the kept rows (see {@link HistoryGap.keptGap}). */
+    keptGap: HistoryGap | undefined;
     /** The run that joins the newest row: the server served it without a hole, down to its oldest row. */
     run: R[];
 }
 
 const splitOf = <R extends HistoryRow>(history: ChatHistory<R>): Split<R> => {
     if (history.gap !== undefined) {
-        const { anchorId, keptCursor } = history.gap;
+        const { anchorId, keptCursor, keptGap } = history.gap;
         const at = Math.max(0, history.rows.findIndex((row) => row.id === anchorId));
 
-        return { kept: history.rows.slice(0, at), keptCursor, run: history.rows.slice(at) };
+        return { kept: history.rows.slice(0, at), keptCursor, keptGap, run: history.rows.slice(at) };
     }
 
     // Rows the cache painted, not read since: nothing on screen is confirmed yet.
     if (history.olderCursor === undefined) {
-        return { kept: history.rows, keptCursor: undefined, run: [] };
+        return { kept: history.rows, keptCursor: undefined, keptGap: undefined, run: [] };
     }
 
-    return { kept: [], keptCursor: undefined, run: history.rows };
+    return { kept: [], keptCursor: undefined, keptGap: undefined, run: history.rows };
+};
+
+/** What is known below the kept rows: the cursor below them, or the hole within them. */
+interface KeptState {
+    cursor: string | null | undefined;
+    gap: HistoryGap | undefined;
+}
+
+const gapOf = (anchorId: string, cursor: string, kept: KeptState): HistoryGap => {
+    if (kept.gap === undefined) {
+        return { anchorId, cursor, keptCursor: kept.cursor };
+    }
+
+    return { anchorId, cursor, keptCursor: kept.cursor, keptGap: kept.gap };
 };
 
 /**
@@ -106,10 +131,12 @@ const splitOf = <R extends HistoryRow>(history: ChatHistory<R>): Split<R> => {
  * - those older rows join the run only when they are one run the server served (`keptCursor`) and the page's oldest row
  * is the newest of them it reached: then nothing lies between, and the cursor below them takes over. Otherwise they
  * stay below a hole at the page's oldest row, read from the page's cursor until a page reaches them;
+ * - a hole within the kept rows (`keptGap`) stays while its anchor is kept. When the page joins the run above it, the
+ * history reads on from that hole; when the page holds or dropped that run, the hole goes and what lay below it counts;
  * - at the start of the chat (`olderCursor: null`), rows older than the page are not on the chat, and go.
  * No row of the page is lost, none of the run is read again, and the cursor stays below the run's oldest row.
  */
-const merged = <R extends HistoryRow>({ kept, keptCursor, run }: Split<R>, page: HistoryPage<R>): ChatHistory<R> => {
+const merged = <R extends HistoryRow>({ kept, keptCursor, keptGap, run }: Split<R>, page: HistoryPage<R>): ChatHistory<R> => {
     const runIds = new Set(run.map((row) => row.id));
     const pageRows = page.rows.filter((row) => !runIds.has(row.id));
     const [pageOldest] = pageRows;
@@ -128,11 +155,29 @@ const merged = <R extends HistoryRow>({ kept, keptCursor, run }: Split<R>, page:
         return { olderCursor: page.olderCursor, rows: body };
     }
 
-    if (keptCursor !== undefined && candidates[firstReached]?.id === pageOldest.id) {
-        return { olderCursor: keptCursor, rows: [...below, ...body] };
+    const rows = [...below, ...body];
+    const isJoined = candidates[firstReached]?.id === pageOldest.id;
+    const stillKept = new Set(below.map((row) => row.id));
+
+    if (isJoined) {
+        stillKept.add(pageOldest.id);
     }
 
-    return { gap: { anchorId: pageOldest.id, cursor: page.olderCursor, keptCursor }, olderCursor: undefined, rows: [...below, ...body] };
+    let state: KeptState = { cursor: keptCursor, gap: keptGap };
+
+    while (state.gap !== undefined && !stillKept.has(state.gap.anchorId)) {
+        state = { cursor: state.gap.keptCursor, gap: state.gap.keptGap };
+    }
+
+    if (isJoined && state.gap !== undefined) {
+        return { gap: state.gap, olderCursor: undefined, rows };
+    }
+
+    if (isJoined && state.cursor !== undefined) {
+        return { olderCursor: state.cursor, rows };
+    }
+
+    return { gap: gapOf(pageOldest.id, page.olderCursor, state), olderCursor: undefined, rows };
 };
 
 /**
@@ -162,9 +207,9 @@ const newestPageOf = <R extends HistoryRow>(history: ChatHistory<R>, page: Histo
         return { ...history, rows: [...split.kept, ...runBelow, ...page.rows] };
     }
 
-    // The page does not reach the run: with no hole, the run becomes the kept rows, and the cursor below it theirs. Below
-    // a hole, the run above it is not known to join the page; the fill reads it again on its way down to the kept rows.
-    return merged(history.gap === undefined ? { kept: history.rows, keptCursor: history.olderCursor, run: [] } : { ...split, run: [] }, page);
+    // The page does not reach the run: every row on screen becomes a kept row, with what is known below them (the cursor
+    // below the run, or the hole under it), so the run above an open hole stays shown until a page reaches it.
+    return merged({ kept: history.rows, keptCursor: history.olderCursor, keptGap: history.gap, run: [] }, page);
 };
 
 /**
