@@ -397,6 +397,14 @@ describe("link text around a flattened line break", () => {
         expect(convert("<a href=/x><p>aX</p><p>b</p></a>", { br: "X", ...options }).trim()).toBe(expected);
     });
 
+    it.each([
+        ["a newline marker", "\n", "[a b](/x)"],
+        ["a marker that ends in a newline", "X\n", "[aX b](/x)"],
+    ])("flattens %s that is not kept, so no newline stays in the link text", (_name, br, expected) => {
+        expect(convert("<a href=/x>a<br>b</a>", { br })).toBe(expected);
+        expect(convert("<a href=/x>a<br><h1>b</h1></a>", { br })).not.toContain("\n");
+    });
+
     it("keeps an inline-tag marker, which is valid in link text, and flattens only the line break", () => {
         expect(convert("<a href=/x>a<br>b</a>", { br: "<br>" })).toBe("[a<br> b](/x)");
     });

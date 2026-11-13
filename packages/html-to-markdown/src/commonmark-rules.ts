@@ -64,6 +64,7 @@ const BACKSLASH_BEFORE_PUNCTUATION = /\\(?=[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]
 // text before that ending, as in ` \`. An even run of backslashes is escaped pairs, not a break.
 const HARD_BREAK = / {2}$|(?:^|[^\\])(?:\\\\)*\\$/;
 const SPACES_ONLY = /^ *$/;
+const MARKER_NEWLINES = /[\r\n]+/g;
 const REGEXP_SPECIAL = /[.*+?^${}()|[\]\\]/g;
 
 function escapeRegExp(text: string): string {
@@ -179,15 +180,6 @@ function normalizeLabel(text: string): string {
 
 function hasHref(node: Node): boolean {
     return node.nodeName === "A" && Boolean((node as Element).getAttribute("href"));
-}
-
-/**
- * True when a link rule turns this element into a link: an `<a>` with a non-empty `href`,
- * in a link style that has a rule. Any other `<a>` prints its text with no brackets, so
- * the text is not closed by a `]`.
- */
-export function isLinkElement(node: Node, options: Options): boolean {
-    return (options.linkStyle === "inlined" || options.linkStyle === "referenced") && hasHref(node);
 }
 
 /**
@@ -1351,8 +1343,11 @@ function linkText(content: string, hardBreak: string): string {
             // A marker that ends in an unescaped backslash would show as a backslash once its break is gone, so it goes
             // with the break. Any other match is kept: a marker such as `<br>` is valid in link text, and text that only
             // looks like the marker (a literal `X`, an escaped backslash pair) is the link's own text.
-            if (written && !HARD_BREAK.test(whole.slice(0, offset + written.length))) {
-                return `${written} `;
+            // A newline in the marker itself would split the link, so it becomes a space too.
+            const inline = written.replaceAll(MARKER_NEWLINES, " ").trimEnd();
+
+            if (inline && !HARD_BREAK.test(whole.slice(0, offset + written.length))) {
+                return `${inline} `;
             }
 
             return whole.charAt(offset - 1) === " " ? "" : " ";
