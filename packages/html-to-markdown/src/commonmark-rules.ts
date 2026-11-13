@@ -1,8 +1,10 @@
-import type { AnnotatedNode, Options, Rule } from "./types";
-import { escapeMarkdown, repeat, trimNewlines } from "./utilities";
+import type { AnnotatedNode, Options, Rule, RuleLookup } from "./types";
+import { escapeMarkdown, parseListStart, repeat, trimNewlines } from "./utilities";
 
 const LINE_START = /^/gm;
 const NEWLINE = /\n/g;
+const NON_BLANK = /\S/;
+const TRAILING_INDENTED_BREAK = /\n *$/;
 const TRAILING_NEWLINE = /\n$/;
 const LINE_BREAKS = /\r?\n|\r/g;
 const BACKTICKS = /`+/g;
@@ -10,6 +12,11 @@ const BACKTICK_EDGE = /^`|`$/;
 const LANGUAGE_CLASS = /language-(\S+)/;
 const LINE_BREAK_RUN = /\n\s*/g;
 const DOUBLE_QUOTE = /"/g;
+
+// The <code> each selected <pre> was matched with. The replacement reads it from here
+// rather than searching again: a rule that claims a wrapper after the match would make
+// the search find nothing, and the block would lose its code.
+const pinnedCode = new WeakMap<Node, Element>();
 
 /**
  * Reference-style links collect their definitions here and append them after
@@ -129,15 +136,15 @@ const rules: Record<string, Rule> = {
     },
 
     fencedCodeBlock: {
-        filter(node, options) {
-            return options.codeBlockStyle === "fenced" && node.nodeName === "PRE" && node.firstChild?.nodeName === "CODE";
+        filter(node, options, lookup) {
+            return options.codeBlockStyle === "fenced" && node.nodeName === "PRE" && pinnedCodeElement(node, lookup) !== null;
         },
 
-        replacement(_content, node, options) {
-            const codeElement = node.firstChild as Element;
-            const className = codeElement.getAttribute("class") ?? "";
+        replacement(_content, node, options, lookup) {
+            const codeElement = pinnedCode.get(node) ?? preCodeElement(node, lookup);
+            const className = codeElement?.getAttribute("class") ?? "";
             const language = (LANGUAGE_CLASS.exec(className) ?? [null, ""])[1];
-            const code = codeElement.textContent ?? "";
+            const code = codeElement?.textContent ?? "";
 
             const fenceChar = options.fence.charAt(0);
             let fenceSize = 3;
@@ -197,12 +204,12 @@ const rules: Record<string, Rule> = {
     },
 
     indentedCodeBlock: {
-        filter(node, options) {
-            return options.codeBlockStyle === "indented" && node.nodeName === "PRE" && node.firstChild?.nodeName === "CODE";
+        filter(node, options, lookup) {
+            return options.codeBlockStyle === "indented" && node.nodeName === "PRE" && pinnedCodeElement(node, lookup) !== null;
         },
 
-        replacement(_content, node) {
-            const code = (node.firstChild as Element).textContent ?? "";
+        replacement(_content, node, _options, lookup) {
+            const code = (pinnedCode.get(node) ?? preCodeElement(node, lookup))?.textContent ?? "";
 
             return `\n\n    ${code.replaceAll(NEWLINE, "\n    ")}\n\n`;
         },
@@ -243,7 +250,15 @@ const rules: Record<string, Rule> = {
             const parent = node.parentNode as Element | null;
 
             if (parent?.nodeName === "LI" && parent.lastElementChild === node) {
-                return `\n${content}`;
+                if (!hasTextAfter(node)) {
+                    return `\n${content}`;
+                }
+
+                // Text after the list needs a blank line. Without one, CommonMark reads the
+                // text as a lazy continuation of the last sub-item's paragraph. An item that
+                // ends in a block or a `<br>` already ends in a line break and its indent, so
+                // it needs one more.
+                return `\n${content}${TRAILING_INDENTED_BREAK.test(content) ? "\n" : "\n\n"}`;
             }
 
             return `\n\n${content}\n\n`;
@@ -258,10 +273,10 @@ const rules: Record<string, Rule> = {
             const parent = node.parentNode as Element | null;
 
             if (parent?.nodeName === "OL") {
-                const start = parent.getAttribute("start");
+                const start = parseListStart(parent.getAttribute("start")) ?? 1n;
                 const index = Array.prototype.indexOf.call(parent.children, node);
 
-                prefix = `${start ? Number(start) + index : index + 1}.  `;
+                prefix = `${start + BigInt(index)}.  `;
             }
 
             const isParagraph = TRAILING_NEWLINE.test(content);
@@ -386,6 +401,73 @@ function stripUrlNoise(href: string): string {
     }
 
     return href.slice(start, end).replaceAll(TAB_OR_NEWLINE, "");
+}
+
+function hasTextAfter(node: Node): boolean {
+    for (let sibling = node.nextSibling; sibling; sibling = sibling.nextSibling) {
+        if (sibling.nodeType === 3 && NON_BLANK.test(sibling.nodeValue ?? "")) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * The `<code>` that a `<pre>` holds as its block, or null when the `<pre>` is not
+ * a code block. A `<pre>` whose first child is `<code>` is one. Otherwise the
+ * `<pre>` must hold a single `<code>`, apart from whitespace, possibly wrapped in
+ * `<div>` or `<span>` elements that hold nothing else. Any other content, such as
+ * a link around the code, keeps the `<pre>` as text. A wrapper that a custom, keep
+ * or remove rule claims is not transparent, so its rule's output is not dropped.
+ */
+function preCodeElement(pre: Node, lookup: RuleLookup): Element | null {
+    if (pre.firstChild?.nodeName === "CODE") {
+        return pre.firstChild as Element;
+    }
+
+    return soleCodeElement(pre, lookup);
+}
+
+function pinnedCodeElement(pre: Node, lookup: RuleLookup): Element | null {
+    const code = preCodeElement(pre, lookup);
+
+    if (code) {
+        pinnedCode.set(pre, code);
+    }
+
+    return code;
+}
+
+// Elements with no rule of their own here. Any other element changes the output
+// (a link, bold text), so it is not a wrapper.
+const WRAPPER_ELEMENTS = new Set(["DIV", "SPAN"]);
+
+function soleCodeElement(parent: Node, lookup: RuleLookup): Element | null {
+    let only: Node | null = null;
+
+    for (let child = parent.firstChild; child; child = child.nextSibling) {
+        // A comment (node type 8) is not content, like blank text.
+        if (child.nodeType === 8 || (child.nodeType === 3 && !NON_BLANK.test(child.nodeValue ?? ""))) {
+            continue;
+        }
+
+        if (only) {
+            return null;
+        }
+
+        only = child;
+    }
+
+    if (only?.nodeType !== 1) {
+        return null;
+    }
+
+    if (only.nodeName === "CODE") {
+        return only as Element;
+    }
+
+    return WRAPPER_ELEMENTS.has(only.nodeName) && !lookup.hasRuleFor(only) ? soleCodeElement(only, lookup) : null;
 }
 
 function cleanAttribute(attribute: string | null): string {

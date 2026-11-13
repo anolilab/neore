@@ -154,7 +154,7 @@ function replacementForNode(service: TurndownService, node: AnnotatedNode): stri
         content = content.trim();
     }
 
-    return whitespace.leading + rule.replacement(content, node, service.options) + whitespace.trailing;
+    return whitespace.leading + rule.replacement(content, node, service.options, service.rules) + whitespace.trailing;
 }
 
 /**

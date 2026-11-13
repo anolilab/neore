@@ -1,15 +1,22 @@
-import type { AnnotatedNode, Options, ReplacementFunction, Rule } from "./types";
+import annotateNode from "./node";
+import type { AnnotatedNode, Options, ReplacementFunction, Rule, RuleLookup } from "./types";
 
 /**
  * Manages the rules used to convert HTML to Markdown: the built-in rules, then
  * the ones added with `addRule`, then keep/remove filters.
  */
-export default class Rules {
+export default class Rules implements RuleLookup {
     private readonly array: Rule[] = [];
 
     private readonly keepList: Rule[] = [];
 
     private readonly removeList: Rule[] = [];
+
+    // The rule each node was given, or undefined when none matched. Keyed by node, so it lives with the parsed document.
+    private readonly decided = new WeakMap<Node, Rule | undefined>();
+
+    // The lists a node is searched in, in order: added and built-in rules, then keep, then remove.
+    private readonly searchOrder: ReadonlyArray<ReadonlyArray<Rule>> = [this.array, this.keepList, this.removeList];
 
     private readonly options: Options;
 
@@ -55,24 +62,20 @@ export default class Rules {
             return this.blankRule;
         }
 
-        // Lowercased once for the node, not once per rule.
-        const nodeName = node.nodeName.toLowerCase();
+        return decideRule(this.decided, this.searchOrder, node, this.options, this) ?? this.defaultRule;
+    }
 
-        const fromRules = findRule(this.array, node, nodeName, this.options);
-
-        if (fromRules) {
-            return fromRules;
+    /**
+     * True when a rule of any kind, built-in, added, keep or remove, matches the node. A rule that must
+     * decide whether to treat a node as transparent asks this first.
+     */
+    hasRuleFor(node: Node): boolean {
+        // Only an element has a rule. A filter written for elements must not be handed a text node.
+        if (node.nodeType !== 1) {
+            return false;
         }
 
-        const fromKeep = findRule(this.keepList, node, nodeName, this.options);
-
-        if (fromKeep) {
-            return fromKeep;
-        }
-
-        const fromRemove = findRule(this.removeList, node, nodeName, this.options);
-
-        return fromRemove ?? this.defaultRule;
+        return decideRule(this.decided, this.searchOrder, annotateNode(node, this.options), this.options, this) !== undefined;
     }
 
     forEach(visit: (rule: Rule, index: number) => void): void {
@@ -82,7 +85,41 @@ export default class Rules {
     }
 }
 
-function isFilterMatch(rule: Rule, node: AnnotatedNode, nodeName: string, options: Options): boolean {
+/**
+ * The first rule of any kind that matches the node, asked once per node. A filter can
+ * be asked twice for one node (code-block detection, then traversal), and a second
+ * answer that differs from the first would split the two. The first answer is kept.
+ */
+function decideRule(
+    decided: WeakMap<Node, Rule | undefined>,
+    searchOrder: ReadonlyArray<ReadonlyArray<Rule>>,
+    node: AnnotatedNode,
+    options: Options,
+    lookup: RuleLookup,
+): Rule | undefined {
+    if (decided.has(node)) {
+        return decided.get(node);
+    }
+
+    // Lowercased once for the node, not once per rule.
+    const nodeName = node.nodeName.toLowerCase();
+
+    for (const list of searchOrder) {
+        const rule = findRule(list, node, nodeName, options, lookup);
+
+        if (rule) {
+            decided.set(node, rule);
+
+            return rule;
+        }
+    }
+
+    decided.set(node, undefined);
+
+    return undefined;
+}
+
+function isFilterMatch(rule: Rule, node: AnnotatedNode, nodeName: string, options: Options, lookup: RuleLookup): boolean {
     const { filter } = rule;
 
     if (typeof filter === "string") {
@@ -94,13 +131,13 @@ function isFilterMatch(rule: Rule, node: AnnotatedNode, nodeName: string, option
     }
 
     if (typeof filter === "function") {
-        return filter.call(rule, node, options);
+        return filter.call(rule, node, options, lookup);
     }
 
     throw new TypeError("`filter` needs to be a string, array, or function");
 }
 
-function findRule(rules: Rule[], node: AnnotatedNode, nodeName: string, options: Options): Rule | undefined {
+function findRule(rules: ReadonlyArray<Rule>, node: AnnotatedNode, nodeName: string, options: Options, lookup: RuleLookup): Rule | undefined {
     // A filter may add rules to this same list. Bounding the search by the length
     // at the start keeps it to the rules that existed, as Array.find did.
     const { length } = rules;
@@ -108,7 +145,7 @@ function findRule(rules: Rule[], node: AnnotatedNode, nodeName: string, options:
     for (let index = 0; index < length; index += 1) {
         const rule = rules[index];
 
-        if (rule && isFilterMatch(rule, node, nodeName, options)) {
+        if (rule && isFilterMatch(rule, node, nodeName, options, lookup)) {
             return rule;
         }
     }
