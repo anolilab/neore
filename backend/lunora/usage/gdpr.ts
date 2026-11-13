@@ -242,14 +242,15 @@ const armRun = async (ctx: MutationCtx, runId: Id<"usageExportRuns">, userId: st
 };
 
 /**
- * How soon the sweep checks a live run again. A live run's export can store its object at any moment, so a live run is checked about a
- * minute after its export's last check, not a time to live later; the purge that outlives its wait re-arms it on this schedule too.
+ * How soon the sweep checks a live run the erasure has re-armed (`erasing`). A live export can store its object at any moment, so such a
+ * run is checked a minute after the last check, and its object goes about a minute after the export ends. Other live runs keep the
+ * time to live, so an ended export's object stays downloadable for a day.
  */
 export const LIVE_RECHECK_MS = 60 * 1000;
 
 /**
- * Arms a live run with no object for the sweep's next check, a minute on. The erasure's forced purge calls it for a run it skips, so
- * the run's object, if its export stores one after deletion completes, is purged about a minute after the export ends.
+ * Hands a live run the erasure could not finish to the sweep: the run is marked `erasing` and checked a minute on. The run's record is
+ * kept while its export is live, so anything the export stores later is found, and the sweep purges it once the export has ended.
  */
 export const rearmLiveUsageRun = internalMutation
     .input({ runId: v.id("usageExportRuns"), userId: v.string() })
@@ -258,6 +259,7 @@ export const rearmLiveUsageRun = internalMutation
         const run = await ctx.db.usageExportRuns.findFirst({ consistency: "primary", where: { _id: runId, userId } });
 
         if (run) {
+            await ctx.db.patch("usageExportRuns", run._id, { erasing: true });
             await armRun(ctx, run._id, userId, ctx.now + LIVE_RECHECK_MS);
         }
 
@@ -266,7 +268,8 @@ export const rearmLiveUsageRun = internalMutation
 
 /**
  * Acts on the export runs that are due, one batch per run of the shard's housekeeping (`lib/shard-housekeeping.ts`). A run is due at its
- * `deleteAt`. A run found live is set one time to live ahead, so a run that dies at any point before then is found dead at that time:
+ * `deleteAt`. A run found live is set one time to live ahead (a minute ahead when the erasure re-armed it), so a run that dies at any point
+ * before then is found dead at that time:
  * its pieces and index rows go then. A sweep reads at most one batch of pieces in all, however many runs are due, so its reads stay
  * within the transaction's read limit; a run with pieces left is due again at once. A keyed run keeps its row until its purge has
  * released it, and waits a time to live before its next purge.
@@ -300,7 +303,7 @@ export const sweepUsageExportPieces = internalMutation
                 }
 
                 if (await isRunLive(ctx, run.requestId, run.userId)) {
-                    await armRun(ctx, run._id, run.userId, ctx.now + LIVE_RECHECK_MS);
+                    await armRun(ctx, run._id, run.userId, ctx.now + (run.erasing === true ? LIVE_RECHECK_MS : EXPORT_PIECE_TTL_MS));
                     continue;
                 }
 
@@ -374,7 +377,8 @@ export const clearUsageExportPieces = internalMutation
         if (!fullPieces(page) && !fullPieces(projects.page)) {
             const run = await ctx.db.usageExportRuns.findFirst({ consistency: "primary", where: { requestId, userId } });
 
-            if (run) {
+            // A run with a stored object keeps its record: it is the object's only record, and the purge releases it.
+            if (run && run.usageKey === undefined) {
                 await ctx.db.delete("usageExportRuns", run._id);
             }
         }

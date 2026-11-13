@@ -2148,6 +2148,7 @@ export interface Doc_usageExportRuns {
     _creationTime: number;
     createdAt: number;
     deleteAt: number;
+    erasing?: boolean;
     requestId: string;
     usageKey?: string;
     userId: string;
@@ -5347,6 +5348,7 @@ export interface Insert_usageExportRuns {
     _creationTime?: number;
     createdAt: number;
     deleteAt: number;
+    erasing?: boolean;
     requestId: string;
     usageKey?: string;
     userId: string;

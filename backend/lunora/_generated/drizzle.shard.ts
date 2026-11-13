@@ -1915,6 +1915,7 @@ export const usageExportRuns = sqliteTable("usageExportRuns", {
     _creationTime: integer("_creationTime").notNull(),
     createdAt: real("createdAt").notNull(),
     deleteAt: real("deleteAt").notNull(),
+    erasing: integer("erasing", { mode: "boolean" }),
     requestId: text("requestId").notNull(),
     usageKey: text("usageKey"),
     userId: text("userId").notNull(),

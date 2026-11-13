@@ -437,7 +437,7 @@ describe("the sweep and the clear", () => {
         expect(await countOf("usageExportPieces", A)).toBe(0);
     });
 
-    it("keeps a live run's pieces, and sets its time a minute ahead, so the sweep checks it again soon", async () => {
+    it("keeps a live run's pieces, and sets its time one time to live ahead", async () => {
         const t0 = Date.now();
 
         await harness.run(async (ctx: any) => {
@@ -459,10 +459,10 @@ describe("the sweep and the clear", () => {
 
         const run = await harness.run(async (ctx: any) => await ctx.db.usageExportRuns.findFirst({ where: { userId: A } }));
 
-        expect(run?.deleteAt).toBe(t0 + LIVE_RECHECK_MS);
+        expect(run?.deleteAt).toBe(t0 + EXPORT_PIECE_TTL_MS);
     });
 
-    it("re-arms a live run with no object for a check a minute on, so a late object is purged soon after its export ends", async () => {
+    it("re-arms a live run for a check a minute on and keeps its record, so a late object is purged soon after its export ends", async () => {
         const t0 = Date.now();
         const request = await harness.run(
             async (ctx: any) =>
@@ -479,7 +479,14 @@ describe("the sweep and the clear", () => {
         expect(await dueAtOf(A)).toBe(Date.now() + LIVE_RECHECK_MS);
         const run = await harness.run(async (ctx: any) => await ctx.db.usageExportRuns.findFirst({ where: { _id: runId } }));
 
-        expect(run?.deleteAt).toBe(Date.now() + LIVE_RECHECK_MS);
+        expect(run).toMatchObject({ erasing: true });
+
+        // The sweep finds the still-live run marked `erasing` and keeps checking it a minute apart, not a time to live apart.
+        vi.setSystemTime(Date.now() + LIVE_RECHECK_MS);
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        const after = await harness.run(async (ctx: any) => await ctx.db.usageExportRuns.findFirst({ where: { _id: runId } }));
+
+        expect(after?.deleteAt).toBe(Date.now() + LIVE_RECHECK_MS);
     });
 
     it("reads at most one batch of pieces per sweep, however many dead runs are due, and finishes them over later sweeps", async () => {
@@ -562,13 +569,13 @@ describe("the sweep and the clear", () => {
         await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
 
         // The real census write: the user's shard is armed for the run's next due time.
-        expect(await dueAtOf(A)).toBe(t0 + LIVE_RECHECK_MS);
+        expect(await dueAtOf(A)).toBe(t0 + EXPORT_PIECE_TTL_MS);
 
         // Before that time the root tick dispatches nothing; at that time it dispatches the user's shard.
         await harness.run(async (ctx: any) => await ctx.runMutation(dispatchDueShards, {}));
         expect(scheduled.shards).toEqual([]);
 
-        vi.setSystemTime(t0 + LIVE_RECHECK_MS);
+        vi.setSystemTime(t0 + EXPORT_PIECE_TTL_MS);
         await harness.run(async (ctx: any) => await ctx.runMutation(dispatchDueShards, {}));
         expect(scheduled.shards).toEqual([A]);
     });
@@ -744,5 +751,15 @@ describe("the sweep and the clear", () => {
         expect(await countOf("usageExportPieces", A)).toBe(0);
         expect(await countOf("usageExportProjects", A)).toBe(0);
         expect(await countOf("usageExportRuns", A)).toBe(0);
+    });
+
+    it("keeps a run's record when it holds a stored object, since that record is the object's only one", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("usageExportRuns", { createdAt: 1, deleteAt: 0, requestId: "clr:keyed", usageKey: "gdpr-exports/clr.json", userId: A });
+        });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(clearUsageExportPieces, { requestId: "clr:keyed", userId: A }));
+
+        expect(await keyedRunsOf(A)).toEqual([{ key: "gdpr-exports/clr.json", live: false, runId: expect.any(String) }]);
     });
 });
