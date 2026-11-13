@@ -185,3 +185,14 @@ The rules are summarized in `backend/lunora/chat/AGENTS.md`, which agents load a
   ciphertext until it settles) and marks the references `abandoned`, which a late spend reads. A Stop naming a prompt abandons
   only that prompt's reply.
   The card sends the server address it showed (`expectedUrl`); the answer is refused if the saved server's URL differs.
+
+## Resending a send (`clientMessageId`)
+
+What `backend/lunora/chat/AGENTS.md` states as the rule, in detail:
+
+- A duplicate whose stream never got its run re-queues it. Whatever became of the run, it hands over each title or category
+  job no try recorded scheduled (`recordStartTitlesScheduled`), one by one, so a failure of one never resubmits the other.
+- Both jobs are keyed by the saved prompt: the title through its `jobId`, the category through `createCategoryChat`'s
+  `thread-category` claim. A kept answer is written before any model is resolved; an unanswered claim is taken over after
+  `CATEGORY_LEASE_MS`; a delivery that finds it in flight fails for the scheduler's retry; only a failed call releases it.
+- A goal `startGoal` refused after the save is recorded on the claim: every resend gets that 400, and it is never resumed.

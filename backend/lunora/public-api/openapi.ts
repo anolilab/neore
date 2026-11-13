@@ -96,14 +96,25 @@ const operation = (route: RouteDefinition) => {
             403: errorResponse("`insufficient_scope` or `forbidden`"),
             404: errorResponse("`not_found`"),
             [status]: { content: successContent, description: "Success" },
+            // A retry with the same `clientMessageId` answers the first send's ids with 200 and `duplicate: true`.
+            ...(route.takesClientMessageId &&
+                status !== "200" && {
+                    200: { content: successContent, description: "A retry of a send with the same `clientMessageId`: its first ids, with `duplicate: true`." },
+                }),
             ...(route.method === "post" &&
                 route.noIdempotency !== true && {
                     409: errorResponse(
-                        route.mayRefuseHostThread
-                            ? "`host_thread_read_only` (the thread runs on a paired computer), `conflict`, `idempotency_in_progress` or `idempotency_outcome_unknown`"
-                            : "`conflict`, `idempotency_in_progress` or `idempotency_outcome_unknown`",
+                        [
+                            ...(route.mayRefuseHostThread ? ["`host_thread_read_only` (the thread runs on a paired computer)"] : []),
+                            ...(route.takesClientMessageId ? ["`chat_start_in_progress` (a send with this `clientMessageId` is still saving)"] : []),
+                            "`conflict`, `idempotency_in_progress` or `idempotency_outcome_unknown`",
+                        ].join(", "),
                     ),
-                    422: errorResponse("`idempotency_conflict`"),
+                    422: errorResponse(
+                        route.takesClientMessageId
+                            ? "`idempotency_conflict` or `client_message_id_reused` (the `clientMessageId` was used for a different request)"
+                            : "`idempotency_conflict`",
+                    ),
                 }),
             ...(route.mayConflict && route.method !== "post" && { 409: errorResponse("`conflict`") }),
             429: errorResponse("`rate_limited` (per key) or `daily_limit_reached`; honour `Retry-After`"),

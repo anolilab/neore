@@ -25,6 +25,7 @@ import {
     startGoal,
     touchGoal,
 } from "./internal";
+import { CHAT_START_LEASE_MS, claimChatStart, recordStartSaved } from "../start-claim";
 import { GOAL_MAX_COST_MICRODOLLARS } from "./logic";
 import { GOAL_CONTINUATION_AGENT, parseGoalReviewNote } from "./shared";
 
@@ -160,6 +161,56 @@ describe("startGoal", () => {
         expect(await run(startGoal, { config: CONFIG, promptMessageId: promptId, text: "x", threadId, userId: "other" })).toMatchObject({ ok: false });
         expect(await run(startGoal, { config: CONFIG, promptMessageId: promptId, text: " ".repeat(3), threadId, userId: OWNER })).toMatchObject({ ok: false });
         expect(await count("threadGoals")).toBe(0);
+    });
+
+    it("starts nothing for a send whose claim a retry took over, so it never supersedes the retry's goal", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+
+        try {
+            const send = { clientMessageId: "goal-send", fingerprint: "f", streams: true, userId: OWNER };
+            const dead = await run(claimChatStart, send);
+
+            await harness.run(async (ctx: any) => await recordStartSaved(ctx, dead.claim, { messageId: promptId, model: "m", threadId }));
+            vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+
+            const retry = await run(claimChatStart, send);
+
+            expect(retry.outcome).toBe("resume");
+
+            const retryGoal = await start({ startClaim: retry.claim });
+
+            await expect(start({ startClaim: dead.claim })).rejects.toThrow("already sent");
+            expect(await read(retryGoal)).toMatchObject({ status: "active" });
+            expect(await count("threadGoals")).toBe(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("leaves a stopped goal stopped when a resumed send names it, and starts no other", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+
+        try {
+            const send = { clientMessageId: "stopped-goal", fingerprint: "f", streams: true, userId: OWNER };
+            const first = await run(claimChatStart, send);
+
+            await harness.run(async (ctx: any) => await recordStartSaved(ctx, first.claim, { messageId: promptId, model: "m", threadId }));
+
+            const goalId = await start({ startClaim: first.claim });
+
+            await run(endGoalsForThread, { reason: "user", threadId });
+            vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+
+            const retry = await run(claimChatStart, send);
+
+            expect(await start({ startClaim: retry.claim })).toBe(goalId);
+            expect(await read(goalId)).toMatchObject({ status: "stopped", stopReason: "user" });
+            expect(await count("threadGoals")).toBe(1);
+            // The resumed run's prompt is no active goal's, so its end hands nothing to a review.
+            expect(await harness.run(async (ctx: any) => await ctx.runQuery(getActiveGoalForRun, { messageId: promptId, threadId }))).toBeNull();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
 

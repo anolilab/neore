@@ -38,6 +38,7 @@ export type ThreadPatch = Partial<
         | "activeLeafMessageId"
         | "autoModel"
         | "awaitingInput"
+        | "category"
         | "groupChat"
         | "contextResetMessageId"
         | "hasContextReset"

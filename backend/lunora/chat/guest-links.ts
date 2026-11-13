@@ -612,6 +612,33 @@ export const recordGuestNoteSent = internalMutation
         return true;
     });
 
+/**
+ * A `/chat/start` send that saved the note as `savedMessageId` and died before its record: its resend (`chat/start-claim.ts`,
+ * whose fingerprint binds the note to the claim, so the saved message is this note's) marks the note sent on whatever guest
+ * send still holds it, without saving it again. A note already sent is left as it is.
+ */
+export const recordResumedGuestNoteSent = internalMutation
+    .input({ messageId: v.id("threadGuestMessages"), savedMessageId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        const row = await ctx.db.get("threadGuestMessages", args.messageId);
+
+        if (row?.userId !== args.userId || row.status !== "held") {
+            return false;
+        }
+
+        const send = await claimRow(ctx, GUEST_SEND_SCOPE, args.messageId);
+        const claimedAt = send?.claimedAt ?? (await claimFence(ctx, GUEST_SEND_SCOPE, args.messageId, { ttlMs: GUEST_SEND_CLAIM_TTL_MS, userId: args.userId }));
+
+        if (claimedAt === null || !(await recordClaimResult(ctx, GUEST_SEND_SCOPE, args.messageId, claimedAt, args.savedMessageId))) {
+            return false;
+        }
+
+        await ctx.db.patch("threadGuestMessages", args.messageId, { status: "sent" });
+
+        return true;
+    });
+
 /** `/chat/start` gave up on its send (charge, agent or save failed): settled at once, as a lost reply may have saved it. */
 export const releaseGuestNoteSend = internalMutation
     .input({ claimedAt: v.number(), messageId: v.id("threadGuestMessages") })
