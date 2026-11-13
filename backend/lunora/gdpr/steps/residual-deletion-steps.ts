@@ -256,7 +256,7 @@ export const purgeUserUsageFiles = internalAction
                 // purges whatever it finds once the export has ended.
                 if (run.live) {
                     // Logged so an operator can tell a deletion that finished past a live export from a normal one.
-                    gdprLogger.warn(`Account deletion finished past a live usage export (${run.runId}); its record is kept for the sweep`);
+                    gdprLogger.warn("Account deletion finished past a live usage export; its record is kept for the sweep");
 
                     if (run.key !== undefined && (await context.storage.getMetadata(run.key))) {
                         await context.storage.delete(run.key);
