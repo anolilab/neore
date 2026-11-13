@@ -1,7 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { PushPermission, PushPlatform, PushServer } from "./push-registration";
-import { createForegroundGate, createPendingWork, createPromptOffer, createTokenChangeFilter, languageTag, onceItWorks, registerPhoneForPush, releaseOnSignOut, releasePhonePush } from "./push-registration";
+import {
+    createForegroundGate,
+    createPendingWork,
+    createPromptOffer,
+    createTokenChangeFilter,
+    dismissAccountAlerts,
+    forgetAccountOnPhone,
+    isAccountSwitch,
+    languageTag,
+    LAST_ACCOUNT_KEY,
+    noteAccountOnPhone,
+    onceItWorks,
+    registerPhoneForPush,
+    releaseOnSignOut,
+    releasePhonePush,
+} from "./push-registration";
 
 const TOKEN = "a".repeat(64);
 
@@ -345,5 +360,116 @@ describe("createPromptOffer", () => {
         offer.end();
 
         expect(offer.claim("b")).toBe(false);
+    });
+});
+
+describe("isAccountSwitch", () => {
+    it("is true only when one person replaces another, so their alerts are removed", () => {
+        expect(isAccountSwitch("u1", "u2")).toBe(true);
+        expect(isAccountSwitch("u1", "u1")).toBe(false);
+        expect(isAccountSwitch(undefined, "u2")).toBe(false);
+        expect(isAccountSwitch("u1", undefined)).toBe(false);
+    });
+});
+
+describe("noteAccountOnPhone", () => {
+    const device = (stored?: string) => {
+        const items: Record<string, string> = stored === undefined ? {} : { [LAST_ACCOUNT_KEY]: stored };
+
+        return {
+            items,
+            store: {
+                digest: async (value: string) => `sha256:${value}`,
+                read: async (key: string) => items[key] ?? null,
+                write: vi.fn(async (key: string, value: string) => {
+                    items[key] = value;
+                }),
+            },
+        };
+    };
+
+    it("removes the previous account's alerts, then records the new account, even after a relaunch", async () => {
+        const { items, store } = device("sha256:u1");
+        const removeAlerts = vi.fn(async () => undefined);
+
+        await noteAccountOnPhone("u2", store, removeAlerts);
+
+        expect(removeAlerts).toHaveBeenCalledOnce();
+        // Only a digest is kept: nothing naming the account stays on the phone.
+        expect(items[LAST_ACCOUNT_KEY]).toBe("sha256:u2");
+    });
+
+    it("keeps the previous account on record when its alerts could not be removed, so the next sign-in still sees the switch", async () => {
+        const { items, store } = device("sha256:u1");
+
+        await expect(
+            noteAccountOnPhone("u2", store, async () => {
+                throw new Error("denied");
+            }),
+        ).rejects.toThrow("denied");
+        expect(store.write).not.toHaveBeenCalled();
+        expect(items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
+    });
+
+    it("removes nothing for the same person or the first sign-in on the phone, and writes only on a change", async () => {
+        const same = device("sha256:u1");
+        const first = device();
+        const removeAlerts = vi.fn(async () => undefined);
+
+        await noteAccountOnPhone("u1", same.store, removeAlerts);
+        expect(same.store.write).not.toHaveBeenCalled();
+        await noteAccountOnPhone("u1", first.store, removeAlerts);
+        expect(first.items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
+        expect(removeAlerts).not.toHaveBeenCalled();
+    });
+
+    it("keeps nothing of an account that signed out, so the next sign-in is a first one", async () => {
+        const { items, store } = device("sha256:u1");
+        const removeAlerts = vi.fn(async () => undefined);
+
+        await forgetAccountOnPhone({
+            remove: async (key) => {
+                Reflect.deleteProperty(items, key);
+            },
+        });
+        await noteAccountOnPhone("u2", store, removeAlerts);
+
+        expect(removeAlerts).not.toHaveBeenCalled();
+    });
+});
+
+describe("dismissAccountAlerts", () => {
+    it("keeps the record of the account when its alerts could not be removed, so the next sign-in still sees the switch", async () => {
+        const items: Record<string, string> = { [LAST_ACCOUNT_KEY]: "sha256:u1" };
+
+        await expect(
+            dismissAccountAlerts({
+                dismissAll: async () => {
+                    throw new Error("denied");
+                },
+                remove: async (key) => {
+                    Reflect.deleteProperty(items, key);
+                },
+            }),
+        ).rejects.toThrow("denied");
+        expect(items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
+    });
+
+    it("removes the alerts, then forgets the account", async () => {
+        const items: Record<string, string> = { [LAST_ACCOUNT_KEY]: "sha256:u1" };
+        const calls: string[] = [];
+
+        await dismissAccountAlerts({
+            dismissAll: async () => {
+                calls.push("dismiss");
+            },
+            remove: async (key) => {
+                calls.push("forget");
+                Reflect.deleteProperty(items, key);
+            },
+        });
+
+        expect(calls).toEqual(["dismiss", "forget"]);
+        expect(items[LAST_ACCOUNT_KEY]).toBeUndefined();
     });
 });

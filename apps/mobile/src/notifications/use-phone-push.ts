@@ -12,6 +12,8 @@ import {
     configurePhoneNotifications,
     deviceLocale,
     devicePushPlatform,
+    dismissAccountNotifications,
+    noteSignedInAccount,
     pushRegistrations,
     syncApprovalActions,
 } from "./phone-push";
@@ -130,6 +132,19 @@ const registerAfterSetUp = async (isPrompt: boolean, isCurrent: () => boolean): 
 };
 
 /**
+ * Another person signed in on this phone, now or before a relaunch: the alerts still on it are the previous account's,
+ * and are removed. A phone that stays with one account keeps its alerts.
+ */
+const removePreviousAccountAlerts = async (userId: string): Promise<void> => {
+    try {
+        await noteSignedInAccount(userId, dismissAccountNotifications);
+    } catch (error) {
+        // eslint-disable-next-line no-console -- no logger in the app; alerts that could not be removed must not be silent
+        console.warn("Could not remove the previous account's notifications.", error);
+    }
+};
+
+/**
  * The moment to ask: `userId` just sent a message, so a reply, a question or an approval may come while the app is in
  * the background. Only while that account is still the one signed in, at most once per sign-in; the system itself
  * shows its prompt only once. An attempt that failed (offline, the server did not answer) leaves that account's offer
@@ -156,6 +171,13 @@ export const offerPhonePush = async (userId: string): Promise<void> => {
 export const usePhonePush = (): void => {
     const { hasToken, status, user } = useAuth();
     const userId = status === "signed-in" && hasToken ? user?.id : undefined;
+
+    // Checked on every sign-in, so the alerts of a previous account are removed even after a relaunch.
+    useEffect(() => {
+        if (userId !== undefined) {
+            removePreviousAccountAlerts(userId);
+        }
+    }, [userId]);
 
     // Set up early, so an alert that arrives as the phone registers already carries its approve and deny actions. Every
     // registration tries the same setup first (`registerAfterSetUp`).

@@ -299,3 +299,53 @@ export const createPromptOffer = () => {
         },
     };
 };
+
+/** Whether the account signed in on the phone changed from one person to another: then the alerts still on it are the previous person's. */
+export const isAccountSwitch = (previous: string | undefined, next: string | undefined): boolean =>
+    previous !== undefined && next !== undefined && previous !== next;
+
+/** A one-way digest of the account last signed in on this phone, kept across launches so a switch after a relaunch is seen too. */
+export const LAST_ACCOUNT_KEY = "neore.mobile.last-push-account";
+
+/**
+ * Records the account signed in on this phone. When another person replaces the account on record, the alerts still on
+ * the phone are the previous person's, and `removeSwitchedAlerts` removes them first. The record moves only after that
+ * succeeds, so a failed removal is seen again at the next sign-in. Kept on the device, not in memory, so it holds across a
+ * relaunch. Only a digest of the id is kept.
+ */
+export const noteAccountOnPhone = async (
+    userId: string,
+    store: {
+        digest: (value: string) => Promise<string>;
+        read: (key: string) => Promise<string | null>;
+        write: (key: string, value: string) => Promise<void>;
+    },
+    removeSwitchedAlerts: () => Promise<void>,
+): Promise<void> => {
+    const current = await store.digest(userId);
+    const previous = await store.read(LAST_ACCOUNT_KEY) ?? undefined;
+
+    if (previous === current) {
+        return;
+    }
+
+    if (isAccountSwitch(previous, current)) {
+        await removeSwitchedAlerts();
+    }
+
+    await store.write(LAST_ACCOUNT_KEY, current);
+};
+
+/** Forgets the account on the phone once its alerts are gone: the next sign-in is a first one. */
+export const forgetAccountOnPhone = async (store: { remove: (key: string) => Promise<void> }): Promise<void> => {
+    await store.remove(LAST_ACCOUNT_KEY);
+};
+
+/**
+ * Removes the alerts still on the phone, for an account that is leaving. The record of that account goes last: if the
+ * alerts could not be removed, the next sign-in still sees the switch.
+ */
+export const dismissAccountAlerts = async (input: { dismissAll: () => Promise<void>; remove: (key: string) => Promise<void> }): Promise<void> => {
+    await input.dismissAll();
+    await forgetAccountOnPhone({ remove: input.remove });
+};

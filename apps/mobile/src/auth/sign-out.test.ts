@@ -311,3 +311,101 @@ describe(runSignOut, () => {
         expect(epoch.start()()).toBe(false);
     });
 });
+
+describe("alerts of the account that leaves", () => {
+    it("removes them after the grant is taken and before the release, and signs out anyway when that fails", async () => {
+        const calls: string[] = [];
+        const warn = vi.fn();
+
+        await signOutOnDevice({
+            clearCache: async () => {
+                calls.push("clear");
+            },
+            dismissNotifications: async () => {
+                calls.push("dismiss");
+
+                throw new Error("denied");
+            },
+            forgetLastChat: async () => {
+                calls.push("forget");
+            },
+            releasePush: async () => {
+                calls.push("release");
+            },
+            revokeSession: async () => {
+                calls.push("revoke");
+            },
+            takeCredential: async () => {
+                calls.push("take");
+
+                return "session-1";
+            },
+            warn,
+        });
+
+        expect(calls).toEqual(["clear", "forget", "take", "dismiss", "release", "revoke"]);
+        expect(warn).toHaveBeenCalledWith("Could not remove this account's notifications.", expect.any(Error));
+    });
+
+    it("removes them when a session ended on the server, with no sign-out, and says so when that fails", async () => {
+        const dismissNotifications = vi.fn(async () => {
+            throw new Error("denied");
+        });
+        const warn = vi.fn();
+
+        await emptyCacheWhileSignedOut({ clearCache: async () => undefined, dismissNotifications, forgetLastChat: async () => undefined, warn });
+
+        expect(dismissNotifications).toHaveBeenCalledOnce();
+        expect(warn).toHaveBeenCalledWith("Could not remove this account's notifications.", expect.any(Error));
+    });
+});
+
+describe("the record of the account that leaves", () => {
+    const signOutWith = (revokeSession: () => Promise<void>, forgetAccount: () => Promise<void>) =>
+        signOutOnDevice({
+            clearCache: async () => undefined,
+            forgetAccount,
+            forgetLastChat: async () => undefined,
+            revokeSession,
+            takeCredential: async () => "session-1",
+            warn: vi.fn(),
+        });
+
+    it("is forgotten once the revoke has landed", async () => {
+        const forgetAccount = vi.fn(async () => undefined);
+
+        await signOutWith(async () => undefined, forgetAccount);
+
+        expect(forgetAccount).toHaveBeenCalledOnce();
+    });
+
+    it("is kept when the revoke fails, so the next sign-in still sees the switch", async () => {
+        const forgetAccount = vi.fn(async () => undefined);
+
+        await signOutWith(
+            async () => {
+                throw new Error("offline");
+            },
+            forgetAccount,
+        );
+
+        expect(forgetAccount).not.toHaveBeenCalled();
+    });
+});
+
+describe("the record when no session was stored", () => {
+    it("is kept, since nothing shows that a session has ended", async () => {
+        const forgetAccount = vi.fn(async () => undefined);
+
+        await signOutOnDevice({
+            clearCache: async () => undefined,
+            forgetAccount,
+            forgetLastChat: async () => undefined,
+            revokeSession: async () => undefined,
+            takeCredential: async () => undefined,
+            warn: vi.fn(),
+        });
+
+        expect(forgetAccount).not.toHaveBeenCalled();
+    });
+});

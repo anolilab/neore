@@ -6,7 +6,13 @@ import { clearLastThread } from "../chat/last-thread-store";
 import { sendSessions } from "../chat/send-sessions";
 import { loadConfig } from "../lib/config";
 import { getClient } from "../lib/lunora";
-import { backendPushServer, devicePushPlatform, pushRegistrations } from "../notifications/phone-push";
+import {
+    backendPushServer,
+    devicePushPlatform,
+    dismissAccountNotifications,
+    pushRegistrations,
+    removeAccountAlertsAndRecord,
+} from "../notifications/phone-push";
 import { releaseOnSignOut } from "../notifications/push-registration";
 import { endPhonePushForAccount } from "../notifications/use-phone-push";
 import { getOfflineCache } from "../offline/database";
@@ -105,7 +111,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 dispatch({ type: "signed-out" });
                 sendSessions.signOut();
                 // Retries a cache wipe that failed at sign-out; the credential side never waits on it.
-                await emptyCacheWhileSignedOut({ clearCache: () => getOfflineCache().clear(), forgetLastChat: clearLastThread, warn: console.warn });
+                await emptyCacheWhileSignedOut({
+                    clearCache: () => getOfflineCache().clear(),
+                    dismissNotifications: dismissAccountNotifications,
+                    forgetLastChat: clearLastThread,
+                    warn: console.warn,
+                });
 
                 return;
             }
@@ -177,6 +188,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             teardown: async () =>
                 await signOutOnDevice({
                     clearCache: () => getOfflineCache().clear(),
+                    dismissNotifications: dismissAccountNotifications,
+                    forgetAccount: removeAccountAlertsAndRecord,
                     forgetLastChat: clearLastThread,
                     releasePush: async () =>
                         await releaseOnSignOut({ platform: devicePushPlatform, registrations: pushRegistrations, server: backendPushServer(client) }),
