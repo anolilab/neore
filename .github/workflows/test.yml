@@ -75,12 +75,19 @@ jobs:
 
             # The standard runner has about 14 GB free, and the affected build and coverage run filled it: the job ran out
             # of disk ("No space left on device") and failed. Toolchains this job never uses are removed first.
+            # Runs in the background: in the foreground the removal took about 96 s. The wait step before the
+            # build reads its status file.
             - name: "Free runner disk"
               shell: "bash"
               run: |
-                  df -h /
-                  sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /usr/local/share/boost /usr/share/swift /opt/hostedtoolcache/CodeQL
-                  df -h /
+                  (
+                      set +e
+                      df -h /
+                      sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /usr/local/share/boost /usr/share/swift /opt/hostedtoolcache/CodeQL
+                      status=$?
+                      df -h /
+                      echo "${status}" > "${RUNNER_TEMP}/disk-status"
+                  ) > "${RUNNER_TEMP}/disk.log" 2>&1 < /dev/null &
 
             - name: "Git checkout ${{ env.HEAD_REPOSITORY }}:${{ env.HEAD_REF }}"
               uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
@@ -117,17 +124,28 @@ jobs:
               shell: "bash"
               run: "bash .github/scripts/apt-retry.sh sudo apt-get install -y libdbus-1-dev pkg-config"
 
+            # Waits for the background disk cleanup started at the top of the job. Nothing before this step
+            # needs the removed directories, so the removal overlaps checkout and setup.
+            - name: "Finish freeing runner disk"
+              shell: "bash"
+              timeout-minutes: 5
+              run: |
+                  until test -s "${RUNNER_TEMP}/disk-status"; do sleep 1; done
+                  cat "${RUNNER_TEMP}/disk.log"
+                  exit "$(cat "${RUNNER_TEMP}/disk-status")"
+
+            # The web and backend app builds are not inputs to the tests in this job. Web tests import the
+            # workspace packages' dist, which `build:packages` produces (the same step Storybook and E2E use).
+            # Backend tests read committed sources and the committed `_generated/` output, so neither needs
+            # a build. Web's `tsc` runs in the Types job, and bundle.yml runs its `vite build` on every PR.
             - name: "Build affected packages"
               shell: "bash"
               env:
-                  # Same fix, same reason as `deploy.yml`'s "Build app" step: the
-                  # standard runner is 2-core/7GB and Node sizes its default
-                  # old-space at ~2080MB. `@neore/web:build` dies there
-                  # with "FATAL ERROR: Ineffective mark-compacts near heap limit",
-                  # driven by the sourcemaps for the large code-split chunks
-                  # (univer-sheet-editor ~11MB, vendor-diagrams ~3.7MB).
+                  # Node's default old-space is ~2080MB on this 2-core/7GB runner.
                   NODE_OPTIONS: "--max-old-space-size=4096"
-              run: 'pnpm exec vis affected build --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
+              run: |
+                  pnpm run build:packages
+                  pnpm exec vis affected build --query "project!=@neore/web && project!=@neore/backend" --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast
 
             # `--parallel 2`: the standard runner is 2-core/7GB and every project's vitest spawns its own
             # worker pool, so running all of them at once starved the suites (trivial tests timing out at
