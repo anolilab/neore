@@ -55,7 +55,7 @@ function emphasisOf(element: Element): Emphasis {
     const style = element.getAttribute("style") ?? "";
     const isStyled = STYLED.has(name);
     const weight = style === "" ? "" : declaredStyle(style, "font-weight");
-    const isNormal = (isStyled || BOLD_NAMES.has(name)) && NORMAL_WEIGHTS.has(weight);
+    const isNormal = (isStyled || isNamed(element)) && NORMAL_WEIGHTS.has(weight);
     const emphasis: Emphasis = {
         isBold: !isNormal && (BOLD_NAMES.has(name) || (isStyled && BOLD_WEIGHTS.has(weight))),
         isItalic: ITALIC_NAMES.has(name) || (isStyled && style !== "" && isItalicStyle(style)),
@@ -246,7 +246,7 @@ const lastTexts = new WeakMap<Node, string>();
  * The text at one edge of the node: its first (or last) descendant's, or "". Remembered for each node on the way down,
  * so nested formatting reads each edge once.
  */
-function edgeText(node: Node | null, side: "first" | "last"): string {
+function edgeText(node: Node | null, side: "first" | "last", lookup: RuleLookup): string {
     const known = side === "first" ? firstTexts : lastTexts;
     const chain: Node[] = [];
     let current = node;
@@ -266,7 +266,7 @@ function edgeText(node: Node | null, side: "first" | "last"): string {
         }
 
         chain.push(current);
-        current = edgeChild(current, side);
+        current = shownFrom(edgeChild(current, side), side, lookup);
     }
 
     for (const member of chain) {
@@ -274,6 +274,17 @@ function edgeText(node: Node | null, side: "first" | "last"): string {
     }
 
     return text;
+}
+
+/** The node, or the first after it toward the edge (the next one for "first", the one before for "last") the page shows. */
+function shownFrom(start: Node | null, side: "first" | "last", lookup: RuleLookup): Node | null {
+    let node = start;
+
+    while (node && (node.nodeType === 8 || (node.nodeType === 1 && lookup.isRemoved(node)))) {
+        node = side === "first" ? node.nextSibling : node.previousSibling;
+    }
+
+    return node;
 }
 
 function edgeChild(node: Node, side: "first" | "last"): Node | null {
@@ -293,16 +304,18 @@ function lastCodePoint(text: string): string {
  * True when the element's edge falls inside a ZWJ emoji sequence (`<b>👩</b>‍👩`). A delimiter there parts the joiner
  * from an emoji and breaks the sequence; formatting shows nothing on an emoji anyway, so it is left unmarked.
  */
-function isInEmojiSequence(element: Element): boolean {
-    const first = edgeText(element, "first");
-    const last = edgeText(element, "last");
+function isInEmojiSequence(element: Element, lookup: RuleLookup): boolean {
+    const first = edgeText(element, "first", lookup);
+    const last = edgeText(element, "last", lookup);
 
     if (first.trimStart().startsWith(JOINER) || last.trimEnd().endsWith(JOINER)) {
         return true;
     }
 
-    const isJoinedAfter = EMOJI_EDGE.test(lastCodePoint(last)) && edgeText(element.nextSibling, "first").startsWith(JOINER);
-    const isJoinedBefore = EMOJI_EDGE.test(String.fromCodePoint(first.codePointAt(0) ?? 0)) && edgeText(element.previousSibling, "last").endsWith(JOINER);
+    const after = edgeText(shownFrom(element.nextSibling, "first", lookup), "first", lookup);
+    const before = edgeText(shownFrom(element.previousSibling, "last", lookup), "last", lookup);
+    const isJoinedAfter = EMOJI_EDGE.test(lastCodePoint(last)) && after.startsWith(JOINER);
+    const isJoinedBefore = EMOJI_EDGE.test(String.fromCodePoint(first.codePointAt(0) ?? 0)) && before.endsWith(JOINER);
 
     return isJoinedAfter || isJoinedBefore;
 }
@@ -432,7 +445,7 @@ function formattingFrom(start: Node | null, kind: Kind): Element | null {
 
 /** True when the preset may write the element's own formatting: no block it cannot span, no split emoji sequence. */
 function canWrap(element: Element, lookup: RuleLookup): boolean {
-    return !hasStructure(element, lookup) && !isInEmojiSequence(element);
+    return !hasStructure(element, lookup) && !isInEmojiSequence(element, lookup);
 }
 
 /**
@@ -468,7 +481,7 @@ const styledText: Rule = {
         }
 
         if (isNamed(node)) {
-            return isUnbold(node) || carriersOf(node).has(node) || isInEmojiSequence(node) || isNestedInStyled(node, lookup);
+            return isUnbold(node) || carriersOf(node).has(node) || isInEmojiSequence(node, lookup) || isNestedInStyled(node, lookup);
         }
 
         const emphasis = emphasisOf(node);

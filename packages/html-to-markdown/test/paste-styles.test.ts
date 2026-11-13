@@ -166,3 +166,25 @@ describe("paste styles: review cases", () => {
         expect(convert("<pre><div>one</div><div><br></div><div>three</div></pre>")).toBe("```\none\n\nthree\n```");
     });
 });
+
+describe("paste styles: review cases, second round", () => {
+    it("takes the language from code the page shows, not from hidden code", () => {
+        expect(convert(`<pre><code class="language-py" hidden>x</code><code class="language-js">y()</code></pre>`)).toBe("```js\ny()\n```");
+        expect(convert(`<pre><span style="display:none"><code class="language-py">x</code></span><code class="language-js">y()</code></pre>`)).toBe(
+            "```js\ny()\n```",
+        );
+    });
+
+    it("keeps a blank line a code block ends with, dropping only the break that ends its last line", () => {
+        expect(convert("<pre>a\n\n</pre>")).toBe("```\na\n\n```");
+    });
+
+    it("keeps italics set back to normal weight inside bold out of the bold", () => {
+        expect(convert(`<b>a <i style="font-weight:normal">b</i> <em style="font-weight:400">c</em> d</b>`)).toBe("**a** *b* *c* **d**");
+    });
+
+    it("reads no joiner from hidden text beside an emoji, so the emoji keeps its formatting", () => {
+        expect(convert(`<p><span style="display:none">\u{200D}</span><b>🎉</b></p>`)).toBe("**🎉**");
+        expect(convert(`<p><b>🎉</b><span hidden>\u{200D}</span></p>`)).toBe("**🎉**");
+    });
+});

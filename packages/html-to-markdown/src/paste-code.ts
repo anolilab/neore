@@ -5,7 +5,6 @@
  */
 import { unlessRemoved } from "./paste-lists";
 import type { Rule, RuleLookup } from "./types";
-import { trimTrailingNewlines } from "./utilities";
 
 // `language-js`, `lang-js`, and GitHub's `highlight-source-shell` (or `highlight-js`) on the element around the block.
 // Longest first, so `highlight-source-shell` is read as `shell`.
@@ -37,10 +36,10 @@ const BACKTICK_RUN = /`+/g;
 const MIN_FENCE = 3;
 
 /** The language a class names on the code, the block, or the two elements around it, in lower case; or "". */
-function languageOf(pre: Element): string {
+function languageOf(pre: Element, lookup: RuleLookup): string {
     const parent = pre.parentElement;
 
-    for (const element of [pre.querySelector("code"), pre, parent, parent?.parentElement]) {
+    for (const element of [shownCode(pre, lookup), pre, parent, parent?.parentElement]) {
         const language = classLanguage(element?.getAttribute("class") ?? "");
 
         if (language !== "") {
@@ -49,6 +48,27 @@ function languageOf(pre: Element): string {
     }
 
     return "";
+}
+
+/** The first `<code>` in the block that the page shows: a hidden one's language is not the shown code's. */
+function shownCode(pre: Element, lookup: RuleLookup): Element | null {
+    const found = pre.querySelectorAll("code");
+    // Copied by index: domino's NodeList is not iterable.
+    const codes = Array.from({ length: found.length }, (_unused, index) => found[index] as Element);
+
+    for (const code of codes) {
+        let isShown = true;
+
+        for (let element: Element | null = code; element && element !== pre && isShown; element = element.parentElement) {
+            isShown = !lookup.isRemoved(element);
+        }
+
+        if (isShown) {
+            return code;
+        }
+    }
+
+    return null;
 }
 
 /** The language the first class with a language prefix names, in lower case; or "". */
@@ -135,7 +155,10 @@ function codeText(pre: Element, lookup: RuleLookup): string {
         pushChildren(steps, node);
     }
 
-    return trimTrailingNewlines(parts.join(""));
+    // Only the line break that ends the last line: a blank line the code ends with stays, as the built-in rule keeps it.
+    const code = parts.join("");
+
+    return code.endsWith("\n") ? code.slice(0, -1) : code;
 }
 
 /** Pushes the node's children, last first, so the first comes off the stack first. */
@@ -163,7 +186,7 @@ export const codeRules: Record<string, Rule> = {
             const code = codeText(node, lookup);
             const fence = fenceFor(code);
 
-            return `\n\n${fence}${languageOf(node)}\n${code}\n${fence}\n\n`;
+            return `\n\n${fence}${languageOf(node, lookup)}\n${code}\n${fence}\n\n`;
         },
     },
 };
