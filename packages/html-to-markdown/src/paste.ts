@@ -56,6 +56,9 @@ const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
 // Only emoji: pictographs and the joiners, modifiers, selectors and flag letters that build them.
 const EMOJI_ONLY = /^[\p{Extended_Pictographic}\p{Emoji_Component}\s]+$/u;
 const MAX_EMOJI_ALT = 16;
+// How a character changes the depth of parentheses a style's reader is in.
+const DEPTH_CHANGE: Readonly<Record<string, number>> = { "(": 1, ")": -1 };
+const QUOTES = new Set(["'", `"`]);
 
 /**
  * The value an inline style gives a property, as CSS reads it: the last declaration wins, unless an earlier one is
@@ -65,7 +68,7 @@ export function declaredStyle(style: string, property: string): string {
     let value = "";
     let isImportant = false;
 
-    for (const declaration of style.split(";")) {
+    for (const declaration of declarations(style)) {
         const colon = declaration.indexOf(":");
 
         if (colon === -1 || declaration.slice(0, colon).trim().toLowerCase() !== property) {
@@ -82,6 +85,57 @@ export function declaredStyle(style: string, property: string): string {
     }
 
     return value;
+}
+
+/**
+ * The declarations of an inline style: split at each `;` that is not inside a quoted string or parentheses, so a value
+ * such as `url('a;b')` or `"x; y"` stays whole.
+ */
+function declarations(style: string): string[] {
+    const parts: string[] = [];
+    let start = 0;
+    let depth = 0;
+    let index = 0;
+
+    while (index < style.length) {
+        const char = style.charAt(index);
+
+        if (QUOTES.has(char)) {
+            index = afterQuoted(style, index);
+            continue;
+        }
+
+        depth = Math.max(0, depth + (DEPTH_CHANGE[char] ?? 0));
+
+        if (char === ";" && depth === 0) {
+            parts.push(style.slice(start, index));
+            start = index + 1;
+        }
+
+        index += 1;
+    }
+
+    parts.push(style.slice(start));
+
+    return parts;
+}
+
+/** The index after the quoted string that opens at `open`, skipping a backslash and the character after it. */
+function afterQuoted(style: string, open: number): number {
+    const quote = style.charAt(open);
+    let index = open + 1;
+
+    while (index < style.length) {
+        const char = style.charAt(index);
+
+        if (char === quote) {
+            return index + 1;
+        }
+
+        index += char === "\\" ? 2 : 1;
+    }
+
+    return style.length;
 }
 
 /** True when the page does not show the element: hidden by an attribute, a style or a screen-reader class, or no text. */
@@ -121,7 +175,13 @@ function imageText(image: Element): string {
  * `$` longer than any run inside, with a space against a `$` at either edge: a `$` in the formula cannot end it early
  * and turn the rest of its source into Markdown.
  */
-function inlineMath(tex: string): string {
+function inlineMath(source: string): string {
+    // A line break is whitespace in TeX, and inline math stays on one line.
+    const tex = source
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line !== "")
+        .join(" ");
     let longest = 0;
     let run = 0;
 
@@ -153,13 +213,7 @@ const pasteRules: Record<string, Rule> = {
         filter: unlessRemoved((node) => node.nodeName === "LI"),
         replacement(content, node, options, lookup) {
             const parent = node.parentNode as Element | null;
-            let marker = options.bulletListMarker;
-
-            if (parent?.nodeName === "OL") {
-                const start = parseListStart(parent.getAttribute("start")) ?? 1n;
-
-                marker = `${start + BigInt(keptItemsBefore(node, lookup))}.`;
-            }
+            const marker = parent?.nodeName === "OL" ? `${itemNumber(parent, node, lookup)}.` : options.bulletListMarker;
 
             const prefix = `${marker} `;
             const body = trimNewlines(content).replaceAll("\n", () => `\n${" ".repeat(prefix.length)}`);
@@ -176,17 +230,35 @@ const pasteRules: Record<string, Rule> = {
     },
 };
 
-/** How many list items before this one a remove filter keeps: a hidden item takes no number. */
-function keptItemsBefore(item: Element, lookup: RuleLookup): number {
-    let count = 0;
+// Each ordered list's item numbers, worked out once for the list, so a long list is numbered in one pass.
+const itemNumbers = new WeakMap<Element, Map<Element, bigint>>();
 
-    for (let previous = item.previousElementSibling; previous; previous = previous.previousElementSibling) {
-        if (previous.nodeName === "LI" && !lookup.isRemoved(previous)) {
-            count += 1;
+/**
+ * The number HTML gives the item: the list's `start`, or the item's own `value`, counting up from there. An item a remove
+ * filter drops takes no number.
+ */
+function itemNumber(list: Element, item: Element, lookup: RuleLookup): bigint {
+    let numbers = itemNumbers.get(list);
+
+    if (!numbers) {
+        numbers = new Map();
+
+        let next = parseListStart(list.getAttribute("start")) ?? 1n;
+
+        for (let child = list.firstElementChild; child; child = child.nextElementSibling) {
+            if (child.nodeName !== "LI" || lookup.isRemoved(child)) {
+                continue;
+            }
+
+            next = parseListStart(child.getAttribute("value")) ?? next;
+            numbers.set(child, next);
+            next += 1n;
         }
+
+        itemNumbers.set(list, numbers);
     }
 
-    return count;
+    return numbers.get(item) ?? 1n;
 }
 
 /** A formula's TeX source, from its `application/x-tex` annotation, or "". */

@@ -118,3 +118,28 @@ describe("paste: declared styles", () => {
         expect(declaredStyle(style, "font-weight")).toBe(expected);
     });
 });
+
+describe("paste: review cases", () => {
+    it("does not split a style at a semicolon inside a quoted value or a url()", () => {
+        expect(convert(`<p><span style="background-image:url('x; display:none;')">shown</span></p>`)).toBe("shown");
+        expect(declaredStyle(`content:"a; display:none"; display:block`, "display")).toBe("block");
+    });
+
+    it("writes a formula's line breaks as spaces, so the inline math stays on one line", () => {
+        expect(convert(`<p><math><semantics><mi>x</mi><annotation encoding="application/x-tex">x\n+ y</annotation></semantics></math></p>`)).toBe("$x + y$");
+        expect(convert(`<p><img class="math" alt="x\n+ y"></p>`)).toBe("$x + y$");
+    });
+
+    it("numbers an item from its own value, and the items after it from there", () => {
+        expect(convert(`<ol start="0"><li>zero</li><li>one</li></ol><ol><li>a</li><li value="5">five</li><li>six</li></ol>`)).toBe(
+            "0. zero\n1. one\n\n1. a\n5. five\n6. six",
+        );
+    });
+
+    it("numbers a long list in work linear in its length", () => {
+        const items = 20_000;
+        const markdown = convert(`<ol>${"<li>x</li>".repeat(items)}</ol>`);
+
+        expect(markdown.split("\n").at(-1)).toBe(`${items}. x`);
+    });
+});
