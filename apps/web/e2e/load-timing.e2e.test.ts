@@ -21,7 +21,9 @@
  * `LOAD_TIMING_STATE` keeps the seeded user (session + thread ids) so a second build is measured on the same data;
  * the first run creates it. `LOAD_TIMING_RUNS` (default 7) sets the runs per profile; `LOAD_TIMING_OUT` writes JSON.
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { isAbsolute, relative, resolve as resolvePath } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 
@@ -33,6 +35,9 @@ const ENABLED = process.env.E2E_LOAD_TIMING === "1";
 const RUNS = Number(process.env.LOAD_TIMING_RUNS) || 7;
 const LABEL = process.env.LOAD_TIMING_LABEL ?? "build";
 const STATE_FILE = process.env.LOAD_TIMING_STATE;
+const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+/** Git-ignored (`.gitignore`: `**\/e2e/.auth/`), like the shared test user's state. */
+const AUTH_DIR = fileURLToPath(new URL(".auth/", import.meta.url));
 const MILESTONE_TIMEOUT_MS = 90_000;
 /** How long no new largest-contentful-paint candidate must arrive before the latest counts as final. */
 const LCP_SETTLE_MS = 1000;
@@ -186,7 +191,40 @@ const timeSwitch = async (page: Page, thread: SeededThread): Promise<number> => 
     return elapsed ?? NaN;
 };
 
+const isInside = (directory: string, file: string): boolean => {
+    const path = relative(directory, file);
+
+    return path !== "" && !path.startsWith("..") && !isAbsolute(path);
+};
+
+/**
+ * The saved state holds a live session cookie: only outside the repository or in the git-ignored `e2e/.auth/`, and
+ * readable by the owner alone.
+ */
+const statePath = (file: string): string => {
+    const target = resolvePath(file);
+
+    if (isInside(REPO_ROOT, target) && !isInside(AUTH_DIR, target)) {
+        throw new Error(`LOAD_TIMING_STATE holds a live session; put it outside the repository or under apps/web/e2e/.auth/, not ${target}`);
+    }
+
+    return target;
+};
+
+const saveState = (file: string, data: Seed): void => {
+    const target = statePath(file);
+
+    writeFileSync(target, JSON.stringify(data), { mode: 0o600 });
+    // `mode` applies only to a new file.
+    chmodSync(target, 0o600);
+};
+
 const seed = async (page: Page): Promise<Seed> => {
+    if (STATE_FILE) {
+        // Refused before seeding, not after.
+        statePath(STATE_FILE);
+    }
+
     if (STATE_FILE && existsSync(STATE_FILE)) {
         return JSON.parse(readFileSync(STATE_FILE, "utf8")) as Seed;
     }
@@ -209,7 +247,7 @@ const seed = async (page: Page): Promise<Seed> => {
     const result: Seed = { storageState: await page.context().storageState(), threads: threads as Seed["threads"] };
 
     if (STATE_FILE) {
-        writeFileSync(STATE_FILE, JSON.stringify(result));
+        saveState(STATE_FILE, result);
     }
 
     return result;

@@ -201,14 +201,15 @@ export const reportLoadTiming = ({ exited = false, firstHiddenAt: seenHiddenAt, 
 
     // Read directly as well: web-vitals reports through callbacks that have not run when the page is already hidden.
     let firstInputAt: number | undefined;
-    let latestPaint: number | undefined;
+    // Every LCP candidate: the one reported is the last before the first hide, which can still move.
+    const paints: number[] = [];
     const flushInputs = watchEntries("first-input", (entries) => {
         for (const entry of entries) {
             firstInputAt = Math.min(firstInputAt ?? Infinity, entry.startTime);
         }
     });
     const flushPaints = watchEntries("largest-contentful-paint", (entries) => {
-        latestPaint = entries.at(-1)?.startTime ?? latestPaint;
+        paints.push(...entries.map((entry) => entry.startTime));
     });
 
     const onVisibility = (): void => {
@@ -237,7 +238,7 @@ export const reportLoadTiming = ({ exited = false, firstHiddenAt: seenHiddenAt, 
         const firstPaint = performance.getEntriesByName("first-contentful-paint", "paint")[0]?.startTime;
         const entryVitals: Partial<Record<VitalName, number>> = {
             FCP: beforeHidden(firstPaint),
-            LCP: beforeHidden(latestPaint),
+            LCP: paints.findLast((at) => beforeHidden(at) !== undefined),
             TTFB: navigation && navigation.responseStart > 0 ? navigation.responseStart : undefined,
         };
 

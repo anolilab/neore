@@ -147,6 +147,21 @@ describe("reportLoadTiming", () => {
         expect(sentProperties()).toMatchObject({ fcp_ms: undefined, lcp_ms: 900 });
     });
 
+    it("keeps the LCP candidate from before the first hide when a later one paints the reveal", async () => {
+        entries["largest-contentful-paint"] = [
+            { name: "", startTime: 900 },
+            { name: "", startTime: 5000 },
+        ];
+
+        const { reportLoadTiming } = await loadReporter();
+
+        // Hidden at 3000 while the chunk loaded; the reveal painted a larger candidate at 5000.
+        reportLoadTiming({ firstHiddenAt: 3000, hasBeenVisible: true });
+        setVisibility("hidden");
+
+        expect(sentProperties()).toMatchObject({ lcp_ms: 900 });
+    });
+
     it("waits in a browser without visibility-state entries when the page was never shown", async () => {
         Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
 
