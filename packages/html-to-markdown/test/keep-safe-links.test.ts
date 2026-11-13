@@ -10,6 +10,18 @@ describe("keep with safeLinks does not emit an unsafe link destination (PR #723 
         expect(service.turndown(`<a href="javascript:alert(1)">x</a>`)).toBe("x");
     });
 
+    // A kept unsafe anchor prints no markup of its own, so its content is converted as an unsafe link's is: escaped.
+    it.each([
+        ["Markdown characters", `<a href="javascript:alert(1)">**bold**</a>`, String.raw`\*\*bold\*\*`],
+        ["inline markup", `<a href="javascript:alert(1)">a <b>b</b></a>`, "a **b**"],
+    ])("a kept unsafe anchor with %s is converted like any unsafe link", (_name, html, expected) => {
+        const service = new TurndownService({ safeLinks: true });
+
+        service.keep(["a"]);
+        expect(service.turndown(html)).toBe(expected);
+        expect(service.turndown(html)).toBe(new TurndownService({ safeLinks: true }).turndown(html));
+    });
+
     it.each([
         ["a block keeps its unsafe anchor as text", ["p"], `<p><a href="javascript:alert(1)">x</a></p>`, "<p>x</p>"],
         ["an unsafe anchor deeper in a kept block", ["p"], `<p><span><a href="javascript:alert(1)">x</a></span></p>`, "<p><span>x</span></p>"],

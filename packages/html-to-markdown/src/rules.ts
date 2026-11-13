@@ -29,9 +29,15 @@ const LINK_ATTRIBUTES = ["href", "xlink:href"];
  *
  * With `safeLinks`, an `<a>` inside the element whose destination is unsafe is
  * written without its link: its content stays and its destination goes. Kept
- * markup with only safe links is output unchanged.
+ * markup with only safe links is output unchanged. A kept anchor that is itself
+ * unsafe prints no markup, so it is written as any unsafe link is: its content,
+ * converted and escaped (see isMarkupKept).
  */
-export function defaultKeepReplacement(_content: string, node: AnnotatedNode, options: Options): string {
+export function defaultKeepReplacement(content: string, node: AnnotatedNode, options: Options): string {
+    if (!isMarkupKept(node, options)) {
+        return content;
+    }
+
     const html = options.safeLinks ? htmlWithoutUnsafeLinks(node) : node.outerHTML;
 
     if (node.isBlock) {
@@ -55,7 +61,6 @@ function htmlWithoutUnsafeLinks(node: AnnotatedNode): string {
     }
 
     const copy = node.cloneNode(true) as Element;
-    const isRootUnsafe = copy.localName === "a" && isUnsafeAnchor(copy);
 
     for (const anchor of [copy, ...anchorsWithin(copy)]) {
         if (anchor.localName === "area" && isUnsafeAnchor(anchor)) {
@@ -65,9 +70,15 @@ function htmlWithoutUnsafeLinks(node: AnnotatedNode): string {
         }
     }
 
-    // A root anchor has no parent to unwrap into, so only its inner markup is output.
-    // eslint-disable-next-line unicorn/prefer-dom-node-html-methods -- domino, the Node and Workers parser, has no getHTML, so innerHTML is the serialiser here.
-    return isRootUnsafe ? copy.innerHTML : copy.outerHTML;
+    return copy.outerHTML;
+}
+
+/**
+ * False for a kept `<a>` whose destination is unsafe under safeLinks: it prints no markup of its own, so its children
+ * are converted and written in its place.
+ */
+function isMarkupKept(node: Node, options: Options): boolean {
+    return !(options.safeLinks && node.nodeType === 1 && (node as Element).localName === "a" && isUnsafeAnchor(node as Element));
 }
 
 /** The `<a>` and `<area>` elements inside the element, in document order. Copied by index, since domino's NodeList is not iterable. */
@@ -201,8 +212,8 @@ export default class Rules implements RuleLookup {
      * neither uses them. Converting them would only throw the output away, and
      * could still leave side effects such as reference-link definitions.
      */
-    skipsChildren(rule: Rule): boolean {
-        return this.skipChildrenRules.has(rule);
+    skipsChildren(rule: Rule, node: Node): boolean {
+        return this.skipChildrenRules.has(rule) && (rule.replacement !== defaultKeepReplacement || isMarkupKept(node, this.options));
     }
 
     forNode(node: AnnotatedNode): Rule {
