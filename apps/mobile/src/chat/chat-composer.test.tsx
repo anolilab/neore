@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
-import { act, useState } from "react";
+import { act, Profiler, useEffect, useState } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -44,27 +44,35 @@ vi.mock(import("../voice/voice-button"), () => {
     return { VoiceButton: () => <span />, VoiceStatus: () => <span /> };
 });
 
-const renders = { list: 0, screen: 0 };
+/** Commits of the message list. It is no memo, so it renders exactly when the screen around it does. */
+const renders = { list: 0 };
 /** The store of the screen rendered last, so a test can write to it as the screen's send does. */
 const rendered: { store?: DraftStore } = {};
 
-/** Stands in for the message list: it renders exactly when the screen around it does. */
-const MessageList = () => {
+const countListRender = () => {
     renders.list += 1;
-
-    return <ul />;
 };
+
+const keepStore = (store: DraftStore) => {
+    rendered.store = store;
+};
+
+/** Stands in for the message list. */
+const MessageList = () => <ul />;
 
 /** The chat screen's wiring: it owns the draft store, the composer subscribes to it. */
 const ChatScreen = ({ onSend }: { onSend: () => void }) => {
     const [draft] = useState(createDraftStore);
 
-    renders.screen += 1;
-    rendered.store = draft;
+    useEffect(() => {
+        keepStore(draft);
+    }, [draft]);
 
     return (
         <>
-            <MessageList />
+            <Profiler id="message-list" onRender={countListRender}>
+                <MessageList />
+            </Profiler>
             <ChatComposer control={{ disabled: false, reason: undefined }} draft={draft} isSendBlocked={false} onSend={onSend} safeBottom={0} sendReason={undefined} />
         </>
     );
@@ -99,7 +107,6 @@ const typeInto = (box: HTMLTextAreaElement, value: string) => {
 describe(ChatComposer, () => {
     beforeEach(() => {
         renders.list = 0;
-        renders.screen = 0;
         // React reads this to allow `act` outside a testing library.
         Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
         mounted.container = document.createElement("div");
@@ -123,7 +130,7 @@ describe(ChatComposer, () => {
 
         expect(box.value).toBe("Hello");
         expect(rendered.store?.get()).toBe("Hello");
-        expect(renders).toStrictEqual({ list: 1, screen: 1 });
+        expect(renders.list).toBe(1);
     });
 
     it("puts dictated words into the draft without re-rendering the screen", () => {
@@ -136,7 +143,7 @@ describe(ChatComposer, () => {
 
         expect(rendered.store?.get()).toBe("Note: buy milk");
         expect(messageBox().value).toBe("Note: buy milk");
-        expect(renders).toStrictEqual({ list: 1, screen: 1 });
+        expect(renders.list).toBe(1);
     });
 
     it("shows a draft the screen writes, as a cleared box after a send or a prompt given back", () => {
@@ -161,7 +168,7 @@ describe(ChatComposer, () => {
         });
 
         expect(messageBox().value).toBe("given back");
-        expect(renders.screen).toBe(1);
+        expect(renders.list).toBe(1);
     });
 });
 
