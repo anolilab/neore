@@ -18,7 +18,7 @@ import { useThreadListPlaceholder } from "./hooks/use-thread-list-cache";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
 import type { GroupType, LoadingStates } from "./types";
 
-// Lazy: it pulls `lucide-react/dynamic`'s import map of every icon (~190KB) for its icon picker.
+// Lazy: a dialog opened on demand, with its icon picker and project panels.
 const ProjectFormDialog = lazy(() => import("@/features/projects/components/project-form-dialog"));
 
 const CHAT_THREAD_PATH_RE = new RegExp(`^/chat/(${LUNORA_ID_SOURCE})$`);

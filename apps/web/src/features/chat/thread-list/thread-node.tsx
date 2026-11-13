@@ -75,7 +75,7 @@ import ThreadOptionsMenu from "./thread-options-menu";
 import ThreadStatusIcon, { NEEDS_YOU_TEXT_CLASS } from "./thread-status-icon";
 import type { BranchNode, LoadingStates } from "./types";
 
-// Lazy: its project icons pull `lucide-react/dynamic`'s import map of every icon (~190KB).
+// Lazy: a dialog opened on demand.
 const MoveToProjectDialog = lazy(() => import("@/features/projects/components/move-to-project-dialog"));
 
 /** Colour, icon and display name of the badge for threads that came in through a messenger. */

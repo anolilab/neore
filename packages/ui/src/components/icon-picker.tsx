@@ -5,6 +5,8 @@ import type { VirtualItem } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Button } from "@ui/components/button";
 import { Input } from "@ui/components/input";
+import LucideIconByName from "@ui/components/lucide-icon-by-name";
+import { loadLucideIconMap } from "@ui/components/lucide-icon-loader";
 import { Popover, PopoverContent, PopoverTrigger } from "@ui/components/popover";
 import { Skeleton } from "@ui/components/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@ui/components/tooltip";
@@ -12,7 +14,6 @@ import cn from "@ui/utils/cn";
 import Fuse from "fuse.js";
 import type { LucideIcon, LucideProps } from "lucide-react";
 import type { IconName } from "lucide-react/dynamic";
-import { DynamicIcon, dynamicIconImports } from "lucide-react/dynamic";
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDebounce } from "rooks";
@@ -64,10 +65,10 @@ const useIconsData = () => {
         const loadIcons = async () => {
             setIsLoading(true);
 
-            const { default: iconsData } = await import("../data/icons-data");
+            const [{ default: iconsData }, getLucideIcon] = await Promise.all([import("../data/icons-data"), loadLucideIconMap()]);
 
             if (isMounted) {
-                setIcons(iconsData.filter((icon: IconData) => icon.name in dynamicIconImports));
+                setIcons(iconsData.filter((icon: IconData) => getLucideIcon(icon.name) !== undefined));
                 setIsLoading(false);
             }
         };
@@ -458,7 +459,7 @@ interface IconProps extends Omit<LucideProps, "ref"> {
     ref?: React.Ref<React.ComponentRef<LucideIcon>>;
 }
 
-const Icon = ({ name, ref, ...props }: IconProps) => <DynamicIcon name={name} {...props} ref={ref} />;
+const Icon = ({ name, ref, ...props }: IconProps) => <LucideIconByName name={name} {...props} ref={ref} />;
 
 Icon.displayName = "Icon";
 
