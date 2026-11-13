@@ -13,7 +13,7 @@ describe("a heading with many breaks and a block", () => {
         const markdown = new TurndownService({ br: "\n", headingStyle: "atx" }).turndown(`<h1>${"a<br>".repeat(8000)}<div>c</div></h1>`);
         const elapsed = performance.now() - started;
 
-        expect(markdown).toBe(`# ${Array.from({ length: 8000 }).fill("a").join(" ")}\n\nc`);
+        expect(markdown).toBe(`# ${"a ".repeat(7999)}a\n\nc`);
         expect(elapsed).toBeLessThan(8000);
     });
 
