@@ -15,7 +15,7 @@ import type { Doc, Id } from "../../../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../../../_generated/server";
 import { stopHostTurn } from "../../../acp/lib/finish";
 import { enqueueJob } from "../../../lib/job-queue";
-import { endActiveGoals } from "../../goals/rows";
+import { endActiveGoals, endGoalsOfStream } from "../../goals/rows";
 import { patchRow } from "../../../lib/patch";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
 import { planPause, RATE_LIMIT_RESUME_SLACK_MS } from "../../lib/rate-limit-pause";
@@ -30,6 +30,16 @@ import { MAX_LENGTH } from "../../../lib/validators";
 import { latestSteerMessageId, latestSteerPendingId, type SteerEntry, withoutQueuedText } from "../../lib/steer-queue";
 import type { StreamStatus } from "./schema";
 import { streamStatusValidator } from "./schema";
+/** Ends only the goals the named streams run (`onlyNamed`), as stopped by the user. */
+const endGoalsOfStreams = async (ctx: MutationCtx, threadId: Id<"threads">, streamIds: Id<"persistentStreams">[]): Promise<boolean> => {
+    let ended = false;
+
+    for (const streamId of streamIds) {
+        ended = (await endGoalsOfStream(ctx, threadId, streamId, "user")) || ended;
+    }
+
+    return ended;
+};
 
 export const STREAM_TTL_MS = 20 * 60 * 1000; // 20 minutes
 const LIVE_STREAM_PAGE = 50;
@@ -249,11 +259,20 @@ const liveStreamsOf = async (ctx: MutationCtx, threadId: string): Promise<Doc<"p
  * and the signal its tools get. A tool that ignores that signal still runs to its end, but no further step starts.
  */
 export const stopActiveForThread = internalMutation
-    .input({ messageId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.string().max(MAX_LENGTH.id) })
+    .input({
+        messageId: v.optional(v.string().max(MAX_LENGTH.id)),
+        /** With `messageId`: stop that reply only, and nothing when it is no longer live (a sub-agent's own continuation). */
+        onlyNamed: v.optional(v.boolean()),
+        threadId: v.string().max(MAX_LENGTH.id),
+    })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         // Read the live streams in pages (a thread has one or two; the bound is for a runaway one), then stop them.
         const live = await liveStreamsOf(ctx, args.threadId);
+
+        if (args.onlyNamed === true && live.every((stream) => stream.messageId !== args.messageId)) {
+            return false;
+        }
 
         // A stop that names a prompt ends that prompt's reply only. When no live stream carries the id (a
         // placeholder key, or a reply started from another row), it falls back to the whole thread.
@@ -326,8 +345,16 @@ export const stopActiveForThread = internalMutation
         // A stale id that fell back to the whole thread must not narrow the cleanup to some older reply.
         await discardPausedThreadSecrets(ctx, { keep, messageId: stoppedWholeThread ? undefined : args.messageId, threadId });
 
-        // A goal ends with the stop, whether or not a reply is live: between its rounds there is none to stop.
-        const goalEnded = await endActiveGoals(ctx, args.threadId as Id<"threads">, "user");
+        // A goal ends with the stop, whether or not a reply is live: between its rounds there is none to stop. A stop of one
+        // named stream (`onlyNamed`, a sub-agent's continuation ended by its run) ends only that stream's goal, if any.
+        const goalEnded =
+            args.onlyNamed === true
+                ? await endGoalsOfStreams(
+                      ctx,
+                      threadId,
+                      streams.map((stream) => stream._id),
+                  )
+                : await endActiveGoals(ctx, threadId, "user");
 
         // A stopped coding-agent turn can start the next queued message of a worker in this same transaction
         // (`stopHostTurn` → `finishRun`): its stream is new, so the thread is still running.

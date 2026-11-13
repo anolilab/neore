@@ -9,6 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { respondToToolApproval } from "../chat/tool-permissions";
+import { stopActiveForThread } from "../chat/streaming/persistent/library";
 import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
 import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
 import type { Id } from "../_generated/dataModel";
@@ -805,5 +806,98 @@ describe("a waiting child's requests in its parent conversation", () => {
         expect(continuations()[0]!.body.args).toMatchObject({ approved: false, threadId: childId });
         expect(await runStatus()).toBe("running");
         expect(await listed()).toStrictEqual([]);
+    });
+});
+
+describe("a resumed run ended from outside", () => {
+    const childStreams = async (): Promise<any[]> =>
+        await run(
+            async (context) =>
+                await context.db
+                    .query("persistentStreams")
+                    .withIndex("by_threadId", (q: any) => q.eq("threadId", childId))
+                    .collect(),
+        );
+    /**
+     * The owner's own approval continuation in the child thread meanwhile, live beside the run's: its request is
+     * interactive (no `subAgentRunId`), and it is read first (`pending` before the run's `streaming`).
+     */
+    const ownerReply = async (): Promise<void> => {
+        const [continuation] = await childStreams();
+        const { _creationTime, _id, ...fields } = continuation;
+
+        await run(async (context) => {
+            await context.db.patch("persistentStreams", _id, { status: "streaming" });
+            await context.db.insert("toolApprovalRuns", {
+                approvalId: "approval-owner",
+                config: { ...CONFIG(), subAgentRunId: undefined },
+                createdAt: Date.now(),
+                status: "approved",
+                threadId: childId,
+                userId: OWNER,
+            });
+            await context.db.insert("persistentStreams", { ...fields, messageId: "approval-owner", status: "pending" });
+        });
+    };
+    const statuses = async () => {
+        const streams = await childStreams();
+
+        return Object.fromEntries(streams.map((stream) => [stream.messageId, stream.status]));
+    };
+    // The harness names no function path for these jobs: a stop of one named stream is the only job with `onlyNamed`.
+    const stopJobs = () => harness.scheduler.list().filter((job) => (job.args as { onlyNamed?: boolean } | undefined)?.onlyNamed === true);
+
+    beforeEach(async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        await answer(APPROVAL_ID, "approve");
+        await ownerReply();
+    });
+
+    it("stops its live continuation at once when a Stop ends it, and only that stream and its goal", async () => {
+        expect(await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER))).toBe(1);
+
+        const [job] = stopJobs();
+
+        expect(stopJobs()).toHaveLength(1);
+        expect(job!.args).toStrictEqual({ messageId: APPROVAL_ID, onlyNamed: true, threadId: childId });
+
+        // A goal the owner set in the child thread is theirs, not the continuation's: the stop leaves it running.
+        const goalId = await run(
+            async (context) =>
+                await context.db.insert("threadGoals", {
+                    config: { model: "test-model" },
+                    costMicrodollars: 0,
+                    createdAt: 1,
+                    maxCostMicrodollars: 2_000_000,
+                    maxRounds: 5,
+                    promptMessageId: "message-owner-goal",
+                    round: 0,
+                    startMessageId: "message-owner-goal",
+                    status: "active",
+                    text: "Keep the files tidy",
+                    threadId: childId,
+                    updatedAt: 1,
+                    userId: OWNER,
+                    verdicts: [],
+                }),
+        );
+
+        await internalCall(stopActiveForThread, job!.args as Record<string, unknown>);
+
+        expect(await statuses()).toStrictEqual({ "approval-owner": "pending", [APPROVAL_ID]: "done" });
+        expect(await run(async (context) => await context.db.get("threadGoals", goalId))).toMatchObject({ status: "active" });
+    });
+
+    it("stops its live continuation when the reaper fails it past its deadline", async () => {
+        const { reapAt } = await runRow();
+
+        await run(async (context) => await reapSubAgentRun(context, runId, reapAt));
+        expect(await runStatus()).toBe("failed");
+        expect(stopJobs().map((job) => job.args)).toStrictEqual([{ messageId: APPROVAL_ID, onlyNamed: true, threadId: childId }]);
+    });
+
+    it("stops nothing once the continuation is no longer live, not the owner's reply beside it", async () => {
+        expect(await internalCall(stopActiveForThread, { messageId: "approval-gone", onlyNamed: true, threadId: childId })).toBe(false);
+        expect(await statuses()).toStrictEqual({ "approval-owner": "pending", [APPROVAL_ID]: "streaming" });
     });
 });

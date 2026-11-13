@@ -544,7 +544,7 @@ export interface InternalApiTypes {
                     retryPausedRunsNow: FunctionReference<"mutation", { threadId: string }, boolean>;
                     setStreamStatus: FunctionReference<"mutation", { status: "pending" | "streaming" | "done" | "error" | "timeout"; streamId: Id<"persistentStreams"> }, void>;
                     settleStoppedRun: FunctionReference<"mutation", { streamId: Id<"persistentStreams"> }, null>;
-                    stopActiveForThread: FunctionReference<"mutation", { messageId?: string; threadId: string }, boolean>;
+                    stopActiveForThread: FunctionReference<"mutation", { messageId?: string; onlyNamed?: boolean; threadId: string }, boolean>;
                 };
                 purge: {
                     purgeFinishedStreams: FunctionReference<"mutation", { budget?: number }, { chunks: number; streams: number }>;

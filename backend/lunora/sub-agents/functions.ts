@@ -1308,6 +1308,35 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
     return false;
 };
 
+/** Live streams of a child thread read per status when looking for a run's continuation: a thread has one or two. */
+const LIVE_STREAMS_CHECKED = 10;
+
+/**
+ * The key of `runId`'s live continuation on its child thread, if one streams: an answer's stream is keyed on the request's
+ * approval id (`resumeClaimedRun`), and that request's snapshot names the run.
+ */
+const liveContinuationOf = async (ctx: Pick<QueryCtx, "db">, childThreadId: string, runId: Id<"subAgentRuns">): Promise<string | undefined> => {
+    for (const status of ["pending", "streaming"] as const) {
+        const live = await ctx.db
+            .query("persistentStreams")
+            .withIndex("by_threadId_status", (q) => q.eq("threadId", childThreadId).eq("status", status))
+            .take(LIVE_STREAMS_CHECKED);
+
+        for (const stream of live) {
+            const request = await ctx.db
+                .query("toolApprovalRuns")
+                .withIndex("by_approvalId", (q) => q.eq("approvalId", stream.messageId))
+                .first();
+
+            if (request?.threadId === childThreadId && request.config.subAgentRunId === runId) {
+                return stream.messageId;
+            }
+        }
+    }
+
+    return undefined;
+};
+
 /**
  * Ends an active run and posts its result — once: a run already ended (a
  * redelivered finish, the reaper after a late success) is left alone. Ending
@@ -1357,6 +1386,23 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     if (run.childThreadId !== undefined && run.mode !== "worker") {
         await closeChildApprovals(ctx, run.childThreadId, run._id, now);
         await releaseHeldResults(ctx, run.childThreadId);
+    }
+
+    // A resumed run (one that waited has a `reapAt`) ended from outside (a Stop, the reaper) streams its continuation on the
+    // child thread, which `shouldRunStop` halts only at its next step: its stream is stopped now, so a tool in it gets the
+    // abort. Only that stream: a reply the owner started in the child meanwhile keeps going. A continuation that ends
+    // itself closes its stream before it settles (`continueAfterToolApproval`, every path), so nothing is found then.
+    if (wasRunning && !hostRun && run.mode !== "worker" && run.reapAt !== undefined && outcome.kind !== "succeeded" && run.childThreadId !== undefined) {
+        const continuation = await liveContinuationOf(ctx, run.childThreadId, run._id);
+
+        if (continuation !== undefined) {
+            // The continuation may end before this runs: `onlyNamed` then stops nothing, not every live reply of the child.
+            await ctx.scheduler.runAfter(0, internal.chat.streaming.persistent.library.stopActiveForThread, {
+                messageId: continuation,
+                onlyNamed: true,
+                threadId: run.childThreadId,
+            });
+        }
     }
 
     // A run ended from this side (stopped, reaped) while its turn still runs: the computer is told to stop. A run ended by
