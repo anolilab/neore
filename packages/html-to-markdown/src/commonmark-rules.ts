@@ -828,30 +828,37 @@ const PRIVATE_USE_END = "".codePointAt(0) ?? 0;
 
 /**
  * A mark that the heading's markup does not contain. A break in the heading is written as this mark, so text of
- * the heading is never taken for a break. The mark is a private-use character the markup lacks; when the markup
- * holds every one, it is a run of the first, one longer than the longest such run in the markup.
+ * the heading is never taken for a break. The mark is a run of private-use characters, long enough that neither
+ * the markup nor a custom rule's output holds the same run by chance.
  */
 function headingBreakMark(heading: Node): string {
     const markup = (heading as Element).outerHTML ?? "";
+    let candidate = 0;
+    let mark = markCandidate(candidate);
 
-    for (let code = PRIVATE_USE_START; code <= PRIVATE_USE_END; code += 1) {
-        const mark = String.fromCodePoint(code);
-
-        if (!markup.includes(mark)) {
-            return mark;
-        }
+    while (markup.includes(mark)) {
+        candidate += 1;
+        mark = markCandidate(candidate);
     }
 
-    const first = String.fromCodePoint(PRIVATE_USE_START);
-    let longest = 0;
-    let current = 0;
+    return mark;
+}
 
-    for (const character of markup) {
-        current = character === first ? current + 1 : 0;
-        longest = Math.max(longest, current);
+const MARK_LENGTH = 8;
+
+/**
+ * The candidate mark with the given number: a run of private-use characters spread across the area by two large
+ * primes, so no candidate is a natural run such as one character repeated. The same number gives the same mark.
+ */
+function markCandidate(candidate: number): string {
+    const span = PRIVATE_USE_END - PRIVATE_USE_START + 1;
+    let mark = "";
+
+    for (let index = 0; index < MARK_LENGTH; index += 1) {
+        mark += String.fromCodePoint(PRIVATE_USE_START + ((candidate * 7919 + (index + 1) * 104_729) % span));
     }
 
-    return first.repeat(longest + 1);
+    return mark;
 }
 
 /** Writes each mark as a space, dropping the spaces beside it. A piece that starts a new line takes no space. */

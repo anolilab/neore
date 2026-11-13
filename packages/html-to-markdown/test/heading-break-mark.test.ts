@@ -38,6 +38,15 @@ describe("the break mark in a heading", () => {
         expect(markdown).toBe(`# ${literal} b\n\nc`);
     });
 
+    // The mark is chosen from the markup, but a custom rule's output is not markup; it must not be taken for a break.
+    it("keeps a private-use character that a custom rule writes inside a heading with a break", () => {
+        const service = new TurndownService({ headingStyle: "atx" });
+
+        service.addRule("span", { filter: "span", replacement: () => String.fromCodePoint(FIRST_PRIVATE_USE) });
+
+        expect(service.turndown("<h1>x<span>s</span><br>y</h1>")).toBe(`# x${String.fromCodePoint(FIRST_PRIVATE_USE)} y`);
+    });
+
     it("gives a custom heading rule the break marker, not the mark", () => {
         const service = new TurndownService({ br: "\n" });
 
