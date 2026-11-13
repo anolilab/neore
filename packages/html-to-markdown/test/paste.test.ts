@@ -196,3 +196,27 @@ describe("paste: review cases, fourth round", () => {
         ).toBe("$x^2$");
     });
 });
+
+describe("paste: review cases, fifth round", () => {
+    it.each([
+        ["an invalid later value", "display:none;display:bogus"],
+        ["visibility:collapse", "visibility:collapse"],
+        ["content-visibility:hidden", "content-visibility:hidden"],
+    ])("hides text hidden by %s", (_name, style) => {
+        expect(convert(`<p>shown<span style="${style}"> secret</span></p>`)).toBe("shown");
+    });
+
+    it("still lets a valid later value show the element", () => {
+        expect(convert(`<p style="display:none; display:inline flow">shown</p>`)).toBe("shown");
+    });
+
+    it("reads only the formula's own TeX annotation, not one nested in another annotation", () => {
+        const tex = "application/x-tex";
+
+        expect(
+            convert(
+                `<p><math><semantics><mi>v</mi><annotation-xml encoding="MathML-Content"><semantics><ci>n</ci><annotation encoding="${tex}">nested</annotation></semantics></annotation-xml></semantics></math></p>`,
+            ),
+        ).toBe("v");
+    });
+});

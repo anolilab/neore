@@ -57,6 +57,42 @@ const PICTOGRAPHIC = /\p{Extended_Pictographic}|\p{Regional_Indicator}{2}/u;
 // Only emoji: pictographs and the joiners, modifiers, selectors and flag letters that build them.
 const EMOJI_ONLY = /^[\p{Extended_Pictographic}\p{Emoji_Component}\s]+$/u;
 const MAX_EMOJI_ALT = 16;
+// The keywords a `display` value is made of: one, or the two- and three-keyword forms such as `inline flow`.
+const DISPLAY_KEYWORDS = new Set([
+    "block",
+    "contents",
+    "flex",
+    "flow",
+    "flow-root",
+    "grid",
+    "inline",
+    "inline-block",
+    "inline-flex",
+    "inline-grid",
+    "inline-table",
+    "list-item",
+    "none",
+    "ruby",
+    "ruby-base",
+    "ruby-base-container",
+    "ruby-text",
+    "ruby-text-container",
+    "run-in",
+    "table",
+    "table-caption",
+    "table-cell",
+    "table-column",
+    "table-column-group",
+    "table-footer-group",
+    "table-header-group",
+    "table-row",
+    "table-row-group",
+]);
+const GLOBAL_VALUES = new Set(["inherit", "initial", "revert", "revert-layer", "unset"]);
+const VISIBILITY_VALUES = new Set(["collapse", "hidden", "visible", ...GLOBAL_VALUES]);
+const CONTENT_VISIBILITY_VALUES = new Set(["auto", "hidden", "visible", ...GLOBAL_VALUES]);
+// `collapse` hides an element as `hidden` does, except in a table, where it also takes the row's or column's space.
+const HIDING_VISIBILITY = new Set(["collapse", "hidden"]);
 // How a character changes the depth of parentheses a style's reader is in.
 const DEPTH_CHANGE: Readonly<Record<string, number>> = { "(": 1, ")": -1 };
 const QUOTES = new Set(["'", `"`]);
@@ -65,7 +101,7 @@ const QUOTES = new Set(["'", `"`]);
  * The value an inline style gives a property, as CSS reads it: the last declaration wins, unless an earlier one is
  * `!important` and the later one is not. Lower case, without `!important`; empty when the style sets none.
  */
-export function declaredStyle(style: string, property: string): string {
+export function declaredStyle(style: string, property: string, isValid: (value: string) => boolean = () => true): string {
     let value = "";
     let isImportant = false;
 
@@ -80,9 +116,11 @@ export function declaredStyle(style: string, property: string): string {
 
         const raw = declaration.slice(colon + 1);
         const isThisImportant = IMPORTANT.test(raw);
+        const candidate = raw.replace(IMPORTANT, "").trim().toLowerCase();
 
-        if (isThisImportant || !isImportant) {
-            value = raw.replace(IMPORTANT, "").trim().toLowerCase();
+        // A browser drops a declaration whose value it cannot read, so an invalid value overrides nothing.
+        if ((isThisImportant || !isImportant) && isValid(candidate)) {
+            value = candidate;
             isImportant = isThisImportant;
         }
     }
@@ -173,7 +211,30 @@ export function isHiddenElement(node: Node): boolean {
 
     const style = element.getAttribute("style") ?? "";
 
-    return style !== "" && (declaredStyle(style, "display") === "none" || declaredStyle(style, "visibility") === "hidden");
+    if (style === "") {
+        return false;
+    }
+
+    if (declaredStyle(style, "display", isDisplayValue) === "none") {
+        return true;
+    }
+
+    if (HIDING_VISIBILITY.has(declaredStyle(style, "visibility", (value) => VISIBILITY_VALUES.has(value)))) {
+        return true;
+    }
+
+    return declaredStyle(style, "content-visibility", (value) => CONTENT_VISIBILITY_VALUES.has(value)) === "hidden";
+}
+
+/** True for a `display` value a browser reads: a global value, or keywords it knows. */
+function isDisplayValue(value: string): boolean {
+    if (GLOBAL_VALUES.has(value)) {
+        return true;
+    }
+
+    const keywords = value.split(" ").filter((keyword) => keyword !== "");
+
+    return keywords.length > 0 && keywords.length <= 3 && keywords.every((keyword) => DISPLAY_KEYWORDS.has(keyword));
 }
 
 /** True for a dialog that is not open, and for what a closed details holds besides its summary: the page shows neither. */
@@ -331,12 +392,24 @@ function itemNumber(list: Element, item: Element, lookup: RuleLookup): bigint {
     return numbers.get(item) ?? 1n;
 }
 
+/** The element's children with a local name, in order. */
+function childrenNamed(element: Element, name: string): Element[] {
+    const found: Element[] = [];
+
+    for (let child = element.firstElementChild; child; child = child.nextElementSibling) {
+        if (child.localName.toLowerCase() === name) {
+            found.push(child);
+        }
+    }
+
+    return found;
+}
+
 /** A formula's TeX source, from its `application/x-tex` annotation, or "". */
 function texSource(node: Element): string {
-    // A media type is matched without case, so `APPLICATION/X-TEX` names TeX too.
-    const found = node.querySelectorAll("annotation");
-    // Copied by index: domino's NodeList is not iterable.
-    const annotations = Array.from({ length: found.length }, (_unused, index) => found[index]);
+    // The formula's own annotations: the children of its semantics. One nested deeper, in another annotation, is a
+    // source for part of it. A media type is matched without case, so `APPLICATION/X-TEX` names TeX too.
+    const annotations = childrenNamed(node, "semantics").flatMap((semantics) => childrenNamed(semantics, "annotation"));
 
     for (const annotation of annotations) {
         const source = annotation?.textContent?.trim() ?? "";
