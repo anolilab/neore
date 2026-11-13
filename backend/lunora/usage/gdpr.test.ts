@@ -395,31 +395,6 @@ describe("the sweep and the clear", () => {
         expect(await countOf("usageExportPieces", A)).toBe(0);
     });
 
-    it("keeps a live run's pieces, and sets its time one time to live ahead", async () => {
-        const t0 = Date.now();
-
-        await harness.run(async (ctx: any) => {
-            const live = await ctx.db.insert("gdprRequests", {
-                requestedAt: 1,
-                requestType: "export",
-                status: "processing",
-                userEmail: "a@example.com",
-                userId: A,
-            });
-
-            await ctx.db.insert("usageExportRuns", { createdAt: t0, deleteAt: t0, requestId: `${live}:1`, userId: A });
-            await ctx.db.insert("usageExportPieces", { ...piece(`${live}:1`, A), createdAt: t0 });
-        });
-
-        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
-
-        expect(await countOf("usageExportPieces", A)).toBe(1);
-
-        const run = await harness.run(async (ctx: any) => await ctx.db.usageExportRuns.findFirst({ where: { userId: A } }));
-
-        expect(run?.deleteAt).toBe(t0 + EXPORT_PIECE_TTL_MS);
-    });
-
     it("re-arms a live run for a check a minute on and keeps its record, so a late object is purged soon after its export ends", async () => {
         const t0 = Date.now();
         const request = await harness.run(
@@ -656,6 +631,11 @@ describe("the sweep and the clear", () => {
         expect(await countOf("usageExportProjects", A)).toBe(0);
         expect(dead).toBeDefined();
         expect(await countOf("usageExportRuns", A)).toBe(2);
+
+        // The live run is re-armed one time to live ahead, so the sweep checks it again then.
+        const liveRun = await harness.run(async (ctx: any) => await ctx.db.usageExportRuns.findFirst({ where: { requestId: `${live}:1` } }));
+
+        expect(liveRun?.deleteAt).toBe(Date.now() + EXPORT_PIECE_TTL_MS);
     });
 
     it("reaches an expired run behind a full scan of live ones on a later sweep, instead of starving it", async () => {
