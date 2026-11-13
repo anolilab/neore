@@ -32,6 +32,7 @@ detail. Paths are relative to `backend/lunora/`.
 - **A result waits while its parent has a request its owner can still answer** (pending, unexpired, and open on the
   parent's latest turn; `waitsOnOpenRequest`), as well as while the parent's one-shot run goes.
   - An answer (`resumeClaimedRun`) or a send releases it.
-  - The run keeps one pending post check (`postCheckId`). A release replaces it instead of adding a loop, and the
-    backed-off recheck covers an expiry.
+  - The run records the token of its current post check (`postCheckId`), and a check acts only while its token is
+    current. A release supersedes the pending check instead of adding a loop. Nothing is cancelled, so a rolled-back
+    release leaves the old check in place. The backed-off recheck covers an expiry.
 - Every end goes through `finishRun`, so a resumed run's live continuation stops too (`liveContinuationOf`).

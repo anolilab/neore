@@ -1230,7 +1230,7 @@ export interface InternalApiTypes {
             isHostWorker: FunctionReference<"query", { userId: string; workerId: string }, boolean>;
             markDeletedThreadResults: FunctionReference<"mutation", { cursor: string | null; status: number; threadId: string }, null>;
             messageWorker: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; message: string; organizationId?: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "awaiting" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
-            postResult: FunctionReference<"mutation", { attempt: number; failures?: number; runId: Id<"subAgentRuns">; waits?: number }, null>;
+            postResult: FunctionReference<"mutation", { attempt: number; check?: string; failures?: number; runId: Id<"subAgentRuns">; waits?: number }, null>;
             reapOverdueWaits: FunctionReference<"mutation", {}, number>;
             reapRun: FunctionReference<"mutation", { claimedAt?: number; runId: Id<"subAgentRuns"> }, null>;
             retryHostRunStart: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;

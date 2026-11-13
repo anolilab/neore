@@ -26,7 +26,9 @@ import {
     finishRun,
     listSubAgentApprovals,
     markRunAwaiting,
+    postResult,
     postRunResult,
+    releaseHeldResults,
     reapOverdueWaits,
     reapSubAgentRun,
     watchSubAgentRunBeat,
@@ -538,7 +540,7 @@ describe("a child that waited on a request", () => {
 
         await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER));
 
-        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { attempt: 0, runId: nestedId } }));
+        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: expect.objectContaining({ attempt: 0, runId: nestedId }) }));
     });
 
     it("holds a nested run's result back while it waits, so its request stays answerable, and posts it once the run ends", async () => {
@@ -576,7 +578,7 @@ describe("a child that waited on a request", () => {
         await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER));
 
         // The run's end posts it at once, not at the held post's next check.
-        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: { attempt: 0, runId: nestedId } }));
+        expect(harness.scheduler.list()).toContainEqual(expect.objectContaining({ args: expect.objectContaining({ attempt: 0, runId: nestedId }) }));
         expect(await run(async (context) => await postRunResult(context, nestedId, 0))).toBe(true);
         const rowsAfter = await childRows();
 
@@ -948,6 +950,18 @@ describe("a resumed run ended from outside", () => {
 describe("a result for a parent that waits on its own request", () => {
     const PARENT_REQUEST = "approval-parent";
     const heldPosts = () => harness.scheduler.list().filter((job) => (job.args as { runId?: string } | undefined)?.runId === runId);
+    /** The checks that act: those whose token is the run's current one, without it. A superseded check does nothing. */
+    const currentChecks = async (): Promise<unknown[]> => {
+        const row = await runRow();
+
+        return heldPosts()
+            .filter((job) => (job.args as { check?: string }).check === row.postCheckId)
+            .map((job) => {
+                const { check: _check, ...args } = job.args as Record<string, unknown>;
+
+                return args;
+            });
+    };
 
     beforeEach(async () => {
         // The parent's own reply paused on a request its owner can still answer.
@@ -982,7 +996,7 @@ describe("a result for a parent that waits on its own request", () => {
 
     it("is held while the request is open, and posted once it can no longer be answered", async () => {
         expect(await parentReplies()).toHaveLength(0);
-        expect(heldPosts().map((job) => job.args)).toContainEqual({ attempt: 0, failures: 0, runId, waits: 1 });
+        expect(await currentChecks()).toStrictEqual([{ attempt: 0, failures: 0, runId, waits: 1 }]);
 
         await run(async (context) => {
             const [row] = await context.db
@@ -1021,7 +1035,7 @@ describe("a result for a parent that waits on its own request", () => {
         await run(async (context) => await clearAwaitingInput(context.db, parentId as Id<"threads">));
         await internalCall(afterOwnerMessage, { threadId: parentId });
 
-        expect(heldPosts().map((job) => job.args)).toStrictEqual([{ attempt: 0, runId }]);
+        expect(await currentChecks()).toStrictEqual([{ attempt: 0, runId }]);
     });
 
     it("is released by a reply that closed a secret request, though no request is pending any more", async () => {
@@ -1037,7 +1051,7 @@ describe("a result for a parent that waits on its own request", () => {
 
         await internalCall(afterOwnerMessage, { threadId: parentId });
 
-        expect(heldPosts().map((job) => job.args)).toStrictEqual([{ attempt: 0, runId }]);
+        expect(await currentChecks()).toStrictEqual([{ attempt: 0, runId }]);
     });
 
     it("keeps one check, however many sends release it while it is still held", async () => {
@@ -1045,13 +1059,51 @@ describe("a result for a parent that waits on its own request", () => {
             await internalCall(afterOwnerMessage, { threadId: parentId });
         }
 
-        expect(heldPosts()).toHaveLength(1);
+        expect(await currentChecks()).toHaveLength(1);
+
+        // A superseded check does nothing when it runs: no post, and no backoff loop of its own.
+        const { postCheckId } = await runRow();
+        const stale = heldPosts().find((job) => (job.args as { check?: string }).check !== postCheckId);
+        const before = heldPosts().length;
+
+        await internalCall(postResult, stale!.args as Record<string, unknown>);
+        expect(heldPosts()).toHaveLength(before);
+        expect((await runRow()).postCheckId).toBe(postCheckId);
+        expect(await parentReplies()).toHaveLength(0);
+    });
+
+    it("keeps the check it had when a release rolls back, and that check still posts", async () => {
+        const { postCheckId } = await runRow();
+        const [held] = heldPosts();
+
+        // A release whose mutation fails after scheduling: nothing it did is kept.
+        await expect(
+            run(async (context) => {
+                await releaseHeldResults(context, parentId);
+
+                throw new Error("rolled back");
+            }),
+        ).rejects.toThrow("rolled back");
+        expect((await runRow()).postCheckId).toBe(postCheckId);
+
+        // The request closes; the check it kept runs and posts.
+        await run(async (context) => {
+            const [row] = await context.db
+                .query("toolApprovalRuns")
+                .withIndex("by_approvalId", (q: any) => q.eq("approvalId", PARENT_REQUEST))
+                .collect();
+
+            await context.db.patch("toolApprovalRuns", row._id, { resolvedAt: Date.now(), status: "denied" });
+        });
+        await internalCall(postResult, held!.args as Record<string, unknown>);
+
+        expect(await parentReplies()).toHaveLength(1);
     });
 
     it("is released when the owner answers the request, to post after the reply the answer starts", async () => {
         await as(OWNER).mutation(respondToToolApproval as never, { approvalId: PARENT_REQUEST, decision: "approve", threadId: parentId } as never);
 
-        expect(heldPosts().map((job) => job.args)).toStrictEqual([{ attempt: 0, runId }]);
+        expect(await currentChecks()).toStrictEqual([{ attempt: 0, runId }]);
     });
 });
 

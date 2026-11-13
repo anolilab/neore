@@ -1381,24 +1381,21 @@ const waitsOnOpenRequest = async (ctx: Pick<QueryCtx, "db">, thread: Doc<"thread
 const HELD_RESULTS_RELEASED = 20;
 
 /**
- * Schedules `run`'s next post check and records it (`postCheckId`). With `replace`, the one still pending is cancelled
- * first: a release then moves the check up instead of starting a second backoff loop beside it. The loop's own reschedule
- * (inside the check that is running) only records the next one.
+ * Schedules `run`'s next post check under a fresh token, recorded as the run's `postCheckId` in the same mutation. A
+ * check acts only while its token is current (`postResult`), so a release supersedes the pending one instead of adding a
+ * second backoff loop, and nothing is cancelled: if this mutation rolls back, neither the new token nor its check exists,
+ * and the old check is still the current one.
  */
 const schedulePostCheck = async (
     ctx: MutationCtx,
-    run: Pick<RunDoc, "_id" | "postCheckId">,
+    run: Pick<RunDoc, "_id">,
     delayMs: number,
     args: { attempt: number; failures?: number; waits?: number },
-    replace = false,
 ): Promise<void> => {
-    if (replace && run.postCheckId !== undefined) {
-        await ctx.scheduler.cancel(run.postCheckId as never).catch(() => undefined);
-    }
+    const check = crypto.randomUUID();
 
-    const id = await ctx.scheduler.runAfter(delayMs, internal.sub_agents.functions.postResult, { ...args, runId: run._id });
-
-    await patchById(ctx.db, "subAgentRuns", run._id, { postCheckId: String(id) });
+    await ctx.scheduler.runAfter(delayMs, internal.sub_agents.functions.postResult, { ...args, check, runId: run._id });
+    await patchById(ctx.db, "subAgentRuns", run._id, { postCheckId: check });
 };
 
 /**
@@ -1415,7 +1412,7 @@ export const releaseHeldResults = async (ctx: MutationCtx, childThreadId: string
 
         for (const row of nested) {
             if (row.resultPostedAt === undefined && row.postFailed === undefined && postsBack(row)) {
-                await schedulePostCheck(ctx, row, 0, { attempt: 0 }, true);
+                await schedulePostCheck(ctx, row, 0, { attempt: 0 });
             }
         }
     }
@@ -1627,9 +1624,24 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
 
 /** A deferred {@link postRunResult}, rescheduled while the parent thread streams. */
 export const postResult = internalMutation
-    .input({ attempt: v.number(), failures: v.optional(v.number()), runId: v.id("subAgentRuns"), waits: v.optional(v.number()) })
+    .input({
+        attempt: v.number(),
+        /** The check's token (`schedulePostCheck`): a check another one superseded since does nothing. */
+        check: v.optional(v.string().max(MAX_LENGTH.id)),
+        failures: v.optional(v.number()),
+        runId: v.id("subAgentRuns"),
+        waits: v.optional(v.number()),
+    })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
+        if (args.check !== undefined) {
+            const run = await ctx.db.get("subAgentRuns", args.runId);
+
+            if (run?.postCheckId !== args.check) {
+                return null;
+            }
+        }
+
         await postRunResult(ctx, args.runId, args.attempt, args.failures, args.waits);
 
         return null;
