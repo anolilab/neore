@@ -68,7 +68,15 @@ const useGuestLinkRevoke = (
                 throw error;
             }
 
-            return await revokeConfirmed(forThread, linkId, await waitingNow(forThread));
+            const waiting = await waitingNow(forThread);
+
+            // Asked again only about a note the owner has not confirmed yet, and only through the confirm. When the read shows
+            // none (the server counts a note this read does not list), stop: never a retry without a click, never a loop.
+            if (waiting.every((noteId) => waitingNotes.includes(noteId))) {
+                throw new Error("The revoke was refused, and no unconfirmed note is shown.", { cause: error });
+            }
+
+            return await revokeConfirmed(forThread, linkId, waiting);
         }
 
         return true;

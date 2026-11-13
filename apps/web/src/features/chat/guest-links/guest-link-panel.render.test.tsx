@@ -92,15 +92,20 @@ const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider 
 
 /** Starts a revoke and tracks whether it has settled, without waiting on real time. */
 const start = (run: () => Promise<boolean>) => {
-    const outcome: { settled: boolean; value?: boolean } = { settled: false };
+    const outcome: { failed?: boolean; settled: boolean; value?: boolean } = { settled: false };
 
     act(() => {
-        void run().then((value) => {
-            outcome.settled = true;
-            outcome.value = value;
+        void run()
+            .then((value) => {
+                outcome.settled = true;
+                outcome.value = value;
 
-            return value;
-        });
+                return value;
+            })
+            .catch(() => {
+                outcome.settled = true;
+                outcome.failed = true;
+            });
     });
 
     return outcome;
@@ -149,6 +154,28 @@ describe("GuestLinkPanel", () => {
         await readNow({ link: { bound: false, expiresAt: mountedAt + 1000, id: "link-1" }, messages: [] });
 
         expect(screen.queryByText(ACTIVE_UNTIL)).toBeNull();
+        expect(screen.getByRole("button", { name: "Create guest link" })).toBeTruthy();
+    });
+
+    it("never asks a timeout to wait longer than a browser can, even for a link ending weeks after the client's clock", () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+        const timeout = vi.spyOn(globalThis, "setTimeout");
+
+        showPanel({ link: { bound: false, expiresAt: Date.now() + 30 * DAY, id: "link-1" }, messages: [] });
+
+        expect(Math.max(...timeout.mock.calls.map(([, delay]) => delay ?? 0))).toBeLessThanOrEqual(2_147_483_647);
+        expect(screen.getByText(ACTIVE_UNTIL)).toBeTruthy();
+    });
+
+    it("waits again even when its timer fires at the very time the panel last read", () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+        showPanel({ link: { bound: false, expiresAt: Date.now() + 1000, id: "link-1" }, messages: [] });
+
+        // The clock moves back by exactly the wait: when the timer fires, it reads the time the panel mounted.
+        vi.setSystemTime(Date.now() - 1000);
+        act(() => vi.advanceTimersByTime(1000));
+        act(() => vi.advanceTimersByTime(1000));
+
         expect(screen.getByRole("button", { name: "Create guest link" })).toBeTruthy();
     });
 
@@ -202,5 +229,20 @@ describe(useGuestLinkRevoke, () => {
             ["link-1", ["note-b"]],
         ]);
         expect(outcome).toStrictEqual({ settled: true, value: true });
+    });
+
+    it("stops, without asking or retrying, when the server refuses again but no unconfirmed note is shown", async () => {
+        const { result } = renderHook(() => useGuestLinkRevoke("thread-1"), { wrapper });
+
+        // The server counts a note on another live link, which the read does not list: there is nothing new to ask about.
+        revoke.mockRejectedValueOnce({ code: "BAD_REQUEST", data: { code: "GUEST_NOTES_WAITING", waiting: 2 } });
+        readLink.mockResolvedValueOnce({ link: null, messages: [{ id: "note-a", status: "held" }] });
+
+        const outcome = start(() => result.current.revokeLink("link-1", ["note-a"]));
+
+        await act(async () => (result.current.confirmDialog as { props: { onConfirm: () => void } }).props.onConfirm());
+
+        expect(revoke).toHaveBeenCalledTimes(1);
+        expect(outcome).toMatchObject({ failed: true, settled: true });
     });
 });

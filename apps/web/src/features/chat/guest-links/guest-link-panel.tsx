@@ -17,6 +17,9 @@ import { errorCode } from "./error-code";
 /** Where a guest opens the link: the token rides in the fragment, which never reaches a server log. */
 export const guestLinkUrl = (linkToken: string): string => `${globalThis.location.origin}/guest#${linkToken}`;
 
+/** The longest a browser timeout can wait: a longer delay fires at once. A link ending later is checked again then. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
+
 interface GuestLinkPanelProps {
     /** A locked chat holds no guest link (`createGuestLink` refuses one): its notes stay readable, no new link is made. */
     locked?: boolean;
@@ -47,6 +50,8 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
     // A link past its end is not live, even before the next read says so (a read reruns on writes, not on time): the panel
     // re-renders when it ends.
     const [now, setNow] = useState(() => Date.now());
+    // Counts the timer's firings, so each one re-checks even when the clock reads the same `now` (it moved back).
+    const [ticks, setTicks] = useState(0);
     const linkEnd = data?.link?.expiresAt;
     const live = linkEnd !== undefined && linkEnd > now;
 
@@ -69,10 +74,16 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
 
         // A timeout to the end (a link lives a day, `GUEST_LINK_TTL_MS`, well within a browser timeout), armed again each time
         // `now` moves while the link is still ahead: a timer can fire early, or the clock move back.
-        const timer = setTimeout(() => setNow(Date.now()), linkEnd - current);
+        const timer = setTimeout(
+            () => {
+                setNow(Date.now());
+                setTicks((count) => count + 1);
+            },
+            Math.min(linkEnd - current, MAX_TIMEOUT_MS),
+        );
 
         return () => clearTimeout(timer);
-    }, [linkEnd, now]);
+    }, [linkEnd, now, ticks]);
 
     const reportError = (error: unknown) => {
         switch (errorCode(error)) {
