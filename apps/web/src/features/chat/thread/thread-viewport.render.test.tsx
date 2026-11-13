@@ -353,6 +353,34 @@ describe("thread viewport while message rows settle", () => {
 
         expect(gap()).toBe(0);
     });
+
+    it("follows the pressed row when it grows long after the press, as an image loading after Copy", () => {
+        const clock = { now: 1000 };
+        const nowSpy = vi.spyOn(performance, "now").mockImplementation(() => clock.now);
+
+        try {
+            mount();
+
+            const row = document.querySelector<HTMLElement>("[data-list-message-id]")!;
+            let rowHeight = 300;
+
+            row.getBoundingClientRect = () => ({ height: rowHeight }) as DOMRect;
+
+            act(() => {
+                row.querySelector("button")!.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+            });
+
+            // Two seconds later an image in that row loads: nothing the reader opened.
+            clock.now += 2000;
+            rowHeight += 400;
+            layout.scrollHeight += 400;
+            playResize();
+
+            expect(gap()).toBe(0);
+        } finally {
+            nowSpy.mockRestore();
+        }
+    });
 });
 
 it("leaves no stand-in animation API behind for the tests that follow", () => {

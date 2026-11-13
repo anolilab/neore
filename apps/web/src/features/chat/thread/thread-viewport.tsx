@@ -37,6 +37,9 @@ const SCROLL_THRESHOLD = 50;
 /** How long a smooth scroll to the bottom may run before growth is followed again, where `scrollend` does not fire. */
 const SMOOTH_SCROLL_TIMEOUT_MS = 1000;
 
+/** How long after a press the pressed row's growth counts as the reader opening something there. */
+const PRESS_GROWTH_WINDOW_MS = 1000;
+
 // Distance from the top of content at which we pre-fetch older messages.
 // Large enough that messages are loaded before the user reaches them.
 const LOAD_MORE_THRESHOLD = 600;
@@ -94,9 +97,10 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
     // The reader asked to scroll up (wheel, key, touch) and that scroll's event has not come yet. Content growing in the
     // same frame can move the view down by more than they scrolled up, so the position alone would not show it.
     const upwardInputRef = useRef(false);
-    // The row the reader last pressed in (a click, a key) and its height then. That row growing afterwards is the reader
-    // opening something in it (tool output, reasoning, a long code block): the view stays where they pressed.
-    const pressedRowRef = useRef<{ height: number; row: Element } | null>(null);
+    // The row the reader last pressed in (a click, a key), its height then and when. That row growing soon afterwards is
+    // the reader opening something in it (tool output, reasoning, a long code block): the view stays where they pressed.
+    // Later growth (an image loading after a press on Copy) is followed as any other.
+    const pressedRowRef = useRef<{ at: number; height: number; row: Element } | null>(null);
 
     // Scroll anchor: scrollHeight captured synchronously in the scroll handler at the
     // exact moment loadMore() is called — before any React state changes. This is the
@@ -272,10 +276,16 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
             }
 
             const pressed = pressedRowRef.current;
-            const pressedHeight = pressed?.row.isConnected ? pressed.row.getBoundingClientRect().height : 0;
 
-            if (pressed && pressedHeight > pressed.height + 1) {
-                pressed.height = pressedHeight;
+            if (pressed && performance.now() - pressed.at > PRESS_GROWTH_WINDOW_MS) {
+                pressedRowRef.current = null;
+            }
+
+            const recent = pressedRowRef.current;
+            const pressedHeight = recent?.row.isConnected ? recent.row.getBoundingClientRect().height : 0;
+
+            if (recent && pressedHeight > recent.height + 1) {
+                recent.height = pressedHeight;
 
                 const atBottom = checkIsAtBottom();
 
@@ -324,7 +334,7 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
         const press = (event: Event) => {
             const row = event.target instanceof Element ? event.target.closest("[data-list-message-id]") : null;
 
-            pressedRowRef.current = row ? { height: row.getBoundingClientRect().height, row } : null;
+            pressedRowRef.current = row ? { at: performance.now(), height: row.getBoundingClientRect().height, row } : null;
         };
         const handleWheel = (event: WheelEvent) => {
             if (event.deltaY < 0) {

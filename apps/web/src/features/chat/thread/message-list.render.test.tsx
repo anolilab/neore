@@ -588,6 +588,26 @@ describe("a long thread", () => {
             expect(scrolls.get("m100")).toBe(3);
         });
 
+        it("stops re-centring once the reader scrolls on their own", () => {
+            // A row that never settles would be re-centred for every frame of the budget.
+            tops.set("m100", [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100]);
+            mountInto();
+            stubRows();
+
+            act(() => scrollToMessage("m100"));
+            runFrames(2);
+
+            const before = scrolls.get("m100");
+
+            // The reader turns the wheel right after the jump.
+            act(() => {
+                document.body.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: -100 }));
+            });
+            runFrames(8);
+
+            expect(scrolls.get("m100")).toBe(before);
+        });
+
         it("stops re-centring an older jump once a newer one is asked for", () => {
             // A row that never settles would be re-centred for every frame of the budget.
             tops.set("m100", [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100]);

@@ -175,10 +175,20 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
         // Re-centre whenever the row's centre moved, for every frame of the budget: rows above it render at their real height as
         // they come into view, and one can still change after a still frame (a late image, a skip that ends later).
+        // The reader scrolling on their own (wheel, drag, touch, a key) ends the re-centring: it would fight their input.
         let framesLeft = JUMP_SETTLE_FRAMES;
         let previousCentre = NaN;
+        const readerInput = new AbortController();
+        const stopOnInput = () => readerInput.abort();
+
+        for (const type of ["wheel", "touchmove", "keydown", "pointerdown"] as const) {
+            element.ownerDocument.addEventListener(type, stopOnInput, { capture: true, passive: true, signal: readerInput.signal });
+        }
+
         const settle = () => {
-            if (jumpGenerationRef.current !== generation || !element.isConnected) {
+            if (jumpGenerationRef.current !== generation || !element.isConnected || readerInput.signal.aborted) {
+                readerInput.abort();
+
                 return;
             }
 
@@ -195,6 +205,8 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
             if (framesLeft > 0) {
                 requestAnimationFrame(settle);
+            } else {
+                readerInput.abort();
             }
         };
 
