@@ -10,7 +10,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { devToolbar } from "@visulima/dev-toolbar/vite";
 import viteErrorOverlay from "@visulima/vite-overlay";
-import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import react from "@vitejs/plugin-react";
 import mdxPlugin from "fumadocs-mdx/vite";
 import Unfonts from "unplugin-fonts/vite";
 import { purgePolyfills } from "unplugin-purge-polyfills";
@@ -19,6 +19,8 @@ import { defineConfig, loadEnv } from "vite";
 import { ViteImageOptimizer } from "vite-plugin-image-optimizer";
 import svgr from "vite-plugin-svgr";
 import wasm from "vite-plugin-wasm";
+
+import reactCompilerOptions from "./react-compiler-options";
 
 // Manual groups hold ONLY what every page loads anyway, for cache stability.
 // A group is emitted as one chunk and swallows the dependencies of what it
@@ -40,6 +42,10 @@ import wasm from "vite-plugin-wasm";
 const REACT_CHUNK_RE = /\/node_modules\/(react|react-dom|react-compiler-runtime|scheduler|use-sync-external-store)\//;
 const TANSTACK_CHUNK_RE = /\/node_modules\/@tanstack\/(react-query|react-router)\//;
 const LUNORA_CHUNK_RE = /\/node_modules\/@lunora\//;
+
+/** A module the Lingui macro has to lower before the React Compiler reads it. */
+const LINGUI_MACRO_RE = /@lingui\/(?:core|react)\/macro/;
+
 // Kept although it ships every Base UI component to every page: ungrouped, the
 // chat route (which uses nearly all of them) paid more for ~50 extra chunks
 // (1,477 vs 1,441KB gzip) than the entry saved (93KB).
@@ -231,9 +237,17 @@ export default defineConfig(async ({ mode }) => {
                     workspaceRoot: "../..",
                 }),
             lingui(),
+            // Babel only lowers the Lingui macros, and only in files that import one. It runs before `react()` below
+            // (both are `pre` plugins, so their order here is their order), so the React Compiler sees plain calls.
             babel({
-                plugins: ["@lingui/babel-plugin-lingui-macro"],
-                presets: [reactCompilerPreset({ target: "19" })],
+                presets: [
+                    {
+                        preset: () => {
+                            return { plugins: ["@lingui/babel-plugin-lingui-macro"] };
+                        },
+                        rolldown: { filter: { code: LINGUI_MACRO_RE } },
+                    },
+                ],
             }),
             Unfonts({
                 custom: {
@@ -278,7 +292,9 @@ export default defineConfig(async ({ mode }) => {
             tailwindcss(),
             svgr(),
             tanstackStart(),
-            react(),
+            // The React Compiler's native port, in place of the Babel plugin: ~15x less compile time. Its options (and why
+            // one check is off) are in `react-compiler-options.ts`, which the compiler coverage test reads too.
+            react({ compiler: reactCompilerOptions }),
         ],
         resolve: {
             alias: {
