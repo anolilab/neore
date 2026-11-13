@@ -300,12 +300,11 @@ export const createPromptOffer = () => {
     };
 };
 
-/** Whether the account signed in on the phone changed from one person to another: then the alerts still on it are the previous person's. */
-export const isAccountSwitch = (previous: string | undefined, next: string | undefined): boolean =>
-    previous !== undefined && next !== undefined && previous !== next;
-
 /** A one-way digest of the account last signed in on this phone, kept across launches so a switch after a relaunch is seen too. */
 export const LAST_ACCOUNT_KEY = "neore.mobile.last-push-account";
+
+/** Written when the alerts of the account on record could not be removed: the next sign-in removes them, whoever it is. */
+export const PENDING_REMOVAL = "pending-removal";
 
 /**
  * Records the account signed in on this phone. When another person replaces the account on record, the alerts still on
@@ -330,8 +329,12 @@ export const noteAccountOnPhone = async (
         return;
     }
 
-    if (isAccountSwitch(previous, current)) {
+    try {
         await removeSwitchedAlerts();
+    } catch (error) {
+        await store.write(LAST_ACCOUNT_KEY, PENDING_REMOVAL);
+
+        throw error;
     }
 
     await store.write(LAST_ACCOUNT_KEY, current);

@@ -7,11 +7,11 @@ import {
     createPendingWork,
     createPromptOffer,
     createTokenChangeFilter,
-    isAccountSwitch,
     languageTag,
     LAST_ACCOUNT_KEY,
     noteAccountOnPhone,
     onceItWorks,
+    PENDING_REMOVAL,
     registerPhoneForPush,
     releaseOnSignOut,
     releasePhonePush,
@@ -362,15 +362,6 @@ describe("createPromptOffer", () => {
     });
 });
 
-describe("isAccountSwitch", () => {
-    it("is true only when one person replaces another, so their alerts are removed", () => {
-        expect(isAccountSwitch("u1", "u2")).toBe(true);
-        expect(isAccountSwitch("u1", "u1")).toBe(false);
-        expect(isAccountSwitch(undefined, "u2")).toBe(false);
-        expect(isAccountSwitch("u1", undefined)).toBe(false);
-    });
-});
-
 describe("noteAccountOnPhone", () => {
     const device = (stored?: string) => {
         const items: Record<string, string> = stored === undefined ? {} : { [LAST_ACCOUNT_KEY]: stored };
@@ -398,7 +389,7 @@ describe("noteAccountOnPhone", () => {
         expect(items[LAST_ACCOUNT_KEY]).toBe("sha256:u2");
     });
 
-    it("keeps the previous account on record when its alerts could not be removed, so the next sign-in still sees the switch", async () => {
+    it("marks the record pending when its alerts could not be removed, so the next sign-in removes them, whoever it is", async () => {
         const { items, store } = device("sha256:u1");
 
         await expect(
@@ -406,20 +397,33 @@ describe("noteAccountOnPhone", () => {
                 throw new Error("denied");
             }),
         ).rejects.toThrow("denied");
-        expect(store.write).not.toHaveBeenCalled();
-        expect(items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
+        expect(items[LAST_ACCOUNT_KEY]).toBe(PENDING_REMOVAL);
+
+        const removeAlerts = vi.fn(async () => undefined);
+
+        await noteAccountOnPhone("u1", store, removeAlerts);
+
+        expect(removeAlerts).toHaveBeenCalledOnce();
     });
 
-    it("removes nothing for the same person or the first sign-in on the phone, and writes only on a change", async () => {
+    it("removes nothing when the same person signs in again", async () => {
         const same = device("sha256:u1");
-        const first = device();
         const removeAlerts = vi.fn(async () => undefined);
 
         await noteAccountOnPhone("u1", same.store, removeAlerts);
-        expect(same.store.write).not.toHaveBeenCalled();
-        await noteAccountOnPhone("u1", first.store, removeAlerts);
-        expect(first.items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
+
         expect(removeAlerts).not.toHaveBeenCalled();
+        expect(same.store.write).not.toHaveBeenCalled();
+    });
+
+    it("removes what was left on a phone with no record, then records the first account", async () => {
+        const first = device();
+        const removeAlerts = vi.fn(async () => undefined);
+
+        await noteAccountOnPhone("u1", first.store, removeAlerts);
+
+        expect(removeAlerts).toHaveBeenCalledOnce();
+        expect(first.items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
     });
 });
 
