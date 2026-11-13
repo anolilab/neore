@@ -24,7 +24,8 @@ describe("emphasis run members", () => {
 
         service.addRule("customI", { filter: "i", replacement: (content: string) => `[${content}]` });
 
-        expect(service.turndown("<em>a</em><i>b</i><em>c</em>")).toBe("_a_[b]_c_");
+        // The neighbours of a custom rule use the asterisk, which is valid next to any character.
+        expect(service.turndown("<em>a</em><i>b</i><em>c</em>")).toBe("*a*[b]*c*");
     });
 
     it("a built-in element nested in a custom-rendered element keeps its own delimiters", () => {

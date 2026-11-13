@@ -658,6 +658,12 @@ function scanRun(
             break;
         }
 
+        // A custom rule writes its own output, so the DOM says nothing about its edge. The edge is unknown, so the
+        // run takes the asterisk, which is valid whatever the neighbour's edge is.
+        if (isCustomRendered(sibling, lookup)) {
+            return { run: { count: 0, wordEdge: true } };
+        }
+
         const edge = edgeCharacter(sibling, side, options);
 
         if (edge !== null) {
@@ -676,6 +682,15 @@ function scanRun(
  */
 function separation(node: AnnotatedNode, side: Side): number {
     return flankOf(node, side) === "" ? edgeBreaks(node, side) : Infinity;
+}
+
+const BUILTIN_RULES = new Set<Rule>(Object.values(rules));
+
+/** True when a rule that is not one of the built-in rules renders the node, so its output is not known from the DOM. */
+function isCustomRendered(node: Node, lookup: RuleLookup): boolean {
+    const rule = lookup.ruleFor(node);
+
+    return rule !== undefined && !BUILTIN_RULES.has(rule);
 }
 
 /** The built-in rule that renders a run's elements. Only its output writes the run's delimiters. */
