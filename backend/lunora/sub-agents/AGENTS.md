@@ -32,11 +32,31 @@
   `acp_cancel` with `keepQueue` (signed; the core copies it into the command) so the worker's other queued messages
   survive; every other Stop leaves it out and the desktop drops what it queued.
   `functions.ts` and `acp/lib/finish.ts` load each other lazily, never statically.
-- **A one-shot run can wait on an approval request** (`awaiting`, `markRunAwaiting`; inert until pausing is turned on,
-  as nothing passes `pauseForApproval` yet): it keeps its fan-out slot,
+- **A one-shot run can wait on an approval request** (`awaiting`, `markRunAwaiting`): it keeps its fan-out slot,
   and its deadline (`reapAt`) is the request's own expiry, when its reaper (`reapRun`, `oneShotReapDue`) fails it with
-  `SUB_AGENT_APPROVAL_EXPIRED_MESSAGE`. A waiting run counts as active: a parent's Stop ends it, and the end denies the
-  requests it waited on (`closeChildApprovals`, only for a run that waited); `markRunAwaiting` closes the requests of a
+  `SUB_AGENT_APPROVAL_EXPIRED_MESSAGE`. A waiting run counts as active: a parent's Stop ends it, and every one-shot end
+  denies the run's own open requests (`closeChildApprovals`, waited or not); `markRunAwaiting` closes the requests of a
   run that ended while recording them, or whose requests a later message moved past. Once a run has waited the beat watch
   stops (its continuation does not beat); `reapOverdueWaits` in `shardSweeps()` reaps an `awaiting` run whose reaper
   was lost (`by_status_and_reapAt`).
+- **The owner answers a waiting run on the CHILD's thread** (`respondToToolApproval`):
+  `claimToolApproval` refuses while the run is queued/running (`SUB_AGENT_STILL_WORKING`), once it ended (also for a
+  request it closed, `SUB_AGENT_RUN_ENDED_BY`), and refuses `hour`/`today` (a headless child never reads timed grants).
+  `resumeClaimedRun` → `resumeRunForAnswer` flips the run to `running` in the claim's transaction, before the stream and
+  the job. The continuation stops at its next step once the run stops (`shouldRunStop` in its `stopWhen`) and hands its end back
+  (`settleSubAgentRun`): every write is bound to the resume it runs under (`resumedWith` = that resume's `reapAt`), so a
+  further pause waits again and an end finishes the run once (`completeResumedRun`) only while that resume is current;
+  a failed write is scheduled again, bound the same way. A continuation that already settled is not ended by a later
+  error.
+- **The parent conversation shows a waiting child's requests** (`listSubAgentApprovals`, the card's `SubAgentApprovals`):
+  the parent's owner only (NOT_FOUND otherwise, a locked parent needs its proof), bounded, with a locked child left out
+  (its owner unlocks the child to answer). It admits the parent and every child, so it reads each child's latest turn
+  through a reader keyed on that child (`admittedThreadMessages`): the guarded `ctx.db` would hand it the parent's rows. The card answers through `respondToToolApproval` on the child's thread, so the
+  claim above decides, and it offers no allow for a period.
+- **A one-shot child of the owner's own turn pauses on an `ask` tool** (`pauseForApproval` → `headlessCanAsk`, only
+  when `originOfRun(dispatchedBy) === "lead"`): a chain a trigger, task, messenger reply or outside agent started drops
+  `ask` tools as its parent run does, and so do workers. The run waits and is answered as above; its first pause is bound
+  to "never resumed" (`resumedWith: 0`), so a late write never re-opens an answered run. A nested result waits
+  while its parent's one-shot run goes (running or awaiting), so it never lands after a request; that run's end, waited
+  or not, posts it (`releaseHeldResults`). A pause, first or continued, never overwrites a `"question"` the child thread
+  waits on.

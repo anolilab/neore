@@ -22,6 +22,25 @@ import KBAttachmentButton from "./kb-attachment-button";
 import TemporaryChatDropdown from "./temporary-chat-dropdown";
 import ThreadDownloadButton from "./thread-download-button";
 
+/**
+ * The page header of a chat that is locked and not unlocked yet: the sidebar toggles stay, but the title (content) and every
+ * action on the chat's data are left out, and it reads nothing about the chat.
+ */
+export const LockedChatSiteHeader: FC = () => {
+    const { t } = useLingui();
+
+    return (
+        <SiteHeader
+            menu={<SidebarTrigger className="text-foreground dark:text-white" icon={<PanelRightIcon />} name="right" />}
+            themeToggle={<ModeToggle className="text-foreground" />}
+            trigger={<SidebarTrigger className="ml-2" name="left" />}
+            workspaceSwitch
+        >
+            <h1 className="text-lg font-bold">{t`Locked chat`}</h1>
+        </SiteHeader>
+    );
+};
+
 const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
     const { t } = useLingui();
     const { actualThreadId, isValid, threadData, validThreadId } = useValidatedThread(threadId);
@@ -143,6 +162,8 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
                             className="focus-visible:ring-ring/50 h-7 min-w-[200px] border-none bg-transparent py-0 text-lg leading-tight font-bold shadow-none focus:outline-none focus-visible:ring-1"
                         />
                     )}
+                    // The title is prose: the desktop shell turns spellcheck off page-wide.
+                    spellCheck
                     value={isValid ? currentTitle : undefined}
                 />
                 {statelessMode && (

@@ -128,6 +128,12 @@ describe("buildAgentCommand", () => {
         }
     });
 
+    it("names neore as Claude Code's entrypoint, and only for Claude Code", () => {
+        expect(agentEnv("claude_code", fakeKey("anthropic"))["CLAUDE_CODE_ENTRYPOINT"]).toBe("neore");
+        expect(agentEnv("codex", fakeKey("openai"))).not.toHaveProperty("CLAUDE_CODE_ENTRYPOINT");
+        expect(buildAgentCommand("claude_code")).not.toContain("CLAUDE_CODE_ENTRYPOINT");
+    });
+
     it("keeps the prompt from starting with a dash", () => {
         expect(buildAgentPrompt("-rf /").startsWith("-")).toBe(false);
     });
@@ -192,6 +198,7 @@ describe("parseRepoUrl", () => {
         });
         expect(parseRepoUrl("https://github.com/anolilab/neore.git").cloneUrl).toBe("https://github.com/anolilab/neore.git");
         expect(parseRepoUrl("https://github.com/anolilab/neore/").github).toEqual({ owner: "anolilab", repo: "neore" });
+        expect(parseRepoUrl("https://github.com/anolilab/neore.git/").cloneUrl).toBe("https://github.com/anolilab/neore.git");
     });
 
     it("accepts other https hosts without a GitHub identity", () => {
@@ -221,9 +228,12 @@ describe("branches", () => {
         expect(isValidBranchName(branch)).toBe(true);
     });
 
-    it.each(["--upload-pack=evil", "-b", "a..b", "a b", "a;b", "/abs", "x.lock", ""])("rejects %j", (branch) => {
-        expect(isValidBranchName(branch)).toBe(false);
-    });
+    it.each(["--upload-pack=evil", "-b", "a..b", "a b", "a;b", "/abs", "x.lock", "", "foo//bar", "foo/.hidden", ".hidden", "foo.lock/bar", "foo."])(
+        "rejects %j",
+        (branch) => {
+            expect(isValidBranchName(branch)).toBe(false);
+        },
+    );
 
     it("refuses an invalid branch in the clone command", () => {
         expect(() => buildCloneCommand(parseRepoUrl("a/b"), "--upload-pack=touch /tmp/x")).toThrow(BRANCH_ERROR);

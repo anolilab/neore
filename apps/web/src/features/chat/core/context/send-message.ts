@@ -6,6 +6,16 @@ import type { HistoryState, useNavigate } from "@tanstack/react-router";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 
 import { goalForMessage, useGoalComposer } from "@/features/chat/goal/goal-store";
+import { draftGeneration } from "@/features/chat/split/composer-drafts";
+import {
+    clearSentDraft,
+    isOwnerLive,
+    paneFocusEpoch,
+    parkSettingsFor,
+    restoreComposerFor,
+    restoreTextFor,
+    takePendingSettingsFor,
+} from "@/features/chat/split/pane-state";
 import type useLocalModelTurn from "@/features/local-models/hooks/use-local-model-turn";
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
@@ -27,6 +37,7 @@ import type { ThreadData, ThreadRow } from "./chat-context-types";
 import type { GatewayErrorBody, GatewayInfo } from "./chat-gateway";
 import { CHAT_STREAM_URL, gatewayError, pendingGatewayInfo, validateGatewayUrl } from "./chat-gateway";
 import type { KickOffMedia } from "./media-kickoff";
+import { streamErrorType } from "./stream-error-type";
 
 /** How long a send waits for the session before handing the text back. */
 const AUTH_READY_TIMEOUT_MS = 10_000;
@@ -106,6 +117,20 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
         turnRef,
     } = env;
 
+    // The chat that sends: every write-back of this send (the draft, the settings) goes to it, whichever pane has focus by then.
+    const owner = threadId || undefined;
+    // Read now, before the auth wait: the wait can end after focus has moved to another pane, and this send is still this chat's.
+    // A write-back is dropped when a sign-out or an account switch cleared the parked state since (the generation has moved on).
+    const generationAtStart = draftGeneration();
+    const focusAtStart = paneFocusEpoch();
+    const sameSession = (): boolean => draftGeneration() === generationAtStart;
+    const { attachedReferences } = useChatUIStore.getState();
+    const modelAtStart = useModelStore.getState();
+    const currentMode = modelAtStart.getComposerMode(threadId || undefined);
+    // The thread the composer showed when the settings were taken: a late failure must not hand them to another thread,
+    // nor to another new-chat composer (which has no thread id either; this provider is gone by then).
+    const consumedFromThread = modelAtStart.selectedModelThreadId;
+
     // Clear any previous error when starting a new send
     setError(null);
 
@@ -117,7 +142,11 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
 
         if (!(await authGate.wait(AUTH_READY_TIMEOUT_MS))) {
             providerLogger.error("[ChatProvider] Session not ready after waiting; send not delivered");
-            useChatUIStore.getState().setComposerText(text);
+
+            if (sameSession()) {
+                restoreTextFor(owner, text);
+            }
+
             useChatUIStore.getState().setIsSubmitting(false);
             handleError(
                 new AppError(texts.sessionNotReady(), {
@@ -155,7 +184,10 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
 
         const restoreComposer = (message: string | undefined) => {
             setOptimisticMessages(withoutMessage(optimisticId));
-            useChatUIStore.getState().setComposerText(text);
+
+            if (sameSession()) {
+                restoreTextFor(owner, text);
+            }
 
             if (message) {
                 handleError(localModelError(message));
@@ -168,9 +200,9 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
             return;
         }
 
-        const pendingSettings = isCreatingNewThread ? getPendingSettingsFromStore() : null;
+        const pendingSettings = isCreatingNewThread ? takePendingSettingsFor(owner, getPendingSettingsFromStore) : null;
 
-        useChatUIStore.getState().clearComposer();
+        clearSentDraft(owner, text, focusAtStart);
         useChatUIStore.getState().setIsSubmitting(false);
         trackEvent("message_sent", { attachment_count: 0, has_attachments: false, model, thread_mode: "text" });
 
@@ -198,16 +230,28 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
         return;
     }
 
-    const { attachedReferences } = useChatUIStore.getState();
     // The pending settings are taken out of the store before the request; a send that fails puts them back with the draft.
     let consumedSettings: PendingSettings | null = null;
-    // The thread the composer showed when the settings were taken: a late failure must not hand them to another thread,
-    // nor to another new-chat composer (which has no thread id either; this provider is gone by then).
-    const consumedFromThread = useModelStore.getState().selectedModelThreadId;
     const restoreSettings = () => {
         const consumed = consumedSettings;
 
-        if (!consumed || !isMountedRef.current || useModelStore.getState().selectedModelThreadId !== consumedFromThread) {
+        if (!consumed || !sameSession()) {
+            return;
+        }
+
+        // The chat that sent it may have lost focus since: its settings go back to what is parked for it, even when this provider is
+        // gone; only the store write below needs the provider mounted.
+        if (owner && !isOwnerLive(owner)) {
+            parkSettingsFor(owner, consumed);
+
+            return;
+        }
+
+        if (!isMountedRef.current) {
+            return;
+        }
+
+        if (useModelStore.getState().selectedModelThreadId !== consumedFromThread) {
             return;
         }
 
@@ -219,8 +263,9 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
     try {
         // For new threads: send all pending settings
         // For existing threads: only send settings that have changed from cached values
-        const pendingSettings = isCreatingNewThread ? getPendingSettingsFromStore() : null;
-        const changedSettings = isCreatingNewThread ? null : getChangedSettings(threadDataRef.current);
+        const pendingSettings = isCreatingNewThread ? takePendingSettingsFor(owner, getPendingSettingsFromStore) : null;
+        // The changed settings are read from the store, which describes the focused chat: only while this send's chat is the live one.
+        const changedSettings = isCreatingNewThread || !isOwnerLive(owner) ? null : getChangedSettings(threadDataRef.current);
 
         consumedSettings = pendingSettings ?? changedSettings;
 
@@ -236,17 +281,14 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
 
         // Build request body — always include model, mode, and language
         // so the backend can persist them on the thread
-        const currentMode = useModelStore.getState().getComposerMode(threadId || undefined);
-
-        // Get generation settings from model store
-        const imageSettings = currentMode === "image" ? useModelStore.getState().imageSettings : undefined;
-        const videoSettings = currentMode === "video" ? useModelStore.getState().videoSettings : undefined;
+        const imageSettings = currentMode === "image" ? modelAtStart.imageSettings : undefined;
+        const videoSettings = currentMode === "video" ? modelAtStart.videoSettings : undefined;
 
         // Get selected MCP server names (empty array = all enabled)
-        const { mcpServerNames } = useModelStore.getState();
+        const { mcpServerNames } = modelAtStart;
 
         // Get search mode and research depth from model store
-        const { researchDepth, searchMode } = useModelStore.getState();
+        const { researchDepth, searchMode } = modelAtStart;
 
         const requestBody: Record<string, unknown> = {
             fileIds,
@@ -316,7 +358,7 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
 
         // Clear composer and show thinking state immediately — before the network round-trip
         // so the UI feels instant and non-frozen while the server processes the request
-        useChatUIStore.getState().clearComposer();
+        clearSentDraft(owner, text, focusAtStart);
         useChatUIStore.getState().setIsSubmitting(false);
         setIsRegenerating(true);
 
@@ -339,12 +381,20 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
                 // Restore composer text so the user can edit their message
                 setIsRegenerating(false);
                 setOptimisticMessages(withoutMessage(optimisticId));
-                useChatUIStore.getState().setComposerText(text);
+
+                if (sameSession()) {
+                    restoreTextFor(owner, text);
+                }
+
                 restoreSettings();
-                useChatUIStore.getState().setComposerBannedContent({
-                    message: errorData.message ?? texts.bannedContent(),
-                    words: errorData.bannedWords ?? [],
-                });
+
+                // The notice sits on the live composer, so it shows only when the chat that sent the text still owns it.
+                if (isOwnerLive(owner)) {
+                    useChatUIStore.getState().setComposerBannedContent({
+                        message: errorData.message ?? texts.bannedContent(),
+                        words: errorData.bannedWords ?? [],
+                    });
+                }
 
                 return;
             }
@@ -465,14 +515,17 @@ export const runSendMessage = async (env: SendMessageEnv, rawText: string, attac
         setOptimisticMessages(withoutMessage(optimisticId));
 
         trackEvent("stream_error", {
-            error_type: error_ instanceof Error ? error_.message : "unknown",
+            error_type: streamErrorType(error_),
             model,
         });
 
         // The composer was cleared before the request; hand the draft back unless a new one is there. After a
         // deadline the backend may still have saved the prompt, so the draft returns for the user to resend on
         // purpose (never automatically) and the timeout message says to check the conversation first.
-        useChatUIStore.getState().restoreComposer({ attachedReferences, composerAttachments: attachments ?? [], composerText: text });
+        if (sameSession()) {
+            restoreComposerFor(owner, { attachedReferences, composerAttachments: attachments ?? [], composerText: text });
+        }
+
         restoreSettings();
 
         handleError(error_);

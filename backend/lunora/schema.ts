@@ -690,6 +690,47 @@ export const schema = defineSchema({
         .index("by_userId_createdAt", ["userId", "createdAt"])
         .index("by_status_deadline", ["status", "deadline"])
         .index("by_createdAt", ["createdAt"]),
+    /**
+     * better-auth `deviceAuthorization` plugin: one row per CLI sign-in code
+     * (`auth/cli-device-auth.ts`). Short-lived (30 minutes) and deleted when the
+     * code is redeemed, denied, or polled after it expired; issuing a new code
+     * also clears the lapsed ones. Hand-maintained like the other auth tables,
+     * so `auth.schema.test.ts` checks it. `hostname` is our own column (what the
+     * requesting machine calls itself, reduced to host-name characters).
+     */
+    deviceCode: defineTable({
+        clientId: v.optional(v.string()),
+        deviceCode: v.string(),
+        expiresAt: v.number(),
+        hostname: v.optional(v.string()),
+        lastPolledAt: v.optional(v.number()),
+        // A host code (`neore-host`) also names the machine's platform and where it keeps the device secret.
+        platform: v.optional(v.string()),
+        pollingInterval: v.optional(v.number()),
+        scope: v.optional(v.string()),
+        status: v.string(),
+        storage: v.optional(v.string()),
+        userCode: v.string(),
+        userId: v.optional(v.string()),
+    })
+        .externallyManaged()
+        .global()
+        .index("deviceCode", ["deviceCode"], { unique: true })
+        // The cleanup at every issue deletes the lapsed codes by this column.
+        .index("expiresAt", ["expiresAt"])
+        .index("userCode", ["userCode"], { unique: true })
+        .index("userId", ["userId"]),
+    // A pairing code whose device was revoked (`revokeDevice`): `registerHeadlessDevice` refuses it, so a machine
+    // still holding the code cannot pair again. On the owner's shard, written in the revoking mutation, so a
+    // registration and a revocation of the same code are serialised. Swept after the code can no longer be presented.
+    devicePairingRevocations: defineTable({
+        codeId: v.string(),
+        revokedAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId_codeId", ["userId", "codeId"])
+        .index("by_revokedAt", ["revokedAt"]),
     // A paired install of the desktop shell (`devices/`, `apps/desktop`). The
     // secret signs calls and verifies results; it is removed on revoke, so a
     // revoked row can sign nothing. `manifest` is the device's verified tools.
@@ -709,6 +750,9 @@ export const schema = defineSchema({
         manifest: v.optional(v.array(vDeviceManifestTool)),
         manifestIssuedAt: v.optional(v.number()),
         name: v.string(),
+        // A machine that paired itself by code: the id of the code it redeemed, so a retried registration of the same
+        // code (the first reply was lost) finds this device instead of making a second one.
+        pairedByCode: v.optional(v.string()),
         platform: vDevicePlatform,
         // Where the device's tools are offered (`devices/lib/scope.ts`): unset = any of the
         // owner's chats, a list = only threads of those projects (empty = nowhere).
@@ -2001,6 +2045,31 @@ export const schema = defineSchema({
         .index("by_projectId", ["projectId"])
         .index("by_knowledgeFileId", ["knowledgeFileId"]),
 
+    // The repositories a coding-agent run in a project picks from (`projects/repositories.ts`), one row each, so a
+    // change to one never rewrites another or the project. Global, like `projects`: a member reads them from
+    // their own shard. `url` is in `parseRepoUrl` clone form; the default is the row with the latest `defaultAt`. A row
+    // with the URL "#default" is not a repository either: it holds the project's last `defaultAt` stamp, so each pick
+    // claims the next one (`stampDefault`).
+    // `userId` and `organizationId` copy the project's, so account deletion and export reach a row by its owner and a
+    // URL lookup stays inside the caller's own and organization's rows. A row with `deletingAt` (and the URL "") is
+    // not a repository: it marks a project delete in progress (`deleteProject`).
+    projectRepositories: defineTable({
+        // Moves on every default-branch save; a save naming an older one is refused (`updateProjectRepo`).
+        branchRevision: v.optional(v.number()),
+        createdAt: v.number(),
+        defaultAt: v.optional(v.number()),
+        defaultBranch: v.optional(v.string()),
+        deletingAt: v.optional(v.number()),
+        organizationId: v.optional(v.string()),
+        projectId: v.id("projects"),
+        url: v.string(),
+        userId: v.optional(v.string()),
+    })
+        .global()
+        .index("by_project_and_url", ["projectId", "url"], { unique: true })
+        .index("by_user_and_url", ["userId", "url"])
+        .index("by_organization_and_url", ["organizationId", "url"]),
+
     projects: defineTable({
         color: v.optional(v.string()),
         context: v.optional(v.string()),
@@ -2746,6 +2815,10 @@ export const schema = defineSchema({
         runDestination: v.optional(vTaskRunDestination),
         skillId: v.optional(v.id("skills")),
         status: vTaskStatus,
+        // When the stuck sweep next looks at this task; unset once its episode has no notice left (`tasks/AGENTS.md`).
+        stuckCheckAt: v.optional(v.number()),
+        // The last stuck notice sent (2 or 7 idle days) and the episode it was sent in (`updatedAt` when that began).
+        stuckNotice: v.optional(v.object({ days: v.number(), since: v.number() })),
         successCriteria: v.optional(v.string()),
         title: v.string(),
         updatedAt: v.number(),
@@ -2755,7 +2828,8 @@ export const schema = defineSchema({
         .index("by_user_and_status", ["userId", "status"])
         .index("by_user_and_goal", ["userId", "goalId"])
         .index("by_recurring_and_nextRunAt", ["recurring", "nextRunAt"])
-        .index("by_status_and_updatedAt", ["status", "updatedAt"]),
+        .index("by_status_and_updatedAt", ["status", "updatedAt"])
+        .index("by_status_and_stuckCheckAt", ["status", "stuckCheckAt"]),
 
     team: defineTable({
         createdAt: v.number(),
@@ -2774,6 +2848,22 @@ export const schema = defineSchema({
         .index("organizationId", ["organizationId"])
         .index("name", ["name"])
         .triggers((t) => auditTriggersFor(t, "team", AUDIT_TABLES["team"]!)),
+
+    // A teammate's access to one connection (`connectors/access.ts`). No row means the default, read and write. Owned by the
+    // connectors module; erased with the user (`connectors/gdpr.ts`).
+    teammateConnectorAccess: defineTable({
+        botId: v.id("bots"),
+        connectorSlug: v.string().max(200),
+        level: v.union(v.literal("read_only"), v.literal("read_write"), v.literal("none")),
+        updatedAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_botId_connectorSlug", ["botId", "connectorSlug"])
+        // The app proxy's check for a call that names no thread: every teammate's setting for one connection (`access.ts`).
+        .index("by_userId_connectorSlug", ["userId", "connectorSlug"])
+        .index("by_userId", ["userId"])
+        .triggers((t) => auditTriggersFor(t, "teammateConnectorAccess", AUDIT_TABLES["teammateConnectorAccess"]!)),
 
     teamMember: defineTable({
         createdAt: v.optional(v.number()),
@@ -2881,7 +2971,6 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
-
     threadGoals: defineTable({
         // The highest round whose review has been claimed (`chat/goals/internal.ts#claimGoalRound`):
         // the review job is queued at least once, and only the delivery that claims a round reviews it.
@@ -2954,6 +3043,7 @@ export const schema = defineSchema({
         .index("by_link", ["linkId"])
         .index("by_thread", ["threadId"])
         .index("by_userId", ["userId"]),
+
     threadInvites: defineTable({
         acceptedAt: v.optional(v.number()),
         acceptedBy: v.optional(v.string()),
@@ -3113,6 +3203,9 @@ export const schema = defineSchema({
         order: v.optional(v.number()),
         organizationId: v.optional(v.string()),
         parentThreadIds: v.optional(v.array(v.string())),
+        // How much of a cloud run the owner leaves unasked (`chat/lib/thread-permission-mode.ts`). Unset = "auto", today's
+        // behaviour. Never set on a host thread, whose approvals keep their own rules.
+        permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
         pinnedAt: v.optional(v.number()),
         projectId: v.optional(v.id("projects")),
         publicAccessToken: v.optional(v.string()),
@@ -3227,6 +3320,11 @@ export const schema = defineSchema({
         approvalId: v.string(),
         config: vToolRunConfig,
         createdAt: v.number(),
+        // The pause the request was asked in: the first request's id, shared by every row of that pause. Absent on rows written before
+        // it existed, which the reminder groups by creation time instead.
+        pauseId: v.optional(v.string()),
+        // When the one reminder push for this pending request went out (`lib/approval-reminder.ts`). Absent until it does.
+        reminderSentAt: v.optional(v.number()),
         resolvedAt: v.optional(v.number()),
         resolvedBy: v.optional(v.string()),
         // Whether the request is a `requestSecret` card (false: a plain approval or a question). Absent on rows written before it
@@ -3431,7 +3529,6 @@ export const schema = defineSchema({
         .index("by_user_reply", ["userId", "replyKey"])
         // The prune, which serves a whole shard.
         .index("by_recordedAt", ["recordedAt"]),
-
     user: defineTable({
         banExpires: v.optional(v.number()),
         banned: v.optional(v.boolean()),

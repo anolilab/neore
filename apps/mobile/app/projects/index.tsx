@@ -3,18 +3,21 @@ import { useState } from "react";
 import { AccessibilityInfo, FlatList, Pressable, Text, TextInput, View } from "react-native";
 
 import { getClient } from "@/lib/lunora";
+import { useOffline, useWriteControl } from "@/offline/offline-context";
 import { createProject, isWriteBlocked, writeErrorMessage } from "@/projects/projects-api";
-import { useIsOffline, useProjects } from "@/projects/use-projects";
+import { useProjects } from "@/projects/use-projects";
 
 const ProjectsScreen = () => {
     const { error: loadError, rows } = useProjects();
-    const isOffline = useIsOffline();
+    const { isOffline } = useOffline();
+    // Off while offline and while the first token mint is out: the write carries the token and would be refused without one.
+    const createControl = useWriteControl("create");
     const [name, setName] = useState("");
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const create = async () => {
-        if (isWriteBlocked({ busy: creating, offline: isOffline })) {
+        if (isWriteBlocked({ busy: creating, offline: createControl.disabled })) {
             return;
         }
 
@@ -37,7 +40,7 @@ const ProjectsScreen = () => {
         }
     };
 
-    const blocked = isWriteBlocked({ busy: creating, offline: isOffline });
+    const blocked = isWriteBlocked({ busy: creating, offline: createControl.disabled });
     const shownError = error ?? loadError;
 
     return (
@@ -76,6 +79,7 @@ const ProjectsScreen = () => {
                     {isOffline
                         ? <Text accessibilityRole="alert">You are offline. Creating a project needs a connection.</Text>
                         : null}
+                    {!isOffline && createControl.reason ? <Text accessibilityRole="alert">{createControl.reason}</Text> : null}
                     {shownError
                         ? <Text accessibilityRole="alert" style={{ color: "#b00020" }}>{shownError}</Text>
                         : null}

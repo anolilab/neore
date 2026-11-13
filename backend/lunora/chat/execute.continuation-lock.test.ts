@@ -11,8 +11,10 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registeredApi, registerModule } from "../../test/registered-api";
 
 import schema from "../schema";
-import { continueAfterToolApproval } from "./execute";
-import { resumeApprovedRun } from "./lib/agent-run";
+import { internal } from "../_generated/internal";
+import { continueAfterToolApproval, settleSubAgentRun } from "./execute";
+import { noteGoalPaused } from "./goals/execute";
+import { failRun, resumeApprovedRun } from "./lib/agent-run";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
@@ -20,9 +22,19 @@ vi.mock("../_generated/api", async (importOriginal) => registeredApi(await impor
 vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
 
 // The resume itself is the model run; the test is about the lock gate and the stream's end state.
+// The real one, unless a test makes the step after a continuation's settlement fail.
+vi.mock("./goals/execute", async (importOriginal) => {
+    const original = await importOriginal<typeof import("./goals/execute")>();
+
+    return { ...original, noteGoalPaused: vi.fn(original.noteGoalPaused) };
+});
+
 vi.mock("./lib/agent-run", async (importOriginal) => {
+    const original = await importOriginal<typeof import("./lib/agent-run")>();
+
     return {
-        ...(await importOriginal<typeof import("./lib/agent-run")>()),
+        ...original,
+        failRun: vi.fn(original.failRun),
         resumeApprovedRun: vi.fn(async () => {
             return { lastMessageId: undefined, paused: false, stopped: false };
         }),
@@ -48,6 +60,7 @@ beforeAll(async () => {
     registerModule(registry, "chat_goals_internal", await import("./goals/internal"));
     registerModule(registry, "chat_streaming", await import("./streaming"));
     registerModule(registry, "chat_streaming_persistent_library", await import("./streaming/persistent/library"));
+    registerModule(registry, "sub_agents_functions", await import("../sub-agents/functions"));
 });
 
 beforeEach(() => {
@@ -210,5 +223,199 @@ describe("continueAfterToolApproval and the pause it answered", () => {
         } finally {
             harness.close();
         }
+    });
+});
+
+describe("a sub-agent child's continuation", () => {
+    /** A paused child thread with its run, resumed with `resumed` (or refused at its lock), and the run row after it. */
+    const resumeChild = async (options: {
+        /** The step after the continuation's settlement throws (`noteGoalPaused`). */
+        failAfterSettling?: boolean;
+        /** The continuation throws, and closing its stream (`failRun`) throws too. */
+        failWithCleanup?: boolean;
+        lockedAt?: number;
+        /** A newer answer resumes the run while this continuation runs: it sets another deadline. */
+        newerResume?: boolean;
+        /** The deadline this run's resume set, and a request of the run open on the child's latest turn. */
+        pausedAgainAt?: number;
+        /** The owner was asked a question in the child thread while the continuation ran. */
+        questionMeanwhile?: boolean;
+        resumed?: { awaitingInput?: "approval"; paused: boolean; stopped: boolean };
+        status?: "cancelled";
+    }) => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await seedPausedRun(harness, options.lockedAt);
+            const runId = await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("subAgentRuns", {
+                        childThreadId: ids.threadId,
+                        createdAt: Date.now(),
+                        depth: 1,
+                        parentThreadId: "parent-thread",
+                        startedAt: Date.now(),
+                        status: options.status ?? "running",
+                        task: "Tidy up",
+                        toolCallId: "call-parent",
+                        updatedAt: Date.now(),
+                        userId: OWNER,
+                        ...(options.pausedAgainAt !== undefined && { reapAt: options.pausedAgainAt }),
+                    }),
+            );
+
+            if (options.pausedAgainAt !== undefined) {
+                // What the continuation saved when it paused again: a request of the run on the child's latest turn.
+                await harness.run(async (ctx: any) => {
+                    await ctx.db.insert("messages", {
+                        message: {
+                            content: [
+                                { input: {}, toolCallId: "call-2", toolName: "mcp_Files__delete", type: "tool-call" },
+                                { approvalId: "approval-2", toolCallId: "call-2", type: "tool-approval-request" },
+                            ],
+                            role: "assistant",
+                        },
+                        order: 0,
+                        status: "success",
+                        stepOrder: 1,
+                        threadId: ids.threadId,
+                        tool: true,
+                        userId: OWNER,
+                    });
+                    await ctx.db.insert("toolApprovalRuns", {
+                        approvalId: "approval-2",
+                        config: { ...config, subAgentRunId: runId },
+                        createdAt: Date.now(),
+                        status: "pending",
+                        threadId: ids.threadId,
+                        userId: OWNER,
+                    });
+                });
+            }
+
+            if (options.failAfterSettling) {
+                vi.mocked(noteGoalPaused).mockRejectedValueOnce(new Error("goal write failed"));
+            }
+
+            if (options.failWithCleanup) {
+                vi.mocked(failRun).mockRejectedValue(new Error("stream write failed"));
+            }
+
+            if (options.failWithCleanup && !options.lockedAt) {
+                vi.mocked(resumeApprovedRun).mockRejectedValueOnce(new Error("model call failed"));
+            } else if (options.resumed) {
+                const { resumed } = options;
+
+                vi.mocked(resumeApprovedRun).mockImplementationOnce(async () => {
+                    if (options.questionMeanwhile) {
+                        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { awaitingInput: "question" }));
+                    }
+
+                    if (options.newerResume && options.pausedAgainAt !== undefined) {
+                        await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", runId, { reapAt: (options.pausedAgainAt ?? 0) + 1 }));
+                    }
+
+                    return { lastMessageId: undefined, ...resumed };
+                });
+            }
+
+            await harness.action(
+                async (ctx: any) =>
+                    await ctx.runAction(continueAfterToolApproval, {
+                        approvalId: "approval-1",
+                        approved: true,
+                        config: { ...config, subAgentRunId: runId },
+                        streamId: ids.streamId,
+                        threadId: ids.threadId,
+                        userId: OWNER,
+                    }),
+            );
+
+            return await harness.run(async (ctx: any) => {
+                const row = await ctx.db.get("subAgentRuns", runId);
+                const approvals = await ctx.db.query("toolApprovalRuns").collect();
+                const child = await ctx.db.get("threads", ids.threadId as never);
+
+                return {
+                    ...row,
+                    childAwaitingInput: child?.awaitingInput,
+                    openRequests: approvals.filter((approval: { status: string }) => approval.status === "pending").length,
+                };
+            });
+        } finally {
+            harness.close();
+        }
+    };
+
+    it("ends the run as failed when the child was stopped meanwhile, or locked after its stream started", async () => {
+        expect(await resumeChild({ resumed: { paused: false, stopped: true } })).toMatchObject({ error: "This sub-agent was stopped.", status: "failed" });
+        expect(await resumeChild({ lockedAt: Date.now() + 60_000 })).toMatchObject({
+            error: "The sub-agent's conversation can no longer continue.",
+            status: "failed",
+        });
+    });
+
+    it("runs nothing for a run stopped or reaped between the answer and the job's start", async () => {
+        expect(await resumeChild({ status: "cancelled" })).toMatchObject({ status: "cancelled" });
+        expect(resumeApprovedRun).not.toHaveBeenCalled();
+    });
+
+    it("waits again for the resume that paused, and not once a newer answer resumed the run meanwhile", async () => {
+        const pausedAgain = { pausedAgainAt: Date.now() + 60 * 60_000, resumed: { paused: true, stopped: false } };
+
+        expect(await resumeChild(pausedAgain)).toMatchObject({ status: "awaiting" });
+        expect(await resumeChild({ ...pausedAgain, newerResume: true })).toMatchObject({ status: "running" });
+    });
+
+    it("leaves a run that waits again waiting, with its request open, when a later step of the continuation fails", async () => {
+        expect(
+            await resumeChild({ failAfterSettling: true, pausedAgainAt: Date.now() + 60 * 60_000, resumed: { paused: true, stopped: false } }),
+        ).toMatchObject({ openRequests: 1, status: "awaiting" });
+    });
+
+    it("ends the run as failed when closing a failed continuation's stream throws too", async () => {
+        try {
+            expect(await resumeChild({ failWithCleanup: true })).toMatchObject({ status: "failed" });
+            expect(await resumeChild({ failWithCleanup: true, lockedAt: Date.now() + 60_000 })).toMatchObject({
+                error: "The sub-agent's conversation can no longer continue.",
+                status: "failed",
+            });
+        } finally {
+            vi.mocked(failRun).mockRestore();
+        }
+    });
+
+    it("leaves a question the owner was asked in the child as what it waits on when the continuation pauses again", async () => {
+        expect(
+            await resumeChild({
+                pausedAgainAt: Date.now() + 60 * 60_000,
+                questionMeanwhile: true,
+                resumed: { awaitingInput: "approval", paused: true, stopped: false },
+            }),
+        ).toMatchObject({ childAwaitingInput: "question", status: "awaiting" });
+    });
+
+    it("hands a pause back to the run's wait, and schedules an end whose write failed", async () => {
+        const runId = "run-1" as never;
+        // The deadline the resume this continuation runs under set: every write, and its retry, is bound to it.
+        const resumedWith = 42;
+        const paused = { runMutation: vi.fn(async () => true), scheduler: { runAfter: vi.fn(async () => "job") } };
+
+        expect(await settleSubAgentRun(paused as never, runId, { kind: "paused" }, resumedWith)).toBe(true);
+        expect(paused.runMutation).toHaveBeenCalledWith(internal.sub_agents.functions.awaitApproval, { resumedWith, runId });
+
+        const failing = {
+            runMutation: vi.fn(async () => {
+                throw new Error("write failed");
+            }),
+            scheduler: { runAfter: vi.fn(async () => "job") },
+        };
+        const completion = { messageIds: ["m1"], outcome: { kind: "succeeded" }, resumedWith, runId };
+
+        expect(await settleSubAgentRun(failing as never, runId, { kind: "succeeded", messageIds: ["m1"] }, resumedWith)).toBe(false);
+        expect(failing.runMutation).toHaveBeenCalledWith(internal.sub_agents.functions.completeResumedRun, completion);
+        expect(failing.scheduler.runAfter).toHaveBeenCalledWith(expect.any(Number), internal.sub_agents.functions.completeResumedRun, completion);
+        expect(await settleSubAgentRun(failing as never, runId, { kind: "paused" }, resumedWith)).toBe(true);
+        expect(failing.scheduler.runAfter).toHaveBeenCalledWith(expect.any(Number), internal.sub_agents.functions.awaitApproval, { resumedWith, runId });
     });
 });

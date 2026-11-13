@@ -4,9 +4,10 @@ import { forgetUnlockProof, isThreadLockedError, onUnlockExpired, useUnlockProof
 import { Button } from "@neore/ui/components/button";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { DEFAULT_MESSAGE_OPTS } from "@/features/chat/core/constants/query-options";
+import { removeStoredDraftsOf } from "@/features/chat/split/composer-drafts";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { ThreadLockDialog } from "./thread-lock-dialog";
@@ -18,7 +19,7 @@ import { ThreadLockDialog } from "./thread-lock-dialog";
  * rebuilt WITH the proof (`withUnlockProof` runs at build time) and a fresh one
  * is fetched: the chat appears on unlock and the prompt returns on relock.
  */
-export const LockedChatGate = ({ children, threadId }: { children: ReactNode; threadId: string }) => {
+export const LockedChatGate = ({ children, lockedExtras, threadId }: { children: ReactNode; lockedExtras?: ReactNode; threadId: string }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
@@ -64,14 +65,50 @@ export const LockedChatGate = ({ children, threadId }: { children: ReactNode; th
     const refused = isThreadLockedError(error);
     const relockedAndPending = proof === undefined && relocked && !isSuccess && !error;
 
+    // Which chat the gate shows now, and whether it still refuses it: read when the storage chunk arrives, after any unmount too.
+    const shown = useRef({ refused, threadId });
+
+    useEffect(() => {
+        shown.current = { refused, threadId };
+    }, [refused, threadId]);
+
+    // The chat's composer never mounts while the gate holds, so its draft stored before the lock is removed from here, even when the
+    // gate unmounted meanwhile (the chat is still locked). Only a chunk that loads after this chat unlocked does nothing: the
+    // unlocked composer may already be storing its draft.
+    useEffect(() => {
+        if (!refused) {
+            return;
+        }
+
+        const stillLocked = (): boolean => shown.current.threadId !== threadId || shown.current.refused;
+
+        void import("@/features/chat/split/stored-drafts")
+            .then(({ lockStoredDraft }: typeof import("@/features/chat/split/stored-drafts")) => {
+                if (stillLocked()) {
+                    lockStoredDraft(threadId);
+                }
+
+                return undefined;
+            })
+            .catch(() => {
+                // The chunk did not load, and the chat's composer stays unmounted while the gate refuses it: remove the draft here.
+                if (stillLocked()) {
+                    removeStoredDraftsOf(threadId);
+                }
+            });
+    }, [refused, threadId]);
+
     if (!refused && !relockedAndPending) {
         // A relocked chat whose read fails for another reason shows that error, not the prompt,
         // and its content stays unmounted.
         if (proof === undefined && relocked && error) {
             return (
-                <section className="flex h-full flex-col items-center justify-center p-6 text-center" role="alert">
-                    <p className="text-destructive text-sm">{error.message}</p>
-                </section>
+                <>
+                    {lockedExtras}
+                    <section className="flex h-full flex-col items-center justify-center p-6 text-center" role="alert">
+                        <p className="text-destructive text-sm">{error.message}</p>
+                    </section>
+                </>
             );
         }
 
@@ -79,26 +116,29 @@ export const LockedChatGate = ({ children, threadId }: { children: ReactNode; th
     }
 
     return (
-        <section aria-labelledby={headingId} className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-            <h2 className="text-lg font-medium" id={headingId}>
-                {t`This chat is locked`}
-            </h2>
-            <p className="text-muted-foreground max-w-md text-sm">{t`Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again.`}</p>
-            <Button onClick={() => setUnlocking(true)} type="button">
-                {t`Unlock chat`}
-            </Button>
-            {unlocking && (
-                <ThreadLockDialog
-                    mode="unlock"
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setUnlocking(false);
-                        }
-                    }}
-                    open
-                    threadId={threadId}
-                />
-            )}
-        </section>
+        <>
+            {lockedExtras}
+            <section aria-labelledby={headingId} className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+                <h2 className="text-lg font-medium" id={headingId}>
+                    {t`This chat is locked`}
+                </h2>
+                <p className="text-muted-foreground max-w-md text-sm">{t`Enter its passcode to read it in this browser. Closing the tab or staying idle locks it again.`}</p>
+                <Button onClick={() => setUnlocking(true)} type="button">
+                    {t`Unlock chat`}
+                </Button>
+                {unlocking && (
+                    <ThreadLockDialog
+                        mode="unlock"
+                        onOpenChange={(open) => {
+                            if (!open) {
+                                setUnlocking(false);
+                            }
+                        }}
+                        open
+                        threadId={threadId}
+                    />
+                )}
+            </section>
+        </>
     );
 };

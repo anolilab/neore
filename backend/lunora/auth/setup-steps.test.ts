@@ -101,6 +101,17 @@ describe("setSetupStepSkipped", () => {
         expect(await stored()).toEqual(["ssh"]);
     });
 
+    it("refuses a choice made for another account and stores nothing", async () => {
+        await expect(
+            asUser().mutation(setSetupStepSkipped as never, { expectedUserId: "someone-else", skipped: true, stepId: "ssh" } as never),
+        ).rejects.toMatchObject({ data: { code: "SETUP_OWNER_MISMATCH" } });
+        expect(await stored()).toBeUndefined();
+
+        await asUser().mutation(setSetupStepSkipped as never, { expectedUserId: USER, skipped: true, stepId: "ssh" } as never);
+
+        expect(await stored()).toEqual(["ssh"]);
+    });
+
     it("refuses an unknown step", async () => {
         await expect(toggle("nope", true)).rejects.toThrow();
     });

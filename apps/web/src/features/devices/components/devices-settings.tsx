@@ -15,6 +15,7 @@ import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import SetupChecklist from "@/features/onboarding/components/setup-checklist";
 import { useCRPC } from "@/lib/lunora/crpc";
 import type { NativeDevicePlatform, NativeDeviceStatus, NativeHostReconnect, NativeHostSpec } from "@/lib/native/bridge";
 import {
@@ -26,7 +27,7 @@ import {
     pairNativeDevice,
     pairNativeHost,
     probeNativeHost,
-} from "@/lib/native/bridge";
+} from "@/lib/native/device-bridge";
 
 import { buildDeviceDiagnostics, routeOf } from "../lib/device-diagnostics";
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
@@ -47,7 +48,7 @@ interface DeviceView {
     projectIds?: string[];
     toolNames: string[];
     /** `ssh`: a server this desktop reaches over SSH and speaks for. */
-    transport?: "ssh";
+    transport?: "headless" | "ssh";
     /** The computer reported a protocol older than the backend serves: it gets no calls until it is updated. */
     updateRequired?: boolean;
     viaDeviceId?: string;
@@ -570,8 +571,10 @@ const DevicesSettings: FC = () => {
 
     return (
         <div className="space-y-6">
+            <SetupChecklist serverFormShown={pairedHere !== undefined && Boolean(native?.deviceId)} />
             <SettingsCard
                 description={t`Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks.`}
+                id="devices-pairing"
                 title={t`Devices`}
             >
                 <CardContent className="space-y-4">
@@ -631,6 +634,7 @@ const DevicesSettings: FC = () => {
             {pairedHere !== undefined && native?.deviceId && (
                 <SettingsCard
                     description={t`Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours.`}
+                    id="devices-ssh"
                     title={t`Servers over SSH`}
                 >
                     <CardContent>

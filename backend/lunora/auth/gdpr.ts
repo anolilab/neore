@@ -73,9 +73,10 @@ export const readIdentityRows = async (ctx: MutationCtx, { userEmail, userId }: 
     const id = userId as Id<"user">;
     const email = userEmail.trim().toLowerCase();
 
-    const [twoFactors, passkeys, members, memberCredits, teamMembers, apiKeys, invitations, signUpInvitations] = await Promise.all([
+    const [twoFactors, passkeys, deviceCodes, members, memberCredits, teamMembers, apiKeys, invitations, signUpInvitations] = await Promise.all([
         ctx.db.twoFactor.findMany({ limit: BATCH, where: { userId: id } }).then((result) => result.page),
         ctx.db.passkey.findMany({ limit: BATCH, where: { userId } }).then((result) => result.page),
+        ctx.db.deviceCode.findMany({ limit: BATCH, where: { userId } }).then((result) => result.page),
         ctx.db.member.findMany({ limit: BATCH, where: { userId: id } }).then((result) => result.page),
         ctx.db.memberCredits.findMany({ limit: BATCH, where: { userId } }).then((result) => result.page),
         ctx.db.teamMember.findMany({ limit: BATCH, where: { userId } }).then((result) => result.page),
@@ -84,7 +85,7 @@ export const readIdentityRows = async (ctx: MutationCtx, { userEmail, userId }: 
         email ? ctx.db.signUpInvitation.findMany({ limit: BATCH, where: { email } }).then((result) => result.page) : Promise.resolve([]),
     ]);
 
-    return { apiKeys, invitations, memberCredits, members, passkeys, signUpInvitations, teamMembers, twoFactors };
+    return { apiKeys, deviceCodes, invitations, memberCredits, members, passkeys, signUpInvitations, teamMembers, twoFactors };
 };
 
 export type IdentityRows = Awaited<ReturnType<typeof readIdentityRows>>;
@@ -97,6 +98,10 @@ export const deleteIdentityRows = async (ctx: MutationCtx, rows: IdentityRows): 
 
     for (const row of rows.passkeys) {
         await ctx.db.delete("passkey", row._id);
+    }
+
+    for (const row of rows.deviceCodes) {
+        await ctx.db.delete("deviceCode", row._id);
     }
 
     for (const row of rows.members) {

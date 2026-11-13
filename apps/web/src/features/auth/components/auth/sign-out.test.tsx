@@ -6,13 +6,17 @@ import { releaseThreadListWrites, writeThreadListCache } from "@/features/chat/t
 import SignOut from "./sign-out";
 
 const auth = vi.hoisted(() => {
-    return { outcome: "success" as "error" | "success", signOut: vi.fn() };
+    return { outcome: "success" as "error" | "success", session: { data: null as { user: { id: string } } | null }, signOut: vi.fn() };
 });
 
 vi.mock("@/features/auth/lib/auth-ui-provider", () => {
     return {
         useAuth: () => {
-            return { authClient: { signOut: auth.signOut }, basePath: "/auth", viewPaths: { SIGN_IN: "sign-in" } };
+            return {
+                authClient: { $store: { atoms: { session: { get: () => auth.session } } }, signOut: auth.signOut },
+                basePath: "/auth",
+                viewPaths: { SIGN_IN: "sign-in" },
+            };
         },
     };
 });
@@ -35,6 +39,8 @@ const list = {
 describe("SignOut", () => {
     beforeEach(() => {
         localStorage.clear();
+        sessionStorage.clear();
+        auth.session.data = null;
         releaseThreadListWrites();
         localStorage.setItem("neore-collapsed-groups", '["archived"]');
         writeThreadListCache("alice", list);
@@ -53,7 +59,8 @@ describe("SignOut", () => {
         await vi.waitFor(() => {
             expect(auth.signOut).toHaveBeenCalled();
         });
-        expect(localStorage).toHaveLength(1);
+        // Only the thread list goes; the drafts' clear marker (`dropStoredDrafts`) is new, and other settings stay.
+        expect(Object.keys(localStorage).filter((key) => !key.startsWith("neore-draft-cleared:"))).toStrictEqual(["neore-collapsed-groups"]);
         expect(localStorage.getItem("neore-collapsed-groups")).toBe('["archived"]');
     });
 
@@ -66,5 +73,62 @@ describe("SignOut", () => {
             expect(globalThis.location.replace).toHaveBeenCalledWith("/auth/sign-in");
         });
         expect(globalThis.location.replace).toHaveBeenCalledTimes(1);
+    });
+
+    it("drops the signed-in account's unsent drafts, with no composer shown on this page load, and leaves another account's", async () => {
+        auth.session.data = { user: { id: "alice" } };
+        localStorage.setItem("neore-draft:alice:thread-a", "{}");
+        localStorage.setItem("neore-draft:bob:thread-a", "{}");
+
+        render(<SignOut />);
+
+        await vi.waitFor(() => {
+            expect(auth.signOut).toHaveBeenCalled();
+        });
+        expect(localStorage.getItem("neore-draft:alice:thread-a")).toBeNull();
+        expect(localStorage.getItem("neore-draft:bob:thread-a")).toBe("{}");
+    });
+
+    it("drops every account's unsent drafts when the session does not say whose they are", async () => {
+        localStorage.setItem("neore-draft:alice:thread-a", "{}");
+        localStorage.setItem("neore-draft:bob:thread-a", "{}");
+
+        render(<SignOut />);
+
+        await vi.waitFor(() => {
+            expect(auth.signOut).toHaveBeenCalled();
+        });
+        expect(Object.keys(localStorage).filter((key) => key.startsWith("neore-draft:"))).toStrictEqual([]);
+    });
+
+    it("keeps the queued prompts and the signed-in hint when sign-out fails, as the session may still be active, but not the queued analytics events", async () => {
+        auth.outcome = "error";
+        localStorage.setItem("neore-signed-in-hint", "1");
+        sessionStorage.setItem("neore:prompt-queue:thread-a", '{"items":[]}');
+        sessionStorage.setItem("neore:posthog-pending-events", '[{"event":"tracked","timestamp":"2026-11-12T10:00:00.000Z"}]');
+
+        render(<SignOut />);
+
+        await vi.waitFor(() => {
+            expect(globalThis.location.replace).toHaveBeenCalled();
+        });
+        expect(localStorage.getItem("neore-signed-in-hint")).toBe("1");
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-a")).toBe('{"items":[]}');
+        // Events queued for PostHog do not wait on a sign-in page that may be someone else's.
+        expect(sessionStorage.getItem("neore:posthog-pending-events")).toBeNull();
+    });
+
+    it("drops the queued prompts and the signed-in hint once sign-out succeeds", async () => {
+        auth.outcome = "success";
+        localStorage.setItem("neore-signed-in-hint", "1");
+        sessionStorage.setItem("neore:prompt-queue:thread-a", '{"items":[]}');
+
+        render(<SignOut />);
+
+        await vi.waitFor(() => {
+            expect(globalThis.location.replace).toHaveBeenCalled();
+        });
+        expect(localStorage.getItem("neore-signed-in-hint")).toBeNull();
+        expect(sessionStorage.getItem("neore:prompt-queue:thread-a")).toBeNull();
     });
 });

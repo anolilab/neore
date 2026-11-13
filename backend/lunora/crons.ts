@@ -275,6 +275,12 @@ export const PERIODIC_JOBS: ReadonlyArray<CronJob & PeriodicJob> = [
         ref: internal.auth.organization_policy_erase.sweepOrphanedOrganizationPolicies,
         schedule: { hourUTC: 4, kind: "daily", minuteUTC: 15 },
     },
+    // Repository rows of a deleted organization's ownerless projects, for a removal the queue never delivered (`projects/gdpr.ts`).
+    {
+        name: "sweepOrphanedOrganizationRepositories",
+        ref: internal.projects.gdpr.sweepOrphanedOrganizationRepositories,
+        schedule: { hourUTC: 4, kind: "daily", minuteUTC: 30 },
+    },
     // 0 0 * * *
     {
         // eslint-disable-next-line no-secrets/no-secrets

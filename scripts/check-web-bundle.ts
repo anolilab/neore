@@ -21,7 +21,9 @@ const ENTRY_GZIP_BUDGET_KIB = 200;
 // 600 -> 675 with the dependency refresh (#589): c15t 3 (@c15t/core + schema, ~+30),
 // posthog-js 1.447 (~+14), TanStack Start's createServerFn as its own chunk (+11), and
 // ~25 of small shared chunks the new chunk split hoists into the first load.
-const CLOSURE_GZIP_BUDGET_KIB = 675;
+// 675 -> 676 with the countdown toast (#653): the card, its toast classes and the footer add ~0.2 KiB.
+// 676 -> 677 with the use-case pages: their routes, copy and index card add ~0.4 KiB to the first load.
+const CLOSURE_GZIP_BUDGET_KIB = 677;
 
 interface ManifestChunk {
     file: string;

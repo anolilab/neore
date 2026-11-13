@@ -35,7 +35,7 @@ import { Plural, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
-import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDownIcon, ChevronUpIcon, CornerDownRightIcon, GripVerticalIcon, ListOrderedIcon, PaperclipIcon, SendIcon, XIcon } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import type { FC, ReactNode } from "react";
@@ -44,11 +44,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatActions, useChatError, useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
-import { selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { allowPromptQueueRestore, selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import type { QueuedSteer, SteerWithdrawal } from "@/features/chat/core/utils/prompt-queue";
 import { decideAutoSend, deliveredSteerItems, takeNextToSend } from "@/features/chat/core/utils/prompt-queue";
-import { useCRPC } from "@/lib/lunora/crpc";
-import { showError } from "@/lib/toast";
+import { useConnectionView } from "@/features/connection/hooks/use-connection";
+import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
+import { showError, showInfo } from "@/lib/toast";
+
+import { permissionModeSaveKey, usePermissionModeSaving } from "./composer-permission-mode";
 
 /**
  * `sendMessage` clears the composer synchronously (before its first await) —
@@ -89,20 +92,33 @@ const useQueueActions = () => {
     const { threadId: currentThreadId } = useChatThread();
     const { isStreaming } = useChatIsStreaming();
     const { error } = useChatError();
+    const queryClient = useQueryClient();
     const { mutateAsync: withdrawSteer } = useMutation(crpc.chat.steering.withdrawSteer.mutationOptions());
+    const offline = useConnectionView() === "offline";
     const busyRef = useRef(false);
     // What an `await` in here must re-read afterwards, not close over.
-    const latestRef = useRef({ hasError: Boolean(error), isStreaming, threadId: currentThreadId });
+    const latestRef = useRef({ hasError: Boolean(error), isStreaming, offline, threadId: currentThreadId });
     // A thread whose send was asked for while a removal held `busyRef`; `explicit` is the Send next button, which outranks a reply's error.
     const sendRequestedRef = useRef<{ explicit: boolean; threadId: string } | undefined>(undefined);
     // Chips whose removal was asked for while another call held `busyRef`.
     const removalsRequestedRef = useRef<{ id: string; threadId: string }[]>([]);
+    const holdOffline = useCallback(
+        (threadId: string, explicit: boolean) => {
+            usePromptQueueStore.getState().holdOffline(threadId, explicit);
+
+            // The Send next button says why nothing moved, as the composer does for a send offline.
+            if (explicit) {
+                showInfo(t`You are offline. Your message stays here; send it once you are back online.`, { id: "composer-offline-send" });
+            }
+        },
+        [t],
+    );
     const removePromptRef = useRef<(threadId: string, id: string) => Promise<void>>(async () => {});
     const sendNextPromptRef = useRef<(threadId: string, options?: { explicit?: boolean }) => Promise<void>>(async () => {});
 
     useEffect(() => {
-        latestRef.current = { hasError: Boolean(error), isStreaming, threadId: currentThreadId };
-    }, [currentThreadId, error, isStreaming]);
+        latestRef.current = { hasError: Boolean(error), isStreaming, offline, threadId: currentThreadId };
+    }, [currentThreadId, error, isStreaming, offline]);
 
     /** Once `busyRef` is free: runs the removals asked for meanwhile, one after the other (each re-queues the rest while it holds the flag). */
     const removeRequestedMeanwhile = useCallback(() => {
@@ -128,62 +144,7 @@ const useQueueActions = () => {
         [withdrawSteer],
     );
 
-    /**
-     * Sends the thread's next prompt. One whose withdrawal failed stays first, and the queue pauses.
-     * An automatic send leaves the queue for the user to review when the reply ended in an error,
-     * even if that error arrived during the withdrawal; `explicit` (the Send next button) sends anyway.
-     */
-    const sendNextPrompt = useCallback(
-        async (threadId: string, { explicit = false }: { explicit?: boolean } = {}): Promise<void> => {
-            if (busyRef.current) {
-                // Not dropped: the call that holds the flag runs it once it lets go.
-                sendRequestedRef.current = { explicit: explicit || sendRequestedRef.current?.explicit === true, threadId };
-
-                return;
-            }
-
-            busyRef.current = true;
-
-            try {
-                const { remove, settleSteer, setPaused } = usePromptQueueStore.getState();
-                const next = await takeNextToSend({
-                    // A reply that started meanwhile owns the thread: a message sent from the
-                    // composer is `isSubmitting` before its stream exists, so that counts too.
-                    canSend: () => {
-                        const latest = latestRef.current;
-
-                        return latest.threadId === threadId && !latest.isStreaming && (explicit || !latest.hasError) && !useChatUIStore.getState().isSubmitting;
-                    },
-                    peek: () => usePromptQueueStore.getState().queues[threadId]?.items[0],
-                    plain: ({ steer }) => {
-                        if (steer) {
-                            settleSteer(threadId, steer.id, "refused");
-                        }
-                    },
-                    remove: (id) => remove(threadId, id),
-                    withdraw: async (steer) => await withdraw(threadId, steer),
-                });
-
-                if (next?.kind === "send") {
-                    sendQueuedPrompt(next.prompt);
-                } else if (next?.kind === "failed") {
-                    setPaused(threadId, true);
-                }
-            } finally {
-                busyRef.current = false;
-                // A send starts a reply, and the next one waits for its end.
-                sendRequestedRef.current = undefined;
-                removeRequestedMeanwhile();
-            }
-        },
-        [removeRequestedMeanwhile, sendQueuedPrompt, withdraw],
-    );
-
-    useEffect(() => {
-        sendNextPromptRef.current = sendNextPrompt;
-    }, [sendNextPrompt]);
-
-    /** After a removal: runs the send that was asked for meanwhile, if the thread still allows one. */
+    /** Once `busyRef` is free: runs the send that was asked for meanwhile, if the thread still allows one. */
     const sendRequestedMeanwhile = useCallback(() => {
         const requested = sendRequestedRef.current;
 
@@ -202,6 +163,114 @@ const useQueueActions = () => {
             void sendNextPromptRef.current(threadId, { explicit });
         }
     }, []);
+
+    /**
+     * Once online with `busyRef` free: runs the shown thread's send that waited for the network. While another call holds
+     * the flag it stays held, and that call runs it when it lets go — its own `finally` must not swallow it.
+     */
+    const replayOfflineHold = useCallback(() => {
+        const { isStreaming: streaming, offline: isOffline, threadId } = latestRef.current;
+
+        // While a reply streams the hold stays where it is: the runner takes it once that reply ends.
+        if (isOffline || busyRef.current || streaming || !threadId) {
+            return;
+        }
+
+        const held = usePromptQueueStore.getState().takeOfflineHold(threadId);
+
+        if (held) {
+            sendRequestedRef.current = { explicit: held.explicit, threadId };
+            sendRequestedMeanwhile();
+        }
+    }, [sendRequestedMeanwhile]);
+
+    /**
+     * Sends the thread's next prompt. One whose withdrawal failed stays first, and the queue pauses.
+     * An automatic send leaves the queue for the user to review when the reply ended in an error,
+     * even if that error arrived during the withdrawal; `explicit` (the Send next button) sends anyway.
+     */
+    const sendNextPrompt = useCallback(
+        async (threadId: string, { explicit = false }: { explicit?: boolean } = {}): Promise<void> => {
+            if (latestRef.current.offline) {
+                holdOffline(threadId, explicit);
+
+                return;
+            }
+
+            if (busyRef.current) {
+                // Not dropped: the call that holds the flag runs it once it lets go.
+                sendRequestedRef.current = { explicit: explicit || sendRequestedRef.current?.explicit === true, threadId };
+
+                return;
+            }
+
+            busyRef.current = true;
+            // Whether this call sent a prompt: its reply has not started in the rendered state yet, so nothing else may send now.
+            let sent = false;
+
+            try {
+                const { remove, settleSteer, setPaused } = usePromptQueueStore.getState();
+                const next = await takeNextToSend({
+                    // A reply that started meanwhile owns the thread: a message sent from the
+                    // composer is `isSubmitting` before its stream exists, so that counts too.
+                    canSend: () => {
+                        const latest = latestRef.current;
+
+                        return (
+                            latest.threadId === threadId &&
+                            !latest.isStreaming &&
+                            // The withdrawal's await can outlast the network: then the prompt stays and is held for it.
+                            !latest.offline &&
+                            // Read from the cache, not the rendered flag: a save that began after the last render is not in that flag yet,
+                            // and this check runs after the withdrawal's await, so it could send under the old mode.
+                            queryClient.isMutating({ exact: true, mutationKey: permissionModeSaveKey(threadId) }) === 0 &&
+                            (explicit || !latest.hasError) &&
+                            !useChatUIStore.getState().isSubmitting
+                        );
+                    },
+                    peek: () => usePromptQueueStore.getState().queues[threadId]?.items[0],
+                    plain: ({ steer }) => {
+                        if (steer) {
+                            settleSteer(threadId, steer.id, "refused");
+                        }
+                    },
+                    remove: (id) => remove(threadId, id),
+                    withdraw: async (steer) => await withdraw(threadId, steer),
+                });
+
+                if (next?.kind === "send") {
+                    sent = true;
+                    sendQueuedPrompt(next.prompt);
+                } else if (next?.kind === "failed") {
+                    setPaused(threadId, true);
+                } else if (next?.kind === "blocked" && latestRef.current.offline) {
+                    holdOffline(threadId, explicit);
+                }
+            } finally {
+                busyRef.current = false;
+                // A send starts a reply, and the next one waits for its end.
+                sendRequestedRef.current = undefined;
+                removeRequestedMeanwhile();
+
+                // A held send waits for this one's reply to end, like any other: it stays held until then.
+                if (!sent) {
+                    replayOfflineHold();
+                }
+            }
+        },
+        [holdOffline, queryClient, removeRequestedMeanwhile, replayOfflineHold, sendQueuedPrompt, withdraw],
+    );
+
+    useEffect(() => {
+        sendNextPromptRef.current = sendNextPrompt;
+    }, [sendNextPrompt]);
+
+    // Back online, or back on a thread whose send waited for the network while it was away: that send goes now.
+    useEffect(() => {
+        if (!offline) {
+            replayOfflineHold();
+        }
+    }, [currentThreadId, offline, replayOfflineHold]);
 
     /** Removes a chip. A steered one leaves only once its run no longer holds the message. */
     const removePrompt = useCallback(
@@ -243,9 +312,10 @@ const useQueueActions = () => {
                 busyRef.current = false;
                 removeRequestedMeanwhile();
                 sendRequestedMeanwhile();
+                replayOfflineHold();
             }
         },
-        [removeRequestedMeanwhile, sendRequestedMeanwhile, t, withdraw],
+        [removeRequestedMeanwhile, replayOfflineHold, sendRequestedMeanwhile, t, withdraw],
     );
 
     useEffect(() => {
@@ -356,18 +426,27 @@ const ComposerPromptQueue: FC = () => {
     const { error } = useChatError();
     const queue = usePromptQueueStore(selectThreadQueue(threadId));
     const { removePrompt, sendNextPrompt } = useQueueActions();
+    const modeSaving = usePermissionModeSaving(threadId);
+    const wasModeSaving = useRef(modeSaving);
     const crpc = useCRPC();
     // The same query (and key) the chat context reads, so no second subscription.
     const { data: activeStream } = useQuery(
         crpc.chat.streaming.getActiveStreamForThread.queryOptions(threadId && threadId !== "default" ? { threadId: threadId as Id<"threads"> } : skipToken),
     );
 
+    // Not before Lunora confirms the session: the chat layout paints before that (`OptimisticAuthGate`), and a queue
+    // left by a session that has since ended is not this visitor's to read.
+    const { isAuthenticated } = useLunoraAuth();
+
     // Restores a queue left in sessionStorage by a reload; it arrives paused.
     useEffect(() => {
-        if (threadId) {
-            usePromptQueueStore.getState().hydrate(threadId);
+        if (!threadId || !isAuthenticated) {
+            return;
         }
-    }, [threadId]);
+
+        allowPromptQueueRestore();
+        usePromptQueueStore.getState().hydrate(threadId);
+    }, [isAuthenticated, threadId]);
 
     // A steered prompt the running reply has taken is in the thread now: retire its chip.
     useEffect(() => {
@@ -396,7 +475,20 @@ const ComposerPromptQueue: FC = () => {
             return;
         }
 
-        const { queues, setPaused } = usePromptQueueStore.getState();
+        const { queues, setPaused, takeOfflineHold } = usePromptQueueStore.getState();
+
+        // A Send next asked for offline waited for this reply: it goes now, as asked (an explicit one even after an error).
+        // Not into a queue paused since, and an automatic one not after an error: the usual decision below pauses it then.
+        if (previous.isStreaming && !isStreaming) {
+            const held = takeOfflineHold(threadId);
+
+            if (held && !(queues[threadId]?.paused ?? false) && (held.explicit || !error)) {
+                void sendNextPrompt(threadId, { explicit: held.explicit });
+
+                return;
+            }
+        }
+
         const current = queues[threadId];
         const decision = decideAutoSend({
             hasError: Boolean(error),
@@ -448,6 +540,17 @@ const ComposerPromptQueue: FC = () => {
             void sendNextPrompt(threadId);
         }
     }, [error, isStreaming, queue.items, queue.paused, sendNextPrompt, threadId]);
+
+    // A save that ends releases the prompts that waited for it, unless the thread is busy, failed, or paused.
+    useEffect(() => {
+        const ended = wasModeSaving.current && !modeSaving;
+
+        wasModeSaving.current = modeSaving;
+
+        if (ended && threadId && !isStreaming && !error && !queue.paused && queue.items.length > 0) {
+            void sendNextPrompt(threadId);
+        }
+    }, [error, isStreaming, modeSaving, queue.items.length, queue.paused, sendNextPrompt, threadId]);
 
     const handleRemove = useCallback(
         (id: string) => {
@@ -583,6 +686,11 @@ const ComposerPromptQueue: FC = () => {
         statusText = <Plural one="# steering — the reply reads it at its next step" other="# steering — the reply reads them at its next step" value={count} />;
     }
 
+    // "Send next" is disabled while the permission mode saves: say why, and that the queue moves on once it has.
+    if (modeSaving && !isStreaming && !queue.paused) {
+        statusText = t`${count} queued — waiting for the permission mode to save`;
+    }
+
     return (
         <div className="mx-2 mt-2 flex flex-wrap items-center gap-1.5">
             <span aria-live="polite" className="text-muted-foreground flex items-center gap-1 text-xs" role="status">
@@ -611,7 +719,7 @@ const ComposerPromptQueue: FC = () => {
                 </SortableContext>
             </DndContext>
             {!isStreaming && (
-                <Button className="h-6 gap-1 px-2 text-xs" onClick={handleSendNext} size="sm" type="button" variant="outline">
+                <Button className="h-6 gap-1 px-2 text-xs" disabled={modeSaving} onClick={handleSendNext} size="sm" type="button" variant="outline">
                     <SendIcon aria-hidden="true" className="size-3" />
                     {t`Send next`}
                 </Button>

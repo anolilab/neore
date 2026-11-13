@@ -1,15 +1,19 @@
+import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, waitFor } from "storybook/test";
+import { expect, userEvent, waitFor } from "storybook/test";
 
+import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { Route as ThreadRoute } from "@/routes/(chat)/chat/$threadId";
 import { Route as ChatIndexRoute } from "@/routes/(chat)/chat/index";
 import { Route as ChatLayoutRoute } from "@/routes/(chat)/route";
 import { ago, MINUTE } from "@/storybook/clock";
+import type { ChatMessage } from "@/storybook/fixtures/chat";
 import { assistantMessage, chatFixtures, CONVERSATION, streamingBody, THREAD_IDS, userMessage } from "@/storybook/fixtures/chat";
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
 import { shellFixtures } from "@/storybook/fixtures/shell";
 import { userFixtures } from "@/storybook/fixtures/user";
-import { lunoraHandlers, lunoraIdle } from "@/storybook/lunora";
+import { lunoraError, lunoraHandlers, lunoraIdle } from "@/storybook/lunora";
 import { StoryPage } from "@/storybook/page";
 
 // Page data arrives after the route loads; under a loaded machine that can outlast the 1 s default of `find*`.
@@ -66,14 +70,54 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Thread: Story = {
-    // color-contrast (#548): a code token inherits #e2e8f0 on the light page; the source is not found yet.
-    parameters: { a11y: { test: "todo" } },
     play: async ({ canvas }) => {
         // Named (it had no accessible name before these stories); its fade-in can outlast the query.
         await expect(await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT)).toBeInTheDocument();
         // The composer's controls had no accessible name before these stories (#548).
         await expect(await canvas.findAllByRole("button", { name: "Model: Claude Sonnet 4.5" }, PAGE_WAIT)).not.toHaveLength(0);
         await expect(await canvas.findAllByRole("combobox", { name: "Response language: English (US)" }, PAGE_WAIT)).not.toHaveLength(0);
+    },
+};
+
+const ROUTE_PROMPT = "Draft the launch email";
+
+/**
+ * The route prompt is written into the composer even when this exact text was applied to the chat before. On the single-chat page
+ * the composer does not remount per focus, so the once-per-chat guard that keeps a split pane's draft must not apply here.
+ */
+export const RoutePromptWrittenAgain: Story = {
+    args: { url: `/chat/${THREAD_IDS.main}?initialMessage=${encodeURIComponent(ROUTE_PROMPT)}` },
+    loaders: [
+        () => {
+            useChatUIStore.getState().clearComposer();
+            useChatUIStore.getState().setAppliedInitialMessageKey(`${THREAD_IDS.main}\n${ROUTE_PROMPT}`);
+        },
+    ],
+    play: async ({ canvas }) => {
+        await waitFor(() => expect(canvas.getByRole("textbox", { name: "Message" })).toHaveTextContent(ROUTE_PROMPT), PAGE_WAIT);
+    },
+};
+
+/** The pane-state read fails: the page says so, and the chat stays usable (its messages and composer do not depend on that read). */
+export const PaneStateReadFails: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                gateway: gatewayModelsHandler(),
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    ...shellFixtures(),
+                    ...chatFixtures(),
+                    lunoraError(api.chat.composite.getThreadPaneState, "INTERNAL", "Read failed", 500),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        // The thread reads its pane state only after first paint has settled (`useAfterFirstPaint`: browser idle, then 3 s),
+        // so the alert arrives later than the page itself.
+        await expect(await canvas.findByText("Could not load this chat's details.", undefined, STATE_WAIT)).toBeInTheDocument();
+        await expect(await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT)).toBeInTheDocument();
     },
 };
 
@@ -163,7 +207,7 @@ export const ReadOnlyShare: Story = {
     },
 };
 
-/** The connection to the backend dropped: the banner above the composer. */
+/** The connection to the backend dropped: the banner at the top of the app. */
 export const Reconnecting: Story = {
     play: async ({ canvas }) => {
         const banner = await canvas.findByText("Reconnecting to the server…", undefined, STATE_WAIT);
@@ -180,7 +224,7 @@ export const Offline: Story = {
         // The "offline" view comes from the browser's offline event, not the live status: fire it once the page has mounted.
         await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT);
         globalThis.dispatchEvent(new Event("offline"));
-        const banner = await canvas.findByText("You are offline.", undefined, STATE_WAIT);
+        const banner = await canvas.findByText("Offline – reconnecting…", undefined, STATE_WAIT);
 
         await expect(banner).toBeInTheDocument();
         await bannerShown(banner);
@@ -216,5 +260,90 @@ export const FreeUser: Story = {
     parameters: {
         msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...shellFixtures({ tier: "free" }), ...chatFixtures()) } },
         persona: "free",
+    },
+};
+
+const LONG_PROMPT = "What is the rollback plan if the billing migration fails halfway?";
+const LONG_REPLY = Array.from(
+    { length: 4 },
+    (_, line) => `Paragraph ${String(line + 1)}. ${"Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(6)}`,
+).join("\n\n");
+
+/** Fourteen exchanges, then the person's last question, then three long replies: the question sits far above the bottom. */
+const LONG_THREAD: ChatMessage[] = [
+    ...Array.from({ length: 14 }, (_, index) => [
+        userMessage(`Earlier question ${String(index + 1)}`, index * 2),
+        assistantMessage(LONG_REPLY, index * 2 + 1),
+    ]).flat(),
+    userMessage(LONG_PROMPT, 28),
+    assistantMessage(LONG_REPLY, 29),
+    assistantMessage(LONG_REPLY, 30),
+    assistantMessage(LONG_REPLY, 31),
+];
+
+/**
+ * A long run of replies after the person's last question. Scrolled up, the control beside scroll-to-bottom jumps back to that
+ * question, and the `jumpToLastMessage` shortcut does the same from the keyboard.
+ */
+export const JumpToLastMessage: Story = {
+    parameters: {
+        msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...shellFixtures(), ...chatFixtures({ messages: LONG_THREAD })) } },
+    },
+    play: async ({ canvas }) => {
+        await settle(canvas);
+
+        const scroller = document.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]');
+
+        if (!scroller) {
+            throw new Error("The thread has no scroll viewport");
+        }
+
+        const prompt = await canvas.findByText(LONG_PROMPT, undefined, PAGE_WAIT);
+        const row = prompt.closest<HTMLElement>('[role="listitem"]');
+
+        if (!row) {
+            throw new Error("The prompt is not in a message row");
+        }
+
+        // The prompt's row is centred in the viewport (what the jump scrolls to), or not.
+        const isCentred = (): boolean => {
+            const box = scroller.getBoundingClientRect();
+            const rect = row.getBoundingClientRect();
+            const centre = rect.top + rect.height / 2;
+
+            return centre >= box.top && centre <= box.bottom;
+        };
+
+        // The thread first scrolls itself to the bottom, a frame after its messages are ready (`thread-viewport.tsx`). Scrolling up
+        // before that lands would be undone by it, and the control, shown only away from the bottom, would never appear. The
+        // viewport starts at the top and nothing else moves it first.
+        await waitFor(() => {
+            expect(scroller.scrollTop).toBeGreaterThan(0);
+        }, STATE_WAIT);
+
+        // Scrolled up past the question, the way a long run of replies leaves it.
+        scroller.scrollTop = 0;
+        await waitFor(() => {
+            expect(isCentred()).toBe(false);
+        }, STATE_WAIT);
+
+        await userEvent.click(await canvas.findByRole("button", { name: "Jump to my last message" }, STATE_WAIT));
+        await waitFor(() => {
+            expect(isCentred()).toBe(true);
+        }, STATE_WAIT);
+
+        // The jump starts unbound, so this story binds the chord a person would set in Settings (Ctrl here, where the platform modifier
+        // is Ctrl). Back up again; the shortcut brings the question back. A real key sequence, not one synthetic keydown, so the keyup
+        // and focus that a person's press also produces are exercised.
+        useUIStateStore.getState().setKeyboardShortcuts({ jumpToLastMessage: "ctrl+shift+l" });
+        scroller.scrollTop = 0;
+        await waitFor(() => {
+            expect(isCentred()).toBe(false);
+        }, STATE_WAIT);
+
+        await userEvent.keyboard("{Control>}{Shift>}l{/Shift}{/Control}");
+        await waitFor(() => {
+            expect(isCentred()).toBe(true);
+        }, STATE_WAIT);
     },
 };

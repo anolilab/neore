@@ -21,13 +21,15 @@ interface ThreadOptionsMenuProps {
     /** The row's accessible name, from the thread title. */
     label: string;
     onOpenChange: (open: boolean) => void;
+    /** Opens the chat as a pane of the split view. Given only while the split view preference is on; absent hides the item. */
+    onOpenInSplitView?: () => void;
     onRename: () => void;
     open: boolean;
     threadId: string;
 }
 
 /** The row's options menu. Holds the thread-level actions that have no row control of their own. */
-const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange, onRename, open, threadId }: ThreadOptionsMenuProps) => {
+const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange, onOpenInSplitView, onRename, open, threadId }: ThreadOptionsMenuProps) => {
     const { t } = useLingui();
     // The action client: a regenerate must fail now when offline, not replay later from a queue, and is one request, not retried.
     const { isPending, mutate: regenerateTitle } = useMutation({
@@ -36,8 +38,8 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
         retry: 0,
     });
 
-    // A locked row gets no menu: the server refuses both its rename and its regenerate.
-    if (isLocked) {
+    // A locked row keeps only the split-view item: the server refuses its rename and its regenerate.
+    if (isLocked && !onOpenInSplitView) {
         return null;
     }
 
@@ -67,8 +69,9 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                     <TooltipContent>{t`Thread options`}</TooltipContent>
                 </Tooltip>
                 <DropdownMenuContent>
-                    <DropdownMenuItem onClick={onRename}>{t`Rename`}</DropdownMenuItem>
-                    {!isHostRun && (
+                    {!isLocked && <DropdownMenuItem onClick={onRename}>{t`Rename`}</DropdownMenuItem>}
+                    {onOpenInSplitView && <DropdownMenuItem onClick={onOpenInSplitView}>{t`Open in split view`}</DropdownMenuItem>}
+                    {!isHostRun && !isLocked && (
                         <DropdownMenuItem
                             onClick={() =>
                                 regenerateTitle(

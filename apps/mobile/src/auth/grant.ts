@@ -27,9 +27,53 @@ export interface GrantUser {
 /** The persistence seam. The app passes expo-secure-store; tests pass a Map. */
 export interface GrantStore {
     clear: () => Promise<void>;
+
+    /**
+     * Clears the grant only while it is `token`'s, as one step no other read or write can come between
+     * ({@link serializeGrantStore}). A store without it is read, then cleared.
+     */
+    clearIfCurrent?: (token: string) => Promise<void>;
     get: () => Promise<StoredGrant | null>;
     set: (grant: StoredGrant) => Promise<void>;
 }
+
+/**
+ * `store` with every read, write and clear run one at a time, in the order they were asked for. The secure store has no
+ * compare-and-delete, but every writer of the grant is in this process, so a queue makes `clearIfCurrent` atomic: a
+ * sign-in's `set` asked for while a refused mint checks and clears waits until that is done, and survives it.
+ */
+export const serializeGrantStore = (store: GrantStore): GrantStore => {
+    let tail: Promise<unknown> = Promise.resolve();
+    const queued = <T>(step: () => Promise<T>): Promise<T> => {
+        const run = (async () => {
+            try {
+                await tail;
+            } catch {
+                // An earlier step's failure is its own caller's; the queue moves on.
+            }
+
+            return await step();
+        })();
+
+        tail = run;
+
+        return run;
+    };
+
+    return {
+        clear: () => queued(() => store.clear()),
+        clearIfCurrent: (token) =>
+            queued(async () => {
+                const current = await store.get();
+
+                if (current?.token === token) {
+                    await store.clear();
+                }
+            }),
+        get: () => queued(() => store.get()),
+        set: (grant) => queued(() => store.set(grant)),
+    };
+};
 
 export class SignInError extends Error {
     public constructor(message: string) {
@@ -241,10 +285,29 @@ export const exchangeGrant = async (input: {
 };
 
 /**
+ * Forgets `token`'s grant, only while the store still holds it: a sign-in that stored a new grant while this one was being
+ * refused keeps its own. Atomic on the app's store (`clearIfCurrent`, `serializeGrantStore`); a store without it is read,
+ * then cleared.
+ */
+const clearGrantIfCurrent = async (store: GrantStore, token: string): Promise<void> => {
+    if (store.clearIfCurrent) {
+        await store.clearIfCurrent(token);
+
+        return;
+    }
+
+    const current = await store.get();
+
+    if (current?.token === token) {
+        await store.clear();
+    }
+};
+
+/**
  * A short-lived JWT for the stored grant, or `null` when the user is signed out:
  * no grant, a 401 (the session is gone), or a 403 (the account is refused, as a
- * guest or a suspended account is). Either drops the grant, so the provider does not
- * retry a session the server will not accept. Any other failure throws and keeps the grant.
+ * guest or a suspended account is). Either drops the grant it sent, so the provider does not
+ * retry a session the server will not accept, but never a newer one stored meanwhile. Any other failure throws and keeps the grant.
  */
 export const fetchAccessToken = async (input: { fetch: Fetch; lunoraUrl: string; store: GrantStore }): Promise<string | null> => {
     const grant = await input.store.get();
@@ -263,7 +326,7 @@ export const fetchAccessToken = async (input: { fetch: Fetch; lunoraUrl: string;
     }
 
     if (response.status === 401 || response.status === 403) {
-        await input.store.clear();
+        await clearGrantIfCurrent(input.store, grant.token);
 
         // eslint-disable-next-line unicorn/no-null -- a signed-out result is null by contract; auth-context compares with null
         return null;

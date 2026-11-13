@@ -11,9 +11,10 @@ import { claimRow, GUEST_SEND_LEASE_MS, GUEST_SEND_SCOPE } from "../lib/claim-on
 import { enqueueJob } from "../lib/job-queue";
 import schema from "../schema";
 import { gateThreadActionHandler } from "./functions";
-import { claimGuestNoteSend, getGuestNoteForSend, recordGuestNoteSent, releaseGuestNoteSend } from "./guest-links";
+import { claimGuestNoteSend, getGuestNoteForSend, recordGuestNoteSent, recordResumedGuestNoteSent, releaseGuestNoteSend } from "./guest-links";
 import { runChatStart } from "./http";
 import { guestTextPart } from "./lib/attached-text";
+import { CHAT_START_LEASE_MS, claimChatStart, recordStartStream, releaseChatStart, saveStartPrompt } from "./start-claim";
 
 const saved = vi.hoisted(() => {
     return {
@@ -65,8 +66,9 @@ vi.mock("./lib/daily-limit", () => {
         },
     };
 });
-vi.mock("./lib/get-agent", () => {
+vi.mock("./lib/get-agent", async (importOriginal) => {
     return {
+        ...(await importOriginal<typeof import("./lib/get-agent")>()),
         default: async () => {
             if (failsAt("agent")) {
                 throw new Error("no agent");
@@ -107,6 +109,8 @@ vi.mock("../lib/http-scheduler", () => {
 
 const OWNER = "owner-user";
 const TITLE_JOBS = /Title|Category/u;
+/** A concurrent send finds the note claimed (being sent) or already sent: either way a guest-note 409, never a host-run one. */
+const GUEST_SEND_REFUSALS = /^GUEST_NOTE_(ALREADY_SENT|BEING_SENT)$/u;
 const MODEL = "openai/gpt-4.1-mini";
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -137,10 +141,57 @@ const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
     "chat_streaming:createStreamWithMessage": async () => "stream-1",
 };
 
-const fakeContext = (): any => {
-    const call = async (reference: { __lunoraRef: string }, args: unknown) => await (HANDLERS[reference.__lunoraRef]?.(args) ?? null);
+/** `extra` answers more references, for a test that must reach a check the others never do. */
+const fakeContext = (extra: typeof HANDLERS = {}): any => {
+    const handlers = { ...HANDLERS, ...extra };
+    const call = async (reference: { __lunoraRef: string }, args: unknown) => await (handlers[reference.__lunoraRef]?.(args) ?? null);
 
     return { auth: { getIdentity: async () => null }, runMutation: call, runQuery: call };
+};
+
+/**
+ * A send with a `clientMessageId`: the claim, its save and its stream are real (`chat/start-claim.ts`). `streamFails` makes
+ * the next stream creation fail, once, as a send that died between its save and its stream.
+ */
+const claimedSend = { streamFails: false };
+
+const CLAIMED_HANDLERS: typeof HANDLERS = {
+    "chat_guest_links:recordResumedGuestNoteSent": async (args) => await run(async (ctx) => await ctx.runMutation(recordResumedGuestNoteSent, args)),
+    "chat_start_claim:claimChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(claimChatStart, args)),
+    "chat_start_claim:releaseChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(releaseChatStart, args)),
+    "chat_start_claim:saveStartPrompt": async (args) => await run(async (ctx) => await ctx.runMutation(saveStartPrompt, args)),
+    "chat_streaming:createStreamWithMessage": async (args) => {
+        if (claimedSend.streamFails) {
+            claimedSend.streamFails = false;
+
+            throw new Error("the stream could not be made");
+        }
+
+        return await run(async (ctx) => {
+            const streamId = await ctx.db.insert("persistentStreams", {
+                expiresAt: Number.MAX_SAFE_INTEGER,
+                messageId: args.messageId,
+                status: "pending",
+                streamingConfig: { contentType: "text", model: MODEL },
+                threadId: args.threadId,
+                userId: args.userId,
+            });
+
+            await recordStartStream(ctx, args.startClaim, streamId);
+
+            return streamId;
+        });
+    },
+};
+
+const sendNoteOnce = async (): Promise<{ json: any; status: number }> => {
+    const response = await runChatStart(
+        fakeContext(CLAIMED_HANDLERS),
+        { clientMessageId: "note-send", guestMessageId: noteId, model: MODEL, prompt: "the composer's own text", threadId } as never,
+        "secret",
+    );
+
+    return { json: await response.json(), status: response.status };
 };
 
 const sendNote = async (): Promise<Response> =>
@@ -155,6 +206,7 @@ beforeEach(async () => {
     saved.scheduled.length = 0;
     saved.charges = 0;
     saved.releaseFails = false;
+    claimedSend.streamFails = false;
     saved.store = async (message) =>
         await run(
             async (ctx) =>
@@ -202,9 +254,11 @@ describe("/chat/start with a held guest note", () => {
             },
         ],
     ])("stores one message, charges once and marks the note sent when it is sent %s", async (_label, sendTwice) => {
-        const statuses = (await sendTwice()).map((response) => response.status).toSorted((x, y) => x - y);
+        const responses = (await sendTwice()).toSorted((x, y) => x.status - y.status);
 
-        expect(statuses).toStrictEqual([200, 409]);
+        expect(responses.map((response) => response.status)).toStrictEqual([200, 409]);
+        // Its own code: a 409 of another kind (a host-run thread's) must not read as one of these.
+        expect(await responses[1]?.json()).toMatchObject({ error: expect.stringMatching(GUEST_SEND_REFUSALS) });
         expect(saved.prompts).toHaveLength(1);
         expect(saved.charges).toBe(1);
         expect(await noteStatus()).toBe("sent");
@@ -215,7 +269,11 @@ describe("/chat/start with a held guest note", () => {
 
         await expect(sendNote()).rejects.toThrow();
         expect(await noteStatus()).toBe("sent");
-        expect((await sendNote()).status).toBe(400);
+
+        const retry = await sendNote();
+
+        expect(retry.status).toBe(409);
+        expect(await retry.json()).toMatchObject({ error: "GUEST_NOTE_ALREADY_SENT" });
         expect(saved.prompts).toHaveLength(1);
     });
 
@@ -224,14 +282,87 @@ describe("/chat/start with a held guest note", () => {
         const response = await runChatStart(fakeContext(), { guestMessageId: noteId, model: MODEL, prompt: "x", threadId: otherThread } as never, "secret");
 
         expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ error: "GUEST_NOTE_NOT_SENDABLE" });
         expect(saved.prompts).toHaveLength(0);
     });
 
-    it("refuses a second send of the same note and saves nothing more", async () => {
+    it("refuses a note sent to an image model with its own code, so the client keeps it to send once a text model is picked", async () => {
+        const response = await runChatStart(
+            fakeContext(),
+            { guestMessageId: noteId, model: "google/gemini-2.5-flash-image", prompt: "x", threadId } as never,
+            "secret",
+        );
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ error: "GUEST_NOTE_NEEDS_TEXT_MODEL" });
+        expect(saved.prompts).toHaveLength(0);
+        expect(await noteStatus()).toBe("held");
+    });
+
+    it("refuses a note sent as a goal, whose rounds would carry the guest's words as the owner's", async () => {
+        // The thread reads as the owner's, so the later goal-ownership check lets the goal through: only the note's own
+        // refusal stops it, before the note's send is claimed and before any charge.
+        const ownThread = {
+            "agent_threads:getThreadInternal": async () => await run(async (ctx) => await ctx.db.get("threads", threadId)),
+            "chat_goals_internal:startGoal": async () => {
+                return { goalId: "goal-1", ok: true };
+            },
+        };
+        const response = await runChatStart(
+            fakeContext(ownThread),
+            { goal: { text: "please call me back" }, guestMessageId: noteId, model: MODEL, prompt: "x", threadId } as never,
+            "secret",
+        );
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ error: "GUEST_NOTE_AS_GOAL" });
+        expect(saved.prompts).toHaveLength(0);
+        expect(saved.charges).toBe(0);
+        expect(await run(async (ctx) => await claimRow(ctx, GUEST_SEND_SCOPE, noteId))).toBeNull();
+        expect(await noteStatus()).toBe("held");
+    });
+
+    it("refuses a second send of the same note as already sent, and saves nothing more", async () => {
         await sendNote();
 
-        expect((await sendNote()).status).toBe(400);
+        const second = await sendNote();
+
+        expect(second.status).toBe(409);
+        expect(await second.json()).toMatchObject({ error: "GUEST_NOTE_ALREADY_SENT" });
         expect(saved.prompts).toHaveLength(1);
+    });
+
+    it("refuses a note another send holds as being sent, not as already sent, and keeps it waiting", async () => {
+        expect(await run(async (ctx) => await ctx.runMutation(claimGuestNoteSend, { messageId: noteId, userId: OWNER }))).toHaveProperty("fence");
+
+        const response = await sendNote();
+
+        expect(response.status).toBe(409);
+        expect(await response.json()).toMatchObject({ error: "GUEST_NOTE_BEING_SENT" });
+        expect(saved.prompts).toHaveLength(0);
+        expect(saved.charges).toBe(0);
+        expect(await noteStatus()).toBe("held");
+    });
+
+    it("refuses a note whose link ended between its lookup and its claim as an ended link, not as sent", async () => {
+        const lookupThenEnd = {
+            "chat_guest_links:getGuestNoteForSend": async (args: any) => {
+                const note = await run(async (ctx) => await ctx.runQuery(getGuestNoteForSend, args));
+
+                await run(async (ctx) => {
+                    const row = await ctx.db.get("threadGuestMessages", noteId);
+
+                    await ctx.db.patch("threadGuestLinks", row.linkId, { expiresAt: 1 });
+                });
+
+                return note;
+            },
+        };
+        const response = await runChatStart(fakeContext(lookupThenEnd), { guestMessageId: noteId, model: MODEL, prompt: "x", threadId } as never, "secret");
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ error: "GUEST_LINK_ENDED" });
+        expect(await noteStatus()).toBe("held");
     });
 
     it.each(["agent", "save"] as const)("lets a note be sent again when its %s step failed before anything was stored", async (step) => {
@@ -247,5 +378,86 @@ describe("/chat/start with a held guest note", () => {
         saved.releaseFails = true;
 
         await expect(sendNote()).rejects.toThrow("the save failed");
+    });
+});
+
+describe("/chat/start with a held guest note and a clientMessageId", () => {
+    const savedNotes = async () =>
+        (await run(async (ctx) => await ctx.db.query("messages").collect())).filter((row: any) =>
+            JSON.stringify(row.message?.content).includes("please call me back"),
+        );
+
+    it("answers a resend of a note it sent with the first send's ids, not as already sent", async () => {
+        const first = await sendNoteOnce();
+        const resent = await sendNoteOnce();
+
+        expect(first.status).toBe(200);
+        expect(resent.status).toBe(200);
+        expect(resent.json).toMatchObject({ duplicate: true, messageId: first.json.messageId, streamId: first.json.streamId });
+        expect(await savedNotes()).toHaveLength(1);
+        expect(saved.charges).toBe(1);
+    });
+
+    it("still refuses a note another send already sent, under a new id", async () => {
+        expect((await sendNoteOnce()).status).toBe(200);
+
+        const other = await runChatStart(
+            fakeContext(CLAIMED_HANDLERS),
+            { clientMessageId: "another-send", guestMessageId: noteId, model: MODEL, prompt: "x", threadId } as never,
+            "secret",
+        );
+
+        expect(other.status).toBe(409);
+        expect(await other.json()).toMatchObject({ error: "GUEST_NOTE_ALREADY_SENT" });
+        expect(await savedNotes()).toHaveLength(1);
+    });
+
+    it("marks the note sent when it resumes a send that saved it but died before its record and its stream", async () => {
+        saved.fail = "record";
+        claimedSend.streamFails = true;
+
+        await expect(sendNoteOnce()).rejects.toThrow("the stream could not be made");
+        expect(await noteStatus()).toBe("held");
+
+        vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+
+        const resumed = await sendNoteOnce();
+
+        expect(resumed.status).toBe(200);
+        expect(resumed.json.streamId).toEqual(expect.any(String));
+        expect(await noteStatus()).toBe("sent");
+        expect((await run(async (ctx) => await claimRow(ctx, GUEST_SEND_SCOPE, noteId)))?.result).toBe(resumed.json.messageId);
+        expect(await savedNotes()).toHaveLength(1);
+        expect(saved.charges).toBe(1);
+    });
+
+    it("resumes a send that saved the note before its link ended, and still refuses the ended link under a new id", async () => {
+        saved.fail = "record";
+        claimedSend.streamFails = true;
+
+        await expect(sendNoteOnce()).rejects.toThrow("the stream could not be made");
+        await run(async (ctx) => {
+            const row = await ctx.db.get("threadGuestMessages", noteId);
+
+            await ctx.db.patch("threadGuestLinks", row.linkId, { expiresAt: 1 });
+        });
+        vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+
+        const other = await runChatStart(
+            fakeContext(CLAIMED_HANDLERS),
+            { clientMessageId: "another-send", guestMessageId: noteId, model: MODEL, prompt: "x", threadId } as never,
+            "secret",
+        );
+
+        expect(other.status).toBe(400);
+        expect(await other.json()).toMatchObject({ error: "GUEST_LINK_ENDED" });
+
+        const resumed = await sendNoteOnce();
+
+        expect(resumed.status).toBe(200);
+        expect(resumed.json.streamId).toEqual(expect.any(String));
+        expect(await noteStatus()).toBe("sent");
+        expect(await savedNotes()).toHaveLength(1);
+        expect(saved.charges).toBe(1);
     });
 });

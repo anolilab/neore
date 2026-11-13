@@ -13,6 +13,7 @@ import type { LanguageModel, ToolSet } from "ai";
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
+import { levelOfConnection, toolOfferedAt } from "../../connectors/access-levels";
 import { getConnectorMcpServers, withMcpServerGrants } from "../../connectors/lib/grant-runtime";
 import { toolsLogger } from "../../lib/logger";
 import type { DeviceToolsResult } from "./device-tools";
@@ -68,6 +69,16 @@ export interface BuildAgentToolsOptions {
     model: LanguageModel | string;
     /** Who started the run, when not the person at the app: an API key's run gets no device tools and no `auto` tool. */
     origin?: RunOrigin;
+    /**
+     * The thread whose permission mode applies to these tools, when it is not `threadId`: a group turn's speakers build their tools
+     * without a thread of their own, but the mode is the group thread's. Omitted, the mode is read for `threadId`.
+     */
+    permissionModeThreadId?: string;
+    /**
+     * Who started the turn, when the tools are built as someone else: an approval resumes a run as the thread's owner, so the
+     * mode is read for the person the snapshot names — `full` is the owner's to give, not a collaborator's. Omitted, `userId`.
+     */
+    permissionModeUserId?: string;
     searchMode: SearchMode;
     /**
      * An invoked skill's tool config. It only changes the CANDIDATES: extra
@@ -133,6 +144,8 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         mcpServerNames,
         model,
         origin,
+        permissionModeThreadId,
+        permissionModeUserId,
         searchMode,
         skillTools,
         snapshot,
@@ -140,6 +153,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         untrustedContext = true,
         userId,
     } = options;
+    const modeThreadId = permissionModeThreadId ?? threadId;
 
     // Built-ins beyond the search mode's set: a skill's extra tools on a fresh
     // run, or — on a snapshot rebuild — every built-in the paused run had (a
@@ -150,7 +164,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     // keeps the ones its run had, and each tool checks the thread again when it runs).
     const baseExtraBuiltIns = snapshot ? snapshot.toolNames : (skillTools?.additionalTools ?? []).filter((name) => !PULL_REQUEST_TOOLS.includes(name));
     const linkThreadId = threadId ?? deviceThreadId;
-    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers, pullRequestTools] = await Promise.all([
+    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers, pullRequestTools, threadMode] = await Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
         ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
         // A run nobody is at inherits no time-boxed allow, so it does not even read them.
@@ -182,6 +196,20 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
                       toolsLogger.warn("[TOOLS] Pull request links unavailable:", error);
 
                       return [];
+                  }),
+        // A headless run ignores the thread's mode, so it does not read it. A failed read fails closed (supervised) even for a
+        // thread with no stored mode: the read cannot tell, and restoring the automatic defaults could undo a mode the owner chose.
+        headless || modeThreadId === undefined
+            ? null
+            : ctx
+                  .runQuery(internal.chat.tool_permissions.getThreadPermissionMode, {
+                      threadId: modeThreadId as Id<"threads">,
+                      userId: permissionModeUserId ?? userId,
+                  })
+                  .catch((error: unknown) => {
+                      toolsLogger.warn("[TOOLS] Thread permission mode unavailable, using supervised:", error);
+
+                      return "supervised" as const;
                   }),
     ]);
 
@@ -240,6 +268,40 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         candidates = Object.fromEntries(Object.entries(candidates).filter(([name]) => !disabled.has(name)));
     }
 
+    // A teammate's access per connection (`connectors/access.ts`). A write tool its level does not allow is not offered to the
+    // model at all, and a connection set to none offers nothing. Fails closed: when the settings cannot be read, no connector
+    // tool is offered, never one the teammate may not use. The thread that governs the run is its own thread, or the one a group
+    // participant's permissions come from. A run with neither has no teammate and keeps every tool.
+    // Read only when a connector's tool is in the set, so a run without one makes no extra query.
+    const accessThreadId = threadId ?? permissionModeThreadId;
+    const hasConnectorTools = Object.keys(candidates).some((name) => mcpResult.descriptors.get(name)?.connectorSlug !== undefined);
+    const connectorAccess =
+        !hasConnectorTools || accessThreadId === undefined
+            ? []
+            : await ctx
+                  .runQuery(internal.connectors.access.listThreadConnectorAccess, { threadId: accessThreadId as Id<"threads">, userId })
+                  .catch((error: unknown) => {
+                      toolsLogger.warn("[TOOLS] Teammate connector access unavailable:", error);
+
+                      return null;
+                  });
+
+    candidates = Object.fromEntries(
+        Object.entries(candidates).filter(([name]) => {
+            const mcp = mcpResult.descriptors.get(name);
+
+            if (!mcp?.connectorSlug) {
+                return true;
+            }
+
+            if (connectorAccess === null) {
+                return false;
+            }
+
+            return toolOfferedAt(levelOfConnection(connectorAccess, mcp.connectorSlug), mcp.annotations);
+        }),
+    );
+
     // A server counts as trusted by what it is (name AND url), so one whose url changed has lost it.
     const trusted = quickCheckOn
         ? new Set<string>(
@@ -293,6 +355,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         ...(quickCheck && { lowRiskCheck: quickCheck.check }),
         ...(trusted && { lowRiskTrusted: trusted }),
         ...(headlessCanAsk && { headlessCanAsk: true }),
+        ...(threadMode && { threadMode }),
         timedGrants,
     });
 

@@ -74,12 +74,54 @@ pub struct AcpAgent {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AcpInstall {
+    /// The package index's hash (npm `dist.integrity`, `sha512-<base64>`) the download was verified against. Set
+    /// only on an npm install: the trust is the index's, taken when the person confirmed, not the publisher's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_integrity: Option<String>,
     pub publisher: String,
     /// SHA-256 of the archive that was verified, lowercase hex.
     pub sha256: String,
     /// The archive's URL, as the registry gave it.
     pub source: String,
+    /// SHA-256 over every file, folder and link of the installed folder, recorded after the install. An agent
+    /// that has one is hashed again before each start and refused when it differs. npm installs only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tree_sha256: Option<String>,
     pub version: String,
+}
+
+/// Whether `before` is an npm install (it has a recorded tree) that `command` and `args` still run: the same
+/// interpreter it was installed to run with and the same pinned program, the first argument of
+/// `node <program> <arguments>`. The arguments after the program are the person's to change.
+fn keeps_program_pin(before: &AcpAgent, command: &str, args: &[String]) -> bool {
+    before
+        .install
+        .as_ref()
+        .is_some_and(|pin| pin.tree_sha256.is_some())
+        && before.command == command
+        && !args.is_empty()
+        && before.args.first() == args.first()
+}
+
+/// Whether a variable of this name changes what an installed npm agent runs: anything that loads code, and every
+/// `NODE_*` setting (`NODE_OPTIONS` with `--require` or `--import`, `NODE_PATH`).
+fn changes_node(name: &str) -> bool {
+    changes_program(name) || name.to_ascii_uppercase().starts_with("NODE_")
+}
+
+/// Drops the pin of the npm agents a changed variable reaches (`agent_key`, or all of them for a global one): they
+/// no longer run what was hashed at install. The files stay; the agent is an ordinary one from now on.
+fn drop_tree_pins(settings: &mut crate::store::Settings, agent_key: Option<&str>) {
+    for agent in &mut settings.acp_agents {
+        if agent_key.is_none_or(|key| agent.key == key)
+            && agent
+                .install
+                .as_ref()
+                .is_some_and(|pin| pin.tree_sha256.is_some())
+        {
+            agent.install = None;
+        }
+    }
 }
 
 /// The user's approval of one agent in one folder, given in the local window and nowhere else.
@@ -288,14 +330,42 @@ pub(crate) fn changes_program(name: &str) -> bool {
             .any(|prefix| upper.starts_with(prefix))
 }
 
+/// The keys Claude Code is registered under: the ACP registry's id, the plain name, and what the "Add agent" forms
+/// make of the label "Claude Code".
+const CLAUDE_AGENT_KEYS: [&str; 3] = ["claude-acp", "claude", "claude-code"];
+/// The Claude Code ACP adapter's programs and packages, current and earlier, for an agent added under another key.
+const CLAUDE_ADAPTERS: [&str; 2] = ["claude-agent-acp", "claude-code-acp"];
+
+/// Whether `agent` runs Claude Code: by its key, or by an adapter named in its command or arguments. A false match
+/// costs nothing, since another program ignores the variable.
+pub(crate) fn runs_claude_code(agent: &AcpAgent) -> bool {
+    let names_adapter = |text: &str| {
+        let lower = text.to_ascii_lowercase();
+
+        CLAUDE_ADAPTERS
+            .iter()
+            .any(|adapter| lower.contains(adapter))
+    };
+
+    CLAUDE_AGENT_KEYS.contains(&agent.key.as_str())
+        || names_adapter(&agent.command)
+        || agent.args.iter().any(|arg| names_adapter(arg))
+}
+
 /// The full environment of one agent: built, then the global variables, then the agent's own.
 /// Every user variable is validated again here, so a hand-edited `device.json` cannot slip a reserved name in.
+/// Claude Code is also told it runs under Neore (its `User-Agent` says so), unless the person set the name.
 pub fn agent_env(
+    claude_code: bool,
     built: BTreeMap<String, String>,
     global: &EnvVars,
     agent: &EnvVars,
 ) -> Result<EnvVars, String> {
     let mut env = built;
+
+    if claude_code {
+        env.insert("CLAUDE_CODE_ENTRYPOINT".to_owned(), "neore".to_owned());
+    }
 
     for layer in [global, agent] {
         for (name, value) in &layer.0 {
@@ -365,6 +435,9 @@ impl DeviceState {
     pub fn acp_update(&self, update: AcpUpdate) -> Result<AcpView, String> {
         let mut uninstall = None;
         let install_root = self.install_root();
+        // Ordered against an install's commit and a prune: a removal never deletes the files of a reinstall that
+        // was recorded after it, and the reverse.
+        let committing = crate::acp_install::lock_installs();
 
         self.change_settings(|settings| {
             match update {
@@ -378,12 +451,17 @@ impl DeviceState {
                         .acp_agents
                         .iter()
                         .position(|agent| agent.key == key);
+
                     let agent = AcpAgent {
                         // The pin describes the installed command: a different one is no longer that.
                         install: existing
                             .filter(|&i| {
-                                settings.acp_agents[i].command == command
-                                    && settings.acp_agents[i].args == args
+                                let before = &settings.acp_agents[i];
+
+                                // An npm install may change the arguments after its pinned program, which is
+                                // still hashed at every start; another interpreter is not what was installed.
+                                (before.command == command && before.args == args)
+                                    || keeps_program_pin(before, &command, &args)
                             })
                             .and_then(|i| settings.acp_agents[i].install.clone()),
                         args,
@@ -409,8 +487,11 @@ impl DeviceState {
                             // still points inside them (other arguments, or another program of the same download).
                             if settings.acp_agents[i].install.is_some()
                                 && agent.install.is_none()
-                                && !Path::new(&agent.command)
-                                    .starts_with(install_root.join(&agent.key))
+                                && !std::iter::once(&agent.command)
+                                    .chain(&agent.args)
+                                    .any(|part| {
+                                        Path::new(part).starts_with(install_root.join(&agent.key))
+                                    })
                             {
                                 uninstall = Some(agent.key.clone());
                             }
@@ -424,10 +505,10 @@ impl DeviceState {
                     }
                 }
                 AcpUpdate::RemoveAgent { key } => {
-                    if settings
-                        .acp_agents
-                        .iter()
-                        .any(|agent| agent.key == key && agent.install.is_some())
+                    // Pinned or not: an edit that moved the program but left a path into the folder in a later
+                    // argument cleared the pin and kept the files, and nothing else would ever delete them.
+                    if settings.acp_agents.iter().any(|agent| agent.key == key)
+                        && fs::symlink_metadata(install_root.join(&key)).is_ok()
                     {
                         uninstall = Some(key.clone());
                     }
@@ -485,12 +566,18 @@ impl DeviceState {
                         return Err(format!("at most {MAX_ENV_VARS} variables"));
                     }
 
-                    let moved = changes_program(&name) && scope.0.get(&name) != Some(&value);
+                    let changed = scope.0.get(&name) != Some(&value);
+                    let moved = changes_program(&name) && changed;
+                    let node = changes_node(&name) && changed;
 
                     scope.0.insert(name, value);
 
                     if moved {
                         drop_path_consents(settings, agent_key.as_deref());
+                    }
+
+                    if node {
+                        drop_tree_pins(settings, agent_key.as_deref());
                     }
                 }
                 AcpUpdate::RemoveEnv { agent_key, name } => {
@@ -502,6 +589,10 @@ impl DeviceState {
                     if removed && changes_program(&name) {
                         drop_path_consents(settings, agent_key.as_deref());
                     }
+
+                    if removed && changes_node(&name) {
+                        drop_tree_pins(settings, agent_key.as_deref());
+                    }
                 }
             }
 
@@ -511,6 +602,8 @@ impl DeviceState {
         if let Some(key) = uninstall {
             self.remove_installed_files(&key);
         }
+
+        drop(committing);
 
         // The approved pairs are in the manifest: the page sends a fresh one.
         self.emit(Event::Changed);
@@ -525,28 +618,61 @@ impl DeviceState {
         agent_key: &str,
         folder: Option<&str>,
     ) -> Result<SpawnPlan, String> {
-        let settings = self.settings();
-        let agent = settings
+        let before = self.settings();
+        let hashed = before
             .acp_agents
             .iter()
             .find(|agent| agent.key == agent_key)
             .ok_or("that agent is not registered")?;
+
+        // An agent run through a package manager is checked against what was recorded at install, every time. That
+        // can take long, and the settings lock is not held for it: the person may change things meanwhile.
+        if let Some(pin) = &hashed.install {
+            self.verify_installed_tree(hashed, pin)?;
+        }
+
+        #[cfg(test)]
+        crate::acp_install::tests_hook::after_hash(agent_key);
+
+        // The plan is built from the settings as they are now, not as they were before the check: an agent that was
+        // removed, re-pointed or re-pinned, or a folder whose approval was withdrawn, must not start from a copy
+        // that has gone stale.
+        let settings = self.settings();
+        let changed = || "The agent's settings changed while it was being checked; start it again.";
+        let agent = settings
+            .acp_agents
+            .iter()
+            .find(|agent| agent.key == agent_key)
+            .ok_or_else(changed)?;
+
+        if agent.command != hashed.command
+            || agent.args != hashed.args
+            || agent.install != hashed.install
+        {
+            return Err(changed().into());
+        }
+
         let cwd: PathBuf = match folder {
             Some(folder) => {
                 let canonical = validate_roots(&[folder.to_owned()])?
                     .pop()
                     .ok_or("choose a folder")?;
+                let approved = |consents: &[AcpConsent]| {
+                    consents
+                        .iter()
+                        .any(|c| c.agent_key == agent_key && c.folder_path == canonical)
+                };
 
                 // Checked before anything starts: a valid request for a pair the user did not approve is refused.
-                if !settings
-                    .acp_consents
-                    .iter()
-                    .any(|c| c.agent_key == agent_key && c.folder_path == canonical)
-                {
-                    return Err(format!(
-                        "{} is not approved for that folder. Approve it in this window first",
-                        agent.label
-                    ));
+                if !approved(&settings.acp_consents) {
+                    return Err(if approved(&before.acp_consents) {
+                        changed().into()
+                    } else {
+                        format!(
+                            "{} is not approved for that folder. Approve it in this window first",
+                            agent.label
+                        )
+                    });
                 }
 
                 PathBuf::from(canonical)
@@ -554,6 +680,7 @@ impl DeviceState {
             None => probe_folder()?,
         };
         let env = agent_env(
+            runs_claude_code(agent),
             built_env(app_vars(std::env::vars_os())),
             &settings.acp_env,
             &agent.env,
@@ -867,7 +994,62 @@ mod tests {
             .0
             .insert("ELECTRON_RUN_AS_NODE".into(), "1".into());
 
-        assert!(agent_env(BTreeMap::new(), &stored.acp_env, &EnvVars::default()).is_err());
+        assert!(agent_env(false, BTreeMap::new(), &stored.acp_env, &EnvVars::default()).is_err());
+    }
+
+    #[test]
+    fn claude_code_is_told_it_runs_under_neore_unless_the_person_says_otherwise() {
+        let none = EnvVars::default();
+        let entrypoint = |claude_code: bool, global: &EnvVars, agent: &EnvVars| {
+            agent_env(claude_code, BTreeMap::new(), global, agent)
+                .unwrap()
+                .0
+                .get("CLAUDE_CODE_ENTRYPOINT")
+                .cloned()
+        };
+        let own = EnvVars(BTreeMap::from([(
+            "CLAUDE_CODE_ENTRYPOINT".to_owned(),
+            "mine".to_owned(),
+        )]));
+
+        assert_eq!(entrypoint(true, &none, &none).as_deref(), Some("neore"));
+        assert_eq!(entrypoint(false, &none, &none), None);
+        assert_eq!(entrypoint(true, &own, &none).as_deref(), Some("mine"));
+        assert_eq!(entrypoint(true, &none, &own).as_deref(), Some("mine"));
+    }
+
+    #[test]
+    fn claude_code_is_known_by_its_key_or_by_its_adapter() {
+        let agent = |key: &str, command: &str, args: &[&str]| AcpAgent {
+            args: args.iter().map(|arg| (*arg).to_owned()).collect(),
+            command: command.to_owned(),
+            env: EnvVars::default(),
+            install: None,
+            key: key.to_owned(),
+            label: key.to_owned(),
+        };
+
+        for key in ["claude-acp", "claude", "claude-code"] {
+            assert!(runs_claude_code(&agent(key, "/bin/x", &[])), "{key}");
+        }
+
+        // Added by hand under another name: the adapter's program, or the package it is run from.
+        assert!(runs_claude_code(&agent(
+            "mine",
+            "/usr/local/bin/claude-agent-acp",
+            &[]
+        )));
+        assert!(runs_claude_code(&agent(
+            "mine",
+            "npx",
+            &["-y", "@zed-industries/claude-code-acp"]
+        )));
+        assert!(!runs_claude_code(&agent("codex-acp", "codex-acp", &[])));
+        assert!(!runs_claude_code(&agent(
+            "gemini",
+            "gemini",
+            &["--experimental-acp"]
+        )));
     }
 
     #[test]

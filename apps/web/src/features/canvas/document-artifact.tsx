@@ -5,15 +5,20 @@
  * Wires canvas state (open/active) and cRPC sheet content into the shared chat-ui component.
  */
 
+import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import DocumentArtifactUI from "@neore/chat-ui/chat/document-artifact";
 import { useQuery } from "@tanstack/react-query";
 import type { FC } from "react";
-import { memo, useEffect, useRef } from "react";
+import { memo, use, useCallback, useEffect, useRef } from "react";
 
+import { ChatThreadContext } from "@/features/chat/core/context/chat-context-hooks";
 import { useCanvasState } from "@/features/chat/core/stores/chat-ui-store";
+import { useSplitViewMountedStore } from "@/features/chat/split/composer-drafts";
+import { useSplitLayoutStore } from "@/features/chat/split/split-layout-store";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
+import { showWarning } from "@/lib/toast";
 
 import preloadCodemirrorEditor from "./canvas-preload";
 
@@ -28,7 +33,29 @@ interface DocumentArtifactProps {
 
 const DocumentArtifact: FC<DocumentArtifactProps> = memo(({ className, documentId, kind, language, title, version }) => {
     const { activeDocumentId, openCanvas } = useCanvasState();
+    const { t } = useLingui();
     const crpc = useCRPC();
+    // Read without throwing, so the card also renders where no chat provider is mounted. The panel shows only in the chat that opened it.
+    const threadId = use(ChatThreadContext)?.threadId;
+    const onOpen = useCallback(
+        (id: string) => {
+            if (!openCanvas(id, threadId)) {
+                showWarning(t`Close the document open in another chat to view this one.`);
+
+                return;
+            }
+
+            // In split view the document's pane takes focus, so the panel shows the document, as a PDF thumbnail's pane does.
+            // Only an open pane is focused: `open` would add the chat as a new pane.
+            const { layout, dispatch } = useSplitLayoutStore.getState();
+            const index = threadId === undefined ? -1 : layout.panes.indexOf(threadId);
+
+            if (useSplitViewMountedStore.getState().mounted && index !== -1) {
+                dispatch({ index, type: "focus" });
+            }
+        },
+        [openCanvas, t, threadId],
+    );
 
     // Track artifact creation once (when first rendered at version 1)
     const trackedRef = useRef(false);
@@ -56,7 +83,7 @@ const DocumentArtifact: FC<DocumentArtifactProps> = memo(({ className, documentI
             isActive={activeDocumentId === documentId}
             kind={kind}
             language={language}
-            onOpen={openCanvas}
+            onOpen={onOpen}
             onPreload={preloadCodemirrorEditor}
             sheetContent={kind === "sheet" ? document?.content : undefined}
             title={title}

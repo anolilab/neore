@@ -7,7 +7,7 @@
  * Recognised by the label each shape opens with (so history saved before this existed is covered) and, for a page,
  * by its structural marker. A person typing a label by hand is refused too, which only ever asks them.
  */
-import { isGuestTextPart } from "../../lib/guest-text";
+import { guestNoteIdOf, isGuestTextPart } from "../../lib/guest-text";
 import { PAGE_CONTEXT_LABEL } from "./page-context";
 
 const ATTACHED_DOCUMENT_LABEL = "[Attached Document]";
@@ -36,8 +36,23 @@ interface MessageLike {
 }
 
 /** A guest's note the owner sent on, marked as not the owner's words (`lib/guest-text.ts`); the mark only ever restricts. */
-export const guestTextPart = (text: string, noteId: string): { providerOptions: { neore: { guestText: string } }; text: string; type: "text" } => {
+export const guestTextPart = (
+    text: string,
+    noteId: string | true,
+): { providerOptions: { neore: { guestText: string | true } }; text: string; type: "text" } => {
     return { providerOptions: { neore: { guestText: noteId } }, text, type: "text" };
+};
+
+/** The note id a stored user message's guest text carries, so an edit of it keeps the mark; `undefined` for the owner's own. */
+export const guestNoteIdOfMessage = (message: MessageLike | undefined): string | true | undefined => {
+    if (message?.role !== "user" || !Array.isArray(message.content)) {
+        return undefined;
+    }
+
+    const parts = message.content as ReadonlyArray<{ providerOptions?: unknown }>;
+
+    // A mark without an id (`true`) is kept as it is.
+    return parts.map((part) => guestNoteIdOf(part)).find((id) => id !== undefined) ?? (parts.some((part) => isGuestTextPart(part)) ? true : undefined);
 };
 
 /** Whether a stored user message carries guest text the owner sent on (memory never mines it). */

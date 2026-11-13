@@ -4,6 +4,7 @@ import type { AnyRoute, RouteComponent } from "@tanstack/react-router";
 import { createMemoryHistory, createRootRouteWithContext, createRoute, createRouter, Outlet, RouterProvider } from "@tanstack/react-router";
 import { useMemo } from "react";
 
+import OfflineBanner from "@/features/connection/components/offline-banner";
 import { useLunora } from "@/lib/lunora/crpc";
 
 import { getActivePersona, sessionFor } from "./session";
@@ -42,6 +43,13 @@ const fromRoute = (route: AnyRoute | undefined) => {
     return { component, loader, loaderDeps, validateSearch };
 };
 
+const PageRoot = () => (
+    <>
+        <OfflineBanner />
+        <Outlet />
+    </>
+);
+
 /**
  * A page in Storybook: the real layout and page routes in a memory router at `url`, with the
  * router context the app gives them (the story's Lunora and Query clients, Lingui, the persona's
@@ -55,7 +63,9 @@ export const StoryPage = ({ levels, url }: StoryPageProps) => {
 
     const router = useMemo(() => {
         const isAuthenticated = sessionFor(getActivePersona()) !== null;
-        const rootRoute = createRootRouteWithContext<Record<string, unknown>>()({ component: Outlet });
+        // The banner as `routes/__root.tsx` mounts it, above every layout. Pages only: its status region would be one more
+        // `role="status"` in every component story.
+        const rootRoute = createRootRouteWithContext<Record<string, unknown>>()({ component: PageRoot });
         let parent: AnyRoute = rootRoute;
         const chain: AnyRoute[] = [];
 

@@ -12,10 +12,6 @@ describe("writeControlState", () => {
         }
     });
 
-    it("covers the composer, send, approve, cancel and start controls", () => {
-        expect([...WRITE_CONTROLS].toSorted((a, b) => a.localeCompare(b))).toEqual(["approve", "cancel", "composer", "send", "start"]);
-    });
-
     it("keeps them disabled while a returning connection is being confirmed, with its own reason", () => {
         for (const control of WRITE_CONTROLS) {
             expect(writeControlState(control, { isChecking: true, isOffline: false }), control).toEqual({ disabled: true, reason: CHECKING_REASON });

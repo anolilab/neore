@@ -6,6 +6,15 @@ interface TokenClient {
 /** Clients already handed their SSR token — seeding is a once-per-client event. */
 const seededClients = new WeakSet<TokenClient>();
 
+/** The token each client was seeded with: the account the server rendered the page's data for. */
+const seededTokens = new WeakMap<object, string>();
+
+/**
+ * The SSR token `seedHydratedAuthToken` handed this client, if it handed one. The live-query manager keeps the
+ * hydrated thread reads only when this exact token is the first one the client adopts.
+ */
+export const hydratedAuthTokenOf = (client: object): string | undefined => seededTokens.get(client);
+
 /**
  * Hands the browser's Lunora client the RPC token the root `beforeLoad` fetched
  * during SSR.
@@ -31,6 +40,7 @@ export const seedHydratedAuthToken = (client: TokenClient, token: string | null 
     seededClients.add(client);
 
     if (token && client.getAuthToken() === null) {
+        seededTokens.set(client, token);
         client.setAuthToken(token);
     }
 };

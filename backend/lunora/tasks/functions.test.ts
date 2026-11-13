@@ -10,7 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import { selectableTextModels } from "../skills/builder-logic";
 import { ANONYMOUS_TASKS_MESSAGE } from "./account";
-import { createTask, runTask, updateTask } from "./functions";
+import { cancelTask, createTask, reviewTask, runTask, updateTask } from "./functions";
+import { checkDueTasks } from "./internal";
 import { MAX_RECURRING_TASKS_PER_USER } from "./logic";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write: the
@@ -250,5 +251,132 @@ describe("recurring tasks", () => {
         await markSkipped();
         await as(USER).mutation(updateTask as never, definition({ taskId }) as never);
         expect(await skipOf()).toStrictEqual([undefined, undefined]);
+    });
+});
+
+describe("review decisions and waiting dependents", () => {
+    const DAY = 24 * 60 * 60_000;
+    const T0 = Date.UTC(2026, 10, 1, 9);
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("restarts a dependent's stuck clock when its review dependency is rejected", async () => {
+        const row = (overrides: Record<string, unknown>) => {
+            return {
+                attemptCount: 0,
+                createdAt: 1,
+                dependsOn: [],
+                instructions: "x",
+                maxRepairRounds: 2,
+                recurring: false,
+                status: "todo",
+                title: "t",
+                updatedAt: T0,
+                userId: USER,
+                ...overrides,
+            };
+        };
+        const review = await harness.run(async (ctx: any) => await ctx.db.insert("tasks", row({ status: "needs_review", title: "Review" })));
+        const waiting = await harness.run(
+            async (ctx: any) => await ctx.db.insert("tasks", row({ dependsOn: [review], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting" })),
+        );
+
+        // Five idle days later the owner rejects the review: the wait was theirs, not idle time for the dependent.
+        const rejectedAt = T0 + 5 * DAY;
+
+        vi.useFakeTimers({ now: rejectedAt, toFake: ["Date"] });
+        await as(USER).mutation(reviewTask as never, { decision: "reject", taskId: review } as never);
+
+        const dependent: any = await harness.run(async (ctx: any) => await ctx.db.get("tasks", waiting));
+
+        expect(dependent.updatedAt).toBe(rejectedAt);
+        expect(dependent.stuckCheckAt).toBe(rejectedAt + 2 * DAY);
+    });
+
+    it("restarts a dependent's stuck clock when its review dependency is retried", async () => {
+        const review = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("tasks", {
+                    attemptCount: 0,
+                    createdAt: 1,
+                    dependsOn: [],
+                    instructions: "x",
+                    maxRepairRounds: 2,
+                    recurring: false,
+                    status: "needs_review",
+                    title: "Review",
+                    updatedAt: T0,
+                    userId: USER,
+                }),
+        );
+        const waiting = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("tasks", {
+                    attemptCount: 0,
+                    createdAt: 1,
+                    dependsOn: [review],
+                    instructions: "x",
+                    maxRepairRounds: 2,
+                    recurring: false,
+                    status: "blocked",
+                    stuckCheckAt: T0 + 2 * DAY,
+                    title: "Waiting",
+                    updatedAt: T0,
+                    userId: USER,
+                }),
+        );
+
+        // Five idle days later the owner retries the review: the dependent waited for that decision, not for its own idleness.
+        const retriedAt = T0 + 5 * DAY;
+
+        vi.useFakeTimers({ now: retriedAt, toFake: ["Date"] });
+        await as(USER).mutation(reviewTask as never, { decision: "retry", taskId: review } as never);
+
+        const dependent: any = await harness.run(async (ctx: any) => await ctx.db.get("tasks", waiting));
+
+        expect(dependent.updatedAt).toBe(retriedAt);
+        expect(dependent.stuckCheckAt).toBe(retriedAt + 2 * DAY);
+    });
+});
+
+describe("cancelling a failed task", () => {
+    it("moves a failed task to todo, a status the stuck ladder never reads, so cancelling sends no push", async () => {
+        const taskId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("tasks", {
+                    attemptCount: 0,
+                    createdAt: 1,
+                    dependsOn: [],
+                    instructions: "x",
+                    lastError: "boom",
+                    maxRepairRounds: 2,
+                    recurring: false,
+                    status: "failed",
+                    stuckCheckAt: 1,
+                    title: "Broke",
+                    updatedAt: 1,
+                    userId: USER,
+                }),
+        );
+
+        await as(USER).mutation(cancelTask as never, { taskId } as never);
+
+        const row: any = await harness.run(async (ctx: any) => await ctx.db.get("tasks", taskId));
+
+        expect(row.status).toBe("todo");
+        expect(row.updatedAt).not.toBe(1);
+
+        // The stuck sweep runs with the check that was due: a task that is no longer failed or blocked must not be notified.
+        await harness.run(async (ctx: any) => await ctx.runMutation(checkDueTasks, {}));
+
+        const notices: any[] = await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("notifications").collect();
+
+            return rows.filter((notice: any) => notice.type === "task_stuck" && notice.userId === USER);
+        });
+
+        expect(notices).toStrictEqual([]);
     });
 });

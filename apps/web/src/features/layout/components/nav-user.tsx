@@ -24,8 +24,11 @@ import { useListDeviceSessions } from "@/features/auth/hooks/device-session-mana
 import { useSession } from "@/features/auth/hooks/session-user-management";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { clearLastAccountHint } from "@/features/auth/lib/last-account-hint";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import useCheckout from "@/features/billing/hooks/use-checkout";
+import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-session";
+import { dropStoredDrafts } from "@/features/chat/split/composer-drafts";
 import { clearThreadListCache, releaseThreadListWrites } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
@@ -276,6 +279,9 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                 onClick={async () => {
                     // Before the request, and it holds writes until the page reloads or the next sign-in: the sidebar stays mounted meanwhile.
                     clearThreadListCache();
+                    // Read before the session ends; when it cannot tell whose drafts they are, every account's go.
+                    const departing = user?.id;
+
                     // Push first, while the session still authenticates the server call.
                     await releasePush();
                     await authClient.signOut({
@@ -294,6 +300,11 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                                 });
                             },
                             onSuccess: async () => {
+                                // Only once the session ended (a failed sign-out keeps them and their saving), and before the reload,
+                                // which comes before the handler that drops them would run.
+                                clearLastAccountHint();
+                                clearPromptQueues();
+                                dropStoredDrafts(departing);
                                 resetAnalyticsIdentity();
                                 // Only after the session ends: a failed sign-out keeps the badge.
                                 await setNativeBadge(0);
@@ -327,7 +338,7 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                         className="text-brand-black dark:text-brand-white"
                         render={
                             isAnonymous ? (
-                                <SidebarMenuButton className="hover:bg-sidebar-accent data-[popup-open]:bg-sidebar-accent" name="login" size="lg">
+                                <SidebarMenuButton className="web:hover:bg-sidebar-accent data-[popup-open]:bg-sidebar-accent" name="login" size="lg">
                                     <UserRound className="size-5 shrink-0" />
                                     <div className="grid flex-1 text-left text-sm leading-tight">
                                         <span className="truncate font-medium">{t`Guest`}</span>
@@ -335,7 +346,7 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                                     <ChevronsUpDown className="text-brand-black/60 dark:text-brand-white/50 ml-auto size-4" />
                                 </SidebarMenuButton>
                             ) : (
-                                <SidebarMenuButton className="hover:bg-sidebar-accent data-[popup-open]:bg-sidebar-accent" name="login" size="lg">
+                                <SidebarMenuButton className="web:hover:bg-sidebar-accent data-[popup-open]:bg-sidebar-accent" name="login" size="lg">
                                     <div className="grid flex-1 text-left text-sm leading-tight">
                                         <span className="truncate font-medium">{hidePersonalInfo ? t`User` : user?.name || t`User`}</span>
                                         <span className="text-brand-black/60 dark:text-brand-white/60 truncate text-xs">

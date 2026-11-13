@@ -64,6 +64,7 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     pageAccess: ["userId", "ownerId", "grantedBy"],
     pageInvites: ["userId", "ownerId", "acceptedBy"],
     passkey: ["userId"],
+    projectRepositories: ["userId"],
     projects: ["userId"],
     promptHistory: ["userId"],
     prompts: ["userId"],
@@ -78,6 +79,7 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
 /** `.global()` tables with a `userId` the merge deliberately leaves alone, and why. */
 export const GLOBAL_USER_TABLES_NOT_REASSIGNED: Readonly<Record<string, string>> = {
     account: "better-auth links the anonymous user itself",
+    deviceCode: "a guest cannot approve a code, and a pending one lapses in 30 minutes",
     documentHistory: "an audit trail records who acted; it is not re-attributed",
     member: "a guest joins no organization",
     memberCredits: "a guest joins no organization",

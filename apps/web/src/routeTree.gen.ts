@@ -16,11 +16,13 @@ import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
 import { Route as DocsRouteRouteImport } from './routes/docs/route'
 import { Route as DownloadRouteImport } from './routes/download'
+import { Route as OfflineShellRouteImport } from './routes/offline-shell'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as chatWorkflowRouteRouteImport } from './routes/(chat)/workflow/route'
 import { Route as publicIndexRouteImport } from './routes/(public)/index'
 import { Route as publicDatenschutzRouteImport } from './routes/(public)/datenschutz'
+import { Route as publicGuestRouteImport } from './routes/(public)/guest'
 import { Route as publicImpressumRouteImport } from './routes/(public)/impressum'
 import { Route as ShortcutDevelopRouteImport } from './routes/_shortcut/develop'
 import { Route as ShortcutEvalsRouteImport } from './routes/_shortcut/evals'
@@ -38,6 +40,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as ApiScribeTokenRouteImport } from './routes/api/scribe-token'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as AuthConvertAccountRouteImport } from './routes/auth/convert-account'
+import { Route as AuthDeviceRouteImport } from './routes/auth/device'
 import { Route as AuthExtensionRouteImport } from './routes/auth/extension'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AuthRecoverAccountRouteImport } from './routes/auth/recover-account'
@@ -60,6 +63,8 @@ import { Route as publicModelsModelSlugRouteImport } from './routes/(public)/mod
 import { Route as publicPTokenRouteImport } from './routes/(public)/p/$token'
 import { Route as publicThreadTokenRouteImport } from './routes/(public)/thread/$token'
 import { Route as publicTutorialsIndexRouteImport } from './routes/(public)/tutorials/index'
+import { Route as publicUseCasesIndexRouteImport } from './routes/(public)/use-cases/index'
+import { Route as publicUseCasesUseCaseSlugRouteImport } from './routes/(public)/use-cases/$useCaseSlug'
 import { Route as ShortcutCodeIndexRouteImport } from './routes/_shortcut/code/index'
 import { Route as ShortcutPagesIndexRouteImport } from './routes/_shortcut/pages/index'
 import { Route as ShortcutPagesPageIdRouteImport } from './routes/_shortcut/pages/$pageId'
@@ -127,6 +132,11 @@ const DownloadRoute = DownloadRouteImport.update({
   path: '/download',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OfflineShellRoute = OfflineShellRouteImport.update({
+  id: '/offline-shell',
+  path: '/offline-shell',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   id: '/robots.txt',
   path: '/robots.txt',
@@ -150,6 +160,11 @@ const publicIndexRoute = publicIndexRouteImport.update({
 const publicDatenschutzRoute = publicDatenschutzRouteImport.update({
   id: '/(public)/datenschutz',
   path: '/datenschutz',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const publicGuestRoute = publicGuestRouteImport.update({
+  id: '/(public)/guest',
+  path: '/guest',
   getParentRoute: () => rootRouteImport,
 } as any)
 const publicImpressumRoute = publicImpressumRouteImport.update({
@@ -235,6 +250,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
 const AuthConvertAccountRoute = AuthConvertAccountRouteImport.update({
   id: '/convert-account',
   path: '/convert-account',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
+const AuthDeviceRoute = AuthDeviceRouteImport.update({
+  id: '/device',
+  path: '/device',
   getParentRoute: () => AuthRouteRoute,
 } as any)
 const AuthExtensionRoute = AuthExtensionRouteImport.update({
@@ -347,6 +367,17 @@ const publicTutorialsIndexRoute = publicTutorialsIndexRouteImport.update({
   path: '/tutorials/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const publicUseCasesIndexRoute = publicUseCasesIndexRouteImport.update({
+  id: '/(public)/use-cases/',
+  path: '/use-cases/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const publicUseCasesUseCaseSlugRoute =
+  publicUseCasesUseCaseSlugRouteImport.update({
+    id: '/(public)/use-cases/$useCaseSlug',
+    path: '/use-cases/$useCaseSlug',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ShortcutCodeIndexRoute = ShortcutCodeIndexRouteImport.update({
   id: '/code/',
   path: '/code/',
@@ -539,16 +570,18 @@ const DashboardSettingsConnectorsMessengerRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof publicIndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
   '/auth': typeof AuthRouteRouteWithChildren
   '/dashboard': typeof DashboardRouteRouteWithChildren
   '/docs': typeof DocsRouteRouteWithChildren
-  '/': typeof publicIndexRoute
   '/download': typeof DownloadRoute
+  '/offline-shell': typeof OfflineShellRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/workflow': typeof chatWorkflowRouteRouteWithChildren
   '/datenschutz': typeof publicDatenschutzRoute
+  '/guest': typeof publicGuestRoute
   '/impressum': typeof publicImpressumRoute
   '/develop': typeof ShortcutDevelopRoute
   '/evals': typeof ShortcutEvalsRoute
@@ -565,6 +598,7 @@ export interface FileRoutesByFullPath {
   '/api/scribe-token': typeof ApiScribeTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/convert-account': typeof AuthConvertAccountRoute
+  '/auth/device': typeof AuthDeviceRoute
   '/auth/extension': typeof AuthExtensionRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/recover-account': typeof AuthRecoverAccountRoute
@@ -583,6 +617,7 @@ export interface FileRoutesByFullPath {
   '/models/$modelSlug': typeof publicModelsModelSlugRoute
   '/p/$token': typeof publicPTokenRoute
   '/thread/$token': typeof publicThreadTokenRoute
+  '/use-cases/$useCaseSlug': typeof publicUseCasesUseCaseSlugRoute
   '/pages/$pageId': typeof ShortcutPagesPageIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/auth/two-factor/otp': typeof AuthTwoFactorOtpRoute
@@ -592,6 +627,7 @@ export interface FileRoutesByFullPath {
   '/gateway/': typeof publicGatewayIndexRoute
   '/models/': typeof publicModelsIndexRoute
   '/tutorials/': typeof publicTutorialsIndexRoute
+  '/use-cases/': typeof publicUseCasesIndexRoute
   '/code/': typeof ShortcutCodeIndexRoute
   '/pages/': typeof ShortcutPagesIndexRoute
   '/admin/gateway/': typeof AdminGatewayIndexRoute
@@ -623,12 +659,14 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/connectors/': typeof DashboardSettingsConnectorsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/auth': typeof AuthRouteRouteWithChildren
   '/': typeof publicIndexRoute
+  '/auth': typeof AuthRouteRouteWithChildren
   '/download': typeof DownloadRoute
+  '/offline-shell': typeof OfflineShellRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/datenschutz': typeof publicDatenschutzRoute
+  '/guest': typeof publicGuestRoute
   '/impressum': typeof publicImpressumRoute
   '/develop': typeof ShortcutDevelopRoute
   '/evals': typeof ShortcutEvalsRoute
@@ -643,6 +681,7 @@ export interface FileRoutesByTo {
   '/api/scribe-token': typeof ApiScribeTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/convert-account': typeof AuthConvertAccountRoute
+  '/auth/device': typeof AuthDeviceRoute
   '/auth/extension': typeof AuthExtensionRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/recover-account': typeof AuthRecoverAccountRoute
@@ -661,6 +700,7 @@ export interface FileRoutesByTo {
   '/models/$modelSlug': typeof publicModelsModelSlugRoute
   '/p/$token': typeof publicPTokenRoute
   '/thread/$token': typeof publicThreadTokenRoute
+  '/use-cases/$useCaseSlug': typeof publicUseCasesUseCaseSlugRoute
   '/pages/$pageId': typeof ShortcutPagesPageIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/auth/two-factor/otp': typeof AuthTwoFactorOtpRoute
@@ -670,6 +710,7 @@ export interface FileRoutesByTo {
   '/gateway': typeof publicGatewayIndexRoute
   '/models': typeof publicModelsIndexRoute
   '/tutorials': typeof publicTutorialsIndexRoute
+  '/use-cases': typeof publicUseCasesIndexRoute
   '/code': typeof ShortcutCodeIndexRoute
   '/pages': typeof ShortcutPagesIndexRoute
   '/admin/gateway': typeof AdminGatewayIndexRoute
@@ -709,10 +750,12 @@ export interface FileRoutesById {
   '/docs': typeof DocsRouteRouteWithChildren
   '/_shortcut': typeof ShortcutRouteWithChildren
   '/download': typeof DownloadRoute
+  '/offline-shell': typeof OfflineShellRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/(chat)/workflow': typeof chatWorkflowRouteRouteWithChildren
   '/(public)/datenschutz': typeof publicDatenschutzRoute
+  '/(public)/guest': typeof publicGuestRoute
   '/(public)/impressum': typeof publicImpressumRoute
   '/_shortcut/develop': typeof ShortcutDevelopRoute
   '/_shortcut/evals': typeof ShortcutEvalsRoute
@@ -729,6 +772,7 @@ export interface FileRoutesById {
   '/api/scribe-token': typeof ApiScribeTokenRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/convert-account': typeof AuthConvertAccountRoute
+  '/auth/device': typeof AuthDeviceRoute
   '/auth/extension': typeof AuthExtensionRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/recover-account': typeof AuthRecoverAccountRoute
@@ -748,6 +792,7 @@ export interface FileRoutesById {
   '/(public)/models/$modelSlug': typeof publicModelsModelSlugRoute
   '/(public)/p/$token': typeof publicPTokenRoute
   '/(public)/thread/$token': typeof publicThreadTokenRoute
+  '/(public)/use-cases/$useCaseSlug': typeof publicUseCasesUseCaseSlugRoute
   '/_shortcut/pages/$pageId': typeof ShortcutPagesPageIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/auth/two-factor/otp': typeof AuthTwoFactorOtpRoute
@@ -757,6 +802,7 @@ export interface FileRoutesById {
   '/(public)/gateway/': typeof publicGatewayIndexRoute
   '/(public)/models/': typeof publicModelsIndexRoute
   '/(public)/tutorials/': typeof publicTutorialsIndexRoute
+  '/(public)/use-cases/': typeof publicUseCasesIndexRoute
   '/_shortcut/code/': typeof ShortcutCodeIndexRoute
   '/_shortcut/pages/': typeof ShortcutPagesIndexRoute
   '/admin/gateway/': typeof AdminGatewayIndexRoute
@@ -790,16 +836,18 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/admin'
     | '/auth'
     | '/dashboard'
     | '/docs'
-    | '/'
     | '/download'
+    | '/offline-shell'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/workflow'
     | '/datenschutz'
+    | '/guest'
     | '/impressum'
     | '/develop'
     | '/evals'
@@ -816,6 +864,7 @@ export interface FileRouteTypes {
     | '/api/scribe-token'
     | '/auth/callback'
     | '/auth/convert-account'
+    | '/auth/device'
     | '/auth/extension'
     | '/auth/forgot-password'
     | '/auth/recover-account'
@@ -834,6 +883,7 @@ export interface FileRouteTypes {
     | '/models/$modelSlug'
     | '/p/$token'
     | '/thread/$token'
+    | '/use-cases/$useCaseSlug'
     | '/pages/$pageId'
     | '/api/auth/$'
     | '/auth/two-factor/otp'
@@ -843,6 +893,7 @@ export interface FileRouteTypes {
     | '/gateway/'
     | '/models/'
     | '/tutorials/'
+    | '/use-cases/'
     | '/code/'
     | '/pages/'
     | '/admin/gateway/'
@@ -874,12 +925,14 @@ export interface FileRouteTypes {
     | '/dashboard/settings/connectors/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/auth'
     | '/'
+    | '/auth'
     | '/download'
+    | '/offline-shell'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/datenschutz'
+    | '/guest'
     | '/impressum'
     | '/develop'
     | '/evals'
@@ -894,6 +947,7 @@ export interface FileRouteTypes {
     | '/api/scribe-token'
     | '/auth/callback'
     | '/auth/convert-account'
+    | '/auth/device'
     | '/auth/extension'
     | '/auth/forgot-password'
     | '/auth/recover-account'
@@ -912,6 +966,7 @@ export interface FileRouteTypes {
     | '/models/$modelSlug'
     | '/p/$token'
     | '/thread/$token'
+    | '/use-cases/$useCaseSlug'
     | '/pages/$pageId'
     | '/api/auth/$'
     | '/auth/two-factor/otp'
@@ -921,6 +976,7 @@ export interface FileRouteTypes {
     | '/gateway'
     | '/models'
     | '/tutorials'
+    | '/use-cases'
     | '/code'
     | '/pages'
     | '/admin/gateway'
@@ -959,10 +1015,12 @@ export interface FileRouteTypes {
     | '/docs'
     | '/_shortcut'
     | '/download'
+    | '/offline-shell'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/(chat)/workflow'
     | '/(public)/datenschutz'
+    | '/(public)/guest'
     | '/(public)/impressum'
     | '/_shortcut/develop'
     | '/_shortcut/evals'
@@ -979,6 +1037,7 @@ export interface FileRouteTypes {
     | '/api/scribe-token'
     | '/auth/callback'
     | '/auth/convert-account'
+    | '/auth/device'
     | '/auth/extension'
     | '/auth/forgot-password'
     | '/auth/recover-account'
@@ -998,6 +1057,7 @@ export interface FileRouteTypes {
     | '/(public)/models/$modelSlug'
     | '/(public)/p/$token'
     | '/(public)/thread/$token'
+    | '/(public)/use-cases/$useCaseSlug'
     | '/_shortcut/pages/$pageId'
     | '/api/auth/$'
     | '/auth/two-factor/otp'
@@ -1007,6 +1067,7 @@ export interface FileRouteTypes {
     | '/(public)/gateway/'
     | '/(public)/models/'
     | '/(public)/tutorials/'
+    | '/(public)/use-cases/'
     | '/_shortcut/code/'
     | '/_shortcut/pages/'
     | '/admin/gateway/'
@@ -1046,9 +1107,11 @@ export interface RootRouteChildren {
   DocsRouteRoute: typeof DocsRouteRouteWithChildren
   ShortcutRoute: typeof ShortcutRouteWithChildren
   DownloadRoute: typeof DownloadRoute
+  OfflineShellRoute: typeof OfflineShellRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   publicDatenschutzRoute: typeof publicDatenschutzRoute
+  publicGuestRoute: typeof publicGuestRoute
   publicImpressumRoute: typeof publicImpressumRoute
   ApiScribeTokenRoute: typeof ApiScribeTokenRoute
   publicIndexRoute: typeof publicIndexRoute
@@ -1056,10 +1119,12 @@ export interface RootRouteChildren {
   publicModelsModelSlugRoute: typeof publicModelsModelSlugRoute
   publicPTokenRoute: typeof publicPTokenRoute
   publicThreadTokenRoute: typeof publicThreadTokenRoute
+  publicUseCasesUseCaseSlugRoute: typeof publicUseCasesUseCaseSlugRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   publicGatewayIndexRoute: typeof publicGatewayIndexRoute
   publicModelsIndexRoute: typeof publicModelsIndexRoute
   publicTutorialsIndexRoute: typeof publicTutorialsIndexRoute
+  publicUseCasesIndexRoute: typeof publicUseCasesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1067,7 +1132,7 @@ declare module '@tanstack/react-router' {
     '/(chat)': {
       id: '/(chat)'
       path: ''
-      fullPath: ''
+      fullPath: '/'
       preLoaderRoute: typeof chatRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
@@ -1113,6 +1178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DownloadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/offline-shell': {
+      id: '/offline-shell'
+      path: '/offline-shell'
+      fullPath: '/offline-shell'
+      preLoaderRoute: typeof OfflineShellRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/robots.txt': {
       id: '/robots.txt'
       path: '/robots.txt'
@@ -1146,6 +1218,13 @@ declare module '@tanstack/react-router' {
       path: '/datenschutz'
       fullPath: '/datenschutz'
       preLoaderRoute: typeof publicDatenschutzRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(public)/guest': {
+      id: '/(public)/guest'
+      path: '/guest'
+      fullPath: '/guest'
+      preLoaderRoute: typeof publicGuestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(public)/impressum': {
@@ -1265,6 +1344,13 @@ declare module '@tanstack/react-router' {
       path: '/convert-account'
       fullPath: '/auth/convert-account'
       preLoaderRoute: typeof AuthConvertAccountRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/auth/device': {
+      id: '/auth/device'
+      path: '/device'
+      fullPath: '/auth/device'
+      preLoaderRoute: typeof AuthDeviceRouteImport
       parentRoute: typeof AuthRouteRoute
     }
     '/auth/extension': {
@@ -1419,6 +1505,20 @@ declare module '@tanstack/react-router' {
       path: '/tutorials'
       fullPath: '/tutorials/'
       preLoaderRoute: typeof publicTutorialsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(public)/use-cases/': {
+      id: '/(public)/use-cases/'
+      path: '/use-cases'
+      fullPath: '/use-cases/'
+      preLoaderRoute: typeof publicUseCasesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(public)/use-cases/$useCaseSlug': {
+      id: '/(public)/use-cases/$useCaseSlug'
+      path: '/use-cases/$useCaseSlug'
+      fullPath: '/use-cases/$useCaseSlug'
+      preLoaderRoute: typeof publicUseCasesUseCaseSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_shortcut/code/': {
@@ -1725,6 +1825,7 @@ const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
 interface AuthRouteRouteChildren {
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthConvertAccountRoute: typeof AuthConvertAccountRoute
+  AuthDeviceRoute: typeof AuthDeviceRoute
   AuthExtensionRoute: typeof AuthExtensionRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthRecoverAccountRoute: typeof AuthRecoverAccountRoute
@@ -1740,6 +1841,7 @@ interface AuthRouteRouteChildren {
 const AuthRouteRouteChildren: AuthRouteRouteChildren = {
   AuthCallbackRoute: AuthCallbackRoute,
   AuthConvertAccountRoute: AuthConvertAccountRoute,
+  AuthDeviceRoute: AuthDeviceRoute,
   AuthExtensionRoute: AuthExtensionRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthRecoverAccountRoute: AuthRecoverAccountRoute,
@@ -1887,9 +1989,11 @@ const rootRouteChildren: RootRouteChildren = {
   DocsRouteRoute: DocsRouteRouteWithChildren,
   ShortcutRoute: ShortcutRouteWithChildren,
   DownloadRoute: DownloadRoute,
+  OfflineShellRoute: OfflineShellRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   publicDatenschutzRoute: publicDatenschutzRoute,
+  publicGuestRoute: publicGuestRoute,
   publicImpressumRoute: publicImpressumRoute,
   ApiScribeTokenRoute: ApiScribeTokenRoute,
   publicIndexRoute: publicIndexRoute,
@@ -1897,11 +2001,23 @@ const rootRouteChildren: RootRouteChildren = {
   publicModelsModelSlugRoute: publicModelsModelSlugRoute,
   publicPTokenRoute: publicPTokenRoute,
   publicThreadTokenRoute: publicThreadTokenRoute,
+  publicUseCasesUseCaseSlugRoute: publicUseCasesUseCaseSlugRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   publicGatewayIndexRoute: publicGatewayIndexRoute,
   publicModelsIndexRoute: publicModelsIndexRoute,
   publicTutorialsIndexRoute: publicTutorialsIndexRoute,
+  publicUseCasesIndexRoute: publicUseCasesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

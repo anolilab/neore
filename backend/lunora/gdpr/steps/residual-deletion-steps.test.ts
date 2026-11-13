@@ -138,6 +138,14 @@ describe("residual account-deletion steps", () => {
                     thread: await ctx.db.insert("threads", { title: "T", userId }),
                 };
 
+                await ctx.db.insert("projectRepositories", { createdAt: NOW, projectId: refs.project, url: `https://github.com/${userId}/r.git`, userId });
+
+                // Left by a project delete that failed part way: the project is gone, the row names its owner.
+                const gone = await ctx.db.insert("projects", { name: "gone", userId });
+
+                await ctx.db.delete("projects", gone);
+                await ctx.db.insert("projectRepositories", { createdAt: NOW, projectId: gone, url: `https://github.com/${userId}/left.git`, userId });
+
                 for (const [table, make] of Object.entries(ROWS)) {
                     const count = userId === A ? MANY : 1;
 
@@ -178,6 +186,14 @@ describe("residual account-deletion steps", () => {
             expect({ count: await countFor(table, A), table }).toStrictEqual({ count: 0, table });
             expect({ count: await countFor(table, B), table }).toStrictEqual({ count: expectedB[table], table });
         }
+
+        // A's repository rows go, a leftover whose project is already gone too; B's stay.
+        const repositories = await rowsOf("projectRepositories");
+
+        expect(repositories.map((row) => (row as { url?: string }).url).toSorted((left, right) => String(left).localeCompare(String(right)))).toStrictEqual([
+            `https://github.com/${B}/left.git`,
+            `https://github.com/${B}/r.git`,
+        ]);
 
         // The ledger keeps its amounts under the marker.
         const ledger = await rowsOf("gatewayUsageDeductions");

@@ -248,6 +248,23 @@ describe("buildAgentTools connector tools", () => {
         };
     });
 
+    it("applies a group participant's connector access, from the thread its permissions come from", async () => {
+        const runQuery = vi.fn(async (_ref: unknown, args: Record<string, unknown>) =>
+            "threadId" in args ? [{ connectorSlug: "notion", level: "read_only" }] : [],
+        );
+
+        const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+            model: "test-model",
+            permissionModeThreadId: "owner-thread",
+            searchMode: "web",
+            userId: "user",
+        });
+
+        expect(Object.keys(tools)).toContain("mcp_Notion__search");
+        expect(Object.keys(tools)).not.toContain("mcp_Notion__create_page");
+        expect(runQuery).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ threadId: "owner-thread" }));
+    });
+
     it("connects to connected connectors alongside the user's MCP servers", async () => {
         await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
 
@@ -306,6 +323,8 @@ describe("buildAgentTools quick-check trust", () => {
             .mockResolvedValueOnce(true)
             // No pull request is linked to the thread.
             .mockResolvedValueOnce({ complete: true, links: [] })
+            // The thread's permission mode.
+            .mockResolvedValueOnce(null)
             .mockResolvedValueOnce(trusted);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
@@ -351,6 +370,8 @@ describe("buildAgentTools quick-check trust", () => {
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(true)
             .mockResolvedValueOnce({ complete: true, links: [] })
+            // The thread's permission mode.
+            .mockResolvedValueOnce(null)
             .mockResolvedValueOnce([mcpTrustId("files", second)]);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
@@ -369,13 +390,14 @@ describe("buildAgentTools pull request tools", () => {
     const toolsFor = async (linked: unknown[]): Promise<Record<string, unknown>> => {
         const runQuery = vi.fn();
 
-        // MCP servers, overrides, grants, the quick check's eligibility, then the thread's pull request links.
+        // MCP servers, overrides, grants, the quick check's eligibility, the thread's pull request links, then its permission mode.
         runQuery
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(false)
-            .mockResolvedValueOnce({ complete: true, links: linked });
+            .mockResolvedValueOnce({ complete: true, links: linked })
+            .mockResolvedValueOnce(null);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",
@@ -402,7 +424,8 @@ describe("buildAgentTools pull request tools", () => {
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
             .mockResolvedValueOnce(false)
-            .mockResolvedValueOnce({ complete: true, links: [] });
+            .mockResolvedValueOnce({ complete: true, links: [] })
+            .mockResolvedValueOnce(null);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",

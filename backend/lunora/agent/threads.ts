@@ -53,7 +53,7 @@ export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
  * Unread, snooze and "needs you" belong to the thread's OWNER; the row is shared with grantees, who must not see
  * (or act on) them. Reads that can reach a grantee return the row through here.
  */
-const OWNER_STATE_KEYS = ["awaitingInput", "lastReplyAt", "lastViewedAt", "snoozeChosenAt", "snoozedUntil"] as const;
+const OWNER_STATE_KEYS = ["awaitingInput", "lastReplyAt", "lastViewedAt", "permissionMode", "snoozeChosenAt", "snoozedUntil"] as const;
 
 export const threadForViewer = (thread: Doc<"threads">, viewerId: string | undefined): ThreadDoc => {
     const isOwner = thread.userId !== undefined && thread.userId === viewerId;
@@ -267,6 +267,8 @@ export const updateThread = internalMutation
     .input({
         /** The run failed in place: a snoozed thread wakes in this same write (`patchThread`). */
         failed: v.optional(v.boolean()),
+        /** A question the thread waits on stays what it waits on: an approval does not overwrite it (a sub-agent's pause). */
+        keepQuestion: v.optional(v.boolean()),
         patch: v.object({ ...vThreadPatchFields }),
         threadId: v.id("threads"),
     })
@@ -276,8 +278,11 @@ export const updateThread = internalMutation
 
         assert(oldThread, `Thread ${args.threadId} not found`);
 
+        const { awaitingInput, ...rest } = args.patch;
+        const keptQuestion = args.keepQuestion === true && awaitingInput === "approval" && oldThread.awaitingInput === "question";
+
         // The run-state rules (a pause ending, a pause or failure waking a snooze) live in `patchThread`.
-        await patchThread(ctx.db, args.threadId, args.patch, { failed: args.failed });
+        await patchThread(ctx.db, args.threadId, keptQuestion ? rest : args.patch, { failed: args.failed });
 
         const newThread = (await ctx.db.get("threads", args.threadId))!;
 
@@ -863,8 +868,44 @@ export const createThreadRelationship = internalMutation
         return null;
     });
 
+/**
+ * The branch relationship of a thread, for its OWNER only (null for anyone else,
+ * an anonymous caller or a missing thread). A locked chat's parent id and branch
+ * point say where it came from, so they need its proof. Plain function over
+ * `ctx.db` so other modules read it in their own transaction.
+ */
+export const readThreadRelationship = async (
+    ctx: Pick<QueryContext, "db">,
+    userId: string | null | undefined,
+    threadId: Id<"threads">,
+    unlockProof?: string | null,
+) => {
+    if (!userId) {
+        return null;
+    }
+
+    const thread = await ctx.db.get("threads", threadId);
+
+    if (!thread || thread.userId !== userId) {
+        return null;
+    }
+
+    if (isThreadLocked(thread)) {
+        const access = await resolveThreadReadAccess(ctx, threadId, userId, unlockProof);
+
+        if (access?.kind !== "full") {
+            return null;
+        }
+    }
+
+    return ctx.db
+        .query("threadRelationships")
+        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+        .unique();
+};
+
 export const getThreadRelationship = query
-    .input({ threadId: v.id("threads") })
+    .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(
         v.union(
             v.object({
@@ -883,22 +924,7 @@ export const getThreadRelationship = query
     .query(async ({ args, ctx }) => {
         const identity = await getAuthUserIdentity(ctx);
 
-        if (!identity) {
-            return null;
-        }
-
-        const thread = await ctx.db.get("threads", args.threadId);
-
-        if (!thread || thread.userId !== identity.userId) {
-            return null;
-        }
-
-        const relationship = await ctx.db
-            .query("threadRelationships")
-            .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
-            .unique();
-
-        return relationship;
+        return readThreadRelationship(ctx, identity?.userId, args.threadId, args.unlockProof);
     });
 
 export const getChildThreads = query
@@ -1150,9 +1176,9 @@ export const checkThreadAccessBatch = internalQuery
  */
 export const checkThreadAccessBatchHandler = async (
     context: QueryContext,
-    args: { requiredPermission?: ThreadPermission; threadId: Id<"threads">; userId: string },
+    args: { requiredPermission?: ThreadPermission; threadId: Id<"threads">; unlockProof?: string | null; userId: string },
 ) => {
-    const access = await resolveThreadReadAccess(context, args.threadId, args.userId);
+    const access = await resolveThreadReadAccess(context, args.threadId, args.userId, args.unlockProof);
 
     if (access?.kind !== "full" || !meetsThreadPermission(access.permission, args.requiredPermission ?? "read")) {
         return { hasAccess: false as const, permission: null, thread: null };
@@ -1217,25 +1243,33 @@ export const createTemporaryThread = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const thread = await ctx.db.get("threads", args.threadId);
-
-        await ctx.db.insert("temporaryThreads", {
-            expiresAt: args.expiresAt,
-            retentionHours: args.retentionHours,
-            threadId: args.threadId,
-            userId: thread?.userId,
-        });
-
-        // Denormalize isTemporary onto thread for efficient filtering
-        if (thread) {
-            await ctx.db.patch("threads", args.threadId, { isTemporary: true });
-        }
-
-        // A temporary chat takes no guest posts: a link already given out is withdrawn with its notes, as archiving does.
-        await withdrawGuestLinksForThread(ctx, args.threadId);
+        await insertTemporaryThread(ctx, args);
 
         return null;
     });
+
+/** A thread made temporary, in the caller's transaction (`createThreadWithInitialMessage` creates one as temporary). */
+export const insertTemporaryThread = async (
+    ctx: MutationContext,
+    args: { expiresAt: number; retentionHours?: number; threadId: Id<"threads"> },
+): Promise<void> => {
+    const thread = await ctx.db.get("threads", args.threadId);
+
+    await ctx.db.insert("temporaryThreads", {
+        expiresAt: args.expiresAt,
+        retentionHours: args.retentionHours,
+        threadId: args.threadId,
+        userId: thread?.userId,
+    });
+
+    // Denormalize isTemporary onto thread for efficient filtering
+    if (thread) {
+        await ctx.db.patch("threads", args.threadId, { isTemporary: true });
+    }
+
+    // A temporary chat takes no guest posts: a link already given out is withdrawn with its notes, as archiving does.
+    await withdrawGuestLinksForThread(ctx, args.threadId);
+};
 
 export const getTemporaryThreads = query
     .input({

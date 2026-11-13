@@ -61,9 +61,12 @@ export const vHomeOverview = v.object({
     subAgents: v.array(
         v.object({
             _id: v.string(),
+            // A waiting run's request is answered in its own thread, which its row opens.
+            childThreadId: v.optional(v.string()),
             createdAt: v.number(),
             parentThreadId: v.string(),
-            status: v.union(v.literal("queued"), v.literal("running")),
+            // `awaiting`: a one-shot child waiting on its owner's approval, still a run that goes.
+            status: v.union(v.literal("queued"), v.literal("running"), v.literal("awaiting")),
             task: v.string(),
         }),
     ),
@@ -91,7 +94,11 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
             orderBy: [{ createdAt: "desc" }],
             where: { status: { in: ["running", "queued"] }, userId },
         }),
-        ctx.db.subAgentRuns.findMany({ limit: HOME_SECTION_LIMIT, orderBy: [{ createdAt: "desc" }], where: { status: { in: ["running", "queued"] }, userId } }),
+        ctx.db.subAgentRuns.findMany({
+            limit: HOME_SECTION_LIMIT,
+            orderBy: [{ createdAt: "desc" }],
+            where: { status: { in: ["running", "queued", "awaiting"] }, userId },
+        }),
         // Most recently touched first (`by_user_and_updatedAt`), soft-deleted
         // rows excluded in SQL. Temporary threads are skipped below.
         ctx.db.threads.findMany({
@@ -163,9 +170,10 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
 
             return {
                 _id: run._id as string,
+                ...(run.childThreadId !== undefined && { childThreadId: run.childThreadId }),
                 createdAt: run.createdAt,
                 parentThreadId: run.parentThreadId,
-                status: run.status as "queued" | "running",
+                status: run.status as "awaiting" | "queued" | "running",
                 task: locked ? LOCKED_THREAD_TITLE : clip(run.task),
             };
         }),

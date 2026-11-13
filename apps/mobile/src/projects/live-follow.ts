@@ -26,16 +26,34 @@ export const liveFor = <T>(state: Scoped<T>, scope: string | undefined): Live<T>
     return { error: state.error, rows: state.rows };
 };
 
-/** Starts a watch for `scope` from an empty state; an error drops the rows. */
+/**
+ * Starts a watch for `scope` from an empty state; an error drops the rows. Each answer with rows from the server is
+ * reported (`onAnswered`): it proves the connection works, which lets the write controls back on after a reconnect.
+ * Rows handed over while `watch` is still subscribing are not: that is the Lunora client replaying a value it held (a
+ * joined subscription or the read cache), from before the server was asked, and the server may still refuse the
+ * subscription. An error is a refusal by the server, not a lost connection, so it reports nothing.
+ */
 export const followLive = <T>(
     scope: string,
     watch: (onRows: (rows: T[]) => void, onError: (message: string) => void) => Unsubscribe,
     publish: (next: Scoped<T>) => void,
+    onAnswered: () => void = () => {},
 ): Unsubscribe => {
     publish({ ...EMPTY_LIVE, scope });
 
-    return watch(
-        (rows) => publish({ error: undefined, rows, scope }),
+    let isSubscribing = true;
+    const stop = watch(
+        (rows) => {
+            publish({ error: undefined, rows, scope });
+
+            if (!isSubscribing) {
+                onAnswered();
+            }
+        },
         (message) => publish({ error: message, rows: undefined, scope }),
     );
+
+    isSubscribing = false;
+
+    return stop;
 };

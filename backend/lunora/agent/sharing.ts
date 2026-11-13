@@ -282,13 +282,16 @@ export const getThreadInvitesWithAccessCheck = internalQuery
  * Direct handler for thread invites with access check.
  * Exported for hot-path queries to bypass runQuery validator overhead.
  */
-export const getThreadInvitesWithAccessCheckHandler = async (context: QueryContext, args: { threadId: Id<"threads">; userId: string }) => {
+export const getThreadInvitesWithAccessCheckHandler = async (
+    context: QueryContext,
+    args: { threadId: Id<"threads">; unlockProof?: string | null; userId: string },
+) => {
     // Pending invites carry their bearer `inviteToken`, and redeeming one grants
     // its permission — so listing them is an ADMIN capability (owner or live
     // admin grant), exactly like `createThreadInvite`. It used to admit any
     // grantee and, via `isPublic`, any signed-in caller, which let a read-only
     // viewer lift a pending admin token and escalate.
-    const access = await resolveThreadReadAccess(context, args.threadId, args.userId);
+    const access = await resolveThreadReadAccess(context, args.threadId, args.userId, args.unlockProof);
 
     if (access?.kind !== "full" || !meetsThreadPermission(access.permission, "admin")) {
         return null;

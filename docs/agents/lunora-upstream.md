@@ -19,9 +19,26 @@ shared facade, since `lunora/notify.ts` makes a fresh memory store per ctx),
 The ORM-facade reads and
 `agent/admitted-thread-db.ts` stay, as ordinary code, not as a workaround).
 
-**Not filed yet (owner to decide):** in `lunoraTest` (`@lunora/server@alpha.273`), `rls()` ignores a range on the second
-index field of `messages` (read policy: `OR` of `{ userId }` and `{ threadId: { in } }`); the owner-policy `threadGuestLinks`
-honours it. `findSentNote` reads through `admittedThreadDb`; `agent/messages.ts#pinFollowingRowParent` is exposed.
+**Not filed yet (owner to decide):** `rls()` (`@lunora/server@alpha.273`) ignores a range on the second index field of
+`messages` (read policy: `OR` of `{ userId }` and `{ threadId: { in } }`); the owner-policy `threadGuestLinks` honours it.
+Once a request admitted two or more threads it drops the `threadId` range too, so a read returns every admitted thread's
+rows. `lunoraTest` runs the production engine (`createShardCtxDb` from `@lunora/shard-engine` with this middleware), so
+this is not test-only: a procedure that admits several threads reads each one's messages through a reader keyed on it
+(`admittedThreadDb`, `admittedThreadMessages`; `findSentNote`, `listSubAgentApprovals`).
+`agent/messages.ts#pinFollowingRowParent` is exposed.
+
+**Not filed yet (owner to decide): seed the identity store from SSR.** `@lunora/react`'s `useAuth` / `useAuthState`
+read `"loading"` on the server and while hydrating (`getServerSnapshot`), and on the client until `getCurrentUser()`
+answers, even when SSR already minted the token. `apps/web/src/features/auth/components/optimistic-auth-gate.tsx`
+works around it with the dehydrated `authStatus` and a stored signed-in hint. An upstream option to seed the store
+(status and user) from SSR would let `<Authenticated>` render on the first paint and retire that gate.
+
+**Not filed yet (owner to decide): `.global()` writes and live queries.** In `@lunora/shard-engine@alpha.193`, only an
+insert into a `.global()` table re-runs the subscriptions that read it, and only on the writer's own Durable Object;
+`patch`, `replace`, `patchIf` and `delete` re-run none. No `.global()` write reaches another shard's subscriptions
+(`@lunora/do`'s `publishLiveFromAction`: "no cross-shard live fan-out"). A `.global()` shape (`defineShape`) is the one
+built-in that polls D1 (every 2s). Until then a list that other members change is read with refetches, not
+subscriptions: `projects_functions:listProjectRepos` is in `NEVER_LIVE` (`apps/web/src/lib/lunora/crpc.tsx`).
 
 Moving queue, mail, push and uploads onto Lunora (2026-10) filed and saw fixed,
 workarounds retired with `@lunora/cli@alpha.365`:

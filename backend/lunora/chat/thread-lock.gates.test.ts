@@ -14,13 +14,25 @@ import { addFile, getFileForUser } from "../agent/files";
 import { readMessagesByIds } from "../agent/messages";
 import { lockThread } from "../agent/thread-lock";
 import { createPin, getThreadPins } from "./pins/functions";
-import { abortThreadStream, branchThread, getCachedFollowupSuggestions, getThread, getThreadUIMessages, gateThreadActionHandler } from "./functions";
-import { getThreadWithData } from "./composite";
+import {
+    abortThreadStream,
+    branchThread,
+    getCachedFollowupSuggestions,
+    getChildThreads,
+    getThread,
+    getThreadUIMessages,
+    gateThreadActionHandler,
+} from "./functions";
+import { getThreadPaneState, getThreadWithData } from "./composite";
+import { getThreadGoal } from "./goals/functions";
+import { getThreadRelationship } from "../agent/threads";
 import { getGroupChat } from "./group/functions";
 import { requireOwnedThread } from "../agent/thread-read-access";
 import { claimToolApproval } from "./lib/tool-approval-claim";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted } from "./lib/thread-gate";
+import { getResolvedVariables } from "../prompts/functions";
 import { getPresentation } from "./slides/functions";
+import { getThreadAccess, getThreadInvites } from "./sharing";
 import { getActiveStreamForThread, streamLockedSinceStartHandler, streamRunThreadHandler } from "./streaming/index";
 import { hashPasscode, mintUnlockProof, newPasscodeEpoch, THREAD_LOCKED_CODE } from "../lib/thread-lock";
 import schema from "../schema";
@@ -41,10 +53,13 @@ beforeAll(async () => {
     registerModule(registry, "chat_functions", await import("./functions"));
     registerModule(registry, "agent_messages", await import("../agent/messages"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "chat_goals_functions", await import("./goals/functions"));
     registerModule(registry, "agent_branches", await import("../agent/branches"));
     registerModule(registry, "agent_context_reset_read", await import("../agent/context-reset-read"));
     registerModule(registry, "agent_thread_lock", await import("../agent/thread-lock"));
     registerModule(registry, "lib_document_history", await import("../lib/document-history"));
+    registerModule(registry, "chat_tool_permissions", await import("./tool-permissions"));
+    registerModule(registry, "chat_thread_state", await import("./thread-state"));
 }, 30_000);
 
 // Same identity seam as `thread-read-paths.test.ts`: the session reads come off the harness identity.
@@ -69,6 +84,26 @@ vi.mock("../lib/audit-triggers", async (importOriginal) => {
         ...(await importOriginal<typeof import("../lib/audit-triggers")>()),
         auditTriggersFor: () => {
             return {};
+        },
+    };
+});
+
+// Fails only the mode copy of a branch (`copyThreadPermissionMode` writes `permissionMode`), after the new thread exists.
+const failModeCopy = vi.hoisted(() => {
+    return { on: false };
+});
+
+vi.mock("../agent/table-writes", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../agent/table-writes")>();
+
+    return {
+        ...original,
+        patchThread: (...args: Parameters<typeof original.patchThread>) => {
+            if (failModeCopy.on && "permissionMode" in args[2]) {
+                throw new Error("mode copy failed");
+            }
+
+            return original.patchThread(...args);
         },
     };
 });
@@ -533,5 +568,253 @@ describe("an unlocked chat returns its content through the composite read", () =
 
     it("and refuses the same read without a proof, with the locked code", async () => {
         await expect(as(OWNER).query(getThreadWithData as never, { threadId } as never)).rejects.toMatchObject({ data: { code: THREAD_LOCKED_CODE } });
+    });
+});
+
+describe("the split-view pane state", () => {
+    const paneArgs = (unlockProof?: string, target: string = threadId) => ({ threadId: target, unlockProof }) as never;
+    const pane = (unlockProof?: string, userId: string = OWNER, target: string = threadId) =>
+        as(userId).query(getThreadPaneState as never, paneArgs(unlockProof, target)) as Promise<any>;
+
+    // A goal, a parent link and one child for `parent`; the child is a separate unlocked thread.
+    const seedRelated = async (parent: string = threadId) =>
+        await harness.run(async (context: any) => {
+            const child = await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Child", userId: OWNER });
+
+            await context.db.insert("threadRelationships", {
+                branchPoint: 1,
+                branchType: "branch",
+                createdAt: 5,
+                parentThreadId: parent,
+                threadId: child,
+                userId: OWNER,
+            });
+            await context.db.insert("threadGoals", {
+                costMicrodollars: 0,
+                createdAt: 3,
+                maxCostMicrodollars: 10,
+                maxRounds: 3,
+                round: 1,
+                startMessageId: "m1",
+                status: "active",
+                text: "ship it",
+                threadId: parent,
+                userId: OWNER,
+                verdicts: [],
+            });
+
+            return child as string;
+        });
+
+    // The locked chat's own parent link, so its relationship row exists.
+    const seedLockedParentLink = async () =>
+        await harness.run(async (context: any) => {
+            const parent = await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Parent", userId: OWNER });
+
+            await context.db.insert("threadRelationships", {
+                branchPoint: 0,
+                branchType: "branch",
+                createdAt: 4,
+                parentThreadId: parent,
+                threadId,
+                userId: OWNER,
+            });
+
+            return parent as string;
+        });
+
+    // An unlocked chat built without `lockedAt`.
+    const insertPlain = async () =>
+        await harness.run(async (context: any) => {
+            const plain = await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Plain", userId: OWNER });
+            const parent = await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Parent", userId: OWNER });
+
+            await context.db.insert("threadRelationships", {
+                branchPoint: 0,
+                branchType: "branch",
+                createdAt: 4,
+                parentThreadId: parent,
+                threadId: plain,
+                userId: OWNER,
+            });
+
+            return { parent: parent as string, plain: plain as string };
+        });
+
+    const fromProcedures = async (unlockProof?: string, target: string = threadId) => {
+        return {
+            childThreads: await as(OWNER).query(getChildThreads as never, { parentThreadId: target, unlockProof } as never),
+            goal: await as(OWNER).query(getThreadGoal as never, paneArgs(unlockProof, target)),
+            relationship: await as(OWNER).query(getThreadRelationship as never, { threadId: target, unlockProof } as never),
+            title: ((await as(OWNER).query(getThread as never, paneArgs(unlockProof, target))) as { title?: string } | null)?.title,
+        };
+    };
+
+    it("an unlocked chat the owner reads: every field equals its own procedure", async () => {
+        const { parent, plain } = await insertPlain();
+        const childId = await seedRelated(plain);
+        const result = await pane(undefined, OWNER, plain);
+
+        expect(result).toEqual(await fromProcedures(undefined, plain));
+        expect(result.title).toBe("Plain");
+        expect(result.goal).toMatchObject({ text: "ship it" });
+        expect(result.relationship).toMatchObject({ parentThreadId: parent });
+        expect(result.childThreads.map((row: { _id: string }) => row._id)).toEqual([childId]);
+    });
+
+    it("a locked chat without its proof: the stub title, nothing else, no throw", async () => {
+        await seedRelated();
+        await seedLockedParentLink();
+        const result = await pane();
+        const stub = await fromProcedures();
+
+        expect(result).toEqual({ childThreads: [], goal: null, relationship: null, ...(stub.title !== undefined && { title: stub.title }) });
+        expect(stub).toMatchObject({ childThreads: [], goal: null, relationship: null });
+        expect(result.title).toBeUndefined();
+    });
+
+    it("the same locked chat with the correct proof: every field equals its own procedure", async () => {
+        const childId = await seedRelated();
+        const parent = await seedLockedParentLink();
+        const result = await pane(proof);
+
+        expect(result).toEqual(await fromProcedures(proof));
+        expect(result.title).toBe("Salary plan");
+        expect(result.goal).toMatchObject({ text: "ship it" });
+        expect(result.relationship).toMatchObject({ parentThreadId: parent });
+        expect(result.childThreads.map((row: { _id: string }) => row._id)).toEqual([childId]);
+    });
+
+    it("a thread id that does not exist: null, as getThread gives", async () => {
+        const missing = await harness.run(async (context: any) => {
+            const id = await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", userId: OWNER });
+
+            await context.db.delete("threads", id);
+
+            return id as string;
+        });
+
+        expect(await pane(undefined, OWNER, missing)).toBeNull();
+    });
+
+    it("a chat of another user: null, as getThread gives", async () => {
+        const { plain } = await insertPlain();
+
+        expect(await pane(undefined, STRANGER, plain)).toBeNull();
+    });
+});
+
+describe("variables, access and invites of a locked chat", () => {
+    const resolved = async (unlockProof?: string, target: string = threadId) =>
+        (await as(OWNER).query(getResolvedVariables as never, { threadId: target, unlockProof } as never)) as {
+            sources: Record<string, string>;
+            values: Record<string, string>;
+        };
+
+    const seedVariables = async (target: string) =>
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadVariables", {
+                threadId: target,
+                updatedAt: 1,
+                userId: OWNER,
+                variables: [{ name: "secret", value: "thread-value" }],
+            });
+            await context.db.insert("userVariableDefaults", { updatedAt: 1, userId: OWNER, variables: [{ name: "tone", value: "user-default" }] });
+        });
+
+    const seedInvite = async (target: string) =>
+        await harness.run(async (context: any) => {
+            await context.db.insert("threadInvites", {
+                expiresAt: Date.now() + 60_000,
+                invitedBy: OWNER,
+                invitedEmail: "guest@example.com",
+                inviteToken: "token-1",
+                ownerId: OWNER,
+                permission: "read",
+                status: "pending",
+                threadId: target,
+            });
+        });
+
+    const insertUnlockedThread = async () =>
+        await harness.run(
+            async (context: any) => await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Open plan", userId: OWNER }),
+        );
+
+    it("getResolvedVariables withholds the thread's values without a proof but keeps the user default", async () => {
+        await seedVariables(threadId);
+
+        const bare = await resolved();
+
+        expect(bare.values).not.toHaveProperty("secret");
+        expect(bare.values).toEqual({ tone: "user-default" });
+        expect(bare.sources).toEqual({ tone: "user" });
+    });
+
+    it("getResolvedVariables returns the thread's values with the proof", async () => {
+        await seedVariables(threadId);
+
+        const unlocked = await resolved(proof);
+
+        expect(unlocked.values).toEqual({ secret: "thread-value", tone: "user-default" });
+        expect(unlocked.sources).toMatchObject({ secret: "thread" });
+    });
+
+    it("getThreadAccess refuses the owner without a proof and lists access with it", async () => {
+        await expect(as(OWNER).query(getThreadAccess as never, { threadId } as never)).rejects.toThrow("Access denied");
+
+        const access: any = await as(OWNER).query(getThreadAccess as never, { threadId, unlockProof: proof } as never);
+
+        expect(access).toMatchObject({ isOwner: true, permission: "admin", users: [] });
+    });
+
+    it("getThreadInvites throws for the owner without a proof and lists invites with it", async () => {
+        await seedInvite(threadId);
+
+        await expect(as(OWNER).query(getThreadInvites as never, { threadId } as never)).rejects.toThrow("Access denied to this thread");
+
+        const invites: any = await as(OWNER).query(getThreadInvites as never, { threadId, unlockProof: proof } as never);
+
+        expect(invites).toHaveLength(1);
+        expect(invites[0]).toMatchObject({ invitedEmail: "guest@example.com", status: "pending" });
+    });
+
+    it("an unlocked chat answers all three calls without a proof", async () => {
+        const open = await insertUnlockedThread();
+
+        await seedVariables(open);
+        await seedInvite(open);
+
+        const { values } = await resolved(undefined, open);
+
+        expect(values).toEqual({ secret: "thread-value", tone: "user-default" });
+        expect(await as(OWNER).query(getThreadAccess as never, { threadId: open } as never)).toMatchObject({ isOwner: true, users: [] });
+        expect(await as(OWNER).query(getThreadInvites as never, { threadId: open } as never)).toHaveLength(1);
+    });
+});
+
+describe("branching a chat under a permission mode", () => {
+    it("removes the new thread when its mode cannot be copied, rather than leaving an empty chat behind", async () => {
+        const source = await harness.run(
+            async (context: any) =>
+                await context.db.insert("threads", { model: "gpt-4o", permissionMode: "supervised", status: "active", title: "Source", userId: OWNER }),
+        );
+        const ownedThreads = async () =>
+            await harness.run(async (context: any) => {
+                const rows = await context.db.query("threads").collect();
+
+                return rows.filter((row: any) => row.userId === OWNER).length;
+            });
+        const before = await ownedThreads();
+
+        failModeCopy.on = true;
+
+        try {
+            await expect(as(OWNER).action(branchThread as never, { threadId: source } as never)).rejects.toThrow("mode copy failed");
+        } finally {
+            failModeCopy.on = false;
+        }
+
+        expect(await ownedThreads()).toBe(before);
     });
 });

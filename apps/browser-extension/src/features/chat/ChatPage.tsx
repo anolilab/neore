@@ -6,12 +6,15 @@ import ChatView from "@neore/chat-ui/chat/chat-view";
 import DocumentArtifact from "@neore/chat-ui/chat/document-artifact";
 import McpAppView from "@neore/chat-ui/chat/mcp-app-view";
 import PresentationArtifact from "@neore/chat-ui/chat/presentation-artifact";
+import type { ToolOutputLoader } from "@neore/chat-ui/chat/tool-output-loader";
+import { ToolOutputLoaderProvider } from "@neore/chat-ui/chat/tool-output-loader";
 import { FetchableOriginsProvider } from "@neore/ui/components/file-renderers/fetchable-origins-provider";
 import { originsOf } from "@neore/ui/hooks/use-fetchable-origins";
 import { AlertCircleIcon, FilePlus2Icon, Loader2Icon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { LUNORA_URL } from "@/lib/env";
+import { lunora } from "@/lib/lunora-client";
 import { useSettings } from "@/lib/settings";
 import type { PageContext } from "@/page-context/build";
 import { PageContextError } from "@/page-context/build";
@@ -32,15 +35,36 @@ interface ChatPageProps {
 // File previews fetch the backend's signed storage URLs, so its origin is the one the provider admits.
 const FETCHABLE_ORIGINS = originsOf(LUNORA_URL);
 
-const components = {
-    DocumentArtifact,
-    // MCP App proxy calls go to the backend's HTTP routes on the Lunora Worker.
-    McpApp: LUNORA_URL ? (props: Omit<Parameters<typeof McpAppView>[0], "lunoraSiteUrl">) => <McpAppView {...props} lunoraSiteUrl={LUNORA_URL} /> : undefined,
-    PresentationArtifact,
+// A tool output the thread page left out, fetched when its tool view is expanded. The extension sends no unlock proof: it does not
+// unlock threads, and the page it shows is refused for a locked thread too.
+const loadToolOutput: ToolOutputLoader = async (ref) => {
+    const { output } = await lunora.query(api.chat.functions.getToolOutput, {
+        messageId: ref.messageId as Id<"messages">,
+        threadId: ref.threadId as Id<"threads">,
+        toolCallId: ref.toolCallId,
+    });
+
+    return output;
+};
+
+// MCP App proxy calls go to the backend's HTTP routes on the Lunora Worker. They name the thread the app is shown in: the proxy
+// applies that thread's permission mode. A call that names none has no thread mode: it gets the tool defaults, so a read-only
+// tool runs and one that would ask is refused.
+const componentsFor = (threadId: string | null) => {
+    return {
+        DocumentArtifact,
+        McpApp: LUNORA_URL
+            ? (props: Omit<Parameters<typeof McpAppView>[0], "lunoraSiteUrl" | "threadId">) => (
+                  <McpAppView {...props} lunoraSiteUrl={LUNORA_URL} {...(threadId !== null && { threadId })} />
+              )
+            : undefined,
+        PresentationArtifact,
+    };
 };
 
 export function ChatPage({ onBack, onThreadCreated, seed, threadId }: ChatPageProps) {
     const settings = useSettings();
+    const components = useMemo(() => componentsFor(threadId), [threadId]);
     const models = useModels();
     const thread = useQuery(api.chat.functions.getThread, threadId ? { threadId: threadId as Id<"threads"> } : "skip");
 
@@ -170,28 +194,30 @@ export function ChatPage({ onBack, onThreadCreated, seed, threadId }: ChatPagePr
     return (
         <main className="h-full">
             <FetchableOriginsProvider origins={FETCHABLE_ORIGINS}>
-                <ChatView
-                    availableModels={models}
-                    components={components}
-                    composerDraft={draft}
-                    composerSlot={composerSlot}
-                    hasMoreMessages={hasMore}
-                    isStreaming={busy}
-                    messages={messages}
-                    onBack={onBack}
-                    onLoadMoreMessages={loadMore}
-                    onSelectModel={setChosenModelId}
-                    onSendMessage={(text) => {
-                        void handleSend(text);
-                    }}
-                    selectedModelId={modelId}
-                    thread={{
-                        _creationTime: thread?._creationTime ?? 0,
-                        _id: threadId ?? "",
-                        model: thread?.model,
-                        title: thread?.title ?? (threadId ? undefined : "New chat"),
-                    }}
-                />
+                <ToolOutputLoaderProvider value={loadToolOutput}>
+                    <ChatView
+                        availableModels={models}
+                        components={components}
+                        composerDraft={draft}
+                        composerSlot={composerSlot}
+                        hasMoreMessages={hasMore}
+                        isStreaming={busy}
+                        messages={messages}
+                        onBack={onBack}
+                        onLoadMoreMessages={loadMore}
+                        onSelectModel={setChosenModelId}
+                        onSendMessage={(text) => {
+                            void handleSend(text);
+                        }}
+                        selectedModelId={modelId}
+                        thread={{
+                            _creationTime: thread?._creationTime ?? 0,
+                            _id: threadId ?? "",
+                            model: thread?.model,
+                            title: thread?.title ?? (threadId ? undefined : "New chat"),
+                        }}
+                    />
+                </ToolOutputLoaderProvider>
             </FetchableOriginsProvider>
         </main>
     );

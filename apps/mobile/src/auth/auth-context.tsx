@@ -1,21 +1,21 @@
 import { tokenRefreshDelayMs } from "@neore/client-runtime";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { clearLastThread } from "../chat/last-thread-store";
+import { sendSessions } from "../chat/send-sessions";
 import { loadConfig } from "../lib/config";
 import { getClient } from "../lib/lunora";
 import { backendPushServer, devicePushPlatform, pushRegistrations } from "../notifications/phone-push";
 import { releaseOnSignOut } from "../notifications/push-registration";
 import { endPhonePushForAccount } from "../notifications/use-phone-push";
 import { getOfflineCache } from "../offline/database";
-import type { AuthStatus } from "./auth-state";
 import { AuthContext } from "./auth-state";
-import type { GrantUser } from "./grant";
 import { fetchAccessToken, readStoredUser, revokeSessionToken, takeStoredGrant } from "./grant";
 import { secureGrantStore } from "./secure-store";
+import { createAuthEpoch, INITIAL_SESSION, reduceSession } from "./session-state";
 import { signInWithBrowser } from "./sign-in";
-import { emptyCacheWhileSignedOut, signOutOnDevice } from "./sign-out";
+import { emptyCacheWhileSignedOut, runSignOut, signOutOnDevice } from "./sign-out";
 
 /** Re-mint the JWT this long before the client's own refresh point, if `exp` is unknown. */
 const FALLBACK_REFRESH_MS = 60_000;
@@ -28,23 +28,54 @@ const nextTick = (tick: number): number => tick + 1;
 /**
  * Keeps the Lunora client's bearer in step with the stored grant. The JWT lives in
  * memory only; it is re-minted when client-runtime says the current one is due.
+ * A returning person is signed in from the stored user before the first mint answers
+ * (`reduceSession`), so the app opens on their saved chats instead of waiting on the network.
  */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-    const [status, setStatus] = useState<AuthStatus>("loading");
-    const [user, setUser] = useState<GrantUser | null>(null);
+    const [session, dispatch] = useReducer(reduceSession, INITIAL_SESSION);
+    const { hasToken, isConfirming, status, user } = session;
     const [refreshTick, setRefreshTick] = useState(0);
-    const [hasToken, setHasToken] = useState(false);
-    const signOutCount = useRef(0);
+    // Bumped by every sign-in and sign-out: a mint still out from before applies nothing.
+    const [epoch] = useState(createAuthEpoch);
+
+    // Signed in again: sends begin again (a sign-out closed them, `sendSessions`).
+    useEffect(() => {
+        if (status !== "signed-in") {
+            return;
+        }
+
+        sendSessions.open();
+    }, [status]);
     // Callers of `retryToken` waiting for the attempt they asked for to end.
     const renewalWaiters = useRef<(() => void)[]>([]);
     const [config] = useState(loadConfig);
     const [client] = useState(getClient);
 
+    // The stored user is on the device: reading it needs no network, so it paints the signed-in app at once. A sign-out,
+    // a mint or a sign-in that starts first wins (the reducer ignores a late read).
+    useEffect(() => {
+        let isCancelled = false;
+
+        const paint = async () => {
+            const storedUser = await readStoredUser(secureGrantStore);
+
+            if (!isCancelled) {
+                dispatch({ type: "stored-user", user: storedUser });
+            }
+        };
+
+        paint();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, []);
+
     useEffect(() => {
         let isCancelled = false;
         let timer: ReturnType<typeof setTimeout> | undefined;
-        const signOutsAtStart = signOutCount.current;
-        const isStale = () => isCancelled || signOutsAtStart !== signOutCount.current;
+        const hasEpochEnded = epoch.start();
+        const isStale = () => isCancelled || hasEpochEnded();
 
         const mint = async () => {
             let jwt: string | null;
@@ -57,11 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const storedUser = await readStoredUser(secureGrantStore);
 
                 if (!isStale()) {
-                    if (storedUser !== null) {
-                        setUser(storedUser);
-                        setStatus("signed-in");
-                    }
-
+                    dispatch({ type: "unreachable", user: storedUser });
                     timer = setTimeout(setRefreshTick, TOKEN_RETRY_MS, nextTick);
                 }
 
@@ -73,11 +100,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
 
             client.setAuthToken(jwt);
-            setHasToken(jwt !== null);
 
             if (jwt === null) {
-                setUser(null);
-                setStatus("signed-out");
+                dispatch({ type: "signed-out" });
+                sendSessions.signOut();
                 // Retries a cache wipe that failed at sign-out; the credential side never waits on it.
                 await emptyCacheWhileSignedOut({ clearCache: () => getOfflineCache().clear(), forgetLastChat: clearLastThread, warn: console.warn });
 
@@ -90,8 +116,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return;
             }
 
-            setUser(storedUser);
-            setStatus("signed-in");
+            dispatch({ type: "token", user: storedUser });
             timer = setTimeout(setRefreshTick, tokenRefreshDelayMs(jwt) ?? FALLBACK_REFRESH_MS, nextTick);
         };
 
@@ -115,41 +140,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isCancelled = true;
             clearTimeout(timer);
         };
-    }, [client, config.lunoraUrl, refreshTick]);
+    }, [client, config.lunoraUrl, epoch, refreshTick]);
 
     const signIn = useCallback(async () => {
-        await signInWithBrowser({ appUrl: config.appUrl, lunoraUrl: config.lunoraUrl });
-        setRefreshTick(nextTick);
-    }, [config.appUrl, config.lunoraUrl]);
-
-    const signOut = useCallback(async () => {
-        // Bumped now and again in `finally`: a refresh that was running, or that starts while the stored session is being
-        // cleared and revoked, is stale, so it cannot report signed-out early or let a new sign-in outlive this sign-out.
-        signOutCount.current += 1;
-        // From here on, no prompt and no registration for the account that is leaving.
-        endPhonePushForAccount();
+        // Ends every mint out, and reopens the epoch a sign-out closed.
+        epoch.open();
+        dispatch({ type: "sign-in-started" });
 
         try {
-            // The cache holds this person's chats: it is emptied FIRST and locally, so a sign-out request that fails or
-            // hangs offline cannot leave them behind. Then the server is told and the stored grant cleared.
-            await signOutOnDevice({
-                clearCache: () => getOfflineCache().clear(),
-                forgetLastChat: clearLastThread,
-                releasePush: async () =>
-                    await releaseOnSignOut({ platform: devicePushPlatform, registrations: pushRegistrations, server: backendPushServer(client) }),
-                revokeSession: async (token) => await revokeSessionToken({ fetch, lunoraUrl: config.lunoraUrl, token }),
-                takeCredential: async () => await takeStoredGrant(secureGrantStore),
-                // eslint-disable-next-line no-console -- no logger in the app; a failed clear must not be silent
-                warn: console.warn,
-            });
+            await signInWithBrowser({ appUrl: config.appUrl, lunoraUrl: config.lunoraUrl });
         } finally {
-            signOutCount.current += 1;
-            client.setAuthToken(null);
-            setHasToken(false);
-            setUser(null);
-            setStatus("signed-out");
+            // Also after a cancelled browser flow: the mint it ended must be replaced, or the status stays `loading`.
+            setRefreshTick(nextTick);
         }
-    }, [client, config.lunoraUrl]);
+    }, [config.appUrl, config.lunoraUrl, epoch]);
+
+    const signOut = useCallback(async () => {
+        // From here on, no prompt and no registration for the account that is leaving.
+        endPhonePushForAccount();
+        // Its sends still going stop (no retry saves a message for it, and none gives its prompt back), and stay closed for
+        // the whole sign-out, so a send begun during the teardown (the account still reads as signed in) is stopped too;
+        // the next sign-in opens them.
+        sendSessions.signOut();
+
+        // A mint still out when sign-out starts applies nothing: the epoch ends before the first await (`runSignOut`).
+        await runSignOut({
+            // Closed until the next sign-in: a mint a refresh timer begins during the teardown applies nothing either.
+            endMints: () => epoch.close(),
+            finish: () => {
+                client.setAuthToken(null);
+                dispatch({ type: "signed-out" });
+            },
+            // The cache holds this person's chats: it is emptied FIRST and locally, so a sign-out request that fails or
+            // hangs offline cannot leave them behind. Then the stored grant is cleared, so nothing on the phone can sign in
+            // with it, and only then is the server told.
+            teardown: async () =>
+                await signOutOnDevice({
+                    clearCache: () => getOfflineCache().clear(),
+                    forgetLastChat: clearLastThread,
+                    releasePush: async () =>
+                        await releaseOnSignOut({ platform: devicePushPlatform, registrations: pushRegistrations, server: backendPushServer(client) }),
+                    revokeSession: async (token) => await revokeSessionToken({ fetch, lunoraUrl: config.lunoraUrl, token }),
+                    takeCredential: async () => await takeStoredGrant(secureGrantStore),
+                    // eslint-disable-next-line no-console -- no logger in the app; a failed clear must not be silent
+                    warn: console.warn,
+                }),
+        });
+    }, [client, config.lunoraUrl, epoch]);
 
     const retryToken = useCallback(
         () =>
@@ -161,8 +198,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 
     const value = useMemo(() => {
-        return { hasToken, retryToken, signIn, signOut, status, user };
-    }, [hasToken, retryToken, signIn, signOut, status, user]);
+        return { hasToken, isConfirming, retryToken, signIn, signOut, status, user };
+    }, [hasToken, isConfirming, retryToken, signIn, signOut, status, user]);
 
     return <AuthContext value={value}>{children}</AuthContext>;
 };

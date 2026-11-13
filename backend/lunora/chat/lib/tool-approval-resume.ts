@@ -7,6 +7,8 @@
  * The continuation runs as the OWNER — the snapshot, tools, keys and thread are
  * theirs.
  */
+import { LunoraError } from "lunorash/server";
+
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
@@ -36,6 +38,19 @@ export interface ResumeClaimedRunArgs {
 /** Returns the new stream's id, which the claimed row now records. */
 export const resumeClaimedRun = async (ctx: MutationCtx, args: ResumeClaimedRunArgs): Promise<string> => {
     const { answer, answerFileIds, answers, approvalId, approved, config, denyReason, ownerId, runId, threadId } = args;
+
+    // A sub-agent's run leaves its wait with the claim, not when the job starts: a second answer meanwhile is refused
+    // (`claimToolApproval`) rather than claimed for a continuation that would find the run already running. Loaded
+    // lazily: the sub-agent module reads the claim helpers. Before the stream and the job, so a refusal
+    // leaves neither behind.
+    if (config.subAgentRunId !== undefined) {
+        const { resumeRunForAnswer } = await import("../../sub-agents/functions");
+
+        if (!(await resumeRunForAnswer(ctx, config.subAgentRunId))) {
+            throw new LunoraError("CONFLICT", "This sub-agent has already ended");
+        }
+    }
+
     const streamId = await persistentTextStreaming.createStream(ctx, {
         messageId: approvalId,
         streamingConfig: {
@@ -65,7 +80,11 @@ export const resumeClaimedRun = async (ctx: MutationCtx, args: ResumeClaimedRunA
     });
 
     // In this transaction, not scheduled: a late write would wipe the `awaitingInput` of a continuation that paused again.
-    await patchThread(ctx.db, threadId, { status: "running", updatedAt: ctx.now });
+    // A sub-agent's answer leaves a question the owner was asked in the child's own chat as what the thread waits on.
+    const thread = config.subAgentRunId === undefined ? null : await ctx.db.get("threads", threadId);
+    const keepsQuestion = thread?.awaitingInput === "question";
+
+    await patchThread(ctx.db, threadId, { status: "running", updatedAt: ctx.now, ...(keepsQuestion && { awaitingInput: "question" as const }) });
 
     return streamId;
 };

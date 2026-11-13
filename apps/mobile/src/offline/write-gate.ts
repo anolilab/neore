@@ -1,5 +1,5 @@
 /** Every control that sends something to the server or a host. Offline, all of them are disabled. */
-export const WRITE_CONTROLS = ["composer", "send", "approve", "cancel", "start"] as const;
+export const WRITE_CONTROLS = ["composer", "send", "approve", "cancel", "start", "create"] as const;
 
 export type WriteControl = (typeof WRITE_CONTROLS)[number];
 

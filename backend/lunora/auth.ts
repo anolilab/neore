@@ -27,9 +27,12 @@ import { createShardClient } from "lunorash/runtime";
 import { internal } from "./_generated/internal";
 import type { Id } from "./_generated/dataModel";
 import { clientGrantCookie } from "./auth/client-grant-cookie";
+import type { HostPairingOptions } from "./auth/cli-device-auth";
+import { cliDeviceAuth } from "./auth/cli-device-auth";
 import { guestConversion } from "./auth/guest-conversion";
 import { deletedOrganizationOf, queueOrganizationBillingCancel } from "./billing/gdpr";
 import { queueOrganizationPolicyErase } from "./auth/organization-policy-erase";
+import { queueOrganizationRepoErase } from "./projects/gdpr";
 import { organizationOfMemberChange, queueSeatSync } from "./billing/seats";
 import { adminEmails } from "./auth/hooks";
 import { inviteOnly } from "@lunora/auth/plugins";
@@ -61,6 +64,7 @@ import { parseOidcIssuer } from "./lib/env-validation";
 import { parseTrustedExtensionOrigins } from "./lib/extension-origins";
 import { enqueueJob } from "./lib/job-queue";
 import { authLogger } from "./lib/logger";
+import type { ApiKeyAuthApi } from "./public-api/identity";
 import { API_KEY_PREFIX } from "./public-api/identity";
 import { DEFAULT_API_SCOPES } from "./public-api/scopes";
 import { INVITATION_EXPIRATION_SECONDS, MEMBERSHIP_LIMIT, ORGANIZATION_LIMIT } from "./lib/constants";
@@ -198,6 +202,8 @@ const passkeyRelyingParty = (): { origin: string | null; rpID: string } => {
  */
 /** Callbacks `buildAuthOptions` wires into plugins; `buildAuth` supplies them from the Worker env. */
 interface AuthOptionHooks {
+    /** A headless machine pairing itself by code (`auth/cli-device-auth.ts`); both run on the account's shard. */
+    hostPairing?: HostPairingOptions;
     /** An anonymous user converted to a real account (a NEW user). See `lib/account-merge.ts`. */
     onGuestConverted?: (guestId: string, userId: string) => Promise<void>;
 }
@@ -261,15 +267,40 @@ export const API_KEY_OPTIONS = {
  * `sign-in-methods` is exempt too: it answers the same static JSON to everyone.
  *
  * Everything a brute-force or mail-bomb would use keeps its strict rule; this
- * map names only the paths it relaxes. `auth.rate-limit.test.ts` drives
- * better-auth's real limiter to pin both halves.
+ * map names only the paths it relaxes or adds (the CLI's device-code sign-in
+ * has its own rules below). `auth.rate-limit.test.ts` drives better-auth's real
+ * limiter to pin them. Per address means per client address only where the app
+ * names a trusted address header; without one better-auth keys every request of
+ * a path on one shared bucket.
  */
+// Key order is meaningful, not alphabetical: `/get-session` must stay first so it matches before the catch-all.
+/* eslint-disable perfectionist/sort-objects */
 export const AUTH_RATE_LIMIT_CUSTOM_RULES: Record<string, false | { max: number; window: number }> = {
     "/get-session": false,
+    // CLI device-code sign-in (`auth/cli-device-auth.ts`). The limiter counts per ADDRESS and its window is
+    // a QUIET gap, so a ceiling with a long window would lock out people polling behind one office address.
+    // The poll route therefore gets a BURST ceiling (120 requests, every gap under 100 ms): a CLI polling
+    // every 5 s never nears it, a loop of invented codes does. The plugin's per-CODE interval bounds a real code.
+    "/device/key": { max: 120, window: 0.1 },
+    // A headless machine pairing (`neore-host pair`) polls this exactly as the CLI polls `/device/key`: same reasoning, same ceiling.
+    "/device/host": { max: 120, window: 0.1 },
+    // Opening a code (the approval page's lookup) replaces the plugin's own rule, 5 per 30 minutes with a window
+    // that only resets after a quiet gap: a reload, a mistyped code or a shared address would lock the page out for
+    // the code's whole life. A burst ceiling instead: 20 requests with every gap under 2 s cuts off a guessing
+    // loop and no person.
+    "/device": { max: 20, window: 2 },
+    // Issuing a code: a person runs `login` rarely. The ceiling is high enough for a shared address to
+    // sign in a whole office (the table is cleaned of lapsed codes on every issue), and low enough to stop a loop.
+    "/device/code": { max: 60, window: 60 },
+    // Approve and deny need a session and a code bound to it, so these only bound a signed-in
+    // account's retries.
+    "/device/approve": { max: 10, window: 10 },
+    "/device/deny": { max: 10, window: 10 },
     // Static configuration, read on every chat page load to choose between guest chat and the signed-out chat. The
     // `/sign-in` prefix rule held it to 3 per 10 s, and a 429 reads as invite-only in the app.
     "/sign-in-methods": false,
 };
+/* eslint-enable perfectionist/sort-objects */
 
 export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions => {
     const oidcDiscovery = resolveOidcDiscoveryUrl();
@@ -339,6 +370,21 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
                   ]
                 : []),
             apiKey(API_KEY_OPTIONS),
+            // `neore login --device`: signs the CLI in by code, answered with a read-only API key.
+            ...cliDeviceAuth({
+                // `neore-host pair`: a headless machine pairs itself as a device of the approving account. The
+                // device row lives on that account's shard, so both steps cross to it.
+                ...(hooks.hostPairing && { hostPairing: hooks.hostPairing }),
+                mintApiKey: async ({ expiresInSeconds, name, userId }) =>
+                    await (getAuth().api as unknown as ApiKeyAuthApi).createApiKey({
+                        body: { expiresIn: expiresInSeconds, name, permissions: DEFAULT_API_SCOPES as Record<string, string[]>, userId },
+                    }),
+                verifyApiKey: async (key) => {
+                    const result = await (getAuth().api as unknown as ApiKeyAuthApi).verifyApiKey({ body: { key } });
+
+                    return result.valid && result.key ? { id: result.key.id, referenceId: result.key.referenceId } : null;
+                },
+            }),
             anonymous({
                 // Converting creates a NEW user, and the guest's rows live on the
                 // guest's shard: move them to the new user's (`lib/account-merge.ts`).
@@ -632,6 +678,16 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
 
     cached = createAuth({
         ...buildAuthOptions({
+            // A machine that pairs itself by code is registered on its owner's shard. BOTH steps carry
+            // `{ shardKey: userId }`: a revocation (`devicePairingRevocations`) only stops a registration that
+            // runs on the same shard as the revoke.
+            hostPairing: {
+                precheck: async (userId, codeId) => {
+                    await shard.call(internal.devices.internal.checkHeadlessPairing, { codeId, userId }, { shardKey: userId });
+                },
+                register: async ({ codeId, name, platform, userId }) =>
+                    await shard.call(internal.devices.internal.registerHeadlessDevice, { codeId, name, platform, userId }, { shardKey: userId }),
+            },
             // Queued, not run here: moving a guest's rows takes a round trip per
             // table and page, too long to hold the sign-up request. The job runs
             // on the NEW user's shard (`lib/account-merge.ts#runGuestMerge`). A
@@ -699,6 +755,7 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
                 if (deletedOrganizationId) {
                     await queueOrganizationBillingCancel(deletedOrganizationId);
                     await queueOrganizationPolicyErase(deletedOrganizationId);
+                    await queueOrganizationRepoErase(deletedOrganizationId);
                 } else if (organizationId) {
                     await queueSeatSync(organizationId);
                 }

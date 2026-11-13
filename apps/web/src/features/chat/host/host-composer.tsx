@@ -21,9 +21,9 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { allowPromptQueueRestore, selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { cleanPromptText } from "@/features/chat/core/utils/prompt-queue";
-import { useCRPC } from "@/lib/lunora/crpc";
+import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import DiffCommentsDraft from "./diff-comments-draft";
 import { caretAfterRemoval } from "./host-caret";
@@ -253,9 +253,17 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     // The reason the head was refused, kept beside the paused queue after the toast has gone.
     const [queueError, setQueueError] = useState<string | undefined>(undefined);
 
+    // Not before Lunora confirms the session: the optimistic chat layout (`OptimisticAuthGate`) paints before that.
+    const { isAuthenticated } = useLunoraAuth();
+
     useEffect(() => {
+        if (!isAuthenticated) {
+            return;
+        }
+
+        allowPromptQueueRestore();
         usePromptQueueStore.getState().hydrate(threadId);
-    }, [threadId]);
+    }, [isAuthenticated, threadId]);
 
     // The queue's state machine (`host-queue.ts`). The ref is the truth, written synchronously on every event, so a decision
     // made between two renders (a lock granted, an answer arriving) reads the current phase; the state re-renders from it.
@@ -818,6 +826,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                                             onChange={(event) => setEditing({ id: item.id, text: event.target.value })}
                                             ref={editorRef}
                                             rows={2}
+                                            spellCheck
                                             value={editing.text}
                                         />
                                         {onlyHidden && (
@@ -986,6 +995,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                     placeholder={t`Message the agent on your computer`}
                     ref={boxRef}
                     rows={2}
+                    spellCheck
                     value={text}
                 />
                 {running && !steerOnSend && !interrupting && !anyTried && canInterruptAndSend() && (

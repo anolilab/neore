@@ -55,6 +55,7 @@ import {
 } from "../chat/agent-switch";
 import { getModelContextWindow } from "../chat/lib/auto-continue";
 import { assertPaidModel, requireEnabledModel } from "../chat/lib/enabled-model";
+import { modeInheritedFrom } from "../chat/tool-permissions";
 import { loadEligibleThread } from "../devices/internal";
 import { isDeviceInScope, resolveThreadProject } from "../devices/lib/scope";
 import { isDeviceOnline } from "../devices/lib/state";
@@ -657,6 +658,9 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
         return { agent: to, coldStartCostly: false, messageId, switched: true };
     }
 
+    // The mode a cloud thread taking over from this one inherits (`modeInheritedFrom`): this thread's own, or for a computer's thread the
+    // cloud thread it was switched from, so a round trip keeps the owner's mode. Read only when a cloud thread is made.
+    const inheritedMode = target.kind === "host" ? null : await modeInheritedFrom(ctx, thread, userId);
     // Across the runner: a new thread that takes over, linked to this one, which stays exactly as it was.
     const forkId =
         target.kind === "host"
@@ -677,6 +681,8 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
             : await insertThread(ctx.db, {
                   activeAgent: { kind: "model", model: target.model },
                   createdBy: userId,
+                  // A handoff to a cloud agent keeps the mode it inherits (a computer's thread has none, so the cloud chat it came from).
+                  ...(inheritedMode && { permissionMode: inheritedMode }),
                   // A thread that took over from a coding agent is marked even when the agent said nothing in words: what it read
                   // and ran is in none of this thread's rows (`threadHandoffTaint`).
                   ...((handoff || current.agent.kind === "host") && { hasHandoff: true }),

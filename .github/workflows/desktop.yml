@@ -329,7 +329,7 @@ jobs:
     release:
         name: "Draft prerelease"
         needs: build
-        runs-on: "ubuntu-latest"
+        runs-on: "ubuntu-24.04"
         timeout-minutes: 15
         # Reading the run's artifacts needs `actions: read`; writing the release needs `contents: write`.
         permissions:

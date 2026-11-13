@@ -219,11 +219,27 @@ describe("reassignGlobalRows", () => {
                 );
             }
 
+            // A guest's project repositories follow the same way, so the new account's export and lookup (by `userId`) find them.
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < rows; index += 1) {
+                    await context.db.insert("projectRepositories", {
+                        createdAt: index,
+                        projectId: `project-${String(index)}`,
+                        url: `u${String(index)}`,
+                        userId: "guest",
+                    });
+                }
+            });
+
             const { reassigned } = await harness.run(async (context: any) => await context.runMutation(reassignGlobalRows, { from: "guest", to: "user" }));
             const left = await harness.run(async (context: any) => await context.db.knowledgeCollections.findMany({ where: { userId: "guest" } }));
+            const leftRepositories = await harness.run(async (context: any) => await context.db.projectRepositories.findMany({ where: { userId: "guest" } }));
+            const movedRepositories = await harness.run(async (context: any) => await context.db.projectRepositories.findMany({ where: { userId: "user" } }));
 
-            expect(reassigned).toBe(rows);
+            expect(reassigned).toBe(rows * 2);
             expect(left.page).toStrictEqual([]);
+            expect(leftRepositories.page).toStrictEqual([]);
+            expect(movedRepositories.page).toHaveLength(rows);
         } finally {
             harness.close();
         }

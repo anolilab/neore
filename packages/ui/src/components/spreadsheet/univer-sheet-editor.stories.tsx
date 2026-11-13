@@ -27,16 +27,28 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Waits until Univer has drawn the sheet's own canvas. Univer adds several canvases (the cell and formula-bar editors
+ * have one each) and the sheet's can come last, so waiting for any canvas is not enough. The editor resets each
+ * canvas's positive tabindex in the task that inserts it (univer-accessibility.tsx), so the a11y check after `play`
+ * never sees one.
+ */
+const settled: Story["play"] = async ({ canvasElement }) => {
+    await waitFor(() => expect(canvasElement.querySelector('canvas[id^="univer-sheet-main-canvas"]')).not.toBeNull(), { timeout: 15_000 });
+    // Only the canvases: they are what the repair resets, and any other positive tabindex is left for the a11y check to report.
+    expect(canvasElement.querySelector('canvas[tabindex]:not([tabindex="0"]):not([tabindex="-1"])')).toBeNull();
+};
+
 export const Default: Story = {
-    play: async ({ canvasElement }) => {
-        await waitFor(() => expect(canvasElement.querySelector("canvas")).not.toBeNull(), { timeout: 15_000 });
-    },
+    play: settled,
 };
 
 export const DarkMode: Story = {
     args: { darkMode: true },
+    play: settled,
 };
 
 export const Empty: Story = {
     args: { content: "" },
+    play: settled,
 };

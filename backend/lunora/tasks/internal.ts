@@ -27,7 +27,8 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { enqueueJob } from "../lib/job-queue";
-import { notifyQuietly } from "../notifications/notify";
+import { notify, notifyQuietly } from "../notifications/notify";
+import { noteShardDue } from "../lib/shard-housekeeping";
 import { patchById, withoutUndefined } from "../lib/patch";
 import type { SkillContext } from "../skills/executor";
 import { prepareSkillInvocation } from "../skills/executor";
@@ -51,6 +52,12 @@ import {
     isPassingFallback,
     pickRunThread,
     recurrenceSkipReason,
+    firstStuckCheckAt,
+    nextStuckCheckAt,
+    STUCK_CHECK_STATUSES,
+    STUCK_OWNER_RECHECK_MS,
+    STUCK_RETRY_MS,
+    stuckNoticeDue,
 } from "./logic";
 import { vTaskRunNoticeReason, vTaskRunOrigin, vVerdict } from "./validators";
 import { vCodingAgentAssignment } from "../coding-agents/validators";
@@ -122,7 +129,13 @@ export const startTask = async (
     }
 
     if (target === "blocked") {
-        await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, status: "blocked", updatedAt: now });
+        await patchById(ctx.db, "tasks", task._id, {
+            activeCycle: undefined,
+            status: "blocked",
+            stuckCheckAt: firstStuckCheckAt(now),
+            updatedAt: now,
+        });
+        await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
 
         return "blocked";
     }
@@ -144,8 +157,157 @@ export const promoteDependents = async (ctx: MutationCtx, completed: Doc<"tasks"
     for (const task of tasks) {
         if (unblocked.has(task._id as string)) {
             await queueCycle(ctx, task, "dependency", now);
+        } else if (task.status === "blocked" && task.dependsOn.includes(completed._id)) {
+            // Still waiting on another dependency, but this one moved: progress, so the stuck clock restarts.
+            await patchById(ctx.db, "tasks", task._id, { stuckCheckAt: firstStuckCheckAt(now), updatedAt: now });
+            await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
         }
     }
+};
+
+/** Most tasks read when following a blocked task's dependencies to what it waits on. */
+const WAIT_SCAN_MAX = 20;
+
+/**
+ * What a blocked task waits on, followed through its dependencies and the blocked tasks between them (at most
+ * `WAIT_SCAN_MAX` tasks are read). `owner` when the chain ends in a `needs_review` task or a failed task that nothing
+ * retries; `slot` when it ends in a failed recurring task, which the schedule runs again at that time.
+ */
+const waitOf = async (ctx: MutationCtx, dependsOn: ReadonlyArray<string>): Promise<{ owner: boolean; slot?: number }> => {
+    const seen = new Set<string>();
+    const queue = [...dependsOn];
+    let owner = false;
+    let slot: number | undefined;
+
+    while (queue.length > 0 && seen.size < WAIT_SCAN_MAX) {
+        const id = queue.shift() as string;
+
+        if (seen.has(id)) {
+            continue;
+        }
+
+        seen.add(id);
+
+        const dependency = await ctx.db.get("tasks", id as Id<"tasks">);
+
+        if (!dependency) {
+            continue;
+        }
+
+        switch (dependency.status) {
+            case "blocked": {
+                queue.push(...dependency.dependsOn);
+
+                break;
+            }
+            case "failed": {
+                if (dependency.recurring && dependency.nextRunAt !== undefined) {
+                    slot = Math.max(slot ?? 0, dependency.nextRunAt);
+                } else {
+                    owner = true;
+                }
+
+                break;
+            }
+            case "needs_review": {
+                owner = true;
+
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+
+    // A queued ID already read adds nothing: the chain is unresolved only while an unread ID is left, past the limit.
+    return { owner: owner || queue.some((id) => !seen.has(id)), slot };
+};
+
+/**
+ * Asks the owner, once per level and stuck episode, about a blocked or failed task that has made no progress for 2 or
+ * 7 days (`STUCK_NOTICE_DAYS`). Only tasks whose `stuckCheckAt` has come due are read, so a task whose notices are
+ * out costs nothing until its episode changes. A blocked task waiting, through its dependencies, on the owner's review
+ * or on a failed task is looked at again daily, so the owner is asked once about the task that needs them, not about
+ * every task behind it. Writes the notice state without touching `updatedAt`, so the notice is not progress.
+ */
+const escalateStuckTasks = async (ctx: MutationCtx, now: number): Promise<void> => {
+    for (const status of STUCK_CHECK_STATUSES) {
+        // `gt(0)` leaves out a row with no check armed: an unset `stuckCheckAt` sorts first, and would fill the batch.
+        const due = await ctx.db
+            .query("tasks")
+            .withIndex("by_status_and_stuckCheckAt", (q) => q.eq("status", status).gt("stuckCheckAt", 0).lte("stuckCheckAt", now))
+            .take(SWEEP_BATCH);
+
+        for (const task of due) {
+            // A failed recurring task runs again at its next slot, so the owner has nothing to decide yet: look after that slot.
+            if (task.status === "failed" && task.recurring && task.nextRunAt !== undefined) {
+                await recheckStuckTask(ctx, task, Math.max(task.nextRunAt, now) + STUCK_OWNER_RECHECK_MS);
+
+                continue;
+            }
+
+            if (task.status === "blocked") {
+                const wait = await waitOf(ctx, task.dependsOn);
+
+                if (wait.owner) {
+                    await recheckStuckTask(ctx, task, now + STUCK_OWNER_RECHECK_MS);
+
+                    continue;
+                }
+
+                if (wait.slot !== undefined) {
+                    await recheckStuckTask(ctx, task, Math.max(wait.slot, now) + STUCK_OWNER_RECHECK_MS);
+
+                    continue;
+                }
+            }
+
+            const days = stuckNoticeDue(task, now);
+
+            if (days !== undefined) {
+                // The notice is written before its level is recorded, so a write that fails is sent again, not lost.
+                try {
+                    // The subject only: the notice names the task and carries no instructions, errors or results, so the
+                    // lock screen shows nothing more than the title (`notifications/AGENTS.md`).
+                    await notify(ctx, {
+                        dedupeKey: `task-stuck:${task._id}:${task.updatedAt}:${days}`,
+                        link: "/tasks",
+                        title: task.title,
+                        type: "task_stuck",
+                        userId: task.userId,
+                    });
+                } catch (error) {
+                    ctx.log.event("tasks.stuck_notice_failed", {
+                        days,
+                        error: error instanceof Error ? error.name : "unknown",
+                        reason: error instanceof Error ? error.message : "unknown",
+                        taskId: task._id,
+                    });
+                    await recheckStuckTask(ctx, task, now + STUCK_RETRY_MS);
+
+                    continue;
+                }
+            }
+
+            const next = nextStuckCheckAt(task, days, now);
+
+            await patchById(ctx.db, "tasks", task._id, {
+                stuckCheckAt: next,
+                ...(days !== undefined && { stuckNotice: { days, since: task.updatedAt } }),
+            });
+
+            if (next !== undefined) {
+                await noteShardDue(ctx, next, task.userId);
+            }
+        }
+    }
+};
+
+/** Sets when the sweep next looks at a stuck task, and arms its shard for that moment. */
+const recheckStuckTask = async (ctx: MutationCtx, task: Doc<"tasks">, at: number): Promise<void> => {
+    await patchById(ctx.db, "tasks", task._id, { stuckCheckAt: at });
+    await noteShardDue(ctx, at, task.userId);
 };
 
 const summarise = (answer: string | undefined): string | undefined => {
@@ -171,6 +333,7 @@ const failedTaskPatch = (lastError: string, now: number) => {
         lastError,
         resultSummary: undefined,
         status: "failed" as const,
+        stuckCheckAt: firstStuckCheckAt(now),
         updatedAt: now,
     };
 };
@@ -178,6 +341,7 @@ const failedTaskPatch = (lastError: string, now: number) => {
 /** Ends a cycle before its round runs, with `lastError` saying why. No `taskRuns` row: nothing ran. */
 const refuseRound = async (ctx: MutationCtx, task: Doc<"tasks">, lastError: string): Promise<void> => {
     await patchById(ctx.db, "tasks", task._id, failedTaskPatch(lastError, Date.now()));
+    await noteShardDue(ctx, firstStuckCheckAt(Date.now()), task.userId);
 };
 
 const vClaim = v.union(
@@ -550,6 +714,7 @@ export const completeRound = internalMutation
 
             await ctx.db.patch("taskRuns", run._id, { ...runResult, error, status: "error" });
             await patchById(ctx.db, "tasks", task._id, { ...failedTaskPatch(error, now), lastRunThreadId });
+            await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
             await notifyTaskRound(ctx, task, run, "failure", error, args.threadId ?? run.threadId);
 
             return "failed";
@@ -713,6 +878,7 @@ export const checkDueTasks = internalMutation
             }
 
             await patchById(ctx.db, "tasks", task._id, failedTaskPatch(message, now));
+            await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
             // The inbox keeps the trace: a recurring task's catch-up may start in this same sweep, which clears
             // `lastError`, and a round that never started has no run row to show it.
             await notifyQuietly(ctx, {
@@ -737,6 +903,8 @@ export const checkDueTasks = internalMutation
                 await failStaleTask(task, STALE_MESSAGE[status]);
             }
         }
+
+        await escalateStuckTasks(ctx, now);
 
         const due = pickFairRecurrences(
             await ctx.db

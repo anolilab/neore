@@ -29,6 +29,8 @@ const LATEST_MESSAGE_WINDOW = 20;
 interface StoredPart {
     approvalId?: string;
     input?: unknown;
+    /** Real server and tool names stamped on an MCP, connector or device call (`lib/mcp-tool-labels.ts`). */
+    providerOptions?: { neore?: { mcpServerName?: unknown; mcpToolName?: unknown } };
     toolCallId?: string;
     toolName?: string;
     type?: string;
@@ -59,51 +61,96 @@ export const findPendingApprovalOnLatestTurn = async (
     return request && { toolName: request.toolName };
 };
 
-/** The same lookup as `findPendingApprovalOnLatestTurn`, with the call's id and arguments too: what a pending request shows a reader. */
-export const findPendingRequestOnLatestTurn = async (
-    ctx: Pick<QueryCtx, "db">,
+/** An unanswered request on a thread's latest assistant turn: the call's id, tool and arguments. */
+export interface PendingToolRequest {
+    input: unknown;
+    /** The call's stamped server and tool, as the chat's own card shows them; `null` for a built-in tool. */
+    label: { server: string; tool: string } | null;
+    toolCallId: string | null;
+    toolName: string | null;
+}
+
+/**
+ * The thread's newest rows, newest first, as far back as the latest-turn check looks: on a branched thread, the end of
+ * the path the user is on. A query that admitted several threads passes a `reader` keyed on this one.
+ */
+export const latestTurnRows = async (
+    reader: Pick<QueryCtx, "db">,
     threadId: Id<"threads">,
-    approvalId: string,
-): Promise<{ input: unknown; toolCallId: string | null; toolName: string | null } | undefined> => {
-    const thread = await ctx.db.get("threads", threadId);
-    // A branched thread's latest turn is the end of the path the user is on;
-    // the newest rows in storage order may belong to a sibling branch.
-    const recent = thread?.activeLeafMessageId
-        ? await loadActivePathTail(ctx, threadId, thread.activeLeafMessageId, LATEST_MESSAGE_WINDOW)
-        : await ctx.db
+    activeLeafMessageId: string | undefined,
+): Promise<Doc<"messages">[]> =>
+    activeLeafMessageId
+        ? await loadActivePathTail(reader, threadId, activeLeafMessageId, LATEST_MESSAGE_WINDOW)
+        : await reader.db
               .query("messages")
               .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
               .order("desc")
               .take(LATEST_MESSAGE_WINDOW);
 
-    for (const message of recent) {
-        const role = roleOf(message);
-        const parts = partsOf(message);
+/** The requests in an assistant message's `parts` that `answered` does not hold, by approval id, each with its call. */
+const unansweredRequests = (parts: ReadonlyArray<StoredPart>, answered: ReadonlySet<string>): Map<string, PendingToolRequest> => {
+    const open = new Map<string, PendingToolRequest>();
+    // The turn's calls by id, indexed once; the first call with an id wins, as a search from the start would.
+    const calls = new Map<string | undefined, StoredPart>();
 
-        if (role === "tool") {
-            if (parts.some((p) => p.type === "tool-approval-response" && p.approvalId === approvalId)) {
-                return undefined;
-            }
+    for (const part of parts) {
+        if (part.type === "tool-call" && !calls.has(part.toolCallId)) {
+            calls.set(part.toolCallId, part);
+        }
+    }
 
+    for (const request of parts) {
+        if (request.type !== "tool-approval-request" || request.approvalId === undefined || answered.has(request.approvalId)) {
             continue;
         }
 
-        if (role !== "assistant") {
-            return undefined;
-        }
+        const call = calls.get(request.toolCallId);
+        const { mcpServerName: server, mcpToolName: tool } = call?.providerOptions?.neore ?? {};
+        const label = typeof server === "string" && typeof tool === "string" ? { server, tool } : null;
 
-        const request = parts.find((p) => p.type === "tool-approval-request" && p.approvalId === approvalId);
-
-        if (!request) {
-            return undefined;
-        }
-
-        const call = parts.find((p) => p.type === "tool-call" && p.toolCallId === request.toolCallId);
-
-        return { input: call?.input, toolCallId: call?.toolCallId ?? null, toolName: call?.toolName ?? null };
+        open.set(request.approvalId, { input: call?.input, label, toolCallId: call?.toolCallId ?? null, toolName: call?.toolName ?? null });
     }
 
-    return undefined;
+    return open;
+};
+
+/**
+ * The unanswered requests of the latest assistant turn in `recent` (newest first), by approval id. Tool messages newer
+ * than that turn answer requests; a newer user message (or none in the window) means the conversation moved on.
+ */
+export const openRequestsOfLatestTurn = (recent: ReadonlyArray<Doc<"messages">>): Map<string, PendingToolRequest> => {
+    const answered = new Set<string>();
+
+    for (const message of recent) {
+        const role = roleOf(message);
+
+        if (role === "assistant") {
+            return unansweredRequests(partsOf(message), answered);
+        }
+
+        if (role !== "tool") {
+            return new Map();
+        }
+
+        for (const part of partsOf(message)) {
+            if (part.type === "tool-approval-response" && part.approvalId !== undefined) {
+                answered.add(part.approvalId);
+            }
+        }
+    }
+
+    return new Map();
+};
+
+/** The same lookup as `findPendingApprovalOnLatestTurn`, with the call's id and arguments too: what a pending request shows a reader. */
+export const findPendingRequestOnLatestTurn = async (
+    ctx: Pick<QueryCtx, "db">,
+    threadId: Id<"threads">,
+    approvalId: string,
+): Promise<PendingToolRequest | undefined> => {
+    const thread = await ctx.db.get("threads", threadId);
+
+    return openRequestsOfLatestTurn(await latestTurnRows(ctx, threadId, thread?.activeLeafMessageId)).get(approvalId);
 };
 
 /** Owner, or a non-expired `write`/`admin` grant. */
@@ -122,6 +169,12 @@ export const APPROVAL_ABANDONED_BY = "abandoned";
 
 /** `error.data.code` of the refusal to answer such a request; the card words it. */
 export const TOOL_REQUEST_ABANDONED = "TOOL_REQUEST_ABANDONED";
+
+/** `resolvedBy` of a request closed because the sub-agent run that waited on it ended (`sub-agents/functions.ts`). */
+export const SUB_AGENT_RUN_ENDED_BY = "run-ended";
+
+/** `error.data.code` of the refusal to answer a sub-agent's request while the sub-agent is still working. */
+export const SUB_AGENT_STILL_WORKING = "SUB_AGENT_STILL_WORKING";
 
 export const claimToolApproval = async (
     ctx: Pick<MutationCtx, "db">,
@@ -179,6 +232,11 @@ export const claimToolApproval = async (
         });
     }
 
+    // Closed because the sub-agent run that waited on it ended, not by an answer: said as such.
+    if (run.status === "denied" && run.resolvedBy === SUB_AGENT_RUN_ENDED_BY) {
+        throw new LunoraError("CONFLICT", "This sub-agent has already ended");
+    }
+
     if (run.status !== "pending") {
         return { kind: "already-resolved", status: run.status, streamId: run.streamId ?? null };
     }
@@ -187,6 +245,28 @@ export const claimToolApproval = async (
 
     if (!pending) {
         throw new LunoraError("CONFLICT", "This tool request is no longer pending");
+    }
+
+    // A sub-agent's request is answered only while its run waits on it. Its continuation puts the run back to running in this
+    // transaction (`resumeClaimedRun`), so a second answer to the same run, or one sent before the run starts waiting, is
+    // refused here and its request stays open, instead of being consumed by a continuation that cannot run it.
+    if (run.config.subAgentRunId !== undefined) {
+        // A sub-agent child runs headless, and a headless run never reads a time-boxed allow: it would be ignored.
+        if (decision === "hour" || decision === "today") {
+            throw new LunoraError("BAD_REQUEST", "A sub-agent's request can be allowed once or always, or denied");
+        }
+
+        const subAgentRun = await ctx.db.get("subAgentRuns", run.config.subAgentRunId);
+
+        if (subAgentRun?.status === "queued" || subAgentRun?.status === "running") {
+            throw new LunoraError("CONFLICT", "The sub-agent is still working on another request. This one closes when its run ends", {
+                data: { code: SUB_AGENT_STILL_WORKING },
+            });
+        }
+
+        if (subAgentRun?.status !== "awaiting") {
+            throw new LunoraError("CONFLICT", "This sub-agent has already ended");
+        }
     }
 
     await ctx.db.patch("toolApprovalRuns", run._id, {

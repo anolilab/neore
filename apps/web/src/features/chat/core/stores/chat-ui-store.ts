@@ -13,6 +13,7 @@ import { create } from "zustand";
 import { devtools, subscribeWithSelector } from "zustand/middleware";
 
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
+import { updateParkedAttachment } from "@/features/chat/split/composer-drafts";
 
 /**
  * Batching utility for high-frequency updates
@@ -87,6 +88,8 @@ interface ChatUIStore {
 
     addAttachment: (file: File) => string; // Returns attachment ID
     addEditAttachment: (file: File) => string;
+    /** The prompt last written into a composer, keyed by chat and text, so a composer that remounts does not write it again. */
+    appliedInitialMessageKey: string | null;
 
     /**
      * Reference images attached to the next outgoing message. Ordered — index
@@ -97,6 +100,8 @@ interface ChatUIStore {
 
     canvasEditMode: "edit" | "preview";
     canvasHistoryVersions: [number, number] | null;
+    /** The chat that opened the open document; the panel shows only there. Unset when the opener did not say. */
+    canvasThreadId: string | null;
 
     canvasViewMode: "editor" | "history";
 
@@ -131,7 +136,8 @@ interface ChatUIStore {
     noteComposerHiddenRemoved: (count: number) => void;
 
     // Canvas/Artifact actions
-    openCanvas: (documentId: string) => void;
+    /** False when the document is open in another chat, which keeps its panel; the caller says so. */
+    openCanvas: (documentId: string, threadId?: string) => boolean;
     openPreviewFile: (file: PreviewFile) => void;
     /** A chat PDF open in the side panel, instead of a document. Cleared when a document opens or the panel closes. */
     previewFile: PreviewFile | null;
@@ -145,6 +151,7 @@ interface ChatUIStore {
     setActiveDocumentId: (documentId: string | null) => void;
     // Right sidebar tab actions
     setActiveRightSidebarTab: (tab: string) => void;
+    setAppliedInitialMessageKey: (key: string | null) => void;
     setAttachedReferences: (references: ReferenceSelection[]) => void;
 
     setCanvasDirty: (dirty: boolean) => void;
@@ -196,11 +203,13 @@ const getAttachmentType = (file: File): "image" | "file" | "document" => {
 
 const initialState = {
     activeDocumentId: null as string | null,
+    appliedInitialMessageKey: null as string | null,
     activeRightSidebarTab: "summary",
     attachedReferences: [] as ReferenceSelection[],
     canvasDirty: false,
     canvasEditMode: "edit" as "edit" | "preview",
     canvasHistoryVersions: null as [number, number] | null,
+    canvasThreadId: null as string | null,
     canvasViewMode: "editor" as "editor" | "history",
     composerAttachments: [] as PendingAttachment[],
     composerBannedContent: null as { message: string; words: string[] } | null,
@@ -217,6 +226,12 @@ const initialState = {
     isSubmitting: false,
     transitioningMessage: null as { text: string; threadId: string } | null,
 };
+
+/**
+ * Whether a document (not a PDF preview) is open in the side panel. Its editor may hold edits that nothing reports yet,
+ * so opening a PDF must not replace it.
+ */
+export const isDocumentOpen = (state: Pick<ChatUIStore, "isCanvasOpen" | "previewFile">): boolean => state.isCanvasOpen && state.previewFile === null;
 
 export const useChatUIStore = create<ChatUIStore>()(
     devtools(
@@ -282,23 +297,39 @@ export const useChatUIStore = create<ChatUIStore>()(
                 },
 
                 closeCanvas: () => {
-                    set({ canvasDirty: false, isCanvasOpen: false, previewFile: null });
+                    set({ canvasDirty: false, canvasThreadId: null, isCanvasOpen: false, previewFile: null });
                 },
                 openPreviewFile: (file) => {
                     set({ isCanvasOpen: true, previewFile: file });
                 },
 
                 // Canvas/Artifact actions
-                openCanvas: (documentId) => {
+                openCanvas: (documentId, threadId) => {
+                    const state = get();
+                    // One editor serves the panel, so a document open in another chat stays put: its editor may hold edits.
+                    const openInOtherChat =
+                        isDocumentOpen(state) &&
+                        state.activeDocumentId !== documentId &&
+                        threadId !== undefined &&
+                        state.canvasThreadId !== null &&
+                        state.canvasThreadId !== threadId;
+
+                    if (openInOtherChat) {
+                        return false;
+                    }
+
                     set({
                         activeDocumentId: documentId,
                         canvasDirty: false,
                         canvasEditMode: "edit",
                         canvasHistoryVersions: null,
+                        canvasThreadId: threadId ?? null,
                         canvasViewMode: "editor",
                         isCanvasOpen: true,
                         previewFile: null,
                     });
+
+                    return true;
                 },
 
                 removeAttachedReference: (id) => {
@@ -347,6 +378,10 @@ export const useChatUIStore = create<ChatUIStore>()(
 
                 setActiveDocumentId: (documentId) => {
                     set({ activeDocumentId: documentId, canvasDirty: false });
+                },
+
+                setAppliedInitialMessageKey: (key) => {
+                    set({ appliedInitialMessageKey: key });
                 },
 
                 // Right sidebar tab actions
@@ -454,6 +489,11 @@ export const useChatUIStore = create<ChatUIStore>()(
                 },
 
                 updateAttachment: (id, updates) => {
+                    // An upload that outlives its pane's focus finishes into the draft parked for that chat.
+                    if (get().composerAttachments.every((a) => a.id !== id) && updateParkedAttachment(id, updates)) {
+                        return;
+                    }
+
                     set((state) => {
                         return {
                             composerAttachments: state.composerAttachments.map((a) => (a.id === id ? { ...a, ...updates } : a)),
@@ -542,12 +582,6 @@ export const useScrollState = () => {
 };
 
 /**
- * Whether a document (not a PDF preview) is open in the side panel. Its editor may hold edits that nothing reports yet,
- * so opening a PDF must not replace it.
- */
-export const isDocumentOpen = (state: Pick<ChatUIStore, "isCanvasOpen" | "previewFile">): boolean => state.isCanvasOpen && state.previewFile === null;
-
-/**
  * The side panel across an account switch: a PDF preview (a signed link, nothing unsaved) closes as the switch starts; a
  * document, whose editor may hold unsaved edits, closes only once the switch has gone through, so a failed switch keeps it.
  * Called with "after" on sign-out too, in every tab.
@@ -574,6 +608,7 @@ export const useCanvasState = () => {
     const canvasDirty = useChatUIStore((state) => state.canvasDirty);
     const canvasViewMode = useChatUIStore((state) => state.canvasViewMode);
     const canvasHistoryVersions = useChatUIStore((state) => state.canvasHistoryVersions);
+    const canvasThreadId = useChatUIStore((state) => state.canvasThreadId);
     const openCanvas = useChatUIStore((state) => state.openCanvas);
     const closeCanvas = useChatUIStore((state) => state.closeCanvas);
     const setActiveDocumentId = useChatUIStore((state) => state.setActiveDocumentId);
@@ -589,6 +624,7 @@ export const useCanvasState = () => {
         previewFile,
         canvasEditMode,
         canvasHistoryVersions,
+        canvasThreadId,
         canvasViewMode,
         closeCanvas,
         isCanvasOpen,
@@ -601,15 +637,18 @@ export const useCanvasState = () => {
     };
 };
 
+/**
+ * One message row's hover and copied state. Each row of a long thread calls this, and every store subscription runs on
+ * every store write (a keystroke in the composer too), so it subscribes to the two booleans only; the setters never
+ * change and are read at call time.
+ */
 export const useMessageInteractionState = (messageId: string) => {
     // Use separate selectors to avoid creating new object references
     const isHovered = useChatUIStore((state) => state.hoveredMessageId === messageId);
     const isCopied = useChatUIStore((state) => state.copiedMessageId === messageId);
-    const setHoveredMessageId = useChatUIStore((state) => state.setHoveredMessageId);
-    const setCopiedMessageId = useChatUIStore((state) => state.setCopiedMessageId);
 
-    const setHovered = (hovered: boolean) => setHoveredMessageId(hovered ? messageId : null);
-    const setCopied = () => setCopiedMessageId(messageId);
+    const setHovered = (hovered: boolean) => useChatUIStore.getState().setHoveredMessageId(hovered ? messageId : null);
+    const setCopied = () => useChatUIStore.getState().setCopiedMessageId(messageId);
 
     return { isCopied, isHovered, setCopied, setHovered };
 };

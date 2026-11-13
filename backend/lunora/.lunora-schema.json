@@ -5860,6 +5860,153 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "deviceCode": {
+      "commitOrdered": false,
+      "fields": {
+        "clientId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "deviceCode": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "expiresAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "hostname": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "lastPolledAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "platform": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "pollingInterval": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "scope": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "status": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "storage": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "userCode": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "deviceCode": {
+          "fields": [
+            "deviceCode"
+          ],
+          "unique": true
+        },
+        "expiresAt": {
+          "fields": [
+            "expiresAt"
+          ],
+          "unique": false
+        },
+        "userCode": {
+          "fields": [
+            "userCode"
+          ],
+          "unique": true
+        },
+        "userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
+    "devicePairingRevocations": {
+      "commitOrdered": false,
+      "fields": {
+        "codeId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "revokedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_revokedAt": {
+          "fields": [
+            "revokedAt"
+          ],
+          "unique": false
+        },
+        "by_userId_codeId": {
+          "fields": [
+            "userId",
+            "codeId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "devices": {
       "commitOrdered": false,
       "fields": {
@@ -6014,6 +6161,12 @@
           "optional": false,
           "unique": false
         },
+        "pairedByCode": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "platform": {
           "kind": "union",
           "nullable": false,
@@ -6063,11 +6216,26 @@
           "unique": false
         },
         "transport": {
-          "kind": "literal",
+          "kind": "union",
           "nullable": false,
           "optional": true,
           "unique": false,
-          "literal": "\"ssh\""
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"headless\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"ssh\""
+            }
+          ]
         },
         "userId": {
           "kind": "string",
@@ -10956,6 +11124,12 @@
     "notifications": {
       "commitOrdered": false,
       "fields": {
+        "approvalId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "body": {
           "kind": "string",
           "nullable": false,
@@ -11095,6 +11269,13 @@
               "optional": false,
               "unique": false,
               "literal": "\"task\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"task_stuck\""
             },
             {
               "kind": "literal",
@@ -20448,6 +20629,92 @@
       "relations": {},
       "shardMode": "root"
     },
+    "projectRepositories": {
+      "commitOrdered": false,
+      "fields": {
+        "branchRevision": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "defaultAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "defaultBranch": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "deletingAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "organizationId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "projectId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "projects"
+        },
+        "url": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_organization_and_url": {
+          "fields": [
+            "organizationId",
+            "url"
+          ],
+          "unique": false
+        },
+        "by_project_and_url": {
+          "fields": [
+            "projectId",
+            "url"
+          ],
+          "unique": true
+        },
+        "by_user_and_url": {
+          "fields": [
+            "userId",
+            "url"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
+    },
     "projects": {
       "commitOrdered": false,
       "fields": {
@@ -24852,6 +25119,32 @@
             }
           ]
         },
+        "stuckCheckAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "stuckNotice": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "days": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "since": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
+        },
         "successCriteria": {
           "kind": "string",
           "nullable": false,
@@ -24882,6 +25175,13 @@
           "fields": [
             "recurring",
             "nextRunAt"
+          ],
+          "unique": false
+        },
+        "by_status_and_stuckCheckAt": {
+          "fields": [
+            "status",
+            "stuckCheckAt"
           ],
           "unique": false
         },
@@ -25090,6 +25390,91 @@
       "memory": false,
       "relations": {},
       "shardMode": "global:d1"
+    },
+    "teammateConnectorAccess": {
+      "commitOrdered": false,
+      "fields": {
+        "botId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "bots"
+        },
+        "connectorSlug": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "refined": true
+        },
+        "level": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"none\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"read_only\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"read_write\""
+            }
+          ]
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_botId_connectorSlug": {
+          "fields": [
+            "botId",
+            "connectorSlug"
+          ],
+          "unique": false
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        },
+        "by_userId_connectorSlug": {
+          "fields": [
+            "userId",
+            "connectorSlug"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
     },
     "temporaryThreads": {
       "commitOrdered": false,
@@ -26980,6 +27365,35 @@
             "unique": false
           }
         },
+        "permissionMode": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"auto\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"full\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"supervised\""
+            }
+          ]
+        },
         "pinnedAt": {
           "kind": "number",
           "nullable": false,
@@ -27757,6 +28171,18 @@
           "kind": "number",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "pauseId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "reminderSentAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "resolvedAt": {

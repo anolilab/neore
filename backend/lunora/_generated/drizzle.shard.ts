@@ -273,6 +273,17 @@ export const deviceCalls = sqliteTable("deviceCalls", {
     by_createdAt: index("by_createdAt").on(t.createdAt),
 }));
 
+export const devicePairingRevocations = sqliteTable("devicePairingRevocations", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    codeId: text("codeId").notNull(),
+    revokedAt: real("revokedAt").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId_codeId: index("by_userId_codeId").on(t.userId, t.codeId),
+    by_revokedAt: index("by_revokedAt").on(t.revokedAt),
+}));
+
 export const devices = sqliteTable("devices", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
@@ -285,10 +296,11 @@ export const devices = sqliteTable("devices", {
     manifest: text("manifest", { mode: "json" }).$type<Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }>>(),
     manifestIssuedAt: real("manifestIssuedAt"),
     name: text("name").notNull(),
+    pairedByCode: text("pairedByCode"),
     platform: text("platform", { mode: "json" }).$type<"macos" | "windows" | "linux">().notNull(),
     projectIds: text("projectIds", { mode: "json" }).$type<Array<Id<"projects">>>(),
     revokedAt: real("revokedAt"),
-    transport: text("transport"),
+    transport: text("transport", { mode: "json" }).$type<"ssh" | "headless">(),
     userId: text("userId").notNull(),
     viaDeviceId: text("viaDeviceId").references((): AnySQLiteColumn => devices._id),
 }, (t) => ({
@@ -903,13 +915,14 @@ export const nodeExecutions = sqliteTable("nodeExecutions", {
 export const notifications = sqliteTable("notifications", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    approvalId: text("approvalId"),
     body: text("body"),
     dedupeKey: text("dedupeKey"),
     emailOutcome: integer("emailOutcome", { mode: "boolean" }),
     link: text("link"),
     outcome: text("outcome", { mode: "json" }).$type<"success" | "failure">(),
     title: text("title").notNull(),
-    type: text("type", { mode: "json" }).$type<"task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request">().notNull(),
+    type: text("type", { mode: "json" }).$type<"task" | "task_stuck" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request">().notNull(),
     userId: text("userId").notNull(),
     createdAt: real("createdAt").notNull(),
     readAt: real("readAt"),
@@ -1456,6 +1469,8 @@ export const tasks = sqliteTable("tasks", {
     runDestination: text("runDestination", { mode: "json" }).$type<"new_thread" | "continue_thread" | "fresh_context">(),
     skillId: text("skillId"),
     status: text("status", { mode: "json" }).$type<"todo" | "queued" | "running" | "needs_review" | "done" | "failed" | "blocked">().notNull(),
+    stuckCheckAt: real("stuckCheckAt"),
+    stuckNotice: text("stuckNotice", { mode: "json" }).$type<{ days: number; since: number }>(),
     successCriteria: text("successCriteria"),
     title: text("title").notNull(),
     updatedAt: real("updatedAt").notNull(),
@@ -1465,6 +1480,21 @@ export const tasks = sqliteTable("tasks", {
     by_user_and_goal: index("by_user_and_goal").on(t.userId, t.goalId),
     by_recurring_and_nextRunAt: index("by_recurring_and_nextRunAt").on(t.recurring, t.nextRunAt),
     by_status_and_updatedAt: index("by_status_and_updatedAt").on(t.status, t.updatedAt),
+    by_status_and_stuckCheckAt: index("by_status_and_stuckCheckAt").on(t.status, t.stuckCheckAt),
+}));
+
+export const teammateConnectorAccess = sqliteTable("teammateConnectorAccess", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    botId: text("botId").references((): AnySQLiteColumn => bots._id).notNull(),
+    connectorSlug: text("connectorSlug").notNull(),
+    level: text("level", { mode: "json" }).$type<"read_only" | "read_write" | "none">().notNull(),
+    updatedAt: real("updatedAt").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_botId_connectorSlug: index("by_botId_connectorSlug").on(t.botId, t.connectorSlug),
+    by_userId_connectorSlug: index("by_userId_connectorSlug").on(t.userId, t.connectorSlug),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const temporaryThreads = sqliteTable("temporaryThreads", {
@@ -1653,6 +1683,7 @@ export const threads = sqliteTable("threads", {
     order: real("order"),
     organizationId: text("organizationId"),
     parentThreadIds: text("parentThreadIds", { mode: "json" }).$type<Array<string>>(),
+    permissionMode: text("permissionMode", { mode: "json" }).$type<"supervised" | "auto" | "full">(),
     pinnedAt: real("pinnedAt"),
     projectId: text("projectId"),
     publicAccessToken: text("publicAccessToken"),
@@ -1720,6 +1751,8 @@ export const toolApprovalRuns = sqliteTable("toolApprovalRuns", {
     approvalId: text("approvalId").notNull(),
     config: text("config", { mode: "json" }).$type<{ autoMediaEnrichment: boolean; contextFromOrder?: number; dispatchOrigin?: "outside_agent" | "trigger" | "messenger"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; headlessApproved?: Array<string>; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; stepsLeft?: number; subAgentRunId?: Id<"subAgentRuns">; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }>().notNull(),
     createdAt: real("createdAt").notNull(),
+    pauseId: text("pauseId"),
+    reminderSentAt: real("reminderSentAt"),
     resolvedAt: real("resolvedAt"),
     resolvedBy: text("resolvedBy"),
     secretRequest: integer("secretRequest", { mode: "boolean" }),

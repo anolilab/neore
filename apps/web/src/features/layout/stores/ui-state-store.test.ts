@@ -26,6 +26,17 @@ describe("thread action defaults against saved bindings", () => {
         expect(mergeKeyboardShortcuts({ newChat: "ctrl+j" }).archiveThread).toBe(defaultKeyboardShortcuts.archiveThread);
     });
 
+    it("starts the jump unbound, since browsers reserve every Ctrl+Shift letter it could take", () => {
+        expect(defaultKeyboardShortcuts.jumpToLastMessage).toBe("");
+        expect(mergeKeyboardShortcuts(undefined).jumpToLastMessage).toBe("");
+    });
+
+    it("keeps a jump binding the person saved, even one on a chord another action holds", () => {
+        const merged = mergeKeyboardShortcuts({ jumpToLastMessage: "ctrl+shift+k", newChat: "ctrl+shift+k" });
+
+        expect(merged.jumpToLastMessage).toBe("ctrl+shift+k");
+    });
+
     it("drops the thread actions' old defaults from a set saved before version 1, so the new defaults apply", () => {
         const migrated = migrateUIState({ keyboardShortcuts: { archiveThread: "ctrl+a", deleteThread: "ctrl+d", newChat: "ctrl+j" } }, 0) as {
             keyboardShortcuts: Record<string, string>;
@@ -43,6 +54,22 @@ describe("thread action defaults against saved bindings", () => {
         };
 
         expect(mergeKeyboardShortcuts(migrated.keyboardShortcuts).deleteThread).toBe("ctrl+d");
+    });
+
+    it("drops the jump's retired Ctrl+Shift+J default from a set saved before version 2, so the jump starts unbound", () => {
+        const migrated = migrateUIState({ keyboardShortcuts: { jumpToLastMessage: "ctrl+shift+j" } }, 1) as {
+            keyboardShortcuts: Record<string, string>;
+        };
+
+        expect(mergeKeyboardShortcuts(migrated.keyboardShortcuts).jumpToLastMessage).toBe("");
+    });
+
+    it("keeps a jump binding on Ctrl+Shift+J that the person saved from version 2 on", () => {
+        const migrated = migrateUIState({ keyboardShortcuts: { jumpToLastMessage: "ctrl+shift+j" } }, UI_STATE_VERSION) as {
+            keyboardShortcuts: Record<string, string>;
+        };
+
+        expect(mergeKeyboardShortcuts(migrated.keyboardShortcuts).jumpToLastMessage).toBe("ctrl+shift+j");
     });
 
     it("keeps a binding the user saved for the thread action itself", () => {

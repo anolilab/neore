@@ -58,9 +58,19 @@ The rules for working in `apps/web/src`. The detail, reasoning and code examples
   names (`lib/auth/README.md`). `import type` from `.server.ts` is safe.
 - Guard layout routes with `requireSession(context, location)` (`@/lib/auth/route-guard`) in `beforeLoad`, not by
   checking `context.isAuthenticated`; loaders return early while `!context.isAuthenticated`. There is no
-  `_authenticated/` layout; `(chat)/route.tsx` uses `<Authenticated>`.
+  `_authenticated/` layout; `(chat)/route.tsx` uses `OptimisticAuthGate` (`features/auth/AGENTS.md`).
 - Throw/handle the error classes from `lib/errors/index.ts` (`ServerError`, `ValidationError`, …), switching on `code`.
 - Access browser APIs only after hydration: track `isHydrated` (`features/auth/hooks/use-last-signin-method.ts`).
+- Desktop shell ([why](../../../docs/agents/web-src.md#desktop-shell)): style `data-native` in
+  `lib/native/native-shell.css`; gate list-row hover with `web:`. Read `isNativeShell()` inside effects, not via a
+  hook. Keep `system` accent and `explicit` marks local; the boot script reads marks via `EXPLICIT_MARKS`. Use
+  `--primary-label`/`-text`/`-hover`, never `text-black` or the raw OS accent. Give a prose `<textarea>` `spellCheck`.
+- Keep shell-only code off the first load (`scripts/check-web-bundle.ts`): mount it with `lazyShellChunk`
+  (`lib/native/shell-chunk.tsx`); one needed offline also goes in `OFFLINE_SHELL_CHUNKS` (`scripts/generate-sw.mjs`).
+  Use `toScriptLiteral` in inline scripts.
+- PostHog loads after mount: read it through `lib/analytics/posthog-client.ts` (`usePostHog`, `useFeatureFlagEnabled`,
+  `getPostHog`), never `posthog-js`/`posthog-js/react`/`@posthog/react` in eagerly loaded code (~115 KiB gzip).
+  Report caught errors with its `captureException` (queued until `startPostHog` ran); load it only via `posthog-js.ts`.
 
 ## CONVENTIONS
 

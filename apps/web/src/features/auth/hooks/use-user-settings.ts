@@ -24,6 +24,9 @@ export const useUserSettings = () => {
  */
 const settingsWrites = { pending: 0, tail: Promise.resolve() as Promise<unknown> };
 
+/** Whether `updateLatest` still has a settings write queued or in flight in this tab: a re-read now would drop its optimistic value. */
+export const hasPendingSettingsWrites = (): boolean => settingsWrites.pending > 0;
+
 /** Which `updateLatest` call last edited each field in this tab: a refused write restores only the fields still its own. */
 const lastFieldEdit = new Map<string, symbol>();
 

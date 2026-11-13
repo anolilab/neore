@@ -176,6 +176,28 @@ export const connectorDefinitions = sqliteTable("connectorDefinitions", {
     by_status: index("by_status").on(t.status),
 }));
 
+export const deviceCode = sqliteTable("deviceCode", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    clientId: text("clientId"),
+    deviceCode: text("deviceCode").notNull(),
+    expiresAt: real("expiresAt").notNull(),
+    hostname: text("hostname"),
+    lastPolledAt: real("lastPolledAt"),
+    platform: text("platform"),
+    pollingInterval: real("pollingInterval"),
+    scope: text("scope"),
+    status: text("status").notNull(),
+    storage: text("storage"),
+    userCode: text("userCode").notNull(),
+    userId: text("userId"),
+}, (t) => ({
+    deviceCode: uniqueIndex("deviceCode").on(t.deviceCode),
+    expiresAt: index("expiresAt").on(t.expiresAt),
+    userCode: uniqueIndex("userCode").on(t.userCode),
+    userId: index("userId").on(t.userId),
+}));
+
 export const documentHistory = sqliteTable("documentHistory", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
@@ -351,6 +373,24 @@ export const passkey = sqliteTable("passkey", {
 }, (t) => ({
     userId: index("userId").on(t.userId),
     credentialID: index("credentialID").on(t.credentialID),
+}));
+
+export const projectRepositories = sqliteTable("projectRepositories", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    branchRevision: real("branchRevision"),
+    createdAt: real("createdAt").notNull(),
+    defaultAt: real("defaultAt"),
+    defaultBranch: text("defaultBranch"),
+    deletingAt: real("deletingAt"),
+    organizationId: text("organizationId"),
+    projectId: text("projectId").references((): AnySQLiteColumn => projects._id).notNull(),
+    url: text("url").notNull(),
+    userId: text("userId"),
+}, (t) => ({
+    by_project_and_url: uniqueIndex("by_project_and_url").on(t.projectId, t.url),
+    by_user_and_url: index("by_user_and_url").on(t.userId, t.url),
+    by_organization_and_url: index("by_organization_and_url").on(t.organizationId, t.url),
 }));
 
 export const projects = sqliteTable("projects", {

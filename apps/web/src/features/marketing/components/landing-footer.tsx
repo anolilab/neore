@@ -109,7 +109,7 @@ const footerLinks = {
     product: [
         { hash: "features", label: msg`Features`, to: "/" },
         { hash: "models", label: msg`Models`, to: "/" },
-        { hash: "use-cases", label: msg`Use Cases`, to: "/" },
+        { hash: undefined, label: msg`Use Cases`, to: "/use-cases" },
     ],
     resources: [
         { hash: "faq", label: msg`FAQ`, to: "/" },

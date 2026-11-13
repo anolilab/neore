@@ -1,21 +1,21 @@
+import { api } from "@neore/backend/api";
+import type { Id } from "@neore/backend/dataModel";
 import { addPushTokenListener } from "expo-notifications";
 import { useEffect } from "react";
 import { AppState } from "react-native";
 
 import { useAuth } from "../auth/auth-state";
 import { getClient } from "../lib/lunora";
-import { backendPushServer, configurePhoneNotifications, deviceLocale, devicePushPlatform, pushRegistrations } from "./phone-push";
+import { listenForApprovalTaps } from "./approval-actions";
+import {
+    backendPushServer,
+    configurePhoneNotifications,
+    deviceLocale,
+    devicePushPlatform,
+    pushRegistrations,
+    syncApprovalActions,
+} from "./phone-push";
 import { createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
-
-/** Push is best-effort: a failure is logged (never the token) and never breaks the screen that asked. */
-const quietly = async (message: string, work: () => Promise<unknown>): Promise<void> => {
-    try {
-        await work();
-    } catch (error) {
-        // eslint-disable-next-line no-console -- no logger in the app; a failed setup must not be silent
-        console.warn(message, error);
-    }
-};
 
 /** `didRun`: no error (offline, no answer). `isRegistered`: the server now holds the token for this account. */
 interface RegisterResult {
@@ -65,6 +65,70 @@ export const endPhonePushForAccount = (): void => {
 /** Coming back to the front often (closing the notification shade, the permission prompt) registers at most this often. */
 export const FOREGROUND_REGISTER_INTERVAL_MS = 60_000;
 
+const setup = { inFlight: undefined as Promise<boolean> | undefined };
+
+/** Registers the approval actions in the current language, unless they already are; a failure is logged and reported as `false`. */
+const syncActionsNow = async (): Promise<boolean> => {
+    try {
+        await syncApprovalActions();
+
+        return true;
+    } catch (error: unknown) {
+        // eslint-disable-next-line no-console -- no logger in the app; a failed setup must not be silent
+        console.warn("Could not set up notifications.", error);
+
+        return false;
+    }
+};
+
+const attemptSetUp = async (): Promise<boolean> => {
+    try {
+        await configurePhoneNotifications();
+
+        return true;
+    } catch (error: unknown) {
+        // eslint-disable-next-line no-console -- no logger in the app; a failed setup must not be silent
+        console.warn("Could not set up notifications.", error);
+
+        return false;
+    }
+};
+
+/**
+ * The setup the approve and deny actions need. Concurrent callers share one attempt. A failed attempt is not remembered as done: the next
+ * call tries again. `configurePhoneNotifications` runs once it has worked, so a retry after that costs nothing.
+ */
+const setUpNotifications = async (): Promise<boolean> => {
+    setup.inFlight ??= attemptSetUp();
+
+    const attempt = setup.inFlight;
+
+    try {
+        const isSetUp = await attempt;
+
+        if (!isSetUp) {
+            return false;
+        }
+
+        // The actions are checked against the current language, and registered again when it changed, before any registration
+        // proceeds. This is the only place the sync runs, so it runs once per setup.
+        return await syncActionsNow();
+    } finally {
+        if (setup.inFlight === attempt) {
+            setup.inFlight = undefined;
+        }
+    }
+};
+
+/** A registration that waits for the setup first: it does not register a phone whose alerts would lack their actions. */
+const registerAfterSetUp = async (isPrompt: boolean, isCurrent: () => boolean): Promise<Awaited<ReturnType<typeof register>>> => {
+    // A setup that failed does not stop the registration: without one the phone gets no alerts at all, where an alert without its
+    // buttons still opens the app. The setup is tried again at the next registration.
+    await setUpNotifications();
+
+    return await register(isPrompt, isCurrent);
+};
+
 /**
  * The moment to ask: `userId` just sent a message, so a reply, a question or an approval may come while the app is in
  * the background. Only while that account is still the one signed in, at most once per sign-in; the system itself
@@ -77,7 +141,7 @@ export const offerPhonePush = async (userId: string): Promise<void> => {
     }
 
     const { account } = signedIn;
-    const { didRun } = await register(true, () => account?.isCurrent === true);
+    const { didRun } = await registerAfterSetUp(true, () => account?.isCurrent === true);
 
     if (!didRun) {
         promptOffer.release(userId);
@@ -93,9 +157,38 @@ export const usePhonePush = (): void => {
     const { hasToken, status, user } = useAuth();
     const userId = status === "signed-in" && hasToken ? user?.id : undefined;
 
+    // Set up early, so an alert that arrives as the phone registers already carries its approve and deny actions. Every
+    // registration tries the same setup first (`registerAfterSetUp`).
     useEffect(() => {
-        quietly("Could not set up notifications.", configurePhoneNotifications);
+        setUpNotifications();
     }, []);
+
+    useEffect(() => {
+        if (userId === undefined) {
+            return undefined;
+        }
+
+        // A tap on an approval alert answers it as the signed-in account, through the procedure the chat's own card uses.
+        // Offline it is refused, never queued (`onlineOnly`). Once that account's sign-out has begun, no tap is answered: the
+        // answer reports that it was skipped, so the tap is not recorded as answered and can be read again.
+        const subscription = listenForApprovalTaps(async (answer) => {
+            if (signedIn.account?.isCurrent !== true) {
+                return false;
+            }
+
+            await getClient().mutation(
+                api.chat.tool_permissions.respondToToolApproval,
+                { approvalId: answer.approvalId, decision: answer.decision, threadId: answer.threadId as Id<"threads"> },
+                { onlineOnly: true },
+            );
+
+            return true;
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [userId]);
 
     useEffect(() => {
         if (userId === undefined) {
@@ -108,7 +201,7 @@ export const usePhonePush = (): void => {
         const foreground = createForegroundGate(FOREGROUND_REGISTER_INTERVAL_MS);
         const isRotation = createTokenChangeFilter();
         const registerSilently = async (): Promise<boolean> => {
-            const { isRegistered } = await register(false, isCurrent);
+            const { isRegistered } = await registerAfterSetUp(false, isCurrent);
 
             return isRegistered;
         };
@@ -130,7 +223,7 @@ export const usePhonePush = (): void => {
                 return;
             }
 
-            quietly("Could not set up notifications.", configurePhoneNotifications);
+            setUpNotifications();
 
             foreground.run(registerSilently);
         });

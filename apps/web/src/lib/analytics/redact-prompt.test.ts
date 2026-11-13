@@ -12,7 +12,62 @@ describe(redactPromptFromEvent, () => {
     it("removes a prompt link's text from the page URL and keeps the rest of the address", () => {
         const event = redactPromptFromEvent(pageView({ $current_url: "https://app.test/chat?prompt=my+secret+%26+more&model=gpt#top" }));
 
-        expect(event?.properties.$current_url).toBe("https://app.test/chat?prompt=redacted&model=gpt#top");
+        expect(event?.properties.$current_url).toBe("https://app.test/chat?prompt=redacted&model=gpt");
+    });
+
+    it("drops the fragment of every address, where a guest link carries its token", () => {
+        const page = `https://app.test/guest#${"ab".repeat(32)}`;
+        const event = redactPromptFromEvent(
+            pageView({
+                $current_url: page,
+                $referrer: page,
+                $set: { $current_url: page },
+                $set_once: { $initial_current_url: page, $initial_referrer: page },
+                url: page,
+            }),
+        );
+
+        expect(JSON.stringify(event)).not.toContain("abab");
+        expect(event?.properties.$current_url).toBe("https://app.test/guest");
+    });
+
+    it("drops the fragment of a guest link written relative, as an autocaptured href is", () => {
+        const event = redactPromptFromEvent(pageView({ $elements_chain: `a:href="/guest#${"cd".repeat(32)}"nth-child="1"` }));
+
+        expect(JSON.stringify(event)).not.toContain("cdcd");
+        expect(event?.properties.$elements_chain).toBe('a:href="/guest"nth-child="1"');
+    });
+
+    it("drops the fragment of a guest link encoded in another address, at any depth", () => {
+        const once = `https://app.test/sign-in?redirectTo=%2Fguest%23${"cd".repeat(32)}&x=1`;
+        const twice = `https://app.test/a?next=%252Fguest%2523${"cd".repeat(32)}`;
+        const event = redactPromptFromEvent(pageView({ $current_url: once, $referrer: twice }));
+
+        expect(JSON.stringify(event)).not.toContain("cdcd");
+        expect(event?.properties.$current_url).toBe("https://app.test/sign-in?redirectTo=%2Fguest&x=1");
+        // A value that only looks alike is left alone.
+        expect(redactPromptFromEvent(pageView({ q: "guest%231 issue" }))?.properties.q).toBe("guest%231 issue");
+    });
+
+    it("drops the fragment of a guest link with a query before it, written relative or encoded", () => {
+        const token = "ef".repeat(32);
+        const event = redactPromptFromEvent(
+            pageView({
+                $current_url: `https://app.test/sign-in?redirectTo=%2Fguest%3Futm_source%3Dx%23${token}&y=2`,
+                $elements_chain: `a:href="/guest?utm_source=x#${token}"nth-child="1"`,
+                $referrer: `https://app.test/a?next=%252Fguest%253Fa%253D1%2523${token}`,
+            }),
+        );
+
+        expect(JSON.stringify(event)).not.toContain("efef");
+        expect(event?.properties.$elements_chain).toBe('a:href="/guest?utm_source=x"nth-child="1"');
+        expect(event?.properties.$current_url).toBe("https://app.test/sign-in?redirectTo=%2Fguest%3Futm_source%3Dx&y=2");
+    });
+
+    it("ends a dropped fragment at an escaped quote in an autocaptured link, keeping the rest of the chain", () => {
+        const event = redactPromptFromEvent(pageView({ $elements_chain: String.raw`a:attr__href="https://app.test/guest#token\"x"nth-child="1"` }));
+
+        expect(event?.properties.$elements_chain).toBe(String.raw`a:attr__href="https://app.test/guest\"x"nth-child="1"`);
     });
 
     it("removes the text of a link nested in a sign-in page's return address", () => {
@@ -21,6 +76,20 @@ describe(redactPromptFromEvent, () => {
 
         expect(JSON.stringify(event)).not.toContain("secret");
         expect(JSON.stringify(event)).toContain("model%3Dgpt");
+    });
+
+    it("removes sign-up's invitation token, in the address, in a nested return address and with an encoded name", () => {
+        const event = redactPromptFromEvent(
+            pageView({
+                $current_url: "https://app.test/auth/sign-up?invite=tok-secret-1&lang=de",
+                $referrer: `https://app.test/auth/sign-in?redirectTo=${encodeURIComponent("/auth/sign-up?invite=tok-secret-2&lang=de")}`,
+                url: "https://app.test/auth/sign-up?%69nvite=tok-secret-3",
+            }),
+        );
+
+        expect(JSON.stringify(event)).not.toContain("tok-secret");
+        expect(event?.properties.$current_url).toBe("https://app.test/auth/sign-up?invite=redacted&lang=de");
+        expect(event?.properties.$referrer).toContain("lang%3Dde");
     });
 
     it("removes the text of a nested link whose separator is encoded but whose = is not", () => {

@@ -1,11 +1,12 @@
 import { deleteItemAsync, getItemAsync, setItemAsync } from "expo-secure-store";
 
 import type { GrantStore, StoredGrant } from "./grant";
+import { serializeGrantStore } from "./grant";
 
 const KEY = "neore.mobile.grant";
 
 /** The session token at rest, in the iOS Keychain / Android Keystore. The JWT is never stored. */
-export const secureGrantStore: GrantStore = {
+const keychainGrantStore: GrantStore = {
     clear: async () => {
         await deleteItemAsync(KEY);
     },
@@ -31,3 +32,9 @@ export const secureGrantStore: GrantStore = {
         await setItemAsync(KEY, JSON.stringify(grant));
     },
 };
+
+/**
+ * The app's grant store: every read, write and clear in one queue (`serializeGrantStore`), so a refused mint's
+ * check-and-clear can never delete a grant a sign-in stores at the same time.
+ */
+export const secureGrantStore: GrantStore = serializeGrantStore(keychainGrantStore);

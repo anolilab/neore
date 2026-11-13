@@ -9,7 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen } from "@testing-library/react";
 import type { Context, ReactNode } from "react";
 import { createElement, useLayoutEffect, useState } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UIMessage } from "@/lib/agent";
 import { shareUnchangedMessages } from "@/lib/agent/share-unchanged-messages";
@@ -23,6 +23,7 @@ const harness = vi.hoisted(() => {
         messages: [] as unknown[],
         MessagesContext: undefined as Context<unknown[]> | undefined,
         publish: undefined as (() => void) | undefined,
+        threadId: "thread-1",
     };
 });
 
@@ -51,7 +52,7 @@ vi.mock("@/features/chat/core/context/chat-context", async () => {
             return { isStreaming: false, loadMore: () => {}, messages: use(harness.MessagesContext!), messagesReady: true, messagesStatus: "Exhausted" };
         },
         useChatThread: () => {
-            return { isNewThread: false, model: "test-model", thread: undefined, threadId: "thread-1" };
+            return { isNewThread: false, model: "test-model", thread: undefined, threadId: harness.threadId };
         },
     };
 });
@@ -307,6 +308,33 @@ describe("message list text size hook", () => {
 });
 
 describe("a jump to a message", () => {
+    afterEach(() => {
+        harness.threadId = "thread-1";
+    });
+
+    it("takes a request made for the next thread once the same list shows that thread", async () => {
+        harness.messages = Array.from({ length: 4 }, (_, index) => makeMessage(index));
+        harness.actions = { copyMessage: () => {}, reloadMessage: () => {} };
+        Element.prototype.scrollIntoView = vi.fn();
+
+        mountInto();
+
+        // Made while the list still shows thread-1, so the list rejects it and it stays pending.
+        act(() => scrollToMessage("b2", { threadId: "thread-2" }));
+
+        // Navigation lands: the same list now renders thread-2.
+        harness.threadId = "thread-2";
+        harness.messages = Array.from(
+            { length: 4 },
+            (_, index) => ({ ...makeMessage(index, `second ${index}`), id: `b${index}`, key: `b${index}` }) as UIMessage,
+        );
+        act(() => harness.publish?.());
+
+        const row = screen.getByText("second 2").closest<HTMLElement>("[role=listitem]")!;
+
+        await vi.waitFor(() => expect(document.activeElement).toBe(row));
+    });
+
     it("marks the row it focuses for a focus ring, and only until focus leaves it", async () => {
         harness.messages = Array.from({ length: 4 }, (_, index) => makeMessage(index));
         harness.actions = { copyMessage: () => {}, reloadMessage: () => {} };

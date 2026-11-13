@@ -4,9 +4,9 @@ import { withoutFocusAreaKeys } from "@neore/backend/auth/shortcut";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import type { AccentId } from "@/features/appearance/lib/accent-presets";
 import type { CodeHighlightThemeId, MermaidThemeId } from "@/features/appearance/lib/code-themes";
 import type { ContrastId, DensityId, MainFontId } from "@/features/appearance/lib/display-preferences";
+import type { AccentChoice, ExplicitAppearance } from "@/features/appearance/lib/native-appearance";
 
 const platformModifier = "ctrl";
 
@@ -29,7 +29,8 @@ export type ModalState = {
 
 /** Accent colour, code-block and diagram themes, UI density and font family — see `features/appearance`. */
 export type AppearanceSettings = {
-    accentColor: AccentId;
+    /** A preset, or `system` (the OS accent; desktop shell only, never synced to `userSettings`). */
+    accentColor: AccentChoice;
     /** Absent means on: long code blocks scroll inside a 24-line cap until expanded. */
     capLongCodeBlocks?: boolean;
     codeHighlightTheme: CodeHighlightThemeId;
@@ -38,8 +39,12 @@ export type AppearanceSettings = {
     /** Absent means `system`: follow the OS `prefers-contrast: more` setting. */
     contrast?: ContrastId;
     density: DensityId;
+    /** Values the user picked (here, or synced from the account); the desktop shell has its own defaults for the rest. */
+    explicit?: ExplicitAppearance;
     mainFont: MainFontId;
     mermaidTheme: MermaidThemeId;
+    /** The account the `synced` marks came from; another one signing in drops them (`AppearanceSync`). */
+    syncedUserId?: string;
 };
 
 export type KeyboardShortcuts = {
@@ -62,6 +67,8 @@ export type KeyboardShortcuts = {
     help: string;
     /** Steps the composer's reasoning effort up (`composer.increaseEffort`). Unbound until the user sets it. */
     increaseEffort?: string;
+    /** Scrolls the open thread to the newest prompt you sent, so its reply is in view (`jump-to-last-message.tsx`). */
+    jumpToLastMessage: string;
     lastItem: string;
     newChat: string;
     newTemporaryChat: string;
@@ -88,6 +95,8 @@ export type UserPreferences = {
     sendBehavior: "enter" | "shiftEnter" | "button";
     showTimestamps: boolean;
     soundEffects: boolean;
+    /** Opt-in, this browser only: open several chats side by side (`features/chat/split`). */
+    splitViewEnabled: boolean;
 };
 
 /** What "Reset to Defaults" restores. */
@@ -103,6 +112,9 @@ export const defaultKeyboardShortcuts: KeyboardShortcuts = {
     firstItem: "home",
     focusSearch: `${platformModifier}+shift+f`,
     help: `${platformModifier}+/`,
+    // No default chord. Shift+ArrowUp selects text in the composer, Ctrl+Shift+J opens devtools, and Ctrl+Shift+L is Edge's paste-and-go;
+    // browsers reserve nearly every Ctrl+Shift letter. The jump button still works, and a chord can be set in Settings.
+    jumpToLastMessage: "",
     lastItem: "end",
     newChat: `${platformModifier}+n`,
     newTemporaryChat: `${platformModifier}+shift+n`,
@@ -136,22 +148,52 @@ const withoutRetiredDefaults = (saved: Partial<KeyboardShortcuts> | undefined): 
     return kept;
 };
 
-/** The persisted UI state's version: 1 since the thread actions returned with new defaults. */
-export const UI_STATE_VERSION = 1;
+/** The jump's default before version 2: browsers take Ctrl+Shift+J for the devtools console, so the jump never ran for them. */
+const RETIRED_JUMP_DEFAULT = `${platformModifier}+shift+j`;
+
+/** `saved` without a jump binding still on the retired chord; for sets saved before version 2 (`migrateUIState`). */
+const withoutRetiredJumpDefault = (saved: Partial<KeyboardShortcuts> | undefined): Partial<KeyboardShortcuts> | undefined => {
+    if (saved === undefined) {
+        return undefined;
+    }
+
+    const kept = { ...saved };
+
+    if (kept.jumpToLastMessage === RETIRED_JUMP_DEFAULT) {
+        delete kept.jumpToLastMessage;
+    }
+
+    return kept;
+};
+
+/**
+ * The persisted UI state's version: 1 since the thread actions returned with new defaults; 2 since the jump moved off Ctrl+Shift+J.
+ */
+export const UI_STATE_VERSION = 2;
 
 /**
  * Brings persisted UI state from an older version up to date. A set saved before version 1 still carries the thread actions'
  * defaults from before they were removed (Mod+A, Mod+D), which nobody chose: they are dropped, so the new defaults apply instead of
  * archiving on select-all or deleting on the bookmark key. A binding saved from version 1 on is the person's own, Mod+D included.
+ * A set saved before version 2 may hold the jump on its retired Ctrl+Shift+J default, also never chosen: it is dropped the same way.
  */
 export const migrateUIState = (persisted: unknown, version: number): unknown => {
-    if (version >= 1 || typeof persisted !== "object" || persisted === null) {
+    if (version >= UI_STATE_VERSION || typeof persisted !== "object" || persisted === null) {
         return persisted;
     }
 
     const state = persisted as { keyboardShortcuts?: Partial<KeyboardShortcuts> };
+    let { keyboardShortcuts } = state;
 
-    return { ...state, keyboardShortcuts: withoutRetiredDefaults(state.keyboardShortcuts) };
+    if (version < 1) {
+        keyboardShortcuts = withoutRetiredDefaults(keyboardShortcuts);
+    }
+
+    if (version < 2) {
+        keyboardShortcuts = withoutRetiredJumpDefault(keyboardShortcuts);
+    }
+
+    return { ...state, keyboardShortcuts };
 };
 
 /**
@@ -163,8 +205,8 @@ export const mergeKeyboardShortcuts = (saved: Partial<KeyboardShortcuts> | undef
     // A binding on F6 or Shift+F6 is cleared: those keys move focus, and a saved action on them would run as well.
     const merged = withoutFocusAreaKeys({ ...defaultKeyboardShortcuts, ...saved });
 
-    // The thread actions are newer than many saved sets. A saved binding already on one of their default chords would make
-    // both fire, so the new action stays unbound there; a binding the user saved for it is theirs and stays.
+    // The thread actions are newer than many saved sets. A saved binding already on one of their default chords would make both
+    // fire, so the new action stays unbound there; a binding the user saved for it is theirs and stays.
     for (const key of ["archiveThread", "deleteThread"] as const) {
         const takenBySaved = Object.values(saved ?? {}).includes(defaultKeyboardShortcuts[key]);
 
@@ -209,6 +251,7 @@ const defaultUIState = {
         sendBehavior: "enter" as const,
         showTimestamps: true,
         soundEffects: false,
+        splitViewEnabled: false,
     },
     rightSidebarWidth: RIGHT_SIDEBAR_DEFAULT_WIDTH,
     search: { isOpen: false, query: "", recentSearches: [], type: "threads" as const },
@@ -346,8 +389,12 @@ export const useUIStateStore = create<UIStateStore>()(
                 },
                 setAppearance: (appearance: Partial<AppearanceSettings>) => {
                     set((state) => {
+                        // Marks only accumulate, merged with the latest state: two choices before a re-render keep both.
+                        const explicit =
+                            appearance.explicit === undefined ? state.appearance.explicit : { ...state.appearance.explicit, ...appearance.explicit };
+
                         return {
-                            appearance: { ...state.appearance, ...appearance },
+                            appearance: { ...state.appearance, ...appearance, explicit },
                         };
                     });
                 },
@@ -417,6 +464,7 @@ export const useUIStateStore = create<UIStateStore>()(
             migrate: (persisted, version) => migrateUIState(persisted, version),
             name: "neore-ui-state",
             // 1: the thread actions' retired defaults are dropped from sets saved before (`migrateUIState`).
+            // 2: the jump's retired Ctrl+Shift+J default is dropped from sets saved before.
             version: UI_STATE_VERSION,
             // The persisted object replaces the defaults wholesale, so a key added after a
             // user last saved (a new shortcut, a new appearance flag) would be missing.

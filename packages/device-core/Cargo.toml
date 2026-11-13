@@ -23,6 +23,8 @@ default = ["keychain"]
 # keychain), and the registry installs (`acp_install.rs`, which unpacks archives). `actions`, `fs`, `shell` and
 # `sandbox` build without it, so `neore-host` links no archive code.
 keychain = ["dep:keyring", "dep:flate2", "dep:tar", "dep:zip"]
+# A headless machine that pairs itself by code and keeps its own device secret (`headless/`).
+headless = ["keychain", "dep:zeroize"]
 # `store::test_keychain`, the in-memory keychain the integration tests install. Off in every build that ships: only
 # this crate's own dev-dependency below turns it on, so `install()` is not in the addon or the host.
 test-support = []
@@ -37,6 +39,8 @@ serde_json = "1"
 sha2 = "0.10"
 tar = { version = "0.4", default-features = false, optional = true }
 zip = { version = "9", default-features = false, features = ["deflate-flate2"], optional = true }
+# Wipes a device secret from memory once it is no longer needed (`headless/vault.rs`).
+zeroize = { version = "1", optional = true }
 
 # The `shell_run` sandbox (`sandbox.rs`) and the process-group kill (`shell.rs`).
 [target.'cfg(unix)'.dependencies]

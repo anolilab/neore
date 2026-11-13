@@ -63,6 +63,7 @@ export const normalizeNotification = (input: NotificationInput) => {
         type: input.type,
         userId: input.userId,
         ...(body && { body: clamp(body, NOTIFICATION_BODY_MAX) }),
+        ...(input.approvalId && { approvalId: input.approvalId }),
         ...(input.dedupeKey && { dedupeKey: input.dedupeKey.slice(0, DEDUPE_KEY_MAX) }),
         ...(link && { link }),
         ...(input.outcome && { outcome: input.outcome }),

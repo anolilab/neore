@@ -132,7 +132,12 @@ vi.mock("@/lib/lunora/crpc", async () => {
             },
         );
 
-    return { useCRPC: () => node([]) };
+    return {
+        useCRPC: () => node([]),
+        useLunoraAuth: () => {
+            return { isAuthenticated: true };
+        },
+    };
 });
 
 const { default: HostComposer } = await import("./host-composer");
