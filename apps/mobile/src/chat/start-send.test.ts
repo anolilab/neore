@@ -4,6 +4,7 @@ import type { StartedChat } from "./chat-api";
 import { ChatError } from "./chat-api";
 import {
     GIVE_BACK_SEPARATOR,
+    holdFor,
     planSend,
     replyStreamOf,
     START_IN_PROGRESS_RETRY_MS,
@@ -32,18 +33,35 @@ const fakeClock = () => {
 
 describe(planSend, () => {
     const held = { clientMessageId: "first-id", prompt: "hello" };
+    // The hold after the app put text typed meanwhile after the prompt.
+    const merged = holdFor(held, `hello${GIVE_BACK_SEPARATOR}and more`);
+
+    it("records what the app merged after a given-back prompt, and nothing on a plain give-back", () => {
+        expect(merged).toStrictEqual({ ...held, mergedRest: "and more" });
+        expect(holdFor(held, "hello")).toStrictEqual(held);
+    });
 
     it("retries the held prompt under its held id when the draft is that prompt", () => {
         expect(planSend(held, "hello")).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "" });
         expect(planSend(held, "  hello \n")).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "" });
     });
 
-    it("sends the held prompt alone under its held id ahead of text typed meanwhile, and keeps that text for the next send", () => {
-        expect(planSend(held, `hello${GIVE_BACK_SEPARATOR}and more`)).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "and more" });
+    it("sends the held prompt alone under its held id ahead of the text the app merged, and keeps that text for the next send", () => {
+        expect(planSend(merged, `hello${GIVE_BACK_SEPARATOR}and more`)).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "and more" });
+        expect(planSend(merged, `hello${GIVE_BACK_SEPARATOR}and more, then this`)).toStrictEqual({
+            heldId: "first-id",
+            prompt: "hello",
+            rest: "and more, then this",
+        });
     });
 
-    it("sends an edited held prompt, or a draft with nothing held, as a new message", () => {
-        expect(planSend(held, `hello there${GIVE_BACK_SEPARATOR}and more`)).toStrictEqual({ prompt: `hello there${GIVE_BACK_SEPARATOR}and more`, rest: "" });
+    it("sends a paragraph added to a plain give-back whole, as a new message, not split in two", () => {
+        expect(planSend(held, `hello${GIVE_BACK_SEPARATOR}some context`)).toStrictEqual({ prompt: `hello${GIVE_BACK_SEPARATOR}some context`, rest: "" });
+    });
+
+    it("sends any other edit, or a draft with nothing held, as a new message", () => {
+        expect(planSend(merged, `hello${GIVE_BACK_SEPARATOR}and less`)).toStrictEqual({ prompt: `hello${GIVE_BACK_SEPARATOR}and less`, rest: "" });
+        expect(planSend(merged, `hello there${GIVE_BACK_SEPARATOR}and more`)).toStrictEqual({ prompt: `hello there${GIVE_BACK_SEPARATOR}and more`, rest: "" });
         expect(planSend(held, "hello again")).toStrictEqual({ prompt: "hello again", rest: "" });
         expect(planSend(null, "hello")).toStrictEqual({ prompt: "hello", rest: "" });
     });

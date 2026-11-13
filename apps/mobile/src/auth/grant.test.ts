@@ -3,7 +3,18 @@ import { createHash, randomBytes } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Fetch, GrantStore, StoredGrant } from "./grant";
-import { buildAuthorizeUrl, createPkce, exchangeGrant, fetchAccessToken, parseAuthorizeResponse, readStoredUser, SignInError, signOutGrant, toBase64Url } from "./grant";
+import {
+    buildAuthorizeUrl,
+    createPkce,
+    exchangeGrant,
+    fetchAccessToken,
+    parseAuthorizeResponse,
+    readStoredUser,
+    serializeGrantStore,
+    SignInError,
+    signOutGrant,
+    toBase64Url,
+} from "./grant";
 
 const REDIRECT = "neore-mobile://auth/callback";
 const LUNORA = "https://backend.example";
@@ -189,6 +200,39 @@ describe("grant storage", () => {
 
         expect(await fetchAccessToken({ fetch, lunoraUrl: LUNORA, store })).toBeNull();
         expect(store.value).toEqual({ token: "session-new", user: USER });
+    });
+
+    it("never lets a sign-in's grant land between a refused mint's check and its clear", async () => {
+        let grant: StoredGrant | null = { token: "session-old", user: USER };
+        // The read answers only once the test lets it, with the value it found when it looked.
+        let isReadReleased = false;
+        // A store whose read answers with the value it found, a moment after it looked: the window a set could fall into.
+        const store = serializeGrantStore({
+            clear: async () => {
+                grant = null;
+            },
+            get: async () => {
+                const found = grant;
+
+                await vi.waitFor(() => {
+                    expect(isReadReleased).toBe(true);
+                });
+
+                return found;
+            },
+            set: async (next) => {
+                grant = next;
+            },
+        });
+
+        const clearing = store.clearIfCurrent?.("session-old");
+        // The browser sign-in stores its grant while the refused mint is between its check and its clear.
+        const signingIn = store.set({ token: "session-new", user: USER });
+
+        isReadReleased = true;
+        await Promise.all([clearing, signingIn]);
+
+        expect(grant).toEqual({ token: "session-new", user: USER });
     });
 
     it("a 500 from the token route throws and keeps the grant", async () => {

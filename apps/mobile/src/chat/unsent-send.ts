@@ -48,14 +48,14 @@ export const failedSendOutcome = (stage: SendStage): "accepted" | "give-back" =>
 export const shouldKeepClientMessageId = (error: unknown): boolean => !isClientMessageIdReused(error);
 
 /** Ends the message of a send that may have reached the server: its prompt is back, and sending it again is safe. */
-export const MAY_HAVE_BEEN_SENT_NOTICE = "It may have been sent: it is back in the message box, and sending it again will not send it twice.";
+export const MAY_HAVE_BEEN_SENT_NOTICE = "It may have been sent: it is back in the message box, and sending it again unchanged will not send it twice.";
 
 /**
  * The same, when the prompt went back ahead of text typed meanwhile: Send sends it again on its own (`planSend`), and the
  * text typed meanwhile stays for the next message. Editing the prompt itself makes it a new message.
  */
 export const MAY_HAVE_BEEN_SENT_MERGED_NOTICE
-    = "It may have been sent: it is back at the top of the message box. Send sends it again on its own, so it is not saved twice, and keeps what you typed after it for your next message.";
+    = "It may have been sent: it is back at the top of the message box. Send sends it again on its own, so it is not saved twice, and keeps what you typed after it for your next message. Changed, it is sent as a new message.";
 
 /** A send whose first try was still being saved when the wait ran out. */
 export const STILL_SENDING_MESSAGE = `The message is still being sent. ${MAY_HAVE_BEEN_SENT_NOTICE}`;

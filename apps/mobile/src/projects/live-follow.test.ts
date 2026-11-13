@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Scoped, SyncState } from "./live-follow";
-import { EMPTY_LIVE, followLive, liveFor } from "./live-follow";
+import { EMPTY_LIVE, followLive, liveFor, ownSyncState } from "./live-follow";
 
 /** A watch the test drives by hand. */
 const fakeWatch = () => {
@@ -209,5 +209,45 @@ describe("liveFor", () => {
         expect(liveFor(stale, "user-b:projects")).toEqual(EMPTY_LIVE);
         expect(liveFor(stale, undefined)).toEqual(EMPTY_LIVE);
         expect(liveFor(stale, "user-a:projects").rows).toEqual(["A's project"]);
+    });
+});
+
+describe("ownSyncState", () => {
+    const projects = "projects_functions:listProjects";
+
+    it("answers a project screen once its own subscription is acknowledged, though others and queued writes still wait", () => {
+        const status = { connection: "connected", synced: false };
+
+        expect(
+            ownSyncState(
+                status,
+                [
+                    { acked: true, functionPath: projects },
+                    { acked: false, functionPath: "chat_functions:listThreads" },
+                ],
+                projects,
+            ),
+        ).toStrictEqual({ synced: true });
+    });
+
+    it("waits while any subscription of its own query is unanswered, or none is open", () => {
+        const status = { connection: "connected", synced: true };
+
+        expect(
+            ownSyncState(
+                status,
+                [
+                    { acked: true, functionPath: projects },
+                    { acked: false, functionPath: projects },
+                ],
+                projects,
+            ),
+        ).toStrictEqual({ synced: false });
+        expect(ownSyncState(status, [], projects)).toStrictEqual({ synced: false });
+    });
+
+    it("falls back to the client's aggregate over HTTP polling, where no subscription is acknowledged", () => {
+        expect(ownSyncState({ connection: "polling", synced: true }, [{ acked: false, functionPath: projects }], projects)).toStrictEqual({ synced: true });
+        expect(ownSyncState({ connection: "offline", synced: false }, [{ acked: true, functionPath: projects }], projects)).toStrictEqual({ synced: false });
     });
 });

@@ -13,10 +13,30 @@ export interface Scoped<T> extends Live<T> {
 
 export const EMPTY_LIVE: Live<never> = { error: undefined, rows: undefined };
 
-/** What `followLive` reads of the Lunora client's `syncStatus()`: `true` once the live connection has every subscription answered. */
+/** What `followLive` reads of the Lunora client: `true` once the live connection has answered the screen's subscription. */
 export interface SyncState {
     synced: boolean;
 }
+
+/**
+ * Whether the subscriptions of one query (`functionPath`, its `__lunoraRef`) are answered on the current socket, from the
+ * client's `syncStatus()` and `debug().subscriptions` (`acked`: "acknowledged on the current socket"). The aggregate
+ * `synced` also waits on unrelated subscriptions and queued writes, which could keep a project screen's writes off for
+ * as long as either lasts. Over HTTP polling the client sets no `acked`, so the aggregate is all there is.
+ */
+export const ownSyncState = (
+    status: { connection: string; synced: boolean },
+    subscriptions: ReadonlyArray<{ acked: boolean; functionPath: string }>,
+    functionPath: string,
+): SyncState => {
+    if (status.connection !== "connected") {
+        return { synced: status.synced };
+    }
+
+    const own = subscriptions.filter((subscription) => subscription.functionPath === functionPath);
+
+    return { synced: own.length > 0 && own.every((subscription) => subscription.acked) };
+};
 
 /**
  * What a screen may show: the state only when it belongs to the current scope.

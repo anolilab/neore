@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ChatError } from "./chat-api";
-import { planSend } from "./start-send";
+import { holdFor, planSend } from "./start-send";
 import type { SendStage } from "./unsent-send";
 import {
     draftAfterUnsent,
@@ -88,7 +88,7 @@ describe("a possibly-sent prompt given back ahead of text typed meanwhile", () =
         const { draft, isMerged } = giveBackDraft("and more", "hello");
 
         expect(isMerged).toBe(true);
-        expect(planSend({ clientMessageId: "first-id", prompt: "hello" }, draft)).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "and more" });
+        expect(planSend(holdFor({ clientMessageId: "first-id", prompt: "hello" }, draft), draft)).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "and more" });
         expect(failedSendMessage(timeout, "requested", { isMerged })).toBe(`The gateway did not answer in time. ${MAY_HAVE_BEEN_SENT_MERGED_NOTICE}`);
     });
 });

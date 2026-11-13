@@ -16,10 +16,12 @@ import { ChatError, startChat } from "@/chat/chat-api";
 import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
 import { displayTextOf, shareTextOf } from "@/chat/message-parts";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
+import { sendSessions } from "@/chat/send-sessions";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import type { HeldSend } from "@/chat/start-send";
-import { planSend, replyStreamOf, startWithRetries } from "@/chat/start-send";
+import { holdFor, planSend, replyStreamOf, startWithRetries } from "@/chat/start-send";
 import { relayReply } from "@/chat/stream";
+import { giveBackOrKeep, restoreUnsentPrompt, unsentPromptKey, unsentPrompts } from "@/chat/unsent-prompts";
 import type { SendStage } from "@/chat/unsent-send";
 import { failedSendMessage, failedSendOutcome, giveBackDraft, shouldKeepClientMessageId, withoutUnsentRows } from "@/chat/unsent-send";
 import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
@@ -152,6 +154,16 @@ const Chat = () => {
     // The prompt that went back to the composer with its `clientMessageId`: sending that prompt again reuses the id, so a
     // send the server took on a try whose answer was lost is saved once (`start-send.ts`).
     const heldSend = useRef<HeldSend | null>(null);
+    // Whether this screen is still mounted: a send that settles after it is gone keeps its prompt in `unsentPrompts` instead.
+    const isMountedRef = useRef(true);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
     // The rows as the last write left them. Every write goes through `writeRows`, so a read can decide against the rows on
     // screen when it lands, not against the rows of the render it was started in.
     const rowsRef = useRef<Row[]>([]);
@@ -442,16 +454,47 @@ const Chat = () => {
             return { isMerged: false };
         }
 
-        // Ahead of anything typed meanwhile: the held id stays the original prompt's, so only that prompt sent alone and
-        // unchanged is the same send, which the notice then says (`failedSendMessage`).
-        const { draft: given, isMerged } = giveBackDraft(draftRef.current, prompt);
+        let isMerged = false;
 
-        setDraft(given);
-        writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
-        heldSend.current = shouldKeepClientMessageId(failure) ? { clientMessageId, prompt } : null;
+        // To the composer while this screen is mounted: ahead of anything typed meanwhile, with the held id the original
+        // prompt's, so the next press sends it alone under that id (`planSend`). A screen left meanwhile (during the token
+        // mint or a retry) is gone: the prompt and its held send wait in `unsentPrompts` for this chat's next mount.
+        giveBackOrKeep({
+            apply: (entry) => {
+                const given = giveBackDraft(draftRef.current, entry.prompt);
+
+                isMerged = given.isMerged;
+                setDraft(given.draft);
+                writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
+                // The hold records what the app merged after the prompt, so a paragraph the person adds is told apart.
+                heldSend.current = entry.held ? holdFor(entry.held, given.draft) : null;
+            },
+            entry: { held: shouldKeepClientMessageId(failure) ? { clientMessageId, prompt } : null, prompt },
+            isMounted: isMountedRef.current,
+            key: accountId === undefined ? undefined : unsentPromptKey(accountId, threadId),
+            store: unsentPrompts,
+        });
 
         return { isMerged };
     };
+
+    // A prompt given back while this chat's screen was gone comes back into the composer with its held send.
+    useEffect(() => {
+        if (accountId === undefined) {
+            return;
+        }
+
+        restoreUnsentPrompt({
+            apply: (entry) => {
+                const given = giveBackDraft(draftRef.current, entry.prompt);
+
+                setDraft(given.draft);
+                heldSend.current = entry.held ? holdFor(entry.held, given.draft) : null;
+            },
+            key: unsentPromptKey(accountId, threadId),
+            store: unsentPrompts,
+        });
+    }, [accountId, setDraft, threadId]);
 
     const send = async () => {
         // A held prompt, which may already be saved, goes again only under its own id and alone (`planSend`): text typed
@@ -478,6 +521,9 @@ const Chat = () => {
         heldSend.current = null;
 
         sendAbort.current = controller;
+        // Sign-out stops this send, retries included (`sendSessions`), and marks it the departed account's.
+        const sendSession = sendSessions.begin(controller);
+
         setSending(true);
         setError(null);
         // Announced when a reply starts and when it finishes. The deltas stay silent: an announcement on each would flood the reader.
@@ -612,6 +658,15 @@ const Chat = () => {
 
             AccessibilityInfo.announceForAccessibility("Reply finished");
         } catch (error_) {
+            // A send sign-out stopped belongs to the account that left: its prompt and held id are dropped, never kept for
+            // the next one to sign in.
+            if (sendSession.isSignedOut()) {
+                writeRows((current) => withoutUnsentRows(current, [userId, assistantId]));
+                heldSend.current = null;
+
+                return;
+            }
+
             const { isMerged } = settleFailedSend({ clientMessageId, error: error_, ids: { assistant: assistantId, user: userId }, prompt, stage });
 
             // The abort error of a send stopped on purpose is not shown: its notice is.
@@ -619,6 +674,7 @@ const Chat = () => {
                 setError(failedSendMessage(error_, stage, { isMerged }));
             }
         } finally {
+            sendSession.end();
             setSending(false);
         }
     };
