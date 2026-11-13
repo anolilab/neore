@@ -163,7 +163,7 @@ export function isHiddenElement(node: Node): boolean {
 
     const element = node as Element;
 
-    if (SKIPPED.has(element.localName) || element.hasAttribute("hidden")) {
+    if (SKIPPED.has(element.localName) || element.hasAttribute("hidden") || isClosedContent(element)) {
         return true;
     }
 
@@ -174,6 +174,39 @@ export function isHiddenElement(node: Node): boolean {
     const style = element.getAttribute("style") ?? "";
 
     return style !== "" && (declaredStyle(style, "display") === "none" || declaredStyle(style, "visibility") === "hidden");
+}
+
+/** True for a dialog that is not open, and for what a closed details holds besides its summary: the page shows neither. */
+function isClosedContent(element: Element): boolean {
+    if (element.localName === "dialog") {
+        return !element.hasAttribute("open");
+    }
+
+    const parent = element.parentNode as Element | null;
+
+    return parent?.nodeName === "DETAILS" && !parent.hasAttribute("open") && element !== summaryOf(parent);
+}
+
+/** A details element's summary: its first summary child, as the page shows it. */
+function summaryOf(details: Element): Element | null {
+    for (let child = details.firstElementChild; child; child = child.nextElementSibling) {
+        if (child.nodeName === "SUMMARY") {
+            return child;
+        }
+    }
+
+    return null;
+}
+
+/** Each closed details' summary text, kept until the details is written. */
+const summaryTexts = new WeakMap<Node, string>();
+
+function summaryText(summary: Element): string {
+    return summaryTexts.get(summary) ?? "";
+}
+
+function isClosedDetails(node: Element): boolean {
+    return node.nodeName === "DETAILS" && !node.hasAttribute("open");
 }
 
 /** The text an image stands for: an emoji's alt text, or a formula's. Any other image is not text, so it has none. */
@@ -219,6 +252,26 @@ function unlessRemoved(isMatch: (node: Element) => boolean): FilterFunction {
 }
 
 const pasteRules: Record<string, Rule> = {
+    // A closed details shows its summary alone. Its other elements are hidden; its loose text is left out here.
+    closedDetails: {
+        filter: unlessRemoved(isClosedDetails),
+        replacement(_content, node) {
+            const summary = summaryOf(node);
+            const text = summary === null ? "" : summaryText(summary);
+
+            return text === "" ? "" : `\n\n${text}\n\n`;
+        },
+    },
+
+    closedSummary: {
+        filter: unlessRemoved((node) => node.nodeName === "SUMMARY" && node.parentNode !== null && isClosedDetails(node.parentNode as Element)),
+        replacement(content, node) {
+            summaryTexts.set(node, content.trim());
+
+            return "";
+        },
+    },
+
     // An image is an emoji's or a formula's text, or nothing: a pasted picture arrives as a file, if at all.
     image: {
         filter: unlessRemoved((node) => node.nodeName === "IMG"),
@@ -286,8 +339,11 @@ function texSource(node: Element): string {
     const annotations = Array.from({ length: found.length }, (_unused, index) => found[index]);
 
     for (const annotation of annotations) {
-        if (annotation?.getAttribute("encoding")?.trim().toLowerCase() === "application/x-tex") {
-            return annotation.textContent?.trim() ?? "";
+        const source = annotation?.textContent?.trim() ?? "";
+
+        // The first TeX annotation with a source: an empty one says nothing about the formula.
+        if (source !== "" && annotation?.getAttribute("encoding")?.trim().toLowerCase() === "application/x-tex") {
+            return source;
         }
     }
 

@@ -172,3 +172,27 @@ describe("paste: review cases, third round", () => {
         expect(convert(`<p>shown<span style='${style}'> secret</span></p>`)).toBe("shown");
     });
 });
+
+describe("paste: review cases, fourth round", () => {
+    it("writes a closed details as its summary alone, an open one all of it", () => {
+        expect(
+            convert(
+                "<details><summary>Logs</summary><p>hidden line</p>loose text</details><details><p>no summary</p></details><details open><summary>Shown</summary><p>body</p></details>",
+            ),
+        ).toBe("Logs\n\nShown\n\nbody");
+    });
+
+    it("leaves out a dialog that is not open", () => {
+        expect(convert("<p>a</p><dialog><p>secret</p></dialog><dialog open><p>shown</p></dialog>")).toBe("a\n\nshown");
+    });
+
+    it("takes the first TeX annotation that has a source", () => {
+        const encoding = "application/x-tex";
+
+        expect(
+            convert(
+                `<p><math><semantics><mi>x</mi><annotation encoding="${encoding}"> </annotation><annotation encoding="${encoding}">x^2</annotation></semantics></math></p>`,
+            ),
+        ).toBe("$x^2$");
+    });
+});
