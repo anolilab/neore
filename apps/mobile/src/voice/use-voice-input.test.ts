@@ -20,6 +20,8 @@ const deferred = <T>() => {
 const native = vi.hoisted(() => {
     return {
         created: 0,
+        /** The options each recorder was made with, as the hook passed them to the native constructor. */
+        createdWith: [] as unknown[],
         /** The clip files deleted, by path. */
         deleted: [] as string[],
         prepare: undefined as Promise<void> | undefined,
@@ -43,8 +45,9 @@ const audio = vi.hoisted(() => {
 // eslint-disable-next-line no-restricted-syntax -- expo-audio is a native module; there is nothing to inject into the hook
 vi.mock(import("expo-audio"), () => {
     // The hook calls it with `new`, so a function, not an arrow: the object it returns is the recorder.
-    const AudioRecorder = function AudioRecorder() {
+    const AudioRecorder = function AudioRecorder(options: unknown) {
         native.created += 1;
+        native.createdWith.push(options);
 
         let isReleased = false;
 
@@ -77,8 +80,14 @@ vi.mock(import("expo-audio"), () => {
     } as never;
 });
 
-// eslint-disable-next-line no-restricted-syntax -- part of the native expo-audio package, see above
-vi.mock(import("expo-audio/build/utils/options"), () => ({ createRecordingOptions: (options: unknown) => options }) as never);
+// The option mapping (`createRecordingOptions`) is expo-audio's real one; it reads the platform from `expo`, whose
+// native modules cannot load in Node, so only the platform is stubbed, and each test sets it.
+const platform = vi.hoisted(() => {
+    return { OS: "ios" };
+});
+
+// eslint-disable-next-line no-restricted-syntax -- `expo` loads native modules; the mapping needs only the platform
+vi.mock(import("expo"), () => ({ Platform: platform }) as never);
 
 // eslint-disable-next-line no-restricted-syntax -- the file system is a native module; no clip is written here
 vi.mock(import("expo-file-system"), () => {
@@ -127,6 +136,8 @@ describe(useVoiceInput, () => {
 
     beforeEach(() => {
         native.created = 0;
+        native.createdWith = [];
+        platform.OS = "ios";
         native.released = 0;
         native.deleted = [];
         native.prepare = undefined;
@@ -210,6 +221,29 @@ describe(useVoiceInput, () => {
 
         expect(native.released).toBe(1);
         expect(native.deleted).toStrictEqual(["file:///clip.m4a"]);
+    });
+
+    it.each([
+        ["ios", { audioQuality: 0, outputFormat: "aac " }],
+        ["android", { audioEncoder: "aac", outputFormat: "mpeg4" }],
+    ])("makes the recorder on the first press with the speech options mapped for %s", async (os, platformOptions) => {
+        platform.OS = os;
+        mount();
+        await hook.start?.();
+        unmount();
+
+        expect(native.createdWith).toStrictEqual([
+            {
+                bitRate: 32_000,
+                directory: undefined,
+                extension: ".m4a",
+                fileName: undefined,
+                isMeteringEnabled: false,
+                numberOfChannels: 1,
+                sampleRate: 16_000,
+                ...platformOptions,
+            },
+        ]);
     });
 
     it("releases the recorder of a screen that goes after it was made, as before", async () => {
