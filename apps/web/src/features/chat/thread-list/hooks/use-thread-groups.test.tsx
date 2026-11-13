@@ -27,10 +27,31 @@ const composite = {
     },
 };
 
+const lingui = vi.hoisted(() => {
+    return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+});
+
 vi.mock("@lingui/react/macro", () => {
     return {
-        useLingui: () => {
-            return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+        // One `t` for every render, as Lingui's is for a locale.
+        useLingui: () => lingui,
+    };
+});
+
+/** How many times the nodes were deep-compared with the previous build's. */
+const shareCalls = vi.hoisted(() => {
+    return { count: 0 };
+});
+
+vi.mock("../lib/share-unchanged-nodes", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../lib/share-unchanged-nodes")>();
+
+    return {
+        ...actual,
+        shareUnchangedNodes: (...args: Parameters<typeof actual.shareUnchangedNodes>) => {
+            shareCalls.count += 1;
+
+            return actual.shareUnchangedNodes(...args);
         },
     };
 });
@@ -369,5 +390,32 @@ describe("node identity across rebuilds", () => {
         rerender(<List />);
 
         expect(commits.count).toBe(2);
+    });
+
+    it("compares an unchanged push once, and nothing on the renders after it", () => {
+        const collapsedGroups = new Set<GroupType>();
+        const collapsedProjects = new Set<string>();
+        const { rerender, result } = renderHook(() => useThreadGroups(collapsedGroups, collapsedProjects, "", "threads", undefined, [], undefined, undefined));
+        const before = nodesOf(result.current.threadGroups);
+
+        // A live push that changes nothing: a fresh page, equal to the one on screen.
+        composite.threads.page = structuredClone(composite.threads.page);
+        shareCalls.count = 0;
+        rerender();
+
+        expect(shareCalls.count).toBe(1);
+
+        // Renders after it bring no new build: nothing is compared again.
+        shareCalls.count = 0;
+        rerender();
+        rerender();
+
+        expect(shareCalls.count).toBe(0);
+
+        const after = nodesOf(result.current.threadGroups);
+
+        for (const [threadId, node] of after) {
+            expect(node).toBe(before.get(threadId));
+        }
     });
 });

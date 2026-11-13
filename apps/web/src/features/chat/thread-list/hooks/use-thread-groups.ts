@@ -48,9 +48,8 @@ const sortThreadsInGroup = (threads: BranchNode[]): BranchNode[] => {
     });
 };
 
-/** The nodes of one build, shared with the build before it, and the build they came from. */
+/** The nodes of one build, shared with the build before it. */
 interface SharedNodes {
-    built: BranchNode[][];
     byId: NodesById;
     lists: BranchNode[][];
 }
@@ -299,17 +298,16 @@ const useThreadGroups = (
 
     // --- Sharing: an unchanged thread gets the node it had, so only the rows whose thread changed re-render ---
     // Kept in state and adjusted during render, not in a ref: an update made during a render is thrown away with that render, so the
-    // nodes compared against are always those of the last render React kept, and the hook stays compiled.
+    // nodes compared against are always those of the last render React kept, and the hook stays compiled. The deep compare runs once
+    // per build (memoized on the build and the nodes it is compared with), so a render that brings no new build compares nothing.
+    const sharedBase = sharedNodes?.byId ?? NO_NODES;
+    const sharedBuild = useMemo(() => (builtNodes === null ? null : shareUnchangedNodes(sharedBase, builtNodes)), [builtNodes, sharedBase]);
     let currentShared = sharedNodes;
 
-    if (builtNodes !== null && currentShared?.built !== builtNodes) {
-        const shared = shareUnchangedNodes(currentShared?.byId ?? NO_NODES, builtNodes);
-
-        // A build that changed no node keeps the state it has: no update, so a rebuild can never loop through this.
-        if (!currentShared || !sameNodeLists(currentShared.lists, shared.lists)) {
-            currentShared = { built: builtNodes, byId: shared.byId, lists: shared.lists };
-            setSharedNodes(currentShared);
-        }
+    // A build that changed no node keeps the state it has: no update, so a rebuild can never loop through this.
+    if (sharedBuild !== null && (!currentShared || !sameNodeLists(currentShared.lists, sharedBuild.lists))) {
+        currentShared = sharedBuild;
+        setSharedNodes(sharedBuild);
     }
 
     const sharedLists = builtNodes === null ? null : (currentShared?.lists ?? null);
