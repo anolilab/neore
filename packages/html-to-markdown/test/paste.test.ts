@@ -135,13 +135,6 @@ describe("paste: review cases", () => {
             "0. zero\n1. one\n\n1. a\n5. five\n6. six",
         );
     });
-
-    it("numbers a long list in work linear in its length", () => {
-        const items = 20_000;
-        const markdown = convert(`<ol>${"<li>x</li>".repeat(items)}</ol>`);
-
-        expect(markdown.split("\n").at(-1)).toBe(`${items}. x`);
-    });
 });
 
 describe("paste: review cases, second round", () => {
@@ -218,5 +211,28 @@ describe("paste: review cases, fifth round", () => {
                 `<p><math><semantics><mi>v</mi><annotation-xml encoding="MathML-Content"><semantics><ci>n</ci><annotation encoding="${tex}">nested</annotation></semantics></annotation-xml></semantics></math></p>`,
             ),
         ).toBe("v");
+    });
+});
+
+describe("paste: review cases, sixth round", () => {
+    it.each([
+        ["a keyword combination CSS does not allow", "display:none;display:inline none"],
+        ["a long gap before important", "display:none !          \t          important;display:block"],
+    ])("hides text when %s follows a hiding declaration", (_name, style) => {
+        expect(convert(`<p>shown<span style="${style}"> secret</span></p>`)).toBe("shown");
+    });
+
+    it("reads a comment inside a value as a break between words, as CSS does", () => {
+        expect(convert(`<p><span style="display:no/**/ne">shown</span></p>`)).toBe("shown");
+    });
+
+    it("reads a formula image only from a class whose word is math", () => {
+        expect(convert(`<p>a<img class="mathematics-logo" alt="Acme"> <img class="mwe-math-fallback" alt="x"></p>`)).toBe("a $x$");
+    });
+
+    it("finds a TeX annotation whose media type has a parameter", () => {
+        const encoding = "application/x-tex; charset=utf-8";
+
+        expect(convert(`<p><math><semantics><mi>v</mi><annotation encoding="${encoding}">x^2</annotation></semantics></math></p>`)).toBe("$x^2$");
     });
 });

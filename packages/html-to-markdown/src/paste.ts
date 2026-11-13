@@ -49,8 +49,6 @@ const SKIPPED = new Set([
     "video",
 ]);
 const HIDDEN_CLASS = /(?:^|\s)(?:sr-only|visually-?hidden)(?:\s|$)/i;
-const IMPORTANT = /!\s{0,20}important\s{0,20}$/i;
-const MATH_CLASS = /math/i;
 const EMOJI_NAME = /^:[\w+-]{1,40}:$/;
 // A pictograph, or a flag: a pair of regional indicator letters, which holds no pictograph.
 const PICTOGRAPHIC = /\p{Extended_Pictographic}|\p{Regional_Indicator}{2}/u;
@@ -93,6 +91,8 @@ const VISIBILITY_VALUES = new Set(["collapse", "hidden", "visible", ...GLOBAL_VA
 const CONTENT_VISIBILITY_VALUES = new Set(["auto", "hidden", "visible", ...GLOBAL_VALUES]);
 // `collapse` hides an element as `hidden` does, except in a table, where it also takes the row's or column's space.
 const HIDING_VISIBILITY = new Set(["collapse", "hidden"]);
+const OUTER_DISPLAY = new Set(["block", "inline", "run-in"]);
+const INNER_DISPLAY = new Set(["flex", "flow", "flow-root", "grid", "ruby", "table"]);
 // How a character changes the depth of parentheses a style's reader is in.
 const DEPTH_CHANGE: Readonly<Record<string, number>> = { "(": 1, ")": -1 };
 const QUOTES = new Set(["'", `"`]);
@@ -115,8 +115,7 @@ export function declaredStyle(style: string, property: string, isValid: (value: 
         }
 
         const raw = declaration.slice(colon + 1);
-        const isThisImportant = IMPORTANT.test(raw);
-        const candidate = raw.replace(IMPORTANT, "").trim().toLowerCase();
+        const { isImportant: isThisImportant, value: candidate } = priority(raw);
 
         // A browser drops a declaration whose value it cannot read, so an invalid value overrides nothing.
         if ((isThisImportant || !isImportant) && isValid(candidate)) {
@@ -155,6 +154,8 @@ function declarations(style: string): string[] {
             const close = style.indexOf("*/", index + 2);
 
             index = close === -1 ? style.length : close + 2;
+            // A comment ends the word before it: `no/**/ne` is two words to CSS, not `none`.
+            current += " ";
             continue;
         }
 
@@ -228,13 +229,50 @@ export function isHiddenElement(node: Node): boolean {
 
 /** True for a `display` value a browser reads: a global value, or keywords it knows. */
 function isDisplayValue(value: string): boolean {
-    if (GLOBAL_VALUES.has(value)) {
-        return true;
-    }
-
     const keywords = value.split(" ").filter((keyword) => keyword !== "");
 
-    return keywords.length > 0 && keywords.length <= 3 && keywords.every((keyword) => DISPLAY_KEYWORDS.has(keyword));
+    if (keywords.length === 1) {
+        return GLOBAL_VALUES.has(value) || DISPLAY_KEYWORDS.has(value);
+    }
+
+    return keywords.length > 1 && keywords.length <= 3 && isDisplayCombination(keywords);
+}
+
+/**
+ * True for the keyword combinations CSS allows: one outer type, one inner type and `list-item`, each at most once, and
+ * with `list-item` only a flow inner type. `none`, `contents` and the internal table and ruby types stand alone.
+ */
+function isDisplayCombination(keywords: ReadonlyArray<string>): boolean {
+    const outer = keywords.filter((keyword) => OUTER_DISPLAY.has(keyword));
+    const inner = keywords.filter((keyword) => INNER_DISPLAY.has(keyword));
+    const markers = keywords.filter((keyword) => keyword === "list-item");
+
+    if (outer.length > 1 || inner.length > 1 || markers.length > 1 || outer.length + inner.length + markers.length !== keywords.length) {
+        return false;
+    }
+
+    return markers.length === 0 || inner.every((keyword) => keyword === "flow" || keyword === "flow-root");
+}
+
+/** A declaration's value and whether it is `!important`; any whitespace may come before and after the `!`. */
+function priority(raw: string): { isImportant: boolean; value: string } {
+    const trimmed = raw.trim();
+    const lower = trimmed.toLowerCase();
+
+    if (lower.endsWith("important")) {
+        const before = trimmed.slice(0, -"important".length).trimEnd();
+
+        if (before.endsWith("!")) {
+            return { isImportant: true, value: before.slice(0, -1).trim().toLowerCase() };
+        }
+    }
+
+    return { isImportant: false, value: lower };
+}
+
+/** True when one of the image's classes has `math` as a word of its own, as `math` or `mwe-math-fallback` does. */
+function isFormulaImage(image: Element): boolean {
+    return (image.getAttribute("class") ?? "").split(" ").some((name) => name.toLowerCase().split("-").includes("math"));
 }
 
 /** True for a dialog that is not open, and for what a closed details holds besides its summary: the page shows neither. */
@@ -274,7 +312,7 @@ function isClosedDetails(node: Element): boolean {
 function imageText(image: Element): string {
     const alt = image.getAttribute("alt")?.trim() ?? "";
 
-    if (alt !== "" && MATH_CLASS.test(image.getAttribute("class") ?? "")) {
+    if (alt !== "" && isFormulaImage(image)) {
         return inlineMath(alt);
     }
 
@@ -392,6 +430,11 @@ function itemNumber(list: Element, item: Element, lookup: RuleLookup): bigint {
     return numbers.get(item) ?? 1n;
 }
 
+/** A media type without its parameters, in lower case: `application/x-tex; charset=utf-8` is `application/x-tex`. */
+function mediaType(value: string): string {
+    return (value.split(";", 1)[0] ?? "").trim().toLowerCase();
+}
+
 /** The element's children with a local name, in order. */
 function childrenNamed(element: Element, name: string): Element[] {
     const found: Element[] = [];
@@ -415,7 +458,7 @@ function texSource(node: Element): string {
         const source = annotation?.textContent?.trim() ?? "";
 
         // The first TeX annotation with a source: an empty one says nothing about the formula.
-        if (source !== "" && annotation?.getAttribute("encoding")?.trim().toLowerCase() === "application/x-tex") {
+        if (source !== "" && mediaType(annotation?.getAttribute("encoding") ?? "") === "application/x-tex") {
             return source;
         }
     }
