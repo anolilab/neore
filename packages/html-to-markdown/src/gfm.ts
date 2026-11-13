@@ -249,6 +249,38 @@ function hasNextItem(item: Element, lookup: RuleLookup): boolean {
     return false;
 }
 
+/** True when the item's first content is a nested list: no text comes before it. */
+function isOpenedByList(item: Element): boolean {
+    for (let child = item.firstChild; child; child = child.nextSibling) {
+        if (child.nodeType === 1) {
+            return LISTS.has(child.nodeName);
+        }
+
+        if (child.nodeType === 3 && (child.nodeValue ?? "").trim() !== "") {
+            return false;
+        }
+    }
+
+    return false;
+}
+
+/** A code block's text, read from the DOM: a `<br>` is a line break, and an element a remove filter drops is left out. */
+function codeText(node: Node, lookup: RuleLookup): string {
+    let text = "";
+
+    for (let child = node.firstChild; child; child = child.nextSibling) {
+        if (child.nodeType === 3 || child.nodeType === 4) {
+            text += child.nodeValue ?? "";
+        } else if (child.nodeName === "BR") {
+            text += "\n";
+        } else if (child.nodeType === 1 && !lookup.isRemoved(child)) {
+            text += codeText(child, lookup);
+        }
+    }
+
+    return text;
+}
+
 /** The text as a code span, its fence longer than any backtick run inside, padded where the text meets a backtick. */
 function inlineCode(text: string): string {
     if (text === "") {
@@ -324,7 +356,7 @@ const tableRules: Record<string, Rule> = {
     // A code block has no place on a table row either: it is inline code, its lines joined by spaces.
     codeBlockInCell: {
         filter: (node, _options, lookup) => node.nodeName === "PRE" && cellOf(node) !== null && !lookup.isRemoved(node),
-        replacement: (_content, node) => ` ${inlineCode(oneLine(node.textContent ?? ""))} `,
+        replacement: (_content, node, _options, lookup) => ` ${inlineCode(oneLine(codeText(node, lookup)))} `,
     },
 
     headingInCell: {
@@ -356,7 +388,8 @@ const tableRules: Record<string, Rule> = {
         filter: (node, _options, lookup) => node.nodeName === "LI" && cellOf(node) !== null && !lookup.isRemoved(node),
         replacement(content, node, _options, lookup) {
             const text = oneLine(content);
-            const own = text.startsWith(ITEM_SEPARATOR.trim()) ? text.slice(ITEM_SEPARATOR.trim().length).trim() : text;
+            // Only the separator a nested list writes is taken off; a semicolon the item's own text starts with stays.
+            const own = isOpenedByList(node) ? text.slice(ITEM_SEPARATOR.trim().length).trim() : text;
 
             return `${own}${hasNextItem(node, lookup) ? ITEM_SEPARATOR : ""}`;
         },

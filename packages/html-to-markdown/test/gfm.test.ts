@@ -213,3 +213,25 @@ describe("gfm review cases, second round", () => {
         );
     });
 });
+
+describe("gfm review cases, third round", () => {
+    it("leaves an element a remove filter drops out of a code block in a cell", () => {
+        const service = new TurndownService().use(gfm);
+
+        service.remove((node) => node.getAttribute("class") === "gone");
+
+        expect(service.turndown(`<table><tr><th>A</th></tr><tr><td><pre>a<span class="gone">SECRET</span>b<br>c</pre></td></tr></table>`)).toBe(
+            "| A |\n| --- |\n| `ab c` |",
+        );
+    });
+
+    it("keeps a semicolon an item's own text starts with", () => {
+        expect(convert("<table><tr><th>A</th></tr><tr><td><ul><li>; value</li><li>b</li></ul></td></tr></table>")).toBe("| A |\n| --- |\n| ; value; b |");
+    });
+
+    it("writes no separator before a nested list that opens an item", () => {
+        expect(convert("<table><tr><th>A</th></tr><tr><td><ul><li><ul><li>inner</li></ul></li><li>b</li></ul></td></tr></table>")).toBe(
+            "| A |\n| --- |\n| inner; b |",
+        );
+    });
+});
