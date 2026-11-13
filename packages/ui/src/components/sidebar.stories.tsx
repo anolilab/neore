@@ -16,6 +16,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarProvider,
+    SidebarRail,
     SidebarTrigger,
 } from "./sidebar";
 
@@ -26,11 +27,20 @@ type LayoutProps = {
     defaultOpen?: "all" | (typeof NAMES)[number][];
     side?: "left" | "right";
     variant?: "sidebar" | "floating" | "inset";
+    /** Adds the rail that reopens a collapsed sidebar from the viewport's edge. */
+    withRail?: boolean;
 };
 
-const Layout = ({ collapsible, defaultOpen = "all", side, variant }: LayoutProps) => (
+const Layout = ({ collapsible, defaultOpen = "all", side, variant, withRail = false }: LayoutProps) => (
     <SidebarProvider className="min-h-80" defaultOpen={defaultOpen} sidebarNames={NAMES}>
-        <Sidebar aria-label="Workspace" collapsible={collapsible} name="main" side={side} variant={variant}>
+        <Sidebar
+            aria-label="Workspace"
+            collapsible={collapsible}
+            name="main"
+            rail={withRail ? <SidebarRail name="main" side={side ?? "left"} /> : undefined}
+            side={side}
+            variant={variant}
+        >
             <SidebarHeader>
                 <p className="px-2 text-sm font-medium">Workspace</p>
             </SidebarHeader>
@@ -130,19 +140,46 @@ const settled = async (element: HTMLElement) => {
     await Promise.all(element.getAnimations().map((animation) => animation.finished));
 };
 
+/** The rail, once it has settled, lies inside the viewport and is the element a click there reaches. */
+const expectRailReachable = async (canvasElement: HTMLElement) => {
+    const rail = canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-rail"]');
+
+    await expect(rail).not.toBeNull();
+
+    if (!rail) {
+        return;
+    }
+
+    await settled(rail);
+
+    const box = rail.getBoundingClientRect();
+
+    await expect({ inside: box.width > 0 && box.left >= 0 && box.right <= globalThis.innerWidth }).toStrictEqual({ inside: true });
+    await expect(rail.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2))).toBe(true);
+};
+
 /**
  * Closing and opening an off-canvas sidebar slides it (translate, on the compositor) and moves the page's edge once: when it has slid
- * out, or at once when it opens. Animating the gap's width instead laid out and painted the page on every frame.
+ * out, or at once when it opens. Animating the gap's width instead laid out and painted the page on every frame. The rail stays at the
+ * viewport's edge to open it again; with reduced motion everything settles at once.
  */
 const slidePlay =
     (side: "left" | "right") =>
-    async ({ canvas, canvasElement }: { canvas: { getByRole: (role: string, options: { name: string }) => HTMLElement }; canvasElement: HTMLElement }) => {
+    async ({ canvasElement }: { canvasElement: HTMLElement }) => {
         const { container, gap } = sidebarParts(canvasElement);
+        const trigger = canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-trigger"]');
+        const sidebar = canvasElement.querySelector<HTMLElement>('[data-slot="sidebar"]');
+
+        await expect(trigger).not.toBeNull();
+
+        if (!trigger) {
+            return;
+        }
 
         // On a phone the sidebar is a sheet, opened by the trigger: it slides in as a dialog, with no gap or sliding box.
         if (globalThis.matchMedia(MOBILE_BREAKPOINT_QUERY).matches) {
             await expect(container).toBeNull();
-            await userEvent.click(canvas.getByRole("button", { name: "Toggle Sidebar" }));
+            await userEvent.click(trigger);
             await expect(await screen.findByRole("dialog", { name: "Sidebar" })).toBeVisible();
 
             return;
@@ -162,16 +199,44 @@ const slidePlay =
 
             return side === "left" ? box.right <= 0 : box.left >= globalThis.innerWidth;
         };
+        const moving = (element: HTMLElement) =>
+            transitionsOf(element)
+                .filter((transition) => transition.duration > 0.01)
+                .map((transition) => transition.property);
+        // Under reduced motion nothing may run or wait: a delayed resting place would hold the page's edge for the slide's length.
+        const movingOrWaiting = (element: HTMLElement) =>
+            transitionsOf(element)
+                .filter((transition) => transition.duration > 0.01 || transition.delay > 0)
+                .map((transition) => transition.property);
 
-        await userEvent.click(canvas.getByRole("button", { name: "Toggle Sidebar" }));
+        // Reduced motion: nothing slides; the box and the page's edge reach their places at once, together.
+        if (globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            await userEvent.click(trigger);
+            await expect(movingOrWaiting(container)).toStrictEqual([]);
+            await expect(movingOrWaiting(gap)).toStrictEqual([]);
+            await settled(container);
+            await settled(gap);
+            await expect(gap.getBoundingClientRect().width).toBe(0);
+            await expect(isOffScreen()).toBe(true);
+            await expectRailReachable(canvasElement);
+
+            await userEvent.click(trigger);
+            await expect(movingOrWaiting(container)).toStrictEqual([]);
+            await expect(movingOrWaiting(gap)).toStrictEqual([]);
+            // The global reduced-motion rule leaves a 0.01 ms transition: settled within a frame.
+            await settled(container);
+            await settled(gap);
+            await expect(gap.getBoundingClientRect().width).toBe(width);
+            await expect(isOffScreen()).toBe(false);
+
+            return;
+        }
+
+        await userEvent.click(trigger);
 
         // Closing: the box slides, its resting place and the gap wait for the slide to end, and nothing animates the width.
         await expect(transitionsOf(container)).toContainEqual(expect.objectContaining({ duration: 200, property: "translate" }));
-        await expect(
-            transitionsOf(container)
-                .filter((transition) => transition.duration > 0)
-                .map((transition) => transition.property),
-        ).toStrictEqual(["translate"]);
+        await expect(moving(container)).toStrictEqual(["translate"]);
         await expect(transitionsOf(gap)).toStrictEqual([{ delay: 200, duration: 0, property: "width" }]);
         await expect(gap.getBoundingClientRect().width).toBe(width);
 
@@ -181,15 +246,14 @@ const slidePlay =
         await expect(gap.getBoundingClientRect().width).toBe(0);
         await expect(isOffScreen()).toBe(true);
 
-        await userEvent.click(canvas.getByRole("button", { name: "Toggle Sidebar" }));
+        // The rail stays at the viewport's edge, and a click on it opens the sidebar again.
+        await expectRailReachable(canvasElement);
+        await userEvent.click(canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-rail"]') ?? trigger);
+        await expect(sidebar?.dataset.state).toBe("expanded");
 
         // Opening: the gap takes its width at once, and the box slides in over it.
         await expect(gap.getBoundingClientRect().width).toBe(width);
-        await expect(
-            transitionsOf(container)
-                .filter((transition) => transition.duration > 0)
-                .map((transition) => transition.property),
-        ).toStrictEqual(["translate"]);
+        await expect(moving(container)).toStrictEqual(["translate"]);
 
         await settled(container);
 
@@ -197,6 +261,6 @@ const slidePlay =
         await expect(container.getBoundingClientRect().width).toBe(width);
     };
 
-export const SlidesClosedAndOpen: Story = { play: slidePlay("left") };
+export const SlidesClosedAndOpen: Story = { args: { withRail: true }, play: slidePlay("left"), tags: ["reduced-motion"] };
 
-export const SlidesClosedAndOpenOnTheRight: Story = { args: { side: "right" }, play: slidePlay("right") };
+export const SlidesClosedAndOpenOnTheRight: Story = { args: { side: "right", withRail: true }, play: slidePlay("right"), tags: ["reduced-motion"] };

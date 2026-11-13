@@ -231,6 +231,7 @@ const Sidebar = <T extends string>({
     collapsible = "offcanvas",
     "data-focus-area": focusArea,
     name,
+    rail,
     side = "left",
     variant = "sidebar",
     ...properties
@@ -239,6 +240,11 @@ const Sidebar = <T extends string>({
     /** Marks the sidebar as a screen area for F6 focus traversal; set on the element the user sees (the sheet on mobile). */
     "data-focus-area"?: string;
     name: T;
+    /**
+     * The `SidebarRail` that reopens the sidebar. It is fixed to the viewport, so it is rendered outside the sliding box: a
+     * translated box would carry it off screen with the panel.
+     */
+    rail?: ReactNode;
     side?: "left" | "right";
     variant?: "sidebar" | "floating" | "inset";
 }) => {
@@ -253,6 +259,7 @@ const Sidebar = <T extends string>({
                 {...properties}
             >
                 {children}
+                {rail}
             </div>
         );
     }
@@ -314,7 +321,7 @@ const Sidebar = <T extends string>({
                     "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) md:flex",
                     collapsible === "offcanvas"
                         ? // Slides on the compositor (translate); its resting place off screen is set once the slide has ended, or at once on opening.
-                          "[transition:translate_200ms_linear,left_0s_linear,right_0s_linear] group-data-[collapsible=offcanvas]:[transition-delay:0s,200ms,200ms] motion-reduce:group-data-[collapsible=offcanvas]:[transition-delay:0s]"
+                          "[transition:translate_200ms_linear,left_0s_linear,right_0s_linear] group-data-[collapsible=offcanvas]:[transition-delay:0s,200ms,200ms] motion-reduce:[transition-duration:0s] motion-reduce:group-data-[collapsible=offcanvas]:[transition-delay:0s]"
                         : "transition-[left,right,width] duration-200 ease-linear",
                     side === "left"
                         ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] group-data-[collapsible=offcanvas]:-translate-x-full"
@@ -338,6 +345,7 @@ const Sidebar = <T extends string>({
                     {children}
                 </div>
             </div>
+            {rail}
         </div>
     );
 };
