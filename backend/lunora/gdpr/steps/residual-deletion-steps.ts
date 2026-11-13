@@ -212,10 +212,11 @@ export const killUserSandboxes = internalAction
 const vUsageErasure = v.object({ hasMore: v.boolean(), runCursor: v.union(v.string(), v.null()) });
 
 /**
- * Pages of a user's keyed runs one purge call reads before it returns its cursor. A page is ten runs, and each run costs a storage
- * lookup, a delete and a record call, so one page keeps the call well under the Worker's subrequest cap. The workflow calls again.
+ * Pages of a user's keyed runs one purge call reads before it returns its cursor. A page is ten runs, and each keyed run costs about
+ * three subrequests (a storage lookup, a delete and a record call), so two pages can reach roughly 60 subrequests in one call. That is
+ * over the 50-subrequest cap the Free plan allows, and fits the paid plan's. The workflow calls again while a cursor comes back.
  */
-const PURGE_PAGES_PER_CALL = 1;
+const PURGE_PAGES_PER_CALL = 2;
 
 /**
  * The usage page's per-day rollup (`usage/activity.ts`): one row per skill per
