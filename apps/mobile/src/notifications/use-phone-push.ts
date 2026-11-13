@@ -12,10 +12,12 @@ import {
     configurePhoneNotifications,
     deviceLocale,
     devicePushPlatform,
+    dismissAccountNotifications,
+    noteSignedInAccount,
     pushRegistrations,
     syncApprovalActions,
 } from "./phone-push";
-import { createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
+import { createAccountChecks, createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
 
 /** `didRun`: no error (offline, no answer). `isRegistered`: the server now holds the token for this account. */
 interface RegisterResult {
@@ -120,10 +122,40 @@ const setUpNotifications = async (): Promise<boolean> => {
     }
 };
 
+/** How long an account check may hold up the checks and registrations queued after it. */
+const ACCOUNT_CHECK_TIMEOUT_MS = 5000;
+
+// eslint-disable-next-line no-console -- no logger in the app; a check that did not finish must not be silent
+const accountChecks = createAccountChecks(ACCOUNT_CHECK_TIMEOUT_MS, console.warn);
+
+/**
+ * Another person signed in on this phone, now or before a relaunch: the alerts still on it are the previous account's,
+ * and are removed. A check for an account that has already left does nothing. A phone that stays with one account keeps
+ * its alerts. Every registration waits for the checks queued before it (`registerAfterSetUp`), so the new account's own
+ * alerts cannot be removed after they arrive.
+ */
+const checkAccount = (userId: string, isCurrent: () => boolean): void => {
+    accountChecks.run(async (isLive) => {
+        const isOwner = () => isCurrent() && isLive();
+
+        if (!isOwner()) {
+            return;
+        }
+
+        try {
+            await noteSignedInAccount(userId, dismissAccountNotifications, isOwner);
+        } catch (error) {
+            // eslint-disable-next-line no-console -- no logger in the app; alerts that could not be removed must not be silent
+            console.warn("Could not remove the previous account's notifications.", error);
+        }
+    });
+};
+
 /** A registration that waits for the setup first: it does not register a phone whose alerts would lack their actions. */
 const registerAfterSetUp = async (isPrompt: boolean, isCurrent: () => boolean): Promise<Awaited<ReturnType<typeof register>>> => {
     // A setup that failed does not stop the registration: without one the phone gets no alerts at all, where an alert without its
     // buttons still opens the app. The setup is tried again at the next registration.
+    await accountChecks.settled();
     await setUpNotifications();
 
     return await register(isPrompt, isCurrent);
@@ -208,6 +240,8 @@ export const usePhonePush = (): void => {
 
         // A new sign-in reopens the gate the last sign-out closed and is offered the prompt again. Its registration
         // counts toward the foreground spacing.
+        checkAccount(userId, isCurrent);
+
         pushRegistrations.open();
         signedIn.account = account;
         promptOffer.begin(userId);

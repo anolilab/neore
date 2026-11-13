@@ -6,19 +6,22 @@
 import type { LunoraClient } from "@lunora/client";
 import { api } from "@neore/backend/api";
 import Constants from "expo-constants";
+import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
 import {
     AndroidImportance,
+    dismissAllNotificationsAsync,
     getExpoPushTokenAsync,
     getPermissionsAsync,
     requestPermissionsAsync,
     setNotificationChannelAsync,
     setNotificationHandler,
 } from "expo-notifications";
+import { getItemAsync, setItemAsync } from "expo-secure-store";
 import { Platform } from "react-native";
 
 import { registerApprovalActions } from "./approval-actions";
 import type { PushPlatform, PushServer } from "./push-registration";
-import { createPendingWork, languageTag, onceItWorks } from "./push-registration";
+import { createPendingWork, createSerialSteps, languageTag, noteAccountOnPhone, onceItWorks } from "./push-registration";
 
 /** Registrations in flight; sign-out settles them before it releases the token. */
 export const pushRegistrations = createPendingWork();
@@ -163,3 +166,24 @@ export const syncApprovalActions = async (): Promise<void> => {
         turn.done?.();
     }
 };
+
+/** Removes the alerts still on this phone. */
+export const dismissAccountNotifications = async (): Promise<void> => {
+    await dismissAllNotificationsAsync();
+};
+
+/** Records the account signed in on this phone; `onSwitch` removes the previous person's alerts first when it differs. */
+/** Every read and write of the record, one at a time, in the order they were asked for. */
+const recordSteps = createSerialSteps();
+
+export const noteSignedInAccount = async (userId: string, onSwitch: () => Promise<void>, isCurrent: () => boolean): Promise<void> =>
+    await noteAccountOnPhone(
+        userId,
+        {
+            digest: async (value) => await digestStringAsync(CryptoDigestAlgorithm.SHA256, value),
+            read: async (key) => await recordSteps(async () => await getItemAsync(key)),
+            write: async (key, value) => await recordSteps(async () => await setItemAsync(key, value)),
+        },
+        onSwitch,
+        isCurrent,
+    );

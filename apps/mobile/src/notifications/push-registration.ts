@@ -299,3 +299,123 @@ export const createPromptOffer = () => {
         },
     };
 };
+
+/** A one-way digest of the account last signed in on this phone, kept across launches so a switch after a relaunch is seen too. */
+export const LAST_ACCOUNT_KEY = "neore.mobile.last-push-account";
+
+/** Written when the alerts of the account on record could not be removed: the next sign-in removes them, whoever it is. */
+export const PENDING_REMOVAL = "pending-removal";
+
+/**
+ * Records the account signed in on this phone. Unless the record already names this account, the alerts still on the phone
+ * may be someone else's, and `removeSwitchedAlerts` removes them first. The record moves to this account only after that
+ * succeeds; a failed removal marks it pending, so the next sign-in removes them again. Kept on the device, not in memory,
+ * so it holds across a relaunch. Only a digest of the id is kept, and sign-out does not clear it.
+ */
+export const noteAccountOnPhone = async (
+    userId: string,
+    store: {
+        digest: (value: string) => Promise<string>;
+        read: (key: string) => Promise<string | null>;
+        write: (key: string, value: string) => Promise<void>;
+    },
+    removeSwitchedAlerts: () => Promise<void>,
+    isCurrent: () => boolean = () => true,
+): Promise<void> => {
+    const current = await store.digest(userId);
+    const previous = await store.read(LAST_ACCOUNT_KEY) ?? undefined;
+
+    if (previous === current || !isCurrent()) {
+        return;
+    }
+
+    try {
+        await removeSwitchedAlerts();
+    } catch (error) {
+        // Pending only while the record still names the account this check read: a newer check's record is never overwritten.
+        const isStillRecorded = (await store.read(LAST_ACCOUNT_KEY) ?? undefined) === previous;
+
+        if (isStillRecorded) {
+            await store.write(LAST_ACCOUNT_KEY, PENDING_REMOVAL);
+        }
+
+        throw error;
+    }
+
+    if (isCurrent()) {
+        await store.write(LAST_ACCOUNT_KEY, current);
+    }
+};
+
+/**
+ * Runs account checks one after another: a check starts only when the one before it has finished. A check that has not
+ * finished after `timeoutMs` stops holding up the ones queued after it, so one hung check cannot keep every later
+ * account's alerts and registration waiting. A check that fails or times out is reported through `warn`; the queue moves on either way.
+ */
+const runAfter = async (
+    previous: Promise<void>,
+    check: (isLive: () => boolean) => Promise<void>,
+    timeoutMs: number,
+    warn: (message: string, error: unknown) => void,
+): Promise<void> => {
+    await previous;
+
+    let isLive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        await Promise.race([
+            check(() => isLive),
+            new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(() => {
+                    isLive = false;
+                    reject(new Error("Timed out"));
+                }, timeoutMs);
+            }),
+        ]);
+    } catch (error) {
+        warn("A check of this phone's notifications did not finish, so it was skipped.", error);
+    } finally {
+        clearTimeout(timer);
+    }
+};
+
+export const createAccountChecks = (timeoutMs: number, warn: (message: string, error: unknown) => void) => {
+    let last: Promise<void> = Promise.resolve();
+
+    return {
+        run: (check: (isLive: () => boolean) => Promise<void>): void => {
+            last = runAfter(last, check, timeoutMs, warn);
+        },
+        /** Resolves once every check queued so far has finished or timed out. */
+        settled: (): Promise<void> => last,
+    };
+};
+
+/**
+ * Runs steps one after another, in the order they were asked for, and gives each caller its own step's result or error.
+ * A write asked for earlier always lands before a later one, so a delayed write from a check that timed out cannot
+ * overwrite a newer account's record.
+ */
+export const createSerialSteps = () => {
+    let last: Promise<void> = Promise.resolve();
+
+    return async <T>(step: () => Promise<T>): Promise<T> => {
+        const previous = last;
+        const run = (async () => {
+            await previous;
+
+            return await step();
+        })();
+
+        last = (async () => {
+            try {
+                await run;
+            } catch {
+                // The caller receives the error.
+            }
+        })();
+
+        return await run;
+    };
+};

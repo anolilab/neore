@@ -1,7 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { PushPermission, PushPlatform, PushServer } from "./push-registration";
-import { createForegroundGate, createPendingWork, createPromptOffer, createTokenChangeFilter, languageTag, onceItWorks, registerPhoneForPush, releaseOnSignOut, releasePhonePush } from "./push-registration";
+import {
+    createAccountChecks,
+    createForegroundGate,
+    createPendingWork,
+    createPromptOffer,
+    createSerialSteps,
+    createTokenChangeFilter,
+    languageTag,
+    LAST_ACCOUNT_KEY,
+    noteAccountOnPhone,
+    onceItWorks,
+    PENDING_REMOVAL,
+    registerPhoneForPush,
+    releaseOnSignOut,
+    releasePhonePush,
+} from "./push-registration";
 
 const TOKEN = "a".repeat(64);
 
@@ -345,5 +360,213 @@ describe("createPromptOffer", () => {
         offer.end();
 
         expect(offer.claim("b")).toBe(false);
+    });
+});
+
+describe("noteAccountOnPhone", () => {
+    const device = (stored?: string) => {
+        const items: Record<string, string> = stored === undefined ? {} : { [LAST_ACCOUNT_KEY]: stored };
+
+        return {
+            items,
+            store: {
+                digest: async (value: string) => `sha256:${value}`,
+                read: async (key: string) => items[key] ?? null,
+                write: vi.fn(async (key: string, value: string) => {
+                    items[key] = value;
+                }),
+            },
+        };
+    };
+
+    it("removes the previous account's alerts, then records the new account, even after a relaunch", async () => {
+        const { items, store } = device("sha256:u1");
+        const removeAlerts = vi.fn(async () => undefined);
+
+        await noteAccountOnPhone("u2", store, removeAlerts);
+
+        expect(removeAlerts).toHaveBeenCalledOnce();
+        // Only a digest is kept: nothing naming the account stays on the phone.
+        expect(items[LAST_ACCOUNT_KEY]).toBe("sha256:u2");
+    });
+
+    it("marks the record pending when its alerts could not be removed, so the next sign-in removes them, whoever it is", async () => {
+        const { items, store } = device("sha256:u1");
+
+        await expect(
+            noteAccountOnPhone("u2", store, async () => {
+                throw new Error("denied");
+            }),
+        ).rejects.toThrow("denied");
+        expect(items[LAST_ACCOUNT_KEY]).toBe(PENDING_REMOVAL);
+
+        const removeAlerts = vi.fn(async () => undefined);
+
+        await noteAccountOnPhone("u1", store, removeAlerts);
+
+        expect(removeAlerts).toHaveBeenCalledOnce();
+    });
+
+    it("removes nothing when the same person signs in again", async () => {
+        const same = device("sha256:u1");
+        const removeAlerts = vi.fn(async () => undefined);
+
+        await noteAccountOnPhone("u1", same.store, removeAlerts);
+
+        expect(removeAlerts).not.toHaveBeenCalled();
+        expect(same.store.write).not.toHaveBeenCalled();
+    });
+
+    it("removes what was left on a phone with no record, then records the first account", async () => {
+        const first = device();
+        const removeAlerts = vi.fn(async () => undefined);
+
+        await noteAccountOnPhone("u1", first.store, removeAlerts);
+
+        expect(removeAlerts).toHaveBeenCalledOnce();
+        expect(first.items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
+    });
+    it("removes nothing and writes nothing for a check that is no longer current", async () => {
+        const { items, store } = device("sha256:u1");
+        const removeAlerts = vi.fn(async () => undefined);
+
+        await noteAccountOnPhone("u2", store, removeAlerts, () => false);
+
+        expect(removeAlerts).not.toHaveBeenCalled();
+        expect(store.write).not.toHaveBeenCalled();
+        expect(items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
+    });
+    it("leaves a newer account's record alone when a removal that is no longer current fails", async () => {
+        const { items, store } = device("sha256:u1");
+
+        await expect(
+            noteAccountOnPhone(
+                "u2",
+                store,
+                async () => {
+                    items[LAST_ACCOUNT_KEY] = "sha256:u3";
+                    throw new Error("denied");
+                },
+                () => true,
+            ),
+        ).rejects.toThrow("denied");
+        expect(items[LAST_ACCOUNT_KEY]).toBe("sha256:u3");
+    });
+});
+
+describe("createSerialSteps", () => {
+    it("runs each step only once the one asked for before it has finished", async () => {
+        const run = createSerialSteps();
+        const order: string[] = [];
+        let release: () => void = () => undefined;
+        let markStarted: () => void = () => undefined;
+        const started = new Promise<void>((resolve) => {
+            markStarted = () => resolve();
+        });
+
+        const first = run(async () => {
+            order.push("first:start");
+            markStarted();
+            await new Promise<void>((resolve) => {
+                release = () => resolve();
+            });
+            order.push("first:end");
+        });
+        const second = run(async () => {
+            order.push("second");
+        });
+
+        await started;
+        expect(order).toEqual(["first:start"]);
+        release();
+        await Promise.all([first, second]);
+
+        expect(order).toEqual(["first:start", "first:end", "second"]);
+    });
+
+    it("keeps the next step running when one fails, and reports the failure to its own caller", async () => {
+        const run = createSerialSteps();
+        const failed = run(async () => {
+            throw new Error("denied");
+        });
+        const next = run(async () => "next");
+
+        await expect(failed).rejects.toThrow("denied");
+        await expect(next).resolves.toBe("next");
+    });
+});
+
+describe("createAccountChecks", () => {
+    it("runs the checks one after another, so a check starts only once the one before it has finished", async () => {
+        const queue = createAccountChecks(1000, () => undefined);
+        const order: string[] = [];
+        let release: () => void = () => undefined;
+        let markStarted: () => void = () => undefined;
+        const started = new Promise<void>((resolve) => {
+            markStarted = () => resolve();
+        });
+
+        queue.run(async () => {
+            order.push("first:start");
+            markStarted();
+            await new Promise<void>((resolve) => {
+                release = () => resolve();
+            });
+            order.push("first:end");
+        });
+        queue.run(async () => {
+            order.push("second");
+        });
+
+        await started;
+        expect(order).toEqual(["first:start"]);
+        release();
+        await queue.settled();
+
+        expect(order).toEqual(["first:start", "first:end", "second"]);
+    });
+
+    it("stops holding up the checks after a check that never finishes once the timeout has passed", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const warn = vi.fn();
+            const queue = createAccountChecks(1000, warn);
+            const next = vi.fn(async () => undefined);
+
+            queue.run(async () => {
+                await new Promise<void>(() => {});
+            });
+            queue.run(next);
+
+            await vi.advanceTimersByTimeAsync(1000);
+            await queue.settled();
+
+            expect(next).toHaveBeenCalledOnce();
+            expect(warn).toHaveBeenCalledOnce();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("tells a check that timed out that it is no longer live", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const queue = createAccountChecks(1000, () => undefined);
+            let isLive: () => boolean = () => true;
+
+            queue.run(async (live) => {
+                isLive = live;
+                await new Promise<void>(() => {});
+            });
+
+            await vi.advanceTimersByTimeAsync(1000);
+            await queue.settled();
+
+            expect(isLive()).toBe(false);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
