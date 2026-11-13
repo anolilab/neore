@@ -686,13 +686,17 @@ describe("the sweep and the clear", () => {
             await ctx.db.insert("usageExportPieces", { ...piece(`${dead}:1`, A), createdAt: old });
         });
 
-        // The first sweep reads the 500 live runs and moves them out of its window, so the expired run is not reached yet.
-        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
-        expect(await countOf("usageExportPieces", A)).toBe(1);
+        // A sweep re-arms a batch of live runs and no more, since each re-arm is a census write. Each live run moves out of the window,
+        // so the expired run is reached after the 510 live ones have been passed: 51 sweeps, then the one that removes its piece.
+        let sweeps = 0;
 
-        // The second sweep reads the 10 live runs left in the window, then the expired run, whose piece it removes.
-        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        while ((await countOf("usageExportPieces", A)) === 1 && sweeps < 60) {
+            await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+            sweeps += 1;
+        }
+
         expect(await countOf("usageExportPieces", A)).toBe(0);
+        expect(sweeps).toBe(52);
     });
 
     it("clears a run's pieces and index rows a batch at a time, and removes its row once none is left", async () => {

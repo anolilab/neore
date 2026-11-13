@@ -298,6 +298,8 @@ export const sweepUsageExportPieces = internalMutation
                     const fast = run.erasingSince !== undefined && ctx.now - run.erasingSince < LIVE_FAST_WINDOW_MS;
 
                     await armRun(ctx, run._id, run.userId, ctx.now + (fast ? LIVE_RECHECK_MS : EXPORT_PIECE_TTL_MS));
+                    // A re-arm is a census write, so it counts toward the batch like a cleared run: one sweep makes at most a batch of them.
+                    handled += 1;
                     continue;
                 }
 
