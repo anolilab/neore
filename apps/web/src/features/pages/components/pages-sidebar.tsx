@@ -11,6 +11,7 @@ import { FileText, Plus, Search, Star, Users } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useId, useMemo, useState } from "react";
 
+import useDebouncedValue from "@/hooks/use-debounced-value";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
@@ -19,18 +20,6 @@ import { buildPageTree } from "../lib/page-tree";
 import PageTreeItem, { PAGE_DRAG_TYPE } from "./page-tree-item";
 
 const SEARCH_DEBOUNCE_MS = 250;
-
-const useDebounced = (value: string, delay: number): string => {
-    const [debounced, setDebounced] = useState(value);
-
-    useEffect(() => {
-        const timer = setTimeout(setDebounced, delay, value);
-
-        return () => clearTimeout(timer);
-    }, [value, delay]);
-
-    return debounced;
-};
 
 /** Ancestors of `pageId`, so the tree opens down to the page being viewed. */
 const ancestorsOf = (pages: ReadonlyArray<FlatPage>, pageId: string | undefined): string[] => {
@@ -53,7 +42,7 @@ const PagesSidebar: FC = () => {
     const searchId = useId();
     const { pageId: activePageId } = useParams({ strict: false }) as { pageId?: string };
     const [query, setQuery] = useState("");
-    const debouncedQuery = useDebounced(query.trim(), SEARCH_DEBOUNCE_MS);
+    const debouncedQuery = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS);
     const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
     const [pendingDelete, setPendingDelete] = useState<FlatPage | null>(null);
 

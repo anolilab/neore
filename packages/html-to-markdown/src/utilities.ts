@@ -416,13 +416,20 @@ export function parseListStart(value: string | null): bigint | null {
     return BigInt(match[1] ?? "0");
 }
 
-const INLINE_SYNTAX = /[\\*`[\]_]/g;
-const INLINE_SYNTAX_PRESENT = /[\\*`[\]_]/;
+// A `<` opens raw HTML when a letter, `/`, `!` or `?` follows it. It opens an email autolink when
+// the text after it is a local part and an `@`, such as `<1a@b.co>`, which a digit can start. The
+// local part leaves out the characters escaped below: a backslash before one of them is not allowed
+// in an autolink, so such a `<` stays as it is. Any other follower (a space, `=`, `<`, or a digit with
+// no `@` after it) cannot open either, so the `<` stays too. A `<` at the end of the string is not
+// escaped here: the text rule decides it, since the next node is not visible from this string.
+const INLINE_SYNTAX = /[\\*`[\]_]|<(?=[a-z/!?]|[a-z0-9.!#$%&'+/=?^{|}~-]+@)/gi;
+const INLINE_SYNTAX_PRESENT = /[\\*`[\]_]|<(?=[a-z/!?]|[a-z0-9.!#$%&'+/=?^{|}~-]+@)/i;
 
 // The line-start markers, anchored and non-global. Their first characters differ, so
-// at most one can match. An ordered-list number is handled apart: its dot is escaped.
+// at most one can match. An ordered-list number is handled apart: its `.` or `)` is escaped
+// when a space, a tab or a line end follows it, since CommonMark makes each of them a list item.
 const LINE_START = /^(?:-|\+ |=+|#{1,6} |~~~|>)/;
-const ORDERED_START = /^(\d+)\. /;
+const ORDERED_START = /^(\d+)([.)])(?=[ \t\n]|$)/;
 
 /**
  * Escapes text so that it cannot start a Markdown block or open an inline
@@ -439,7 +446,7 @@ export function escapeMarkdown(string: string): string {
     // After the inline pass, a string that starts with a backslash matches no
     // line-start rule, so matching on the escaped string is exact.
     if (ORDERED_START.test(inline)) {
-        return inline.replace(ORDERED_START, String.raw`$1\. `);
+        return inline.replace(ORDERED_START, String.raw`$1\$2`);
     }
 
     return inline.replace(LINE_START, String.raw`\$&`);

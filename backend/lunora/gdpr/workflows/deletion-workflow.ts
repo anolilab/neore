@@ -32,6 +32,9 @@ export interface DeletionParams {
     userId: string;
 }
 
+/** Rounds the erasure waits, one minute apart, for a live usage export to end before it forces the purge. */
+const MAX_USAGE_PURGE_ROUNDS = 120;
+
 /** Upper bound on batches per drained step — a guard against a row that never stops matching. */
 const MAX_DRAIN_ROUNDS = 10_000;
 
@@ -580,11 +583,65 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             requestId: args.requestId,
         });
 
-        await drain(
-            "delete-user-usage-daily",
-            async (round) =>
-                await context.run(steps.deleteUserUsageDaily, { userId: args.userId }, { dedupId: stepDedupId(scope, "delete-user-usage-daily", round) }),
-        );
+        // The usage rows and export tables are erased in batches. The run scan carries its position from one batch to the next.
+        // Each erasure starts its run scan afresh (`undefined`); a null cursor between its batches means the scan has finished.
+        const eraseUsage = async (name: string): Promise<void> => {
+            let runCursor: string | null | undefined;
+
+            await drain(name, async (round) => {
+                const result = (await context.run(
+                    steps.deleteUserUsageDaily,
+                    { runCursor, userId: args.userId },
+                    { dedupId: stepDedupId(scope, name, round) },
+                )) as { hasMore: boolean; runCursor?: string | null };
+
+                runCursor = result.runCursor ?? null;
+
+                return result;
+            });
+        };
+
+        await eraseUsage("delete-user-usage-daily");
+
+        // The stored usage JSON is deleted before the erasure is done. The scan of the keyed runs continues from the cursor each call
+        // returns; a run whose export is still live keeps its record, and once a full pass finds one, the workflow waits a minute and
+        // scans again. After the wait's bound the purge is forced, so erasure finishes while a long export is still live.
+        let waits = 0;
+        let cursor: string | null = null;
+        let waiting = false;
+
+        for (let round = 0; ; round += 1) {
+            const force = waits >= MAX_USAGE_PURGE_ROUNDS;
+
+            const result = (await context.step.do(
+                `purge-user-usage-files-${String(round)}`,
+                async () =>
+                    await context.run(
+                        steps.purgeUserUsageFiles,
+                        { cursor, force, userId: args.userId },
+                        { dedupId: stepDedupId(scope, "purge-user-usage-files", round) },
+                    ),
+            )) as { cursor?: string | null; waiting: boolean };
+
+            waiting ||= result.waiting;
+
+            if (typeof result.cursor === "string") {
+                cursor = result.cursor;
+                continue;
+            }
+
+            if (!waiting || force) {
+                break;
+            }
+
+            cursor = null;
+            waiting = false;
+            waits += 1;
+            await context.step.sleep(`usage-exports-live-${String(round)}`, "1 minute");
+        }
+
+        // Writes made while the export was live are removed as well.
+        await eraseUsage("delete-user-usage-daily-after-purge");
 
         await context.step.do(
             "delete-user-settings",

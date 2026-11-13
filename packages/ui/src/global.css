@@ -23,6 +23,29 @@
     --font-pixel-line: "Geist Pixel Line", "Geist Mono Variable", monospace;
 }
 
+/* The "Thinking…" text shimmer (ai-elements/shimmer.tsx). 30 steps per sweep: the browser repaints the text 30 times
+   per cycle instead of on every frame, and no script runs per frame. A utility, not a `@theme` variable: a theme
+   variable is resolved on :root, where the element's `--shimmer-duration` never reaches it.
+   It animates background-position, a paint property, on purpose: the highlight lives inside the glyphs
+   (background-clip: text), which a transformed layer cannot be clipped to. The surface is one short line of text,
+   and the component pauses it off-screen (`data-paused`). */
+@utility animate-text-shimmer {
+    animation: text-shimmer var(--shimmer-duration, 2s) steps(30) infinite;
+
+    &[data-paused] {
+        animation-play-state: paused;
+    }
+}
+
+@keyframes text-shimmer {
+    from {
+        background-position: 100% center;
+    }
+    to {
+        background-position: 0% center;
+    }
+}
+
 :root {
     /* ── Brand palette ─────────────────────────────────────── */
     --brand-lime: #caff00; /* Electric Lime Surge */
