@@ -143,3 +143,26 @@ describe("paste: review cases", () => {
         expect(markdown.split("\n").at(-1)).toBe(`${items}. x`);
     });
 });
+
+describe("paste: review cases, second round", () => {
+    it("keeps a flag emoji drawn as an image", () => {
+        expect(convert(`<p>Go <img alt="🇺🇸"></p>`)).toBe("Go 🇺🇸");
+    });
+
+    it("writes a list in a table cell as the cell's text, as the gfm rules do", () => {
+        expect(convert("<table><tr><th>A</th></tr><tr><td><ul><li>a</li><li>b<ul><li>c</li></ul></li></ul></td></tr></table>")).toBe(
+            "| A |\n| --- |\n| a; b; c |",
+        );
+    });
+
+    it("reads a style with a CSS comment in it", () => {
+        expect(convert(`<p>shown<span style="display:/**/none"> secret</span></p>`)).toBe("shown");
+        expect(declaredStyle("display: none /* hide */", "display")).toBe("none");
+    });
+
+    it("finds a TeX annotation whatever the case of its encoding", () => {
+        const encoding = "APPLICATION/X-TEX";
+
+        expect(convert(`<p><math><semantics><mi>x</mi><annotation encoding="${encoding}">x^2</annotation></semantics></math></p>`)).toBe("$x^2$");
+    });
+});

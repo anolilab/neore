@@ -52,7 +52,8 @@ const HIDDEN_CLASS = /(?:^|\s)(?:sr-only|visually-?hidden)(?:\s|$)/i;
 const IMPORTANT = /!\s{0,20}important\s{0,20}$/i;
 const MATH_CLASS = /math/i;
 const EMOJI_NAME = /^:[\w+-]{1,40}:$/;
-const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
+// A pictograph, or a flag: a pair of regional indicator letters, which holds no pictograph.
+const PICTOGRAPHIC = /\p{Extended_Pictographic}|\p{Regional_Indicator}{2}/u;
 // Only emoji: pictographs and the joiners, modifiers, selectors and flag letters that build them.
 const EMOJI_ONLY = /^[\p{Extended_Pictographic}\p{Emoji_Component}\s]+$/u;
 const MAX_EMOJI_ALT = 16;
@@ -68,7 +69,9 @@ export function declaredStyle(style: string, property: string): string {
     let value = "";
     let isImportant = false;
 
-    for (const declaration of declarations(style)) {
+    const parts = declarations(withoutComments(style));
+
+    for (const declaration of parts) {
         const colon = declaration.indexOf(":");
 
         if (colon === -1 || declaration.slice(0, colon).trim().toLowerCase() !== property) {
@@ -85,6 +88,27 @@ export function declaredStyle(style: string, property: string): string {
     }
 
     return value;
+}
+
+// The style without its comments: CSS reads `display:` then an empty comment then `none` as `display:none`. An
+// unclosed comment runs to the end.
+function withoutComments(style: string): string {
+    let result = "";
+    let index = 0;
+
+    for (let open = style.indexOf("/*"); open !== -1; open = style.indexOf("/*", index)) {
+        result += style.slice(index, open);
+
+        const close = style.indexOf("*/", open + 2);
+
+        if (close === -1) {
+            return result;
+        }
+
+        index = close + 2;
+    }
+
+    return result + style.slice(index);
 }
 
 /**
@@ -263,15 +287,28 @@ function itemNumber(list: Element, item: Element, lookup: RuleLookup): bigint {
 
 /** A formula's TeX source, from its `application/x-tex` annotation, or "". */
 function texSource(node: Element): string {
-    return node.querySelector(`annotation[encoding="application/x-tex"]`)?.textContent?.trim() ?? "";
+    // A media type is matched without case, so `APPLICATION/X-TEX` names TeX too.
+    const found = node.querySelectorAll("annotation");
+    // Copied by index: domino's NodeList is not iterable.
+    const annotations = Array.from({ length: found.length }, (_unused, index) => found[index]);
+
+    for (const annotation of annotations) {
+        if (annotation?.getAttribute("encoding")?.trim().toLowerCase() === "application/x-tex") {
+            return annotation.textContent?.trim() ?? "";
+        }
+    }
+
+    return "";
 }
 
 /** The paste preset: the `gfm` rules, hidden content left out, and image, formula and list rules for a composer. */
 export function paste(service: TurndownService): void {
-    service.use(gfm);
     service.remove(isHiddenElement);
 
     for (const [key, rule] of Object.entries(pasteRules)) {
         service.addRule(key, rule);
     }
+
+    // Added last, so it comes first: inside a table cell its rules write a list as the cell's text.
+    service.use(gfm);
 }
