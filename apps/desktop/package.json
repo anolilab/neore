@@ -4,7 +4,7 @@
     "private": true,
     "description": "Electron desktop shell around the deployed Neore web app",
     "type": "module",
-    "main": "dist/main.cjs",
+    "main": "dist/boot.cjs",
     "scripts": {
         "build": "node scripts/build.mjs",
         "build:dictation-helper": "node scripts/build-dictation-helper.mjs",
