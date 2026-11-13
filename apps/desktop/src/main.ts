@@ -992,14 +992,25 @@ const createQuickComposer = (): BrowserWindow => {
 
         state.composer = undefined;
         state.composerOpening = undefined;
+        shellProbe.quickComposer = false;
     });
 
     // A page that failed to load, or whose renderer died, never paints again: it is thrown away, and the next press
-    // makes a new one instead of toggling a dead window.
-    const discard = (): void => {
+    // makes a new one instead of toggling a dead window. A failed load both fires `did-fail-load` and rejects
+    // `loadURL`, so only the first report is logged.
+    let discarded = false;
+    const discard = (reason: string): void => {
+        if (discarded) {
+            return;
+        }
+
+        discarded = true;
+        log(`Quick Composer discarded, a press opens a new one: ${reason}`);
+
         if (state.composer === win) {
             state.composer = undefined;
             state.composerOpening = undefined;
+            shellProbe.quickComposer = false;
         }
 
         if (!win.isDestroyed()) {
@@ -1007,18 +1018,18 @@ const createQuickComposer = (): BrowserWindow => {
         }
     };
 
-    contents.on("did-fail-load", (_event, _errorCode: number, _description: string, _validatedUrl: string, isMainFrame: boolean) => {
+    contents.on("did-fail-load", (_event, errorCode: number, description: string, _validatedUrl: string, isMainFrame: boolean) => {
         if (isMainFrame) {
-            discard();
+            discard(`load failed (${errorCode} ${description})`);
         }
     });
-    contents.on("render-process-gone", () => discard());
+    contents.on("render-process-gone", (_event, details: { reason: string }) => discard(`renderer gone (${details.reason})`));
 
     const load = async (): Promise<void> => {
         try {
             await win.loadURL(composerPage.href);
-        } catch {
-            discard();
+        } catch (error) {
+            discard(`load failed (${String(error)})`);
         }
     };
 

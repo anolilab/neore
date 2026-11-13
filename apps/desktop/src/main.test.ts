@@ -58,6 +58,8 @@ interface Fake {
     applicationMenu?: { template: { label?: string; role?: string; submenu?: { click?: () => void; label?: string }[] }[] };
     focusedWindow: FakeWindow | null;
     ipc: Map<string, (event: unknown, payload?: unknown) => unknown>;
+    /** What a window's `loadURL` rejects with, while set. */
+    loadRejection?: Error;
     /** `systemPreferences.subscribeNotification`: macOS distributed notifications, by name. */
     macNotifications: { callback: () => void; name: string | null }[];
     notificationFails: boolean;
@@ -137,7 +139,7 @@ vi.mock("electron", () => {
             loadURL: (url: string) => {
                 window.loaded.push(url);
 
-                return Promise.resolve();
+                return fakeElectron.loadRejection === undefined ? Promise.resolve() : Promise.reject(fakeElectron.loadRejection);
             },
             maximize: () => {
                 window.calls.push("maximize");
@@ -353,6 +355,8 @@ const isComposer = (window: FakeWindow): boolean => SITE_HTML_PATTERN.test(windo
 const composerWindows = (): FakeWindow[] => fake().windows.filter((window) => isComposer(window) && !window.destroyed);
 /** The composer the last `newComposer` made. */
 const composer = (): FakeWindow => composerWindows().at(-1) as FakeWindow;
+/** The shell probe's word on whether the composer window exists. */
+const probeSaysComposer = (): boolean | undefined => (globalThis as { neoreShell?: { quickComposer: boolean } }).neoreShell?.quickComposer;
 const pressComposerShortcut = (): void => fake().shortcuts.get(COMPOSER_SHORTCUT)?.();
 const composerReady = (window: FakeWindow): void => window.handlers.get("ready-to-show")?.({ preventDefault: () => {} }, "");
 
@@ -556,11 +560,14 @@ describe("tray and Quick Composer", () => {
         it.each(failures)("is thrown away when %s, and the next press makes a new one that opens at its paint", (_name, fail) => {
             const failed = newComposer({ ready: false });
 
+            expect(probeSaysComposer()).toBe(true);
             fail(failed);
             expect(failed.destroyed).toBe(true);
             expect(composerWindows()).toStrictEqual([]);
+            expect(probeSaysComposer()).toBe(false);
 
             pressComposerShortcut();
+            expect(probeSaysComposer()).toBe(true);
 
             const fresh = composer();
 
@@ -574,6 +581,33 @@ describe("tray and Quick Composer", () => {
 
             composerReady(fresh);
             expect(fresh.calls).toStrictEqual(["show"]);
+        });
+
+        it("logs a rejected load once, with its error, and the next press makes a new one", async () => {
+            const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+            try {
+                fake().loadRejection = new Error("ERR_FILE_NOT_FOUND (-6) loading 'file:///quick-composer/index.html'");
+
+                const failed = newComposer({ ready: false });
+
+                fake().loadRejection = undefined;
+                await vi.waitFor(() => expect(failed.destroyed).toBe(true));
+                // Electron also fires `did-fail-load` for the same failure: still one line.
+                (failed.webContents.handlers.get("did-fail-load") as unknown as (...args: unknown[]) => void)({}, -6, "ERR_FILE_NOT_FOUND", failed.loaded[0], true);
+
+                const lines = stderr.mock.calls.map(([chunk]) => String(chunk)).filter((line) => line.includes("Quick Composer"));
+
+                expect(lines).toStrictEqual([expect.stringContaining("ERR_FILE_NOT_FOUND (-6)")]);
+                expect(probeSaysComposer()).toBe(false);
+
+                pressComposerShortcut();
+                expect(composer()).not.toBe(failed);
+                expect(probeSaysComposer()).toBe(true);
+            } finally {
+                fake().loadRejection = undefined;
+                stderr.mockRestore();
+            }
         });
 
         it("ignores a failed subframe load", () => {
