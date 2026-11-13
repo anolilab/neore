@@ -1656,6 +1656,7 @@ export interface Doc_subAgentRuns {
     organizationId?: string;
     parentModel?: string;
     parentThreadId: string;
+    postCheckId?: string;
     postFailed?: string;
     reapAt?: number;
     result?: string;
@@ -1935,6 +1936,7 @@ export interface Doc_threads {
     customSystemPrompt?: string;
     deleted?: boolean;
     deletedAt?: number;
+    deletingAt?: number;
     dictationLanguage?: string;
     enabledFeatures?: Array<string>;
     externalThreadId?: string;
@@ -4869,6 +4871,7 @@ export interface Insert_subAgentRuns {
     organizationId?: string;
     parentModel?: string;
     parentThreadId: string;
+    postCheckId?: string;
     postFailed?: string;
     reapAt?: number;
     result?: string;
@@ -5148,6 +5151,7 @@ export interface Insert_threads {
     customSystemPrompt?: string;
     deleted?: boolean;
     deletedAt?: number;
+    deletingAt?: number;
     dictationLanguage?: string;
     enabledFeatures?: Array<string>;
     externalThreadId?: string;

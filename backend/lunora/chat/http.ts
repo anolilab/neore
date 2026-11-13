@@ -460,6 +460,9 @@ const emptyAfterStripping = (prompt: unknown): boolean => {
 const hostRunThreadResponse = (): Response =>
     Response.json({ error: "HOST_RUN_THREAD", message: "This thread runs on a paired computer. Send the message from the desktop app." }, { status: 409 });
 
+/** How long a send waits before it tries its failed `afterOwnerMessage` call once more. */
+const AFTER_SAVE_RETRY_MS = 5000;
+
 export const runChatStart = async (
     context: HttpActionCtx,
     rawBody: ChatStartBody,
@@ -1054,6 +1057,31 @@ const runChatStartOnShard = async (
         });
     };
 
+    /**
+     * The message is saved, whatever its content: a sub-agent waiting on this thread ends its wait, and a result held for
+     * the owner's own request here is released (`afterOwnerMessage`, idempotent). Its own transaction, after the save and
+     * its claim: a failure is logged and never fails this send, whose prompt is saved and charged. A new thread can be
+     * neither a sub-agent's child nor hold a request, so it costs nothing. Once per send, whichever path reaches it.
+     */
+    let afterSaveDone = false;
+    const afterSave = async (savedThreadId: string): Promise<void> => {
+        if (validThreadId === undefined || afterSaveDone) {
+            return;
+        }
+
+        afterSaveDone = true;
+
+        // A failed call is logged and tried once more shortly (it is idempotent); a failed retry schedule is logged too.
+        await context.runMutation(internal.sub_agents.functions.afterOwnerMessage, { threadId: savedThreadId }).catch(async (error: unknown) => {
+            chatLogger.warn("[chat] Could not end a sub-agent's wait or release its held results; retrying shortly", error);
+            await httpScheduler(context)
+                .runAfter(AFTER_SAVE_RETRY_MS, internal.sub_agents.functions.afterOwnerMessage, { threadId: savedThreadId })
+                .catch((error_: unknown) => {
+                    chatLogger.error("[chat] Could not end a sub-agent's wait or release its held results, nor schedule a retry", error_);
+                });
+        });
+    };
+
     if (startOutcome?.outcome === "duplicate") {
         // The stream token attaches to the first send's run as a reconnect does; a run that ended reads from the thread.
         const { messageId, streamId: duplicateStreamId, threadId } = startOutcome;
@@ -1065,6 +1093,10 @@ const runChatStartOnShard = async (
                 await enqueueRun({ messageId, streamId: duplicateStreamId, threadId });
             }
         } finally {
+            // The first try may have died before its own call: a resend makes it, whether or not its run's submission
+            // succeeds (it is idempotent and catches its own errors).
+            await afterSave(threadId);
+
             // Title jobs no try recorded scheduled: they follow the run, so a failed submission skipped them, or one was refused.
             // Each is recorded once scheduled; one this resend fails to schedule, or dies before, is left to the next.
             // A guest note's text never reaches the title model.
@@ -1353,53 +1385,63 @@ const runChatStartOnShard = async (
     let streamId: string | null = null;
     let streamToken: string | undefined;
 
-    if (contentType === "text") {
-        const activeOrganizationId = await activeOrganizationPromise;
-        let goalId: Id<"threadGoals"> | undefined;
+    // The prompt is saved from here on: a stream or run that fails still ends a sub-agent's wait (`afterSave`, once).
+    try {
+        if (contentType === "text") {
+            const activeOrganizationId = await activeOrganizationPromise;
+            let goalId: Id<"threadGoals"> | undefined;
 
-        if (body.goal !== undefined && goalConfig?.ok) {
-            const started = await context.runMutation(internal.chat.goals.internal.startGoal, {
-                // The goal's config was checked with the resolved model; a resumed send runs on its saved one.
-                config: { ...goalConfig.value, model: effectiveModel },
-                ...(typeof body.goal.maxRounds === "number" && { maxRounds: body.goal.maxRounds }),
-                ...(activeOrganizationId && { organizationId: activeOrganizationId }),
-                promptMessageId: messageId,
+            if (body.goal !== undefined && goalConfig?.ok) {
+                const started = await context.runMutation(internal.chat.goals.internal.startGoal, {
+                    // The goal's config was checked with the resolved model; a resumed send runs on its saved one.
+                    config: { ...goalConfig.value, model: effectiveModel },
+                    ...(typeof body.goal.maxRounds === "number" && { maxRounds: body.goal.maxRounds }),
+                    ...(activeOrganizationId && { organizationId: activeOrganizationId }),
+                    promptMessageId: messageId,
+                    ...(startClaim !== undefined && { startClaim }),
+                    // The trimmed text the length check above passed, so a padded goal cannot fail validation after the charge.
+                    text: goalText,
+                    threadId: threadId as Id<"threads">,
+                    userId,
+                });
+
+                if (!started.ok) {
+                    // The prompt is saved though its goal is refused: it moved the thread past what it waited on all the same.
+                    await afterSave(threadId);
+
+                    return Response.json({ error: started.error }, { status: 400 });
+                }
+
+                goalId = started.goalId;
+            }
+
+            streamId = await context.runMutation(internal.chat.streaming.createStreamWithMessage, {
+                ...(goalId && { goalId }),
+                messageId,
                 ...(startClaim !== undefined && { startClaim }),
-                // The trimmed text the length check above passed, so a padded goal cannot fail validation after the charge.
-                text: goalText,
-                threadId: threadId as Id<"threads">,
+                streamingConfig,
+                threadId,
                 userId,
             });
 
-            if (!started.ok) {
-                return Response.json({ error: started.error }, { status: 400 });
-            }
+            streamToken = await createStreamToken(streamId!, userId, threadId, signingSecret);
 
-            goalId = started.goalId;
+            // On the jobs queue, not the scheduler: the SchedulerDO runs jobs one at a
+            // time, so a scheduled run waited behind every other user's run and
+            // behind this request's own title jobs (`lib/job-queue.ts`).
+            await enqueueRun({ messageId, streamId: streamId!, threadId });
+
+            // The thread's `running` status was set with the stream, in
+            // `createStreamWithMessage`.
         }
+    } catch (error) {
+        await afterSave(threadId);
 
-        streamId = await context.runMutation(internal.chat.streaming.createStreamWithMessage, {
-            ...(goalId && { goalId }),
-            messageId,
-            ...(startClaim !== undefined && { startClaim }),
-            streamingConfig,
-            threadId,
-            userId,
-        });
-
-        streamToken = await createStreamToken(streamId!, userId, threadId, signingSecret);
-
-        // On the jobs queue, not the scheduler: the SchedulerDO runs jobs one at a
-        // time, so a scheduled run waited behind every other user's run and
-        // behind this request's own title jobs (`lib/job-queue.ts`).
-        await enqueueRun({ messageId, streamId: streamId!, threadId });
-
-        // The thread's `running` status was set with the stream, in
-        // `createStreamWithMessage`.
+        throw error;
     }
 
     // A claimed send records each title job it scheduled, so a resend schedules only one it could not.
-    const scheduledTitleJobs = await runTitleJobs();
+    const [, scheduledTitleJobs] = await Promise.all([afterSave(threadId), runTitleJobs()]);
 
     if (startClaim !== undefined) {
         await recordTitlesScheduled(startClaim, messageId, scheduledTitleJobs);

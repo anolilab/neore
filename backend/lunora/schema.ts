@@ -2702,6 +2702,8 @@ export const schema = defineSchema({
         // The delegating run's model, inherited when still allowed.
         parentModel: v.optional(v.string()),
         parentThreadId: v.string(),
+        // The run's one pending post check (`postResult`), so a release replaces it instead of adding a second loop.
+        postCheckId: v.optional(v.string()),
         // Why the result never reached the parent thread, once the retries ran out. Terminal: set
         // instead of `resultPostedAt`, never with it.
         postFailed: v.optional(v.string()),
@@ -3172,6 +3174,9 @@ export const schema = defineSchema({
         customSystemPrompt: v.optional(v.string()),
         deleted: v.optional(v.boolean()),
         deletedAt: v.optional(v.number()),
+        // Set on a hard delete's first page (`agent/threads.ts`): the thread is going, and a sub-agent's result no longer
+        // posts into it (`isGoneParent`), whatever page the delete is on.
+        deletingAt: v.optional(v.number()),
         dictationLanguage: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
         externalThreadId: v.optional(v.string()),

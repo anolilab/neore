@@ -10,6 +10,8 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { respondToToolApproval } from "../chat/tool-permissions";
 import { stopActiveForThread } from "../chat/streaming/persistent/library";
+import { _deletePageForThreadId } from "../agent/threads";
+import { clearAwaitingInput } from "../agent/table-writes";
 import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
 import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
 import type { Id } from "../_generated/dataModel";
@@ -17,6 +19,11 @@ import schema from "../schema";
 import {
     cancelSubAgentRunsForStop,
     completeResumedRun,
+    markDeletedThreadResults,
+    cancelDeletedThreadQueue,
+    claimQueuedRun,
+    afterOwnerMessage,
+    finishRun,
     listSubAgentApprovals,
     markRunAwaiting,
     postRunResult,
@@ -36,6 +43,7 @@ const STILL_WORKING = /still working/iu;
 const NOT_FOUND = /not found/iu;
 const ONCE_OR_ALWAYS = /once or always/iu;
 const ALREADY_ENDED = /already ended/iu;
+const GONE = /gone/u;
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
@@ -934,5 +942,690 @@ describe("a resumed run ended from outside", () => {
     it("stops nothing once the continuation is no longer live, not the owner's reply beside it", async () => {
         expect(await internalCall(stopActiveForThread, { messageId: "approval-gone", onlyNamed: true, threadId: childId })).toBe(false);
         expect(await statuses()).toStrictEqual({ "approval-owner": "pending", [APPROVAL_ID]: "streaming" });
+    });
+});
+
+describe("a result for a parent that waits on its own request", () => {
+    const PARENT_REQUEST = "approval-parent";
+    const heldPosts = () => harness.scheduler.list().filter((job) => (job.args as { runId?: string } | undefined)?.runId === runId);
+
+    beforeEach(async () => {
+        // The parent's own reply paused on a request its owner can still answer.
+        await run(async (context) => {
+            await context.db.insert("messages", {
+                message: {
+                    content: [
+                        { input: { path: "/tmp/parent.txt" }, toolCallId: "call-parent-tool", toolName: TOOL, type: "tool-call" },
+                        { approvalId: PARENT_REQUEST, toolCallId: "call-parent-tool", type: "tool-approval-request" },
+                    ],
+                    role: "assistant",
+                },
+                order: 1,
+                status: "success",
+                stepOrder: 0,
+                threadId: parentId,
+                tool: true,
+                userId: OWNER,
+            });
+            await context.db.insert("toolApprovalRuns", {
+                approvalId: PARENT_REQUEST,
+                config: { ...CONFIG(), subAgentRunId: undefined },
+                createdAt: Date.now(),
+                status: "pending",
+                threadId: parentId,
+                userId: OWNER,
+            });
+            await context.db.patch("threads", parentId as Id<"threads">, { awaitingInput: "approval" });
+        });
+        await run(async (context) => await finishRun(context, runId, { error: "boom", kind: "failed" }));
+    });
+
+    it("is held while the request is open, and posted once it can no longer be answered", async () => {
+        expect(await parentReplies()).toHaveLength(0);
+        expect(heldPosts().map((job) => job.args)).toContainEqual({ attempt: 0, failures: 0, runId, waits: 1 });
+
+        await run(async (context) => {
+            const [row] = await context.db
+                .query("toolApprovalRuns")
+                .withIndex("by_approvalId", (q: any) => q.eq("approvalId", PARENT_REQUEST))
+                .collect();
+
+            await context.db.patch("toolApprovalRuns", row._id, { createdAt: Date.now() - PENDING_APPROVAL_TTL_MS - 1 });
+        });
+
+        expect(await run(async (context) => await postRunResult(context, runId, 0))).toBe(true);
+        expect(await parentReplies()).toHaveLength(1);
+    });
+
+    it("is posted once the request is closed, though no answer is on the turn yet", async () => {
+        await run(async (context) => {
+            const [row] = await context.db
+                .query("toolApprovalRuns")
+                .withIndex("by_approvalId", (q: any) => q.eq("approvalId", PARENT_REQUEST))
+                .collect();
+
+            await context.db.patch("toolApprovalRuns", row._id, { resolvedAt: Date.now(), status: "denied" });
+        });
+
+        expect(await run(async (context) => await postRunResult(context, runId, 0))).toBe(true);
+    });
+
+    it("is held though the thread does not show it waits yet: a run records its requests before it says so", async () => {
+        await run(async (context) => await clearAwaitingInput(context.db, parentId as Id<"threads">));
+
+        expect(await run(async (context) => await postRunResult(context, runId, 0))).toBe(false);
+        expect(await parentReplies()).toHaveLength(0);
+    });
+
+    it("is released when the owner sends a new message past the request, though the thread does not show it waits yet", async () => {
+        await run(async (context) => await clearAwaitingInput(context.db, parentId as Id<"threads">));
+        await internalCall(afterOwnerMessage, { threadId: parentId });
+
+        expect(heldPosts().map((job) => job.args)).toStrictEqual([{ attempt: 0, runId }]);
+    });
+
+    it("is released by a reply that closed a secret request, though no request is pending any more", async () => {
+        // The reply's own send denied the secret request it moved past (`discardPausedThreadSecrets`) before this runs.
+        await run(async (context) => {
+            const [row] = await context.db
+                .query("toolApprovalRuns")
+                .withIndex("by_approvalId", (q: any) => q.eq("approvalId", PARENT_REQUEST))
+                .collect();
+
+            await context.db.patch("toolApprovalRuns", row._id, { resolvedAt: Date.now(), resolvedBy: "abandoned", secretRequest: true, status: "denied" });
+        });
+
+        await internalCall(afterOwnerMessage, { threadId: parentId });
+
+        expect(heldPosts().map((job) => job.args)).toStrictEqual([{ attempt: 0, runId }]);
+    });
+
+    it("keeps one check, however many sends release it while it is still held", async () => {
+        for (let send = 0; send < 3; send += 1) {
+            await internalCall(afterOwnerMessage, { threadId: parentId });
+        }
+
+        expect(heldPosts()).toHaveLength(1);
+    });
+
+    it("is released when the owner answers the request, to post after the reply the answer starts", async () => {
+        await as(OWNER).mutation(respondToToolApproval as never, { approvalId: PARENT_REQUEST, decision: "approve", threadId: parentId } as never);
+
+        expect(heldPosts().map((job) => job.args)).toStrictEqual([{ attempt: 0, runId }]);
+    });
+});
+
+describe("deleting a thread", () => {
+    const deleteThread = async (threadId: string): Promise<unknown> => await internalCall(_deletePageForThreadId, { threadId });
+    const ran = new Set<string>();
+    /** The next marking continuation not yet run, by its args (the harness names no function path). */
+    const continuation = (): Record<string, unknown> | undefined => {
+        const job = harness.scheduler
+            .list()
+            .find((entry) => (entry.args as { status?: number } | undefined)?.status !== undefined && !ran.has(String(entry.id)));
+
+        if (job) {
+            ran.add(String(job.id));
+        }
+
+        return job?.args as Record<string, unknown> | undefined;
+    };
+
+    /** A run the child delegated itself, still working. */
+    const nestedRun = async (): Promise<Id<"subAgentRuns">> =>
+        await run(async (context) => {
+            const now = Date.now();
+            const nestedChild = await context.db.insert("threads", { status: "active", title: "Sub-agent: nested", userId: OWNER });
+
+            return await context.db.insert("subAgentRuns", {
+                childThreadId: nestedChild,
+                createdAt: now,
+                depth: 2,
+                parentThreadId: childId,
+                startedAt: now,
+                status: "running",
+                task: "Nested work",
+                toolCallId: "call-nested",
+                updatedAt: now,
+                userId: OWNER,
+            });
+        });
+    const statusOf = async (id: Id<"subAgentRuns">): Promise<string> => {
+        const row = await run(async (context) => await context.db.get("subAgentRuns", id));
+
+        return row.status;
+    };
+
+    it.each([
+        ["waiting", false],
+        ["resumed", true],
+    ] as const)("ends the %s run it is the child of, and the run that child delegated", async (_case, resumed) => {
+        const nested = await nestedRun();
+
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        if (resumed) {
+            await answer(APPROVAL_ID, "approve");
+        }
+
+        await deleteThread(childId);
+
+        expect(await runStatus()).toBe("cancelled");
+        expect(await statusOf(nested)).toBe("cancelled");
+    });
+
+    it("ends the waiting run it delegated, whose result has nowhere to go", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        await deleteThread(parentId);
+
+        expect(await runRow()).toMatchObject({ postFailed: expect.stringMatching(GONE), status: "cancelled" });
+        expect(await parentReplies()).toHaveLength(0);
+    });
+
+    it("ends the worker messages the user typed, which a Stop leaves alone", async () => {
+        const typed = await run(async (context) => {
+            const now = Date.now();
+            const worker = await context.db.insert("threads", { status: "active", title: "Worker", userId: OWNER });
+
+            return await context.db.insert("subAgentRuns", {
+                childThreadId: worker,
+                clientId: "client-typed",
+                createdAt: now,
+                depth: 1,
+                mode: "worker",
+                parentThreadId: parentId,
+                startedAt: now,
+                status: "running",
+                task: "Typed by the user",
+                toolCallId: "call-typed",
+                updatedAt: now,
+                userId: OWNER,
+            });
+        });
+
+        await deleteThread(parentId);
+
+        const ended = await run(async (context) => await context.db.get("subAgentRuns", typed));
+
+        expect(ended.status).toBe("cancelled");
+    });
+
+    it("takes no result posted after its first page, however many it has yet to mark", async () => {
+        // More messages than one page, so the thread is still there after the delete's first page.
+        await run(async (context) => {
+            for (const order of [0, 1]) {
+                await context.db.insert("messages", {
+                    message: { content: `Message ${String(order)}`, role: "user" },
+                    order,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId: parentId,
+                    tool: false,
+                    userId: OWNER,
+                });
+            }
+        });
+        await internalCall(_deletePageForThreadId, { limit: 1, threadId: parentId });
+        expect(await run(async (context) => await context.db.get("threads", parentId as Id<"threads">))).not.toBeNull();
+
+        // A run the paged marking has not reached yet: the thread is going, so its post is refused all the same.
+        const late = await run(async (context) => {
+            const now = Date.now();
+
+            return await context.db.insert("subAgentRuns", {
+                childThreadId: childId,
+                createdAt: now,
+                depth: 1,
+                parentThreadId: parentId,
+                result: "Late",
+                status: "succeeded",
+                task: "Late",
+                toolCallId: "call-late",
+                updatedAt: now,
+                userId: OWNER,
+            });
+        });
+
+        expect(await run(async (context) => await postRunResult(context, late, 0))).toBe(false);
+        expect(await parentReplies()).toHaveLength(0);
+    });
+
+    it("schedules nothing for a thread with no runs", async () => {
+        const lone = await run(async (context) => await context.db.insert("threads", { status: "active", title: "Lone", userId: OWNER }));
+        const before = harness.scheduler.list().length;
+
+        await deleteThread(lone);
+
+        expect(
+            harness.scheduler
+                .list()
+                .slice(before)
+                .filter((job) => JSON.stringify(job.args).includes(lone)),
+        ).toStrictEqual([]);
+    });
+
+    it("starts no queued message of a worker that is being deleted, past what its delete has cancelled", async () => {
+        const queued = await run(async (context) => {
+            const now = Date.now();
+            const worker = await context.db.insert("threads", { deletingAt: now, status: "active", title: "Worker", userId: OWNER });
+
+            return await context.db.insert("subAgentRuns", {
+                childThreadId: worker,
+                createdAt: now,
+                depth: 1,
+                mode: "worker",
+                parentThreadId: parentId,
+                runner: { deviceId: "device-1", kind: "host" },
+                status: "queued",
+                task: "Next message",
+                toolCallId: "call-next",
+                updatedAt: now,
+                userId: OWNER,
+            });
+        });
+
+        expect(await run(async (context) => await claimQueuedRun(context, queued))).toBeNull();
+
+        const row = await run(async (context) => await context.db.get("subAgentRuns", queued));
+
+        expect(row.status).toBe("cancelled");
+    });
+
+    it("does not walk a going worker's queue from one run's end, which its delete cancels in batches", async () => {
+        const { going, running } = await run(async (context) => {
+            const now = Date.now();
+            const thread = await context.db.insert("threads", { deletingAt: now, status: "active", title: "Worker", userId: OWNER });
+            const base = {
+                childThreadId: thread,
+                depth: 1,
+                mode: "worker" as const,
+                parentThreadId: parentId,
+                runner: { deviceId: "device-1", kind: "host" as const },
+                updatedAt: now,
+                userId: OWNER,
+            };
+            const current = await context.db.insert("subAgentRuns", {
+                ...base,
+                createdAt: now - 1,
+                startedAt: now,
+                status: "running",
+                task: "Current",
+                toolCallId: "call-current",
+            });
+
+            for (let index = 0; index < 205; index += 1) {
+                await context.db.insert("subAgentRuns", {
+                    ...base,
+                    createdAt: now + index,
+                    status: "queued",
+                    task: `Queued ${String(index)}`,
+                    toolCallId: `call-host-${String(index)}`,
+                });
+            }
+
+            return { going: thread, running: current };
+        });
+
+        await run(async (context) => await finishRun(context, running, { kind: "cancelled" }));
+
+        const queued = await run(
+            async (context) =>
+                await context.db
+                    .query("subAgentRuns")
+                    .withIndex("by_childThreadId_and_status", (q: any) => q.eq("childThreadId", going).eq("status", "queued"))
+                    .collect(),
+        );
+
+        expect(queued).toHaveLength(205);
+    });
+
+    it("does not walk the queue of a worker whose row is already gone", async () => {
+        const { gone, running } = await run(async (context) => {
+            const now = Date.now();
+            const thread = await context.db.insert("threads", { status: "active", title: "Worker", userId: OWNER });
+            const base = {
+                childThreadId: thread,
+                depth: 1,
+                mode: "worker" as const,
+                parentThreadId: parentId,
+                runner: { deviceId: "device-1", kind: "host" as const },
+                updatedAt: now,
+                userId: OWNER,
+            };
+            const current = await context.db.insert("subAgentRuns", {
+                ...base,
+                createdAt: now - 1,
+                startedAt: now,
+                status: "running",
+                task: "Current",
+                toolCallId: "call-gone-current",
+            });
+
+            for (let index = 0; index < 205; index += 1) {
+                await context.db.insert("subAgentRuns", {
+                    ...base,
+                    createdAt: now + index,
+                    status: "queued",
+                    task: `Queued ${String(index)}`,
+                    toolCallId: `call-gone-${String(index)}`,
+                });
+            }
+
+            // The delete's last page took the row.
+            await context.db.delete("threads", thread);
+
+            return { gone: thread, running: current };
+        });
+
+        await run(async (context) => await finishRun(context, running, { kind: "cancelled" }));
+
+        const queued = await run(
+            async (context) =>
+                await context.db
+                    .query("subAgentRuns")
+                    .withIndex("by_childThreadId_and_status", (q: any) => q.eq("childThreadId", gone).eq("status", "queued"))
+                    .collect(),
+        );
+
+        expect(queued).toHaveLength(205);
+    });
+
+    it("lets a result post again to a chat whose delete was abandoned an hour ago or more", async () => {
+        await run(async (context) => await context.db.patch("threads", parentId as Id<"threads">, { deletingAt: Date.now() - 2 * 60 * 60_000 }));
+        await run(async (context) => await finishRun(context, runId, { error: "boom", kind: "failed" }));
+
+        expect(await parentReplies()).toHaveLength(1);
+    });
+
+    it("ends every run it delegated, past the first page of 20", async () => {
+        await run(async (context) => {
+            const now = Date.now();
+
+            for (let index = 0; index < 25; index += 1) {
+                await context.db.insert("subAgentRuns", {
+                    createdAt: now + index,
+                    depth: 1,
+                    parentThreadId: parentId,
+                    status: "queued",
+                    task: `Delegated ${String(index)}`,
+                    toolCallId: `call-delegated-${String(index)}`,
+                    updatedAt: now,
+                    userId: OWNER,
+                });
+            }
+        });
+
+        await deleteThread(parentId);
+
+        const left = await run(
+            async (context) =>
+                await context.db
+                    .query("subAgentRuns")
+                    .withIndex("by_parentThreadId_and_status", (q: any) => q.eq("parentThreadId", parentId).eq("status", "queued"))
+                    .collect(),
+        );
+
+        expect(left).toStrictEqual([]);
+    });
+
+    /** A worker (live) with host runs queued for a lead that is being deleted. */
+    const workerForGoingLead = async (queued: number) =>
+        await run(async (context) => {
+            const now = Date.now();
+            const lead = await context.db.insert("threads", { deletingAt: now, status: "active", title: "Lead", userId: OWNER });
+            const worker = await context.db.insert("threads", { status: "active", title: "Worker", userId: OWNER });
+            const base = {
+                childThreadId: worker,
+                depth: 1,
+                mode: "worker" as const,
+                parentThreadId: lead,
+                runner: { deviceId: "device-1", kind: "host" as const },
+                updatedAt: now,
+                userId: OWNER,
+            };
+            const current = await context.db.insert("subAgentRuns", {
+                ...base,
+                createdAt: now - 1,
+                startedAt: now,
+                status: "running",
+                task: "Current",
+                toolCallId: "call-lead-current",
+            });
+            const ids = [];
+
+            for (let index = 0; index < queued; index += 1) {
+                ids.push(
+                    await context.db.insert("subAgentRuns", {
+                        ...base,
+                        createdAt: now + index,
+                        status: "queued",
+                        task: `Queued ${String(index)}`,
+                        toolCallId: `call-lead-${String(index)}`,
+                    }),
+                );
+            }
+
+            return { current, ids, worker };
+        });
+
+    it("refuses at claim a queued run whose lead is being deleted", async () => {
+        const { ids } = await workerForGoingLead(1);
+
+        expect(await run(async (context) => await claimQueuedRun(context, ids[0]!))).toBeNull();
+
+        const row = await run(async (context) => await context.db.get("subAgentRuns", ids[0]!));
+
+        expect(row.status).toBe("cancelled");
+    });
+
+    it("does not walk a worker's line of runs whose lead is being deleted from one run's end", async () => {
+        const { current, worker } = await workerForGoingLead(205);
+
+        await run(async (context) => await finishRun(context, current, { kind: "cancelled" }));
+
+        const queued = await run(
+            async (context) =>
+                await context.db
+                    .query("subAgentRuns")
+                    .withIndex("by_childThreadId_and_status", (q: any) => q.eq("childThreadId", worker).eq("status", "queued"))
+                    .collect(),
+        );
+
+        expect(queued).toHaveLength(205);
+    });
+
+    it("cancels a deleted worker's queue past one call's 200, in a continuation", async () => {
+        const worker = await run(async (context) => {
+            const now = Date.now();
+            const thread = await context.db.insert("threads", { status: "active", title: "Worker", userId: OWNER });
+
+            for (let index = 0; index < 205; index += 1) {
+                await context.db.insert("subAgentRuns", {
+                    childThreadId: thread,
+                    createdAt: now + index,
+                    depth: 1,
+                    mode: "worker",
+                    parentThreadId: parentId,
+                    status: "queued",
+                    task: `Message ${String(index)}`,
+                    toolCallId: `call-many-queued-${String(index)}`,
+                    updatedAt: now,
+                    userId: OWNER,
+                });
+            }
+
+            return thread;
+        });
+        const queuedLeft = async (): Promise<number> => {
+            const rows = await run(
+                async (context) =>
+                    await context.db
+                        .query("subAgentRuns")
+                        .withIndex("by_childThreadId_and_status", (q: any) => q.eq("childThreadId", worker).eq("status", "queued"))
+                        .collect(),
+            );
+
+            return rows.length;
+        };
+
+        await deleteThread(worker);
+        expect(await queuedLeft()).toBe(5);
+
+        const jobs = harness.scheduler.list().filter((job) => JSON.stringify(job.args) === JSON.stringify({ threadId: worker }));
+
+        expect(jobs).toHaveLength(1);
+        await internalCall(cancelDeletedThreadQueue, { threadId: worker });
+        expect(await queuedLeft()).toBe(0);
+    });
+
+    it("cancels every queued message of a deleted worker, past the first page", async () => {
+        const worker = await run(async (context) => {
+            const now = Date.now();
+            const thread = await context.db.insert("threads", { status: "active", title: "Worker", userId: OWNER });
+
+            for (let index = 0; index < 25; index += 1) {
+                await context.db.insert("subAgentRuns", {
+                    childThreadId: thread,
+                    createdAt: now + index,
+                    depth: 1,
+                    mode: "worker",
+                    parentThreadId: parentId,
+                    status: "queued",
+                    task: `Message ${String(index)}`,
+                    toolCallId: `call-queued-${String(index)}`,
+                    updatedAt: now,
+                    userId: OWNER,
+                });
+            }
+
+            return thread;
+        });
+
+        await deleteThread(worker);
+
+        const left = await run(
+            async (context) =>
+                await context.db
+                    .query("subAgentRuns")
+                    .withIndex("by_childThreadId_and_status", (q: any) => q.eq("childThreadId", worker).eq("status", "queued"))
+                    .collect(),
+        );
+
+        expect(left).toStrictEqual([]);
+    });
+
+    it("marks every unposted result bound for it gone, past the first page of runs that posted", async () => {
+        const unposted = await run(async (context) => {
+            const now = Date.now();
+            const ended = {
+                childThreadId: childId,
+                createdAt: now,
+                depth: 1,
+                parentThreadId: parentId,
+                status: "succeeded",
+                task: "Old",
+                updatedAt: now,
+                userId: OWNER,
+            };
+
+            for (let index = 0; index < 205; index += 1) {
+                await context.db.insert("subAgentRuns", { ...ended, resultPostedAt: now, toolCallId: `call-old-${String(index)}` });
+            }
+
+            return await context.db.insert("subAgentRuns", { ...ended, task: "New", toolCallId: "call-new" });
+        });
+
+        await deleteThread(parentId);
+
+        // Past one call's budget, the marking goes on in continuations, each from where the last stopped.
+        let continued = 0;
+
+        for (let job = continuation(); job !== undefined; job = continuation()) {
+            continued += 1;
+            await internalCall(markDeletedThreadResults, job);
+        }
+
+        expect(continued).toBeGreaterThan(0);
+
+        expect(await run(async (context) => await context.db.get("subAgentRuns", unposted))).toMatchObject({ postFailed: expect.stringMatching(GONE) });
+    });
+
+    it("stops a resumed run's live continuation on the deleted child", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        await answer(APPROVAL_ID, "approve");
+        await deleteThread(childId);
+
+        expect(await runStatus()).toBe("cancelled");
+        expect(harness.scheduler.list().map((job) => job.args)).toContainEqual({ messageId: APPROVAL_ID, onlyNamed: true, threadId: childId });
+    });
+});
+
+describe("a new message in a waiting child", () => {
+    const after = async (threadId: string): Promise<unknown> => await internalCall(afterOwnerMessage, { threadId });
+    /** A row on the child's thread at `order`: the owner's new message, or an assistant turn with a request of the run. */
+    const childRow = async (order: number, approvalId?: string): Promise<void> =>
+        await run(async (context) => {
+            await context.db.insert("messages", {
+                message:
+                    approvalId === undefined
+                        ? { content: "Do it differently.", role: "user" }
+                        : {
+                              content: [
+                                  { input: {}, toolCallId: `call-${approvalId}`, toolName: TOOL, type: "tool-call" },
+                                  { approvalId, toolCallId: `call-${approvalId}`, type: "tool-approval-request" },
+                              ],
+                              role: "assistant",
+                          },
+                order,
+                status: "success",
+                stepOrder: 0,
+                threadId: childId,
+                tool: approvalId !== undefined,
+                userId: OWNER,
+            });
+
+            if (approvalId !== undefined) {
+                await context.db.insert("toolApprovalRuns", {
+                    approvalId,
+                    config: CONFIG(),
+                    createdAt: Date.now(),
+                    status: "pending",
+                    threadId: childId,
+                    userId: OWNER,
+                });
+            }
+        });
+
+    it("ends the run's wait, which frees its slot and closes its requests", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        await childRow(2);
+
+        expect(await after(childId)).toBe(1);
+        expect(await runStatus()).toBe("cancelled");
+        expect(await pendingRequests()).toHaveLength(0);
+    });
+
+    it("ends nothing for a child whose run does not wait, whatever requests are open there", async () => {
+        // The run is still running, its requests recorded: a pending sub-agent request alone is no wait to end.
+        expect(await after(childId)).toBe(0);
+        expect(await runStatus()).toBe("running");
+    });
+
+    it("leaves a wait the continuation started again on a request still open", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        await childRow(2);
+        // The owner answered meanwhile, and the continuation paused on a new request: the run waits on that one.
+        await childRow(3, "approval-3");
+
+        expect(await after(childId)).toBe(0);
+        expect(await runStatus()).toBe("awaiting");
+    });
+
+    it("leaves a resumed run going: it is past its request", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+        await answer(APPROVAL_ID, "approve");
+
+        expect(await after(childId)).toBe(0);
+        expect(await runStatus()).toBe("running");
     });
 });

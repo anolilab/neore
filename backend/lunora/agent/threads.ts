@@ -491,7 +491,15 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         const host = await context.db.get("threads", args.threadId);
 
         if (host) {
+            // The thread is going from here on, whatever page the delete is on: no sub-agent's result posts into it.
+            await context.db.patch("threads", args.threadId, { deletingAt: context.now });
             await endHostThread(context, host, context.now);
+
+            // A sub-agent waiting on this thread's request, or one this thread delegated, ends with it. Loaded lazily, as
+            // every reader of the sub-agent module from the chat path.
+            const { endSubAgentRunsOfDeletedThread } = await import("../sub-agents/functions");
+
+            await endSubAgentRunsOfDeletedThread(context, args.threadId, host.userId);
         }
 
         // A goal's review queued between pages would read a half-deleted transcript, charge and open another round.

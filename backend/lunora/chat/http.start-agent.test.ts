@@ -7,6 +7,8 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runAgentModelOf } from "../agent/agent-switch";
+import { enqueueJob } from "../lib/job-queue";
+import { chatLogger } from "../lib/logger";
 import schema from "../schema";
 import { gateThreadActionHandler } from "./functions";
 import { switchThreadAgentHandler } from "./agent-switch";
@@ -51,10 +53,17 @@ vi.mock("./lib/get-agent", () => {
         },
     };
 });
+/** What the send scheduled through `httpScheduler`: the title jobs, and a retry of a failed `afterOwnerMessage`. */
+const scheduled = vi.hoisted(() => [] as { args: unknown; delayMs: number }[]);
+
 vi.mock("../lib/http-scheduler", () => {
     return {
         httpScheduler: () => {
-            return { runAfter: async () => {} };
+            return {
+                runAfter: async (delayMs: number, _reference: unknown, args: unknown) => {
+                    scheduled.push({ args, delayMs });
+                },
+            };
         },
     };
 });
@@ -69,6 +78,12 @@ const ids: Record<string, string> = {};
 let streamingConfigs: { model: string }[] = [];
 let agentModelQueries = 0;
 let activeLeafCalls: { runModel?: string }[] = [];
+/** Every mutation a send made, by reference, and whether the sub-agent side's call after the save fails. */
+let mutationCalls: { args: unknown; ref: string }[] = [];
+let failAfterMessage = false;
+/** What the send's claim answers (`claimChatStart`), for a send with a `clientMessageId`. */
+let claimOutcome: unknown = null;
+let failStream = false;
 
 const run = async <T>(body: (ctx: any) => Promise<T>): Promise<T> => await harness.run(body);
 
@@ -97,6 +112,24 @@ const fakeContext = (): any => {
             },
         },
         runMutation: async (reference: { __lunoraRef: string }, args: any) => {
+            mutationCalls.push({ args, ref: reference.__lunoraRef });
+
+            if (reference.__lunoraRef === "sub_agents_functions:afterOwnerMessage" && failAfterMessage) {
+                throw new Error("afterOwnerMessage failed");
+            }
+
+            if (reference.__lunoraRef === "chat_start_claim:claimChatStart") {
+                return claimOutcome;
+            }
+
+            if (reference.__lunoraRef === "chat_goals_internal:startGoal") {
+                return { error: "A goal is already running here.", ok: false };
+            }
+
+            if (reference.__lunoraRef === "chat_streaming:createStreamWithMessage" && failStream) {
+                throw new Error("stream write failed");
+            }
+
             if (reference.__lunoraRef === "chat_streaming:createStreamWithMessage") {
                 streamingConfigs.push(args.streamingConfig);
 
@@ -157,6 +190,11 @@ beforeEach(async () => {
     streamingConfigs = [];
     agentModelQueries = 0;
     activeLeafCalls = [];
+    mutationCalls = [];
+    failAfterMessage = false;
+    claimOutcome = null;
+    failStream = false;
+    scheduled.length = 0;
     harness = lunoraTest(schema as never);
     threadId = await run(async (ctx) => await ctx.db.insert("threads", { model: A, status: "active", title: "T", userId: OWNER }));
     await insertRow("u1", 0, 0, "user", "hello");
@@ -389,5 +427,77 @@ describe("/chat/start organization", () => {
 
         await expect(runChatStart(inOrganization(true), { model: A, prompt: "hi" } as never, "secret")).rejects.toThrow("session read failed");
         expect(createdThreads).toStrictEqual([]);
+    });
+});
+
+describe("/chat/start and a sub-agent's wait", () => {
+    const afterMessageCalls = () => mutationCalls.filter((call) => call.ref === "sub_agents_functions:afterOwnerMessage").map((call) => call.args);
+
+    it("tells the sub-agent side about the saved message, for a text send and an image send alike", async () => {
+        const text = await start({ model: A });
+        const image = await start({ model: "google/gemini-2.5-flash-image" });
+
+        expect([text.status, image.status]).toStrictEqual([200, 200]);
+        expect(afterMessageCalls()).toStrictEqual([{ threadId }, { threadId }]);
+    });
+
+    it("tells it again on a resend of a send whose stream never ran, which may have died before its own call", async () => {
+        claimOutcome = { messageId: "m-first", outcome: "duplicate", streamId: "stream-first", streamUnclaimed: true, threadId };
+
+        const response = await start({ clientMessageId: "client-1", model: A });
+
+        expect(response.status).toBe(200);
+        expect(afterMessageCalls()).toStrictEqual([{ threadId }]);
+    });
+
+    it("tells it on a resend whose run's submission fails again", async () => {
+        claimOutcome = { messageId: "m-first", outcome: "duplicate", streamId: "stream-first", streamUnclaimed: true, threadId };
+        vi.mocked(enqueueJob).mockRejectedValueOnce(new Error("queue down"));
+
+        await expect(start({ clientMessageId: "client-3", model: A })).rejects.toThrow("queue down");
+        expect(afterMessageCalls()).toStrictEqual([{ threadId }]);
+    });
+
+    it("tells it nothing for a send the claim refuses, which saved nothing, nor for a send that starts a thread", async () => {
+        claimOutcome = { outcome: "in_progress" };
+
+        const refused = await start({ clientMessageId: "client-2", model: A });
+
+        claimOutcome = null;
+
+        const fresh = await start({ model: A, threadId: undefined });
+
+        expect([refused.status, fresh.status]).toStrictEqual([409, 200]);
+        expect(afterMessageCalls()).toStrictEqual([]);
+    });
+
+    it("tells it about a prompt saved though its goal is refused", async () => {
+        const response = await start({ goal: { text: "Ship the release" }, model: A });
+
+        expect(response.status).toBe(400);
+        expect(afterMessageCalls()).toStrictEqual([{ threadId }]);
+    });
+
+    it("tells it once about a saved prompt whose stream then fails", async () => {
+        failStream = true;
+
+        await expect(start({ model: A })).rejects.toThrow("stream write failed");
+        expect(afterMessageCalls()).toStrictEqual([{ threadId }]);
+    });
+
+    it("does not fail the send when that call fails", async () => {
+        failAfterMessage = true;
+
+        const warn = vi.spyOn(chatLogger, "warn").mockImplementation(() => undefined);
+        const response = await start({ model: A });
+
+        // The failure itself is left on the record, then retried.
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("retrying shortly"), expect.objectContaining({ message: "afterOwnerMessage failed" }));
+        warn.mockRestore();
+
+        expect(response.status).toBe(200);
+        expect(afterMessageCalls()).toHaveLength(1);
+        // Tried once more shortly, with the same args.
+        expect(scheduled.filter((job) => job.delayMs > 0).map((job) => job.args)).toStrictEqual([{ threadId }]);
     });
 });

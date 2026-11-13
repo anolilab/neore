@@ -62,3 +62,5 @@
   while its parent's one-shot run goes (running or awaiting), so it never lands after a request; that run's end, waited
   or not, posts it (`releaseHeldResults`). A pause, first or continued, never overwrites a `"question"` the child thread
   waits on.
+- **Lifecycle** ([reference](../../../docs/agents/sub-agents.md)): a send in a child ends its moved-past waits
+  (`afterOwnerMessage`); a hard delete sets `deletingAt` and ends the thread's runs (`endSubAgentRunsOfDeletedThread`).

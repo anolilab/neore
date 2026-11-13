@@ -24293,6 +24293,12 @@
           "optional": false,
           "unique": false
         },
+        "postCheckId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "postFailed": {
           "kind": "string",
           "nullable": false,
@@ -27168,6 +27174,12 @@
           "unique": false
         },
         "deletedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "deletingAt": {
           "kind": "number",
           "nullable": false,
           "optional": true,
