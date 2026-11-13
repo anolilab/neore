@@ -436,4 +436,57 @@ describe("the chat screen filling its history after the newest page", () => {
         });
         expect(mounted.container?.textContent).toContain("An earlier answer");
     });
+
+    it("goes on with the fill it runs when a refresh lands mid-fill, so no older page is asked for twice", async () => {
+        const asked: string[] = [];
+        let answerOlder: (() => void) | undefined;
+
+        harness.olderPage = async (cursor) => {
+            asked.push(cursor);
+
+            if (cursor === "older") {
+                // The first older page waits until the refresh has landed.
+                // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+                await new Promise<void>((resolve) => {
+                    answerOlder = resolve;
+                });
+
+                return {
+                    continueCursor: "oldest",
+                    isDone: false,
+                    page: [{ _creationTime: 0, id: "q0", parts: [{ text: "An older question", type: "text" }], role: "user", status: "success" }],
+                };
+            }
+
+            return { continueCursor: "", isDone: true, page: [] };
+        };
+
+        act(() => {
+            mounted.root?.render(createElement(ChatScreen));
+        });
+
+        await vi.waitFor(() => {
+            expect(asked).toStrictEqual(["older"]);
+        });
+
+        // A reconnect re-reads the newest page while the fill waits for its first older page.
+        const before = stable.offline;
+
+        stable.offline = { ...before, refreshTick: before.refreshTick + 1 };
+
+        await act(async () => {
+            mounted.root?.render(createElement(ChatScreen));
+        });
+
+        await act(async () => {
+            answerOlder?.();
+        });
+
+        await vi.waitFor(() => {
+            expect(asked).toStrictEqual(["older", "oldest"]);
+        });
+        expect(mounted.container?.textContent).toContain("An older question");
+
+        stable.offline = before;
+    });
 });

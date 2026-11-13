@@ -139,6 +139,12 @@ interface OlderInput {
     cache: ScopedCache | undefined;
     fetchPage: () => Promise<{ olderCursor: string | null; rows: MessageRow[] }>;
     gate: MessageReadGate;
+
+    /**
+     * Whether the page may still be shown, when not the gate's watch: a fill decides it per chat, so a newest-page read
+     * landing meanwhile does not throw the page away (it is placed by the cursor it was read from, `withOlderPage`).
+     */
+    isCurrent?: () => boolean;
     threadId: string;
 }
 
@@ -146,9 +152,7 @@ interface OlderInput {
  * One older page of a chat. A refusal of the chat is handled exactly as for the newest pages (the saved copy is
  * dropped); a page that the screen moved on from is dropped. The rows are not saved: the cache keeps the newest.
  */
-export const readOlderMessages = async ({ cache, fetchPage, gate, threadId }: OlderInput): Promise<OlderPageResult> => {
-    const isCurrent = gate.watch();
-
+export const readOlderMessages = async ({ cache, fetchPage, gate, isCurrent = gate.watch(), threadId }: OlderInput): Promise<OlderPageResult> => {
     try {
         const { olderCursor, rows } = await fetchPage();
 

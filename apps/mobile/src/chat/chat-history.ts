@@ -234,12 +234,17 @@ const olderPageApplied = <R extends HistoryRow>(history: ChatHistory<R>, page: H
     return merged(splitOf(history), page);
 };
 
-/** Carries the fill target over a read, until it is reached or nothing older is left. */
+/**
+ * Carries the fill target over a read, until it is reached or nothing older is left. While a hole is open the target
+ * stays: the rows kept below it may not be on the chat's active path (another branch), and go when a page reaches past
+ * them, so only the run that joins the newest row, once no hole is left, counts toward it.
+ */
 const withFillCarried = <R extends HistoryRow>(before: ChatHistory<R>, after: ChatHistory<R>): ChatHistory<R> => {
     const { fillTarget, ...rest } = after;
     const target = before.fillTarget ?? fillTarget;
+    const isReached = target !== undefined && after.gap === undefined && newestRun(after).length >= target;
 
-    if (target === undefined || after.rows.length >= target || nextOlderCursor(after) === null) {
+    if (target === undefined || isReached || nextOlderCursor(after) === null) {
         return rest;
     }
 
@@ -270,17 +275,21 @@ export const OPEN_FILL_ROWS = 200;
 /** Older pages one fill reads at most. A hole it has not closed by then stays marked, and the next fill goes on with it. */
 export const MAX_FILL_PAGES = 10;
 
-/** The page reads of {@link fillHistory}. */
-const readFill = async <R extends HistoryRow>({
-    fetchOlder,
-    read,
-    update,
-}: {
+interface FillInput<R extends HistoryRow> {
     fetchOlder: (cursor: string) => Promise<HistoryPage<R> | undefined>;
+    /** Whether the fill may go on: false once the screen left this chat. A fill that is not current reads and applies nothing more. */
+    isCurrent?: () => boolean;
     read: () => ChatHistory<R>;
     update: (apply: (history: ChatHistory<R>) => ChatHistory<R>) => void;
-}): Promise<"filled" | "stopped"> => {
+}
+
+/** The page reads of {@link fillHistory}. */
+const readFill = async <R extends HistoryRow>({ fetchOlder, isCurrent = () => true, read, update }: FillInput<R>): Promise<"filled" | "stopped"> => {
     for (let pages = 0; pages < MAX_FILL_PAGES; pages += 1) {
+        if (!isCurrent()) {
+            return "stopped";
+        }
+
         const history = read();
         const cursor = nextOlderCursor(history);
 
@@ -291,7 +300,7 @@ const readFill = async <R extends HistoryRow>({
         // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
         const page = await fetchOlder(cursor);
 
-        if (page === undefined) {
+        if (page === undefined || !isCurrent()) {
             return "stopped";
         }
 
@@ -308,22 +317,56 @@ const readFill = async <R extends HistoryRow>({
  * failed); the history then keeps its hole, if any, for the next fill. However it ends, `save` gets the run that joins
  * the newest row, the chat's newest messages as now read, for the cache.
  */
-export const fillHistory = async <R extends HistoryRow>({
-    fetchOlder,
-    read,
-    save,
-    update,
-}: {
-    fetchOlder: (cursor: string) => Promise<HistoryPage<R> | undefined>;
-    read: () => ChatHistory<R>;
-    save: (rows: R[]) => void;
-    update: (apply: (history: ChatHistory<R>) => ChatHistory<R>) => void;
-}): Promise<"filled" | "stopped"> => {
-    const outcome = await readFill({ fetchOlder, read, update });
+export const fillHistory = async <R extends HistoryRow>({ save, ...input }: FillInput<R> & { save: (rows: R[]) => void }): Promise<"filled" | "stopped"> => {
+    const outcome = await readFill(input);
 
-    save(newestRun(read()));
+    save(newestRun(input.read()));
 
     return outcome;
+};
+
+/** One fill a {@link createFillRunner} runs: the chat it fills, whether it may go on, and the fill itself. */
+interface FillRequest<K> {
+    fill: (key: K, isCurrent: () => boolean) => Promise<unknown>;
+    isCurrent: () => boolean;
+    key: K;
+}
+
+/**
+ * Runs at most one fill of a screen at a time. A read that asks for a fill while one runs for the same chat does not
+ * start another (both would read the same cursors): the running fill reads the history afresh before each page, so it
+ * goes on from what that read left, and once it ends it runs again, in case it stopped before that read landed. A
+ * request for another chat, or one no longer current, stops the running fill at its next check.
+ */
+export const createFillRunner = <K>() => {
+    let latest: FillRequest<K> | undefined;
+    let isRequested = false;
+    let running: Promise<void> | undefined;
+
+    const drain = async (): Promise<void> => {
+        try {
+            while (isRequested && latest !== undefined) {
+                isRequested = false;
+
+                const { fill, key } = latest;
+
+                // eslint-disable-next-line no-await-in-loop -- one fill at a time is the point
+                await fill(key, () => latest?.key === key && latest.isCurrent());
+            }
+        } finally {
+            running = undefined;
+        }
+    };
+
+    return {
+        request: async (request: FillRequest<K>): Promise<void> => {
+            latest = request;
+            isRequested = true;
+            running ??= drain();
+
+            await running;
+        },
+    };
 };
 
 /**

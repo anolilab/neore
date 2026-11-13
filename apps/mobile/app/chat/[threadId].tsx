@@ -17,6 +17,7 @@ import { ChatError, startChat } from "@/chat/chat-api";
 import { ChatComposer } from "@/chat/chat-composer";
 import type { ChatHistory, HistoryGap, HistoryPage } from "@/chat/chat-history";
 import {
+    createFillRunner,
     createLoadingOwner,
     fillHistory,
     hasOlder,
@@ -179,6 +180,11 @@ const Chat = () => {
     // Whether this chat has had a read land since it opened: the first one also fills older pages after it is painted.
     const hasOpened = useRef(false);
     const readGate = useRef(createMessageReadGate());
+    // Which chat a fill reads for: it moves when the screen leaves the chat or the chat is refused, and a fill of the
+    // chat before stops. A newest-page read does not move it: the fill goes on from what that read left.
+    const fillEpoch = useRef(0);
+    // At most one fill at a time (`createFillRunner`): a refresh that lands mid-fill does not start a second one.
+    const [fillRunner] = useState(createFillRunner<string>);
     // Whether this chat is the one on screen: a read that lands after another chat was pushed over it must not save it.
     const isFocusedRef = useRef(false);
     const [threadId, setThreadId] = useState<string | undefined>(routeThreadId === NEW_THREAD ? undefined : routeThreadId);
@@ -252,6 +258,7 @@ const Chat = () => {
         (refusedThreadId: string) => {
             isRefused.current = true;
             hasLiveRows.current = false;
+            fillEpoch.current += 1;
             historyRef.current = { olderCursor: undefined };
             writeRows([]);
             setCanLoadOlder(false);
@@ -265,7 +272,12 @@ const Chat = () => {
     // One older page of chat `id` from `cursor`, as the history takes it; `undefined` when it cannot be shown. A chat the
     // server refuses is cleared here, as the newest-page read clears it; other failures go to `onFailure`.
     const readOlderPage = useCallback(
-        async (id: string, cursor: string, onFailure: (message: string) => void): Promise<HistoryPage<Row> | undefined> => {
+        async (
+            id: string,
+            cursor: string,
+            onFailure: (message: string) => void,
+            isCurrent?: () => boolean,
+        ): Promise<HistoryPage<Row> | undefined> => {
             const result = await readOlderMessages({
                 cache,
                 fetchPage: async () => {
@@ -275,6 +287,7 @@ const Chat = () => {
                     return { olderCursor: page.isDone ? null : page.continueCursor, rows: page.page.map((message) => toRow(message, id, syncedAt)) };
                 },
                 gate: readGate.current,
+                isCurrent,
                 threadId: id,
             });
 
@@ -304,10 +317,10 @@ const Chat = () => {
     );
 
     // Older pages read after the newest one is painted (`fillHistory`): through a hole first, then, for a chat just opened,
-    // down to as far back as a chat opened before. "Load older messages" waits meanwhile.
+    // down to as far back as a chat opened before. "Load older messages" waits meanwhile. It runs through `fillRunner`,
+    // which says whether it may go on (`isCurrent`): still this chat, and no fill asked for another.
     const fillOlderRows = useCallback(
-        async (id: string) => {
-            const isCurrent = readGate.current.watch();
+        async (id: string, isCurrent: () => boolean) => {
             const startedAt = Date.now();
             const end = loadingOwner.begin();
 
@@ -316,11 +329,17 @@ const Chat = () => {
                     await fillHistory({
                         // A failure of this fill shows as "Load older messages" shows it; one the screen moved on from does not.
                         fetchOlder: async (cursor) =>
-                            await readOlderPage(id, cursor, (message) => {
-                                if (isCurrent()) {
-                                    setError(message);
-                                }
-                            }),
+                            await readOlderPage(
+                                id,
+                                cursor,
+                                (message) => {
+                                    if (isCurrent()) {
+                                        setError(message);
+                                    }
+                                },
+                                isCurrent,
+                            ),
+                        isCurrent,
                         read: readHistory,
                         save: (run) => {
                             if (isCurrent()) {
@@ -378,7 +397,9 @@ const Chat = () => {
                     });
 
                     if (requiresFill(readHistory())) {
-                        settleQuietly(fillOlderRows(id));
+                        const epoch = fillEpoch.current;
+
+                        settleQuietly(fillRunner.request({ fill: fillOlderRows, isCurrent: () => fillEpoch.current === epoch, key: id }));
                     }
 
                     setError(withoutRefusal);
@@ -402,7 +423,7 @@ const Chat = () => {
                 }
             }
         },
-        [accountId, cache, fillOlderRows, readHistory, reportRead, showRefused, writeHistory],
+        [accountId, cache, fillOlderRows, fillRunner, readHistory, reportRead, showRefused, writeHistory],
     );
 
     // One older page: the rest of a hole first, then below the run (`nextOlderCursor`).
@@ -460,6 +481,7 @@ const Chat = () => {
         // A read begun for another chat must not land on this one, and the next chat fills its history when it opens.
         return () => {
             gate.invalidate();
+            fillEpoch.current += 1;
             hasOpened.current = false;
         };
     }, [threadId]);

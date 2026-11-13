@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ChatHistory, HistoryPage, HistoryRow } from "./chat-history";
 import {
+    createFillRunner,
     createLoadingOwner,
     fillHistory,
     MAX_FILL_PAGES,
@@ -338,6 +339,99 @@ describe("an opening fill that stops early", () => {
     });
 });
 
+describe("an opening fill across a branch switch", () => {
+    it("keeps filling to the target when the rows kept below the hole were an old branch the fill drops", async () => {
+        // On screen: 100-130, then a131-a330 of a branch since left. The active path is 1-130, then b131-b180.
+        const shown: ChatHistory<HistoryRow> = { olderCursor: "100", rows: [...run(100, 130), ...run(131, 330, "a")] };
+        const { read, screen, update } = screenOf(opening(shown, "b161", run(161, 180, "b")));
+        const server = serverOf();
+        const pages: Record<string, HistoryPage<HistoryRow>> = {
+            b141: { olderCursor: "121", rows: [...run(121, 130), ...run(131, 140, "b")] },
+            b161: { olderCursor: "b141", rows: run(141, 160, "b") },
+        };
+        const asked: string[] = [];
+
+        // The screen holds over 200 rows while the hole is open, but most of them go when it closes.
+        expect(screen.history.rows.length).toBeGreaterThan(OPEN_FILL_ROWS);
+
+        await fillHistory({
+            fetchOlder: async (cursor) => {
+                asked.push(cursor);
+
+                return pages[cursor] ?? await server(cursor);
+            },
+            read,
+            save: () => {},
+            update,
+        });
+
+        expect(asked).toStrictEqual(["b161", "b141", "100", "80", "60", "40", "20"]);
+        expect(ids(screen.history.rows)).toStrictEqual(ids([...run(1, 130), ...run(131, 180, "b")]));
+        expect(screen.history.fillTarget).toBeUndefined();
+    });
+});
+
+describe(createFillRunner, () => {
+    it("runs one fill at a time: a request while one runs is taken up by it, then the fill runs once more", async () => {
+        const runner = createFillRunner<string>();
+        const started: string[] = [];
+        let release: (() => void) | undefined;
+        const fill = async (key: string) => {
+            started.push(key);
+
+            if (started.length === 1) {
+                // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+                await new Promise<void>((resolve) => {
+                    release = resolve;
+                });
+            }
+        };
+
+        const first = runner.request({ fill, isCurrent: () => true, key: "t1" });
+        const second = runner.request({ fill, isCurrent: () => true, key: "t1" });
+
+        expect(started).toStrictEqual(["t1"]);
+
+        release?.();
+        await Promise.all([first, second]);
+
+        expect(started).toStrictEqual(["t1", "t1"]);
+    });
+
+    it("stops a running fill when another chat asks for one, or its request is no longer current", async () => {
+        const runner = createFillRunner<string>();
+        const checks: boolean[] = [];
+        let release: (() => void) | undefined;
+        let isCurrent = true;
+
+        const first = runner.request({
+            fill: async (_key, check) => {
+                checks.push(check());
+                // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+                await new Promise<void>((resolve) => {
+                    release = resolve;
+                });
+                checks.push(check());
+            },
+            isCurrent: () => isCurrent,
+            key: "t1",
+        });
+
+        isCurrent = false;
+
+        expect(checks).toStrictEqual([true]);
+
+        const second = runner.request({ fill: async (_key, check) => {
+            checks.push(check());
+        }, isCurrent: () => true, key: "t2" });
+
+        release?.();
+        await Promise.all([first, second]);
+
+        expect(checks).toStrictEqual([true, false, true]);
+    });
+});
+
 describe("a chat opened on saved rows", () => {
     it("confirms the saved rows against the server page by page, and never asks again for a row already confirmed", async () => {
         const served = serverOf();
@@ -428,6 +522,8 @@ const randomOf = (seed: number) => {
 
 describe("any split of a chat into pages", () => {
     it("never reads a row of the run again, loses no row, keeps the order, and drops rows not on the chat, through refreshes and failed reads", async () => {
+        const runner = createFillRunner<string>();
+
         for (let seed = 1; seed <= 400; seed += 1) {
             const random = randomOf(seed);
             let last = 20 + random(100);
@@ -458,7 +554,10 @@ describe("any split of a chat into pages", () => {
                 const shown = shownIds.filter((id) => id.startsWith("m")).map((id) => Number(id.slice(1)));
 
                 expect(shown, `seed ${seed}: order`).toStrictEqual(shown.toSorted((a, b) => a - b));
-                expect([...confirmed].filter((id) => !shownIds.includes(id)), `seed ${seed}: a confirmed row lost`).toStrictEqual([]);
+
+                const shownSet = new Set(shownIds);
+
+                expect([...confirmed].filter((id) => !shownSet.has(id)), `seed ${seed}: a confirmed row lost`).toStrictEqual([]);
 
                 const newestRunIds = ids(newestRun(screen.history));
 
@@ -473,7 +572,23 @@ describe("any split of a chat into pages", () => {
 
                 expect(nextOlderCursor(screen.history), `seed ${seed}: the cursor is below the run`).toBe(isUnread || oldest === 1 ? null : String(oldest));
             };
+            /** Cursors whose page landed with no refresh meanwhile: the history has moved below them, and never asks again. */
+            const answered = new Set<string>();
+            let inFlight = 0;
+            const pendingFills: Promise<void>[] = [];
+            /** Asks the runner for a fill (set below, once `fetchOlder` is there). */
+            let fill = async (): Promise<void> => {};
             const fetchOlder = async (cursor: string) => {
+                inFlight += 1;
+
+                // Checked without `expect` on every page: thousands of pages are read here.
+                if (inFlight !== 1 || answered.has(cursor)) {
+                    expect.fail(`seed ${seed}: ${inFlight === 1 ? `cursor ${cursor} asked for again` : "two fills read at once"}`);
+                }
+
+                await Promise.resolve();
+                inFlight -= 1;
+
                 if (isFailing && random(3) === 0) {
                     return undefined;
                 }
@@ -492,7 +607,26 @@ describe("any split of a chat into pages", () => {
                     readAgain.add(id);
                 }
 
+                // A refresh lands while the page is on its way, and asks for a fill while this one runs.
+                if (random(4) === 0) {
+                    last += random(40);
+                    refresh();
+                    check();
+                    pendingFills.push(fill());
+                } else {
+                    answered.add(cursor);
+                }
+
                 return page;
+            };
+            // Every fill goes through the runner, as the screen's do; a refresh that lands mid-fill asks for one too.
+
+            fill = async () => {
+                await runner.request({
+                    fill: async (_key, isCurrent) => await fillHistory({ fetchOlder, isCurrent, read, save: () => {}, update }),
+                    isCurrent: () => true,
+                    key: "chat",
+                });
             };
 
             update((history) => withFillTarget(withNewestPage(history, newestPage()), Infinity));
@@ -509,7 +643,7 @@ describe("any split of a chat into pages", () => {
                 }
 
                 // eslint-disable-next-line no-await-in-loop -- each step reads after the one before
-                await fillHistory({ fetchOlder, read, save: () => {}, update });
+                await fill();
                 check();
             }
 
@@ -517,11 +651,15 @@ describe("any split of a chat into pages", () => {
 
             while (nextOlderCursor(screen.history) !== null) {
                 // eslint-disable-next-line no-await-in-loop -- each fill goes on from where the one before stopped
-                await fillHistory({ fetchOlder, read, save: () => {}, update });
+                await fill();
                 check();
             }
 
+            // eslint-disable-next-line no-await-in-loop -- the fills the refreshes asked for ended with the ones awaited
+            await Promise.all(pendingFills);
+
             expect(ids(screen.history.rows), `seed ${seed}: the whole chat`).toStrictEqual(ids(run(1, last)));
         }
-    });
+        // 400 seeds take a few seconds alone, and several times that beside the other test files.
+    }, 60_000);
 });
