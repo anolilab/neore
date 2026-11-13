@@ -380,6 +380,7 @@ const HierarchicalThreadList: FC<
     collapsedProjects,
     currentThreadId,
     expandedThreads,
+    isSearchError = false,
     isSearchLoading,
     isSelectionMode,
     lastSelectedIndex,
@@ -905,6 +906,15 @@ const HierarchicalThreadList: FC<
     }
 
     // Show empty state for search results
+    if (threadGroups.length === 0 && searchQuery.trim() && isSearchError) {
+        return (
+            <div className="text-muted-foreground px-3 py-8 text-center text-sm">
+                <p role="alert">{t`Search failed for "${searchQuery}". Try again.`}</p>
+                <p className="mt-2 text-xs opacity-70">{t`Press ? for keyboard shortcuts`}</p>
+            </div>
+        );
+    }
+
     if (threadGroups.length === 0 && searchQuery.trim()) {
         const message = searchType === "threads" ? t`No threads found for` : t`No messages found for`;
 
