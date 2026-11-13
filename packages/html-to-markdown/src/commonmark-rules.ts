@@ -164,7 +164,9 @@ function nextReferenceId(count: number, labels: ReadonlyMap<string, string>): nu
     return id;
 }
 
-const WHITESPACE_RUN = /\s+/g;
+// The whitespace CommonMark collapses in a label: spaces, tabs and line endings. A non-breaking space is part of it.
+const WHITESPACE_RUN = /[ \t\r\n]+/g;
+const EDGE_SPACE = /^ | $/g;
 
 /**
  * A reference label as CommonMark matches it: leading and trailing whitespace dropped, each run of
@@ -172,7 +174,7 @@ const WHITESPACE_RUN = /\s+/g;
  * reference parsers do, so `ß` and `SS` are one label.
  */
 function normalizeLabel(text: string): string {
-    return text.replaceAll(WHITESPACE_RUN, " ").trim().toLowerCase().toUpperCase();
+    return text.replaceAll(WHITESPACE_RUN, " ").replaceAll(EDGE_SPACE, "").toLowerCase().toUpperCase();
 }
 
 function hasHref(node: Node): boolean {
@@ -1182,7 +1184,7 @@ function edgeCharacter(node: Node, side: Side, options: Options, lookup: RuleLoo
  * a link style that writes no link, or an unsafe destination under safe links renders
  * only its text.
  */
-function isRenderedLink(element: Element, options: Options): boolean {
+export function isRenderedLink(element: Element, options: Options): boolean {
     const href = element.getAttribute("href");
 
     if (!href || (options.linkStyle !== "inlined" && options.linkStyle !== "referenced")) {

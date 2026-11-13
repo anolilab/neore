@@ -413,3 +413,34 @@ describe("link text around a flattened line break", () => {
         expect(convert("<a href=/x>a<br>&nbsp;- b</a>")).toBe("[a  \n\u{A0}- b](/x)");
     });
 });
+
+/*
+ * Under safeLinks an unsafe link prints only its text, with no brackets around it. A `<` at the end of that text is
+ * then followed directly by what comes after the link, so the look-ahead reads on past it.
+ */
+
+describe("a < at the end of an unsafe link's text under safeLinks", () => {
+    it.each([
+        ["an element", `<a href="javascript:x">a&lt;</a><span>img src=x onerror=alert(1)&gt;</span>`, String.raw`a\<img src=x onerror=alert(1)>`],
+        ["a letter", `<a href="javascript:x">a&lt;</a>b`, String.raw`a\<b`],
+    ])("escapes the < when %s follows the link", (_name, html, expected) => {
+        expect(convert(html, { safeLinks: true })).toBe(expected);
+    });
+
+    it("guard: a < inside a rendered link is closed off by the bracket", () => {
+        expect(convert(`<a href="/ok">a&lt;</a>b`, { safeLinks: true })).toBe("[a<](/ok)b");
+    });
+});
+
+/*
+ * CommonMark collapses only spaces, tabs and line endings in a reference label. A non-breaking space is part of the
+ * label, so `a&nbsp;b` and `a b` are two labels and both keep the collapsed style.
+ */
+
+describe("reference labels with a non-breaking space", () => {
+    it("treats a label with a non-breaking space as distinct from one with a space", () => {
+        expect(convert(`<a href="/a">a&nbsp;b</a> <a href="/b">a b</a>`, { linkReferenceStyle: "collapsed", linkStyle: "referenced" })).toBe(
+            "[a\u{A0}b][] [a b][]\n\n[a\u{A0}b]: /a\n[a b]: /b",
+        );
+    });
+});

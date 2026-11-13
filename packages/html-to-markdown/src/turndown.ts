@@ -1,4 +1,4 @@
-import COMMONMARK_RULES, { isLinkElement } from "./commonmark-rules";
+import COMMONMARK_RULES, { isRenderedLink } from "./commonmark-rules";
 import annotateNode from "./node";
 import rootNode from "./root-node";
 import Rules from "./rules";
@@ -239,7 +239,8 @@ function* followingText(node: Node, options: Options): Generator<string> {
 
         const parent: Node | null = current.parentNode;
 
-        if (!parent || isLinkElement(parent, options) || isBlock(parent)) {
+        // Only a link that prints brackets closes the text: under safeLinks an unsafe link prints its text alone.
+        if (!parent || (parent.nodeName === "A" && isRenderedLink(parent as Element, options)) || isBlock(parent)) {
             return;
         }
 
