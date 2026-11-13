@@ -1304,6 +1304,7 @@ export interface InternalApiTypes {
             clearUsageExportPieces: FunctionReference<"mutation", { requestId: string; userId: string }, { hasMore: boolean }>;
             keyedUsageRuns: FunctionReference<"query", { cursor: string | null; userId: string }, { cursor: string | null; keyed: Array<{ key?: string; live: boolean; runId: Id<"usageExportRuns"> }> }>;
             purgeUsageFile: FunctionReference<"action", { key: string; runId: Id<"usageExportRuns"> }, null>;
+            rearmLiveUsageRun: FunctionReference<"mutation", { runId: Id<"usageExportRuns">; userId: string }, null>;
             releaseUsageKey: FunctionReference<"mutation", { runId: Id<"usageExportRuns"> }, null>;
             sweepUsageExportPieces: FunctionReference<"mutation", {}, null>;
         };
@@ -2642,6 +2643,7 @@ export const internal: InternalApiTypes = {
             clearUsageExportPieces: { __lunoraRef: "usage_gdpr:clearUsageExportPieces" },
             keyedUsageRuns: { __lunoraRef: "usage_gdpr:keyedUsageRuns" },
             purgeUsageFile: { __lunoraRef: "usage_gdpr:purgeUsageFile" },
+            rearmLiveUsageRun: { __lunoraRef: "usage_gdpr:rearmLiveUsageRun" },
             releaseUsageKey: { __lunoraRef: "usage_gdpr:releaseUsageKey" },
             sweepUsageExportPieces: { __lunoraRef: "usage_gdpr:sweepUsageExportPieces" },
         },

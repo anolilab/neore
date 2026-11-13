@@ -247,8 +247,10 @@ export const purgeUserUsageFiles = internalAction
                     continue;
                 }
 
-                // A live run with no object yet has nothing to purge; a forced purge leaves it for the sweep.
+                // A live run with no object yet has nothing to purge. A forced purge leaves it to the sweep, re-armed for a check a minute on,
+                // since its export may still store an object after deletion completes.
                 if (run.key === undefined) {
+                    await context.runMutation(internal.usage.gdpr.rearmLiveUsageRun, { runId: run.runId, userId });
                     continue;
                 }
 

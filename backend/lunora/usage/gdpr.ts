@@ -242,6 +242,29 @@ const armRun = async (ctx: MutationCtx, runId: Id<"usageExportRuns">, userId: st
 };
 
 /**
+ * How soon the sweep checks a live run again. A live run's export can store its object at any moment, so a live run is checked about a
+ * minute after its export's last check, not a time to live later; the purge that outlives its wait re-arms it on this schedule too.
+ */
+export const LIVE_RECHECK_MS = 60 * 1000;
+
+/**
+ * Arms a live run with no object for the sweep's next check, a minute on. The erasure's forced purge calls it for a run it skips, so
+ * the run's object, if its export stores one after deletion completes, is purged about a minute after the export ends.
+ */
+export const rearmLiveUsageRun = internalMutation
+    .input({ runId: v.id("usageExportRuns"), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args: { runId, userId }, ctx }) => {
+        const run = await ctx.db.usageExportRuns.findFirst({ consistency: "primary", where: { _id: runId, userId } });
+
+        if (run) {
+            await armRun(ctx, run._id, userId, ctx.now + LIVE_RECHECK_MS);
+        }
+
+        return null;
+    });
+
+/**
  * Acts on the export runs that are due, one batch per run of the shard's housekeeping (`lib/shard-housekeeping.ts`). A run is due at its
  * `deleteAt`. A run found live is set one time to live ahead, so a run that dies at any point before then is found dead at that time:
  * its pieces and index rows go then. A sweep reads at most one batch of pieces in all, however many runs are due, so its reads stay
@@ -277,7 +300,7 @@ export const sweepUsageExportPieces = internalMutation
                 }
 
                 if (await isRunLive(ctx, run.requestId, run.userId)) {
-                    await armRun(ctx, run._id, run.userId, ctx.now + EXPORT_PIECE_TTL_MS);
+                    await armRun(ctx, run._id, run.userId, ctx.now + LIVE_RECHECK_MS);
                     continue;
                 }
 
