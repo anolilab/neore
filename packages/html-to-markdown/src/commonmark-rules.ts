@@ -271,9 +271,7 @@ const rules: Record<string, Rule> = {
         filter: "br",
 
         replacement(_content, node, options) {
-            const heading = blockHeadingOf(node, options);
-
-            return heading ? headingBreakMark(heading) : lineBreakMarker(options.br);
+            return breakMarkFor(node, options) ?? lineBreakMarker(options.br);
         },
     },
 
@@ -777,22 +775,18 @@ function headingMarkOf(heading: Node, options: Options): string | undefined {
     return mark;
 }
 
-/** The heading a break in the node is marked for, or null when no heading that holds a block contains it. */
-function blockHeadingOf(node: Node, options: Options): Element | null {
+/**
+ * The break mark for a break in the node's heading, or undefined when the break is not in a heading that
+ * holds a block. Uses the heading's cached mark, so each break does not serialise the whole heading again.
+ */
+function breakMarkFor(node: Node, options: Options): string | undefined {
     for (let ancestor = node.parentNode; ancestor; ancestor = ancestor.parentNode) {
         if (HEADING_NAMES.has(ancestor.nodeName)) {
-            return headingMarkOf(ancestor, options) === undefined ? null : (ancestor as Element);
+            return headingMarkOf(ancestor, options);
         }
     }
 
-    return null;
-}
-
-/** The break mark for a break in the node's heading, or undefined when there is none. */
-function breakMarkFor(node: Node, options: Options): string | undefined {
-    const heading = blockHeadingOf(node, options);
-
-    return heading ? headingBreakMark(heading) : undefined;
+    return undefined;
 }
 
 // The Unicode private-use area, U+E000 to U+F8FF.
