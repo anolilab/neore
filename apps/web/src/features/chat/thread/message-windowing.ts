@@ -156,12 +156,13 @@ export const parseMessageHash = (hash: string): string | undefined => {
 };
 
 /**
- * Keys that open, or step through, the BROWSER's find: Cmd/Ctrl+F, and F3 and Cmd/Ctrl+G with or without Shift.
- * Cmd/Ctrl+Shift+F is not one: it is the app's own Focus Search shortcut.
+ * Keys that open, or step through, the BROWSER's find: Mod+F, and F3 and Mod+G with or without Shift, where Mod is
+ * Command on a Mac (`isMac`) and Control elsewhere. On a Mac, Control+F moves the caret (an Emacs-style binding) and
+ * Control+G is not find either. Mod+Shift+F is not one: it is the app's own Focus Search shortcut.
  * Find opened from a menu (Edit › Find, Firefox's quick find, mobile Safari) sends no key at all; the list's
  * "Show all earlier messages" control is the way to reach unmounted messages from there.
  */
-export const isBrowserFindKey = (event: Pick<KeyboardEvent, "ctrlKey" | "key" | "metaKey" | "shiftKey">): boolean => {
+export const isBrowserFindKey = (event: Pick<KeyboardEvent, "ctrlKey" | "key" | "metaKey" | "shiftKey">, isMac: boolean): boolean => {
     // Autofill and some IMEs send a keydown with no `key`.
     const key = typeof event.key === "string" ? event.key : "";
 
@@ -169,7 +170,7 @@ export const isBrowserFindKey = (event: Pick<KeyboardEvent, "ctrlKey" | "key" | 
         return true;
     }
 
-    if (!event.metaKey && !event.ctrlKey) {
+    if (!(isMac ? event.metaKey : event.ctrlKey)) {
         return false;
     }
 

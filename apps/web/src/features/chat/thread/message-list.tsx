@@ -32,6 +32,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
+import { getPlatformModifierForEvents } from "@neore/ui/utils/keyboard-shortcuts";
 import type { Virtualizer } from "@tanstack/react-virtual";
 import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
 import { AnimatePresence } from "motion/react";
@@ -128,8 +129,10 @@ const useShowAllMessages = (): { isAllShown: boolean; showAll: () => void } => {
             return undefined;
         }
 
+        // The same platform test the app's own Mod shortcuts use.
+        const isMac = getPlatformModifierForEvents() === "cmd";
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (isBrowserFindKey(event) && !event.defaultPrevented) {
+            if (isBrowserFindKey(event, isMac) && !event.defaultPrevented) {
                 setIsAllShown(true);
             }
         };
@@ -286,8 +289,16 @@ const useFocusedRowId = (listRef: RefObject<HTMLElement | null>): string | undef
             return undefined;
         }
 
-        const rowIdOf = (target: EventTarget | null): string | undefined =>
-            target instanceof Element && list.contains(target) ? target.closest<HTMLElement>(ROW_SELECTOR)?.dataset.listMessageId : undefined;
+        // Focus on the row itself (a jump lands there) holds nothing: only a control inside the row, where input lives, does.
+        const rowIdOf = (target: EventTarget | null): string | undefined => {
+            if (!(target instanceof Element) || !list.contains(target)) {
+                return undefined;
+            }
+
+            const row = target.closest<HTMLElement>(ROW_SELECTOR);
+
+            return row && row !== target ? row.dataset.listMessageId : undefined;
+        };
         const handleFocusIn = (event: FocusEvent) => setFocusedId(rowIdOf(event.target));
         const handleFocusOut = (event: FocusEvent) => setFocusedId(rowIdOf(event.relatedTarget));
 

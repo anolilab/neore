@@ -29,6 +29,10 @@ const harness = vi.hoisted(() => {
         contentRenders: new Map<string, number>(),
         /** Renders the list inside the real shortcut manager and the thread's find bar. */
         withFind: false,
+        /** What every Lunora action does (a file's finalize step); a test gives it a result. */
+        action: (async () => undefined) as (args: unknown) => Promise<unknown>,
+        /** What a file upload does; a test makes it hang until it lets it finish. */
+        upload: (async () => "upload-1") as () => Promise<string>,
         /** What every cRPC mutation does; a test makes one hang or fail. */
         mutate: (async () => undefined) as (variables: unknown) => Promise<unknown>,
         /** The edit composer the list renders for the message being edited. */
@@ -182,7 +186,7 @@ vi.mock("@/lib/lunora/crpc", () => {
     // Any depth of namespace (`crpc.a.b.fn`) ends at `leaf`.
     const namespace: object = new Proxy({}, { get: (_target, key) => (Object.hasOwn(leaf, key) ? leaf[key as keyof typeof leaf] : namespace) });
 
-    return { useAction: () => async () => undefined, useCRPC: () => namespace };
+    return { useAction: () => async (args: unknown) => harness.action(args), useCRPC: () => namespace };
 });
 
 // A user message's copy-link action asks whether the thread is a group chat; these threads are not.
@@ -238,6 +242,10 @@ vi.mock("@/lib/auth/server-functions", () => {
 
 vi.mock("@/lib/env", () => {
     return { default: { VITE_LUNORA_URL: "http://localhost:8788" } };
+});
+
+vi.mock("@/lib/upload/upload-file", () => {
+    return { uploadFile: async () => harness.upload() };
 });
 
 // The thread's owner is signed in, so prompts in it can be answered.
@@ -683,6 +691,8 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
         harness.rowExtras.clear();
         harness.thread = undefined;
         harness.mutate = async () => undefined;
+        harness.action = async () => undefined;
+        harness.upload = async () => "upload-1";
         useChatUIStore.getState().stopEditing();
         harness.threadId = "thread-1";
         scrollReportDelayFrames = 0;
@@ -790,13 +800,63 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
         ["F3", { code: "F3", key: "F3" }],
         ["Shift+F3", { code: "F3", key: "F3", shiftKey: true }],
         ["Ctrl+G", { code: "KeyG", ctrlKey: true, key: "g" }],
-        ["Cmd+Shift+G", { code: "KeyG", key: "G", metaKey: true, shiftKey: true }],
+        ["Ctrl+Shift+G", { code: "KeyG", ctrlKey: true, key: "G", shiftKey: true }],
     ])("mounts every message once %s reaches the browser's find", (_name, init: KeyboardEventInit) => {
         mountInto();
 
         pressKey(init);
 
         expect(mountedIds()).toHaveLength(THREAD_LENGTH);
+    });
+
+    describe("on a Mac", () => {
+        beforeEach(() => {
+            vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+        });
+
+        it("leaves windowing on for Control+F in the composer, which moves the caret there", () => {
+            const composer = document.createElement("textarea");
+
+            composer.setAttribute("aria-label", "Message");
+            document.body.insertAdjacentElement("beforeend", composer);
+            mountInto();
+            composer.focus();
+
+            pressKey({ code: "KeyF", ctrlKey: true, key: "f" });
+            pressKey({ code: "KeyG", ctrlKey: true, key: "g" });
+
+            expect(mountedIds().length).toBeLessThan(THREAD_LENGTH / 2);
+            composer.remove();
+        });
+
+        it.each([
+            ["Command+F", { code: "KeyF", key: "f", metaKey: true }],
+            ["Command+Shift+G", { code: "KeyG", key: "G", metaKey: true, shiftKey: true }],
+        ])("mounts every message once %s reaches the browser's find", (_name, init: KeyboardEventInit) => {
+            mountInto();
+
+            pressKey(init);
+
+            expect(mountedIds()).toHaveLength(THREAD_LENGTH);
+        });
+    });
+
+    it("lets the tail shrink back after a jump to a recent message while many replies arrive", async () => {
+        mountInto();
+
+        // The jump focuses the row itself.
+        act(() => scrollToMessage(`m${THREAD_LENGTH - 5}`));
+        await vi.waitFor(() => expect(focusedMessageId()).toBe(`m${THREAD_LENGTH - 5}`), { timeout: 5000 });
+
+        const REPLIES = 100;
+
+        for (let reply = 0; reply < REPLIES; reply += 1) {
+            harness.messages = [...(harness.messages as UIMessage[]), makeMessage(THREAD_LENGTH + reply)];
+            act(() => harness.publish?.());
+        }
+
+        // The newest ALWAYS_MOUNTED_TAIL plus the head's window at the top, not every reply since the jump.
+        expect(mountedIds().length).toBeLessThan(ALWAYS_MOUNTED_TAIL + 30);
     });
 
     it("offers keyboard users a control that shows every earlier message and moves focus to the oldest", async () => {
@@ -1089,6 +1149,42 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
             });
 
             expect((within(rowOf("m101")!).getByRole("textbox") as HTMLTextAreaElement).value).toBe("src/a.ts");
+        });
+
+        it("keeps a question card's row while a file it attaches is still uploading, so the file arrives", async () => {
+            const user = userEvent.setup();
+            // The upload hangs until the test lets it finish.
+            const network = new EventTarget();
+
+            harness.thread = { userId: "owner" };
+            harness.upload = async () =>
+                new Promise((resolve) => {
+                    network.addEventListener("done", () => resolve("upload-1"), { once: true });
+                });
+            harness.action = async () => {
+                return { fileId: "file-1" };
+            };
+            harness.rowExtras.set("m101", () => createElement(AskUserPrompt, { part: waitingPart("tool-askUser", { question: "Which file?" }) }));
+            mountInto();
+
+            act(() => scrollToMessage("m101"));
+            await vi.waitFor(() => expect(rowOf("m101")).not.toBeNull(), { timeout: 5000 });
+            await user.upload(
+                rowOf("m101")!.querySelector<HTMLInputElement>('input[type="file"]')!,
+                new File(["%PDF-1.4"], "plan.pdf", { type: "application/pdf" }),
+            );
+            act(() => (document.activeElement as HTMLElement).blur());
+            await scrollToNewest();
+
+            expect(rowOf("m101")).not.toBeNull();
+
+            await act(async () => {
+                network.dispatchEvent(new Event("done"));
+            });
+
+            const attached = within(rowOf("m101")!).getByRole("list", { name: "Attached files" });
+
+            expect(within(attached).getByText("plan.pdf")).toBeTruthy();
         });
 
         it("holds no row for a card its viewer cannot answer, or one nobody has typed in", async () => {

@@ -189,32 +189,45 @@ describe(isBrowserFindKey, () => {
         return { ctrlKey: false, key: "", metaKey: false, shiftKey: false, ...init };
     };
 
-    it("takes the keys that open or step through the browser's find", () => {
-        expect(isBrowserFindKey(key({ ctrlKey: true, key: "f" }))).toBe(true);
-        expect(isBrowserFindKey(key({ key: "F", metaKey: true }))).toBe(true);
-        expect(isBrowserFindKey(key({ key: "F3" }))).toBe(true);
-        expect(isBrowserFindKey(key({ ctrlKey: true, key: "g" }))).toBe(true);
-        expect(isBrowserFindKey(key({ key: "F3", shiftKey: true }))).toBe(true);
-        expect(isBrowserFindKey(key({ key: "G", metaKey: true }))).toBe(true);
+    it("takes the keys that open or step through the browser's find, with Control off a Mac", () => {
+        expect(isBrowserFindKey(key({ ctrlKey: true, key: "f" }), false)).toBe(true);
+        expect(isBrowserFindKey(key({ key: "F3" }), false)).toBe(true);
+        expect(isBrowserFindKey(key({ key: "F3", shiftKey: true }), false)).toBe(true);
+        expect(isBrowserFindKey(key({ ctrlKey: true, key: "g" }), false)).toBe(true);
+        expect(isBrowserFindKey(key({ ctrlKey: true, key: "G", shiftKey: true }), false)).toBe(true);
+        // The Windows key is not find's modifier.
+        expect(isBrowserFindKey(key({ key: "f", metaKey: true }), false)).toBe(false);
+    });
+
+    it("takes Command, not Control, on a Mac", () => {
+        expect(isBrowserFindKey(key({ key: "F", metaKey: true }), true)).toBe(true);
+        expect(isBrowserFindKey(key({ key: "G", metaKey: true }), true)).toBe(true);
+        expect(isBrowserFindKey(key({ key: "F3" }), true)).toBe(true);
+        // Control+F moves the caret forward; Control+G is not find either.
+        expect(isBrowserFindKey(key({ ctrlKey: true, key: "f" }), true)).toBe(false);
+        expect(isBrowserFindKey(key({ ctrlKey: true, key: "g" }), true)).toBe(false);
     });
 
     it("leaves other keys alone", () => {
-        expect(isBrowserFindKey(key({ key: "f" }))).toBe(false);
-        expect(isBrowserFindKey(key({ key: "g" }))).toBe(false);
-        expect(isBrowserFindKey(key({ ctrlKey: true, key: "h" }))).toBe(false);
-        expect(isBrowserFindKey(key({ key: "F4" }))).toBe(false);
-        // The app's Focus Search shortcut, not the browser's find.
-        expect(isBrowserFindKey(key({ ctrlKey: true, key: "F", shiftKey: true }))).toBe(false);
-        expect(isBrowserFindKey(key({ key: "F", metaKey: true, shiftKey: true }))).toBe(false);
+        for (const isMac of [false, true]) {
+            const modifier = isMac ? { metaKey: true } : { ctrlKey: true };
+
+            expect(isBrowserFindKey(key({ key: "f" }), isMac)).toBe(false);
+            expect(isBrowserFindKey(key({ key: "g" }), isMac)).toBe(false);
+            expect(isBrowserFindKey(key({ ...modifier, key: "h" }), isMac)).toBe(false);
+            expect(isBrowserFindKey(key({ key: "F4" }), isMac)).toBe(false);
+            // The app's Focus Search shortcut, not the browser's find.
+            expect(isBrowserFindKey(key({ ...modifier, key: "F", shiftKey: true }), isMac)).toBe(false);
+        }
     });
 
     it("takes a keydown with no key (autofill) without throwing", () => {
         const autofill = { ctrlKey: false, key: undefined, metaKey: false, shiftKey: false } as unknown as KeyboardEvent;
         const withModifier = { ctrlKey: true, key: undefined, metaKey: false, shiftKey: false } as unknown as KeyboardEvent;
 
-        expect(() => isBrowserFindKey(autofill)).not.toThrow();
-        expect(isBrowserFindKey(autofill)).toBe(false);
-        expect(isBrowserFindKey(withModifier)).toBe(false);
+        expect(() => isBrowserFindKey(autofill, false)).not.toThrow();
+        expect(isBrowserFindKey(autofill, false)).toBe(false);
+        expect(isBrowserFindKey(withModifier, false)).toBe(false);
     });
 });
 
