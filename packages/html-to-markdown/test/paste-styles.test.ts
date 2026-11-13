@@ -229,3 +229,18 @@ describe("paste styles: review cases, fourth round", () => {
         expect(convert(`<b>a <a href="https://x.y" style="font-weight:normal">x</a> b</b>`)).toBe("**a** [x](https://x.y) **b**");
     });
 });
+
+describe("paste styles: review cases, fifth round", () => {
+    it("writes the bold of a link holding a normal-weight run inside its label, its syntax whole", () => {
+        expect(convert(`<b>a <a href="https://x.y"><span style="font-weight:normal">x</span></a> b</b>`)).toBe("**a** [x](https://x.y) **b**");
+        expect(convert(`<b>a <a href="https://x.y"><span style="font-weight:normal">x</span> y</a> b</b>`)).toBe("**a** [x **y**](https://x.y) **b**");
+    });
+
+    it("lets an invalid decoration shorthand override no earlier one, and reads a valid one with its style, thickness and color", () => {
+        expect(
+            convert(
+                `<p><span style="text-decoration:line-through; text-decoration:bogus">x</span> <span style="text-decoration:underline wavy red line-through">y</span> <span style="text-decoration:line-through #ff0000 2px">z</span></p>`,
+            ),
+        ).toBe("~~x~~ ~~y~~ ~~z~~");
+    });
+});

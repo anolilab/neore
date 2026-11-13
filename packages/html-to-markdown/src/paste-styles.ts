@@ -10,7 +10,7 @@ import { escapeTildes } from "./gfm";
 import { declaredStyle } from "./inline-style";
 import type TurndownService from "./turndown";
 import type { TurndownInput } from "./turndown";
-import type { Rule, RuleLookup } from "./types";
+import type { Options, Rule, RuleLookup } from "./types";
 import { isBlock } from "./utilities";
 
 const NORMAL_START = "\u{1}";
@@ -26,6 +26,163 @@ const GLOBAL_VALUES = new Set(["inherit", "initial", "revert", "revert-layer", "
 const NUMBER = /^\d+(?:\.\d+)?$/;
 const MAX_WEIGHT = 1000;
 const LINE_KEYWORDS = new Set(["blink", "line-through", "none", "overline", "underline"]);
+// What else the `text-decoration` shorthand takes: a line style, a thickness and a color.
+const DECORATION_STYLES = new Set(["dashed", "dotted", "double", "solid", "wavy"]);
+const THICKNESS = /^(?:auto|from-font|\d+(?:\.\d+)?(?:%|[a-z]{1,4})?)$/;
+const HEX_COLOR = /^#(?:[\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/;
+// The named colors of CSS Color 4, and the two keywords a color may also be.
+const NAMED_COLORS = new Set([
+    "aliceblue",
+    "antiquewhite",
+    "aqua",
+    "aquamarine",
+    "azure",
+    "beige",
+    "bisque",
+    "black",
+    "blanchedalmond",
+    "blue",
+    "blueviolet",
+    "brown",
+    "burlywood",
+    "cadetblue",
+    "chartreuse",
+    "chocolate",
+    "coral",
+    "cornflowerblue",
+    "cornsilk",
+    "crimson",
+    "currentcolor",
+    "cyan",
+    "darkblue",
+    "darkcyan",
+    "darkgoldenrod",
+    "darkgray",
+    "darkgreen",
+    "darkgrey",
+    "darkkhaki",
+    "darkmagenta",
+    "darkolivegreen",
+    "darkorange",
+    "darkorchid",
+    "darkred",
+    "darksalmon",
+    "darkseagreen",
+    "darkslateblue",
+    "darkslategray",
+    "darkslategrey",
+    "darkturquoise",
+    "darkviolet",
+    "deeppink",
+    "deepskyblue",
+    "dimgray",
+    "dimgrey",
+    "dodgerblue",
+    "firebrick",
+    "floralwhite",
+    "forestgreen",
+    "fuchsia",
+    "gainsboro",
+    "ghostwhite",
+    "gold",
+    "goldenrod",
+    "gray",
+    "green",
+    "greenyellow",
+    "grey",
+    "honeydew",
+    "hotpink",
+    "indianred",
+    "indigo",
+    "ivory",
+    "khaki",
+    "lavender",
+    "lavenderblush",
+    "lawngreen",
+    "lemonchiffon",
+    "lightblue",
+    "lightcoral",
+    "lightcyan",
+    "lightgoldenrodyellow",
+    "lightgray",
+    "lightgreen",
+    "lightgrey",
+    "lightpink",
+    "lightsalmon",
+    "lightseagreen",
+    "lightskyblue",
+    "lightslategray",
+    "lightslategrey",
+    "lightsteelblue",
+    "lightyellow",
+    "lime",
+    "limegreen",
+    "linen",
+    "magenta",
+    "maroon",
+    "mediumaquamarine",
+    "mediumblue",
+    "mediumorchid",
+    "mediumpurple",
+    "mediumseagreen",
+    "mediumslateblue",
+    "mediumspringgreen",
+    "mediumturquoise",
+    "mediumvioletred",
+    "midnightblue",
+    "mintcream",
+    "mistyrose",
+    "moccasin",
+    "navajowhite",
+    "navy",
+    "oldlace",
+    "olive",
+    "olivedrab",
+    "orange",
+    "orangered",
+    "orchid",
+    "palegoldenrod",
+    "palegreen",
+    "paleturquoise",
+    "palevioletred",
+    "papayawhip",
+    "peachpuff",
+    "peru",
+    "pink",
+    "plum",
+    "powderblue",
+    "purple",
+    "rebeccapurple",
+    "red",
+    "rosybrown",
+    "royalblue",
+    "saddlebrown",
+    "salmon",
+    "sandybrown",
+    "seagreen",
+    "seashell",
+    "sienna",
+    "silver",
+    "skyblue",
+    "slateblue",
+    "slategray",
+    "slategrey",
+    "snow",
+    "springgreen",
+    "steelblue",
+    "tan",
+    "teal",
+    "thistle",
+    "tomato",
+    "transparent",
+    "turquoise",
+    "violet",
+    "wheat",
+    "white",
+    "whitesmoke",
+    "yellow",
+    "yellowgreen",
+]);
 // An angle, as `oblique` may take: `10deg`, `-0.5turn`.
 const ANGLE = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:deg|grad|rad|turn)$/;
 
@@ -110,9 +267,25 @@ function isItalicStyle(style: string): boolean {
     return value === "italic" || value.startsWith("oblique");
 }
 
-// The `text-decoration` shorthand also takes a color, which can be almost any word, so only its longhand is checked.
+/**
+ * True for a `text-decoration` shorthand a browser reads: each keyword a line, a line style, a thickness or a color.
+ * A value with a function in it (`rgb(…)`, `var(…)`) is taken as read: its keywords are not split on its spaces.
+ */
+function isDecorationValue(value: string): boolean {
+    if (GLOBAL_VALUES.has(value) || value.includes("(")) {
+        return true;
+    }
+
+    return value
+        .split(CSS_SPACE)
+        .every(
+            (keyword) =>
+                LINE_KEYWORDS.has(keyword) || DECORATION_STYLES.has(keyword) || THICKNESS.test(keyword) || HEX_COLOR.test(keyword) || NAMED_COLORS.has(keyword),
+        );
+}
+
 function isStruckStyle(style: string): boolean {
-    const isShorthandStruck = declaredStyle(style, "text-decoration").split(CSS_SPACE).includes("line-through");
+    const isShorthandStruck = declaredStyle(style, "text-decoration", isDecorationValue).split(CSS_SPACE).includes("line-through");
 
     return isShorthandStruck || declaredStyle(style, "text-decoration-line", isDecorationLineValue).split(CSS_SPACE).includes("line-through");
 }
@@ -185,6 +358,8 @@ function topOf(node: Node): Node {
 }
 
 const carriersByTop = new WeakMap<Node, Set<Element>>();
+// Links that hold a normal-weight run inside bold.
+const linkRuns = new WeakSet<Element>();
 
 /**
  * The elements a normal-weight run's marks pass through: the bold element around each run and the formatting elements
@@ -225,6 +400,11 @@ function carriersOf(node: Node): Set<Element> {
 function addCarriers(run: Element, carriers: Set<Element>): void {
     for (let above = run.parentNode; above?.nodeType === 1 && !carriers.has(above as Element); above = above.parentNode) {
         carriers.add(above as Element);
+
+        // A link writes the bold inside its own label, as the marks must not reach into its syntax.
+        if (above.nodeName === "A") {
+            linkRuns.add(above as Element);
+        }
 
         if (emphasisOf(above as Element).isBold) {
             return;
@@ -551,6 +731,34 @@ function isNestedInStyled(element: Element, lookup: RuleLookup): boolean {
     });
 }
 
+/** The element's content with the bold, italics and strikethrough its name or style gives it, and its normal-weight marks. */
+function formatted(content: string, node: Element, options: Options, lookup: RuleLookup): string {
+    const emphasis = emphasisOf(node);
+    const isWrapped = canWrap(node, lookup);
+    let text = content;
+
+    if (emphasis.isBold || linkRuns.has(node)) {
+        // Bold inside bold writes no second pair; the marks wait for the bold around it. A link holding a normal-weight
+        // run writes its label's bold runs, and the link as a whole is then marked normal.
+        if (!emphasis.isBold || !isFormattedAbove(node, "isBold", lookup)) {
+            text = isWrapped ? wrapRuns(text, options.strongDelimiter, true) : withoutMarks(text);
+        }
+    } else if (isUnbold(node) && isNamed(node) && text.trim() !== "") {
+        // All of it is normal weight, so marks inside it are not needed.
+        text = `${NORMAL_START}${withoutMarks(text)}${NORMAL_END}`;
+    }
+
+    if (isWrapped && emphasis.isItalic && !isFormattedAbove(node, "isItalic", lookup)) {
+        text = wrapRuns(text, options.emDelimiter, false);
+    }
+
+    if (isWrapped && emphasis.isStrike && !isFormattedAbove(node, "isStrike", lookup)) {
+        text = wrapRuns(escapeTildes(text), "~~", false);
+    }
+
+    return text;
+}
+
 // Bold, italics and strikethrough set by a style, and text set back to normal weight inside bold. A styled block passes
 // its formatted text on to the rule that writes the block: a paragraph, a list item, a table cell.
 const styledText: Rule = {
@@ -565,40 +773,25 @@ const styledText: Rule = {
 
         const emphasis = emphasisOf(node);
 
+        if (node.nodeName === "A" && carriersOf(node).has(node) && linkRuns.has(node)) {
+            return true;
+        }
+
         return STYLED.has(node.nodeName) && (emphasis.isBold || emphasis.isItalic || emphasis.isStrike || isUnbold(node));
     },
     replacement(content, node, options, lookup) {
-        const emphasis = emphasisOf(node);
-        const isWrapped = canWrap(node, lookup);
-        let text = content;
-
-        if (emphasis.isBold) {
-            // Bold inside bold writes no second pair; the marks wait for the bold around it.
-            if (!isFormattedAbove(node, "isBold", lookup)) {
-                text = isWrapped ? wrapRuns(text, options.strongDelimiter, true) : withoutMarks(text);
-            }
-        } else if (isUnbold(node) && isNamed(node) && text.trim() !== "") {
-            // All of it is normal weight, so marks inside it are not needed.
-            text = `${NORMAL_START}${withoutMarks(text)}${NORMAL_END}`;
-        }
-
-        if (isWrapped && emphasis.isItalic && !isFormattedAbove(node, "isItalic", lookup)) {
-            text = wrapRuns(text, options.emDelimiter, false);
-        }
-
-        if (isWrapped && emphasis.isStrike && !isFormattedAbove(node, "isStrike", lookup)) {
-            text = wrapRuns(escapeTildes(text), "~~", false);
-        }
+        const text = formatted(content, node, options, lookup);
 
         if (isNamed(node)) {
             return text;
         }
 
         const next = lookup.ruleAfter(styledText, node);
-        const written = next.replacement.call(next, isUnbold(node) ? withoutMarks(text) : text, node, options, lookup);
+        const isMarkedWhole = isUnbold(node) || linkRuns.has(node);
+        const written = next.replacement.call(next, isMarkedWhole ? withoutMarks(text) : text, node, options, lookup);
 
         // Marked around what the element's rule writes, not inside it: a link's label is not where its bold ends.
-        return isUnbold(node) ? markNormal(written) : written;
+        return isMarkedWhole ? markNormal(written) : written;
     },
 };
 
