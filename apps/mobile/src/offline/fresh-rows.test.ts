@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isOldestFreshRowOnScreen, mergeFreshRead, withFreshRows } from "./fresh-rows";
+import { isOldestFreshRowOnScreen, withFreshRows } from "./fresh-rows";
 
 interface TestRow {
     finished?: boolean;
@@ -54,35 +54,5 @@ describe("withFreshRows", () => {
         expect(isOldestFreshRowOnScreen(current, [row("b"), row("c")])).toBe(true);
         expect(isOldestFreshRowOnScreen(current, [row("x"), row("y")])).toBe(false);
         expect(isOldestFreshRowOnScreen(current, [])).toBe(false);
-    });
-});
-
-/** Rows `from` to `to`, oldest first, as a run of the history. */
-const run = (from: number, to: number): TestRow[] => Array.from({ length: to - from + 1 }, (_, index) => row(`m${from + index}`));
-
-describe(mergeFreshRead, () => {
-    it("keeps the saved rows the cache painted before the fresh page, so they stay when the app goes offline", () => {
-        const merged = mergeFreshRead(run(1, 50), run(31, 50), false);
-
-        expect(merged.rows).toStrictEqual(run(1, 50));
-        expect(merged).toMatchObject({ hasGap: false, keepsCursor: false });
-    });
-
-    it("keeps loaded older rows when more than a page of messages came after them, and reports the gap", () => {
-        // Rows 1-40 were on screen, older pages loaded; 40 more messages came, and the fresh newest page is 61-80.
-        const merged = mergeFreshRead(run(1, 40), run(61, 80), true);
-
-        expect(merged.rows).toStrictEqual([...run(1, 40), ...run(61, 80)]);
-        expect(merged).toMatchObject({ hasGap: true, keepsCursor: true });
-    });
-
-    it("keeps no local or finished row, which the fresh page replaces", () => {
-        const merged = mergeFreshRead([row("old"), row("sending", { status: "local" }), row("done", { finished: true })], [row("new")], false);
-
-        expect(merged.rows.map((shown) => shown.id)).toStrictEqual(["old", "new"]);
-    });
-
-    it("shows nothing for a chat whose newest page is empty", () => {
-        expect(mergeFreshRead(run(1, 3), [], true)).toStrictEqual({ hasGap: false, keepsCursor: false, rows: [] });
     });
 });

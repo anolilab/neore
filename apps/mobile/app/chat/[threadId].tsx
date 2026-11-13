@@ -14,8 +14,10 @@ import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
 import type { StartedChat } from "@/chat/chat-api";
 import { ChatError, startChat } from "@/chat/chat-api";
+import type { ChatHistory, HistoryGap, HistoryPage } from "@/chat/chat-history";
+import { createLoadingOwner, fillHistory, hasOlder, newestRun, nextOlderCursor, olderPageOf, OPEN_FILL_ROWS, withNewestPage, withOlderPage } from "@/chat/chat-history";
 import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
-import { fillHistory, HISTORY_PAGE_SIZE, OPEN_FILL_ROWS, readNewestRows } from "@/chat/message-pages";
+import { HISTORY_PAGE_SIZE, readNewestRows } from "@/chat/message-pages";
 import { displayTextOf, shareTextOf } from "@/chat/message-parts";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
 import type { SendSession } from "@/chat/send-sessions";
@@ -33,7 +35,7 @@ import { withCatch, withFinally } from "@/lib/guarded";
 import { getClient } from "@/lib/lunora";
 import { streamingFetch } from "@/lib/streaming-fetch";
 import { offerPhonePush } from "@/notifications/use-phone-push";
-import { mergeFreshRead } from "@/offline/fresh-rows";
+import { MAX_MESSAGES_PER_THREAD } from "@/offline/cache";
 import { mergeRows } from "@/offline/merge";
 import { createMessageReadGate, readOlderMessages, readThreadMessages } from "@/offline/message-read";
 import { OfflineBanner } from "@/offline/offline-banner";
@@ -155,8 +157,6 @@ const Chat = () => {
     const hasLiveRows = useRef(false);
     // Set when the server refused this chat (locked, gone): a late read of the cache must not paint it again.
     const isRefused = useRef(false);
-    // Whether "Load older messages" has added pages here: only then does the cursor on screen continue a loaded run.
-    const hasLoadedOlder = useRef(false);
     // Whether this chat has had a read land since it opened: the first one also fills older pages after it is painted.
     const hasOpened = useRef(false);
     const readGate = useRef(createMessageReadGate());
@@ -176,9 +176,26 @@ const Chat = () => {
         rowsRef.current = next;
         setRows(next);
     }, []);
-    // Where the next older page starts; null once the whole history is loaded.
-    const [olderCursor, setOlderCursor] = useState<string | null>(null);
+    // The history's cursor and hole (`chat-history.ts`); its rows are `rowsRef`. Every read that changes the history
+    // goes through `writeHistory`, so the rows, the cursor and the hole never disagree.
+    const historyRef = useRef<{ gap?: HistoryGap; olderCursor: string | null | undefined }>({ olderCursor: undefined });
+    const [canLoadOlder, setCanLoadOlder] = useState(false);
+    const readHistory = useCallback((): ChatHistory<Row> => {
+        return { ...historyRef.current, rows: rowsRef.current };
+    }, []);
+    const writeHistory = useCallback(
+        (apply: (history: ChatHistory<Row>) => ChatHistory<Row>) => {
+            const next = apply(readHistory());
+
+            historyRef.current = { gap: next.gap, olderCursor: next.olderCursor };
+            writeRows(next.rows);
+            setCanLoadOlder(hasOlder(next));
+        },
+        [readHistory, writeRows],
+    );
     const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+    // Each fill and "Load older messages" press takes "Loading older messages" over; only the latest may end it.
+    const [loadingOwner] = useState(() => createLoadingOwner(setIsLoadingOlder));
     const [draft, setDraftState] = useState("");
     // The composer as the last write left it, like `rowsRef`: a failed send decides whether its prompt lands alone or ahead
     // of text typed meanwhile against the composer as it is, not as it was when the send started.
@@ -224,9 +241,9 @@ const Chat = () => {
         (refusedThreadId: string) => {
             isRefused.current = true;
             hasLiveRows.current = false;
-            hasLoadedOlder.current = false;
+            historyRef.current = { olderCursor: undefined };
             writeRows([]);
-            setOlderCursor(null);
+            setCanLoadOlder(false);
             setError(REFUSED_MESSAGE);
             // A chat the server refuses is not reopened on launch, and only this account's record of it is forgotten.
             settleQuietly(accountId ? forgetLastThread({ threadId: refusedThreadId, userId: accountId }) : undefined);
@@ -234,40 +251,72 @@ const Chat = () => {
         [accountId, writeRows],
     );
 
-    // Older pages fetched after a read is painted (`fillHistory`). "Load older messages" waits meanwhile, so the two do not
-    // fetch the same pages; the cursor the fill ends on is the screen's, unless it continues rows loaded before.
-    const fillOlderRows = useCallback(
-        async ({ anchorId, cursor, fillTo, id, keepsCursor }: { anchorId: string; cursor: string | null; fillTo: number; id: string; keepsCursor: boolean }) => {
-            const fetchOlder = async (at: string) => {
-                const result = await readOlderMessages({
-                    cache,
-                    fetchPage: async () => {
-                        const page = await fetchMessagePage(id, at);
-                        const syncedAt = Date.now();
+    // One older page of chat `id` from `cursor`, as the history takes it; `undefined` when it cannot be shown. A chat the
+    // server refuses is cleared here, as the newest-page read clears it; other failures go to `onFailure`.
+    const readOlderPage = useCallback(
+        async (id: string, cursor: string, onFailure: (message: string) => void): Promise<HistoryPage<Row> | undefined> => {
+            const result = await readOlderMessages({
+                cache,
+                fetchPage: async () => {
+                    const page = await fetchMessagePage(id, cursor);
+                    const syncedAt = Date.now();
 
-                        return { olderCursor: page.isDone ? null : page.continueCursor, rows: page.page.map((message) => toRow(message, id, syncedAt)) };
-                    },
-                    gate: readGate.current,
-                    threadId: id,
-                });
-
-                return result.kind === "page" ? result : undefined;
-            };
-
-            setIsLoadingOlder(true);
-
-            const filled = await withFinally(
-                async () => await fillHistory({ anchorId, cursor, fetchOlder, fillTo, read: () => rowsRef.current, write: writeRows }),
-                () => {
-                    setIsLoadingOlder(false);
+                    return { olderCursor: page.isDone ? null : page.continueCursor, rows: page.page.map((message) => toRow(message, id, syncedAt)) };
                 },
-            );
+                gate: readGate.current,
+                threadId: id,
+            });
 
-            if (!keepsCursor && !filled.isStopped) {
-                setOlderCursor(filled.cursor);
-            }
+            return olderPageOf(result, {
+                onFailure,
+                onRefused: () => {
+                    showRefused(id);
+                },
+            });
         },
-        [cache, writeRows],
+        [cache, showRefused],
+    );
+
+    // The run that joins the newest row is the chat's newest messages: saved as they are, up to the cache's limit, so a
+    // chat reopened offline shows what was read here, not only the newest page.
+    const saveNewestRun = useCallback(
+        (id: string, syncedAt: number, isCurrent: () => boolean) => {
+            if (!isCurrent()) {
+                return;
+            }
+
+            const newest = newestRun(readHistory()).slice(-MAX_MESSAGES_PER_THREAD);
+
+            settleQuietly(cache?.saveMessages(id, newest, { syncedAt }));
+        },
+        [cache, readHistory],
+    );
+
+    // Older pages read after the newest one is painted (`fillHistory`): through a hole first, then, for a chat just opened,
+    // down to as far back as a chat opened before. "Load older messages" waits meanwhile.
+    const fillOlderRows = useCallback(
+        async (id: string, fillTo: number) => {
+            const isCurrent = readGate.current.watch();
+            const startedAt = Date.now();
+            const end = loadingOwner.begin();
+
+            await withFinally(
+                async () =>
+                    await fillHistory({
+                        fetchOlder: async (cursor) => await readOlderPage(id, cursor, () => {}),
+                        fillTo,
+                        read: readHistory,
+                        save: (run) => {
+                            if (isCurrent()) {
+                                settleQuietly(cache?.saveMessages(id, run.slice(-MAX_MESSAGES_PER_THREAD), { syncedAt: startedAt }));
+                            }
+                        },
+                        update: writeHistory,
+                    }),
+                end,
+            );
+        },
+        [cache, loadingOwner, readHistory, readOlderPage, writeHistory],
     );
 
     // The newest page loads first, in one request, and is painted at once; older pages follow (`fillOlderRows`), and
@@ -300,28 +349,15 @@ const Chat = () => {
                     isRefused.current = false;
                     hasLiveRows.current = true;
 
-                    // Older rows on screen stay (loaded ones and the saved ones the cache painted). The cursor on screen
-                    // goes on only when it continues loaded rows; otherwise the read's own cursor takes over.
-                    const merged = mergeFreshRead(rowsRef.current, result.rows, hasLoadedOlder.current);
+                    // Older rows on screen stay (loaded ones, and the saved ones the cache painted); a hole below the
+                    // newest page is marked and filled after the paint.
                     const isOpening = !hasOpened.current;
 
-                    writeRows(merged.rows);
-
-                    if (!merged.keepsCursor) {
-                        hasLoadedOlder.current = false;
-                        setOlderCursor(result.olderCursor);
-                    }
-
                     hasOpened.current = true;
+                    writeHistory((history) => withNewestPage(history, { olderCursor: result.olderCursor, rows: result.rows }));
 
-                    // After the newest page is painted: the pages between it and the older rows kept, or, for a chat just
-                    // opened, older pages up to as far back as a chat opened before.
-                    const [newest] = result.rows;
-
-                    if (newest !== undefined && (isOpening || merged.hasGap)) {
-                        settleQuietly(
-                            fillOlderRows({ anchorId: newest.id, cursor: result.olderCursor, fillTo: isOpening ? OPEN_FILL_ROWS : 0, id, keepsCursor: merged.keepsCursor }),
-                        );
+                    if (isOpening || historyRef.current.gap !== undefined) {
+                        settleQuietly(fillOlderRows(id, isOpening ? OPEN_FILL_ROWS : 0));
                     }
 
                     setError(withoutRefusal);
@@ -345,66 +381,31 @@ const Chat = () => {
                 }
             }
         },
-        [accountId, cache, fillOlderRows, reportRead, showRefused, writeRows],
+        [accountId, cache, fillOlderRows, reportRead, showRefused, writeHistory],
     );
 
+    // One older page: the rest of a hole first, then below the run (`nextOlderCursor`).
     const loadOlder = async () => {
-        if (!threadId || olderCursor === null || isLoadingOlder) {
+        const cursor = nextOlderCursor(readHistory());
+
+        if (!threadId || cursor === null || isLoadingOlder) {
             return;
         }
 
-        setIsLoadingOlder(true);
-
-        const showOlder = (result: Awaited<ReturnType<typeof readOlderMessages>>) => {
-            switch (result.kind) {
-                case "failed": {
-                    setError(result.message);
-                    break;
-                }
-                case "page": {
-                    hasLoadedOlder.current = true;
-                    writeRows((current) => {
-                        const onScreen = new Set(current.map((row) => row.id));
-
-                        return [...result.rows.filter((row) => !onScreen.has(row.id)), ...current];
-                    });
-                    setOlderCursor(result.olderCursor);
-                    break;
-                }
-                case "refused": {
-                    showRefused(threadId);
-                    break;
-                }
-                case "unreachable": {
-                    setError("Could not load older messages. You appear to be offline.");
-                    break;
-                }
-                default: {
-                    // The screen moved on while the page loaded.
-                    break;
-                }
-            }
-        };
-
-        const fetchPage = async () => {
-            const page = await fetchMessagePage(threadId, olderCursor);
-            const syncedAt = Date.now();
-
-            return {
-                olderCursor: page.isDone ? null : page.continueCursor,
-                rows: page.page.map((message) => toRow(message, threadId, syncedAt)),
-            };
-        };
+        const id = threadId;
+        const isCurrent = readGate.current.watch();
+        const startedAt = Date.now();
+        const end = loadingOwner.begin();
 
         // `withFinally`, not `try … finally`: the React Compiler skips a component that holds a `finally`.
-        await withFinally(
-            async () => {
-                showOlder(await readOlderMessages({ cache, fetchPage, gate: readGate.current, threadId }));
-            },
-            () => {
-                setIsLoadingOlder(false);
-            },
-        );
+        await withFinally(async () => {
+            const page = await readOlderPage(id, cursor, setError);
+
+            if (page !== undefined) {
+                writeHistory((history) => withOlderPage(history, page));
+            }
+        }, end);
+        saveNewestRun(id, startedAt, isCurrent);
     };
 
     // The saved messages paint first; live rows replace them, and a cached row never replaces a newer live one.
@@ -745,9 +746,8 @@ const Chat = () => {
     };
 
     const olderHeader
-        = olderCursor === null
-            ? undefined
-            : (
+        = canLoadOlder
+            ? (
             <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ busy: isLoadingOlder, disabled: isLoadingOlder }}
@@ -757,7 +757,8 @@ const Chat = () => {
             >
                 <Text style={{ textAlign: "center" }}>{isLoadingOlder ? "Loading older messages..." : "Load older messages"}</Text>
             </Pressable>
-            );
+            )
+            : undefined;
 
     /** Opens the system share sheet. Cancelling resolves normally, so a rejection is a failure to open it. */
     const shareRow = async (text: string): Promise<void> => {

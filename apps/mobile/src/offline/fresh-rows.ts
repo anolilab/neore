@@ -32,39 +32,3 @@ export const withFreshRows = <T extends FreshRow>(current: ReadonlyArray<T>, fre
 
     return [...older, ...fresh];
 };
-
-/** What a fresh read of the newest page does to the rows on screen. */
-export interface FreshMerge<T> {
-    /**
-     * Older rows are kept but the fresh page does not reach them: more than a page of messages came after them. The
-     * pages in between are still to be fetched (`fillHistory`); until then the kept rows sit right before the fresh ones.
-     */
-    hasGap: boolean;
-    /** Whether the cursor on screen still continues the kept rows: only after "Load older messages" added them. */
-    keepsCursor: boolean;
-    rows: T[];
-}
-
-/**
- * Merges a fresh read of the newest page into the rows on screen, keeping the older server rows instead of dropping
- * them: rows "Load older messages" added, and the saved rows the cache painted, which must stay on screen when the app
- * goes offline again. The fresh read is the newest page, so every row on screen it does not hold is older (or gone).
- * Rows before the fresh read's oldest row are kept when the screen reaches it; when it does not, all older rows are
- * kept and the merge reports the gap. Local and finished rows are never kept: the fresh read holds their server copies.
- */
-export const mergeFreshRead = <T extends FreshRow>(current: ReadonlyArray<T>, fresh: ReadonlyArray<T>, hasLoadedOlder: boolean): FreshMerge<T> => {
-    if (fresh.length === 0) {
-        return { hasGap: false, keepsCursor: false, rows: [] };
-    }
-
-    const boundary = current.findIndex((row) => row.id === fresh[0]?.id);
-    const freshIds = new Set(fresh.map((row) => row.id));
-    const candidates = boundary === -1 ? current : current.slice(0, boundary);
-    const older = candidates.filter((row) => !freshIds.has(row.id) && row.status !== "local" && !row.finished);
-
-    return {
-        hasGap: boundary === -1 && older.length > 0,
-        keepsCursor: hasLoadedOlder && older.length > 0,
-        rows: [...older, ...fresh],
-    };
-};

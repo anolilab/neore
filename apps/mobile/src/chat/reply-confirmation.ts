@@ -10,8 +10,10 @@ const CONFIRM_HOLD_READS = 15;
 const CONFIRM_GIVE_UP_READS = 150;
 
 /**
- * Pages read per check, newest first, before the send counts as not found: other sessions can push it back. With the
- * short first page that is 20 + 5 × 100 messages, as far back as five full pages reached.
+ * Pages read per check, newest first, before the send counts as not found: other sessions can push it back. The
+ * server caps every page at 20 messages (`getThreadUIMessages`), so a check reaches back 6 × 20 = 120 messages, past the
+ * 100 the five capped pages of before reached. A send is checked for a few minutes after it, while other sessions
+ * would have to add that many messages to push it out of reach.
  */
 const CONFIRM_MAX_PAGES = 6;
 
@@ -21,7 +23,7 @@ const CONFIRM_MAX_PAGES = 6;
  */
 export const CONFIRM_FIRST_PAGE_SIZE = 20;
 
-/** Messages in each further page of a check, when other messages pushed the send off the first one. */
+/** Messages asked for in each further page of a check, when other messages pushed the send off the first one; the server caps it at 20. */
 export const CONFIRM_PAGE_SIZE = 100;
 
 /** How far apart the follow-up checks are, after a reply that the relay did not confirm as complete. */
