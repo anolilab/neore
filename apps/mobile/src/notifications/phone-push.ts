@@ -23,6 +23,7 @@ import { sharedKeychainOps } from "../auth/secure-store";
 import { writeIfDifferent } from "../auth/shared-keychain";
 import { loadConfig } from "../lib/config";
 import { registerApprovalActions } from "./approval-actions";
+import { clearTapRoute } from "./pending-tap";
 import type { PushPlatform, PushServer } from "./push-registration";
 import { createPendingWork, createSerialSteps, languageTag, noteAccountOnPhone, onceItWorks } from "./push-registration";
 
@@ -192,6 +193,7 @@ export const syncApprovalActions = async (): Promise<void> => {
 
 /** Removes the alerts still on this phone. */
 export const dismissAccountNotifications = async (): Promise<void> => {
+    clearTapRoute();
     await dismissAllNotificationsAsync();
 };
 

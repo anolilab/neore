@@ -419,3 +419,58 @@ export const createSerialSteps = () => {
         return await run;
     };
 };
+
+/** The opaque ids a phone push carries; never any text. */
+export interface PushIds {
+    notificationId: string;
+    threadId?: string;
+}
+
+const ID = /^[\w-]{1,64}$/u;
+
+const parseJson = (value: string): unknown => {
+    try {
+        return JSON.parse(value) as unknown;
+    } catch {
+        return undefined;
+    }
+};
+
+/**
+ * The ids in a push, wherever the platform and the notification library put them:
+ * the parsed `data`, Expo's `body` key in an APNs payload, an FCM message's `data`,
+ * or a background task's `dataString`. Anything that is not an id is ignored.
+ */
+export const pushIdsIn = (value: unknown, depth = 0): PushIds | undefined => {
+    if (typeof value === "string") {
+        return depth < 4 ? pushIdsIn(parseJson(value), depth + 1) : undefined;
+    }
+
+    if (typeof value !== "object" || !value || depth > 4) {
+        return undefined;
+    }
+
+    const { body, data, dataString, notificationId, threadId } = value as { body?: unknown; data?: unknown; dataString?: unknown; notificationId?: unknown; threadId?: unknown };
+
+    if (typeof notificationId === "string" && ID.test(notificationId)) {
+        return { notificationId, ...typeof threadId === "string" && ID.test(threadId) && { threadId } };
+    }
+
+    return pushIdsIn(data, depth + 1) ?? pushIdsIn(dataString, depth + 1) ?? pushIdsIn(body, depth + 1);
+};
+
+/** The ids of a delivered or tapped notification: its content, or the raw push it came from. */
+export const pushIdsFromNotification = (request: { content: { data?: unknown }; trigger?: unknown }): PushIds | undefined => {
+    const trigger = (request.trigger ?? {}) as { payload?: unknown; remoteMessage?: unknown };
+
+    return pushIdsIn(request.content.data) ?? pushIdsIn(trigger.payload) ?? pushIdsIn(trigger.remoteMessage);
+};
+
+/** The screen a tapped notification opens: its chat, or the chat list. */
+export const routeForPush = (ids: PushIds | undefined): `/chat/${string}` | "/" => {
+    if (ids?.threadId === undefined) {
+        return "/";
+    }
+
+    return `/chat/${ids.threadId}`;
+};

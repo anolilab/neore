@@ -13,9 +13,11 @@ import {
     noteAccountOnPhone,
     onceItWorks,
     PENDING_REMOVAL,
+    pushIdsIn,
     registerPhoneForPush,
     releaseOnSignOut,
     releasePhonePush,
+    routeForPush,
 } from "./push-registration";
 
 const TOKEN = "a".repeat(64);
@@ -568,5 +570,26 @@ describe("createAccountChecks", () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+});
+
+describe("pushIdsIn", () => {
+    it("reads the ids from the data, a JSON string, or Expo's body key", () => {
+        expect(pushIdsIn({ notificationId: "n1", threadId: "t1" })).toStrictEqual({ notificationId: "n1", threadId: "t1" });
+        expect(pushIdsIn({ data: JSON.stringify({ notificationId: "n2" }) })).toStrictEqual({ notificationId: "n2" });
+        expect(pushIdsIn({ body: { notificationId: "n3" } })).toStrictEqual({ notificationId: "n3" });
+    });
+
+    it("ignores an id that is not a plain identifier, and a thread id that is not one either", () => {
+        expect(pushIdsIn({ notificationId: "../etc", threadId: "t1" })).toBeUndefined();
+        expect(pushIdsIn({ notificationId: "n1", threadId: "a b" })).toStrictEqual({ notificationId: "n1" });
+    });
+});
+
+describe("routeForPush", () => {
+    it("opens the chat a push names, and the chat list when it names none", () => {
+        expect(routeForPush({ notificationId: "n1", threadId: "t1" })).toBe("/chat/t1");
+        expect(routeForPush({ notificationId: "n1" })).toBe("/");
+        expect(routeForPush(undefined)).toBe("/");
     });
 });

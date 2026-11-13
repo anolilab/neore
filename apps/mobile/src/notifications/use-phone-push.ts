@@ -1,12 +1,15 @@
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
-import { addPushTokenListener } from "expo-notifications";
-import { useEffect } from "react";
+import { addPushTokenListener, DEFAULT_ACTION_IDENTIFIER, useLastNotificationResponse } from "expo-notifications";
+import { useRouter, useSegments } from "expo-router";
+import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 
 import { useAuth } from "../auth/auth-state";
+import { canClaimLaunchReopen } from "../chat/launch-reopen";
 import { getClient } from "../lib/lunora";
 import { listenForApprovalTaps } from "./approval-actions";
+import { canNavigateToTap, holdTapRoute, takeTapRoute } from "./pending-tap";
 import {
     backendPushServer,
     configurePhoneNotifications,
@@ -18,7 +21,7 @@ import {
     syncApprovalActions,
     syncExtensionAddress,
 } from "./phone-push";
-import { createAccountChecks, createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
+import { createAccountChecks, createForegroundGate, createPromptOffer, createTokenChangeFilter, pushIdsFromNotification, registerPhoneForPush, routeForPush } from "./push-registration";
 
 /** `didRun`: no error (offline, no answer). `isRegistered`: the server now holds the token for this account. */
 interface RegisterResult {
@@ -189,7 +192,33 @@ export const offerPhonePush = async (userId: string): Promise<void> => {
  */
 export const usePhonePush = (): void => {
     const { hasToken, status, user } = useAuth();
+    const router = useRouter();
+    const response = useLastNotificationResponse();
+    const isOnSignIn = useSegments()[0] === "sign-in";
+    const handled = useRef<string | undefined>(undefined);
     const userId = status === "signed-in" && hasToken ? user?.id : undefined;
+
+    // A tapped notification opens its chat (the chat list when it names none). An approval alert's body opens its chat too;
+    // its approve and deny buttons answer it (`approval-tap-listener`), and a tap is never an answer.
+    useEffect(() => {
+        if (response?.actionIdentifier === DEFAULT_ACTION_IDENTIFIER && handled.current !== response.notification.request.identifier) {
+            const { request } = response.notification;
+
+            handled.current = request.identifier;
+            // A launch from a notification opens its chat, not the one the launch would reopen.
+            canClaimLaunchReopen();
+            holdTapRoute(routeForPush(pushIdsFromNotification(request)), { whileSignedOut: status !== "signed-in" });
+        }
+
+        // Still signing in (or on the sign-in screen): the sign-in gate goes there instead of the chat list.
+        if (canNavigateToTap({ isOnSignIn, status })) {
+            const route = takeTapRoute();
+
+            if (route !== undefined) {
+                router.push(route);
+            }
+        }
+    }, [isOnSignIn, response, router, status]);
 
     // Set up early, so an alert that arrives as the phone registers already carries its approve and deny actions. Every
     // registration tries the same setup first (`registerAfterSetUp`).

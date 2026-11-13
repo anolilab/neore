@@ -17,6 +17,7 @@ import { applyStoredCrashReportChoice, startCrashReporting } from "@/lib/crash-r
 import { installMarker } from "@/lib/install-marker";
 import { createPostHogClient } from "@/lib/posthog-client";
 import { canHideSplash, listReady } from "@/lib/splash-gate";
+import { routeAfterSignIn } from "@/notifications/pending-tap";
 import { usePhonePush } from "@/notifications/use-phone-push";
 import { OfflineProvider } from "@/offline/offline-provider";
 import { settleQuietly } from "@/offline/quietly";
@@ -83,7 +84,7 @@ const SignInGate = () => {
         }
 
         if (status === "signed-in" && isOnSignIn) {
-            router.replace("/");
+            router.replace(routeAfterSignIn());
         }
     }, [isOnSettings, isOnSignIn, router, status]);
 
