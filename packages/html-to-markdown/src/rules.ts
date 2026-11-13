@@ -1,5 +1,6 @@
 import annotateNode from "./node";
 import type { AnnotatedNode, Options, ReplacementFunction, Rule, RuleLookup } from "./types";
+import { removeReplacement } from "./utilities";
 
 /** The answers given to nodes during one conversion. */
 interface Answers {
@@ -69,7 +70,7 @@ export default class Rules implements RuleLookup {
     remove(filter: Rule["filter"]): void {
         this.removeList.unshift({
             filter,
-            replacement: () => "",
+            replacement: removeReplacement,
         });
         this.answers.undecided = new WeakSet();
     }

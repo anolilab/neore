@@ -1,6 +1,18 @@
 import annotateNode from "./node";
 import type { AnnotatedNode, Options, Rule, RuleLookup } from "./types";
-import { codeText, edgeBreaks, escapeMarkdown, hasOnlyBreaks, isBlock, isVoid, lineBreakMarker, parseListStart, repeat, trimNewlines } from "./utilities";
+import {
+    codeText,
+    edgeBreaks,
+    escapeMarkdown,
+    hasOnlyBreaks,
+    isBlock,
+    isVoid,
+    lineBreakMarker,
+    parseListStart,
+    removeReplacement,
+    repeat,
+    trimNewlines,
+} from "./utilities";
 
 const LINE_START = /^/gm;
 const NEWLINE = /\n/g;
@@ -15,6 +27,7 @@ const LINE_BREAK_RUN = /\n\s*/g;
 const DOUBLE_QUOTE = /"/g;
 // A character that can sit next to emphasis without `_` failing to open or close: anything but
 // whitespace, punctuation and symbols (CommonMark's flanking rules).
+const WHITESPACE_EDGE = /^\s$/u;
 const WORD_CHARACTER = /^[^\s\p{P}\p{S}]$/u;
 const EMPHASIS_NAMES = new Set(["em", "i"]);
 const STRONG_NAMES = new Set(["b", "strong"]);
@@ -666,7 +679,14 @@ function maxJoinBreaks(options: Options): number {
  * own output, so the DOM says nothing about its edge; the run then takes the asterisk, valid against any edge.
  */
 function siblingEdgeRun(sibling: Node, side: Side, options: Options, lookup: RuleLookup): EmphasisRun | null {
-    if (isCustomRendered(sibling, lookup)) {
+    const rule = lookup.ruleFor(sibling);
+
+    // A removed element writes only its flanking whitespace, which ends the run like a space.
+    if (rule?.replacement === removeReplacement) {
+        return WHITESPACE_EDGE.test(textEdge(sibling.textContent ?? "", side) ?? "") ? { count: 0, wordEdge: false } : null;
+    }
+
+    if (isCustomRendered(sibling, lookup, options)) {
         return { count: 0, wordEdge: true };
     }
 
@@ -686,10 +706,11 @@ function separation(node: AnnotatedNode, side: Side): number {
 const BUILTIN_RULES = new Set<Rule>(Object.values(rules));
 
 /** True when a rule that is not one of the built-in rules renders the node, so its output is not known from the DOM. */
-function isCustomRendered(node: Node, lookup: RuleLookup): boolean {
+function isCustomRendered(node: Node, lookup: RuleLookup, options: Options): boolean {
     const rule = lookup.ruleFor(node);
 
-    return rule !== undefined && !BUILTIN_RULES.has(rule);
+    // A blank element goes through the blank rule whatever its filter says, so its output is known from the DOM.
+    return rule !== undefined && !BUILTIN_RULES.has(rule) && !annotationOf(node, options).isBlank;
 }
 
 /** The built-in rule that renders a run's elements. Only its output writes the run's delimiters. */

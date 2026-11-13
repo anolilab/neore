@@ -34,6 +34,14 @@ export function trimLeadingBreaks(string: string): string {
     return string.replace(TRAILING_NEWLINE_BLOCK_START, "");
 }
 
+/**
+ * The replacement of a rule added with `remove`. One shared function, so the emphasis code can tell a removed
+ * element (which writes nothing) from one a custom rule renders.
+ */
+export function removeReplacement(): string {
+    return "";
+}
+
 /** The string the line-break rule emits for a hard break. */
 export function lineBreakMarker(br: string): string {
     return `${br}\n`;
