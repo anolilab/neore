@@ -55,17 +55,155 @@ interface RunStyle {
 // the search find nothing, and the block would lose its code.
 const pinnedCode = new WeakMap<Node, Element>();
 
+// A backslash escapes the ASCII punctuation character after it, and at the end of
+// the destination it would escape the closing parenthesis. Such a backslash is
+// doubled. Any other backslash is literal, so it is left alone.
+const BACKSLASH_BEFORE_PUNCTUATION = /\\(?=[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]|$)/g;
+// The hard break is `options.br` followed by a line break. CommonMark reads a line that ends in
+// two or more spaces, or in an unescaped backslash, as a hard break. The marker may hold other
+// text before that ending, as in ` \`. An even run of backslashes is escaped pairs, not a break.
+const HARD_BREAK = / {2}$|(?:^|[^\\])(?:\\\\)*\\$/;
+const SPACES_ONLY = /^ *$/;
+const REGEXP_SPECIAL = /[.*+?^${}()|[\]\\]/g;
+
+function escapeRegExp(text: string): string {
+    return text.replaceAll(REGEXP_SPECIAL, String.raw`\$&`);
+}
+
+// The tag names of CommonMark's HTML block type 6. A tag with one of these names may interrupt a
+// paragraph. Any other tag (an inline one such as `<em>`) cannot, so it does not start a block.
+const HTML_BLOCK_TAGS = [
+    "address",
+    "article",
+    "aside",
+    "base",
+    "basefont",
+    "blockquote",
+    "body",
+    "caption",
+    "center",
+    "col",
+    "colgroup",
+    "dd",
+    "details",
+    "dialog",
+    "dir",
+    "div",
+    "dl",
+    "dt",
+    "fieldset",
+    "figcaption",
+    "figure",
+    "footer",
+    "form",
+    "frame",
+    "frameset",
+    "h[1-6]",
+    "head",
+    "header",
+    "hr",
+    "html",
+    "iframe",
+    "legend",
+    "li",
+    "link",
+    "main",
+    "menu",
+    "menuitem",
+    "nav",
+    "noframes",
+    "ol",
+    "optgroup",
+    "option",
+    "p",
+    "param",
+    "search",
+    "section",
+    "summary",
+    "table",
+    "tbody",
+    "td",
+    "tfoot",
+    "th",
+    "thead",
+    "title",
+    "tr",
+    "track",
+    "ul",
+].join("|");
+// The HTML blocks that can interrupt a paragraph (CommonMark types 1 to 6): comments, declarations,
+// processing instructions, the block tags above, and the raw-text tags `script`, `pre`, `style` and
+// `textarea`. Each needs a word end after its name, so `<divide>` is not a block.
+const HTML_BLOCK_START = new RegExp(String.raw`<(?:[!?]|/?(?:${HTML_BLOCK_TAGS})(?=[\t\n\r />]|$)|(?:script|pre|style|textarea)(?=[\t\n\r >]|$))`, "iy");
+// The line starts that CommonMark lets interrupt a paragraph: a quote, an ATX heading, a
+// fence, a bullet followed by a space, a setext underline, a thematic break, an ordered
+// item that starts at 1, and an HTML block. Only `1` can start an ordered item that
+// interrupts a paragraph. Sticky, so each one tests at a single index and copies nothing.
+const BLOCK_OPENERS: ReadonlyArray<RegExp> = [
+    />/y,
+    /#{1,6}(?=[ \t\n]|$)/y,
+    /`{3}|~{3}/y,
+    /[*+-](?=[ \t\n]|$)/y,
+    /-+(?=[ \t]*(?:\n|$))/y,
+    /=+(?=[ \t]*(?:\n|$))/y,
+    // A thematic break is three or more markers and nothing else on the line. Text that starts with
+    // three markers, such as emphasis around a word, is not one.
+    /([*_-])(?:[ \t]*\1){2}[ \t]*(?=\n|$)/y,
+    /1[.)](?=[ \t\n]|$)/y,
+    HTML_BLOCK_START,
+];
+
+/** The next numbered id after `count` references, skipping any number that a label already names. */
+function nextReferenceId(count: number, labels: ReadonlyMap<string, string>): number {
+    let id = count + 1;
+
+    while (labels.has(String(id))) {
+        id += 1;
+    }
+
+    return id;
+}
+
+const WHITESPACE_RUN = /\s+/g;
+
+/**
+ * A reference label as CommonMark matches it: leading and trailing whitespace dropped, each run of
+ * whitespace read as one space, and case ignored.
+ */
+function normalizeLabel(text: string): string {
+    return text.replaceAll(WHITESPACE_RUN, " ").trim().toLowerCase();
+}
+
+function hasHref(node: Node): boolean {
+    return node.nodeName === "A" && Boolean((node as Element).getAttribute("href"));
+}
+
+/**
+ * True when a link rule turns this element into a link: an `<a>` with a non-empty `href`,
+ * in a link style that has a rule. Any other `<a>` prints its text with no brackets, so
+ * the text is not closed by a `]`.
+ */
+export function isLinkElement(node: Node, options: Options): boolean {
+    return (options.linkStyle === "inlined" || options.linkStyle === "referenced") && hasHref(node);
+}
+
 /**
  * Reference-style links collect their definitions here and append them after
  * the document (see `append`). The state lives on this rule object, as in
  * upstream; the rule is shared by every converter in the process.
  */
 function isReferencedLink(node: AnnotatedNode, options: Options): boolean {
-    return options.linkStyle === "referenced" && node.nodeName === "A" && Boolean(node.getAttribute("href"));
+    return options.linkStyle === "referenced" && hasHref(node);
 }
 
 class ReferenceLinkRule implements Rule {
     references: string[] = [];
+
+    /**
+     * The destination (with its title) that each label names, so a second link with the same label
+     * and another destination is not sent to the first. Keys are labels as CommonMark matches them.
+     */
+    labels = new Map<string, string>();
 
     filter = isReferencedLink;
 
@@ -79,9 +217,8 @@ class ReferenceLinkRule implements Rule {
         // The reference definition is written after the document, out of the heading's reach, so a heading's break
         // marks are turned into spaces here; otherwise the label in the heading and the definition would differ.
         const mark = breakMarkFor(node, lookup);
-        const { lead, text, trail } = headingLinkParts(rawContent, mark);
-        const content = mark === undefined ? text : joinAtMarks(text, mark);
-
+        const { lead, text: markedText, trail } = headingLinkParts(rawContent, mark);
+        const text = linkText(mark === undefined ? markedText : joinAtMarks(markedText, mark), options.br);
         const href = escapeLinkDestination(rawHref, options.safeLinks);
         let title = cleanAttribute(node.getAttribute("title"));
 
@@ -89,31 +226,26 @@ class ReferenceLinkRule implements Rule {
             title = ` "${escapeLinkTitle(title)}"`;
         }
 
-        let replacement: string;
-        let reference: string;
+        const definition = `${href}${title}`;
+        const isInline = options.linkReferenceStyle === "collapsed" || options.linkReferenceStyle === "shortcut";
+        const label = normalizeLabel(text);
+        const owner = isInline ? this.labels.get(label) : undefined;
 
-        switch (options.linkReferenceStyle) {
-            case "collapsed": {
-                replacement = `[${content}][]`;
-                reference = `[${content}]: ${href}${title}`;
-                break;
-            }
-            case "shortcut": {
-                replacement = `[${content}]`;
-                reference = `[${content}]: ${href}${title}`;
-                break;
-            }
-            default: {
-                const id = this.references.length + 1;
+        // A label that another link names with a different destination cannot name this one, so it
+        // takes a numbered id. The same destination under the same label is one definition either way.
+        if (isInline && (owner === undefined || owner === definition)) {
+            this.labels.set(label, definition);
+            this.references.push(`[${text}]: ${definition}`);
 
-                replacement = `[${content}][${id}]`;
-                reference = `[${id}]: ${href}${title}`;
-            }
+            return lead + (options.linkReferenceStyle === "collapsed" ? `[${text}][]` : `[${text}]`) + trail;
         }
 
-        this.references.push(reference);
+        const id = nextReferenceId(this.references.length, this.labels);
 
-        return lead + replacement + trail;
+        this.labels.set(String(id), definition);
+        this.references.push(`[${id}]: ${definition}`);
+
+        return `${lead}[${text}][${id}]${trail}`;
     }
 
     append(): string {
@@ -122,6 +254,7 @@ class ReferenceLinkRule implements Rule {
         if (this.references.length > 0) {
             references = `\n\n${this.references.join("\n")}\n\n`;
             this.references = []; // Reset references
+            this.labels = new Map(); // and the labels they name
         }
 
         return references;
@@ -258,7 +391,7 @@ const rules: Record<string, Rule> = {
 
     inlineLink: {
         filter(node, options) {
-            return options.linkStyle === "inlined" && node.nodeName === "A" && Boolean(node.getAttribute("href"));
+            return options.linkStyle === "inlined" && hasHref(node);
         },
 
         replacement(content, node, options, lookup) {
@@ -273,7 +406,7 @@ const rules: Record<string, Rule> = {
             const titlePart = title ? ` "${title}"` : "";
             const { lead, text, trail } = headingLinkParts(content, breakMarkFor(node, lookup));
 
-            return `${lead}[${text}](${href}${titlePart})${trail}`;
+            return `${lead}[${linkText(text, options.br)}](${href}${titlePart})${trail}`;
         },
     },
 
@@ -1179,14 +1312,99 @@ function cleanAttribute(attribute: string | null): string {
 }
 
 /**
+ * Link text sits on one line. A line that starts with a block marker (a list item, a
+ * quote, a heading underline, an ordered number) ends the paragraph, and the brackets
+ * stop being a link. A block element inside a link puts such lines there, so every
+ * line break becomes a space, except a hard break whose next line cannot open a block.
+ * CommonMark keeps a hard break inside link text.
+ *
+ * A space that already precedes the break is not doubled, so a marker that the block
+ * rule added (`> `) follows one space, not two.
+ *
+ * The closing `]` follows the text, so it is appended for the line checks and removed
+ * after. A lone `+` at the end of the text is then not a list item, and a hard break
+ * before it is kept.
+ */
+function linkText(content: string, hardBreak: string): string {
+    const hasHardBreaks = HARD_BREAK.test(hardBreak);
+    const closed = `${content}]`;
+    // A line break, with the marker that the rule writes in front of it when the marker is there.
+    const lineBreak = new RegExp(String.raw`(${escapeRegExp(hardBreak)})?\n\s*`, "g");
+
+    return closed
+        .replaceAll(lineBreak, (match: string, marker: string | undefined, offset: number, whole: string) => {
+            const written = marker ?? "";
+
+            if (hasHardBreaks && written && isKeptHardBreak(match.slice(written.length), offset + written.length, whole, hardBreak)) {
+                return match;
+            }
+
+            // Spaces are harmless in text, so a space marker stays and the break becomes a space or nothing. Any other
+            // marker, such as a backslash, would show in the link text, so it goes with the break.
+            if (SPACES_ONLY.test(written)) {
+                return written + (whole.charAt(offset + written.length - 1) === " " ? "" : " ");
+            }
+
+            return whole.charAt(offset - 1) === " " ? "" : " ";
+        })
+        .slice(0, -1);
+}
+
+/**
+ * True for a single line break that directly follows the hard break marker, when the
+ * line after it cannot open a block. A break inside a blank line is not a hard break.
+ */
+function isKeptHardBreak(run: string, offset: number, whole: string, hardBreak: string): boolean {
+    const markerStart = offset - hardBreak.length;
+    const isAfterMarker = markerStart >= 0 && whole.startsWith(hardBreak, markerStart);
+    const isSingle = !run.includes("\n", 1);
+    // A line indented by four columns or more is a paragraph continuation, so it cannot open a block.
+    const isCannotOpenBlock = indentWidth(run) >= 4;
+
+    return isAfterMarker && isSingle && (isCannotOpenBlock || !isBlockStartAt(whole, offset + run.length));
+}
+
+/** The columns of indentation after a line break. A tab reaches the next multiple of four. */
+function indentWidth(run: string): number {
+    let width = 0;
+
+    for (let index = 1; index < run.length; index += 1) {
+        const char = run.charAt(index);
+
+        if (char === " ") {
+            width += 1;
+        } else if (char === "\t") {
+            width += 4 - (width % 4);
+        } else {
+            break;
+        }
+    }
+
+    return width;
+}
+
+function isBlockStartAt(text: string, index: number): boolean {
+    for (const opener of BLOCK_OPENERS) {
+        opener.lastIndex = index;
+
+        if (opener.test(text)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * With `safeLinks`, `\` and `&` are escaped too. CommonMark undoes those added escapes, so the rendered destination is
  * the raw attribute, not the decoded copy. The check already covers the raw attribute: `isUnsafeDestination` runs on a
  * decoded copy of that same text. Line breaks are dropped first, as a browser drops them from an `href`, so the
- * destination stays on one line and cannot start a reference definition.
+ * destination stays on one line and cannot start a reference definition. Every backslash is doubled in safe mode, so
+ * the punctuation rule is applied only outside it.
  */
 function escapeLinkDestination(destination: string, isSafeLinks = false): string {
     const oneLine = destination.replaceAll(LINE_BREAKS, "");
-    const escaped = (isSafeLinks ? oneLine.replaceAll("\\", "\\\\").replaceAll("&", "&amp;") : oneLine)
+    const escaped = (isSafeLinks ? oneLine.replaceAll("\\", "\\\\").replaceAll("&", "&amp;") : oneLine.replaceAll(BACKSLASH_BEFORE_PUNCTUATION, String.raw`\\`))
         .replaceAll("<", String.raw`\<`)
         .replaceAll(">", String.raw`\>`)
         .replaceAll("(", String.raw`\(`)

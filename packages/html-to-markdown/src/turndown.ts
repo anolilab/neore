@@ -1,4 +1,4 @@
-import COMMONMARK_RULES from "./commonmark-rules";
+import COMMONMARK_RULES, { isLinkElement } from "./commonmark-rules";
 import annotateNode from "./node";
 import rootNode from "./root-node";
 import Rules from "./rules";
@@ -7,6 +7,7 @@ import {
     defaultBlankReplacement,
     defaultElementReplacement,
     escapeMarkdown,
+    isBlock,
     trimKeepingBreaks,
     trimLeadingBreaks,
     trimLeadingNewlines,
@@ -121,7 +122,7 @@ function process(service: TurndownService, parentNode: Node): string[] {
         if (node.nodeType === 3 || node.nodeType === 4) {
             const text = node.nodeValue ?? "";
 
-            replacement = node.isCode ? text : service.escape(text);
+            replacement = node.isCode ? text : escapeText(service, child, text);
         } else if (node.nodeType === 1) {
             replacement = replacementForNode(service, node);
         }
@@ -130,6 +131,125 @@ function process(service: TurndownService, parentNode: Node): string[] {
     }
 
     return output;
+}
+
+// The character that opens raw HTML after a `<`, and a character of an email local part. An email
+// autolink opens with a local part and then an `@`.
+const HTML_START = /[a-z/!?]/i;
+const LOCAL_PART = /[a-z0-9.!#$%&'+/=?^{|}~-]/i;
+const WHITESPACE_CHAR = /\s/;
+
+/**
+ * Steps taken while reading the text after a `<`: each node visited. The scale test reads it to show
+ * that a deeply nested run costs work in proportion to its size.
+ */
+export const htmlOpenerSteps = { count: 0 };
+
+/**
+ * Escapes a text node. `escapeMarkdown` sees only this node, so a `<` at its end is
+ * left alone there. Here the next output is known from the DOM: a `<` is escaped when
+ * that output may begin with one of the characters that open raw HTML or an autolink.
+ * A `<` followed by a space, a line break or the end of its block stays as it is.
+ * This `<` escape belongs to the default escaper. A custom `escape` decides every escape itself, so
+ * nothing is added after it.
+ */
+function escapeText(service: TurndownService, node: Node, text: string): string {
+    const escaped = service.escape(text);
+
+    if (service.escape === escapeMarkdown && text.endsWith("<") && escaped.endsWith("<") && isFollowedByHtmlOpener(node, service.options)) {
+        return `${escaped.slice(0, -1)}${String.raw`\<`}`;
+    }
+
+    return escaped;
+}
+
+/**
+ * True when the output after the node may begin with a character that opens raw HTML, or with an
+ * email autolink. It reads the following text (see `followingText`) only as far as the first
+ * character that decides: a letter, `/`, `!` or `?` decides at once, and a local part decides at
+ * its `@`. The check is conservative: a `<` that cannot open HTML may still be escaped.
+ */
+function isFollowedByHtmlOpener(node: Node, options: Options): boolean {
+    let isInLocalPart = false;
+
+    for (const piece of followingText(node, options)) {
+        for (const char of piece) {
+            const step: Step = isInLocalPart ? stepInLocalPart(char) : stepAfterLessThan(char);
+
+            if (step === "opens") {
+                return true;
+            }
+
+            if (step === "ends") {
+                return false;
+            }
+
+            isInLocalPart = step === "local";
+        }
+    }
+
+    return false;
+}
+
+/** What one character after a `<` decides: it opens markup, it ends the search, it starts a local part, or it is skipped. */
+type Step = "opens" | "ends" | "local" | "skip";
+
+function stepAfterLessThan(char: string): Step {
+    if (HTML_START.test(char)) {
+        return "opens";
+    }
+
+    if (LOCAL_PART.test(char)) {
+        return "local";
+    }
+
+    return WHITESPACE_CHAR.test(char) ? "skip" : "ends";
+}
+
+/** Inside a local part, an `@` opens an email autolink, and any other character that is not part of one ends the search. */
+function stepInLocalPart(char: string): Step {
+    if (char === "@") {
+        return "opens";
+    }
+
+    return LOCAL_PART.test(char) ? "local" : "ends";
+}
+
+/**
+ * The text that the output after the node is made of, in order. It looks at the next sibling, then
+ * past the end of an inline parent. A link that the rules print ends the search: it closes with `]`.
+ * A block ends it too, since a block starts on a new line. An `<a>` that prints no link is looked
+ * past, like any inline parent.
+ */
+function* followingText(node: Node, options: Options): Generator<string> {
+    let current: Node | null = node;
+
+    while (current) {
+        for (let sibling = current.nextSibling; sibling; sibling = sibling.nextSibling) {
+            yield* textOf(sibling);
+        }
+
+        const parent: Node | null = current.parentNode;
+
+        if (!parent || isLinkElement(parent, options) || isBlock(parent)) {
+            return;
+        }
+
+        current = parent;
+    }
+}
+
+/** The text nodes under a node, in order. A comment prints nothing, so it is skipped. */
+function* textOf(node: Node): Generator<string> {
+    htmlOpenerSteps.count += 1;
+
+    if (node.nodeType === 3 || node.nodeType === 4) {
+        yield node.nodeValue ?? "";
+    } else if (node.nodeType === 1) {
+        for (let child = node.firstChild; child; child = child.nextSibling) {
+            yield* textOf(child);
+        }
+    }
 }
 
 /**
