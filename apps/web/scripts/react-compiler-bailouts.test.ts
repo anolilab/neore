@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 const MUST_COMPILE: Record<string, string[]> = {
     "src/features/chat/core/context/chat-context.tsx": ["ChatProvider"],
     "src/features/chat/core/hooks/use-threads.ts": ["useThreads"],
+    "src/features/chat/thread-list/hierarchical-thread-list.tsx": ["HierarchicalThreadList"],
     "src/features/chat/thread-list/thread-list-header.tsx": ["ThreadListHeader"],
     "src/features/chat/thread-list/thread-list.tsx": ["ThreadList"],
     "src/features/chat/thread/thread.tsx": ["ThreadContent"],
@@ -87,7 +88,10 @@ describe("react Compiler coverage of the chat components", () => {
             const { code, events } = compile(file);
 
             for (const name of names) {
-                const line = declarationLine(code, name);
+                // The compiler reports a function where it starts, which is below the declaration when a type annotation spans lines.
+                const line = Math.min(
+                    ...events.map((event: CompilerEvent) => event.fnLoc?.start.line ?? 0).filter((start: number) => start >= declarationLine(code, name)),
+                );
                 const ownEvents = events.filter((event: CompilerEvent) => event.fnLoc?.start.line === line);
                 const reasons = ownEvents
                     .filter((event: CompilerEvent) => event.kind === "CompileError" || event.kind === "PipelineError")
