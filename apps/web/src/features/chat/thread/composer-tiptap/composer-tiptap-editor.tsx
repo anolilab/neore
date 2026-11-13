@@ -31,6 +31,7 @@ import useFavoriteModels from "@/features/chat/core/hooks/use-favorite-models";
 import type { PromptHistoryDirection } from "@/features/chat/core/utils/prompt-history";
 import type { PromptVariable } from "@/features/prompts/lib/prompt-variables";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
+import { LOAD_MARKS, useLoadMark } from "@/lib/analytics/load-marks";
 
 import type { ChatReference } from "../chat-reference";
 import { cleanEditorText } from "./clean-editor-text";
@@ -380,6 +381,9 @@ const ComposerTiptapEditor = ({
 
     // The "@" and "/" menus' data, loaded on the first edit that leaves text in the composer, so they open with it.
     const suggestionsWarm = useMentionPrefetch(editor, suggestions);
+
+    // Real-user load timing: the composer counts as visible once its editor exists (`lib/analytics/load-marks.ts`).
+    useLoadMark(LOAD_MARKS.composerVisible, editor !== null);
 
     // Sync placeholder ref + trigger a decoration re-render (with a brief fade) when placeholder changes.
     useEffect(() => {

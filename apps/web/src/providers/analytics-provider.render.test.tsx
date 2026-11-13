@@ -39,6 +39,17 @@ vi.mock("@c15t/react", () => {
 const loadPostHog = vi.hoisted(() => vi.fn());
 
 const reportFirstNativeLaunch = vi.hoisted(() => vi.fn());
+const reportLoadTiming = vi.hoisted(() => vi.fn());
+/** Holds the load-timing chunk "in flight" until a test lets it arrive. */
+const loadTimingChunk = vi.hoisted(() => {
+    return { arrived: Promise.resolve() };
+});
+
+vi.mock("@/lib/analytics/load-timing/report-load-timing", async () => {
+    await loadTimingChunk.arrived;
+
+    return { reportLoadTiming };
+});
 
 vi.mock("@/lib/analytics/first-native-launch", () => {
     return { reportFirstNativeLaunch };
@@ -247,6 +258,94 @@ describe("AnalyticsProvider", () => {
         expect(screen.getByText("analytics on")).toBeTruthy();
         // The client that started once back online has not had its flags yet: what reads them waits again.
         expect(screen.getByText("flags pending")).toBeTruthy();
+    });
+
+    it("loads the load-timing reporter at mount, alongside PostHog rather than after it", async () => {
+        reportLoadTiming.mockClear();
+        loadPostHog.mockReturnValue(new Promise(() => {}));
+
+        render(<AnalyticsProvider>{null}</AnalyticsProvider>);
+
+        await vi.waitFor(() => {
+            expect(reportLoadTiming).toHaveBeenCalledExactlyOnceWith({ exited: false, hasBeenVisible: true });
+        });
+    });
+
+    it("tells the reporter about a page exit that came while its chunk was loading", async () => {
+        reportLoadTiming.mockClear();
+        loadPostHog.mockReturnValue(new Promise(() => {}));
+
+        let arrive: () => void = () => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- not in this project's TypeScript lib (es2023)
+        loadTimingChunk.arrived = new Promise((resolve) => {
+            arrive = resolve;
+        });
+
+        render(<AnalyticsProvider>{null}</AnalyticsProvider>);
+        globalThis.dispatchEvent(new Event("pagehide"));
+        arrive();
+
+        await vi.waitFor(() => {
+            expect(reportLoadTiming).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ exited: true }));
+        });
+
+        loadTimingChunk.arrived = Promise.resolve();
+    });
+
+    it("tells the reporter the page was shown when it was hidden while the chunk loaded", async () => {
+        reportLoadTiming.mockClear();
+        loadPostHog.mockReturnValue(new Promise(() => {}));
+
+        let arrive: () => void = () => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- not in this project's TypeScript lib (es2023)
+        loadTimingChunk.arrived = new Promise((resolve) => {
+            arrive = resolve;
+        });
+
+        render(<AnalyticsProvider>{null}</AnalyticsProvider>);
+        // A tab switch before the chunk arrived: in Safari and Firefox nothing else records that the page was shown.
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+        document.dispatchEvent(new Event("visibilitychange"));
+        arrive();
+
+        await vi.waitFor(() => {
+            expect(reportLoadTiming).toHaveBeenCalledExactlyOnceWith({ exited: false, firstHiddenAt: expect.any(Number), hasBeenVisible: true });
+        });
+
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+        loadTimingChunk.arrived = Promise.resolve();
+    });
+
+    it("does not tell the reporter a tab opened in the background was shown", async () => {
+        reportLoadTiming.mockClear();
+        loadPostHog.mockReturnValue(new Promise(() => {}));
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+
+        render(<AnalyticsProvider>{null}</AnalyticsProvider>);
+
+        await vi.waitFor(() => {
+            expect(reportLoadTiming).toHaveBeenCalledExactlyOnceWith({ exited: false, firstHiddenAt: 0, hasBeenVisible: false });
+        });
+
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    });
+
+    it("logs a load-timing reporter that fails to start instead of dropping the error", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const failure = new Error("observer failed");
+
+        reportLoadTiming.mockImplementationOnce(() => {
+            throw failure;
+        });
+        loadPostHog.mockReturnValue(new Promise(() => {}));
+
+        render(<AnalyticsProvider>{null}</AnalyticsProvider>);
+
+        await vi.waitFor(() => {
+            expect(warn).toHaveBeenCalledWith("[PostHog] Load timing did not start:", failure);
+        });
     });
 
     it("records the landing page view before what a descendant queues on mount", async () => {
