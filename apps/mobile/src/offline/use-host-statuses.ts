@@ -2,6 +2,7 @@ import { api } from "@neore/backend/api";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "../auth/auth-state";
+import { withCatch } from "../lib/guarded";
 import { getClient } from "../lib/lunora";
 import { isNetworkFailure } from "./connectivity";
 import { mergeRows } from "./merge";
@@ -40,14 +41,12 @@ export const useHostStatuses = (): Map<string, ShownStatus> => {
         let isCancelled = false;
 
         const run = async () => {
-            try {
-                const cached = await cache?.loadStatuses() ?? [];
+            // An unreadable cache is an empty one. Both reads use `withCatch`, not a `try`: the React Compiler skips a hook
+            // whose `try` holds a condition.
+            const cached = await withCatch(async () => await cache?.loadStatuses() ?? [], (): StatusRow[] => []);
 
-                if (!isCancelled && !hasLiveRows.current && cached.length > 0) {
-                    setRows((current) => mergeRows(current, cached));
-                }
-            } catch {
-                // An unreadable cache is an empty one.
+            if (!isCancelled && !hasLiveRows.current && cached.length > 0) {
+                setRows((current) => mergeRows(current, cached));
             }
 
             if (!hasToken) {
@@ -57,25 +56,25 @@ export const useHostStatuses = (): Map<string, ShownStatus> => {
             // Stamped when the read starts, so a slow older read cannot look newer than a later one.
             const startedAt = Date.now();
 
-            try {
-                const live = await readLiveStatuses(startedAt);
-
-                if (!isCancelled) {
-                    hasLiveRows.current = true;
-                    setIsLive(true);
-                    setRows(
-                        live.map((row) => {
-                            return { ...row, syncedAt: startedAt };
-                        }),
-                    );
-                    settleQuietly(cache?.saveStatuses(live, { syncedAt: startedAt }));
-                    reportRead("succeeded");
-                }
-            } catch (error: unknown) {
+            const live = await withCatch(async () => await readLiveStatuses(startedAt), (error: unknown) => {
                 // Kept as shown. Only a read the network failed is reachability news; a refusal is not.
                 if (!isCancelled && isNetworkFailure(error)) {
                     reportRead("failed");
                 }
+
+                return undefined;
+            });
+
+            if (live !== undefined && !isCancelled) {
+                hasLiveRows.current = true;
+                setIsLive(true);
+                setRows(
+                    live.map((row) => {
+                        return { ...row, syncedAt: startedAt };
+                    }),
+                );
+                settleQuietly(cache?.saveStatuses(live, { syncedAt: startedAt }));
+                reportRead("succeeded");
             }
         };
 

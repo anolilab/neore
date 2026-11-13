@@ -2,6 +2,7 @@ import { Link } from "expo-router";
 import { useState } from "react";
 import { AccessibilityInfo, FlatList, Pressable, Text, TextInput, View } from "react-native";
 
+import { withFinally } from "@/lib/guarded";
 import { getClient } from "@/lib/lunora";
 import { useOffline, useWriteControl } from "@/offline/offline-context";
 import { createProject, isWriteBlocked, writeErrorMessage } from "@/projects/projects-api";
@@ -24,20 +25,25 @@ const ProjectsScreen = () => {
         setCreating(true);
         setError(null);
 
-        try {
-            const created = await createProject(getClient(), name);
+        const attempt = async () => {
+            try {
+                const created = await createProject(getClient(), name);
 
-            setName("");
-            // The live list delivers the row itself; this tells a screen reader the tap did something.
-            AccessibilityInfo.announceForAccessibility(`Project ${created.title} created`);
-        } catch (error_: unknown) {
-            const message = writeErrorMessage(error_);
+                setName("");
+                // The live list delivers the row itself; this tells a screen reader the tap did something.
+                AccessibilityInfo.announceForAccessibility(`Project ${created.title} created`);
+            } catch (error_: unknown) {
+                const message = writeErrorMessage(error_);
 
-            setError(message);
-            AccessibilityInfo.announceForAccessibility(message);
-        } finally {
+                setError(message);
+                AccessibilityInfo.announceForAccessibility(message);
+            }
+        };
+
+        // `withFinally`, not `try … finally`: the React Compiler skips a component that holds a `finally`.
+        await withFinally(attempt, () => {
             setCreating(false);
-        }
+        });
     };
 
     const blocked = isWriteBlocked({ busy: creating, offline: createControl.disabled });
