@@ -9,7 +9,7 @@ describe("the rule lookup", () => {
 
         service.addRule("element-only", {
             filter(node: Node) {
-                return (node as Element).hasAttribute("data-x");
+                return (node as Element).matches("span");
             },
             replacement: (content: string) => content,
         });
