@@ -1,4 +1,5 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, render, renderHook } from "@testing-library/react";
+import { startTransition, Suspense, use, useLayoutEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupType } from "../types";
@@ -26,15 +27,40 @@ const composite = {
     },
 };
 
+const lingui = vi.hoisted(() => {
+    return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+});
+
 vi.mock("@lingui/react/macro", () => {
     return {
-        useLingui: () => {
-            return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+        // One `t` for every render, as Lingui's is for a locale.
+        useLingui: () => lingui,
+    };
+});
+
+/** How many times the nodes were deep-compared with the previous build's. */
+const shareCalls = vi.hoisted(() => {
+    return { count: 0 };
+});
+
+vi.mock("../lib/share-unchanged-nodes", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../lib/share-unchanged-nodes")>();
+
+    return {
+        ...actual,
+        shareUnchangedNodes: (...args: Parameters<typeof actual.shareUnchangedNodes>) => {
+            shareCalls.count += 1;
+
+            return actual.shareUnchangedNodes(...args);
         },
     };
 });
-vi.mock("@tanstack/react-query", () => {
+vi.mock("@tanstack/react-query", async (importOriginal) => {
+    const { replaceEqualDeep } = await importOriginal<typeof import("@tanstack/react-query")>();
+
     return {
+        // The node sharing uses the real one.
+        replaceEqualDeep,
         skipToken: Symbol("skip"),
         useQuery: () => {
             return { data: composite, isPlaceholderData: state.isPlaceholderData };
@@ -218,5 +244,193 @@ describe("derived sections", () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+});
+
+describe("node identity across rebuilds", () => {
+    const original = composite.threads.page;
+
+    beforeEach(() => {
+        state.isPlaceholderData = false;
+        state.projects = [{ _id: "p1", createdAt: 1, title: "Work" }];
+        state.projectsAnswered = true;
+        composite.threads.page = [
+            { _id: "a", _creationTime: NOW, createdAt: NOW, status: "active", title: "First" },
+            { _id: "b", _creationTime: NOW, createdAt: NOW, projectId: "p1", status: "active", title: "Second" },
+            { _id: "c", _creationTime: NOW, createdAt: NOW, status: "active", title: "Third" },
+        ] as never;
+    });
+
+    afterEach(() => {
+        composite.threads.page = original;
+    });
+
+    const nodesOf = (groups: ReturnType<typeof groupsFor>) => new Map(groups.flatMap((group) => group.threads).map((node) => [node.threadId, node]));
+
+    it("keeps every other thread's node when one thread's status changes, so only that row re-renders", () => {
+        const collapsedGroups = new Set<GroupType>();
+        const collapsedProjects = new Set<string>();
+        const { rerender, result } = renderHook(() => useThreadGroups(collapsedGroups, collapsedProjects, "", "threads", undefined, [], undefined, undefined));
+        const before = nodesOf(result.current.threadGroups);
+
+        // A live push is a freshly decoded page: every thread object is new, and one of them changed.
+        composite.threads.page = (structuredClone(composite.threads.page) as { _id: string; status: string }[]).map((thread) =>
+            thread._id === "c" ? { ...thread, status: "running" } : thread,
+        ) as never;
+        rerender();
+        const after = nodesOf(result.current.threadGroups);
+
+        expect(after.get("a")).toBe(before.get("a"));
+        expect(after.get("b")).toBe(before.get("b"));
+        expect(after.get("c")).not.toBe(before.get("c"));
+        expect(after.get("c")?.status).toBe("running");
+    });
+
+    it("keeps every node when a rebuild changes nothing in them", () => {
+        const collapsedGroups = new Set<GroupType>();
+        const collapsedProjects = new Set<string>();
+        const { rerender, result } = renderHook(() => useThreadGroups(collapsedGroups, collapsedProjects, "", "threads", undefined, [], undefined, undefined));
+        const before = nodesOf(result.current.threadGroups);
+
+        composite.threads.page = structuredClone(composite.threads.page);
+        rerender();
+        const after = nodesOf(result.current.threadGroups);
+
+        expect([...after.keys()]).toStrictEqual([...before.keys()]);
+
+        for (const [threadId, node] of after) {
+            expect(node).toBe(before.get(threadId));
+        }
+    });
+
+    it("compares with the list on screen, not with a render React threw away", async () => {
+        const collapsedGroups = new Set<GroupType>();
+        const collapsedProjects = new Set<string>();
+        const harness: { abandon?: () => void; groups?: ReturnType<typeof groupsFor>; push?: () => void } = {};
+        // A render that suspends here never commits: the transition that asked for it is thrown away.
+        const never = new Promise<never>(() => {});
+        const Pending = ({ abandon }: { abandon: boolean }) => {
+            if (abandon) {
+                use(never);
+            }
+
+            return null;
+        };
+        const List = () => {
+            const { threadGroups } = useThreadGroups(collapsedGroups, collapsedProjects, "", "threads", undefined, [], undefined, undefined);
+
+            // Only what commits is on screen.
+            useLayoutEffect(() => {
+                harness.groups = threadGroups;
+            });
+
+            return null;
+        };
+        const Host = () => {
+            const [abandon, setAbandon] = useState(false);
+            const [, setPush] = useState(0);
+
+            useLayoutEffect(() => {
+                harness.abandon = () => startTransition(() => setAbandon(true));
+                harness.push = () => setPush((value) => value + 1);
+            }, []);
+
+            return (
+                <Suspense fallback={null}>
+                    <List />
+                    <Pending abandon={abandon} />
+                </Suspense>
+            );
+        };
+        const { page } = composite.threads;
+
+        render(<Host />);
+        const before = nodesOf(harness.groups ?? []);
+
+        // A push changes "c", and the only render that read it is thrown away...
+        composite.threads.page = (structuredClone(page) as { _id: string; status: string }[]).map((thread) =>
+            thread._id === "c" ? { ...thread, status: "running" } : thread,
+        ) as never;
+        await act(async () => {
+            harness.abandon?.();
+        });
+
+        // ...then the next push brings "c" back as it is on screen: its row keeps its node.
+        composite.threads.page = structuredClone(page);
+        act(() => {
+            harness.push?.();
+        });
+        const after = nodesOf(harness.groups ?? []);
+
+        expect(after.get("c")?.status).toBe("active");
+        expect(after.get("c")).toBe(before.get("c"));
+        expect(after.get("a")).toBe(before.get("a"));
+    });
+
+    it("commits once per push: keeping the shared nodes adds no render to the screen", () => {
+        const collapsedGroups = new Set<GroupType>();
+        const collapsedProjects = new Set<string>();
+        const commits = { count: 0 };
+        const List = () => {
+            useThreadGroups(collapsedGroups, collapsedProjects, "", "threads", undefined, [], undefined, undefined);
+
+            useLayoutEffect(() => {
+                commits.count += 1;
+            });
+
+            return null;
+        };
+        const { rerender } = render(<List />);
+
+        expect(commits.count).toBe(1);
+
+        composite.threads.page = (structuredClone(composite.threads.page) as { _id: string; status: string }[]).map((thread) =>
+            thread._id === "c" ? { ...thread, status: "running" } : thread,
+        ) as never;
+        rerender(<List />);
+
+        expect(commits.count).toBe(2);
+    });
+
+    it("compares an unchanged push once, and nothing on the renders after it", () => {
+        const collapsedGroups = new Set<GroupType>();
+        const collapsedProjects = new Set<string>();
+        const { rerender, result } = renderHook(() => useThreadGroups(collapsedGroups, collapsedProjects, "", "threads", undefined, [], undefined, undefined));
+        const before = nodesOf(result.current.threadGroups);
+
+        // A live push that changes nothing: a fresh page, equal to the one on screen.
+        composite.threads.page = structuredClone(composite.threads.page);
+        shareCalls.count = 0;
+        rerender();
+
+        expect(shareCalls.count).toBe(1);
+
+        // Renders after it bring no new build: nothing is compared again.
+        shareCalls.count = 0;
+        rerender();
+        rerender();
+
+        expect(shareCalls.count).toBe(0);
+
+        const after = nodesOf(result.current.threadGroups);
+
+        for (const [threadId, node] of after) {
+            expect(node).toBe(before.get(threadId));
+        }
+    });
+
+    it("compares a changed push once, not again in React's retry after it keeps the result", () => {
+        const collapsedGroups = new Set<GroupType>();
+        const collapsedProjects = new Set<string>();
+        const { rerender, result } = renderHook(() => useThreadGroups(collapsedGroups, collapsedProjects, "", "threads", undefined, [], undefined, undefined));
+
+        composite.threads.page = (structuredClone(composite.threads.page) as { _id: string; status: string }[]).map((thread) =>
+            thread._id === "c" ? { ...thread, status: "running" } : thread,
+        ) as never;
+        shareCalls.count = 0;
+        rerender();
+
+        expect(shareCalls.count).toBe(1);
+        expect(nodesOf(result.current.threadGroups).get("c")?.status).toBe("running");
     });
 });
