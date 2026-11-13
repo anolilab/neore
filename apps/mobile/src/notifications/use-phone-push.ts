@@ -206,6 +206,11 @@ export const usePhonePush = (): void => {
     // A tapped notification opens its chat (the chat list when it names none). An approval alert's body opens its chat too;
     // its approve and deny buttons answer it (`approval-tap-listener`), and a tap is never an answer.
     useEffect(() => {
+        // A sign-out ends with the status going signed-out: from then on a tap belongs to the next sign-in, not the one that left.
+        if (status === "signed-out") {
+            signOutState.isBegun = false;
+        }
+
         // A tap during a sign-out waits for the next sign-in instead of navigating to the account that is leaving.
         const isSigningOut = signOutState.isBegun;
 
@@ -282,7 +287,6 @@ export const usePhonePush = (): void => {
         checkAccount(userId, isCurrent);
 
         pushRegistrations.open();
-        signOutState.isBegun = false;
         signedIn.account = account;
         promptOffer.begin(userId);
         foreground.run(registerSilently);
