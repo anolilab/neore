@@ -239,9 +239,10 @@ const ITEM_SEPARATOR = "; ";
 const listsWithItems = new WeakSet<Node>();
 
 /** True when the item's first content is a nested list that wrote items: no text comes before its separator. */
-function isOpenedByWrittenList(item: Element): boolean {
+function isOpenedByWrittenList(item: Element, lookup: RuleLookup): boolean {
     for (let child = item.firstChild; child; child = child.nextSibling) {
-        if (child.nodeType === 1) {
+        // An element a remove filter drops writes nothing, so it does not come before the list.
+        if (child.nodeType === 1 && !lookup.isRemoved(child)) {
             return listsWithItems.has(child);
         }
 
@@ -394,7 +395,7 @@ const tableRules: Record<string, Rule> = {
             const text = oneLine(content);
             // A nested list that opens the item and wrote items has no item text before it to keep apart from, so its
             // separator is taken off. Text of the item's own, a semicolon too, stays as it is.
-            const own = isOpenedByWrittenList(node) ? text.slice(ITEM_SEPARATOR.trim().length).trim() : text;
+            const own = isOpenedByWrittenList(node, lookup) ? text.slice(ITEM_SEPARATOR.trim().length).trim() : text;
 
             return `${own}${hasNextItem(node, lookup) ? ITEM_SEPARATOR : ""}`;
         },
@@ -439,47 +440,72 @@ const tableRules: Record<string, Rule> = {
 
 const strikeAncestors = new WeakMap<Node, Element | null>();
 
+interface BacktickRun {
+    end: number;
+    /** The index of the next run of the same length, which closes a code span this run opens, or -1. */
+    next: number;
+    start: number;
+}
+
+/** The backtick runs of the text, in order, each with the next run of the same length, found in one pass from the end. */
+function backtickRuns(text: string): BacktickRun[] {
+    const runs: BacktickRun[] = [];
+
+    for (let index = text.indexOf("`"); index !== -1;) {
+        const end = runEnd(text, index, "`");
+
+        runs.push({ end, next: -1, start: index });
+        index = text.indexOf("`", end);
+    }
+
+    const lastOfLength = new Map<number, number>();
+
+    for (let index = runs.length - 1; index >= 0; index -= 1) {
+        const run = runs[index] as BacktickRun;
+        const length = run.end - run.start;
+
+        run.next = lastOfLength.get(length) ?? -1;
+        lastOfLength.set(length, index);
+    }
+
+    return runs;
+}
+
 /**
- * Literal tilde runs of two or more escaped, outside code spans: inside struck text they would end the strike. A single
- * tilde is left as it is, as in `~/path`.
+ * Literal tildes escaped, outside code spans: inside struck text a tilde run of two would end the strike, and a lone
+ * tilde beside the strike's own tildes would make a run that opens a code fence. Each backtick run is read once.
  */
-function escapeTildeRuns(markdown: string): string {
+function escapeTildes(markdown: string): string {
+    const runs = backtickRuns(markdown);
+    let run = 0;
     let result = "";
     let index = 0;
 
     while (index < markdown.length) {
-        const [text, end] = escapedToken(markdown, index);
+        const char = markdown.charAt(index);
+        let end = index + 1;
 
-        result += text;
+        while (run < runs.length && (runs[run] as BacktickRun).start < index) {
+            run += 1;
+        }
+
+        const current = runs[run];
+
+        if (char === "\\") {
+            end = index + 2;
+        } else if (current?.start === index) {
+            // A code span runs to the next run of the same length; an unmatched run is literal backticks.
+            const close = runs[current.next];
+
+            end = close ? close.end : current.end;
+            run = (close ? current.next : run) + 1;
+        }
+
+        result += char === "~" ? String.raw`\~` : markdown.slice(index, end);
         index = end;
     }
 
     return result;
-}
-
-/** The token that starts at `index`, as written, and where it ends: an escape, a code span, a tilde run or a character. */
-function escapedToken(markdown: string, index: number): [text: string, end: number] {
-    const char = markdown.charAt(index);
-
-    if (char === "\\") {
-        return [markdown.slice(index, index + 2), index + 2];
-    }
-
-    if (char === "`") {
-        const fenceEnd = runEnd(markdown, index, "`");
-        const close = closingFence(markdown, fenceEnd, fenceEnd - index);
-        const end = close === -1 ? fenceEnd : close;
-
-        return [markdown.slice(index, end), end];
-    }
-
-    if (char === "~") {
-        const end = runEnd(markdown, index, "~");
-
-        return [end - index >= 2 ? String.raw`\~`.repeat(end - index) : "~", end];
-    }
-
-    return [char, index + 1];
 }
 
 /** Where the run of `char` that starts at `start` ends. */
@@ -493,23 +519,6 @@ function runEnd(text: string, start: number, char: string): number {
     return end;
 }
 
-/** The end of the backtick run of exactly `length` that closes a code span opened before `from`, or -1. */
-function closingFence(text: string, from: number, length: number): number {
-    let index = text.indexOf("`", from);
-
-    while (index !== -1) {
-        const end = runEnd(text, index, "`");
-
-        if (end - index === length) {
-            return end;
-        }
-
-        index = text.indexOf("`", end);
-    }
-
-    return -1;
-}
-
 const strikethrough: Rule = {
     filter: (node, _options, lookup) => STRIKE_NAMES.has(node.nodeName) && !lookup.isRemoved(node),
     replacement(content, node) {
@@ -518,7 +527,7 @@ const strikethrough: Rule = {
             return content;
         }
 
-        return content.trim() === "" ? content : `~~${escapeTildeRuns(content)}~~`;
+        return content.trim() === "" ? content : `~~${escapeTildes(content)}~~`;
     },
 };
 

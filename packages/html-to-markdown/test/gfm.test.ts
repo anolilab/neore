@@ -324,3 +324,23 @@ describe("gfm review cases, sixth round", () => {
         expect(convert("<table><tr><th>A</th></tr><tr><td><ul><li>a\u{F8FE}b</li></ul></td></tr></table>")).toBe("| A |\n| --- |\n| a\u{F8FE}b |");
     });
 });
+
+describe("gfm review cases, seventh round", () => {
+    it("looks past an element a remove filter drops to find the nested list that opens an item", () => {
+        const service = new TurndownService().use(gfm);
+
+        service.remove((node) => node.getAttribute("class") === "gone");
+
+        expect(
+            service.turndown(`<table><tr><th>A</th></tr><tr><td><ul><li><span class="gone">x</span><ul><li>inner</li></ul></li></ul></td></tr></table>`),
+        ).toBe("| A |\n| --- |\n| inner |");
+    });
+
+    it("escapes a lone tilde in struck text, so it cannot open a code fence", () => {
+        expect(convert("<p><s>~</s></p>")).toBe(String.raw`~~\~~~`);
+    });
+
+    it("leaves backtick runs with no closing run as they are", () => {
+        expect(convert("<p><s>a `` b ``` c ~~</s></p>")).toBe(String.raw`~~a \`\` b \`\`\` c \~\~~~`);
+    });
+});
