@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 
 import { clearLastThread } from "../chat/last-thread-store";
 import { sendSessions } from "../chat/send-sessions";
-import { unsentPrompts } from "../chat/unsent-prompts";
 import { loadConfig } from "../lib/config";
 import { getClient } from "../lib/lunora";
 import { backendPushServer, devicePushPlatform, pushRegistrations } from "../notifications/phone-push";
@@ -39,14 +38,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Bumped by every sign-in and sign-out: a mint still out from before applies nothing.
     const [epoch] = useState(createAuthEpoch);
 
-    // Signed in again: sends begin and unsent prompts are kept again (a sign-out closed both, `sendSessions`, `unsentPrompts`).
+    // Signed in again: sends begin again (a sign-out closed them, `sendSessions`).
     useEffect(() => {
         if (status !== "signed-in") {
             return;
         }
 
         sendSessions.open();
-        unsentPrompts.open();
     }, [status]);
     // Callers of `retryToken` waiting for the attempt they asked for to end.
     const renewalWaiters = useRef<(() => void)[]>([]);
@@ -106,7 +104,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (jwt === null) {
                 dispatch({ type: "signed-out" });
                 sendSessions.signOut();
-                unsentPrompts.close();
                 // Retries a cache wipe that failed at sign-out; the credential side never waits on it.
                 await emptyCacheWhileSignedOut({ clearCache: () => getOfflineCache().clear(), forgetLastChat: clearLastThread, warn: console.warn });
 
@@ -146,7 +143,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, [client, config.lunoraUrl, epoch, refreshTick]);
 
     const signIn = useCallback(async () => {
-        epoch.end();
+        // Ends every mint out, and reopens the epoch a sign-out closed.
+        epoch.open();
         dispatch({ type: "sign-in-started" });
 
         try {
@@ -160,17 +158,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signOut = useCallback(async () => {
         // From here on, no prompt and no registration for the account that is leaving.
         endPhonePushForAccount();
-        // Its sends still going stop (no retry saves a message for it), and its unsent prompts are dropped with it: they
-        // never come back into another account's composer. Both stay closed for the whole sign-out, so a send begun during
-        // the teardown (the account still reads as signed in) keeps nothing either; the next sign-in opens them.
+        // Its sends still going stop (no retry saves a message for it, and none gives its prompt back), and stay closed for
+        // the whole sign-out, so a send begun during the teardown (the account still reads as signed in) is stopped too;
+        // the next sign-in opens them.
         sendSessions.signOut();
-        unsentPrompts.close();
 
         // A mint still out when sign-out starts applies nothing: the epoch ends before the first await (`runSignOut`).
         await runSignOut({
-            endMints: () => epoch.end(),
+            // Closed until the next sign-in: a mint a refresh timer begins during the teardown applies nothing either.
+            endMints: () => epoch.close(),
             finish: () => {
-                unsentPrompts.clear();
                 client.setAuthToken(null);
                 dispatch({ type: "signed-out" });
             },

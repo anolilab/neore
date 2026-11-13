@@ -12,16 +12,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/auth/auth-state";
 import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
+import type { StartedChat } from "@/chat/chat-api";
 import { ChatError, startChat } from "@/chat/chat-api";
 import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
 import { displayTextOf, shareTextOf } from "@/chat/message-parts";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
+import type { SendSession } from "@/chat/send-sessions";
 import { sendSessions } from "@/chat/send-sessions";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import type { HeldSend } from "@/chat/start-send";
-import { abortableSleep, holdFor, planSend, replyStreamOf, startWithRetries } from "@/chat/start-send";
+import { abortableSleep, afterStart, clientMessageIdFor, replyStreamOf, startWithRetries } from "@/chat/start-send";
 import { relayReply } from "@/chat/stream";
-import { followUnsentPrompts, giveBackOrKeep, takeUnsentPrompt, unsentPromptKey, unsentPrompts } from "@/chat/unsent-prompts";
 import type { SendStage } from "@/chat/unsent-send";
 import { failedSendMessage, failedSendOutcome, giveBackDraft, shouldKeepClientMessageId, withoutUnsentRows } from "@/chat/unsent-send";
 import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
@@ -157,16 +158,6 @@ const Chat = () => {
     // The prompt that went back to the composer with its `clientMessageId`: sending that prompt again reuses the id, so a
     // send the server took on a try whose answer was lost is saved once (`start-send.ts`).
     const heldSend = useRef<HeldSend | null>(null);
-    // Whether this screen is still mounted: a send that settles after it is gone keeps its prompt in `unsentPrompts` instead.
-    const isMountedRef = useRef(true);
-
-    useEffect(() => {
-        isMountedRef.current = true;
-
-        return () => {
-            isMountedRef.current = false;
-        };
-    }, []);
     // The rows as the last write left them. Every write goes through `writeRows`, so a read can decide against the rows on
     // screen when it lands, not against the rows of the render it was started in.
     const rowsRef = useRef<Row[]>([]);
@@ -183,20 +174,11 @@ const Chat = () => {
     // The composer as the last write left it, like `rowsRef`: a failed send decides whether its prompt lands alone or ahead
     // of text typed meanwhile against the composer as it is, not as it was when the send started.
     const draftRef = useRef("");
-    // `sending` as the last write left it, read where a kept prompt is offered outside a render (`followUnsentPrompts`).
-    const sendingRef = useRef(false);
-    // Offers this chat's kept prompts again once the screen can take one: its composer is empty and no send is going.
-    const offerUnsent = useRef<() => void>(() => {});
     const setDraft = useCallback((update: string | ((current: string) => string)) => {
         const next = typeof update === "function" ? update(draftRef.current) : update;
 
         draftRef.current = next;
         setDraftState(next);
-
-        // Emptied (sent, or cleared by the person): the next kept prompt, if any, may come in now.
-        if (next.trim() === "") {
-            offerUnsent.current();
-        }
     }, []);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -446,7 +428,7 @@ const Chat = () => {
         }
     }, [confirmTick, hasToken, loadMessages, refreshTick, sending, status, threadId]);
 
-    // A send the server did not didTake, or whose answer was lost, gives its prompt back and drops its local rows: no read
+    // A send the server did not accept, or whose answer was lost, gives its prompt back and drops its local rows: no read
     // will confirm them. The prompt keeps its `clientMessageId`, so sending it again cannot save it twice; the server answers
     // a resend of a saved one with its ids. Only an id the server says belongs to another request is dropped.
     const settleFailedSend = ({
@@ -466,73 +448,61 @@ const Chat = () => {
             return { isMerged: false };
         }
 
-        let isMerged = false;
+        // Back to this screen's composer, ahead of anything typed meanwhile, with its held id: the same prompt sent again
+        // alone and unchanged is the same send (`clientMessageIdFor`). A screen left meanwhile is gone, and so is the prompt.
+        const { draft: given, isMerged } = giveBackDraft(draftRef.current, prompt);
 
-        // To the composer while this screen is mounted: ahead of anything typed meanwhile, with the held id the original
-        // prompt's, so the next press sends it alone under that id (`planSend`). A screen left meanwhile (during the token
-        // mint or a retry) is gone: the prompt and its held send wait in `unsentPrompts` for this chat's next mount.
-        giveBackOrKeep({
-            apply: (entry) => {
-                const given = giveBackDraft(draftRef.current, entry.prompt);
-
-                isMerged = given.isMerged;
-                setDraft(given.draft);
-                writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
-                // The hold records what the app merged after the prompt, so a paragraph the person adds is told apart.
-                heldSend.current = entry.held ? holdFor(entry.held, given.draft) : null;
-            },
-            entry: { held: shouldKeepClientMessageId(failure) ? { clientMessageId, prompt } : null, prompt },
-            isMounted: isMountedRef.current,
-            key: accountId === undefined ? undefined : unsentPromptKey(accountId, threadId),
-            store: unsentPrompts,
-        });
+        setDraft(given);
+        writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
+        heldSend.current = shouldKeepClientMessageId(failure) ? { clientMessageId, prompt } : null;
 
         return { isMerged };
     };
 
-    // Prompts given back while this chat's screen was gone come back into the composer, each with its own held send: those
-    // kept before this mount at once, and one kept while it is mounted (a send left during its token mint that settles
-    // after the person came back) when it lands. One at a time, taken only into an empty composer with no send going, so
-    // `planSend` resends each under its own id and none is merged into another; the next is offered when the composer is
-    // empty again (sent, or cleared) and when a send ends.
-    useEffect(() => {
-        if (accountId === undefined) {
-            return undefined;
+    // After a start answered: `true` when the send was stopped while it was out (sign-out, leaving, a refusal) and changes
+    // nothing more here, since the server has the message. One sign-out stopped also drops its local rows and its hold, as
+    // its failure would (`afterStart`).
+    const isStoppedAfterStart = ({
+        controller,
+        ids,
+        sendSession,
+    }: {
+        controller: AbortController;
+        ids: { assistant: string; user: string };
+        sendSession: SendSession;
+    }): boolean => {
+        const next = afterStart({ isAborted: controller.signal.aborted, isSignedOut: sendSession.isSignedOut() });
+
+        if (next === "signed-out") {
+            writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
+            heldSend.current = null;
         }
 
-        const follow = followUnsentPrompts({
-            didTake: (entry) => {
-                // Only into an empty composer with no send going, never merged into what is there (`takeUnsentPrompt`).
-                const next = takeUnsentPrompt({ draft: draftRef.current, isSending: sendingRef.current }, entry);
+        return next !== "continue";
+    };
 
-                if (next === undefined) {
-                    return false;
-                }
+    // A start accepted: its chat is this screen's, the prompt is complete, and a new chat's screen moves to it.
+    const acceptStart = ({ controller, sender, started, userId }: { controller: AbortController; sender: string | undefined; started: StartedChat; userId: string }) => {
+        setThreadId(started.threadId);
 
-                setDraft(next.draft);
-                heldSend.current = next.held;
+        // A reply, a question or an approval may now arrive while the app is in the background.
+        if (sender) {
+            offerPhonePush(sender);
+        }
 
-                return true;
-            },
-            key: unsentPromptKey(accountId, threadId),
-            store: unsentPrompts,
-        });
+        // The prompt is complete once the server has accepted it, whether or not the screen's next read succeeds.
+        writeRows((current) => finishRow(current, userId));
 
-        offerUnsent.current = follow.offer;
-
-        return () => {
-            offerUnsent.current = () => {};
-            follow.stop();
-        };
-    }, [accountId, setDraft, threadId]);
+        // A send stopped meanwhile (sign-out, leaving, a refusal) keeps its result but moves no route.
+        if (shouldMoveRoute(routeThreadId, controller.signal)) {
+            router.setParams({ threadId: started.threadId });
+        }
+    };
 
     const send = async () => {
-        // A held prompt, which may already be saved, goes again only under its own id and alone (`planSend`): text typed
-        // after it stays in the composer for the next send.
         // The composer as the last write left it (`draftRef`), not as this render saw it: an edit made just before the press
-        // must not be lost to a resend of the unchanged held prompt.
-        const plan = planSend(heldSend.current, draftRef.current);
-        const { prompt } = plan;
+        // is what is sent.
+        const prompt = draftRef.current.trim();
 
         if (!prompt || sending || sendControl.disabled) {
             return;
@@ -547,8 +517,8 @@ const Chat = () => {
         const controller = new AbortController();
         // The account that sends: the offer below is its, even if another account is signed in by the time it lands.
         const sender = accountId;
-        // One id per composed message: the held one when this press retries the prompt that went back.
-        const clientMessageId = plan.heldId ?? randomUUID();
+        // One id per composed message: the held one when this is exactly the prompt that went back, so the resend is the same send.
+        const clientMessageId = clientMessageIdFor(heldSend.current, prompt, randomUUID);
 
         heldSend.current = null;
 
@@ -557,11 +527,10 @@ const Chat = () => {
         const sendSession = sendSessions.begin(controller);
 
         setSending(true);
-        sendingRef.current = true;
         setError(null);
         // Announced when a reply starts and when it finishes. The deltas stay silent: an announcement on each would flood the reader.
         AccessibilityInfo.announceForAccessibility("Assistant is replying");
-        setDraft(plan.rest);
+        setDraft("");
         const stamp = Date.now();
         const userId = `user-${stamp}`;
         const assistantId = `pending-${stamp}`;
@@ -608,21 +577,12 @@ const Chat = () => {
                 });
             });
 
+            if (isStoppedAfterStart({ controller, ids: { assistant: assistantId, user: userId }, sendSession })) {
+                return;
+            }
+
             stage = "accepted";
-            setThreadId(started.threadId);
-
-            // A reply, a question or an approval may now arrive while the app is in the background.
-            if (sender) {
-                offerPhonePush(sender);
-            }
-
-            // The prompt is complete once the server has accepted it, whether or not the screen's next read succeeds.
-            writeRows((current) => finishRow(current, userId));
-
-            // A send stopped meanwhile (sign-out, leaving, a refusal) keeps its result but moves no route.
-            if (shouldMoveRoute(routeThreadId, controller.signal)) {
-                router.setParams({ threadId: started.threadId });
-            }
+            acceptStart({ controller, sender, started, userId });
 
             const replyStream = replyStreamOf(started);
 
@@ -709,9 +669,6 @@ const Chat = () => {
         } finally {
             sendSession.end();
             setSending(false);
-            sendingRef.current = false;
-            // The screen may take the next kept prompt now (its hold was used or never set).
-            offerUnsent.current();
         }
     };
 

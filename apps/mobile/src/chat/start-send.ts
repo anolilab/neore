@@ -4,63 +4,20 @@ import { ChatError, isClientMessageIdReused, isStartInProgress } from "./chat-ap
 /** A send whose prompt went back to the composer: sending the same prompt again is a retry of it, under the same id. */
 export interface HeldSend {
     clientMessageId: string;
-
-    /**
-     * The text the app itself put after the prompt when it gave it back (typed meanwhile), when it did: only a draft that
-     * still begins with the prompt, the separator and this text is split (`planSend`). Absent on a plain give-back.
-     */
-    mergedRest?: string;
     prompt: string;
 }
 
-/** What `draftAfterUnsent` puts between a prompt given back and text typed meanwhile. */
-export const GIVE_BACK_SEPARATOR = "\n\n";
-
-/** What one press of Send sends (`prompt`, under `heldId` when it is a retry), and what stays in the composer (`rest`). */
-export interface SendPlan {
-    /** The held send's `clientMessageId` when this press retries it; otherwise the send takes a new one. */
-    heldId?: string;
-    prompt: string;
-    rest: string;
-}
-
 /**
- * The hold for a prompt given back into `draft`: the send with, when the app put text typed meanwhile after the prompt,
- * that text as `mergedRest`, so `planSend` can tell the app's merge from the person's own edits.
+ * The `clientMessageId` of a send of `prompt`: the held one when the prompt is exactly the one that went back to the
+ * composer (a retry, which the server answers with the first send's ids if that one was saved), a new one for anything
+ * else, which is another message.
  */
-export const holdFor = (held: Pick<HeldSend, "clientMessageId" | "prompt">, draft: string): HeldSend => {
-    const prefix = `${held.prompt}${GIVE_BACK_SEPARATOR}`;
-
-    return draft.startsWith(prefix) ? { ...held, mergedRest: draft.slice(prefix.length) } : { clientMessageId: held.clientMessageId, prompt: held.prompt };
-};
-
-/**
- * Plans a press of Send so a held prompt, which may already be saved, is only ever sent again under its own
- * `clientMessageId`, never folded into a new message that would save it a second time. A draft that is the held prompt
- * is sent under its held id. A draft the app merged (the held prompt, the separator and the text typed meanwhile, still
- * as recorded in `mergedRest`, perhaps with more after it) sends the held prompt alone under its held id and keeps the
- * rest for the next send. Any other draft, including the held prompt with a paragraph the person added, is a new
- * message, and the hold ends.
- */
-export const planSend = (held: HeldSend | null, draft: string): SendPlan => {
-    const prompt = draft.trim();
-
-    if (held === null) {
-        return { prompt, rest: "" };
+export const clientMessageIdFor = (held: HeldSend | null, prompt: string, newId: () => string): string => {
+    if (held !== null && held.prompt === prompt) {
+        return held.clientMessageId;
     }
 
-    if (prompt === held.prompt) {
-        return { heldId: held.clientMessageId, prompt, rest: "" };
-    }
-
-    const prefix = `${held.prompt}${GIVE_BACK_SEPARATOR}`;
-    const leading = draft.trimStart();
-
-    if (held.mergedRest !== undefined && held.mergedRest.trim() !== "" && leading.startsWith(`${prefix}${held.mergedRest}`)) {
-        return { heldId: held.clientMessageId, prompt: held.prompt, rest: leading.slice(prefix.length).trim() };
-    }
-
-    return { prompt, rest: "" };
+    return newId();
 };
 
 /** How long a send whose first try is still being saved (409) is waited for: past the server's 2-minute lease, after which it is resumed. */
@@ -175,4 +132,16 @@ export const abortableSleep = async (ms: number, signal?: AbortSignal): Promise<
         timer = setTimeout(done, ms);
         signal?.addEventListener("abort", done, { once: true });
     });
+};
+
+/**
+ * What a send does once its start answered: go on, or, when it was stopped while the start was out, change nothing more on
+ * the screen (the server has the message). A send a sign-out stopped (`signed-out`) also drops its local rows and hold.
+ */
+export const afterStart = ({ isAborted, isSignedOut }: { isAborted: boolean; isSignedOut: boolean }): "continue" | "signed-out" | "stopped" => {
+    if (!isAborted) {
+        return "continue";
+    }
+
+    return isSignedOut ? "signed-out" : "stopped";
 };

@@ -4,9 +4,8 @@ import type { StartedChat } from "./chat-api";
 import { ChatError } from "./chat-api";
 import {
     abortableSleep,
-    GIVE_BACK_SEPARATOR,
-    holdFor,
-    planSend,
+    afterStart,
+    clientMessageIdFor,
     replyStreamOf,
     START_IN_PROGRESS_RETRY_MS,
     START_IN_PROGRESS_WAIT_MS,
@@ -32,39 +31,17 @@ const fakeClock = () => {
     };
 };
 
-describe(planSend, () => {
-    const held = { clientMessageId: "first-id", prompt: "hello" };
-    // The hold after the app put text typed meanwhile after the prompt.
-    const merged = holdFor(held, `hello${GIVE_BACK_SEPARATOR}and more`);
+describe(clientMessageIdFor, () => {
+    const newId = vi.fn(() => "new-id");
 
-    it("records what the app merged after a given-back prompt, and nothing on a plain give-back", () => {
-        expect(merged).toStrictEqual({ ...held, mergedRest: "and more" });
-        expect(holdFor(held, "hello")).toStrictEqual(held);
+    it("reuses the held id when exactly the same prompt is sent again", () => {
+        expect(clientMessageIdFor({ clientMessageId: "first-id", prompt: "hello" }, "hello", newId)).toBe("first-id");
     });
 
-    it("retries the held prompt under its held id when the draft is that prompt", () => {
-        expect(planSend(held, "hello")).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "" });
-        expect(planSend(held, "  hello \n")).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "" });
-    });
-
-    it("sends the held prompt alone under its held id ahead of the text the app merged, and keeps that text for the next send", () => {
-        expect(planSend(merged, `hello${GIVE_BACK_SEPARATOR}and more`)).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "and more" });
-        expect(planSend(merged, `hello${GIVE_BACK_SEPARATOR}and more, then this`)).toStrictEqual({
-            heldId: "first-id",
-            prompt: "hello",
-            rest: "and more, then this",
-        });
-    });
-
-    it("sends a paragraph added to a plain give-back whole, as a new message, not split in two", () => {
-        expect(planSend(held, `hello${GIVE_BACK_SEPARATOR}some context`)).toStrictEqual({ prompt: `hello${GIVE_BACK_SEPARATOR}some context`, rest: "" });
-    });
-
-    it("sends any other edit, or a draft with nothing held, as a new message", () => {
-        expect(planSend(merged, `hello${GIVE_BACK_SEPARATOR}and less`)).toStrictEqual({ prompt: `hello${GIVE_BACK_SEPARATOR}and less`, rest: "" });
-        expect(planSend(merged, `hello there${GIVE_BACK_SEPARATOR}and more`)).toStrictEqual({ prompt: `hello there${GIVE_BACK_SEPARATOR}and more`, rest: "" });
-        expect(planSend(held, "hello again")).toStrictEqual({ prompt: "hello again", rest: "" });
-        expect(planSend(null, "hello")).toStrictEqual({ prompt: "hello", rest: "" });
+    it("gives a new id to any other prompt, and to a send with nothing held", () => {
+        expect(clientMessageIdFor({ clientMessageId: "first-id", prompt: "hello" }, "hello again", newId)).toBe("new-id");
+        expect(clientMessageIdFor({ clientMessageId: "first-id", prompt: "hello" }, "hello\n\nand more", newId)).toBe("new-id");
+        expect(clientMessageIdFor(null, "hello", newId)).toBe("new-id");
     });
 });
 
@@ -203,5 +180,16 @@ describe(abortableSleep, () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+});
+
+describe(afterStart, () => {
+    it("goes on with a start that answered while the send still runs", () => {
+        expect(afterStart({ isAborted: false, isSignedOut: false })).toBe("continue");
+    });
+
+    it("changes nothing more for a send stopped while its start was out, and drops a signed-out one's rows", () => {
+        expect(afterStart({ isAborted: true, isSignedOut: false })).toBe("stopped");
+        expect(afterStart({ isAborted: true, isSignedOut: true })).toBe("signed-out");
     });
 });

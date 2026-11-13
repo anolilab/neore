@@ -186,7 +186,7 @@ describe(runSignOut, () => {
         const finish = vi.fn();
 
         await runSignOut({
-            endMints: () => epoch.end(),
+            endMints: () => epoch.close(),
             finish,
             teardown: async () => {
                 // The mint answers while the teardown still waits on the cache and the server.
@@ -206,7 +206,7 @@ describe(runSignOut, () => {
 
         await expect(
             runSignOut({
-                endMints: () => epoch.end(),
+                endMints: () => epoch.close(),
                 finish,
                 teardown: async () => {
                     isStale = epoch.start();
@@ -218,5 +218,29 @@ describe(runSignOut, () => {
 
         expect(isStale?.()).toBe(true);
         expect(finish).toHaveBeenCalledOnce();
+    });
+
+    it("applies nothing from a mint a refresh timer begins while the teardown still runs, until the next sign-in", async () => {
+        const epoch = createAuthEpoch();
+        let staleDuringTeardown: boolean | undefined;
+        let begunDuringTeardown: (() => boolean) | undefined;
+
+        await runSignOut({
+            endMints: () => epoch.close(),
+            finish: () => {},
+            teardown: async () => {
+                // The refresh timer fires after the epoch ended, and its mint answers before the teardown is done.
+                begunDuringTeardown = epoch.start();
+                staleDuringTeardown = begunDuringTeardown();
+                await Promise.resolve();
+            },
+        });
+
+        expect(staleDuringTeardown).toBe(true);
+
+        // The next sign-in reopens the epoch; a mint from the sign-out still applies nothing, a new one applies.
+        epoch.open();
+        expect(begunDuringTeardown?.()).toBe(true);
+        expect(epoch.start()()).toBe(false);
     });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ChatError } from "./chat-api";
-import { holdFor, planSend } from "./start-send";
+import { clientMessageIdFor } from "./start-send";
 import type { SendStage } from "./unsent-send";
 import {
     draftAfterUnsent,
@@ -76,19 +76,19 @@ describe(failedSendMessage, () => {
 describe("a possibly-sent prompt given back ahead of text typed meanwhile", () => {
     const timeout = new ChatError("The gateway did not answer in time.");
 
-    it("lands alone in an empty composer, and the next send retries it under its held id", () => {
-        const { draft, isMerged } = giveBackDraft("", "hello");
-
-        expect(isMerged).toBe(false);
-        expect(planSend({ clientMessageId: "first-id", prompt: "hello" }, draft)).toMatchObject({ heldId: "first-id", prompt: "hello" });
+    it("lands alone in an empty composer, where resending it reuses its id", () => {
+        expect(giveBackDraft("", "hello")).toStrictEqual({ draft: "hello", isMerged: false });
+        expect(clientMessageIdFor({ clientMessageId: "first-id", prompt: "hello" }, "hello", () => "new-id")).toBe("first-id");
         expect(failedSendMessage(timeout, "requested")).toBe(`The gateway did not answer in time. ${MAY_HAVE_BEEN_SENT_NOTICE}`);
     });
 
-    it("is never saved twice: the next send sends it alone under its held id, and keeps what was typed for the one after", () => {
+    it("lands merged otherwise, and the notice no longer promises that sending the box is safe", () => {
         const { draft, isMerged } = giveBackDraft("and more", "hello");
 
         expect(isMerged).toBe(true);
-        expect(planSend(holdFor({ clientMessageId: "first-id", prompt: "hello" }, draft), draft)).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "and more" });
+        // The merged draft is another message: it gets a new id, so the original prompt in it could be saved again.
+        expect(clientMessageIdFor({ clientMessageId: "first-id", prompt: "hello" }, draft, () => "new-id")).toBe("new-id");
         expect(failedSendMessage(timeout, "requested", { isMerged })).toBe(`The gateway did not answer in time. ${MAY_HAVE_BEEN_SENT_MERGED_NOTICE}`);
+        expect(failedSendMessage(timeout, "requested", { isMerged })).not.toContain("will not send it twice");
     });
 });

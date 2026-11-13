@@ -22,20 +22,34 @@ export type SessionEvent = { type: "sign-in-started" | "signed-out" } | { type: 
 
 /**
  * Ends every token mint already out: a sign-in or a sign-out starts a new epoch, and a mint begun in an older one applies
- * nothing (no bearer, no "signed out", no cache wipe) since its grant may be the one being replaced.
+ * nothing (no bearer, no "signed out", no cache wipe) since its grant may be the one being replaced. A sign-out also
+ * closes it (`close`) until the next sign-in (`open`): a mint begun during its teardown (a refresh timer) applies
+ * nothing either, though it began after the epoch ended.
  */
 export const createAuthEpoch = () => {
     let epoch = 0;
+    let isClosed = false;
 
     return {
+        /** A sign-out: ends every mint out, and every one begun until the next sign-in. */
+        close: (): void => {
+            epoch += 1;
+            isClosed = true;
+        },
         end: (): void => {
             epoch += 1;
         },
-        /** Starts a mint; the returned check says whether an epoch has ended since. */
+        /** A sign-in: ends every mint out (those begun while closed included) and lets new ones apply again. */
+        open: (): void => {
+            epoch += 1;
+            isClosed = false;
+        },
+        /** Starts a mint; the returned check says whether an epoch has ended since, or the sign-out it began in still runs. */
         start: (): () => boolean => {
             const startedIn = epoch;
+            const isBegunClosed = isClosed;
 
-            return () => startedIn !== epoch;
+            return () => isBegunClosed || isClosed || startedIn !== epoch;
         },
     };
 };
