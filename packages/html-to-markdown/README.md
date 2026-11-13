@@ -85,10 +85,18 @@ new TurndownService(PASTE_OPTIONS).use(paste).turndown(html);
   as inline math). Any other image is dropped: a pasted picture arrives as a file, if at all.
 - A formula with a TeX annotation is written as inline math; without one, its visible text stays.
 - The forms are the ones people type: `- ` and `1. ` with one space, a plain newline for a line break, fenced code,
-  `#` headings, `*` emphasis and `---` rules.
+  `#` headings, `*` emphasis and `---` rules. A nested item is indented to its parent's text.
+- Items are numbered as HTML numbers them, from the list's `start` or an item's `value`. Markdown numbers only in
+  digits and from 0 up, so a lettered or roman list (`type="a"`, `"i"`) and a number below 0 are written as text after
+  a bullet: `- b. item`, `- -1. item`.
+- Google Docs writes a nested item as an item of the same list with a deeper `aria-level`; Word writes a list as
+  paragraphs with `mso-list` styles and hides the marker. Both are written as nested lists, each depth numbered on its
+  own, and a copy that starts at a nested item starts at the left edge. Word's numbers (up to nine digits) are kept,
+  and a lettered or roman marker is written after a bullet. A list placed straight in a list goes under the item
+  before it.
+- `<b>` or `<strong>` set back to normal weight is not bold: Google Docs wraps a whole copy in one.
 
-The rest of the composer's paste behaviour (Word and Google Docs lists, formatting set by style, code languages)
-follows in the next parts.
+The rest of the composer's paste behaviour (formatting set by style, code languages) follows in the next parts.
 
 ## Status
 
