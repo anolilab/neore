@@ -141,3 +141,21 @@ describe("an element that a rule claims but that prints nothing, between emphasi
         expect(service.turndown("<em>a</em><span>y</span><em>b</em>")).toBe("*a*x*b*");
     });
 });
+
+/*
+ * Each member's walk decides on its own whether the next element joins the run. An element that would not be a run
+ * member itself (here, one holding only an empty link) must not join from its side either, or one delimiter is left
+ * without its partner.
+ */
+
+describe("emphasis beside an element holding only an empty link", () => {
+    it.each([
+        ["the empty link first", "<em><a href=/x></a></em><em>b</em>"],
+        ["the empty link second", "<em>b</em><em><a href=/x></a></em>"],
+    ])("pairs every delimiter with %s", (_name, html) => {
+        const markdown = new TurndownService().turndown(html);
+
+        expect(markdown.split("_").length % 2).toBe(1);
+        expect(markdown).toContain("[](/x)");
+    });
+});

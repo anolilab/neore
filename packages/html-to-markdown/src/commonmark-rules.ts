@@ -643,8 +643,9 @@ function scanRun(
 ): { member: AnnotatedNode } | { run: EmphasisRun } {
     const gap = separation(node, side);
     let sibling = neighbour(node, side);
-    // An element with a block inside it never merges, because the block would end the delimiter.
-    const canMerge = !hasBlockDescendant(node);
+    // An element merges only if it would be a run member itself: the walk from its neighbour applies the same test,
+    // so the two walks agree. That also keeps out an element with a block inside, which would end the delimiter.
+    const canMerge = isRunMember(node, names, options, lookup);
 
     while (sibling && gap !== Infinity) {
         emphasisSteps.count += 1;
