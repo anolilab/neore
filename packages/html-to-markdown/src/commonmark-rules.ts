@@ -3,6 +3,7 @@ import type { AnnotatedNode, Options, Rule, RuleLookup } from "./types";
 import {
     codeText,
     defaultBlankReplacement,
+    defaultElementReplacement,
     edgeBreaks,
     escapeMarkdown,
     hasOnlyBreaks,
@@ -636,7 +637,7 @@ function scanRun(
     lookup: RuleLookup,
 ): { member: AnnotatedNode } | { run: EmphasisRun } {
     const gap = separation(node, side);
-    let sibling = neighbour(node, side);
+    let sibling = neighbourThroughWrappers(node, side, options, lookup);
     // An element merges only if it would be a run member itself: the walk from its neighbour applies the same test,
     // so the two walks agree. That also keeps out an element with a block inside, which would end the delimiter.
     const canMerge = isRunMember(node, names, options, lookup);
@@ -654,6 +655,14 @@ function scanRun(
             return { member };
         }
 
+        const inner = wrapperEntry(sibling, side, options, lookup);
+
+        // A wrapper that prints its content as is is invisible to the run: the walk steps into it.
+        if (inner) {
+            sibling = inner;
+            continue;
+        }
+
         const edgeRun = siblingEdgeRun(sibling, side, options, lookup);
 
         // A sibling that prints nothing (a comment, an empty span) is stepped over in both directions, so the two
@@ -662,7 +671,7 @@ function scanRun(
             return { run: gap > 0 ? { count: 0, wordEdge: false } : edgeRun };
         }
 
-        sibling = neighbour(sibling, side);
+        sibling = neighbourThroughWrappers(sibling, side, options, lookup);
     }
 
     return { run: { count: 0, wordEdge: false } };
@@ -697,7 +706,7 @@ function siblingEdgeRun(sibling: Node, side: Side, options: Options, lookup: Rul
         return { count: 0, wordEdge: true };
     }
 
-    const edge = edgeCharacter(sibling, side, options);
+    const edge = edgeCharacter(sibling, side, options, lookup);
 
     return edge === null ? null : { count: 0, wordEdge: WORD_CHARACTER.test(edge) };
 }
@@ -740,7 +749,7 @@ function isRunMember(node: Node, names: ReadonlySet<string>, options: Options, l
         return false;
     }
 
-    return !hasOnlyBreaks(node) && !hasBlockDescendant(node) && childEdge(node as Element, "left", options) !== null;
+    return !hasOnlyBreaks(node) && !hasBlockDescendant(node) && childEdge(node as Element, "left", options, lookup) !== null;
 }
 
 /**
@@ -964,7 +973,7 @@ function voidEdge(element: Element): string | null {
  * the output ends in markup, a void element that prints markup or a block boundary,
  * and null when the node outputs nothing.
  */
-function edgeCharacter(node: Node, side: Side, options: Options): string | null {
+function edgeCharacter(node: Node, side: Side, options: Options, lookup: RuleLookup): string | null {
     if (node.nodeType === 3) {
         return textEdge(node.nodeValue ?? "", side);
     }
@@ -992,10 +1001,11 @@ function edgeCharacter(node: Node, side: Side, options: Options): string | null 
             return element.textContent ? " " : null;
         }
 
-        return "";
+        // A nested same-kind element whose parent writes the delimiters prints none, so its edge is its text.
+        return isDelimitedByParent(element, options, lookup) ? childEdge(element, side, options, lookup) : "";
     }
 
-    return childEdge(element, side, options);
+    return childEdge(element, side, options, lookup);
 }
 
 /**
@@ -1020,11 +1030,11 @@ function textEdge(text: string, side: Side): string | null {
 }
 
 /** The edge of the first child, from the facing end, that outputs something. */
-function childEdge(element: Element, side: Side, options: Options): string | null {
+function childEdge(element: Element, side: Side, options: Options, lookup: RuleLookup): string | null {
     let child = side === "left" ? element.lastChild : element.firstChild;
 
     while (child) {
-        const edge = edgeCharacter(child, side, options);
+        const edge = edgeCharacter(child, side, options, lookup);
 
         if (edge !== null) {
             return edge;
@@ -1038,6 +1048,67 @@ function childEdge(element: Element, side: Side, options: Options): string | nul
 
 function neighbour(node: Node, side: Side): Node | null {
     return side === "left" ? node.previousSibling : node.nextSibling;
+}
+
+/**
+ * The next node on one side, climbing out of transparent wrappers (see isTransparentWrapper) at their edge. A
+ * wrapper with whitespace at that edge ends the walk: the space keeps the run apart from what follows.
+ */
+function neighbourThroughWrappers(node: Node, side: Side, options: Options, lookup: RuleLookup): Node | null {
+    let current = node;
+    let next = neighbour(current, side);
+
+    while (!next) {
+        const parent = current.parentNode;
+
+        if (!parent || !isTransparentWrapper(parent, options, lookup) || flankOf(annotationOf(parent, options), side) !== "") {
+            return null;
+        }
+
+        current = parent;
+        next = neighbour(current, side);
+    }
+
+    return next;
+}
+
+/** The child a walk steps into when it meets a transparent wrapper with no whitespace on the facing edge, else null. */
+function wrapperEntry(node: Node, side: Side, options: Options, lookup: RuleLookup): Node | null {
+    if (!isTransparentWrapper(node, options, lookup) || flankOf(annotationOf(node, options), opposite(side)) !== "") {
+        return null;
+    }
+
+    return side === "left" ? node.lastChild : node.firstChild;
+}
+
+/**
+ * True for an inline element that prints its content as is: no rule claims it and the default replacement writes
+ * it (a span, or an anchor that renders no link). Its text sits directly beside its neighbours in the output.
+ */
+function isTransparentWrapper(node: Node, options: Options, lookup: RuleLookup): boolean {
+    if (node.nodeType !== 1 || isBlock(node) || isVoid(node) || options.defaultReplacement !== defaultElementReplacement) {
+        return false;
+    }
+
+    const name = node.nodeName.toLowerCase();
+
+    if (DELIMITED_NAMES.has(name) && (name !== "a" || isRenderedLink(node as Element, options))) {
+        return false;
+    }
+
+    return lookup.ruleFor(node) === undefined && !annotationOf(node, options).isBlank;
+}
+
+/** True for an emphasis or strong element nested in a same-kind parent that writes the delimiters for both. */
+function isDelimitedByParent(element: Element, options: Options, lookup: RuleLookup): boolean {
+    const name = element.nodeName.toLowerCase();
+    const names = EMPHASIS_NAMES.has(name) ? EMPHASIS_NAMES : STRONG_NAMES;
+
+    if (!names.has(name) || lookup.ruleFor(element) !== builtinRunRule(names)) {
+        return false;
+    }
+
+    return hasSharingParent(element.parentNode, { intraword: "", names, plain: "" }, options, lookup);
 }
 
 function opposite(side: Side): Side {

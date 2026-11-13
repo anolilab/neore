@@ -45,6 +45,15 @@ export function defaultBlankReplacement(_content: string, node: AnnotatedNode): 
 }
 
 /**
+ * The default replacement for an element no rule claims: its content, between paragraph breaks for a block.
+ * Shared, so the emphasis code can tell an inline element that prints its content as is from one a caller's own
+ * `defaultReplacement` writes.
+ */
+export function defaultElementReplacement(content: string, node: AnnotatedNode): string {
+    return node.isBlock ? `\n\n${content}\n\n` : content;
+}
+
+/**
  * The replacement of a rule added with `remove`. One shared function, so the emphasis code can tell a removed
  * element (which writes nothing) from one a custom rule renders.
  */

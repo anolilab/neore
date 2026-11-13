@@ -147,9 +147,57 @@ function hasEdgeSpace(element: Element): boolean {
     return EDGE_WHITESPACE.test(element.textContent ?? "");
 }
 
+/**
+ * An inline element that no rule claims, so it prints its content as is. The converter's emphasis runs climb out
+ * of it and step into it (`isTransparentWrapper` in src/commonmark-rules.ts), so the neighbour test does too.
+ */
+function isWrapper(node: Node): boolean {
+    return (
+        node.nodeType === 1 &&
+        !isBlock(node) &&
+        !isVoid(node) &&
+        !EMPHASIS_NAMES.has(node.nodeName) &&
+        !NO_WORD_EDGE.has(node.nodeName) &&
+        !BLANK_TEXT.test(node.textContent ?? "")
+    );
+}
+
+/** The nearest non-empty node on one side, looking out of and into wrappers as the converter's runs do. */
+function nearestThroughWrappers(node: Node, side: (typeof SIDES)[number]): Node | null {
+    let current = node;
+    let next = nearest(current, side);
+
+    while (!next) {
+        const parent = current.parentNode;
+
+        if (!parent || !isWrapper(parent)) {
+            return null;
+        }
+
+        current = parent;
+        next = nearest(current, side);
+    }
+
+    while (next && isWrapper(next)) {
+        let child: ChildNode | null = side === "previousSibling" ? next.lastChild : next.firstChild;
+
+        while (child && isEmptyNode(child)) {
+            child = child[side];
+        }
+
+        if (!child) {
+            break;
+        }
+
+        next = child;
+    }
+
+    return next;
+}
+
 function hasChangedNeighbour(element: Element): boolean {
     return SIDES.some((side) => {
-        const next = nearest(element, side);
+        const next = nearestThroughWrappers(element, side);
         // Adjacent emphasis, with at most one break between, merges into one run.
         const afterBreak = next?.nodeName === "BR" ? nearest(next, side) : next;
 
@@ -174,11 +222,11 @@ function isWordNeighbour(sibling: Node | null, side: (typeof SIDES)[number]): bo
     return facing !== undefined && WORD_CHARACTER.test(facing);
 }
 
-// Measured: 1403 of the 1500 documents are compared. A blank block counts as a printing block
+// Measured: 1398 of the 1500 documents are compared (emphasis next to a wrapper is excluded, see isWrapper). A blank block counts as a printing block
 // in the predicate too, so a parent with one keeps its delimiters and is compared like upstream.
 // The floor is that count, so an exclusion that grows (a regression hidden as an intended
 // change) fails the test.
-const MIN_COMPARED = 1403;
+const MIN_COMPARED = 1398;
 
 // Mulberry32: a small seeded PRNG, so a failure reproduces exactly.
 function createRandom(seed: number): () => number {

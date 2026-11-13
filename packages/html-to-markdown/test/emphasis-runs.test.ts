@@ -214,3 +214,35 @@ describe("emphasis around a removed element with whitespace on one side", () => 
         expect(markdown).toBe("_a_ _b_");
     });
 });
+
+/*
+ * An inline wrapper that prints its content as is (a span, an anchor with no link) is invisible to an emphasis run:
+ * the walk climbs out of it at its edge and steps into it from outside, so emphasis inside a wrapper sees the same
+ * neighbours as emphasis without one.
+ */
+
+describe("emphasis inside a wrapper that prints its content as is", () => {
+    it.each([
+        ["a span", "Bru<span><em>ss</em></span>el"],
+        ["an anchor with no link", "Bru<a><em>ss</em></a>el"],
+    ])("uses the intraword delimiter inside %s, as without the wrapper", (_name, html) => {
+        expect(new TurndownService().turndown(html)).toBe("Bru*ss*el");
+    });
+
+    it.each([
+        ["after the wrapper", "<em>a</em><span><em>b</em></span>"],
+        ["before the wrapper", "<span><em>a</em></span><em>b</em>"],
+    ])("joins adjacent emphasis %s into one run", (_name, html) => {
+        expect(new TurndownService().turndown(html)).toBe("_ab_");
+    });
+
+    it("keeps the space at a wrapper's edge as a run boundary", () => {
+        expect(new TurndownService().turndown("x<span> <em>a</em></span>")).toBe("x _a_");
+    });
+});
+
+describe("emphasis beside a nested same-kind element that prints no delimiters", () => {
+    it("reads the nested element's edge from its text", () => {
+        expect(new TurndownService().turndown("<strong><em>a</em><strong>b</strong></strong>")).toBe("***a*b**");
+    });
+});

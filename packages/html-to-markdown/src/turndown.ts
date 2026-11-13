@@ -3,7 +3,15 @@ import annotateNode from "./node";
 import rootNode from "./root-node";
 import Rules from "./rules";
 import type { AnnotatedNode, Options, Rule } from "./types";
-import { defaultBlankReplacement, escapeMarkdown, trimKeepingBreaks, trimLeadingBreaks, trimLeadingNewlines, trimTrailingNewlines } from "./utilities";
+import {
+    defaultBlankReplacement,
+    defaultElementReplacement,
+    escapeMarkdown,
+    trimKeepingBreaks,
+    trimLeadingBreaks,
+    trimLeadingNewlines,
+    trimTrailingNewlines,
+} from "./utilities";
 
 export type TurndownInput = string | Node;
 
@@ -12,9 +20,7 @@ export const DEFAULT_OPTIONS: Options = {
     br: "  ",
     bulletListMarker: "*",
     codeBlockStyle: "indented",
-    defaultReplacement(content, node) {
-        return node.isBlock ? `\n\n${content}\n\n` : content;
-    },
+    defaultReplacement: defaultElementReplacement,
     emDelimiter: "_",
     fence: "```",
     headingStyle: "setext",
