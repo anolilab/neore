@@ -41,9 +41,9 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, fill, url }) 
     const containerRef = useRef<HTMLDivElement>(null);
     // A URL the page may not fetch is refused before any request, as the thumbnail refuses it.
     const origins = useFetchableOrigins();
-    // The shared pdf.js worker, taken after commit: the document renders once it is there.
-    const pdfOptions = useSharedPdfOptions();
     const refused = !isFetchableUrl(url, origins);
+    // The shared pdf.js worker, taken after commit and only for a document that will load: it renders once it is there.
+    const pdfOptions = useSharedPdfOptions(loadState !== "failed" && !refused);
 
     const loadDeadlineRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 

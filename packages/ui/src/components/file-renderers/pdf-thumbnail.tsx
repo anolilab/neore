@@ -65,10 +65,11 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
     // fetch is refused before any request, the way the text previews refuse it.
     const [progress, setProgress] = useState(0);
     const origins = useFetchableOrigins();
-    // The shared pdf.js worker, taken after commit: the document renders once it is there.
-    const pdfOptions = useSharedPdfOptions();
     const refused = !isFetchableUrl(url, origins);
     const unavailable = failed || refused;
+    // The shared pdf.js worker, taken after commit and only while a document will render (not refused or failed, not
+    // already drawn): the document renders once it is there.
+    const pdfOptions = useSharedPdfOptions(!unavailable && !snapshot);
     // Loading ends when the first page has rendered, not when the page count arrives: a page that never renders is failed too.
     const loading = !unavailable && !rendered;
 

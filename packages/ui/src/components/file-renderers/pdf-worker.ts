@@ -35,15 +35,17 @@ const existingPdfOptions = (): { worker: PdfWorker } | undefined => (shared.opti
  * The shared `options` for a `Document`, or `undefined` until this component has committed: starting the worker is a
  * side effect, and a render React throws away (or one that never commits) must not leave a worker running. Render
  * the `Document` only once this is defined; once the worker is up, later components get it on their first render.
+ * `enabled` is whether a `Document` will render now: a refused or failed URL starts no worker, and one that becomes
+ * loadable later starts it then (call this unconditionally, so it can).
  */
-export const useSharedPdfOptions = (): { worker: PdfWorker } | undefined => {
+export const useSharedPdfOptions = (enabled: boolean): { worker: PdfWorker } | undefined => {
     const [options, setOptions] = useState(existingPdfOptions);
 
     useEffect(() => {
-        if (!options) {
+        if (enabled && !options) {
             setOptions(sharedPdfOptions());
         }
-    }, [options]);
+    }, [enabled, options]);
 
     return options;
 };

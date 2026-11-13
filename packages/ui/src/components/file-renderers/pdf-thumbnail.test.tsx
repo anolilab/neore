@@ -193,6 +193,19 @@ describe("the thumbnail's worker and cache", () => {
         });
     };
 
+    /** Marks the shared worker gone (mounting a document first, so there is one), so the next document needs a new one. */
+    const retireSharedWorker = async () => {
+        await render(<PdfThumbnail onOpen={() => {}} url={`${ORIGIN}/worker.pdf?sig=1`} />);
+
+        const [options] = firstPage.documentOptions.slice(-1) as { worker: { destroyed: boolean } }[];
+
+        options!.worker.destroyed = true;
+        act(() => {
+            root.unmount();
+        });
+        root = createRoot(container);
+    };
+
     beforeEach(() => {
         container = document.createElement("div");
         document.body.append(container);
@@ -207,6 +220,9 @@ describe("the thumbnail's worker and cache", () => {
     });
 
     it("has two thumbnails share one pdf.js worker", async () => {
+        // Relative to before: other tests (in any order) may have started the shared worker already.
+        const before = firstPage.workers;
+
         await render(
             <>
                 <PdfThumbnail onOpen={() => {}} url={PDF_URL} />
@@ -218,8 +234,8 @@ describe("the thumbnail's worker and cache", () => {
 
         expect(first?.worker).toBeDefined();
         expect(second?.worker).toBe(first?.worker);
-        // One worker for every document this file has loaded, these two included.
-        expect(firstPage.workers).toBe(1);
+        // At most the one shared worker for both documents.
+        expect(firstPage.workers - before).toBeLessThanOrEqual(1);
     });
 
     it("shows the cached image on a remount, without loading the PDF again", async () => {
@@ -295,16 +311,7 @@ describe("the thumbnail's worker and cache", () => {
     });
 
     it("starts the shared worker after commit, not in a render that is thrown away", async () => {
-        // A worker from earlier tests is marked gone, so the next document needs a new one.
-        await render(<PdfThumbnail onOpen={() => {}} url={`${ORIGIN}/worker.pdf?sig=1`} />);
-
-        const [options] = firstPage.documentOptions.slice(-1) as { worker: { destroyed: boolean } }[];
-
-        options!.worker.destroyed = true;
-        act(() => {
-            root.unmount();
-        });
-        root = createRoot(container);
+        await retireSharedWorker();
 
         const before = firstPage.workers;
 
@@ -323,6 +330,32 @@ describe("the thumbnail's worker and cache", () => {
         });
         root = createRoot(container);
         await render(<PdfThumbnail onOpen={() => {}} url={`${ORIGIN}/mounted.pdf?sig=1`} />);
+
+        expect(firstPage.workers).toBe(before + 1);
+    });
+
+    it("starts no worker for a refused URL, and one once the URL may be fetched", async () => {
+        await retireSharedWorker();
+
+        const elsewhere = "https://elsewhere.example/report.pdf?sig=1";
+        const before = firstPage.workers;
+        const mount = async (origins: ReadonlyArray<string>) => {
+            await act(async () => {
+                root.render(
+                    <FetchableOriginsProvider origins={origins}>
+                        <PdfThumbnail onOpen={() => {}} url={elsewhere} />
+                    </FetchableOriginsProvider>,
+                );
+            });
+        };
+
+        await mount(originsOf(ORIGIN));
+
+        expect(container.querySelector('[role="status"]')).not.toBeNull();
+        expect(firstPage.workers).toBe(before);
+
+        // The same thumbnail, now allowed to fetch that origin.
+        await mount(originsOf(ORIGIN, elsewhere));
 
         expect(firstPage.workers).toBe(before + 1);
     });
