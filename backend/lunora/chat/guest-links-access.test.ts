@@ -62,7 +62,8 @@ const { default: schema } = await import("../schema");
 const guestLinks = await import("./guest-links");
 const { claimRow, GUEST_SEND_LEASE_MS, GUEST_SEND_SCOPE } = await import("../lib/claim-once");
 const { guestTextPart } = await import("./lib/attached-text");
-const { GUEST_MAX_HELD_PER_LINK, GUEST_MESSAGE_MAX_CHARS, hashGuestToken } = await import("./lib/guest-link-store");
+const { GUEST_MAX_HELD_PER_LINK, GUEST_MAX_ROWS_PER_LINK, GUEST_MESSAGE_MAX_CHARS, GUEST_MESSAGE_REMOVAL_PAGE, hashGuestToken } =
+    await import("./lib/guest-link-store");
 
 const OWNER = "user-owner";
 const BROWSER = "fresh-browser-token";
@@ -526,5 +527,20 @@ describe("revoking a link", () => {
         await revoke([unseen.messageId]);
 
         expect(await rows("threadGuestMessages")).toHaveLength(0);
+    });
+
+    it("refuses a revoke that confirms nothing while a note waits", async () => {
+        const { linkToken } = await createLink();
+
+        await hold(linkToken, "waiting");
+        await expect(asOwner().mutation(guestLinks.revokeGuestLink as never, { threadId } as never)).rejects.toMatchObject({
+            data: { code: "GUEST_NOTES_WAITING", waiting: 1 },
+        });
+        expect(await rows("threadGuestMessages")).toHaveLength(1);
+    });
+
+    it("takes a whole link in the revoke's own transaction, so no later removal deletes a note the check never saw", () => {
+        // A link holding more rows than one removal deletes would leave a continuation that a new note could outrun.
+        expect(GUEST_MAX_ROWS_PER_LINK).toBeLessThanOrEqual(GUEST_MESSAGE_REMOVAL_PAGE);
     });
 });
