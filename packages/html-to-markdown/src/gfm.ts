@@ -78,6 +78,7 @@ function nearestAncestor(node: Node, names: ReadonlySet<string>, known: WeakMap<
 }
 
 const TABLE_NAMES = new Set(["TABLE"]);
+const STRIKE_NAMES = new Set(["DEL", "S", "STRIKE"]);
 const cellAncestors = new WeakMap<Node, Element | null>();
 const tableAncestors = new WeakMap<Node, Element | null>();
 
@@ -105,13 +106,25 @@ function ownCells(row: Element, lookup: RuleLookup): Element[] {
     return childElements(row).filter((cell) => CELLS.has(cell.nodeName) && !isRemoved(cell, lookup));
 }
 
-/**
- * The rows of the table itself, read from its children and row groups: a selector would list the rows of every table
- * nested in it too, once per table around them, which grows with the square of the nesting.
- */
-function ownRows(table: Element, lookup: RuleLookup): Row[] {
-    const groups: Element[][] = [];
-    // Rows straight in the table form one group while no row group comes between them.
+/** The row groups of a table, in the order it shows them: its head first and its footer last, wherever they are. */
+interface Sections {
+    body: Element[][];
+    foot: Element[][];
+    head: Element[][];
+}
+
+/** Which section a row group belongs to. */
+function sectionOf(sections: Sections, name: string): Element[][] {
+    if (name === "THEAD") {
+        return sections.head;
+    }
+
+    return name === "TFOOT" ? sections.foot : sections.body;
+}
+
+/** The row groups of the table that a remove filter keeps. Rows straight in the table form one group until a row group. */
+function sectionsOf(table: Element, lookup: RuleLookup): Sections {
+    const sections: Sections = { body: [], foot: [], head: [] };
     let loose: Element[] | undefined;
 
     for (const child of childElements(table)) {
@@ -122,19 +135,28 @@ function ownRows(table: Element, lookup: RuleLookup): Row[] {
         if (child.nodeName === "TR") {
             if (!loose) {
                 loose = [];
-                groups.push(loose);
+                sections.body.push(loose);
             }
 
             loose.push(child);
         } else if (ROW_GROUPS.has(child.nodeName)) {
             loose = undefined;
-            groups.push(childElements(child).filter((row) => row.nodeName === "TR" && !isRemoved(row, lookup)));
+            sectionOf(sections, child.nodeName).push(groupRows(child, lookup));
         }
     }
 
+    return sections;
+}
+
+/**
+ * The rows of the table itself, read from its children and row groups: a selector would list the rows of every table
+ * nested in it too, once per table around them, which grows with the square of the nesting.
+ */
+function ownRows(table: Element, lookup: RuleLookup): Row[] {
+    const { body, foot, head } = sectionsOf(table, lookup);
     const rows: Row[] = [];
 
-    for (const group of groups) {
+    for (const group of [...head, ...body, ...foot]) {
         const groupEnd = rows.length + group.length;
 
         for (const element of group) {
@@ -143,6 +165,11 @@ function ownRows(table: Element, lookup: RuleLookup): Row[] {
     }
 
     return rows;
+}
+
+/** The rows of a row group that a remove filter keeps. */
+function groupRows(group: Element, lookup: RuleLookup): Element[] {
+    return childElements(group).filter((row) => row.nodeName === "TR" && !isRemoved(row, lookup));
 }
 
 /** A span attribute as the DOM clamps it: `colspan` 1 to 1000, `rowspan` 0 to 65534, where 0 spans to the group's end. */
@@ -209,6 +236,39 @@ function grid(rows: ReadonlyArray<Row>, lookup: RuleLookup): { lines: string[][]
     return { lines, width };
 }
 
+const ITEM_SEPARATOR = "; ";
+
+/** True when a list item that a remove filter keeps follows this one. */
+function hasNextItem(item: Element, lookup: RuleLookup): boolean {
+    for (let next = item.nextElementSibling; next; next = next.nextElementSibling) {
+        if (next.nodeName === "LI" && !lookup.isRemoved(next)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/** The text as a code span, its fence longer than any backtick run inside, padded where the text meets a backtick. */
+function inlineCode(text: string): string {
+    if (text === "") {
+        return "";
+    }
+
+    let longest = 0;
+    let run = 0;
+
+    for (const char of text) {
+        run = char === "`" ? run + 1 : 0;
+        longest = Math.max(longest, run);
+    }
+
+    const fence = "`".repeat(longest + 1);
+    const pad = text.startsWith("`") || text.endsWith("`") ? " " : "";
+
+    return `${fence}${pad}${text}${pad}${fence}`;
+}
+
 function captionText(caption: Element): string {
     return cellTexts.get(caption) ?? "";
 }
@@ -217,14 +277,15 @@ function tableReplacement(_content: string, node: AnnotatedNode, _options: Optio
     const rows = ownRows(node, lookup);
 
     // A table in a cell has no room for a grid: it is the text of its cells, inside the cell's line.
+    const caption = childElements(node).find((child) => child.nodeName === "CAPTION" && !isRemoved(child, lookup));
+    const title = caption === undefined ? "" : captionText(caption);
+
     if (cellOf(node)) {
         const texts = rows.flatMap(({ element }) => ownCells(element, lookup).map((cell) => cellTexts.get(cell) ?? ""));
 
-        return ` ${texts.filter((text) => text !== "").join(" ")} `;
+        return ` ${[title, ...texts].filter((text) => text !== "").join(" ")} `;
     }
 
-    const caption = childElements(node).find((child) => child.nodeName === "CAPTION" && !isRemoved(child, lookup));
-    const title = caption === undefined ? "" : captionText(caption);
     const before = title === "" ? "\n\n" : `\n\n${title}\n\n`;
     const laidOut = grid(rows, lookup);
 
@@ -245,7 +306,10 @@ function tableReplacement(_content: string, node: AnnotatedNode, _options: Optio
         return before;
     }
 
-    const line = (cells: ReadonlyArray<string>): string => `| ${Array.from({ length: width }, (_unused, index) => cells[index] ?? "").join(" | ")} |`;
+    // GFM splits a row on every unescaped pipe, code spans included, so every pipe is escaped, once, here: a nested
+    // table's text is kept unescaped until the outer table writes it.
+    const line = (cells: ReadonlyArray<string>): string =>
+        `| ${Array.from({ length: width }, (_unused, index) => (cells[index] ?? "").replaceAll(PIPE, String.raw`\|`)).join(" | ")} |`;
     const [head = [], ...body] = lines;
 
     return `${before}${[line(head), `|${" --- |".repeat(width)}`, ...body.map((cells) => line(cells))].join("\n")}\n\n`;
@@ -255,6 +319,12 @@ const tableRules: Record<string, Rule> = {
     blockInCell: {
         filter: (node, _options, lookup) => BLOCKS_IN_CELL.has(node.nodeName) && cellOf(node) !== null && !lookup.isRemoved(node),
         replacement: (content) => ` ${oneLine(content)} `,
+    },
+
+    // A code block has no place on a table row either: it is inline code, its lines joined by spaces.
+    codeBlockInCell: {
+        filter: (node, _options, lookup) => node.nodeName === "PRE" && cellOf(node) !== null && !lookup.isRemoved(node),
+        replacement: (_content, node) => ` ${inlineCode(oneLine(node.textContent ?? ""))} `,
     },
 
     headingInCell: {
@@ -268,17 +338,27 @@ const tableRules: Record<string, Rule> = {
 
     // Blocks have no place on a table row. Inside a cell a list is its items joined by `; `, a heading is strong text,
     // and a paragraph or a quote is its text.
+    // A list nested in an item is a list of more items, so it is kept apart from the item's own text by the separator.
     listInCell: {
         filter: (node, _options, lookup) => LISTS.has(node.nodeName) && cellOf(node) !== null && !lookup.isRemoved(node),
-        replacement: (content) => ` ${content.trim()} `,
+        replacement(content, node) {
+            const items = content.trim();
+
+            if (node.parentNode?.nodeName === "LI") {
+                return `${ITEM_SEPARATOR}${items} `;
+            }
+
+            return ` ${items} `;
+        },
     },
 
     listItemInCell: {
         filter: (node, _options, lookup) => node.nodeName === "LI" && cellOf(node) !== null && !lookup.isRemoved(node),
-        replacement(content, node) {
-            const hasNextItem = Boolean(node.nextElementSibling && node.nextElementSibling.nodeName === "LI");
+        replacement(content, node, _options, lookup) {
+            const text = oneLine(content);
+            const own = text.startsWith(ITEM_SEPARATOR.trim()) ? text.slice(ITEM_SEPARATOR.trim().length).trim() : text;
 
-            return `${oneLine(content)}${hasNextItem ? "; " : ""}`;
+            return `${own}${hasNextItem(node, lookup) ? ITEM_SEPARATOR : ""}`;
         },
     },
 
@@ -297,12 +377,11 @@ const tableRules: Record<string, Rule> = {
         },
     },
 
-    // A cell keeps its text for the table rule. GFM splits a row on every unescaped pipe, code spans included, so every
-    // pipe is escaped.
+    // A cell keeps its text for the table rule, which escapes its pipes when it writes the row.
     tableCell: {
         filter: (node, _options, lookup) => CELLS.has(node.nodeName) && tableOf(node) !== null && !lookup.isRemoved(node),
         replacement(content, node) {
-            cellTexts.set(node, oneLine(content).replaceAll(PIPE, String.raw`\|`));
+            cellTexts.set(node, oneLine(content));
 
             return "";
         },
@@ -320,12 +399,88 @@ const tableRules: Record<string, Rule> = {
     },
 };
 
-const STRIKE_NAMES = new Set(["DEL", "S", "STRIKE"]);
+const strikeAncestors = new WeakMap<Node, Element | null>();
+
+/**
+ * Literal tilde runs of two or more escaped, outside code spans: inside struck text they would end the strike. A single
+ * tilde is left as it is, as in `~/path`.
+ */
+function escapeTildeRuns(markdown: string): string {
+    let result = "";
+    let index = 0;
+
+    while (index < markdown.length) {
+        const [text, end] = escapedToken(markdown, index);
+
+        result += text;
+        index = end;
+    }
+
+    return result;
+}
+
+/** The token that starts at `index`, as written, and where it ends: an escape, a code span, a tilde run or a character. */
+function escapedToken(markdown: string, index: number): [text: string, end: number] {
+    const char = markdown.charAt(index);
+
+    if (char === "\\") {
+        return [markdown.slice(index, index + 2), index + 2];
+    }
+
+    if (char === "`") {
+        const fenceEnd = runEnd(markdown, index, "`");
+        const close = closingFence(markdown, fenceEnd, fenceEnd - index);
+        const end = close === -1 ? fenceEnd : close;
+
+        return [markdown.slice(index, end), end];
+    }
+
+    if (char === "~") {
+        const end = runEnd(markdown, index, "~");
+
+        return [end - index >= 2 ? String.raw`\~`.repeat(end - index) : "~", end];
+    }
+
+    return [char, index + 1];
+}
+
+/** Where the run of `char` that starts at `start` ends. */
+function runEnd(text: string, start: number, char: string): number {
+    let end = start;
+
+    while (text.charAt(end) === char) {
+        end += 1;
+    }
+
+    return end;
+}
+
+/** The end of the backtick run of exactly `length` that closes a code span opened before `from`, or -1. */
+function closingFence(text: string, from: number, length: number): number {
+    let index = text.indexOf("`", from);
+
+    while (index !== -1) {
+        const end = runEnd(text, index, "`");
+
+        if (end - index === length) {
+            return end;
+        }
+
+        index = text.indexOf("`", end);
+    }
+
+    return -1;
+}
 
 const strikethrough: Rule = {
     filter: (node, _options, lookup) => STRIKE_NAMES.has(node.nodeName) && !lookup.isRemoved(node),
-    replacement(content) {
-        return content.trim() === "" ? content : `~~${content}~~`;
+    replacement(content, node) {
+        // A strike inside a strike is struck already: the outer element writes the one pair of tildes.
+        if (nearestAncestor(node, STRIKE_NAMES, strikeAncestors)) {
+            return content;
+        }
+
+        return content.trim() === "" ? content : `~~${escapeTildeRuns(content)}~~`;
     },
 };
 

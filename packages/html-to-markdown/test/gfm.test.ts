@@ -131,3 +131,53 @@ describe("gfm span attributes", () => {
         expect(convert(`<table><tr><th colspan="2abc">a</th></tr><tr><td>1</td><td>2</td></tr></table>`)).toBe("| a |  |\n| --- | --- |\n| 1 | 2 |");
     });
 });
+
+describe("gfm review cases", () => {
+    it("escapes a pipe from a nested table's cell once, so it stays inside the outer cell", () => {
+        expect(convert("<table><tr><th>A</th></tr><tr><td><table><tr><td>a|b</td></tr></table></td></tr></table>")).toBe(
+            String.raw`| A |
+| --- |
+| a\|b |`,
+        );
+    });
+
+    it("writes no separator after the last list item a remove filter keeps", () => {
+        const service = new TurndownService().use(gfm);
+
+        service.remove((node) => node.getAttribute("class") === "gone");
+
+        expect(service.turndown(`<table><tr><th>A</th></tr><tr><td><ul><li>a</li><li class="gone">b</li></ul></td></tr></table>`)).toBe(
+            "| A |\n| --- |\n| a |",
+        );
+    });
+
+    it("writes a code block in a cell as inline code, on one line", () => {
+        expect(convert("<table><tr><th>A</th></tr><tr><td><pre><code>x *y*\nz</code></pre></td></tr></table>")).toBe("| A |\n| --- |\n| `x *y* z` |");
+    });
+
+    it("keeps a nested table's caption with its cells' text", () => {
+        expect(convert("<table><tr><th>A</th></tr><tr><td><table><caption>Cap</caption><tr><td>x</td></tr></table></td></tr></table>")).toBe(
+            "| A |\n| --- |\n| Cap x |",
+        );
+    });
+
+    it("keeps a nested list's items apart from the item that holds them", () => {
+        expect(convert("<table><tr><th>A</th></tr><tr><td><ul><li>outer<ul><li>inner</li></ul></li><li>next</li></ul></td></tr></table>")).toBe(
+            "| A |\n| --- |\n| outer; inner; next |",
+        );
+    });
+
+    it("writes the head, then the body, then the footer, whatever their order in the source", () => {
+        expect(convert("<table><tfoot><tr><td>f</td></tr></tfoot><tbody><tr><td>b</td></tr></tbody><thead><tr><th>h</th></tr></thead></table>")).toBe(
+            "| h |\n| --- |\n| b |\n| f |",
+        );
+    });
+
+    it("escapes literal tildes inside struck text, but not in its code", () => {
+        expect(convert("<p><s>a ~~b~~ c <code>~~</code></s></p>")).toBe(String.raw`~~a \~\~b\~\~ c ${"`"}~~${"`"}~~`);
+    });
+
+    it("writes one pair of tildes for a strike nested in a strike", () => {
+        expect(convert("<p><s>a<del>b</del></s></p>")).toBe("~~ab~~");
+    });
+});
