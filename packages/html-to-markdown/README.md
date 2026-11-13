@@ -76,8 +76,11 @@ new TurndownService(PASTE_OPTIONS).use(paste).turndown(html);
 
 - It uses the `gfm` plugin, and `PASTE_OPTIONS` turns `safeLinks` on.
 - What the page does not show is left out: an element with `hidden`, `aria-hidden="true"`, an `sr-only` or
-  `visually-hidden` class, or a style whose last `display` is `none` or `visibility` is `hidden` (an earlier
-  `!important` declaration wins). So are scripts, styles, media, form controls, embedded documents and `<svg>`.
+  `visually-hidden` class, or a style whose last valid `display` is `none`, `visibility` is `hidden` or `collapse`, or
+  `content-visibility` is `hidden` (an earlier `!important` declaration wins, and comments are skipped). A closed
+  `<details>` is written as its summary alone, and a `<dialog>` that is not open is left out. So are scripts, styles, media, buttons, selects, text areas, embedded documents and
+  `<svg>`. A checkbox is a task box (`[x] ` or `[ ] `), from the `gfm` rules. The checks apply to the elements inside
+  what is converted, as all rules do: pass the HTML as a string, or a container, not a hidden element itself.
 - An image is written as text only when it draws an emoji (its alt text) or a formula (an image with a `math` class,
   as inline math). Any other image is dropped: a pasted picture arrives as a file, if at all.
 - A formula with a TeX annotation is written as inline math; without one, its visible text stays.
