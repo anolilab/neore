@@ -252,8 +252,10 @@ export const sweepUsageExportPieces = internalMutation
     .input({})
     .output(v.null())
     .mutation(async ({ ctx }) => {
+        // Primary, like every read here that decides a deletion: a stale row could show a run unkeyed after its key was stored.
         const dueAt = (cursor: string | null) =>
             ctx.db.usageExportRuns.findMany({
+                consistency: "primary",
                 cursor,
                 limit: EXPORT_PIECE_BATCH,
                 orderBy: [{ deleteAt: "asc" }],
