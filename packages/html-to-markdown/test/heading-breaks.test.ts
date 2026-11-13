@@ -137,3 +137,23 @@ describe("a heading whose breaks a custom rule renders", () => {
         expect(service.turndown("<h1><br>a</h1>")).toBe("# \na");
     });
 });
+
+/*
+ * Untrusted HTML can hold private-use text built to contain every candidate break mark: the candidates step through
+ * the area by a fixed amount, so one run of about 6,400 characters in that progression holds them all. The search
+ * must stop after a bounded number of candidates and fall back to a mark that is absent by construction.
+ */
+
+describe("a heading crafted to contain every candidate break mark", () => {
+    it("still converts, and keeps its text", () => {
+        let crafted = "";
+
+        for (let index = 0; index < 6408; index += 1) {
+            crafted += String.fromCodePoint(FIRST_PRIVATE_USE + ((index * 2329) % 6400));
+        }
+
+        const markdown = new TurndownService({ headingStyle: "atx" }).turndown(`<h1>${crafted}<br>b</h1>`);
+
+        expect(markdown).toBe(`# ${crafted} b`);
+    });
+});

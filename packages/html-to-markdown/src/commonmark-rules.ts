@@ -822,6 +822,9 @@ function breakMarkFor(node: Node, lookup: RuleLookup): string | undefined {
 // The Unicode private-use area, U+E000 to U+F8FF, written as escapes so no editor can strip the characters.
 const PRIVATE_USE_START = "\u{E000}".codePointAt(0) ?? 0;
 const PRIVATE_USE_END = "\u{F8FF}".codePointAt(0) ?? 0;
+// A break mark is this many private-use characters, and at most this many candidates are tried.
+const MARK_LENGTH = 8;
+const MARK_CANDIDATES = 16;
 
 /**
  * A mark that the heading's markup does not contain. A break in the heading is written as this mark, so text of
@@ -830,18 +833,35 @@ const PRIVATE_USE_END = "\u{F8FF}".codePointAt(0) ?? 0;
  */
 function headingBreakMark(heading: Node): string {
     const markup = (heading as Element).outerHTML ?? "";
-    let candidate = 0;
-    let mark = markCandidate(candidate);
 
-    while (markup.includes(mark)) {
-        candidate += 1;
-        mark = markCandidate(candidate);
+    // Untrusted markup can hold every candidate (they share one step), so only a bounded number are tried.
+    for (let candidate = 0; candidate < MARK_CANDIDATES; candidate += 1) {
+        const mark = markCandidate(candidate);
+
+        if (!markup.includes(mark)) {
+            return mark;
+        }
     }
 
-    return mark;
+    return repeatedMark(markup);
 }
 
-const MARK_LENGTH = 8;
+/**
+ * A mark absent from the markup by construction: the first private-use character, repeated once more than its
+ * longest run in the markup and never shorter than a candidate. One pass over the markup, so it always ends.
+ */
+function repeatedMark(markup: string): string {
+    const first = String.fromCodePoint(PRIVATE_USE_START);
+    let longest = 0;
+    let current = 0;
+
+    for (const character of markup) {
+        current = character === first ? current + 1 : 0;
+        longest = Math.max(longest, current);
+    }
+
+    return first.repeat(Math.max(MARK_LENGTH, longest + 1));
+}
 
 /**
  * The candidate mark with the given number: a run of private-use characters spread across the area by two large
