@@ -437,7 +437,6 @@ describe("a long thread", () => {
         harness.actions = { copyMessage: () => {}, reloadMessage: () => {} };
     });
 
-    /* eslint-disable testing-library/no-node-access -- the assertions are about which elements the stylesheet reaches */
     it("keeps every message mounted, each a row directly in the list, where off-screen rows skip layout and paint", () => {
         mountInto();
 
@@ -458,7 +457,6 @@ describe("a long thread", () => {
         expect(placeholder.closest("[data-list-message-id]")).toBeNull();
         expect(screen.getAllByRole("listitem").at(-1)?.contains(placeholder)).toBe(true);
     });
-    /* eslint-enable testing-library/no-node-access */
 
     describe("a jump", () => {
         /** Calls of `scrollIntoView` per row, and the tops a row reports, frame after frame. */
@@ -471,25 +469,39 @@ describe("a long thread", () => {
             scrolls.clear();
             tops.clear();
             onScroll = () => {};
-            Element.prototype.scrollIntoView = vi.fn(function scrollIntoView(this: Element) {
-                const id = (this as HTMLElement).dataset.listMessageId ?? "";
-
-                scrolls.set(id, (scrolls.get(id) ?? 0) + 1);
-                onScroll(id);
-            });
-            vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function getBoundingClientRect(this: Element) {
-                const id = (this as HTMLElement).dataset.listMessageId ?? "";
-                const queue = tops.get(id) ?? [];
-                const top = queue.length > 1 ? queue.shift()! : (queue[0] ?? 0);
-
-                return { bottom: top + 100, height: 100, left: 0, right: 0, top, width: 0, x: 0, y: top, toJSON: () => ({}) } as DOMRect;
-            });
         });
+
+        /** Gives every mounted row a scroll that is counted and a top that follows `tops`, frame after frame. */
+        const stubRows = (): void => {
+            for (const row of document.querySelectorAll<HTMLElement>("[data-list-message-id]")) {
+                const id = row.dataset.listMessageId ?? "";
+
+                Object.defineProperties(row, {
+                    getBoundingClientRect: {
+                        configurable: true,
+                        value: () => {
+                            const queue = tops.get(id) ?? [];
+                            const top = queue.length > 1 ? queue.shift()! : (queue[0] ?? 0);
+
+                            return { bottom: top + 100, height: 100, left: 0, right: 0, top, width: 0, x: 0, y: top } as DOMRect;
+                        },
+                    },
+                    scrollIntoView: {
+                        configurable: true,
+                        value: () => {
+                            scrolls.set(id, (scrolls.get(id) ?? 0) + 1);
+                            onScroll(id);
+                        },
+                    },
+                });
+            }
+        };
 
         it("re-centres its row until rows above it stop pushing it", async () => {
             // Rows above render at their real height as they come into view: the row moves twice, then stays.
             tops.set("m100", [500, 300, 300]);
             mountInto();
+            stubRows();
 
             act(() => scrollToMessage("m100"));
 
@@ -505,6 +517,7 @@ describe("a long thread", () => {
             // A row that never settles would be re-centred for every frame of the budget.
             tops.set("m100", [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100]);
             mountInto();
+            stubRows();
 
             // The newer jump is asked for right after the older one first scrolls its row.
             onScroll = (id) => {

@@ -162,7 +162,7 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
         // Re-centre until the row stops moving (rows above it render at their real height as they come into view).
         let framesLeft = JUMP_SETTLE_FRAMES;
-        let previousTop = Number.NaN;
+        let previousTop = NaN;
         const settle = () => {
             if (jumpGenerationRef.current !== generation || !element.isConnected) {
                 return;

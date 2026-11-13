@@ -311,13 +311,13 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
             }
         };
         // The viewport has no single content element: its children come and go (the breadcrumb, the empty state).
-        const children = new MutationObserver(observeChildren);
+        const childList = new MutationObserver(observeChildren);
 
         observeChildren();
-        children.observe(viewport, { childList: true });
+        childList.observe(viewport, { childList: true });
 
         return () => {
-            children.disconnect();
+            childList.disconnect();
             resizes.disconnect();
         };
     }, [pinToBottom]);

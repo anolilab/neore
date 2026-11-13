@@ -1,3 +1,5 @@
+/* eslint-disable testing-library/no-node-access -- the test plays the browser: it sets the scroller's geometry by hand */
+
 /**
  * Stick to the bottom while message rows settle. Rows off screen skip layout (`content-visibility` in styles.css) and
  * are counted at an estimated height until they render, so the content keeps growing after the thread opens. jsdom has
