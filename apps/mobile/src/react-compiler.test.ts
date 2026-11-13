@@ -2,7 +2,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { transformSync } from "@babel/core";
+import type { ParserOptions, types } from "@babel/core";
+import { parseSync, transformSync } from "@babel/core";
 import reactCompiler from "babel-plugin-react-compiler";
 import { describe, expect, it } from "vitest";
 
@@ -17,11 +18,12 @@ const SOURCE_FILE = /\.tsx?$/u;
 const NOT_COMPILED = /\.(?:test|d)\.tsx?$/u;
 
 /**
- * Hooks the compiler still skips, each with its reason. A new bail-out fails the test, and so does one that is fixed
- * and still listed here. The voice hooks write and pass refs while rendering (`callbacks.current`, the session made in
- * a `useState` initializer).
+ * Hooks the compiler still skips, as `file#name`, by the top-level declaration that holds them: an edit that moves them
+ * down the file does not change the list. A new bail-out fails the test, and so does one that is fixed and still listed
+ * here. The voice hooks write and pass refs while rendering (`callbacks.current`, the session made in a `useState`
+ * initializer).
  */
-const KNOWN_BAILOUTS = ["src/voice/use-dictation.ts:32", "src/voice/use-dictation.ts:83", "src/voice/use-voice-input.ts:125"];
+const KNOWN_BAILOUTS = ["src/voice/use-dictation.ts#useDictation", "src/voice/use-dictation.ts#useOnDeviceVoiceInput", "src/voice/use-voice-input.ts#useVoiceInput"];
 
 const sourceFiles = (directory: string): string[] =>
     readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -42,7 +44,7 @@ interface CompileEvent {
 }
 
 interface CompileResult {
-    /** `file:line` of each function the compiler skipped, with its reason. */
+    /** `file#name` of each top-level declaration whose function the compiler skipped, with its reason. */
     bailouts: Map<string, string>;
     compiled: string[];
 }
@@ -57,26 +59,51 @@ const reasonOf = (event: CompileEvent): string => {
     return detail?.options?.reason ?? detail?.reason ?? event.kind;
 };
 
+/** The name a top-level statement declares: a function, a `const` holding one, or `default` for an anonymous export. */
+const declaredName = (statement: types.Statement): string | undefined => {
+    const declaration = statement.type === "ExportNamedDeclaration" || statement.type === "ExportDefaultDeclaration" ? statement.declaration : statement;
+
+    if (declaration?.type === "FunctionDeclaration") {
+        return declaration.id?.name ?? "default";
+    }
+
+    if (declaration?.type === "VariableDeclaration") {
+        const [first] = declaration.declarations;
+
+        return first?.id.type === "Identifier" ? first.id.name : undefined;
+    }
+
+    return statement.type === "ExportDefaultDeclaration" ? "default" : undefined;
+};
+
+/** The top-level declaration that holds `line`: the component or hook a reported location belongs to. */
+const enclosingName = (statements: ReadonlyArray<types.Statement>, line: number | undefined): string => {
+    const holder = statements.find((statement) => line !== undefined && statement.loc !== null && statement.loc !== undefined && statement.loc.start.line <= line && line <= statement.loc.end.line);
+
+    return (holder && declaredName(holder)) ?? `line ${line ?? "?"}`;
+};
+
 const compile = (file: string): CompileResult => {
     const result: CompileResult = { bailouts: new Map(), compiled: [] };
+    const source = readFileSync(file, "utf8");
+    const options = {
+        babelrc: false,
+        configFile: false,
+        filename: file,
+        parserOpts: { plugins: file.endsWith(".tsx") ? ["typescript", "jsx"] : ["typescript"] } satisfies ParserOptions,
+    };
+    const statements = parseSync(source, options)?.program.body ?? [];
     const logger = {
         logEvent: (_filename: string | null, event: CompileEvent) => {
             if (event.kind === "CompileSuccess") {
                 result.compiled.push(event.fnName ?? "<anonymous>");
             } else if (event.kind === "CompileError" || event.kind === "PipelineError") {
-                result.bailouts.set(`${relative(appRoot, file)}:${event.fnLoc?.start.line ?? "?"}`, reasonOf(event));
+                result.bailouts.set(`${relative(appRoot, file)}#${enclosingName(statements, event.fnLoc?.start.line)}`, reasonOf(event));
             }
         },
     };
 
-    transformSync(readFileSync(file, "utf8"), {
-        babelrc: false,
-        code: false,
-        configFile: false,
-        filename: file,
-        parserOpts: { plugins: file.endsWith(".tsx") ? ["typescript", "jsx"] : ["typescript"] },
-        plugins: [[reactCompiler, { logger, panicThreshold: "none", target: "19" }]],
-    });
+    transformSync(source, { ...options, code: false, plugins: [[reactCompiler, { logger, panicThreshold: "none", target: "19" }]] });
 
     return result;
 };
