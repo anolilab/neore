@@ -126,6 +126,19 @@ describe("an element that a rule claims but that prints nothing, between emphasi
         expect(service.turndown("<em>a</em><span>x</span><em>b</em>")).toBe(plain);
     });
 
+    // An emphasis element whose only content is removed prints nothing, so it writes no delimiter and is no run member.
+    it.each([
+        ["after", "<em>a</em><em><span>b</span></em>", "_a_"],
+        ["before", "<em><span>b</span></em><em>a</em>", "_a_"],
+        ["after, with whitespace", "<strong>a</strong><b><span> b</span></b>", "**a**"],
+    ])("closes the run when the emphasis %s it holds only a removed element", (_name, html, expected) => {
+        const service = new TurndownService();
+
+        service.remove("span");
+
+        expect(service.turndown(html).trim()).toBe(expected);
+    });
+
     // A caller's blankReplacement can print text for a blank element, so its output is not known from the DOM.
     it("splits the run at a blank element when a custom blankReplacement prints text", () => {
         const service = new TurndownService({ blankReplacement: () => "X" });

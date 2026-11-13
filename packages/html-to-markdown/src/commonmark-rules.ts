@@ -1011,6 +1011,11 @@ function edgeCharacter(node: Node, side: Side, options: Options, lookup: RuleLoo
         return null;
     }
 
+    // A removed element prints none of its text, so an element holding only that prints nothing and is no run member.
+    if (lookup.ruleFor(node)?.replacement === removeReplacement) {
+        return null;
+    }
+
     const element = node as Element;
     const annotated = annotationOf(element, options);
 
