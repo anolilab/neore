@@ -1102,6 +1102,57 @@ describe("useFeatureFlagsKnown on the client this module loads", () => {
 });
 
 describe("useFeatureFlagEnabled", () => {
+    it("answers off once started when the flags never arrive within the wait, and follows them if they come later", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+        const listeners: (() => void)[] = [];
+
+        posthog.onFeatureFlags.mockImplementation((callback: () => void) => {
+            listeners.push(callback);
+
+            return () => {};
+        });
+
+        try {
+            const client = await loadClientModule();
+            const loaded = await client.loadPostHog();
+            const isEnabled = vi.fn(() => true);
+
+            Object.assign(loaded, { isFeatureEnabled: isEnabled });
+
+            const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: loaded }, children);
+            const { result } = renderHook(() => client.useFeatureFlagEnabled("code-mode"), { wrapper });
+
+            act(() => {
+                client.setAnalyticsIdentity({ user: { id: "user-1" } });
+                client.startPostHog(loaded, () => {});
+            });
+
+            expect(result.current).toBeUndefined();
+
+            act(() => {
+                vi.advanceTimersByTime(client.FLAGS_WAIT_MS);
+            });
+
+            expect(result.current).toBe(false);
+
+            act(() => {
+                for (const listener of listeners) {
+                    listener();
+                }
+            });
+
+            expect(result.current).toBe(true);
+        } finally {
+            posthog.onFeatureFlags.mockImplementation((callback: () => void) => {
+                callback();
+
+                return () => {};
+            });
+            vi.useRealTimers();
+        }
+    });
+
     it("is pending while PostHog loads, and answers from the server-rendered flags once it will not start", async () => {
         const client = await loadClientModule();
         const wrapper = ({ children }: { children: ReactNode }) => createElement(client.PostHogClientContext, { value: undefined }, children);

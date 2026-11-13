@@ -100,6 +100,32 @@ describe(ErrorBoundary, () => {
         expect(captureException).toHaveBeenCalledExactlyOnceWith(frozenError, { errorBoundary: "route" });
     });
 
+    it("hands a reporting onError the error with React's component stack as its cause", () => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        captureException.mockClear();
+
+        const thrown = new Error("route crashed");
+        const RouteThrower = (): never => {
+            throw thrown;
+        };
+        const onError = vi.fn((error: Error) => {
+            captureException(error, { errorBoundary: "route" });
+        });
+
+        render(
+            <ErrorBoundary fallback={(error: Error) => <p>{`Recovered: ${error.message}`}</p>} isReportedByOnError onError={onError} showToast={false}>
+                <RouteThrower />
+            </ErrorBoundary>,
+        );
+
+        const [reported] = captureException.mock.calls[0] ?? [];
+
+        expect(reported).toBe(thrown);
+        expect(thrown.cause).toBeInstanceOf(Error);
+        expect((thrown.cause as Error).name).toBe("React ErrorBoundary Error");
+        expect((thrown.cause as Error).stack).toContain("RouteThrower");
+    });
+
     it("still renders its fallback, and warns, when reporting the error throws", () => {
         vi.spyOn(console, "error").mockImplementation(() => {});
         const warn = vi.spyOn(console, "warn").mockImplementation(() => {});

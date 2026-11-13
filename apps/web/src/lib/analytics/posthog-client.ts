@@ -949,6 +949,18 @@ export const useFeatureFlagEnabled = (flag: string): boolean | undefined => {
     // A client whose flags have not arrived reads every flag as off: that is not an answer yet, so it stays pending.
     const read = useCallback(() => (posthog && hasFlagsOf(posthog) ? posthog.isFeatureEnabled(flag) : undefined), [posthog, flag]);
     const enabled = useSyncExternalStore(subscribe, read, notLoaded);
+    const started = useStartedPostHog();
+    const isFlagsWaitOver = useSyncExternalStore(subscribeStarted, readFlagsWaitOver, notKnown);
 
-    return posthog === undefined && fallsBack ? readBootstrapFlag(flag) : enabled;
+    if (posthog === undefined) {
+        return fallsBack ? readBootstrapFlag(flag) : enabled;
+    }
+
+    // Started, and its flags did not come within `FLAGS_WAIT_MS`: the server-rendered flag answers (else off), so what
+    // is gated shows instead of staying blank. Flags that arrive later still take over.
+    if (enabled === undefined && posthog === getPostHog() && started === posthog && isFlagsWaitOver) {
+        return readBootstrapFlag(flag);
+    }
+
+    return enabled;
 };

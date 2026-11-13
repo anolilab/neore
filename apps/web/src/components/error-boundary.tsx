@@ -90,17 +90,18 @@ const withComponentStack = (error: unknown, componentStack: string): unknown => 
     return error;
 };
 
-/** Reports a caught render error; a failure here must never keep the boundary from rendering its fallback. */
-const captureRenderError = (error: unknown, componentStack: string): void => {
-    // The component stack is best-effort: an error whose cause chain cannot be read or changed is reported as it is.
-    let reported: unknown = error;
-
+/** The error to report, with the component stack as its cause where it can be attached; else the error as thrown. */
+const toReportedError = (error: unknown, componentStack: string): unknown => {
     try {
-        reported = withComponentStack(error, componentStack);
+        return withComponentStack(error, componentStack);
     } catch {
         // A throwing `cause` accessor, say: the original error still goes.
+        return error;
     }
+};
 
+/** Reports a caught render error; a failure here must never keep the boundary from rendering its fallback. */
+const captureRenderError = (reported: unknown): void => {
     try {
         captureException(reported);
     } catch (reportError) {
@@ -119,7 +120,8 @@ class PostHogCapturingBoundary extends React.Component<
         children: ReactNode;
         fallback: (captured: CapturedError) => ReactNode;
         isReportedByOnCaught?: boolean;
-        onCaught?: (captured: CapturedError) => void;
+        /** `reported` is the error with its component stack attached, for an `onCaught` that sends the report itself. */
+        onCaught?: (captured: CapturedError & { reported: unknown }) => void;
     },
     { captured: CapturedError | null }
 > {
@@ -136,11 +138,14 @@ class PostHogCapturingBoundary extends React.Component<
 
         const { isReportedByOnCaught, onCaught } = this.props;
 
+        // Attached either way: a handler that reports keeps the cause PostHog groups by.
+        const reported = toReportedError(error, componentStack);
+
         if (!isReportedByOnCaught) {
-            captureRenderError(error, componentStack);
+            captureRenderError(reported);
         }
 
-        onCaught?.({ componentStack, error });
+        onCaught?.({ componentStack, error, reported });
     }
 
     public override render(): ReactNode {
@@ -158,10 +163,11 @@ export const ErrorBoundary = ({ children, fallback, isReportedByOnError, onError
     const toError = (error: unknown): Error => (error instanceof Error ? error : new Error(String(error)));
 
     // Once per caught error (`componentDidCatch`), never on a render of the fallback.
-    const handleCaught = ({ componentStack, error }: CapturedError) => {
+    const handleCaught = ({ componentStack, error, reported }: CapturedError & { reported: unknown }) => {
         const errorObject = toError(error);
 
-        onError?.(errorObject, { componentStack });
+        // A handler that reports gets the error with its component stack attached; the toast shows the error as thrown.
+        onError?.(isReportedByOnError ? toError(reported) : errorObject, { componentStack });
 
         if (showToast !== false) {
             showError(errorObject);
