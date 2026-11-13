@@ -6,7 +6,6 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { dispatchDueShards } from "../lib/shard-housekeeping";
-import { backfillUsageExportRunDeleteAt } from "../migrations";
 import schema from "../schema";
 import {
     clearUsageExportPieces,
@@ -371,32 +370,6 @@ describe("a retried erasure", () => {
 });
 
 describe("the sweep and the clear", () => {
-    it("sweeps a run stored without a due time once the backfill has given it one, at a time a time to live after its creation", async () => {
-        const t0 = Date.now();
-        const up = backfillUsageExportRunDeleteAt.up as (document: Record<string, unknown>) => Record<string, unknown> | undefined;
-
-        await harness.run(async (ctx: any) => {
-            const dead = await ctx.db.insert("gdprRequests", {
-                requestedAt: 1,
-                requestType: "export",
-                status: "failed",
-                userEmail: "a@example.com",
-                userId: A,
-            });
-            const legacy = up({ _id: "legacy", createdAt: t0, requestId: `${dead}:1`, userId: A });
-
-            await ctx.db.insert("usageExportRuns", legacy);
-            await ctx.db.insert("usageExportPieces", { ...piece(`${dead}:1`, A), createdAt: t0 });
-        });
-
-        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
-        expect(await countOf("usageExportPieces", A)).toBe(1);
-
-        vi.setSystemTime(new Date(t0 + EXPORT_PIECE_TTL_MS));
-        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
-        expect(await countOf("usageExportPieces", A)).toBe(0);
-    });
-
     it("removes a dead run's pieces at the time its last live sweep set, and not before", async () => {
         const t0 = Date.now();
         const setAt = t0 + EXPORT_PIECE_TTL_MS;

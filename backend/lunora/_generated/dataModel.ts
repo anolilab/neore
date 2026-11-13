@@ -2123,7 +2123,7 @@ export interface Doc_usageExportPieces {
     closedRows?: number;
     createdAt?: number;
     cutoff?: string;
-    kind: "file" | "projects" | "rows" | "titles" | "verified";
+    kind: "projects" | "rows" | "titles" | "verified";
     nextCursor?: string;
     pass: number;
     payload: string;
@@ -5323,7 +5323,7 @@ export interface Insert_usageExportPieces {
     closedRows?: number;
     createdAt?: number;
     cutoff?: string;
-    kind: "file" | "projects" | "rows" | "titles" | "verified";
+    kind: "projects" | "rows" | "titles" | "verified";
     nextCursor?: string;
     pass: number;
     payload: string;

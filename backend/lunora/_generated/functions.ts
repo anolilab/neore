@@ -7568,5 +7568,4 @@ export interface RegisteredDataMigration {
 export const LUNORA_MIGRATIONS: Record<string, RegisteredDataMigration> = {
     "add-headless-approved": lunora_migrations_249.addHeadlessApproved as unknown as RegisteredDataMigration,
     "add-headless-resume-bounds": lunora_migrations_249.addHeadlessResumeBounds as unknown as RegisteredDataMigration,
-    "backfill-usage-export-run-delete-at": lunora_migrations_249.backfillUsageExportRunDeleteAt as unknown as RegisteredDataMigration,
 };

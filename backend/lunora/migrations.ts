@@ -37,20 +37,3 @@ export const addHeadlessResumeBounds = defineMigration({
         return { ...document, config: { ...config, stepsLeft: getMaxSteps(config.shouldAutoContinue === true) } };
     },
 });
-
-/**
- * The export runs' due time (`deleteAt`) became required. A run stored before it has none, so it is given one a time to live after
- * its creation: the time the sweep would have acted on it had it been set, so it is swept like any other run.
- */
-export const backfillUsageExportRunDeleteAt = defineMigration({
-    id: "backfill-usage-export-run-delete-at",
-    table: "usageExportRuns",
-    up: (document) => {
-        if (document.deleteAt !== undefined) {
-            return undefined;
-        }
-
-        // The sweep's time to live (`usage/gdpr.ts` EXPORT_PIECE_TTL_MS), written out: a migration keeps the value it was made with.
-        return { ...document, deleteAt: (document.createdAt as number) + 24 * 60 * 60 * 1000 };
-    },
-});

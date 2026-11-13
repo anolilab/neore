@@ -2,8 +2,7 @@
   "jurisdiction": "eu",
   "migrationIds": [
     "add-headless-approved",
-    "add-headless-resume-bounds",
-    "backfill-usage-export-run-delete-at"
+    "add-headless-resume-bounds"
   ],
   "tables": {
     "account": {
@@ -29316,13 +29315,6 @@
           "optional": false,
           "unique": false,
           "members": [
-            {
-              "kind": "literal",
-              "nullable": false,
-              "optional": false,
-              "unique": false,
-              "literal": "\"file\""
-            },
             {
               "kind": "literal",
               "nullable": false,

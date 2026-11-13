@@ -1883,7 +1883,7 @@ export const usageExportPieces = sqliteTable("usageExportPieces", {
     closedRows: real("closedRows"),
     createdAt: real("createdAt"),
     cutoff: text("cutoff"),
-    kind: text("kind", { mode: "json" }).$type<"file" | "projects" | "rows" | "titles" | "verified">().notNull(),
+    kind: text("kind", { mode: "json" }).$type<"projects" | "rows" | "titles" | "verified">().notNull(),
     nextCursor: text("nextCursor"),
     pass: real("pass").notNull(),
     payload: text("payload").notNull(),

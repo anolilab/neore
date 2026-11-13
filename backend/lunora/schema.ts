@@ -3526,8 +3526,7 @@ export const schema = defineSchema({
         createdAt: v.optional(v.number()),
         // The day the export's recount is taken before (YYYY-MM-DD): rows dated before it are counted, later ones are not.
         cutoff: v.optional(v.string()),
-        // `file` is the kind earlier builds stored; nothing writes it now, and it stays so stored rows still validate.
-        kind: v.union(v.literal("file"), v.literal("projects"), v.literal("rows"), v.literal("titles"), v.literal("verified")),
+        kind: v.union(v.literal("projects"), v.literal("rows"), v.literal("titles"), v.literal("verified")),
         // The rows page's cursor for the next page (unset on the last page).
         nextCursor: v.optional(v.string()),
         pass: v.number(),
