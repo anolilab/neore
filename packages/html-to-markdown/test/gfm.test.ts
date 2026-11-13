@@ -263,3 +263,23 @@ describe("gfm review cases, fourth round", () => {
         expect(service.turndown(`<p>a<s class="flip">secret</s>b</p>`)).toBe("ab");
     });
 });
+
+describe("gfm review cases, fifth round", () => {
+    it("keeps an item's first character when the nested list that opens it writes nothing", () => {
+        const service = new TurndownService().use(gfm);
+
+        service.remove((node) => node.getAttribute("class") === "gone");
+
+        expect(service.turndown(`<table><tr><th>A</th></tr><tr><td><ul><li><ul class="gone"><li>x</li></ul>value</li></ul></td></tr></table>`)).toBe(
+            "| A |\n| --- |\n| value |",
+        );
+    });
+
+    it("leaves a line break a remove filter drops out of a code block in a cell", () => {
+        const service = new TurndownService().use(gfm);
+
+        service.remove((node) => node.getAttribute("class") === "gone");
+
+        expect(service.turndown(`<table><tr><th>A</th></tr><tr><td><pre>a<br class="gone">b</pre></td></tr></table>`)).toBe("| A |\n| --- |\n| `ab` |");
+    });
+});

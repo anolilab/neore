@@ -228,27 +228,14 @@ function grid(rows: ReadonlyArray<Row>, lookup: RuleLookup): { lines: string[][]
 }
 
 const ITEM_SEPARATOR = "; ";
+// Written by a list nested in an item, in place of the separator, so the item can tell its own text from it.
+const NESTED_LIST_MARK = "\u{F8FE}";
 
 /** True when a list item that a remove filter keeps follows this one. */
 function hasNextItem(item: Element, lookup: RuleLookup): boolean {
     for (let next = item.nextElementSibling; next; next = next.nextElementSibling) {
         if (next.nodeName === "LI" && !lookup.isRemoved(next)) {
             return true;
-        }
-    }
-
-    return false;
-}
-
-/** True when the item's first content is a nested list: no text comes before it. */
-function isOpenedByList(item: Element): boolean {
-    for (let child = item.firstChild; child; child = child.nextSibling) {
-        if (child.nodeType === 1) {
-            return LISTS.has(child.nodeName);
-        }
-
-        if (child.nodeType === 3 && (child.nodeValue ?? "").trim() !== "") {
-            return false;
         }
     }
 
@@ -262,10 +249,8 @@ function codeText(node: Node, lookup: RuleLookup): string {
     for (let child = node.firstChild; child; child = child.nextSibling) {
         if (child.nodeType === 3 || child.nodeType === 4) {
             text += child.nodeValue ?? "";
-        } else if (child.nodeName === "BR") {
-            text += "\n";
         } else if (child.nodeType === 1 && !lookup.isRemoved(child)) {
-            text += codeText(child, lookup);
+            text += child.nodeName === "BR" ? "\n" : codeText(child, lookup);
         }
     }
 
@@ -368,7 +353,7 @@ const tableRules: Record<string, Rule> = {
             const items = content.trim();
 
             if (node.parentNode?.nodeName === "LI") {
-                return `${ITEM_SEPARATOR}${items} `;
+                return items === "" ? "" : `${NESTED_LIST_MARK}${items} `;
             }
 
             return ` ${items} `;
@@ -379,8 +364,12 @@ const tableRules: Record<string, Rule> = {
         filter: (node, _options, lookup) => node.nodeName === "LI" && cellOf(node) !== null && !lookup.isRemoved(node),
         replacement(content, node, _options, lookup) {
             const text = oneLine(content);
-            // Only the separator a nested list writes is taken off; a semicolon the item's own text starts with stays.
-            const own = isOpenedByList(node) ? text.slice(ITEM_SEPARATOR.trim().length).trim() : text;
+            // A nested list that opens the item has no item text to keep apart from, so its mark is dropped. Every other
+            // mark a nested list wrote becomes the separator; text of the item's own, a semicolon too, stays as it is.
+            const own = (text.startsWith(NESTED_LIST_MARK) ? text.slice(NESTED_LIST_MARK.length).trim() : text).replaceAll(
+                NESTED_LIST_MARK,
+                () => ITEM_SEPARATOR,
+            );
 
             return `${own}${hasNextItem(node, lookup) ? ITEM_SEPARATOR : ""}`;
         },
