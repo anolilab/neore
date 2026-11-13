@@ -82,6 +82,7 @@ This tool returns as soon as the sub-agent has started. Its result is posted to 
             dispatchedBy: context.dispatchOrigin,
             // A headless run cannot be asked to approve: a worker on a computer is out of its reach (checked at admission).
             ...(context.headless && { headless: true }),
+            ...(context.organizationId && { organizationId: context.organizationId }),
             ...(input.host && { host: input.host }),
             ...(parentModel !== undefined && { parentModel }),
             parentThreadId: context.threadId,

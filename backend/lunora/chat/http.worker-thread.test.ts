@@ -29,7 +29,11 @@ const { runChatStart } = await import("./http");
 
 const context = () =>
     ({
-        auth: { getIdentity: async () => null },
+        auth: {
+            getIdentity: async () => {
+                return { sessionId: "session-1" };
+            },
+        },
         runMutation: async (reference: { __lunoraRef?: string }) => {
             state.calls.push(String(reference.__lunoraRef ?? reference));
 
@@ -39,6 +43,11 @@ const context = () =>
             const name = String(reference.__lunoraRef ?? reference);
 
             state.calls.push(name);
+
+            // The caller's sign-in is a valid session in the personal space.
+            if (name.includes("getSessionOrganizationForCap")) {
+                return { organizationId: null };
+            }
 
             if (name.includes("gateThreadAction")) {
                 return { isWorker: state.isWorker, outcome: "ok" };
@@ -59,7 +68,7 @@ describe("runChatStart", () => {
 
         expect(response.status).toBe(400);
         expect(await response.json()).toMatchObject({ error: expect.stringContaining("worker") });
-        expect(state.calls.filter((name) => !name.includes("gateThreadAction") && !name.includes("getActiveOrganization"))).toStrictEqual([]);
+        expect(state.calls.filter((name) => !name.includes("gateThreadAction") && !name.includes("getSessionOrganizationForCap"))).toStrictEqual([]);
     });
 
     it("refuses a regenerate in a worker's thread the same way", async () => {

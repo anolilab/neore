@@ -26,10 +26,15 @@ export const getMembersByOrganization = async (context: AuthContext, organizatio
     await context.db.member.findMany({ limit, where: { organizationId } }).then((result) => result.page);
 
 /**
- * Typed wrapper for querying Better Auth member by organization and user.
+ * Typed wrapper for querying Better Auth member by organization and user. A check that enforces a removal passes
+ * `"primary"`: `member` is a global table, and a regional replica can still hold a membership that was just revoked.
  */
-export const getMemberByOrganizationAndUser = async (context: AuthContext, organizationId: string, userId: string): Promise<Doc<"member"> | null> =>
-    context.db.member.findFirst({ where: { organizationId, userId } });
+export const getMemberByOrganizationAndUser = async (
+    context: AuthContext,
+    organizationId: string,
+    userId: string,
+    consistency?: "primary",
+): Promise<Doc<"member"> | null> => context.db.member.findFirst({ ...(consistency && { consistency }), where: { organizationId, userId } });
 
 /**
  * Typed wrapper for querying Better Auth members by userId.

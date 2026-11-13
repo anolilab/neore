@@ -254,6 +254,7 @@ const evaluateCase = async (ctx: ActionCtx, claim: Claim, onThread: (threadId: s
         memory: false,
         model,
         onThread,
+        organizationId: claim.organizationId ?? null,
         origin: "trigger",
         personalization: "none",
         prompt: claim.input,

@@ -190,3 +190,17 @@ describe("modeOfThread", () => {
         await expect(isComparisonColumn({ db: databaseWith([comparison("trashed")]) } as never, "child" as never)).resolves.toBe(false);
     });
 });
+
+describe("thread permission mode under an organization's cap", () => {
+    it("never lifts a tool above the organization's cap, not even under full", () => {
+        // `full` runs a tool that would ask; an `ask` cap holds it at `ask`, and an `off` cap removes it.
+        expect(resolveToolPermission(mcp(), undefined, { permissionCap: "ask", threadMode: "full" })).toBe("ask");
+        expect(resolveToolPermission(mcp(), undefined, { permissionCap: "off", threadMode: "full" })).toBe("off");
+        // An "Always allow" the member set is held by the cap the same way.
+        expect(resolveToolPermission(mcp(), { [mcp().key]: "auto" }, { permissionCap: "ask", threadMode: "full" })).toBe("ask");
+    });
+
+    it("still lets supervised hold a tool below an auto cap", () => {
+        expect(resolveToolPermission(SHELL, undefined, { permissionCap: "auto", threadMode: "supervised" })).toBe("ask");
+    });
+});

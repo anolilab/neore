@@ -7,6 +7,7 @@
 import { internal } from "../../_generated/internal";
 import type { ActionCtx } from "../../_generated/server";
 import type { MCPServerConfig } from "../../chat/lib/mcp-tools";
+import type { ConnectorGrant } from "./grant-runtime";
 import { getConnectorMcpServers, withMcpServerGrants } from "./grant-runtime";
 
 export const resolveUserMcpServers = async (ctx: Pick<ActionCtx, "runMutation" | "runQuery">, userId: string): Promise<MCPServerConfig[]> => {
@@ -31,4 +32,25 @@ export const findUserMcpServer = async (
     const servers = await resolveUserMcpServers(ctx, userId);
 
     return servers.find((server) => server.name === serverName) ?? null;
+};
+
+/**
+ * Which server a name means, as {@link findUserMcpServer} would pick it, read from the stored lists alone: no sign-in
+ * or connector token is resolved or refreshed. For a caller that only needs the tool's permission key.
+ */
+export const findUserMcpServerIdentity = async (
+    ctx: Pick<ActionCtx, "runQuery">,
+    userId: string,
+    serverName: string,
+): Promise<Pick<MCPServerConfig, "connectorSlug" | "name"> | null> => {
+    const saved = (await ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId })) as MCPServerConfig[];
+
+    if (saved.some((server) => server.name === serverName)) {
+        return { name: serverName };
+    }
+
+    const grants = (await ctx.runQuery(internal.connectors.store.listConnectorGrants, { userId })) as ConnectorGrant[];
+    const grant = grants.find((candidate) => candidate.name === serverName);
+
+    return grant ? { connectorSlug: grant.slug, name: grant.name } : null;
 };

@@ -33,6 +33,7 @@ import {
     afterRun,
     AgentRunError,
     buildRunStreamArgs,
+    continuationFailureMessage,
     createRunSteering,
     discardRunSecrets,
     endStoppedRun,
@@ -42,15 +43,16 @@ import {
     loadRunContext,
     mayExtractMemory,
     memoryToCarry,
+    readResumeInterruptedRuns,
     readRunPlan,
     resolveBackupModelId,
     resolveRunModel,
     resumeApprovedRun,
     setDispatchOrigin,
     setResearchDepth,
+    setRunOrganizationId,
     setRunStartedBy,
     setThreadStatus,
-    readResumeInterruptedRuns,
     stampSavedToolCalls,
 } from "./lib/agent-run";
 import { buildAgentTools } from "./lib/agent-tools";
@@ -505,6 +507,8 @@ export const runStreamingAgent = internalAction
                               mcpProgress: toolProgressSink(ctx, streamId, runEpoch),
                               mcpServerNames: streamingConfig.mcpServerNames,
                               model,
+                              // A thread's stored organization wins; the run's own caps a thread that has none.
+                              organizationId: organizationId ?? null,
                               ...(origin === "outside_agent" && { origin }),
                               searchMode: effectiveSearchMode,
                               skillTools: invokedSkill?.config
@@ -537,6 +541,7 @@ export const runStreamingAgent = internalAction
                 setDispatchOrigin(ctx, origin ?? "lead");
                 // A write collaborator's turn runs as the collaborator: `startedBy` is what its continuation, run as the owner, still knows.
                 setRunStartedBy(ctx, userId);
+                setRunOrganizationId(ctx, organizationId);
 
                 // Build agent
                 const isAutoContinue = streamingConfig.shouldAutoContinue === true;
@@ -839,6 +844,7 @@ export const runStreamingAgent = internalAction
                         snapshot: {
                             autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
                             ...(origin === "outside_agent" && { dispatchOrigin: origin }),
+                            ...(organizationId && { organizationId }),
                             instructions: streamTextArgs.system ?? agent.options.instructions,
                             mcpServerNames: toolResult.mcpServerNames,
                             mcpToolFingerprints: toolResult.mcpToolFingerprints,
@@ -1173,9 +1179,7 @@ export const continueAfterToolApproval = internalAction
         } catch (error) {
             streamLogger.error(`[ToolApproval] Continuation failed:`, error);
 
-            const safeMessage = isAgentRunError(error, "stale-approval")
-                ? "This tool request is no longer pending."
-                : "An error occurred while continuing the response. Please try again.";
+            const safeMessage = continuationFailureMessage(error);
 
             // A failure closing the stream must not skip the run's end below.
             try {

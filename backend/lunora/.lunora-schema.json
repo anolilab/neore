@@ -2,7 +2,8 @@
   "jurisdiction": "eu",
   "migrationIds": [
     "add-headless-approved",
-    "add-headless-resume-bounds"
+    "add-headless-resume-bounds",
+    "backfill-approval-organization"
   ],
   "tables": {
     "account": {
@@ -28084,6 +28085,13 @@
               "optional": false,
               "unique": false
             },
+            "organizationId": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
+            },
             "promptMessageId": {
               "kind": "string",
               "nullable": false,
@@ -28351,6 +28359,12 @@
         },
         "firing": {
           "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "pausedPermanently": {
+          "kind": "boolean",
           "nullable": false,
           "optional": true,
           "unique": false

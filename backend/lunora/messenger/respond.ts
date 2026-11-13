@@ -192,6 +192,8 @@ const generateReply = async (ctx: ActionCtx, threadId: Id<"threads">, userId: st
         maxSteps: replyTools ? MESSENGER_TOOL_REPLY_MAX_STEPS : MESSENGER_TEXT_REPLY_MAX_STEPS,
         memory: false,
         model: chooseReplyModel({ media, rules, tools }),
+        // A messenger reply has no organization: it runs in the personal space (org-policy.md §6a).
+        organizationId: null,
         origin: "messenger",
         personalization: "none",
         thread: { threadId },

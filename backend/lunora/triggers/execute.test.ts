@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mappedReferences } from "../../test/registered-api";
+import { LEFT_ORGANIZATION_MESSAGE } from "../auth/lib/organization-policy";
 import { executeTrigger } from "./execute";
 import type { QuietSnapshot } from "./quiet";
 
@@ -218,6 +219,14 @@ describe("a quiet routine's run", () => {
         expect(state.runs[0]?.thread).toEqual({ tags: ["trigger"], title: "Trigger: Digest" });
     });
 
+    it("passes the routine's organization so its tools are capped by the space it was created in", async () => {
+        state.trigger = { ...state.trigger, organizationId: "org-a" };
+
+        await run();
+
+        expect(state.runs[0]?.organizationId).toBe("org-a");
+    });
+
     it("posts the run when the check itself fails", async () => {
         state.trigger = { ...state.trigger, quietWhenEmpty: true };
         state.snapshotError = true;
@@ -300,6 +309,30 @@ describe("a quiet routine's run", () => {
         await run();
 
         expect(state.runs).toHaveLength(1);
+    });
+
+    it("records an admission refusal for an owner who left the organization as permanent, so the trigger pauses at once", async () => {
+        state.admissionRefusal = LEFT_ORGANIZATION_MESSAGE;
+
+        await run();
+
+        expect(state.runs).toHaveLength(0);
+        expect(state.mutations.find((entry) => entry.name === "updateExecution")?.args).toMatchObject({
+            error: LEFT_ORGANIZATION_MESSAGE,
+            permanent: true,
+            status: "failed",
+            userFixable: true,
+        });
+        // The settlement records the cause on the trigger itself; no separate write that could fail apart from it.
+        expect(state.mutations.map((entry) => entry.name)).not.toContain("updateTriggerStats");
+
+        state.admissionRefusal = "Daily limit reached";
+        state.mutations = [];
+
+        await run();
+
+        expect(state.mutations.find((entry) => entry.name === "updateExecution")?.args).not.toHaveProperty("permanent");
+        expect(state.mutations.map((entry) => entry.name)).not.toContain("updateTriggerStats");
     });
 
     it("schedules the give-back again when it fails, so the window is not left past activity nobody posted", async () => {

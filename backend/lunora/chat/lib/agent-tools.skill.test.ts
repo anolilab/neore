@@ -8,6 +8,7 @@
 import type { ToolSet } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { internal } from "../../_generated/internal";
 import type { ActionCtx } from "../../_generated/server";
 import { buildAgentTools } from "./agent-tools";
 import { mcpTrustId } from "./low-risk-trust";
@@ -74,9 +75,16 @@ vi.mock("./mcp-tools", () => {
 
 let connectorServers: { connectorSlug: string; enabled: boolean; name: string; protocol: "http"; url: string }[] = [];
 
+/** How often the connector servers were read, which refreshes their tokens. */
+let connectorReads = 0;
+
 vi.mock("../../connectors/lib/grant-runtime", () => {
     return {
-        getConnectorMcpServers: async () => connectorServers,
+        getConnectorMcpServers: async () => {
+            connectorReads += 1;
+
+            return connectorServers;
+        },
         withMcpServerGrants: async (_ctx: unknown, _userId: string, servers: unknown[]) => servers,
     };
 });
@@ -93,7 +101,7 @@ const fakeCtx = (): ActionCtx => {
 };
 
 const toolNames = async (skillTools?: { additionalTools?: string[]; disabledTools?: string[] }): Promise<string[]> => {
-    const { tools } = await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", skillTools, userId: "user" });
+    const { tools } = await buildAgentTools(fakeCtx(), { model: "test-model", organizationId: null, searchMode: "web", skillTools, userId: "user" });
 
     return Object.keys(tools).toSorted((a, b) => a.localeCompare(b));
 };
@@ -102,21 +110,161 @@ beforeEach(() => {
     overrides = {};
     mcpTools = { descriptors: new Map(), tools: {} };
     connectorServers = [];
+    connectorReads = 0;
     requestedServers = [];
     requestedOptions = undefined;
+});
+
+describe("buildAgentTools under an ask cap", () => {
+    const build = async (headless: boolean, headlessCanAsk?: boolean) => {
+        const runQuery = vi.fn();
+
+        mcpTools = {
+            descriptors: new Map([["mcp_docs__search", { serverName: "docs", toolName: "search" }]]),
+            tools: { mcp_docs__search: fakeTool("search") },
+        };
+        // MCP servers, overrides (an interactive run also reads its grants), then the run's thread, which cannot be found,
+        // so the run is capped at `ask`.
+        runQuery.mockResolvedValueOnce([{ enabled: true, name: "docs", protocol: "http", url: "https://docs.example/mcp" }]).mockResolvedValueOnce(overrides);
+
+        if (!headless) {
+            runQuery.mockResolvedValueOnce({});
+        }
+
+        runQuery.mockResolvedValueOnce(null).mockResolvedValue({ complete: true, links: [] });
+
+        return await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+            headless,
+            ...(headlessCanAsk && { headlessCanAsk }),
+            model: "test-model",
+            organizationId: null,
+            searchMode: "web",
+            threadId: "thread",
+            userId: "user",
+        });
+    };
+
+    it("gives a headless run no tools without connecting to a server or reading a connector", async () => {
+        const result = await build(true);
+
+        expect(result.tools).toStrictEqual({});
+        expect(result.mcpServerNames).toStrictEqual([]);
+        expect(requestedOptions).toBeUndefined();
+        expect(requestedServers).toStrictEqual([]);
+        expect(connectorReads).toBe(0);
+    });
+
+    it("still builds the tools of a headless run that pauses for its owner's answer, each asking", async () => {
+        const result = await build(true, true);
+
+        expect(connectorReads).toBe(1);
+        expect(requestedServers.map((server) => server.name)).toStrictEqual(["docs"]);
+        expect((result.tools["mcp_docs__search"] as { needsApproval?: unknown }).needsApproval).toBe(true);
+    });
+
+    it("still builds an interactive run's tools, each asking", async () => {
+        const result = await build(false);
+
+        expect(connectorReads).toBe(1);
+        expect(requestedServers.map((server) => server.name)).toStrictEqual(["docs"]);
+        expect((result.tools["mcp_docs__search"] as { needsApproval?: unknown }).needsApproval).toBe(true);
+    });
+});
+
+describe("buildAgentTools under an organization's policy", () => {
+    /** A run in a thread filed under `org-a`, whose policy sets `cap`; returns what was built and which policies were read. */
+    const buildInOrganization = async (cap: "ask" | "auto" | "off", headless = false) => {
+        const policiesRead: unknown[] = [];
+        const runQuery = vi.fn(async (reference: unknown, args: Record<string, unknown>) => {
+            if (reference === internal.auth.functions.getMCPServersQuery) {
+                return [{ enabled: true, name: "docs", protocol: "http", url: "https://docs.example/mcp" }];
+            }
+
+            if (reference === internal.chat.tool_permissions.getToolPermissionsQuery) {
+                return overrides;
+            }
+
+            if (reference === internal.agent.threads.getThreadInternal) {
+                return { organizationId: "org-a" };
+            }
+
+            if (reference === internal.auth.organization_policy.getPermissionCapQuery) {
+                policiesRead.push(args);
+
+                return cap;
+            }
+
+            if (reference === internal.source_control.pr_agent.linkedPullRequestsOfThread) {
+                return { complete: true, links: [] };
+            }
+
+            // The thread holds no permission mode of its own, so each tool keeps its default.
+            if (reference === internal.chat.tool_permissions.getThreadPermissionMode) {
+                return null;
+            }
+
+            // Time grants, the quick check's eligibility and its trusted servers: none.
+            return reference === internal.chat.tool_permissions.getLowRiskApprovalContext ? false : {};
+        });
+
+        mcpTools = {
+            descriptors: new Map([["mcp_docs__search", { annotations: { readOnlyHint: true }, serverName: "docs", toolName: "search" }]]),
+            tools: { mcp_docs__search: fakeTool("search") },
+        };
+
+        const result = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
+            headless,
+            model: "test-model",
+            // The run was started from no organization: the thread's own is the one that caps it.
+            organizationId: null,
+            searchMode: "web",
+            threadId: "thread",
+            userId: "user",
+        });
+
+        return { policiesRead, result };
+    };
+
+    it("reads the cap from the thread's organization's policy, and offers no tool under off", async () => {
+        const { policiesRead, result } = await buildInOrganization("off");
+
+        expect(policiesRead).toStrictEqual([{ organizationId: "org-a" }]);
+        expect(result.tools).toStrictEqual({});
+        expect(requestedServers).toStrictEqual([]);
+    });
+
+    it("holds a read-only tool the member would run unasked at ask under that policy's ask cap", async () => {
+        const { policiesRead, result } = await buildInOrganization("ask");
+
+        expect(policiesRead).toStrictEqual([{ organizationId: "org-a" }]);
+        expect((result.tools["mcp_docs__search"] as { needsApproval?: unknown }).needsApproval).toBe(true);
+    });
+
+    it("lets the same tool run unasked when the policy allows auto", async () => {
+        const { result } = await buildInOrganization("auto");
+
+        expect((result.tools["mcp_docs__search"] as { needsApproval?: unknown }).needsApproval).not.toBe(true);
+    });
 });
 
 describe("buildAgentTools MCP progress", () => {
     const sink = vi.fn();
 
     it("hands the progress sink to the MCP tools of an interactive run", async () => {
-        await buildAgentTools(fakeCtx(), { mcpProgress: sink, model: "test-model", searchMode: "web", userId: "user" });
+        await buildAgentTools(fakeCtx(), { mcpProgress: sink, model: "test-model", organizationId: null, searchMode: "web", userId: "user" });
 
         expect(requestedOptions?.progress).toBe(sink);
     });
 
     it("relays none for a run an outside agent started, whose event mapping drops progress chunks", async () => {
-        await buildAgentTools(fakeCtx(), { mcpProgress: sink, model: "test-model", origin: "outside_agent", searchMode: "web", userId: "user" });
+        await buildAgentTools(fakeCtx(), {
+            mcpProgress: sink,
+            model: "test-model",
+            organizationId: null,
+            origin: "outside_agent",
+            searchMode: "web",
+            userId: "user",
+        });
 
         expect(requestedOptions?.progress).toBeUndefined();
     });
@@ -144,6 +292,7 @@ describe("buildAgentTools with a skill", () => {
     it("rebuilds a paused skill run with its extra tool, but never wider than the snapshot", async () => {
         const { tools } = await buildAgentTools(fakeCtx(), {
             model: "test-model",
+            organizationId: null,
             searchMode: "web",
             snapshot: { mcpServerNames: [], toolNames: ["codeExecution"] },
             userId: "user",
@@ -166,7 +315,7 @@ describe("buildAgentTools MCP permission keys", () => {
         };
     });
 
-    const build = async () => await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
+    const build = async () => await buildAgentTools(fakeCtx(), { model: "test-model", organizationId: null, searchMode: "web", userId: "user" });
 
     it("keys each tool by its own server, not by a guess from the runtime name", async () => {
         const { permissionKeys } = await build();
@@ -193,6 +342,7 @@ describe("buildAgentTools MCP permission keys", () => {
                 headless: true,
                 ...(headlessCanAsk && { headlessCanAsk }),
                 model: "test-model",
+                organizationId: null,
                 searchMode: "web",
                 userId: "user",
             });
@@ -230,7 +380,7 @@ describe("buildAgentTools MCP fingerprints", () => {
     it("records the fingerprint of each MCP tool the run is offered, and only those, for its approval snapshot", async () => {
         overrides = { "mcp:docs:delete": "off" };
 
-        const { mcpToolFingerprints } = await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
+        const { mcpToolFingerprints } = await buildAgentTools(fakeCtx(), { model: "test-model", organizationId: null, searchMode: "web", userId: "user" });
 
         expect(mcpToolFingerprints).toStrictEqual({ mcp_docs__search: "aaa" });
     });
@@ -255,6 +405,7 @@ describe("buildAgentTools connector tools", () => {
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",
+            organizationId: null,
             permissionModeThreadId: "owner-thread",
             searchMode: "web",
             userId: "user",
@@ -266,19 +417,19 @@ describe("buildAgentTools connector tools", () => {
     });
 
     it("connects to connected connectors alongside the user's MCP servers", async () => {
-        await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
+        await buildAgentTools(fakeCtx(), { model: "test-model", organizationId: null, searchMode: "web", userId: "user" });
 
         expect(requestedServers.map((server) => server.connectorSlug)).toStrictEqual(["notion"]);
     });
 
     it("keys connector tools connector:<slug>:<tool>, never by the display name", async () => {
-        const { permissionKeys } = await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
+        const { permissionKeys } = await buildAgentTools(fakeCtx(), { model: "test-model", organizationId: null, searchMode: "web", userId: "user" });
 
         expect(permissionKeys).toMatchObject({ mcp_Notion__create_page: "connector:notion:create_page", mcp_Notion__search: "connector:notion:search" });
     });
 
     it("defaults connector tools to ask unless they declare readOnlyHint", async () => {
-        const { tools } = await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
+        const { tools } = await buildAgentTools(fakeCtx(), { model: "test-model", organizationId: null, searchMode: "web", userId: "user" });
 
         expect((tools["mcp_Notion__create_page"] as { needsApproval?: unknown }).needsApproval).toBe(true);
         expect((tools["mcp_Notion__search"] as { needsApproval?: unknown }).needsApproval).toBeUndefined();
@@ -287,17 +438,29 @@ describe("buildAgentTools connector tools", () => {
     it("honours an override on the connector key", async () => {
         overrides = { "connector:notion:create_page": "off" };
 
-        const { tools } = await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", userId: "user" });
+        const { tools } = await buildAgentTools(fakeCtx(), { model: "test-model", organizationId: null, searchMode: "web", userId: "user" });
 
         expect(Object.keys(tools)).not.toContain("mcp_Notion__create_page");
     });
 
     it("rebuilds a paused run with only the connectors its snapshot named", async () => {
-        await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", snapshot: { mcpServerNames: [], toolNames: [] }, userId: "user" });
+        await buildAgentTools(fakeCtx(), {
+            model: "test-model",
+            organizationId: null,
+            searchMode: "web",
+            snapshot: { mcpServerNames: [], toolNames: [] },
+            userId: "user",
+        });
 
         expect(requestedServers).toStrictEqual([]);
 
-        await buildAgentTools(fakeCtx(), { model: "test-model", searchMode: "web", snapshot: { mcpServerNames: ["Notion"], toolNames: [] }, userId: "user" });
+        await buildAgentTools(fakeCtx(), {
+            model: "test-model",
+            organizationId: null,
+            searchMode: "web",
+            snapshot: { mcpServerNames: ["Notion"], toolNames: [] },
+            userId: "user",
+        });
 
         expect(requestedServers.map((server) => server.name)).toStrictEqual(["Notion"]);
     });
@@ -316,10 +479,12 @@ describe("buildAgentTools quick-check trust", () => {
     const needsApproval = async (trusted: string[], url = URL): Promise<unknown> => {
         const runQuery = vi.fn();
 
+        // The server, override and grant reads start first; the run's thread is read next, for its permission cap.
         runQuery
             .mockResolvedValueOnce([{ enabled: true, name: "docs", protocol: "http", url }])
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
+            .mockResolvedValueOnce({ organizationId: null })
             .mockResolvedValueOnce(true)
             // No pull request is linked to the thread.
             .mockResolvedValueOnce({ complete: true, links: [] })
@@ -329,6 +494,7 @@ describe("buildAgentTools quick-check trust", () => {
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",
+            organizationId: null,
             searchMode: "web",
             threadId: "thread",
             userId: "user",
@@ -361,6 +527,7 @@ describe("buildAgentTools quick-check trust", () => {
 
         const runQuery = vi.fn();
 
+        // The server, override and grant reads start first; the run's thread is read next, for its permission cap.
         runQuery
             .mockResolvedValueOnce([
                 { enabled: true, name: "files", protocol: "http", url: first },
@@ -368,6 +535,7 @@ describe("buildAgentTools quick-check trust", () => {
             ])
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
+            .mockResolvedValueOnce({ organizationId: null })
             .mockResolvedValueOnce(true)
             .mockResolvedValueOnce({ complete: true, links: [] })
             // The thread's permission mode.
@@ -376,6 +544,7 @@ describe("buildAgentTools quick-check trust", () => {
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",
+            organizationId: null,
             searchMode: "web",
             threadId: "thread",
             userId: "user",
@@ -390,17 +559,20 @@ describe("buildAgentTools pull request tools", () => {
     const toolsFor = async (linked: unknown[]): Promise<Record<string, unknown>> => {
         const runQuery = vi.fn();
 
-        // MCP servers, overrides, grants, the quick check's eligibility, the thread's pull request links, then its permission mode.
+        // MCP servers, overrides, grants, the run's thread (for its permission cap), the quick check's eligibility, the
+        // thread's pull request links, then its permission mode.
         runQuery
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
+            .mockResolvedValueOnce({ organizationId: null })
             .mockResolvedValueOnce(false)
             .mockResolvedValueOnce({ complete: true, links: linked })
             .mockResolvedValueOnce(null);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",
+            organizationId: null,
             searchMode: "web",
             threadId: "thread",
             userId: "user",
@@ -423,12 +595,14 @@ describe("buildAgentTools pull request tools", () => {
             .mockResolvedValueOnce([])
             .mockResolvedValueOnce(overrides)
             .mockResolvedValueOnce({})
+            .mockResolvedValueOnce({ organizationId: null })
             .mockResolvedValueOnce(false)
             .mockResolvedValueOnce({ complete: true, links: [] })
             .mockResolvedValueOnce(null);
 
         const { tools } = await buildAgentTools({ runQuery } as unknown as ActionCtx, {
             model: "test-model",
+            organizationId: null,
             searchMode: "web",
             skillTools: { additionalTools: ["readPullRequest", "mergePullRequest"] },
             threadId: "thread",
