@@ -154,3 +154,25 @@ export const replyStreamOf = (started: StartedChat): { streamId: string; streamT
 
     return { streamId: started.streamId, streamToken: started.streamToken };
 };
+
+/**
+ * Waits `ms`, or until `signal` aborts: it then resolves at once and clears its timer, so a stopped send leaves its retry
+ * delay at once. It resolves rather than rejects, so `startWithRetries` still ends the send with its own error.
+ */
+export const abortableSleep = async (ms: number, signal?: AbortSignal): Promise<void> => {
+    if (signal?.aborted) {
+        return;
+    }
+
+    await new Promise<void>((resolve) => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const done = (): void => {
+            clearTimeout(timer);
+            signal?.removeEventListener("abort", done);
+            resolve();
+        };
+
+        timer = setTimeout(done, ms);
+        signal?.addEventListener("abort", done, { once: true });
+    });
+};

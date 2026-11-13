@@ -5,8 +5,8 @@ import { useAuth } from "@/auth/auth-state";
 import { getClient } from "@/lib/lunora";
 import { useOffline } from "@/offline/offline-context";
 
-import type { Live, Scoped } from "./live-follow";
-import { EMPTY_LIVE, followLive, liveFor, ownSyncState } from "./live-follow";
+import type { Live, OwnSubscription, Scoped } from "./live-follow";
+import { EMPTY_LIVE, followLive, liveFor, ownSyncState, subscriptionIdOf } from "./live-follow";
 import type { ProjectRow, ProjectThreadRow } from "./projects-api";
 import { watchProject, watchProjects, watchProjectThreads } from "./projects-api";
 
@@ -37,15 +37,27 @@ const useLive = <T>(
         }
 
         // The client's sync status also reports an answer that calls no rows callback (a reconnect's `resume` frame). It is
-        // judged on this query's own subscriptions (`ownSyncState`), not on every subscription and queued write.
+        // judged on this screen's own subscription (`ownSyncState`): by its `id`, read from the client's debug snapshot
+        // around the subscribe call (`subscriptionIdOf`), so another project's subscription to the same query never blocks it.
+        let own: OwnSubscription = { functionPath };
+        const watchOwn: typeof watch = (onRows, onError) => {
+            const before = getClient().debug().subscriptions;
+            const stop = watch(onRows, onError);
+            const id = subscriptionIdOf(before, getClient().debug().subscriptions, functionPath);
+
+            own = id === undefined ? { functionPath } : { functionPath, id };
+
+            return stop;
+        };
+
         return followLive(
             scope,
-            watch,
+            watchOwn,
             setLive,
             () => reportRead("succeeded"),
             (listener) =>
                 getClient().onSyncStatus((syncStatus) => {
-                    listener(ownSyncState(syncStatus, getClient().debug().subscriptions, functionPath));
+                    listener(ownSyncState(syncStatus, getClient().debug().subscriptions, own));
                 }),
         );
         // `scope` stands for the user and everything `watch` and `functionPath` close over; `reportRead` is stable.

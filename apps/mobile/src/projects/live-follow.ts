@@ -15,27 +15,63 @@ export const EMPTY_LIVE: Live<never> = { error: undefined, rows: undefined };
 
 /** What `followLive` reads of the Lunora client: `true` once the live connection has answered the screen's subscription. */
 export interface SyncState {
+    /**
+     * `synced` is the screen's own subscription's acknowledgement on a live socket, not the client's aggregate (which also
+     * waits on, and settles with, every other subscription). Only such a report can end a refusal.
+     */
+    isOwnAck?: boolean;
     synced: boolean;
 }
 
+/** Which of the client's subscriptions is the screen's: its own `id` when known, else every one of its query. */
+export interface OwnSubscription {
+    functionPath: string;
+    id?: string;
+}
+
 /**
- * Whether the subscriptions of one query (`functionPath`, its `__lunoraRef`) are answered on the current socket, from the
- * client's `syncStatus()` and `debug().subscriptions` (`acked`: "acknowledged on the current socket"). The aggregate
- * `synced` also waits on unrelated subscriptions and queued writes, which could keep a project screen's writes off for
- * as long as either lasts. Over HTTP polling the client sets no `acked`, so the aggregate is all there is.
+ * Whether the screen's subscription is answered on the current socket, from the client's `syncStatus()` and
+ * `debug().subscriptions` (`acked`: "acknowledged on the current socket"). The aggregate `synced` also waits on unrelated
+ * subscriptions and queued writes. `debug()` carries no args, so the narrowest key is the subscription's `id`
+ * ({@link subscriptionIdOf}): another project's subscription to the same query never blocks this one. Without it (the
+ * screen joined a subscription already open) every subscription of the query counts. Over HTTP polling the client sets
+ * no `acked`, so the aggregate is all there is.
  */
 export const ownSyncState = (
     status: { connection: string; synced: boolean },
-    subscriptions: ReadonlyArray<{ acked: boolean; functionPath: string }>,
-    functionPath: string,
+    subscriptions: ReadonlyArray<{ acked: boolean; functionPath: string; id: string }>,
+    own: OwnSubscription,
 ): SyncState => {
     if (status.connection !== "connected") {
         return { synced: status.synced };
     }
 
-    const own = subscriptions.filter((subscription) => subscription.functionPath === functionPath);
+    const isMine = (subscription: { functionPath: string; id: string }): boolean => {
+        if (own.id === undefined) {
+            return subscription.functionPath === own.functionPath;
+        }
 
-    return { synced: own.length > 0 && own.every((subscription) => subscription.acked) };
+        return subscription.id === own.id;
+    };
+    const mine = subscriptions.filter((subscription) => isMine(subscription));
+
+    return { isOwnAck: true, synced: mine.length > 0 && mine.every((subscription) => subscription.acked) };
+};
+
+/**
+ * The `id` of the subscription a `subscribe` call opened: the one of its query that is in the client's debug snapshot
+ * after the call and was not before. `undefined` when the call joined a subscription already open (deduped by query and
+ * args, so it opened none) or the snapshot cannot tell (more than one appeared).
+ */
+export const subscriptionIdOf = (
+    before: ReadonlyArray<{ functionPath: string; id: string }>,
+    after: ReadonlyArray<{ functionPath: string; id: string }>,
+    functionPath: string,
+): string | undefined => {
+    const known = new Set(before.map((subscription) => subscription.id));
+    const opened = after.filter((subscription) => subscription.functionPath === functionPath && !known.has(subscription.id));
+
+    return opened.length === 1 ? opened[0]?.id : undefined;
 };
 
 /**
@@ -78,6 +114,8 @@ export const followLive = <T>(
 
     let isSubscribing = true;
     let isRefused = false;
+    // Refused, then unanswered since: the next acknowledgement is a new connection's.
+    let isAwaitingNewAnswer = false;
     let isStopped = false;
     const stop = watch(
         (rows) => {
@@ -90,6 +128,7 @@ export const followLive = <T>(
         },
         (message) => {
             isRefused = true;
+            isAwaitingNewAnswer = false;
             publish({ error: message, rows: undefined, scope });
         },
     );
@@ -99,6 +138,16 @@ export const followLive = <T>(
     let reports = 0;
     const stopSync = watchSync?.((status) => {
         reports += 1;
+
+        // A refused subscription that goes unanswered (a new connection) and is acknowledged again was answered again: the
+        // refusal ends. Refused once more, Lunora calls the error callback before this report's check runs, so it stands.
+        // Only the subscription's own acknowledgement says so: the aggregate (HTTP polling) also flips with other subscriptions.
+        if (isRefused && status.isOwnAck === true && !status.synced) {
+            isAwaitingNewAnswer = true;
+        } else if (isRefused && isAwaitingNewAnswer && status.isOwnAck === true && status.synced) {
+            isRefused = false;
+            isAwaitingNewAnswer = false;
+        }
 
         if (isRegistering || !status.synced) {
             return;

@@ -18,10 +18,10 @@
   connection being checked; the splash holds until the chat list has read its saved rows, at most 2 s,
   `splash-gate.ts`). A mint still out when a sign-in or sign-out starts applies nothing (`createAuthEpoch`). A mint with no answer keeps them signed in without a JWT, which counts as offline; an answered "no session"
   signs out and empties the cache. Live queries wait for a JWT. A project subscription also counts as answered when the
-  client's `onSyncStatus` says its own query's subscriptions are acked (`ownSyncState`, from `debug().subscriptions`;
-  the aggregate `synced` only over polling) after registering (a reconnect's `resume` frame calls no rows callback). That
+  client's `onSyncStatus` says its own subscription is acked (`ownSyncState`, from `debug().subscriptions`, keyed by the
+  `id` the subscribe call opened, `subscriptionIdOf`, since `debug()` carries no args; the aggregate only over polling) after registering (a reconnect's `resume` frame calls no rows callback). That
   report waits a microtask and counts only while it is still the latest report (a drop in between voids it): Lunora
-  reports a refused subscription `synced` before its error callback, so an error in between drops it, and a refused subscription counts no `synced` until its rows arrive. A 401/403 mint clears the stored
+  reports a refused subscription `synced` before its error callback, so an error in between drops it, and a refused subscription counts no `synced` until its rows arrive or its own ack drops and returns (a new connection). A 401/403 mint clears the stored
   grant only while it still holds the grant that mint sent (a new sign-in's grant survives an old mint's refusal); every
   grant read, write and clear goes through one queue (`serializeGrantStore`), so that check-and-clear is atomic.
   **Stamps and races:** a read stamps its rows with the moment it STARTED (`syncedAt`), and only the newest read of a

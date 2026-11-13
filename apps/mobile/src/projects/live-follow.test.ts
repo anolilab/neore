@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Scoped, SyncState } from "./live-follow";
-import { EMPTY_LIVE, followLive, liveFor, ownSyncState } from "./live-follow";
+import { EMPTY_LIVE, followLive, liveFor, ownSyncState, subscriptionIdOf } from "./live-follow";
 
 /** A watch the test drives by hand. */
 const fakeWatch = () => {
@@ -203,6 +203,45 @@ describe("followLive", () => {
         expect(answered).toBe(1);
     });
 
+    it("ends a refusal when a later connection acknowledges the subscription again, with no rows", async () => {
+        let answered = 0;
+        let report: ((status: SyncState) => void) | undefined;
+        const fake = fakeWatch();
+
+        followLive(
+            "a:projects",
+            fake.watch,
+            recorder().publish,
+            () => {
+                answered += 1;
+            },
+            (listener) => {
+                report = listener;
+
+                return () => {};
+            },
+        );
+
+        // Refused, in Lunora's order.
+        report?.({ synced: true });
+        fake.error("FORBIDDEN");
+        await Promise.resolve();
+        expect(answered).toBe(0);
+
+        // A reconnect: the subscription goes unanswered, then the new connection resumes it with no rows.
+        report?.({ isOwnAck: true, synced: false });
+        report?.({ isOwnAck: true, synced: true });
+        await Promise.resolve();
+        expect(answered).toBe(1);
+
+        // Refused once more on the next connection: the refusal stands again.
+        report?.({ isOwnAck: true, synced: false });
+        report?.({ isOwnAck: true, synced: true });
+        fake.error("FORBIDDEN");
+        await Promise.resolve();
+        expect(answered).toBe(1);
+    });
+
     it("drops the rows when the subscription fails", () => {
         const fake = fakeWatch();
         const seen = recorder();
@@ -245,41 +284,61 @@ describe("liveFor", () => {
 });
 
 describe("ownSyncState", () => {
-    const projects = "projects_functions:listProjects";
+    const projects = "projects_functions:getProject";
+    const connected = { connection: "connected", synced: false };
 
-    it("answers a project screen once its own subscription is acknowledged, though others and queued writes still wait", () => {
-        const status = { connection: "connected", synced: false };
+    it("answers a screen once its own subscription is acknowledged, though another project's of the same query still waits", () => {
+        const subscriptions = [
+            { acked: true, functionPath: projects, id: "sub_1" },
+            { acked: false, functionPath: projects, id: "sub_2" },
+            { acked: false, functionPath: "chat_functions:listThreads", id: "sub_3" },
+        ];
 
-        expect(
-            ownSyncState(
-                status,
-                [
-                    { acked: true, functionPath: projects },
-                    { acked: false, functionPath: "chat_functions:listThreads" },
-                ],
-                projects,
-            ),
-        ).toStrictEqual({ synced: true });
+        expect(ownSyncState(connected, subscriptions, { functionPath: projects, id: "sub_1" })).toStrictEqual({ isOwnAck: true, synced: true });
+        expect(ownSyncState(connected, subscriptions, { functionPath: projects, id: "sub_2" })).toStrictEqual({ isOwnAck: true, synced: false });
     });
 
-    it("waits while any subscription of its own query is unanswered, or none is open", () => {
-        const status = { connection: "connected", synced: true };
+    it("judges every subscription of its query when its own id is unknown, and none open is no answer", () => {
+        const subscriptions = [
+            { acked: true, functionPath: projects, id: "sub_1" },
+            { acked: false, functionPath: projects, id: "sub_2" },
+        ];
 
-        expect(
-            ownSyncState(
-                status,
-                [
-                    { acked: true, functionPath: projects },
-                    { acked: false, functionPath: projects },
-                ],
-                projects,
-            ),
-        ).toStrictEqual({ synced: false });
-        expect(ownSyncState(status, [], projects)).toStrictEqual({ synced: false });
+        expect(ownSyncState(connected, subscriptions, { functionPath: projects })).toStrictEqual({ isOwnAck: true, synced: false });
+        expect(ownSyncState(connected, [], { functionPath: projects, id: "sub_1" })).toStrictEqual({ isOwnAck: true, synced: false });
     });
 
     it("falls back to the client's aggregate over HTTP polling, where no subscription is acknowledged", () => {
-        expect(ownSyncState({ connection: "polling", synced: true }, [{ acked: false, functionPath: projects }], projects)).toStrictEqual({ synced: true });
-        expect(ownSyncState({ connection: "offline", synced: false }, [{ acked: true, functionPath: projects }], projects)).toStrictEqual({ synced: false });
+        const subscriptions = [{ acked: false, functionPath: projects, id: "sub_1" }];
+
+        expect(ownSyncState({ connection: "polling", synced: true }, subscriptions, { functionPath: projects, id: "sub_1" })).toStrictEqual({ synced: true });
+        expect(ownSyncState({ connection: "offline", synced: false }, subscriptions, { functionPath: projects, id: "sub_1" })).toStrictEqual({ synced: false });
+    });
+});
+
+describe("subscriptionIdOf", () => {
+    const projects = "projects_functions:getProject";
+
+    it("finds the subscription a subscribe call opened", () => {
+        const before = [{ functionPath: projects, id: "sub_1" }];
+        const after = [...before, { functionPath: "chat_functions:listThreads", id: "sub_2" }, { functionPath: projects, id: "sub_3" }];
+
+        expect(subscriptionIdOf(before, after, projects)).toBe("sub_3");
+    });
+
+    it("finds none when the call joined a subscription already open, or more than one appeared", () => {
+        const before = [{ functionPath: projects, id: "sub_1" }];
+
+        expect(subscriptionIdOf(before, before, projects)).toBeUndefined();
+        expect(
+            subscriptionIdOf(
+                [],
+                [
+                    { functionPath: projects, id: "sub_1" },
+                    { functionPath: projects, id: "sub_2" },
+                ],
+                projects,
+            ),
+        ).toBeUndefined();
     });
 });

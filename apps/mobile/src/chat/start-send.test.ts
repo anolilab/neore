@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { StartedChat } from "./chat-api";
 import { ChatError } from "./chat-api";
 import {
+    abortableSleep,
     GIVE_BACK_SEPARATOR,
     holdFor,
     planSend,
@@ -151,5 +152,56 @@ describe(replyStreamOf, () => {
         const delivered: StartedChat = { contentType: "text", duplicate: true, messageId: "m1", streamId: null, streaming: false, threadId: "t1" };
 
         expect(replyStreamOf(delivered)).toBeUndefined();
+    });
+});
+
+describe(abortableSleep, () => {
+    it("resolves at once when the send is stopped, and leaves no timer behind", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const controller = new AbortController();
+            let isDone = false;
+            const sleeping = (async () => {
+                await abortableSleep(3000, controller.signal);
+                isDone = true;
+            })();
+
+            expect(vi.getTimerCount()).toBe(1);
+
+            controller.abort();
+            await sleeping;
+
+            expect(isDone).toBe(true);
+            expect(vi.getTimerCount()).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("waits the whole delay when nothing stops it, and not at all when already stopped", async () => {
+        vi.useFakeTimers();
+
+        try {
+            let isDone = false;
+            const sleeping = (async () => {
+                await abortableSleep(3000);
+                isDone = true;
+            })();
+
+            await vi.advanceTimersByTimeAsync(2999);
+            expect(isDone).toBe(false);
+            await vi.advanceTimersByTimeAsync(1);
+            await sleeping;
+            expect(isDone).toBe(true);
+
+            const stopped = new AbortController();
+
+            stopped.abort();
+            await abortableSleep(3000, stopped.signal);
+            expect(vi.getTimerCount()).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

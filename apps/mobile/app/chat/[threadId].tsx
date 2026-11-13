@@ -19,7 +19,7 @@ import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScr
 import { sendSessions } from "@/chat/send-sessions";
 import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import type { HeldSend } from "@/chat/start-send";
-import { holdFor, planSend, replyStreamOf, startWithRetries } from "@/chat/start-send";
+import { abortableSleep, holdFor, planSend, replyStreamOf, startWithRetries } from "@/chat/start-send";
 import { relayReply } from "@/chat/stream";
 import { followUnsentPrompts, giveBackOrKeep, takeUnsentPrompt, unsentPromptKey, unsentPrompts } from "@/chat/unsent-prompts";
 import type { SendStage } from "@/chat/unsent-send";
@@ -46,6 +46,9 @@ import { appendTranscript } from "@/voice/voice-input";
 type Row = MessageRow & { finished?: boolean };
 
 const NEW_THREAD = "new";
+
+/** A new chat's screen moves to the chat its start opened, unless the send was stopped meanwhile (sign-out, leaving, a refusal). */
+const shouldMoveRoute = (routeThreadId: string, signal: AbortSignal): boolean => routeThreadId === NEW_THREAD && !signal.aborted;
 const MAX_HISTORY_PAGES = 10;
 const REFUSED_MESSAGE = "This chat is locked or no longer available.";
 const SHARE_FAILED_MESSAGE = "The message could not be shared. Try again.";
@@ -526,7 +529,9 @@ const Chat = () => {
     const send = async () => {
         // A held prompt, which may already be saved, goes again only under its own id and alone (`planSend`): text typed
         // after it stays in the composer for the next send.
-        const plan = planSend(heldSend.current, draft);
+        // The composer as the last write left it (`draftRef`), not as this render saw it: an edit made just before the press
+        // must not be lost to a resend of the unchanged held prompt.
+        const plan = planSend(heldSend.current, draftRef.current);
         const { prompt } = plan;
 
         if (!prompt || sending || sendControl.disabled) {
@@ -596,10 +601,9 @@ const Chat = () => {
                             jwt,
                         }),
                     signal: controller.signal,
+                    // Cut short when the send is stopped, so a stopped send settles at once, not after its retry delay.
                     sleep: async (ms) => {
-                        await new Promise((resolve) => {
-                            setTimeout(resolve, ms);
-                        });
+                        await abortableSleep(ms, controller.signal);
                     },
                 });
             });
@@ -615,7 +619,8 @@ const Chat = () => {
             // The prompt is complete once the server has accepted it, whether or not the screen's next read succeeds.
             writeRows((current) => finishRow(current, userId));
 
-            if (routeThreadId === NEW_THREAD) {
+            // A send stopped meanwhile (sign-out, leaving, a refusal) keeps its result but moves no route.
+            if (shouldMoveRoute(routeThreadId, controller.signal)) {
                 router.setParams({ threadId: started.threadId });
             }
 
