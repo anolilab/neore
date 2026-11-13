@@ -23861,6 +23861,11 @@
                         },
                         "type": "array"
                       },
+                      "linkId": {
+                        "description": "Id<\"threadGuestLinks\">",
+                        "type": "string",
+                        "x-lunora-table": "threadGuestLinks"
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",
@@ -23868,6 +23873,7 @@
                       }
                     },
                     "required": [
+                      "linkId",
                       "threadId"
                     ],
                     "type": "object"

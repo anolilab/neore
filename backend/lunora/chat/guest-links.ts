@@ -208,14 +208,30 @@ export const createGuestLink = authMutation
  * Withdraws the guest link and everything guests left on it. Works on a locked chat, so the owner can always withdraw. The
  * owner names the waiting notes they agreed to delete (`confirmedNotes`, none by default): a note they did not see (left
  * since, even in place of one sent meanwhile) is never deleted, the revoke is refused with the count now waiting instead.
- * The read and the delete are one transaction.
+ * The owner also names the link they meant (`linkId`): when another tab has replaced it, the live link is not that one
+ * and the revoke is refused as an ended link, so a confirmation never takes a link the owner did not see. The reads and
+ * the delete are one transaction.
  */
 export const revokeGuestLink = authMutation
     .use(rateLimit("sharing/update"))
-    .input({ confirmedNotes: v.optional(v.array(v.id("threadGuestMessages")).max(GUEST_MAX_HELD_PER_LINK)), threadId: v.id("threads") })
+    .input({
+        confirmedNotes: v.optional(v.array(v.id("threadGuestMessages")).max(GUEST_MAX_HELD_PER_LINK)),
+        linkId: v.id("threadGuestLinks"),
+        threadId: v.id("threads"),
+    })
     .output(v.null())
-    .mutation(async ({ args: { confirmedNotes = [], threadId }, ctx: context }) => {
+    .mutation(async ({ args: { confirmedNotes = [], linkId, threadId }, ctx: context }) => {
         await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
+
+        // Only compared with the owner's own thread's live link: an id from elsewhere never matches and grants nothing.
+        const live = await context.db
+            .query("threadGuestLinks")
+            .withIndex("by_thread_expiresAt", (q) => q.eq("threadId", threadId).gt("expiresAt", context.now))
+            .first();
+
+        if (live && live._id !== linkId) {
+            throw new LunoraError("NOT_FOUND", "That guest link has ended.", { data: { code: "GUEST_LINK_ENDED" } });
+        }
 
         // Only compared with the owner's own thread's notes: an id from another thread matches nothing and grants nothing.
         const confirmed = new Set<string>(confirmedNotes);

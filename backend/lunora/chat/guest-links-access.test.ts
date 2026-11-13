@@ -477,11 +477,11 @@ describe("reviewing a held note", () => {
 
 describe("revoking a link", () => {
     it("removes the link, its messages and its route", async () => {
-        const { linkToken } = await createLink();
+        const { id: linkId, linkToken } = await createLink();
 
         const { messageId } = await hold(linkToken, "bye");
 
-        await asOwner().mutation(guestLinks.revokeGuestLink as never, { confirmedNotes: [messageId], threadId } as never);
+        await asOwner().mutation(guestLinks.revokeGuestLink as never, { confirmedNotes: [messageId], linkId, threadId } as never);
 
         expect(await rows("threadGuestLinks")).toHaveLength(0);
         expect(await rows("threadGuestMessages")).toHaveLength(0);
@@ -499,8 +499,11 @@ describe("revoking a link", () => {
         expect(await rows("threadGuestLinks")).toMatchObject([{ _id: made.id }]);
     });
 
-    const revoke = async (confirmedNotes: (string | undefined)[]) =>
-        await asOwner().mutation(guestLinks.revokeGuestLink as never, { confirmedNotes, threadId } as never);
+    const revoke = async (confirmedNotes: (string | undefined)[], linkId?: string) =>
+        await asOwner().mutation(
+            guestLinks.revokeGuestLink as never,
+            { confirmedNotes, linkId: linkId ?? (await rows("threadGuestLinks"))[0]?._id, threadId } as never,
+        );
 
     it("never deletes a note left after the owner confirmed: it refuses with the count now waiting", async () => {
         const { linkToken } = await createLink();
@@ -533,10 +536,24 @@ describe("revoking a link", () => {
         const { linkToken } = await createLink();
 
         await hold(linkToken, "waiting");
-        await expect(asOwner().mutation(guestLinks.revokeGuestLink as never, { threadId } as never)).rejects.toMatchObject({
+        const linkId = (await rows("threadGuestLinks"))[0]?._id;
+
+        await expect(asOwner().mutation(guestLinks.revokeGuestLink as never, { linkId, threadId } as never)).rejects.toMatchObject({
             data: { code: "GUEST_NOTES_WAITING", waiting: 1 },
         });
         expect(await rows("threadGuestMessages")).toHaveLength(1);
+    });
+
+    it("never takes a link that replaced the one the owner confirmed: it is refused as ended", async () => {
+        const seen = await createLink();
+        const replacement = await createLink();
+
+        await expect(revoke([], seen.id)).rejects.toMatchObject({ data: { code: "GUEST_LINK_ENDED" } });
+        expect(await rows("threadGuestLinks")).toMatchObject([{ _id: replacement.id }]);
+
+        await revoke([], replacement.id);
+
+        expect(await rows("threadGuestLinks")).toHaveLength(0);
     });
 
     it("takes a whole link in the revoke's own transaction, so no later removal deletes a note the check never saw", () => {
