@@ -8,8 +8,21 @@ const CONFIRM_REFRESH_READS = 6;
 const CONFIRM_HOLD_READS = 15;
 /** Unsettled checks after which a confirmation is given up; the final status is then left to the next read. */
 const CONFIRM_GIVE_UP_READS = 150;
-/** Pages read per check, newest first, before the send counts as not found: other sessions can push it back. */
-const CONFIRM_MAX_PAGES = 5;
+
+/**
+ * Pages read per check, newest first, before the send counts as not found: other sessions can push it back. With the
+ * short first page that is 20 + 5 × 100 messages, as far back as five full pages reached.
+ */
+const CONFIRM_MAX_PAGES = 6;
+
+/**
+ * Messages in a check's first page. The send, its steers and its reply are the newest messages of the chat, so a short
+ * page finds them; this page is read every two seconds while the reply is checked, so it stays small.
+ */
+export const CONFIRM_FIRST_PAGE_SIZE = 20;
+
+/** Messages in each further page of a check, when other messages pushed the send off the first one. */
+export const CONFIRM_PAGE_SIZE = 100;
 
 /** How far apart the follow-up checks are, after a reply that the relay did not confirm as complete. */
 export const CONFIRM_READ_INTERVAL_MS = 2000;
@@ -30,8 +43,8 @@ export interface ConfirmPage {
     page: ReadonlyArray<{ id: string; role: string; status: string }>;
 }
 
-/** Reads one page of a thread's messages, from the newest page when the cursor is null. */
-export type ConfirmPageFetch = (threadId: string, cursor: string | null) => Promise<ConfirmPage>;
+/** Reads one page of `pageSize` of a thread's messages, from the newest page when the cursor is null. */
+export type ConfirmPageFetch = (threadId: string, cursor: string | null, pageSize: number) => Promise<ConfirmPage>;
 
 /** What one round of checks decides: the replies that end, the ones that stop holding the composer, and whether to re-read. */
 export interface CheckRound {
@@ -78,7 +91,7 @@ export const readReplyState = async (
 
     for (let index = 0; index < CONFIRM_MAX_PAGES && isCurrent(); index += 1) {
         // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
-        const page = await fetchPage(threadId, cursor);
+        const page = await fetchPage(threadId, cursor, index === 0 ? CONFIRM_FIRST_PAGE_SIZE : CONFIRM_PAGE_SIZE);
 
         // `replyStateAfter` reads newest first; a page is oldest first inside, so it is reversed here.
         seen.push(
@@ -116,9 +129,9 @@ export const readAllReplyStates = async (
     isCurrent: () => boolean,
 ): Promise<ConfirmOutcome[]> => {
     const pages = new Map<string, Promise<ConfirmPage>>();
-    const sharedFetch: ConfirmPageFetch = (id, cursor) => {
-        const key = `${id}:${cursor ?? ""}`;
-        const known = pages.get(key) ?? fetchPage(id, cursor);
+    const sharedFetch: ConfirmPageFetch = (id, cursor, pageSize) => {
+        const key = `${id}:${cursor ?? ""}:${pageSize}`;
+        const known = pages.get(key) ?? fetchPage(id, cursor, pageSize);
 
         pages.set(key, known);
 

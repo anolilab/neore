@@ -15,6 +15,7 @@ import { secureGrantStore } from "@/auth/secure-store";
 import type { StartedChat } from "@/chat/chat-api";
 import { ChatError, startChat } from "@/chat/chat-api";
 import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
+import { HISTORY_PAGE_SIZE, readNewestRows } from "@/chat/message-pages";
 import { displayTextOf, shareTextOf } from "@/chat/message-parts";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
 import type { SendSession } from "@/chat/send-sessions";
@@ -50,7 +51,6 @@ const NEW_THREAD = "new";
 
 /** A new chat's screen moves to the chat its start opened, unless the send was stopped meanwhile (sign-out, leaving, a refusal). */
 const shouldMoveRoute = (routeThreadId: string, signal: AbortSignal): boolean => routeThreadId === NEW_THREAD && !signal.aborted;
-const MAX_HISTORY_PAGES = 10;
 const REFUSED_MESSAGE = "This chat is locked or no longer available.";
 const SHARE_FAILED_MESSAGE = "The message could not be shared. Try again.";
 const AWAIT_REPLY_MESSAGE = "Wait for the last reply to finish before sending another.";
@@ -130,9 +130,9 @@ const appendToRow = (rows: Row[], id: string, text: string): Row[] =>
         return { ...row, shareText: row.shareText + text, text: row.text + text };
     });
 
-const fetchMessagePage = (threadId: string, cursor: string | null) =>
+const fetchMessagePage = (threadId: string, cursor: string | null, pageSize: number = HISTORY_PAGE_SIZE) =>
     getClient().query(api.chat.functions.getThreadUIMessages, {
-        paginationOpts: { cursor, numItems: 100 },
+        paginationOpts: { cursor, numItems: pageSize },
         threadId: threadId as Id<"threads">,
     });
 
@@ -225,29 +225,17 @@ const Chat = () => {
         [accountId, writeRows],
     );
 
-    // The newest pages load when a chat opens; "Load older messages" fetches the rest one page at a time.
+    // The newest page loads when a chat opens, in one request; "Load older messages" fetches the rest one page at a time.
     const loadMessages = useCallback(
         async (id: string) => {
             const result = await readThreadMessages({
                 cache,
-                fetchRows: async (startedAt) => {
-                    const pages: Row[][] = [];
-                    let cursor: string | null = null;
-                    let isDone = false;
-
-                    for (let index = 0; !isDone && index < MAX_HISTORY_PAGES; index += 1) {
-                        // eslint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it
-                        const page = await fetchMessagePage(id, cursor);
-
-                        // Pages come newest first, and each page is oldest first inside (`toUIMessages` sorts it ascending).
-                        // Each older page goes in front, so the rows read oldest first.
-                        pages.unshift(page.page.map((message) => toRow(message, id, startedAt)));
-                        isDone = page.isDone;
-                        cursor = page.continueCursor;
-                    }
-
-                    return { olderCursor: isDone ? null : cursor, rows: pages.flat() };
-                },
+                // A page is oldest first inside (`toUIMessages` sorts it ascending), so its rows read oldest first.
+                fetchRows: async (startedAt) =>
+                    await readNewestRows(
+                        async (cursor, pageSize) => await fetchMessagePage(id, cursor, pageSize),
+                        (message) => toRow(message, id, startedAt),
+                    ),
                 gate: readGate.current,
                 threadId: id,
             });

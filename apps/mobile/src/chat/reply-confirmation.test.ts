@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Confirmation, ConfirmPage } from "./reply-confirmation";
-import { readAllReplyStates, readReplyState, tallyChecks } from "./reply-confirmation";
+import { CONFIRM_FIRST_PAGE_SIZE, CONFIRM_PAGE_SIZE, readAllReplyStates, readReplyState, tallyChecks } from "./reply-confirmation";
 
 /** One page of messages, given oldest first inside the page as the server returns them. */
 const page = (messages: [id: string, role: string, status?: string][], next: { continueCursor: string | null; isDone: boolean }): ConfirmPage => {
@@ -41,6 +41,43 @@ describe("readReplyState", () => {
 
         expect(await readReplyState(fetchPage, "t1", "sent", 0, () => true)).toBe("settled");
         expect(fetchPage.mock.calls.map((call) => call[1])).toEqual([null, "older"]);
+    });
+
+    it("finds a send on the newest page in one short request", async () => {
+        const fetchPage = vi.fn(
+            async (): Promise<ConfirmPage> =>
+                page(
+                    [
+                        ["earlier", "assistant"],
+                        ["sent", "user"],
+                        ["ours", "assistant", "pending"],
+                    ],
+                    { continueCursor: "older", isDone: false },
+                ),
+        );
+
+        expect(await readReplyState(fetchPage, "t1", "sent", 0, () => true)).toBe("pending");
+        expect(fetchPage.mock.calls).toStrictEqual([["t1", null, CONFIRM_FIRST_PAGE_SIZE]]);
+    });
+
+    it("reads full pages after the first when the send was pushed back", async () => {
+        const fetchPage = vi.fn(async (_threadId: string, cursor: string | null, _pageSize: number): Promise<ConfirmPage> => {
+            if (cursor === null) {
+                return page([["other", "user"]], { continueCursor: "older", isDone: false });
+            }
+
+            return page(
+                [
+                    ["sent", "user"],
+                    ["ours", "assistant"],
+                ],
+                { continueCursor: null, isDone: true },
+            );
+        });
+
+        await readReplyState(fetchPage, "t1", "sent", 0, () => true);
+
+        expect(fetchPage.mock.calls.map((call) => call[2])).toStrictEqual([CONFIRM_FIRST_PAGE_SIZE, CONFIRM_PAGE_SIZE]);
     });
 
     it("stops fetching once its check is no longer current", async () => {
