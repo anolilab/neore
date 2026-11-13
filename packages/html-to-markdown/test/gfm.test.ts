@@ -1,3 +1,4 @@
+import { createDocument } from "@mixmark-io/domino";
 import { describe, expect, it } from "vitest";
 
 import type { Options } from "../src/index";
@@ -179,5 +180,36 @@ describe("gfm review cases", () => {
 
     it("writes one pair of tildes for a strike nested in a strike", () => {
         expect(convert("<p><s>a<del>b</del></s></p>")).toBe("~~ab~~");
+    });
+});
+
+describe("gfm review cases, second round", () => {
+    it("writes a checkbox's current state, which a DOM input may have changed from its attribute", () => {
+        const box = `<input type="checkbox">`;
+        const document = createDocument(`<ul><li>${box}a</li><li><input type="checkbox" checked>b</li></ul>`);
+        const boxes = document.querySelectorAll("input");
+
+        (boxes[0] as HTMLInputElement).checked = true;
+        (boxes[1] as HTMLInputElement).checked = false;
+
+        expect(new TurndownService().use(gfm).turndown(document.body)).toBe("*   [x] a\n*   [ ] b");
+    });
+
+    it("finds a remove filter that another remove filter adds while it runs", () => {
+        const service = new TurndownService().use(gfm);
+        let isAdded = false;
+
+        service.remove((node) => {
+            if (!isAdded && node.getAttribute("class") === "gone") {
+                isAdded = true;
+                service.remove((candidate) => candidate.getAttribute("class") === "gone");
+            }
+
+            return false;
+        });
+
+        expect(service.turndown(`<table><tr><th>A</th><th class="gone">B</th></tr><tr><td>1</td><td class="gone">2</td></tr></table>`)).toBe(
+            "| A |\n| --- |\n| 1 |",
+        );
     });
 });

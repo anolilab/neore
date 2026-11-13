@@ -60,6 +60,9 @@ new TurndownService().use(gfm).turndown("<table><tr><th>a</th></tr><tr><td><s>1<
 - A table whose spans would fill more than 100,000 cells is written as its cells' text, a line per row.
 - `<del>`, `<s>` and `<strike>` are `~~text~~`. A checkbox is `[x] ` or `[ ] `.
 - An element that a `remove` filter matches is left out, even where a gfm rule would write it.
+- The table is laid out from the text gfm's own rules keep for each cell and caption. A rule added after `gfm` for
+  `td`, `th` or `caption` takes those elements from it, and the table does not write what that rule returns: its output
+  reaches the row mixed with the other cells', with no place in the grid.
 
 ## Status
 

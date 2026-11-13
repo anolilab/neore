@@ -488,7 +488,11 @@ const strikethrough: Rule = {
 const taskListItem: Rule = {
     filter: (node, _options, lookup) => node.nodeName === "INPUT" && (node.getAttribute("type") ?? "").toLowerCase() === "checkbox" && !lookup.isRemoved(node),
     replacement(_content, node) {
-        return node.hasAttribute("checked") ? "[x] " : "[ ] ";
+        // The current state, which a page may have changed since the markup set it; the attribute where there is none.
+        const { checked } = node as Partial<HTMLInputElement>;
+        const isChecked = typeof checked === "boolean" ? checked : node.hasAttribute("checked");
+
+        return isChecked ? "[x] " : "[ ] ";
     },
 };
 

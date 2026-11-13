@@ -268,10 +268,15 @@ export default class Rules implements RuleLookup {
             return known;
         }
 
+        // A filter may add a remove filter while it runs, which replaces the answers. This answer belongs to the old
+        // filters then, so it is not recorded.
+        const answersBefore = this.removedAnswers;
         // Annotated once per element, as ruleFor does: annotating reads the element's whole text.
         const isMatch = findRule(this.removeList, annotateNode(node, this.options), node.nodeName.toLowerCase(), this.options, this) !== undefined;
 
-        this.removedAnswers.set(node, isMatch);
+        if (this.removedAnswers === answersBefore) {
+            this.removedAnswers.set(node, isMatch);
+        }
 
         return isMatch;
     }
