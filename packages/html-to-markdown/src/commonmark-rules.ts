@@ -701,7 +701,7 @@ function siblingEdgeRun(sibling: Node, side: Side, options: Options, lookup: Rul
         // Whitespace on either side ends the run, so the walks from both members reach the same answer about it.
         const text = sibling.textContent ?? "";
 
-        return WHITESPACE_EDGE.test(textEdge(text, "left") ?? "") || WHITESPACE_EDGE.test(textEdge(text, "right") ?? "") ? { count: 0, wordEdge: false } : null;
+        return WHITESPACE_EDGE.test(text.slice(0, 1)) || WHITESPACE_EDGE.test(text.slice(-1)) ? { count: 0, wordEdge: false } : null;
     }
 
     if (isCustomRendered(sibling, lookup, options)) {
@@ -1057,10 +1057,27 @@ function isRenderedLink(element: Element, options: Options): boolean {
     return !(options.safeLinks && isUnsafeDestination(href));
 }
 
-function textEdge(text: string, side: Side): string | null {
-    const chars = [...text];
+// The highest code point that fits in one UTF-16 unit.
+const LAST_SINGLE_UNIT = 65_535;
 
-    return chars[side === "left" ? chars.length - 1 : 0] ?? null;
+/** The code point at one end of the text, read without copying the text: the last one for "left", the first for "right". */
+function textEdge(text: string, side: Side): string | null {
+    if (text === "") {
+        return null;
+    }
+
+    if (side === "right") {
+        return String.fromCodePoint(text.codePointAt(0) ?? 0);
+    }
+
+    // The last code point starts one unit back, or two when the last unit is the low half of a surrogate pair.
+    const pairStart = text.length - 2;
+
+    if (pairStart >= 0 && (text.codePointAt(pairStart) ?? 0) > LAST_SINGLE_UNIT) {
+        return text.slice(pairStart);
+    }
+
+    return text.slice(-1);
 }
 
 /** The edge of the first child, from the facing end, that outputs something. */

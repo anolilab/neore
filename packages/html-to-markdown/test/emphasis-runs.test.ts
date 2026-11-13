@@ -259,3 +259,19 @@ describe("emphasis beside a nested same-kind element that prints no delimiters",
         expect(new TurndownService().turndown("<strong><em>a</em><strong>b</strong></strong>")).toBe("***a*b**");
     });
 });
+
+/*
+ * The character beside emphasis is read as a whole code point, so a symbol or letter outside the Basic Multilingual
+ * Plane (two UTF-16 units) is classed by what it is, not by one of its halves.
+ */
+
+describe("emphasis beside a character outside the Basic Multilingual Plane", () => {
+    it.each([
+        ["a symbol before", "\u{1F600}<em>a</em>", "\u{1F600}_a_"],
+        ["a symbol after", "<em>a</em>\u{1F600}", "_a_\u{1F600}"],
+        ["a letter before", "\u{1D400}<em>a</em>", "\u{1D400}*a*"],
+        ["a letter after", "<em>a</em>\u{1D400}", "*a*\u{1D400}"],
+    ])("classes %s by its code point", (_name, html, expected) => {
+        expect(new TurndownService().turndown(html)).toBe(expected);
+    });
+});

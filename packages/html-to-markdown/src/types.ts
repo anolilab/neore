@@ -47,7 +47,11 @@ export interface Options {
 export interface RuleLookup {
     /** True when a rule of any kind (built-in, added, keep or remove) matches the node. */
     hasRuleFor: (node: Node) => boolean;
-    /** The rule that handles the node, or undefined when none matches. Asked once per node, so it is the rule that outputs it. */
+
+    /**
+     * The first rule whose filter matches the node, or undefined when none matches. Asked once per node, so the answer
+     * does not change. A blank node is still written by `blankReplacement`, whatever this returns.
+     */
     ruleFor: (node: Node) => Rule | undefined;
 }
 
