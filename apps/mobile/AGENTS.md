@@ -48,7 +48,8 @@
   - A send stopped before its first try sends nothing; sign-out ends the mint epoch before its first await (`runSignOut`).
   - Sign-out stops every send still retrying (`sendSessions`) and drops its prompt and held id.
   - A prompt given back after its chat screen unmounted waits in `unsentPrompts` (per account and chat, cleared at
-    sign-out) and returns, with its held id, when that chat's screen mounts again.
+    sign-out) and returns, with its held id, to that chat's screen: at its next mount, or at once to one already mounted
+    (`watch`); each is taken once. A screen holding its own send keeps it first (`withUnsentPrompt`).
   - A start with `streaming: false` (no `streamToken`) follows no stream: the chat's saved reply is read instead.
   - Match codes lower-cased: the gateway passes `/chat/start`'s SCREAMING_CASE, the public API uses snake_case.
   - Nothing is held and polled for: the resend is idempotent.

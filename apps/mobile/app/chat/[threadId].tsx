@@ -21,7 +21,7 @@ import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import type { HeldSend } from "@/chat/start-send";
 import { holdFor, planSend, replyStreamOf, startWithRetries } from "@/chat/start-send";
 import { relayReply } from "@/chat/stream";
-import { giveBackOrKeep, restoreUnsentPrompt, unsentPromptKey, unsentPrompts } from "@/chat/unsent-prompts";
+import { followUnsentPrompts, giveBackOrKeep, unsentPromptKey, unsentPrompts, withUnsentPrompt } from "@/chat/unsent-prompts";
 import type { SendStage } from "@/chat/unsent-send";
 import { failedSendMessage, failedSendOutcome, giveBackDraft, shouldKeepClientMessageId, withoutUnsentRows } from "@/chat/unsent-send";
 import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
@@ -478,18 +478,20 @@ const Chat = () => {
         return { isMerged };
     };
 
-    // A prompt given back while this chat's screen was gone comes back into the composer with its held send.
+    // A prompt given back while this chat's screen was gone comes back into the composer with its held send: one kept before
+    // this mount at once, and one kept while it is mounted (a send left during its token mint that settles after the
+    // person came back) when it lands. Each is taken once. A hold the screen already has is kept (`withUnsentPrompt`).
     useEffect(() => {
         if (accountId === undefined) {
-            return;
+            return undefined;
         }
 
-        restoreUnsentPrompt({
+        return followUnsentPrompts({
             apply: (entry) => {
-                const given = giveBackDraft(draftRef.current, entry.prompt);
+                const next = withUnsentPrompt({ draft: draftRef.current, held: heldSend.current }, entry);
 
-                setDraft(given.draft);
-                heldSend.current = entry.held ? holdFor(entry.held, given.draft) : null;
+                setDraft(next.draft);
+                heldSend.current = next.held;
             },
             key: unsentPromptKey(accountId, threadId),
             store: unsentPrompts,
