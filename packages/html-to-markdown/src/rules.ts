@@ -1,6 +1,18 @@
 import annotateNode from "./node";
 import type { AnnotatedNode, Options, ReplacementFunction, Rule, RuleLookup } from "./types";
 
+/** The answers given to nodes during one conversion. */
+interface Answers {
+    /** A rule's answer, kept for the whole conversion so a node never gets a second one. */
+    readonly decided: WeakMap<Node, Rule>;
+    /** No-match answers. Dropped when a rule, keep or remove is added, because the new one may match them. */
+    undecided: WeakSet<Node>;
+}
+
+function newAnswers(): Answers {
+    return { decided: new WeakMap(), undecided: new WeakSet() };
+}
+
 /**
  * Manages the rules used to convert HTML to Markdown: the built-in rules, then
  * the ones added with `addRule`, then keep/remove filters.
@@ -12,15 +24,10 @@ export default class Rules implements RuleLookup {
 
     private readonly removeList: Rule[] = [];
 
-    // The rule each node was given, or undefined when none matched. Replaced whenever a rule is added, so a
-    // negative answer given before the rule existed is not reused.
-    private decided = new WeakMap<Node, Rule>();
-
-    // Nodes that no rule matched. Dropped when a rule is added, because the new rule may match them.
-    private undecided = new WeakSet<Node>();
-
     // The lists a node is searched in, in order: added and built-in rules, then keep, then remove.
     private readonly searchOrder: ReadonlyArray<ReadonlyArray<Rule>> = [this.array, this.keepList, this.removeList];
+
+    private readonly answers = newAnswers();
 
     private readonly options: Options;
 
@@ -45,7 +52,7 @@ export default class Rules implements RuleLookup {
 
     add(_key: string, rule: Rule): void {
         this.array.unshift(rule);
-        this.undecided = new WeakSet();
+        this.answers.undecided = new WeakSet();
     }
 
     keep(filter: Rule["filter"]): void {
@@ -53,7 +60,7 @@ export default class Rules implements RuleLookup {
             filter,
             replacement: this.keepReplacement,
         });
-        this.undecided = new WeakSet();
+        this.answers.undecided = new WeakSet();
     }
 
     remove(filter: Rule["filter"]): void {
@@ -61,7 +68,7 @@ export default class Rules implements RuleLookup {
             filter,
             replacement: () => "",
         });
-        this.undecided = new WeakSet();
+        this.answers.undecided = new WeakSet();
     }
 
     forNode(node: AnnotatedNode): Rule {
@@ -69,7 +76,7 @@ export default class Rules implements RuleLookup {
             return this.blankRule;
         }
 
-        return decideRule(this.decided, this.undecided, this.searchOrder, node, this.options, this) ?? this.defaultRule;
+        return decideRule(this.answers, this.searchOrder, node, this.options, this) ?? this.defaultRule;
     }
 
     /**
@@ -82,7 +89,7 @@ export default class Rules implements RuleLookup {
             return false;
         }
 
-        return decideRule(this.decided, this.undecided, this.searchOrder, annotateNode(node, this.options), this.options, this) !== undefined;
+        return decideRule(this.answers, this.searchOrder, annotateNode(node, this.options), this.options, this) !== undefined;
     }
 
     forEach(visit: (rule: Rule, index: number) => void): void {
@@ -98,20 +105,19 @@ export default class Rules implements RuleLookup {
  * answer that differs from the first would split the two. The first answer is kept.
  */
 function decideRule(
-    decided: WeakMap<Node, Rule>,
-    undecided: WeakSet<Node>,
+    answers: Answers,
     searchOrder: ReadonlyArray<ReadonlyArray<Rule>>,
     node: AnnotatedNode,
     options: Options,
     lookup: RuleLookup,
 ): Rule | undefined {
-    const known = decided.get(node);
+    const known = answers.decided.get(node);
 
     if (known) {
         return known;
     }
 
-    if (undecided.has(node)) {
+    if (answers.undecided.has(node)) {
         return undefined;
     }
 
@@ -122,13 +128,13 @@ function decideRule(
         const rule = findRule(list, node, nodeName, options, lookup);
 
         if (rule) {
-            decided.set(node, rule);
+            answers.decided.set(node, rule);
 
             return rule;
         }
     }
 
-    undecided.add(node);
+    answers.undecided.add(node);
 
     return undefined;
 }
