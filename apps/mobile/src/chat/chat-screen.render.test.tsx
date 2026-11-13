@@ -58,6 +58,13 @@ const stable = vi.hoisted(() => {
 // eslint-disable-next-line no-restricted-syntax -- react-native cannot load in Node; the screen imports it directly
 vi.mock(import("react-native"), () => ({
     AccessibilityInfo: { announceForAccessibility: () => {} },
+    // The app is in the front (`useIsAppActive`).
+    AppState: {
+        addEventListener: () => {
+            return { remove: () => {} };
+        },
+        currentState: "active",
+    },
     Keyboard: {
         addListener: () => {
             return { remove: () => {} };
@@ -114,6 +121,8 @@ vi.mock(import("expo-router"), async () => {
         useFocusEffect: (effect: () => (() => void) | undefined) => {
             useEffect(effect, [effect]);
         },
+        // The chat is on screen: its reply checks run (`useReplyConfirmation`'s pause).
+        useIsFocused: () => true,
         useLocalSearchParams: () => {
             return { threadId: "t1" };
         },
