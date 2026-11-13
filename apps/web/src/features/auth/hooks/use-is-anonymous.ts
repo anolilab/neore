@@ -1,8 +1,7 @@
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 
 export default function useIsAnonymous() {
-    const { hooks } = useAuth();
-    const sessionResult = hooks.useSession();
+    const sessionResult = useAuthSession();
     const { data: sessionData } = sessionResult;
 
     const user = sessionData?.user;

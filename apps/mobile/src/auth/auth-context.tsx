@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { clearLastThread } from "../chat/last-thread-store";
 import { sendSessions } from "../chat/send-sessions";
 import { loadConfig } from "../lib/config";
+import { withFinally } from "../lib/guarded";
 import { getClient } from "../lib/lunora";
 import {
     backendPushServer,
@@ -129,10 +130,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             timer = setTimeout(setRefreshTick, tokenRefreshDelayMs(jwt) ?? FALLBACK_REFRESH_MS, nextTick);
         };
 
+        // `withFinally`, not `try … finally`: the React Compiler skips a component that holds a `finally`.
         const run = async () => {
-            try {
-                await mint();
-            } finally {
+            await withFinally(mint, () => {
                 const waiting = [...renewalWaiters.current];
 
                 renewalWaiters.current.length = 0;
@@ -140,7 +140,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 for (const resolve of waiting) {
                     resolve();
                 }
-            }
+            });
         };
 
         run();
@@ -156,12 +156,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         epoch.open();
         dispatch({ type: "sign-in-started" });
 
-        try {
-            await signInWithBrowser({ appUrl: config.appUrl, lunoraUrl: config.lunoraUrl });
-        } finally {
+        await withFinally(async () => await signInWithBrowser({ appUrl: config.appUrl, lunoraUrl: config.lunoraUrl }), () => {
             // Also after a cancelled browser flow: the mint it ended must be replaced, or the status stays `loading`.
             setRefreshTick(nextTick);
-        }
+        });
     }, [config.appUrl, config.lunoraUrl, epoch]);
 
     const signOut = useCallback(async () => {
