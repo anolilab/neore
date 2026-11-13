@@ -132,6 +132,21 @@ describe("reportLoadTiming", () => {
         expect(sentProperties()).toMatchObject({ composer_visible_ms: 800, sidebar_list_visible_ms: undefined });
     });
 
+    it("drops a paint web-vitals reports after the first hide, keeping the buffered one from before it", async () => {
+        entries["largest-contentful-paint"] = [{ name: "", startTime: 900 }];
+
+        const { reportLoadTiming } = await loadReporter();
+        const { onFCP, onLCP } = await import("web-vitals");
+
+        // Hidden at 3000 while the chunk loaded, back in front when it arrived.
+        reportLoadTiming({ firstHiddenAt: 3000, hasBeenVisible: true });
+        vi.mocked(onLCP).mock.calls[0]?.[0]({ name: "LCP", navigationType: "navigate", value: 5000 } as Parameters<Parameters<typeof onLCP>[0]>[0]);
+        vi.mocked(onFCP).mock.calls[0]?.[0]({ name: "FCP", navigationType: "navigate", value: 4500 } as Parameters<Parameters<typeof onFCP>[0]>[0]);
+        setVisibility("hidden");
+
+        expect(sentProperties()).toMatchObject({ fcp_ms: undefined, lcp_ms: 900 });
+    });
+
     it("waits in a browser without visibility-state entries when the page was never shown", async () => {
         Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
 

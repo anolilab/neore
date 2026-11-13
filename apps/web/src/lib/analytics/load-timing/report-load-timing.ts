@@ -249,7 +249,13 @@ export const reportLoadTiming = ({ exited = false, firstHiddenAt: seenHiddenAt, 
                 marks: readMarks(),
                 navigationType: navigationType ?? entryNavigationType(navigation),
                 pathname,
-                vitals: { ...entryVitals, ...vitals },
+                // web-vitals' paints get the same cutoff: after a tab is revealed it can report a paint of the reveal.
+                vitals: {
+                    FCP: beforeHidden(vitals.FCP) ?? entryVitals.FCP,
+                    INP: vitals.INP,
+                    LCP: beforeHidden(vitals.LCP) ?? entryVitals.LCP,
+                    TTFB: vitals.TTFB ?? entryVitals.TTFB,
+                },
             }),
         );
     };

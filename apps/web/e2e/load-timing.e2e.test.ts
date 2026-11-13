@@ -101,45 +101,48 @@ const readLoad = async (page: Page): Promise<LoadSample> => {
         })
         .toBe(3);
 
-    return await page.evaluate(async (settleMs: number) => {
-        const at = (name: string): number | undefined => performance.getEntriesByName(`load-probe:${name}`, "mark")[0]?.startTime;
-        // LCP keeps updating while larger content paints: observe until no new candidate came for `settleMs` (at most
-        // six times that), then take the latest; the observer is disconnected only then.
-        const lcp = await new Promise<number | undefined>((resolve) => {
-            let latest: number | undefined;
-            let settle: ReturnType<typeof setTimeout> | undefined;
-            let observer: PerformanceObserver | undefined;
-            let cap: ReturnType<typeof setTimeout> | undefined;
-            const finish = (): void => {
-                clearTimeout(settle);
-                clearTimeout(cap);
-                observer?.disconnect();
-                resolve(latest);
-            };
-
-            cap = setTimeout(finish, settleMs * 6);
-
-            try {
-                observer = new PerformanceObserver((list) => {
-                    latest = list.getEntries().at(-1)?.startTime ?? latest;
+    return await page.evaluate(
+        async ({ deadlineMs, settleMs }: { deadlineMs: number; settleMs: number }) => {
+            const at = (name: string): number | undefined => performance.getEntriesByName(`load-probe:${name}`, "mark")[0]?.startTime;
+            // LCP keeps updating while larger content paints: observe until no new candidate came for `settleMs`, at the latest
+            // until the milestones' own deadline from navigation start, then take the latest; the observer is disconnected only then.
+            const lcp = await new Promise<number | undefined>((resolve) => {
+                let latest: number | undefined;
+                let settle: ReturnType<typeof setTimeout> | undefined;
+                let observer: PerformanceObserver | undefined;
+                let cap: ReturnType<typeof setTimeout> | undefined;
+                const finish = (): void => {
                     clearTimeout(settle);
-                    settle = setTimeout(finish, settleMs);
-                });
-                observer.observe({ buffered: true, type: "largest-contentful-paint" });
-                settle = setTimeout(finish, settleMs);
-            } catch {
-                finish();
-            }
-        });
+                    clearTimeout(cap);
+                    observer?.disconnect();
+                    resolve(latest);
+                };
 
-        return {
-            composer: at("composer"),
-            fcp: performance.getEntriesByName("first-contentful-paint")[0]?.startTime,
-            lcp,
-            messages: at("messages"),
-            sidebar: at("sidebar"),
-        };
-    }, LCP_SETTLE_MS);
+                cap = setTimeout(finish, Math.max(settleMs, deadlineMs - performance.now()));
+
+                try {
+                    observer = new PerformanceObserver((list) => {
+                        latest = list.getEntries().at(-1)?.startTime ?? latest;
+                        clearTimeout(settle);
+                        settle = setTimeout(finish, settleMs);
+                    });
+                    observer.observe({ buffered: true, type: "largest-contentful-paint" });
+                    settle = setTimeout(finish, settleMs);
+                } catch {
+                    finish();
+                }
+            });
+
+            return {
+                composer: at("composer"),
+                fcp: performance.getEntriesByName("first-contentful-paint")[0]?.startTime,
+                lcp,
+                messages: at("messages"),
+                sidebar: at("sidebar"),
+            };
+        },
+        { deadlineMs: MILESTONE_TIMEOUT_MS, settleMs: LCP_SETTLE_MS },
+    );
 };
 
 /** Click the sidebar row of `thread` from inside the page and time until its messages show. */
