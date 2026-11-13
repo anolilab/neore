@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { holdSendForSignIn, runSendMessage } from "@/features/chat/core/context/send-message";
 import { holdForSignIn } from "@/features/chat/core/hooks/use-pending-send";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
-import { isSendStarting } from "@/features/chat/core/utils/send-in-flight";
+import { clearSendStarting, isSendStarting, markSendStarting, subscribeSendStarting } from "@/features/chat/core/utils/send-in-flight";
 import { useGoalComposer } from "@/features/chat/goal/goal-store";
 
 vi.mock("@/lib/env", () => {
@@ -114,7 +114,7 @@ afterEach(() => {
     vi.unstubAllGlobals();
     useGoalComposer.getState().setEnabled(false);
     useChatUIStore.getState().setComposerText("");
-    useChatUIStore.setState({ composerBannedContent: null });
+    useChatUIStore.setState({ composerBannedContent: null, isSubmitting: false });
     vi.mocked(holdForSignIn).mockClear();
 });
 
@@ -154,11 +154,12 @@ describe("runSendMessage with a held guest note", () => {
 
         useChatUIStore.getState().setComposerText("my half-written reply");
 
-        await runSendMessage(timedOut as never, NOTE.text, undefined, FROM_PANEL);
+        const outcome = await runSendMessage(timedOut as never, NOTE.text, undefined, FROM_PANEL);
 
         expect(sentBodies).toHaveLength(0);
         expect(useChatUIStore.getState().composerText).toBe("my half-written reply");
-        expect(timedOut.handleError).toHaveBeenCalledWith(expect.objectContaining({ message: "guest note not sent" }));
+        expect(outcome).toStrictEqual({ failure: "guest note not sent", refused: false, started: false });
+        expect(timedOut.handleError).not.toHaveBeenCalled();
     });
 
     it("neither puts the note in the composer nor holds it as the owner's words when they must sign in first", () => {
@@ -182,14 +183,34 @@ describe("runSendMessage with a held guest note", () => {
         ["asGoal", "not as a goal"],
         ["beingSent", "being sent"],
         ["linkEnded", "link ended"],
-    ] as const)("says what a %s refusal of the note means, in the app's words", async (answer, message) => {
+    ] as const)("says what a %s refusal of the note means, in the app's words, to the Guests tab only", async (answer, message) => {
         const refused = env();
 
         gateway.answer = answer;
 
-        await runSendMessage(refused as never, NOTE.text, undefined, FROM_PANEL);
+        const outcome = await runSendMessage(refused as never, NOTE.text, undefined, FROM_PANEL);
 
-        expect(refused.handleError).toHaveBeenCalledWith(expect.objectContaining({ message }));
+        expect(outcome).toStrictEqual({ failure: message, refused: false, started: false });
+        // Not the chat's error banner, whose Retry would rerun the owner's last reply.
+        expect(refused.handleError).not.toHaveBeenCalled();
+    });
+
+    it("leaves the owner's error banner, and its Retry, in place: only the owner's own send clears it", async () => {
+        const guest = env();
+        const own = env();
+
+        gateway.answer = "accept";
+        await runSendMessage(guest as never, NOTE.text, undefined, FROM_PANEL);
+        await runSendMessage(own as never, "my own words");
+
+        expect(guest.setError).not.toHaveBeenCalledWith(null);
+        expect(own.setError).toHaveBeenCalledWith(null);
+    });
+
+    it("counts the note's send as started only once the gateway took it", async () => {
+        gateway.answer = "accept";
+
+        expect(await runSendMessage(env() as never, NOTE.text, undefined, FROM_PANEL)).toStrictEqual({ refused: false, started: true });
     });
 
     it("does not read another 409, a host-run thread's, as the note already sent", async () => {
@@ -197,9 +218,10 @@ describe("runSendMessage with a held guest note", () => {
 
         gateway.answer = "hostRun";
 
-        await runSendMessage(hostRun as never, NOTE.text, undefined, FROM_PANEL);
+        const outcome = await runSendMessage(hostRun as never, NOTE.text, undefined, FROM_PANEL);
 
-        expect(hostRun.handleError).toHaveBeenCalledWith(expect.objectContaining({ message: "This thread runs on a paired computer." }));
+        expect(outcome).toMatchObject({ failure: "This thread runs on a paired computer.", started: false });
+        expect(hostRun.handleError).not.toHaveBeenCalled();
     });
 
     it("counts the send as starting in its thread until it returns, so no other send starts beside it", async () => {
@@ -210,6 +232,41 @@ describe("runSendMessage with a held guest note", () => {
         expect(isSendStarting("t1")).toBe(true);
         await sending;
         expect(isSendStarting("t1")).toBe(false);
+    });
+
+    it("ends a send refused for banned words as refused, so what queued behind it waits", async () => {
+        const ended = vi.fn();
+        const unsubscribe = subscribeSendStarting(ended);
+
+        try {
+            gateway.answer = "banned";
+            await runSendMessage(env() as never, "my own words");
+            gateway.answer = "unavailable";
+            await runSendMessage(env() as never, "my own words");
+        } finally {
+            unsubscribe();
+        }
+
+        expect(ended.mock.calls).toStrictEqual([[{ refused: true, threadId: "t1" }], [{ refused: false, threadId: "t1" }]]);
+    });
+
+    it("tells a refusal at once, though another send in the thread is still starting", () => {
+        const ended = vi.fn();
+        const unsubscribe = subscribeSendStarting(ended);
+
+        try {
+            markSendStarting("t1");
+            markSendStarting("t1");
+            clearSendStarting("t1", { refused: true });
+
+            expect(ended.mock.calls).toStrictEqual([[{ refused: true, threadId: "t1" }]]);
+
+            clearSendStarting("t1");
+
+            expect(ended).toHaveBeenLastCalledWith({ refused: false, threadId: "t1" });
+        } finally {
+            unsubscribe();
+        }
     });
 
     it("sends none of the composer's files with a guest's note", async () => {
@@ -225,11 +282,53 @@ describe("runSendMessage with a held guest note", () => {
         gateway.answer = "banned";
         useChatUIStore.getState().setComposerText("my half-written reply");
 
-        await runSendMessage(banned as never, NOTE.text, undefined, FROM_PANEL);
+        const outcome = await runSendMessage(banned as never, NOTE.text, undefined, FROM_PANEL);
 
         expect(useChatUIStore.getState().composerBannedContent).toBeNull();
         expect(useChatUIStore.getState().composerText).toBe("my half-written reply");
-        expect(banned.handleError).toHaveBeenCalled();
+        expect(outcome).toMatchObject({ started: false });
+        expect(outcome.failure).not.toBe("");
+        expect(banned.handleError).not.toHaveBeenCalled();
+    });
+
+    it("runs on the thread's saved settings, leaving the owner's unsent ones for the owner's next send", async () => {
+        let unsent: { customSystemPrompt: string } | null = { customSystemPrompt: "the owner's new prompt" };
+        // As the store does: the changes are taken out when read.
+        const getChangedSettings = vi.fn(() => {
+            const taken = unsent;
+
+            unsent = null;
+
+            return taken;
+        });
+
+        gateway.answer = "accept";
+        await runSendMessage(env({ getChangedSettings }) as never, NOTE.text, undefined, FROM_PANEL);
+
+        expect(getChangedSettings).not.toHaveBeenCalled();
+        expect(sentBodies[0]).not.toHaveProperty("customSystemPrompt");
+
+        await runSendMessage(env({ getChangedSettings }) as never, "my own words");
+
+        expect(sentBodies[1]).toMatchObject({ customSystemPrompt: "the owner's new prompt" });
+    });
+
+    it("leaves the composer's submit guard to the composer that set it, on every way a guest's send ends", async () => {
+        const timedOut = env({ authGate: { isReady: () => false, set: vi.fn(), wait: vi.fn(async () => false) } });
+
+        // Another pane's send is waiting for its session.
+        useChatUIStore.getState().setIsSubmitting(true);
+        gateway.answer = "accept";
+        await runSendMessage(env() as never, NOTE.text, undefined, FROM_PANEL);
+        await runSendMessage(timedOut as never, NOTE.text, undefined, FROM_PANEL);
+        await runSendMessage(env() as never, "\u{200B}", undefined, FROM_PANEL);
+        holdSendForSignIn(NOTE.text, FROM_PANEL);
+
+        expect(useChatUIStore.getState().isSubmitting).toBe(true);
+
+        await runSendMessage(env() as never, "my own words");
+
+        expect(useChatUIStore.getState().isSubmitting).toBe(false);
     });
 
     it("refuses a local turn, which would save the guest's words as the owner's", async () => {
@@ -237,9 +336,11 @@ describe("runSendMessage with a held guest note", () => {
 
         useChatUIStore.getState().setComposerText("my half-written reply");
 
-        await runSendMessage(local as never, NOTE.text, undefined, FROM_PANEL);
+        const outcome = await runSendMessage(local as never, NOTE.text, undefined, FROM_PANEL);
 
         expect(local.sendLocalTurn).not.toHaveBeenCalled();
+        expect(outcome).toStrictEqual({ failure: "hosted only", refused: false, started: false });
+        expect(local.handleError).not.toHaveBeenCalled();
         expect(useChatUIStore.getState().composerText).toBe("my half-written reply");
     });
 });

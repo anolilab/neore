@@ -29,7 +29,12 @@ const revokeCalled = fn(() => null);
 const FIXTURES = guestLinksFixtures();
 
 const meta = {
-    args: { sendNote: fn(async () => "sent" as const), threadId: "thread-1" },
+    args: {
+        sendNote: fn(async () => {
+            return { kind: "sent" as const };
+        }),
+        threadId: "thread-1",
+    },
     component: WithRevoke,
     decorators: [
         (Story) => (

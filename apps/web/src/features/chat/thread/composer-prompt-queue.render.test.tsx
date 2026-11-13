@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { EMPTY_PROMPT_QUEUE, serializePromptQueue } from "@/features/chat/core/utils/prompt-queue";
-import { clearSendStarting, markSendStarting } from "@/features/chat/core/utils/send-in-flight";
+import { clearSendStarting, isSendStarting, markSendStarting } from "@/features/chat/core/utils/send-in-flight";
 
 import ComposerPromptQueue from "./composer-prompt-queue";
 
@@ -150,6 +150,12 @@ describe("composer prompt queue", () => {
         withdrawSteer.mockReset();
         toast.showInfo.mockReset();
         usePromptQueueStore.setState({ offlineHolds: {}, queues: {} });
+
+        // A test that failed midway can leave a send marked as starting in the thread.
+        while (isSendStarting(chat.threadId)) {
+            clearSendStarting(chat.threadId);
+        }
+
         // Marks the thread as hydrated, so the (empty) stored queue is not read over ours.
         usePromptQueueStore.getState().hydrate(chat.threadId);
     });
@@ -172,7 +178,7 @@ describe("composer prompt queue", () => {
         expect(screen.getByText("an ended session's prompt")).toBeTruthy();
     });
 
-    it("holds a queued prompt while another send in the thread has begun and its reply does not stream yet", async () => {
+    it("holds a queued prompt while another send in the thread has begun, and sends it once that send ends without a reply", async () => {
         chat.error = undefined;
         markSendStarting(chat.threadId);
 
@@ -187,8 +193,102 @@ describe("composer prompt queue", () => {
 
             expect(chat.sendMessage).not.toHaveBeenCalled();
         } finally {
-            clearSendStarting(chat.threadId);
+            // The send that held it ends, refused before any reply streamed: no streaming -> idle transition follows.
+            act(() => {
+                clearSendStarting(chat.threadId);
+            });
         }
+
+        await nextFrame();
+        await nextFrame();
+
+        expect(chat.sendMessage).toHaveBeenCalledWith("queued", []);
+    });
+
+    it("leaves an old queue put when another thread's send ends", async () => {
+        chat.error = undefined;
+        // Queued before this thread showed: coming back to it never sends by surprise.
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+        render(<ComposerPromptQueue />);
+
+        markSendStarting("another-thread");
+        act(() => {
+            clearSendStarting("another-thread");
+        });
+        await nextFrame();
+        await nextFrame();
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("leaves an old queue put when a send of its own thread ends that it never waited for", async () => {
+        chat.error = undefined;
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+        render(<ComposerPromptQueue />);
+
+        markSendStarting(chat.threadId);
+        act(() => {
+            clearSendStarting(chat.threadId);
+        });
+        await nextFrame();
+        await nextFrame();
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("pauses the queue behind a composer send refused for banned words, though its brief reply state ends cleanly", async () => {
+        chat.error = undefined;
+        markSendStarting(chat.threadId);
+        // The send began its reply state before the gateway answered.
+        chat.isStreaming = true;
+
+        const view = render(<ComposerPromptQueue />);
+
+        // Queued behind it while it is out.
+        act(() => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+        });
+        // Refused: the text goes back to the composer, and the reply state ends without an error.
+        act(() => {
+            clearSendStarting(chat.threadId, { refused: true });
+        });
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+        await nextFrame();
+        await nextFrame();
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
+    });
+
+    it("pauses the queue when its own first prompt is refused for banned words, so the second does not go at once", async () => {
+        chat.error = undefined;
+        // The queue's send begins its reply state, then is refused.
+        chat.sendMessage.mockImplementation(() => {
+            markSendStarting(chat.threadId);
+            chat.isStreaming = true;
+        });
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "first" });
+
+        const view = render(<ComposerPromptQueue />);
+
+        act(() => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "second" });
+        });
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+        view.rerender(<ComposerPromptQueue />);
+        await nextFrame();
+
+        act(() => {
+            clearSendStarting(chat.threadId, { refused: true });
+        });
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+        await nextFrame();
+        await nextFrame();
+
+        expect(chat.sendMessage).toHaveBeenCalledTimes(1);
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
     });
 
     it("holds a queued prompt while the thread's mode is saving, and sends it once the save has ended", async () => {
@@ -385,6 +485,38 @@ describe("composer prompt queue", () => {
         render(<ComposerPromptQueue />);
 
         await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", []));
+    });
+
+    it("keeps a prompt when the queue is paused (Stop) while its steer withdrawal settles", async () => {
+        chat.error = undefined;
+
+        let finish: (value: { outcome: "withdrawn" }) => void = () => {};
+
+        // The lib target has no `Promise.withResolvers` yet.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve) => {
+            finish = resolve;
+        });
+
+        withdrawSteer.mockReturnValue(promise);
+        render(<ComposerPromptQueue />);
+
+        await act(async () => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+        });
+        expect(withdrawSteer).toHaveBeenCalledTimes(1);
+
+        // Stop pauses the queue while the withdrawal is still out.
+        act(() => {
+            usePromptQueueStore.getState().setPaused(chat.threadId, true);
+        });
+
+        await act(async () => {
+            finish({ outcome: "withdrawn" });
+        });
+        await nextFrame();
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
     });
 
     it("holds a prompt when a mode save begins after the last render, while a steer withdrawal settles", async () => {

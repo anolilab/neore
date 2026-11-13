@@ -47,7 +47,7 @@ import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-
 import { allowPromptQueueRestore, selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import type { QueuedSteer, SteerWithdrawal } from "@/features/chat/core/utils/prompt-queue";
 import { decideAutoSend, deliveredSteerItems, takeNextToSend } from "@/features/chat/core/utils/prompt-queue";
-import { isSendStarting } from "@/features/chat/core/utils/send-in-flight";
+import { isSendStarting, subscribeSendStarting } from "@/features/chat/core/utils/send-in-flight";
 import { useConnectionView } from "@/features/connection/hooks/use-connection";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 import { showError, showInfo } from "@/lib/toast";
@@ -117,9 +117,54 @@ const useQueueActions = () => {
     const removePromptRef = useRef<(threadId: string, id: string) => Promise<void>>(async () => {});
     const sendNextPromptRef = useRef<(threadId: string, options?: { explicit?: boolean }) => Promise<void>>(async () => {});
 
+    // Threads whose send was held only because another send there had begun (`explicit` as asked): that send's end tries again.
+    const deferredRef = useRef(new Map<string, boolean>());
+    // That end, waiting for the render after it: a reply the send started reads as streaming there, an error as an error.
+    const [released, setReleased] = useState<{ explicit: boolean; threadId: string }>();
+
+    const deferBehindStartingSend = useCallback((threadId: string, explicit: boolean): boolean => {
+        if (!isSendStarting(threadId)) {
+            return false;
+        }
+
+        deferredRef.current.set(threadId, explicit || deferredRef.current.get(threadId) === true);
+
+        return true;
+    }, []);
+
     useEffect(() => {
         latestRef.current = { hasError: Boolean(error), isStreaming, offline, threadId: currentThreadId };
     }, [currentThreadId, error, isStreaming, offline]);
+
+    // Only the thread whose send was held, and only when it was held: never a queue another thread's send never touched.
+    useEffect(
+        () =>
+            subscribeSendStarting(({ refused, threadId }) => {
+                const explicit = deferredRef.current.get(threadId);
+
+                // A refused send (banned words) went back to the composer to be fixed: the queue waits for the owner (Send next,
+                // or resume), as after an error. Paused now, before the streaming -> idle that follows reads as a plain end.
+                if (refused) {
+                    deferredRef.current.delete(threadId);
+
+                    const { queues, setPaused } = usePromptQueueStore.getState();
+
+                    if ((queues[threadId]?.items.length ?? 0) > 0) {
+                        setPaused(threadId, true);
+                    }
+
+                    return;
+                }
+
+                if (explicit === undefined) {
+                    return;
+                }
+
+                deferredRef.current.delete(threadId);
+                setReleased({ explicit, threadId });
+            }),
+        [],
+    );
 
     /** Once `busyRef` is free: runs the removals asked for meanwhile, one after the other (each re-queues the rest while it holds the flag). */
     const removeRequestedMeanwhile = useCallback(() => {
@@ -220,6 +265,9 @@ const useQueueActions = () => {
                         return (
                             latest.threadId === threadId &&
                             !latest.isStreaming &&
+                            // Paused meanwhile (Stop, a refused send): Send next resumes the queue before it sends, so this holds only
+                            // a pause that came after the send was asked for.
+                            !usePromptQueueStore.getState().queues[threadId]?.paused &&
                             // The withdrawal's await can outlast the network: then the prompt stays and is held for it.
                             !latest.offline &&
                             // Read from the cache, not the rendered flag: a save that began after the last render is not in that flag yet,
@@ -227,8 +275,9 @@ const useQueueActions = () => {
                             queryClient.isMutating({ exact: true, mutationKey: permissionModeSaveKey(threadId) }) === 0 &&
                             (explicit || !latest.hasError) &&
                             !useChatUIStore.getState().isSubmitting &&
-                            // Another send (a guest note's, say) has begun and its reply is not streaming yet.
-                            !isSendStarting(threadId)
+                            // Another send (a guest note's, say) has begun and its reply is not streaming yet: its end tries
+                            // again (`deferredRef`).
+                            !deferBehindStartingSend(threadId, explicit)
                         );
                     },
                     peek: () => usePromptQueueStore.getState().queues[threadId]?.items[0],
@@ -243,6 +292,8 @@ const useQueueActions = () => {
 
                 if (next?.kind === "send") {
                     sent = true;
+                    // It went: nothing waits for the send that held it any more.
+                    deferredRef.current.delete(threadId);
                     sendQueuedPrompt(next.prompt);
                 } else if (next?.kind === "failed") {
                     setPaused(threadId, true);
@@ -261,12 +312,27 @@ const useQueueActions = () => {
                 }
             }
         },
-        [holdOffline, queryClient, removeRequestedMeanwhile, replayOfflineHold, sendQueuedPrompt, withdraw],
+        [deferBehindStartingSend, holdOffline, queryClient, removeRequestedMeanwhile, replayOfflineHold, sendQueuedPrompt, withdraw],
     );
 
     useEffect(() => {
         sendNextPromptRef.current = sendNextPrompt;
     }, [sendNextPrompt]);
+
+    // Runs once per release: `latestRef` was refreshed above in this same commit, and `sendNextPrompt` checks it.
+    const handledReleaseRef = useRef(released);
+
+    useEffect(() => {
+        if (released === undefined || handledReleaseRef.current === released) {
+            return;
+        }
+
+        handledReleaseRef.current = released;
+
+        if (!usePromptQueueStore.getState().queues[released.threadId]?.paused) {
+            void sendNextPrompt(released.threadId, { explicit: released.explicit });
+        }
+    }, [released, sendNextPrompt]);
 
     // Back online, or back on a thread whose send waited for the network while it was away: that send goes now.
     useEffect(() => {

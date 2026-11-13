@@ -19,7 +19,7 @@ import React, { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
-import { useChatActions, useChatIsRunning, useChatThread } from "@/features/chat/core/context/chat-context-hooks";
+import { useChatActions, useChatThread } from "@/features/chat/core/context/chat-context-hooks";
 import { getValidThreadId } from "@/features/chat/core/hooks/use-validated-thread";
 import { canHaveGuestLink } from "@/features/chat/guest-links/can-have-guest-link";
 import GuestLinkPanel from "@/features/chat/guest-links/guest-link-panel";
@@ -72,10 +72,10 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
     // A guest note goes out alone through the ordinary send, with its id; the owner's draft stays in the composer. Held here,
     // beside the menu, so a send still goes through when the menu closes mid-check.
     const { sendMessage } = useChatActions();
-    const turnRunning = useChatIsRunning();
-    const { sendingId, sendNote } = useGuestNoteSend(actualThreadId, turnRunning, async (text, guestMessageId) => {
-        await sendMessage(text, undefined, { guestMessageId });
-    });
+    const { sendingId, sendNote, turnRunning } = useGuestNoteSend(
+        actualThreadId,
+        async (text, guestMessageId) => await sendMessage(text, undefined, { guestMessageId }),
+    );
     const { knownNotWorker } = useWorker(actualThreadId);
     // No tab until the thread and its relationship are known (`canHaveGuestLink`). A locked chat's read says nothing of its
     // relationship (`null`), so a locked worker's thread shows the tab; there Create is off and the backend refuses a link.

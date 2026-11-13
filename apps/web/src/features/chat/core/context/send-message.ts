@@ -35,7 +35,7 @@ import { newChatTemporaryFields } from "../utils/new-chat-temporary";
 import type { ReadinessGate } from "../utils/readiness-gate";
 import { clearSendStarting, markSendStarting } from "../utils/send-in-flight";
 import type { ChangedSettings, ChatActionBase } from "./chat-action-shared";
-import { afterLastContextReset, localModelError, withoutMessage } from "./chat-action-shared";
+import { afterLastContextReset, localModelError, toAppError, withoutMessage } from "./chat-action-shared";
 import type { ThreadData, ThreadRow } from "./chat-context-types";
 import type { GatewayErrorBody, GatewayInfo } from "./chat-gateway";
 import { CHAT_STREAM_URL, gatewayError, pendingGatewayInfo, validateGatewayUrl } from "./chat-gateway";
@@ -104,11 +104,41 @@ export interface SendMessageOptions {
 }
 
 /**
+ * How a send ended, for its caller. `started`: the gateway took it and its reply is on. `refused`: banned words sent the
+ * text back to the composer. A guest note's failure never reaches the chat's error banner, whose Retry would rerun the
+ * owner's last reply: `failure` carries its message to the Guests tab instead (empty for none in particular), and
+ * `signIn` says the owner was asked to sign in first.
+ */
+export interface SendOutcome {
+    failure?: string;
+    refused: boolean;
+    signIn?: boolean;
+    started: boolean;
+}
+
+/** What the send body reports as it goes; `runSendMessage` gathers it into the `SendOutcome`. */
+interface SendReport {
+    failed: (message: string) => void;
+    refused: () => void;
+    started: () => void;
+}
+
+/** A guest note's own refusal (`guestRefusalText`), its message already in the app's words. */
+class GuestNoteRefusal extends Error {}
+
+/** The composer's submit guard is global and the composer's: a guest note's Send never set it, so it never clears it. */
+const endComposerSubmit = (guestMessageId: string | undefined): void => {
+    if (guestMessageId === undefined) {
+        useChatUIStore.getState().setIsSubmitting(false);
+    }
+};
+
+/**
  * A send by someone who must sign in first (invite-only): the owner's own text goes back to the composer and is held for
  * after sign-in. A guest's note is not the composer's draft: it is neither put there nor held to go out as the owner's words.
  */
 export const holdSendForSignIn = (text: string, { guestMessageId }: SendMessageOptions = {}): void => {
-    useChatUIStore.getState().setIsSubmitting(false);
+    endComposerSubmit(guestMessageId);
 
     if (guestMessageId === undefined) {
         useChatUIStore.getState().setComposerText(text);
@@ -118,15 +148,27 @@ export const holdSendForSignIn = (text: string, { guestMessageId }: SendMessageO
     }
 };
 
-/** One user turn, local or through the gateway; `runSendMessage` marks the thread around it. */
-const runSendMessageBody = async (env: SendMessageEnv, rawText: string, attachments?: PendingAttachment[], options: SendMessageOptions = {}) => {
+/**
+ * One user turn, local or through the gateway; `runSendMessage` marks the thread around it and gathers its `report`.
+ */
+const runSendMessageBody = async (
+    env: SendMessageEnv,
+    rawText: string,
+    attachments: PendingAttachment[] | undefined,
+    options: SendMessageOptions,
+    report: SendReport,
+) => {
     // Every caller (the composer, voice, a queued prompt) ends here, and the local branch never reaches the server's
     // filter, so hidden characters leave the text before either branch sees it.
     const { removed, text } = stripHiddenText(rawText);
 
     // Only hidden characters is not a message (the server refuses it the same way).
     if (removed > 0 && text.trim() === "" && !attachments?.length) {
-        useChatUIStore.getState().setIsSubmitting(false);
+        endComposerSubmit(options.guestMessageId);
+
+        if (options.guestMessageId !== undefined) {
+            report.failed("");
+        }
 
         return;
     }
@@ -180,8 +222,11 @@ const runSendMessageBody = async (env: SendMessageEnv, rawText: string, attachme
     // nor to another new-chat composer (which has no thread id either; this provider is gone by then).
     const consumedFromThread = modelAtStart.selectedModelThreadId;
 
-    // Clear any previous error when starting a new send
-    setError(null);
+    // Clear any previous error when starting a new send. Not for a guest's note: the owner's failed turn keeps its banner and
+    // its Retry.
+    if (guestMessageId === undefined) {
+        setError(null);
+    }
 
     // Never drop the input: wait for the session (the composer stays in
     // its submitting state meanwhile) and, if it never comes, hand the
@@ -196,13 +241,13 @@ const runSendMessageBody = async (env: SendMessageEnv, rawText: string, attachme
                 restoreTextFor(owner, text);
             }
 
-            useChatUIStore.getState().setIsSubmitting(false);
-            handleError(
-                new AppError(guestMessageId === undefined ? texts.sessionNotReady() : texts.guestNoteSessionNotReady(), {
-                    code: "AUTH_NOT_READY",
-                    statusCode: 401,
-                }),
-            );
+            endComposerSubmit(guestMessageId);
+
+            if (guestMessageId === undefined) {
+                handleError(new AppError(texts.sessionNotReady(), { code: "AUTH_NOT_READY", statusCode: 401 }));
+            } else {
+                report.failed(texts.guestNoteSessionNotReady());
+            }
 
             return;
         }
@@ -231,7 +276,7 @@ const runSendMessageBody = async (env: SendMessageEnv, rawText: string, attachme
         // A local turn is saved as the owner's own words, so a guest's note goes only through the hosted path.
         if (guestMessageId !== undefined) {
             setOptimisticMessages(withoutMessage(optimisticId));
-            handleError(localModelError(texts.guestNoteNotLocal()));
+            report.failed(texts.guestNoteNotLocal());
 
             return;
         }
@@ -322,7 +367,10 @@ const runSendMessageBody = async (env: SendMessageEnv, rawText: string, attachme
         // For existing threads: only send settings that have changed from cached values
         const pendingSettings = isCreatingNewThread ? takePendingSettingsFor(owner, getPendingSettingsFromStore) : null;
         // The changed settings are read from the store, which describes the focused chat: only while this send's chat is the live one.
-        const changedSettings = isCreatingNewThread || !isOwnerLive(owner) ? null : getChangedSettings(threadDataRef.current);
+        // A guest's note sends none of them (system prompt, features, language, reasoning, stateless), so the thread's saved
+        // ones apply and the owner's unsent changes stay for the owner's next send. Model, mode, search, MCP and the media
+        // settings still come from the composer, as for any send.
+        const changedSettings = isCreatingNewThread || guestMessageId !== undefined || !isOwnerLive(owner) ? null : getChangedSettings(threadDataRef.current);
 
         consumedSettings = pendingSettings ?? changedSettings;
 
@@ -423,7 +471,7 @@ const runSendMessageBody = async (env: SendMessageEnv, rawText: string, attachme
             clearSentDraft(owner, text, focusAtStart);
         }
 
-        useChatUIStore.getState().setIsSubmitting(false);
+        endComposerSubmit(guestMessageId);
         setIsRegenerating(true);
 
         // Call gateway /v1/chat — creates thread + message, schedules agent, returns metadata
@@ -446,7 +494,7 @@ const runSendMessageBody = async (env: SendMessageEnv, rawText: string, attachme
             const guestRefusal = guestMessageId === undefined ? undefined : guestRefusalText(texts, errorData.error);
 
             if (guestRefusal !== undefined) {
-                throw new Error(guestRefusal);
+                throw new GuestNoteRefusal(guestRefusal);
             }
 
             // A guest's note is not in the composer, so its refusal shows as an error, not as the composer's banner.
@@ -468,6 +516,8 @@ const runSendMessageBody = async (env: SendMessageEnv, rawText: string, attachme
                         words: errorData.bannedWords ?? [],
                     });
                 }
+
+                report.refused();
 
                 return;
             }
@@ -500,6 +550,8 @@ const runSendMessageBody = async (env: SendMessageEnv, rawText: string, attachme
                 streamToken: data.streamToken,
                 threadId: data.threadId,
             };
+
+            report.started();
 
             // Update gateway info state so it propagates through context — unless
             // another turn started while this request was in flight.
@@ -604,7 +656,13 @@ const runSendMessageBody = async (env: SendMessageEnv, rawText: string, attachme
 
         restoreSettings();
 
-        handleError(error_);
+        // A guest note's failure goes to the Guests tab in the app's words, never to the chat's error banner: its Retry reruns
+        // the owner's last reply.
+        if (guestMessageId === undefined) {
+            handleError(error_);
+        } else {
+            report.failed(error_ instanceof GuestNoteRefusal ? error_.message : toAppError(error_).message);
+        }
 
         if (error_ instanceof Error && (error_.message.includes("401") || error_.message.includes("403"))) {
             refetchSession();
@@ -616,12 +674,32 @@ const runSendMessageBody = async (env: SendMessageEnv, rawText: string, attachme
  * The body of the provider's `sendMessage`: one user turn, local or through the gateway. Until it returns (the reply
  * streams, or the send failed), the thread counts a send starting (`isSendStarting`): a queued prompt or a guest note waits.
  */
-export const runSendMessage = async (env: SendMessageEnv, rawText: string, attachments?: PendingAttachment[], options: SendMessageOptions = {}) => {
+export const runSendMessage = async (
+    env: SendMessageEnv,
+    rawText: string,
+    attachments?: PendingAttachment[],
+    options: SendMessageOptions = {},
+): Promise<SendOutcome> => {
     markSendStarting(env.threadId);
 
+    const outcome: SendOutcome = { refused: false, started: false };
+
     try {
-        await runSendMessageBody(env, rawText, attachments, options);
+        await runSendMessageBody(env, rawText, attachments, options, {
+            failed: (message) => {
+                outcome.failure = message;
+            },
+            refused: () => {
+                outcome.refused = true;
+            },
+            started: () => {
+                outcome.started = true;
+            },
+        });
     } finally {
-        clearSendStarting(env.threadId);
+        // A refused send holds what queued behind it, as an error does: the owner is fixing its text.
+        clearSendStarting(env.threadId, { refused: outcome.refused });
     }
+
+    return outcome;
 };

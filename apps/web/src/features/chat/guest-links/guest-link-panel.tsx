@@ -55,9 +55,15 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, s
     // The token comes back once: it is not kept in the mutation cache after the panel closes.
     const create = useMutation(crpc.chat.guest_links.createGuestLink.mutationOptions({ gcTime: 0 }));
     const dismiss = useMutation(crpc.chat.guest_links.dismissHeldGuestMessage.mutationOptions());
-    // Said in the status region once a sent note reads as sent; focus then moves on to the next note's Send, or the list.
-    const [announcement, setAnnouncement] = useState<string>();
-    const focusNextRef = useRef(false);
+    // The note a Send handed over or a Dismiss deleted (a new object each time), with the notes after it as the owner saw them.
+    // Once the read no longer shows it waiting, focus moves on, and a sent one is said "Sent"; a send that fails leaves it
+    // waiting, so nothing happens.
+    const [leaving, setLeaving] = useState<{ after: string[]; id: string; sent: boolean }>();
+    const focusedForRef = useRef(leaving);
+    const sendButtonsRef = useRef(new Map<string, HTMLButtonElement>());
+    const listRef = useRef<HTMLUListElement>(null);
+    // Always rendered: focus lands here when the list itself is gone (the last note dismissed or sent).
+    const introRef = useRef<HTMLParagraphElement>(null);
     const hintId = useId();
     // After a revoke, focus goes to "Create guest link" once it shows, not to the page: the Revoke button is gone.
     const focusCreateRef = useRef(false);
@@ -206,7 +212,19 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, s
     const linkUrl = live && madeLink !== undefined && madeLink.id === data?.link?.id ? madeLink.url : undefined;
 
     // The outcome is read from the returned promise, not from mutation callbacks: it still arrives once the menu closed.
+    // The notes after this one, as the owner sees them now: a dismissed note is gone from the read by the time focus moves.
+    const notesAfter = (messageId: string): string[] => {
+        const notes = data?.messages ?? [];
+
+        return notes.slice(notes.findIndex((note) => note.id === messageId) + 1).map((note) => note.id);
+    };
+
     const handleSend = async (messageId: string) => {
+        const after = notesAfter(messageId);
+
+        // Emptied first, so the "Sent" that follows is a change the status region announces, after every send.
+        setLeaving(undefined);
+
         let outcome: GuestNoteSendOutcome;
 
         try {
@@ -217,36 +235,77 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, s
             return;
         }
 
-        if (outcome !== "sent") {
-            toast.info(outcome === "busy" ? t`A reply is running. Send a message once it has finished.` : t`That message was already sent.`);
+        switch (outcome.kind) {
+            case "already-sent": {
+                toast.info(t`That message was already sent.`);
+                break;
+            }
+            case "busy": {
+                toast.info(t`A reply is running. Send a message once it has finished.`);
 
+                return;
+            }
+            // Its refusal in the app's words; a refused note stays waiting, to be sent again.
+            case "failed": {
+                toast.error(outcome.message || t`That did not work. Please try again.`);
+                break;
+            }
+            case "sent": {
+                setLeaving({ after, id: messageId, sent: true });
+                break;
+            }
+            // "sign-in": the login prompt is open, nothing else to say.
+            default: {
+                return;
+            }
+        }
+
+        // Read afresh, as after create and revoke: a live read can fall back to one-shot. Its answer is not awaited: a live read
+        // can answer with what it held, and the update shows once it arrives.
+        void linkQuery.refetch();
+    };
+
+    const leftNote = leaving === undefined ? undefined : data?.messages.find((note) => note.id === leaving.id);
+    // Sent, or gone (dismissed): its buttons are gone.
+    const hasLeft = leaving !== undefined && data !== undefined && leftNote?.status !== "held";
+
+    let statusText: string | null = null;
+
+    if (linkQuery.isPending) {
+        statusText = t`Loading the guest link…`;
+    } else if (leaving?.sent === true && leftNote?.status === "sent") {
+        statusText = t`Sent`;
+    }
+
+    // Once the read no longer shows the note waiting: focus goes to the next waiting note's Send after it, or else the list (also
+    // when that Send is off, a reply running): the note's own buttons are gone.
+    useEffect(() => {
+        if (!hasLeft || focusedForRef.current === leaving) {
             return;
         }
 
-        const { data: after } = await linkQuery.refetch();
+        focusedForRef.current = leaving;
 
-        if (after?.messages.some((note) => note.id === messageId && note.status === "sent")) {
-            focusNextRef.current = true;
-            setAnnouncement(t`Sent`);
-        }
-    };
+        const waiting = new Set(data?.messages.filter((note) => note.status === "held").map((note) => note.id));
+        const nextId = leaving?.after.find((id) => waiting.has(id));
+        const next = nextId === undefined ? undefined : sendButtonsRef.current.get(nextId);
 
-    // The first waiting note's Send, or else the list, takes focus after a send: the sent note's buttons are gone.
-    const takeFocusAfterSend = (element: HTMLElement | null) => {
-        if (!(element && focusNextRef.current)) {
-            return;
-        }
-
-        focusNextRef.current = false;
-        element.focus();
-    };
+        (next && !next.disabled ? next : (listRef.current ?? introRef.current))?.focus();
+    }, [data, hasLeft, leaving]);
 
     const handleDismiss = (messageId: string) => {
+        const after = notesAfter(messageId);
+
         dismiss.mutate(
             { messageId: messageId as Id<"threadGuestMessages">, unlockProof },
             {
                 onError: reportError,
                 onSuccess: (result) => {
+                    // Focus moves on once the read no longer shows it waiting; nothing is said "Sent".
+                    setLeaving({ after, id: messageId, sent: false });
+                    // Read afresh, as after create and revoke: a live read can fall back to one-shot.
+                    void linkQuery.refetch();
+
                     if (result.status === "sent") {
                         toast.info(t`That message was already sent.`);
                     }
@@ -279,10 +338,12 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, s
 
     return (
         <div className="flex flex-col gap-3">
-            <p className="text-muted-foreground text-sm">{t`Anyone with a guest link can leave you a message here. Nothing they write runs until you send it.`}</p>
+            <p className="text-muted-foreground text-sm" ref={introRef} tabIndex={-1}>
+                {t`Anyone with a guest link can leave you a message here. Nothing they write runs until you send it.`}
+            </p>
             {/* Mounted from the start, so the text that appears in it is announced. */}
             <p className="text-muted-foreground text-sm empty:hidden" role="status">
-                {linkQuery.isPending ? t`Loading the guest link…` : (announcement ?? null)}
+                {statusText}
             </p>
             {turnRunning && live && waitingNotes.length > 0 && (
                 <p className="text-muted-foreground text-sm" id={hintId}>
@@ -331,7 +392,7 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, s
             )}
             {/* A lapsed link's notes are hidden, as the server hides them. */}
             {live && data && data.messages.length > 0 && (
-                <ul aria-label={t`Guest messages`} className="flex flex-col gap-2" ref={takeFocusAfterSend} tabIndex={-1}>
+                <ul aria-label={t`Guest messages`} className="flex flex-col gap-2" ref={listRef} tabIndex={-1}>
                     {data.messages.map((note) => {
                         // Cut by characters, not UTF-16 units: an emoji is never split.
                         const characters = [...note.text];
@@ -351,7 +412,13 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, s
                                                 onClick={() => {
                                                     void handleSend(note.id);
                                                 }}
-                                                ref={takeFocusAfterSend}
+                                                ref={(element) => {
+                                                    if (element) {
+                                                        sendButtonsRef.current.set(note.id, element);
+                                                    } else {
+                                                        sendButtonsRef.current.delete(note.id);
+                                                    }
+                                                }}
                                                 size="sm"
                                             >
                                                 {t`Send`}

@@ -8,6 +8,7 @@ import type { useLunora } from "@/lib/lunora/crpc";
 import type { RateLimitPause } from "../../thread/rate-limit-pause-notice";
 import type { ThreadOwnerState } from "../../thread-list/lib/thread-state-rules";
 import type { PendingAttachment } from "../stores/chat-ui-store";
+import type { SendOutcome } from "./send-message";
 
 /**
  * Thread capabilities - what actions are available
@@ -120,7 +121,8 @@ export interface ChatActionsContextValue {
     lunora: ReturnType<typeof useLunora>;
     regenerate: () => Promise<void>;
     reloadMessage: (messageId: string) => Promise<void>;
-    sendMessage: (text: string, attachments?: PendingAttachment[], options?: { guestMessageId?: string }) => Promise<void>;
+    /** Resolves once the send has started or failed: a guest note's failure comes back here, not in the chat's error banner. */
+    sendMessage: (text: string, attachments?: PendingAttachment[], options?: { guestMessageId?: string }) => Promise<SendOutcome>;
 }
 
 /**

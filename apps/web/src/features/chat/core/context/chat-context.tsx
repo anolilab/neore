@@ -57,7 +57,7 @@ import type {
 import type { GatewayInfo } from "./chat-gateway";
 import { NO_GATEWAY_INFO, pendingGatewayInfo } from "./chat-gateway";
 import { kickOffMediaGeneration } from "./media-kickoff";
-import type { SendMessageOptions } from "./send-message";
+import type { SendMessageOptions, SendOutcome } from "./send-message";
 import { holdSendForSignIn, runSendMessage } from "./send-message";
 import { registerThreadErrorSink, takeUndeliveredThreadError } from "./thread-error-sinks";
 
@@ -680,14 +680,14 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     const { mustSignIn } = useInviteOnly();
 
     const sendMessage = useCallback(
-        async (text: string, attachments?: PendingAttachment[], options?: SendMessageOptions) => {
+        async (text: string, attachments?: PendingAttachment[], options?: SendMessageOptions): Promise<SendOutcome> => {
             if (mustSignIn) {
                 holdSendForSignIn(text, options);
 
-                return;
+                return { refused: false, signIn: true, started: false };
             }
 
-            await runSendMessage(
+            return await runSendMessage(
                 {
                     authGate,
                     authHeader,
