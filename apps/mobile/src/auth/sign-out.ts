@@ -8,8 +8,6 @@ interface SignOutSteps {
     clearCache: () => Promise<void>;
     /** Removes the alerts still on the phone. */
     dismissNotifications?: () => Promise<void>;
-    /** Removes the alerts once more and forgets the account. Called only once its session is revoked: a push sent before the revoke can still arrive. */
-    forgetAccount?: () => Promise<void>;
     /** Forgets the chat saved to reopen on launch. */
     forgetLastChat: () => Promise<void>;
     /** Tells the server this phone stops getting the account's pushes. Signs in with the in-memory JWT. */
@@ -30,33 +28,16 @@ const removeAlerts = async (dismiss: (() => Promise<void>) | undefined, warn: (m
     }
 };
 
-/** Revokes the stored session. True only when the revoke landed; offline or refused, the session expires on its own, and nothing on the phone holds it. */
-const revokeIfStored = async (token: string | undefined, revokeSession: (token: string) => Promise<void>, warn: (message: string, error: unknown) => void): Promise<boolean> => {
+/** Revokes the stored session. Offline or refused, the session expires on its own, and nothing on the phone holds it. */
+const revokeStored = async (token: string | undefined, revokeSession: (token: string) => Promise<void>, warn: (message: string, error: unknown) => void): Promise<void> => {
     if (token === undefined) {
-        return false;
-    }
-
-    try {
-        await revokeSession(token);
-
-        return true;
-    } catch (error) {
-        warn("Could not revoke the session on the server.", error);
-
-        return false;
-    }
-};
-
-/** Forgets the account on the phone once its session is revoked. A failed revoke keeps the record, so the next sign-in sees the switch. */
-const forgetRevokedAccount = async (isRevoked: boolean, forget: (() => Promise<void>) | undefined, warn: (message: string, error: unknown) => void): Promise<void> => {
-    if (!isRevoked) {
         return;
     }
 
     try {
-        await forget?.();
+        await revokeSession(token);
     } catch (error) {
-        warn("Could not forget the account on this phone.", error);
+        warn("Could not revoke the session on the server.", error);
     }
 };
 
@@ -71,7 +52,6 @@ const forgetRevokedAccount = async (isRevoked: boolean, forget: (() => Promise<v
 export const signOutOnDevice = async ({
     clearCache,
     dismissNotifications,
-    forgetAccount,
     forgetLastChat,
     releasePush,
     revokeSession,
@@ -121,27 +101,22 @@ export const signOutOnDevice = async ({
         }
     }
 
-    const isRevoked = await revokeIfStored(token, revokeSession, warn);
+    await revokeStored(token, revokeSession, warn);
 
-    await forgetRevokedAccount(isRevoked, forgetAccount, warn);
+    // Once more after the revoke, whether or not it landed: a push accepted before the revoke can still be on its way.
+    await removeAlerts(dismissNotifications, warn);
 };
 
 /**
  * Runs whenever the app finds nobody signed in (at launch, or when a refresh finds no grant or the server rejects it):
  * empties the offline cache and forgets the saved chat again, so a wipe that failed at sign-out (a locked or full disk),
  * or a session that ended without one, cannot leave the last account's chats on the device until someone signs in.
- * A session the server ended never ran the sign-out, so the alerts of the account it held are removed here too.
  * Never blocks: a failure only warns, and the next signed-out start tries again.
  */
-export const emptyCacheWhileSignedOut = async ({
-    clearCache,
-    dismissNotifications,
-    forgetLastChat,
-    warn,
-}: Pick<SignOutSteps, "clearCache" | "dismissNotifications" | "forgetLastChat" | "warn">): Promise<void> => {
+export const emptyCacheWhileSignedOut = async ({ clearCache, forgetLastChat, warn }: Pick<SignOutSteps, "clearCache" | "forgetLastChat" | "warn">): Promise<void> => {
     // The forget is queued at once, not after the cache wipe: the sign-in screen is already up, and a chat saved by a
     // quick sign-in must queue after this forget, or the forget would delete it.
-    const [cache, lastChat, alerts] = await Promise.allSettled([clearCache(), forgetLastChat(), dismissNotifications?.()]);
+    const [cache, lastChat] = await Promise.allSettled([clearCache(), forgetLastChat()]);
 
     if (cache.status === "rejected") {
         warn("Could not empty the offline cache.", cache.reason);
@@ -149,10 +124,6 @@ export const emptyCacheWhileSignedOut = async ({
 
     if (lastChat.status === "rejected") {
         warn("Could not forget the last viewed chat.", lastChat.reason);
-    }
-
-    if (alerts.status === "rejected") {
-        warn("Could not remove this account's notifications.", alerts.reason);
     }
 };
 

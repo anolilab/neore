@@ -17,7 +17,7 @@ import {
     pushRegistrations,
     syncApprovalActions,
 } from "./phone-push";
-import { createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
+import { createAccountChecks, createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
 
 /** `didRun`: no error (offline, no answer). `isRegistered`: the server now holds the token for this account. */
 interface RegisterResult {
@@ -122,26 +122,40 @@ const setUpNotifications = async (): Promise<boolean> => {
     }
 };
 
+/** How long an account check may hold up the checks and registrations queued after it. */
+const ACCOUNT_CHECK_TIMEOUT_MS = 5000;
+
+const accountChecks = createAccountChecks(ACCOUNT_CHECK_TIMEOUT_MS);
+
+/**
+ * Another person signed in on this phone, now or before a relaunch: the alerts still on it are the previous account's,
+ * and are removed. A check for an account that has already left does nothing. A phone that stays with one account keeps
+ * its alerts. Every registration waits for the checks queued before it (`registerAfterSetUp`), so the new account's own
+ * alerts cannot be removed after they arrive.
+ */
+const checkAccount = (userId: string, isCurrent: () => boolean): void => {
+    accountChecks.run(async () => {
+        if (!isCurrent()) {
+            return;
+        }
+
+        try {
+            await noteSignedInAccount(userId, dismissAccountNotifications);
+        } catch (error) {
+            // eslint-disable-next-line no-console -- no logger in the app; alerts that could not be removed must not be silent
+            console.warn("Could not remove the previous account's notifications.", error);
+        }
+    });
+};
+
 /** A registration that waits for the setup first: it does not register a phone whose alerts would lack their actions. */
 const registerAfterSetUp = async (isPrompt: boolean, isCurrent: () => boolean): Promise<Awaited<ReturnType<typeof register>>> => {
     // A setup that failed does not stop the registration: without one the phone gets no alerts at all, where an alert without its
     // buttons still opens the app. The setup is tried again at the next registration.
+    await accountChecks.settled();
     await setUpNotifications();
 
     return await register(isPrompt, isCurrent);
-};
-
-/**
- * Another person signed in on this phone, now or before a relaunch: the alerts still on it are the previous account's,
- * and are removed. A phone that stays with one account keeps its alerts.
- */
-const removePreviousAccountAlerts = async (userId: string): Promise<void> => {
-    try {
-        await noteSignedInAccount(userId, dismissAccountNotifications);
-    } catch (error) {
-        // eslint-disable-next-line no-console -- no logger in the app; alerts that could not be removed must not be silent
-        console.warn("Could not remove the previous account's notifications.", error);
-    }
 };
 
 /**
@@ -171,13 +185,6 @@ export const offerPhonePush = async (userId: string): Promise<void> => {
 export const usePhonePush = (): void => {
     const { hasToken, status, user } = useAuth();
     const userId = status === "signed-in" && hasToken ? user?.id : undefined;
-
-    // Checked on every sign-in, so the alerts of a previous account are removed even after a relaunch.
-    useEffect(() => {
-        if (userId !== undefined) {
-            removePreviousAccountAlerts(userId);
-        }
-    }, [userId]);
 
     // Set up early, so an alert that arrives as the phone registers already carries its approve and deny actions. Every
     // registration tries the same setup first (`registerAfterSetUp`).
@@ -230,6 +237,8 @@ export const usePhonePush = (): void => {
 
         // A new sign-in reopens the gate the last sign-out closed and is offered the prompt again. Its registration
         // counts toward the foreground spacing.
+        checkAccount(userId, isCurrent);
+
         pushRegistrations.open();
         signedIn.account = account;
         promptOffer.begin(userId);

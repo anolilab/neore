@@ -2,12 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { PushPermission, PushPlatform, PushServer } from "./push-registration";
 import {
+    createAccountChecks,
     createForegroundGate,
     createPendingWork,
     createPromptOffer,
     createTokenChangeFilter,
-    dismissAccountAlerts,
-    forgetAccountOnPhone,
     isAccountSwitch,
     languageTag,
     LAST_ACCOUNT_KEY,
@@ -422,54 +421,52 @@ describe("noteAccountOnPhone", () => {
         expect(first.items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
         expect(removeAlerts).not.toHaveBeenCalled();
     });
-
-    it("keeps nothing of an account that signed out, so the next sign-in is a first one", async () => {
-        const { items, store } = device("sha256:u1");
-        const removeAlerts = vi.fn(async () => undefined);
-
-        await forgetAccountOnPhone({
-            remove: async (key) => {
-                Reflect.deleteProperty(items, key);
-            },
-        });
-        await noteAccountOnPhone("u2", store, removeAlerts);
-
-        expect(removeAlerts).not.toHaveBeenCalled();
-    });
 });
 
-describe("dismissAccountAlerts", () => {
-    it("keeps the record of the account when its alerts could not be removed, so the next sign-in still sees the switch", async () => {
-        const items: Record<string, string> = { [LAST_ACCOUNT_KEY]: "sha256:u1" };
+describe("createAccountChecks", () => {
+    it("runs the checks one after another, so a check starts only once the one before it has finished", async () => {
+        const queue = createAccountChecks(1000);
+        const order: string[] = [];
+        let release: () => void = () => undefined;
 
-        await expect(
-            dismissAccountAlerts({
-                dismissAll: async () => {
-                    throw new Error("denied");
-                },
-                remove: async (key) => {
-                    Reflect.deleteProperty(items, key);
-                },
-            }),
-        ).rejects.toThrow("denied");
-        expect(items[LAST_ACCOUNT_KEY]).toBe("sha256:u1");
-    });
-
-    it("removes the alerts, then forgets the account", async () => {
-        const items: Record<string, string> = { [LAST_ACCOUNT_KEY]: "sha256:u1" };
-        const calls: string[] = [];
-
-        await dismissAccountAlerts({
-            dismissAll: async () => {
-                calls.push("dismiss");
-            },
-            remove: async (key) => {
-                calls.push("forget");
-                Reflect.deleteProperty(items, key);
-            },
+        queue.run(async () => {
+            order.push("first:start");
+            await new Promise<void>((resolve) => {
+                release = () => resolve();
+            });
+            order.push("first:end");
+        });
+        queue.run(async () => {
+            order.push("second");
         });
 
-        expect(calls).toEqual(["dismiss", "forget"]);
-        expect(items[LAST_ACCOUNT_KEY]).toBeUndefined();
+        await vi.waitFor(() => {
+            expect(order).toEqual(["first:start"]);
+        });
+        release();
+        await queue.settled();
+
+        expect(order).toEqual(["first:start", "first:end", "second"]);
+    });
+
+    it("stops holding up the checks after a check that never finishes once the timeout has passed", async () => {
+        vi.useFakeTimers();
+
+        try {
+            const queue = createAccountChecks(1000);
+            const next = vi.fn(async () => undefined);
+
+            queue.run(async () => {
+                await new Promise<void>(() => {});
+            });
+            queue.run(next);
+
+            await vi.advanceTimersByTimeAsync(1000);
+            await queue.settled();
+
+            expect(next).toHaveBeenCalledOnce();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

@@ -311,7 +311,8 @@ export const LAST_ACCOUNT_KEY = "neore.mobile.last-push-account";
  * Records the account signed in on this phone. When another person replaces the account on record, the alerts still on
  * the phone are the previous person's, and `removeSwitchedAlerts` removes them first. The record moves only after that
  * succeeds, so a failed removal is seen again at the next sign-in. Kept on the device, not in memory, so it holds across a
- * relaunch. Only a digest of the id is kept.
+ * relaunch. Only a digest of the id is kept. The record outlives sign-out on purpose: alerts of that account that are still
+ * in flight are told apart from the next person's alerts at the next sign-in.
  */
 export const noteAccountOnPhone = async (
     userId: string,
@@ -336,16 +337,38 @@ export const noteAccountOnPhone = async (
     await store.write(LAST_ACCOUNT_KEY, current);
 };
 
-/** Forgets the account on the phone once its alerts are gone: the next sign-in is a first one. */
-export const forgetAccountOnPhone = async (store: { remove: (key: string) => Promise<void> }): Promise<void> => {
-    await store.remove(LAST_ACCOUNT_KEY);
+/**
+ * Runs account checks one after another: a check starts only when the one before it has finished. A check that has not
+ * finished after `timeoutMs` stops holding up the ones queued after it, so one hung check cannot keep every later
+ * account's alerts and registration waiting. The check reports its own failure; the queue moves on either way.
+ */
+const runAfter = async (previous: Promise<void>, check: () => Promise<void>, timeoutMs: number): Promise<void> => {
+    await previous;
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        await Promise.race([
+            check(),
+            new Promise<never>((_resolve, reject) => {
+                timer = setTimeout(() => reject(new Error("Timed out")), timeoutMs);
+            }),
+        ]);
+    } catch {
+        // The check has reported its own failure.
+    } finally {
+        clearTimeout(timer);
+    }
 };
 
-/**
- * Removes the alerts still on the phone, for an account that is leaving. The record of that account goes last: if the
- * alerts could not be removed, the next sign-in still sees the switch.
- */
-export const dismissAccountAlerts = async (input: { dismissAll: () => Promise<void>; remove: (key: string) => Promise<void> }): Promise<void> => {
-    await input.dismissAll();
-    await forgetAccountOnPhone({ remove: input.remove });
+export const createAccountChecks = (timeoutMs: number) => {
+    let last: Promise<void> = Promise.resolve();
+
+    return {
+        run: (check: () => Promise<void>): void => {
+            last = runAfter(last, check, timeoutMs);
+        },
+        /** Resolves once every check queued so far has finished or timed out. */
+        settled: (): Promise<void> => last,
+    };
 };

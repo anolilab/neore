@@ -11,7 +11,6 @@ import {
     devicePushPlatform,
     dismissAccountNotifications,
     pushRegistrations,
-    removeAccountAlertsAndRecord,
 } from "../notifications/phone-push";
 import { releaseOnSignOut } from "../notifications/push-registration";
 import { endPhonePushForAccount } from "../notifications/use-phone-push";
@@ -113,7 +112,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 // Retries a cache wipe that failed at sign-out; the credential side never waits on it.
                 await emptyCacheWhileSignedOut({
                     clearCache: () => getOfflineCache().clear(),
-                    dismissNotifications: dismissAccountNotifications,
                     forgetLastChat: clearLastThread,
                     warn: console.warn,
                 });
@@ -189,7 +187,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 await signOutOnDevice({
                     clearCache: () => getOfflineCache().clear(),
                     dismissNotifications: dismissAccountNotifications,
-                    forgetAccount: removeAccountAlertsAndRecord,
                     forgetLastChat: clearLastThread,
                     releasePush: async () =>
                         await releaseOnSignOut({ platform: devicePushPlatform, registrations: pushRegistrations, server: backendPushServer(client) }),
