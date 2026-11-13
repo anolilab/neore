@@ -1,3 +1,5 @@
+/* eslint-disable max-classes-per-file -- two inert stand-ins for browser APIs jsdom lacks (ResizeObserver, SpeechSynthesisUtterance) */
+
 /**
  * Render-count harness for the message list: how many rows re-render when a
  * live update touches one message of a long thread. Rows are counted through a
@@ -6,7 +8,7 @@
 
 import { formatGoalReviewNote } from "@neore/backend/chat/goals";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { Context, ReactNode } from "react";
 import { createElement, useLayoutEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +17,7 @@ import type { UIMessage } from "@/lib/agent";
 import { shareUnchangedMessages } from "@/lib/agent/share-unchanged-messages";
 
 import { ALWAYS_MOUNTED_TAIL, VIRTUALIZE_FLAG_KEY } from "./message-windowing";
+import { getReadAloudId, stopReadAloud } from "./read-aloud-speech";
 
 const harness = vi.hoisted(() => {
     return {
@@ -23,6 +26,8 @@ const harness = vi.hoisted(() => {
         contentRenders: new Map<string, number>(),
         /** Renders the list inside the real shortcut manager and the thread's find bar. */
         withFind: false,
+        /** Renders the real read-aloud action on assistant rows. */
+        withReadAloud: false,
         activeStreamId: null as string | null,
         goal: null as unknown,
         /** Gives the scroller a layout; jsdom has none. */
@@ -143,8 +148,13 @@ vi.mock("./generation-model-menu", () => {
     return { default: () => null };
 });
 
-vi.mock("./read-aloud-action", () => {
-    return { default: () => null };
+vi.mock("./read-aloud-action", async (importOriginal) => {
+    const { createElement: create } = await import("react");
+    const actual = await importOriginal<typeof import("./read-aloud-action")>();
+
+    return {
+        default: (props: Parameters<typeof actual.default>[0]) => (harness.withReadAloud ? create(actual.default, props) : null),
+    };
 });
 
 vi.mock("./restore-to-input-action", () => {
@@ -480,13 +490,22 @@ describe("message list goal", () => {
     });
 });
 
-/* eslint-disable class-methods-use-this -- an inert stand-in */
+/* eslint-disable class-methods-use-this -- inert stand-ins for browser APIs jsdom lacks */
 class InertResizeObserver {
     public disconnect(): void {}
 
     public observe(): void {}
 
     public unobserve(): void {}
+}
+
+/** An utterance that never ends on its own, like a long reply still being read. */
+class SilentUtterance {
+    public lang = "";
+
+    public constructor(public readonly text: string) {}
+
+    public addEventListener(): void {}
 }
 /* eslint-enable class-methods-use-this */
 
@@ -497,6 +516,14 @@ const pressFind = (): void => {
     act(() => {
         target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, code: "KeyF", ctrlKey: true, key: "f" }));
     });
+};
+
+const nextFrames = async (count: number): Promise<void> => {
+    for (let frame = 0; frame < count; frame += 1) {
+        await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => resolve());
+        });
+    }
 };
 
 const focusedMessageId = (): string | undefined => (document.activeElement as HTMLElement | null)?.dataset.listMessageId;
@@ -561,6 +588,8 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
         harness.layoutViewport = undefined;
         harness.loadMore = () => {};
         harness.withFind = false;
+        harness.withReadAloud = false;
+        harness.threadId = "thread-1";
         scrollReportDelayFrames = 0;
         vi.unstubAllGlobals();
         vi.restoreAllMocks();
@@ -643,13 +672,11 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
 
         await vi.waitFor(() => expect(focusedMessageId()).toBe(`m${THREAD_LENGTH - 5}`), { timeout: 5000 });
 
-        // Long enough for the first target's row to mount and its retries to run out.
-        await act(
-            () =>
-                new Promise<void>((resolve) => {
-                    setTimeout(resolve, 1000);
-                }),
-        );
+        // The first target's row mounts once its scroll is reported; a retry still pending would reveal it on its next frame.
+        await vi.waitFor(() => expect(mountedIds()).toContain("m100"), { timeout: 5000 });
+        await act(async () => {
+            await nextFrames(2);
+        });
 
         expect(mountedIds()).toContain("m100");
         expect(focusedMessageId()).toBe(`m${THREAD_LENGTH - 5}`);
@@ -698,5 +725,85 @@ describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
         await vi.waitFor(() => expect(focusedMessageId()).toBe("older-5"), { timeout: 5000 });
         expect(mountedIds()).toContain(`m${THREAD_LENGTH - 1}`);
         expect(mountedIds().length).toBeLessThan(THREAD_LENGTH / 2);
+    });
+
+    describe("read aloud", () => {
+        const speechSynthesisStub = { cancel: vi.fn(), speak: vi.fn() };
+
+        const viewport = (): HTMLElement => document.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')!;
+        const row = (id: string): HTMLElement | null => document.querySelector<HTMLElement>(`[data-list-message-id="${CSS.escape(id)}"]`);
+
+        /** Jumps to an older reply in the virtualized head and starts reading it aloud. */
+        const readOlderReply = async (id: string): Promise<void> => {
+            act(() => scrollToMessage(id));
+            await vi.waitFor(() => expect(row(id)).not.toBeNull(), { timeout: 5000 });
+            fireEvent.click(within(row(id)!).getByRole("button", { name: "Read aloud" }));
+
+            expect(getReadAloudId()).toBe(id);
+        };
+
+        beforeEach(() => {
+            harness.withReadAloud = true;
+            speechSynthesisStub.cancel.mockClear();
+            speechSynthesisStub.speak.mockClear();
+            vi.stubGlobal("speechSynthesis", speechSynthesisStub);
+            vi.stubGlobal("SpeechSynthesisUtterance", SilentUtterance);
+        });
+
+        afterEach(() => {
+            stopReadAloud();
+        });
+
+        it("keeps reading an older reply after it scrolls out of the window, and its row offers Stop again", async () => {
+            mountInto();
+            await readOlderReply("m101");
+
+            const cancelsWhileStarting = speechSynthesisStub.cancel.mock.calls.length;
+
+            // Back to the newest messages: the virtualizer unmounts the reply that is reading.
+            act(() => viewport().scrollTo({ top: THREAD_LENGTH * 100 }));
+            await vi.waitFor(() => expect(row("m101")).toBeNull(), { timeout: 5000 });
+
+            expect(getReadAloudId()).toBe("m101");
+            expect(speechSynthesisStub.cancel).toHaveBeenCalledTimes(cancelsWhileStarting);
+
+            // Scrolled back into view, the remounted row knows it is reading and stops it.
+            act(() => scrollToMessage("m101"));
+            await vi.waitFor(() => expect(row("m101")).not.toBeNull(), { timeout: 5000 });
+            fireEvent.click(within(row("m101")!).getByRole("button", { name: "Stop reading" }));
+
+            expect(getReadAloudId()).toBeNull();
+            expect(speechSynthesisStub.cancel).toHaveBeenCalledTimes(cancelsWhileStarting + 1);
+        });
+
+        it("stops reading when the thread is left", async () => {
+            mountInto();
+            await readOlderReply("m101");
+
+            harness.threadId = "thread-2";
+            harness.messages = Array.from({ length: 4 }, (_, index) => ({ ...makeMessage(index), id: `b${index}`, key: `b${index}` }) as UIMessage);
+            act(() => harness.publish?.());
+
+            expect(getReadAloudId()).toBeNull();
+        });
+
+        it("stops reading when the list goes away", async () => {
+            const { unmount } = mountInto();
+
+            await readOlderReply("m101");
+            unmount();
+
+            expect(getReadAloudId()).toBeNull();
+        });
+
+        it("stops reading when the message that is reading is deleted", async () => {
+            mountInto();
+            await readOlderReply("m101");
+
+            harness.messages = (harness.messages as UIMessage[]).filter((message) => message.id !== "m101");
+            act(() => harness.publish?.());
+
+            expect(getReadAloudId()).toBeNull();
+        });
     });
 });

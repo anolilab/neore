@@ -32,7 +32,7 @@ import type { Virtualizer } from "@tanstack/react-virtual";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { AnimatePresence } from "motion/react";
 import type { FC, ReactNode } from "react";
-import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
@@ -57,6 +57,7 @@ import {
     shouldLoadOlderForJump,
 } from "./message-windowing";
 import { RateLimitPauseNotice } from "./rate-limit-pause-notice";
+import { useEndReadAloudWithMessages } from "./read-aloud-speech";
 import { selectStreamIdToShow, selectStreamTokenFor } from "./stream-to-show";
 import { StreamingPlaceholder, ThinkingPlaceholder } from "./streaming-placeholder";
 
@@ -236,6 +237,11 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     const editingMessageId = useChatUIStore((state) => state.editingMessageId);
 
     const initialIds = useInitialMessageIds(messages, messagesReady);
+
+    // Read aloud outlives its row (virtualization unmounts it); it ends with the thread, or with its message.
+    const messageIds = useMemo(() => threadMessages.map((message) => message.id), [threadMessages]);
+
+    useEndReadAloudWithMessages(messageIds);
 
     // The server snapshot is the default (on): localStorage does not exist during SSR.
     const isVirtualizeFlagOn = useSyncExternalStore(subscribeToNothing, readVirtualizeFlag, () => true);
