@@ -777,6 +777,9 @@ catalogs:
     '@tanstack/highlight':
       specifier: 1.2.11
       version: 1.2.11
+    hast-util-to-jsx-runtime:
+      specifier: 2.3.6
+      version: 2.3.6
     rehype-parse:
       specifier: 9.0.1
       version: 9.0.1
@@ -795,6 +798,9 @@ catalogs:
     remark-parse:
       specifier: 11.0.0
       version: 11.0.0
+    remark-rehype:
+      specifier: 11.1.2
+      version: 11.1.2
     remark-stringify:
       specifier: 11.0.0
       version: 11.0.0
@@ -3172,6 +3178,9 @@ importers:
       fuse.js:
         specifier: catalog:utils
         version: 7.5.0
+      hast-util-to-jsx-runtime:
+        specifier: catalog:markdown
+        version: 2.3.6(supports-color@10.2.2)
       hls.js:
         specifier: catalog:file-renderers
         version: 1.7.4
@@ -3250,6 +3259,9 @@ importers:
       remark-parse:
         specifier: catalog:markdown
         version: 11.0.0(supports-color@10.2.2)
+      remark-rehype:
+        specifier: catalog:markdown
+        version: 11.1.2
       remark-stringify:
         specifier: catalog:markdown
         version: 11.0.0
