@@ -183,6 +183,51 @@ describe("code block with whitespace or a wrapper before <code> (#486, #498, #53
         expect(service.turndown("<pre><div><code>x</code></div></pre>")).toBe(codeBlockStyle === "fenced" ? "```\nx\n```" : "    x");
     });
 
+    // Detection and traversal both ask a wrapper's filter. The answer is taken once, so a filter that matches only on its
+    // first call still supplies the wrapper's output, instead of the code block dropping it.
+    it("uses a wrapper's rule when its filter matches only on the first call", () => {
+        let calls = 0;
+        const service = new TurndownService({ codeBlockStyle: "fenced" });
+
+        service.addRule("claims-once", {
+            filter(node: Node) {
+                if (node.nodeName !== "DIV") {
+                    return false;
+                }
+
+                calls += 1;
+
+                return calls === 1;
+            },
+            replacement: () => "[wrapper]",
+        });
+
+        expect(service.turndown("<pre><div><code>x</code></div></pre>")).toBe("[wrapper]");
+        expect(calls).toBe(1);
+    });
+
+    // A filter that starts matching on its second call is not asked again, so the code block keeps the code.
+    it.each(["indented", "fenced"] as const)("a filter that starts matching later is asked once, in %s style", (codeBlockStyle) => {
+        let calls = 0;
+        const service = new TurndownService({ codeBlockStyle });
+
+        service.addRule("claims-late", {
+            filter(node: Node) {
+                if (node.nodeName !== "DIV") {
+                    return false;
+                }
+
+                calls += 1;
+
+                return calls > 1;
+            },
+            replacement: () => "[wrapper]",
+        });
+
+        expect(service.turndown("<pre><div><code>x</code></div></pre>")).toBe(codeBlockStyle === "fenced" ? "```\nx\n```" : "    x");
+        expect(calls).toBe(1);
+    });
+
     it("does not make a code block when text comes before <code>", () => {
         const html = "<pre>note <code>x = 1</code></pre>";
         const upstream = new TurndownUpstream({ codeBlockStyle: "indented" }).turndown(html);

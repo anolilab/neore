@@ -12,6 +12,12 @@ export default class Rules implements RuleLookup {
 
     private readonly removeList: Rule[] = [];
 
+    // The rule each node was given, or undefined when none matched. Keyed by node, so it lives with the parsed document.
+    private readonly decided = new WeakMap<Node, Rule | undefined>();
+
+    // The lists a node is searched in, in order: added and built-in rules, then keep, then remove.
+    private readonly searchOrder: ReadonlyArray<ReadonlyArray<Rule>> = [this.array, this.keepList, this.removeList];
+
     private readonly options: Options;
 
     private readonly blankRule: Rule;
@@ -56,24 +62,7 @@ export default class Rules implements RuleLookup {
             return this.blankRule;
         }
 
-        // Lowercased once for the node, not once per rule.
-        const nodeName = node.nodeName.toLowerCase();
-
-        const fromRules = findRule(this.array, node, nodeName, this.options, this);
-
-        if (fromRules) {
-            return fromRules;
-        }
-
-        const fromKeep = findRule(this.keepList, node, nodeName, this.options, this);
-
-        if (fromKeep) {
-            return fromKeep;
-        }
-
-        const fromRemove = findRule(this.removeList, node, nodeName, this.options, this);
-
-        return fromRemove ?? this.defaultRule;
+        return decideRule(this.decided, this.searchOrder, node, this.options, this) ?? this.defaultRule;
     }
 
     /**
@@ -81,10 +70,7 @@ export default class Rules implements RuleLookup {
      * decide whether to treat a node as transparent asks this first.
      */
     hasRuleFor(node: Node): boolean {
-        const annotated = annotateNode(node, this.options);
-        const nodeName = annotated.nodeName.toLowerCase();
-
-        return [this.array, this.keepList, this.removeList].some((list) => findRule(list, annotated, nodeName, this.options, this) !== undefined);
+        return decideRule(this.decided, this.searchOrder, annotateNode(node, this.options), this.options, this) !== undefined;
     }
 
     forEach(visit: (rule: Rule, index: number) => void): void {
@@ -92,6 +78,40 @@ export default class Rules implements RuleLookup {
             visit(rule, index);
         });
     }
+}
+
+/**
+ * The first rule of any kind that matches the node, asked once per node. A filter can
+ * be asked twice for one node (code-block detection, then traversal), and a second
+ * answer that differs from the first would split the two. The first answer is kept.
+ */
+function decideRule(
+    decided: WeakMap<Node, Rule | undefined>,
+    searchOrder: ReadonlyArray<ReadonlyArray<Rule>>,
+    node: AnnotatedNode,
+    options: Options,
+    lookup: RuleLookup,
+): Rule | undefined {
+    if (decided.has(node)) {
+        return decided.get(node);
+    }
+
+    // Lowercased once for the node, not once per rule.
+    const nodeName = node.nodeName.toLowerCase();
+
+    for (const list of searchOrder) {
+        const rule = findRule(list, node, nodeName, options, lookup);
+
+        if (rule) {
+            decided.set(node, rule);
+
+            return rule;
+        }
+    }
+
+    decided.set(node, undefined);
+
+    return undefined;
 }
 
 function isFilterMatch(rule: Rule, node: AnnotatedNode, nodeName: string, options: Options, lookup: RuleLookup): boolean {
@@ -112,7 +132,7 @@ function isFilterMatch(rule: Rule, node: AnnotatedNode, nodeName: string, option
     throw new TypeError("`filter` needs to be a string, array, or function");
 }
 
-function findRule(rules: Rule[], node: AnnotatedNode, nodeName: string, options: Options, lookup: RuleLookup): Rule | undefined {
+function findRule(rules: ReadonlyArray<Rule>, node: AnnotatedNode, nodeName: string, options: Options, lookup: RuleLookup): Rule | undefined {
     // A filter may add rules to this same list. Bounding the search by the length
     // at the start keeps it to the rules that existed, as Array.find did.
     const { length } = rules;
