@@ -1,3 +1,4 @@
+import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
 import { AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY, deleteItemAsync, getItemAsync, setItemAsync } from "expo-secure-store";
 import { Platform } from "react-native";
 
@@ -30,7 +31,7 @@ export const sharedKeychainOps: KeychainWriteOps = createKeychainWriteOps({
  */
 const upgradeOnce = untilItWorks(async () => {
     if (Platform.OS === "ios") {
-        await upgradeGrantInPlace(KEY, sharedKeychainOps);
+        await upgradeGrantInPlace(KEY, sharedKeychainOps, async (value) => await digestStringAsync(CryptoDigestAlgorithm.SHA256, value));
     }
 });
 

@@ -130,16 +130,25 @@ export const configurePhoneNotifications = onceItWorks(async () => {
 
     if (Platform.OS === "android") {
         await setNotificationChannelAsync(ANDROID_CHANNEL_ID, { importance: AndroidImportance.HIGH, name: channelName(deviceLocale()) });
-    } else {
-        // The extension's address does not gate the approval actions: a failed write only warns, and setup goes on.
-        try {
-            await writeIfDifferent(EXTENSION_LUNORA_URL_KEY, loadConfig().lunoraUrl, sharedKeychainOps);
-        } catch (error) {
-            // eslint-disable-next-line no-console -- no logger in the app; a failed write must not be silent
-            console.warn("Could not give the notification extension the server address.", error);
-        }
     }
 });
+
+/**
+ * Gives the notification extension the backend's address on every setup, not only the first: a write that failed before
+ * is tried again. It never fails setup: the approval actions do not depend on it.
+ */
+export const syncExtensionAddress = async (): Promise<void> => {
+    if (Platform.OS !== "ios") {
+        return;
+    }
+
+    try {
+        await writeIfDifferent(EXTENSION_LUNORA_URL_KEY, loadConfig().lunoraUrl, sharedKeychainOps);
+    } catch (error) {
+        // eslint-disable-next-line no-console -- no logger in the app; a failed write must not be silent
+        console.warn("Could not give the notification extension the server address.", error);
+    }
+};
 
 /** The language the approval actions were last registered in, once they were: a change of language registers them again. */
 const approvalActionsState = { isRegistered: false, locale: undefined as string | undefined };

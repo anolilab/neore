@@ -190,10 +190,19 @@ enum PushContent {
     }
 
     /// The response's status (`nil` when there was no answer) and its JSON body, read only for a 2xx.
+    /// The backend is https. A local backend may be plain http, in debug builds only.
+    private static func isAllowedEndpoint(_ endpoint: URL) -> Bool {
+        #if DEBUG
+        return endpoint.scheme == "https" || endpoint.host == "localhost"
+        #else
+        return endpoint.scheme == "https"
+        #endif
+    }
+
     private static func post(_ url: String, body: [String: String], bearer: String?, deadline: Date) async -> (status: Int?, json: [String: Any]?) {
         let remaining = deadline.timeIntervalSinceNow
 
-        guard remaining > 0, let endpoint = URL(string: url), endpoint.scheme == "https" || endpoint.host == "localhost" else {
+        guard remaining > 0, let endpoint = URL(string: url), isAllowedEndpoint(endpoint) else {
             return (nil, nil)
         }
 

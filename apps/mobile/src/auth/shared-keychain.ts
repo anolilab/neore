@@ -18,28 +18,32 @@ export interface KeychainWriteOps {
     writeInPlace: (key: string, value: string) => Promise<void>;
 }
 
-/** Set once the stored grant has been made readable after the first unlock. */
+/** Holds the fingerprint of the grant made readable after the first unlock: a grant written since is upgraded again. */
 export const GRANT_ACCESSIBILITY_MARKER = "neore.mobile.grant-after-first-unlock";
 
 /**
- * Makes a grant stored before this build readable on a locked phone, once: when the
- * marker says it is done, nothing is written. Never deletes. Resolves whether the
- * grant was written.
+ * Makes the grant readable on a locked phone, once for each grant: a grant stored by an older build (readable only while
+ * unlocked) is rewritten over itself, in place, and never deleted. The marker holds the fingerprint of the grant it was
+ * made for, so a grant written since, by a build that was rolled back for instance, is upgraded again. Resolves whether it
+ * wrote.
  */
-export const upgradeGrantInPlace = async (key: string, ops: KeychainWriteOps): Promise<boolean> => {
-    if (await ops.read(GRANT_ACCESSIBILITY_MARKER) === "1") {
+export const upgradeGrantInPlace = async (key: string, ops: KeychainWriteOps, fingerprint: (value: string) => Promise<string>): Promise<boolean> => {
+    const value = await ops.read(key);
+
+    if (value === null) {
         return false;
     }
 
-    const value = await ops.read(key);
+    const print = await fingerprint(value);
 
-    if (value !== null) {
-        await ops.writeInPlace(key, value);
+    if (await ops.read(GRANT_ACCESSIBILITY_MARKER) === print) {
+        return false;
     }
 
-    await ops.writeInPlace(GRANT_ACCESSIBILITY_MARKER, "1");
+    await ops.writeInPlace(key, value);
+    await ops.writeInPlace(GRANT_ACCESSIBILITY_MARKER, print);
 
-    return value !== null;
+    return true;
 };
 
 /** Writes `value` only when the stored one differs. Resolves whether it wrote. */

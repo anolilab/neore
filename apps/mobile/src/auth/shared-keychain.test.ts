@@ -5,6 +5,9 @@ import { createKeychainWriteOps, GRANT_ACCESSIBILITY_MARKER, untilItWorks, upgra
 
 const KEY = "neore.mobile.grant";
 const GRANT = "{\"token\":\"session-1\"}";
+const OLD_GRANT = "{\"token\":\"session-0\"}";
+
+const fingerprint = async (value: string) => `fp(${value})`;
 
 /** A keychain: `items` by key, and every write in order. It has no delete: the write path must never need one. */
 const keychain = (initial: Record<string, string>) => {
@@ -25,24 +28,31 @@ describe("upgradeGrantInPlace", () => {
     it("rewrites a grant from before this build over itself, once, so the sign-in is never missing", async () => {
         const { items, ops, writes } = keychain({ [KEY]: GRANT });
 
-        expect(await upgradeGrantInPlace(KEY, ops)).toBe(true);
-        expect(writes).toEqual([`${KEY}=${GRANT}`, `${GRANT_ACCESSIBILITY_MARKER}=1`]);
+        expect(await upgradeGrantInPlace(KEY, ops, fingerprint)).toBe(true);
+        expect(writes).toEqual([`${KEY}=${GRANT}`, `${GRANT_ACCESSIBILITY_MARKER}=fp(${GRANT})`]);
         // At every step the grant is readable: there is no delete in between.
         expect(items[KEY]).toBe(GRANT);
     });
 
     it("writes nothing on later launches", async () => {
-        const { ops, writes } = keychain({ [GRANT_ACCESSIBILITY_MARKER]: "1", [KEY]: GRANT });
+        const { ops, writes } = keychain({ [GRANT_ACCESSIBILITY_MARKER]: `fp(${GRANT})`, [KEY]: GRANT });
 
-        expect(await upgradeGrantInPlace(KEY, ops)).toBe(false);
+        expect(await upgradeGrantInPlace(KEY, ops, fingerprint)).toBe(false);
         expect(writes).toEqual([]);
     });
 
-    it("only sets the marker when nobody is signed in: a later sign-in writes the grant readable already", async () => {
+    it("upgrades a grant written after the marker was set, so a rolled-back build cannot leave it locked", async () => {
+        const { ops, writes } = keychain({ [GRANT_ACCESSIBILITY_MARKER]: `fp(${OLD_GRANT})`, [KEY]: GRANT });
+
+        expect(await upgradeGrantInPlace(KEY, ops, fingerprint)).toBe(true);
+        expect(writes).toEqual([`${KEY}=${GRANT}`, `${GRANT_ACCESSIBILITY_MARKER}=fp(${GRANT})`]);
+    });
+
+    it("writes nothing when nobody is signed in: a later sign-in writes the grant readable already", async () => {
         const { ops, writes } = keychain({});
 
-        expect(await upgradeGrantInPlace(KEY, ops)).toBe(false);
-        expect(writes).toEqual([`${GRANT_ACCESSIBILITY_MARKER}=1`]);
+        expect(await upgradeGrantInPlace(KEY, ops, fingerprint)).toBe(false);
+        expect(writes).toEqual([]);
     });
 });
 
