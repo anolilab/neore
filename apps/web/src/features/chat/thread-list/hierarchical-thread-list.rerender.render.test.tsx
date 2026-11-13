@@ -187,10 +187,33 @@ const groups: ThreadGroup[] = [
     } as unknown as ThreadGroup,
 ];
 
-vi.mock("./hooks/use-thread-groups", () => {
-    const result = { isPlaceholderData: false, threadGroups: groups, threadsData: {} };
+/** A root thread with one branch under it, and a plain root after it: the rows a nested highlight shows on. */
+const [parentId, childId, plainId] = [6, 7, 8].map((index) => `00000000-0000-4000-8000-00000000000${index}`) as [string, string, string];
+const node = (threadId: string, depth: number, children: BranchNode[] = []): BranchNode =>
+    ({
+        branchPoint: 0,
+        branchType: depth === 0 ? "root" : "branch",
+        children,
+        createdAt: 0,
+        depth,
+        status: "idle",
+        threadId,
+        title: threadId,
+    }) as unknown as BranchNode;
+const nestedGroups: ThreadGroup[] = [
+    { groupType: "today", threads: [node(parentId, 0, [node(childId, 1)]), node(plainId, 0)], title: "Today" } as unknown as ThreadGroup,
+];
 
-    return { default: () => result };
+/** Which thread groups the list gets: the flat five, or the parent with its branch. */
+const groupsInUse = vi.hoisted(() => {
+    return { nested: false };
+});
+
+vi.mock("./hooks/use-thread-groups", () => {
+    const flat = { isPlaceholderData: false, threadGroups: groups, threadsData: {} };
+    const nested = { isPlaceholderData: false, threadGroups: nestedGroups, threadsData: {} };
+
+    return { default: () => (groupsInUse.nested ? nested : flat) };
 });
 
 // The real handlers close over the open thread (deleting it moves the route): new functions each time it changes.
@@ -307,11 +330,11 @@ const listProps = {
 } as unknown as Omit<Parameters<typeof HierarchicalThreadList>[0], "currentThreadId">;
 
 /** The rows that rendered while `change` ran. */
-const rowsUpdatedBy = (change: () => void): string[] => {
+const rowsUpdatedBy = (change: () => void, ids: ReadonlyArray<string> = threadIds): string[] => {
     renders.clear();
     act(change);
 
-    return threadIds.filter((threadId) => renders.has(threadId));
+    return ids.filter((threadId) => renders.has(threadId));
 };
 
 const [first, second, third] = threadIds as [string, string, string];
@@ -328,6 +351,7 @@ beforeEach(() => {
             unobserve = vi.fn();
         },
     );
+    groupsInUse.nested = false;
     route.set(`/chat/${first}`);
     pullRequestCounts.set(new Map());
 });
@@ -375,5 +399,44 @@ describe("the sidebar thread list", () => {
         render(<HierarchicalThreadList {...listProps} currentThreadId={first} />);
 
         expect(rowsUpdatedBy(() => pullRequestCounts.set(new Map([[third, 1]])))).toStrictEqual([third]);
+    });
+
+    describe("with a branch open under its parent", () => {
+        const nestedIds = [parentId, childId, plainId];
+        const nestedProps = { ...listProps, expandedThreads: new Set([parentId]) };
+        /** The classes of a row's own box, by thread. */
+        const classesOf = (container: HTMLElement, threadId: string) =>
+            // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the highlight is only a class on the row's box
+            container.querySelector(`[data-thread-id="${CSS.escape(threadId)}"]`)?.className.split(" ") ?? [];
+
+        beforeEach(() => {
+            groupsInUse.nested = true;
+            route.set(`/chat/${plainId}`);
+        });
+
+        it("marks the branch as the open thread, not its parent, and re-renders only the rows that change", () => {
+            const { container, rerender } = render(<HierarchicalThreadList {...nestedProps} currentThreadId={plainId} />);
+
+            const updatedRows = rowsUpdatedBy(() => {
+                route.set(`/chat/${childId}`);
+                rerender(<HierarchicalThreadList {...nestedProps} currentThreadId={childId} />);
+            }, nestedIds);
+
+            expect(updatedRows).toStrictEqual([childId, plainId]);
+            expect(classesOf(container, childId)).toContain("bg-white/20");
+            expect(classesOf(container, parentId)).not.toContain("bg-white/20");
+            expect(classesOf(container, plainId)).not.toContain("bg-white/20");
+        });
+
+        it("moves the arrow keys' highlight from the parent onto its branch, re-rendering only those two rows", () => {
+            const { container } = render(<HierarchicalThreadList {...nestedProps} currentThreadId={plainId} />);
+
+            // The first press selects the parent; the next one reaches the branch under it.
+            fireEvent.keyDown(document.body, { key: "ArrowDown" });
+
+            expect(rowsUpdatedBy(() => fireEvent.keyDown(document.body, { key: "ArrowDown" }), nestedIds)).toStrictEqual([parentId, childId]);
+            expect(classesOf(container, childId)).toContain("ring-white/50");
+            expect(classesOf(container, parentId)).not.toContain("ring-white/50");
+        });
     });
 });
