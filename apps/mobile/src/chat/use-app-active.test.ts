@@ -1,11 +1,15 @@
+// @vitest-environment jsdom
+import { act, createElement } from "react";
+import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 
-import { subscribeToAppState } from "./use-app-active";
+import { subscribeToAppState, useIsAppActive } from "./use-app-active";
 
 const appState = vi.hoisted(() => {
     return {
         listeners: [] as (() => void)[],
         removed: 0,
+        state: "active",
     };
 });
 
@@ -22,7 +26,9 @@ vi.mock(import("react-native"), () => ({
                 },
             };
         },
-        currentState: "active",
+        get currentState() {
+            return appState.state;
+        },
     },
 } as never));
 
@@ -53,5 +59,45 @@ describe(subscribeToAppState, () => {
 
         expect(appState.listeners).toHaveLength(2);
         expect(appState.removed).toBe(2);
+    });
+});
+
+describe(useIsAppActive, () => {
+    it("is false only while the app is in the background, not for a system sheet over it", () => {
+        const seen: boolean[] = [];
+        const Probe = () => {
+            seen.push(useIsAppActive());
+
+            return null;
+        };
+        const root = createRoot(document.createElement("div"));
+        /** The phone reports a new app state: the native listener installed last hears it. */
+        const dispatch = (state: string) => {
+            act(() => {
+                appState.state = state;
+                appState.listeners.at(-1)?.();
+            });
+        };
+
+        // React reads this to allow `act` outside a testing library.
+        Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
+        act(() => {
+            root.render(createElement(Probe));
+        });
+
+        dispatch("background");
+        const inBackground = seen.at(-1);
+
+        dispatch("inactive");
+        const underSheet = seen.at(-1);
+
+        dispatch("active");
+        const inFront = seen.at(-1);
+
+        act(() => {
+            root.unmount();
+        });
+
+        expect([inBackground, underSheet, inFront]).toStrictEqual([false, true, true]);
     });
 });
