@@ -5,6 +5,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { dispatchDueShards } from "../lib/shard-housekeeping";
 import { backfillUsageExportRunDeleteAt } from "../migrations";
 import schema from "../schema";
 import {
@@ -17,28 +18,20 @@ import {
     sweepUsageExportPieces,
 } from "./gdpr";
 
-/** Object keys the purges were scheduled for, captured in place of the scheduler. */
+/** Object keys the purges were scheduled for, and the shards the scheduler was asked to run a tick on, captured in place of the scheduler. */
 const scheduled = vi.hoisted(() => {
-    return { armed: [] as number[], keys: [] as string[] };
-});
-
-// The shard's due time, captured in place of the census: the test reads the time a shard was armed for.
-vi.mock("../lib/shard-housekeeping", async (importOriginal) => {
-    return {
-        ...(await importOriginal<typeof import("../lib/shard-housekeeping")>()),
-        noteShardDue: async (_ctx: unknown, dueAt: number) => {
-            scheduled.armed.push(dueAt);
-        },
-    };
+    return { keys: [] as string[], shards: [] as string[] };
 });
 
 vi.mock("../lib/shard-scheduler", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../lib/shard-scheduler")>()),
-        runAfterOnShard: async (_scheduler: unknown, _delay: number, _target: unknown, args: Record<string, unknown>) => {
+        runAfterOnShard: async (_scheduler: unknown, _delay: number, _target: unknown, args: Record<string, unknown>, shardKey: string) => {
             if (typeof args["key"] === "string") {
                 scheduled.keys.push(args["key"]);
             }
+
+            scheduled.shards.push(shardKey);
 
             return null;
         },
@@ -66,6 +59,14 @@ const countOf = async (table: string, userId: string): Promise<number> =>
         const { page } = await ctx.db[table].findMany({ limit: 1000, where: { userId } });
 
         return page.length;
+    });
+
+/** The due time the user's shard is armed for in the census, read as the root tick reads it. */
+const dueAtOf = async (userId: string): Promise<number | undefined> =>
+    await harness.run(async (ctx: any) => {
+        const row = await ctx.db.shardActivity.findFirst({ where: { shardKey: userId } });
+
+        return row?.nextDueAt;
     });
 
 /** Every keyed run of the user, read page by page as the erasure's purge reads them. */
@@ -104,7 +105,7 @@ beforeEach(() => {
     vi.setSystemTime(new Date("2026-11-12T12:00:00.000Z"));
     harness = lunoraTest(schema as never);
     scheduled.keys = [];
-    scheduled.armed = [];
+    scheduled.shards = [];
 });
 
 afterEach(() => {
@@ -468,7 +469,7 @@ describe("the sweep and the clear", () => {
         expect(await keyedRunsOf(A)).toEqual([{ key: "gdpr-exports/live-keyed.json", live: true, runId: expect.any(String) }]);
     });
 
-    it("arms an idle shard for the time its live run is due again, so the root tick reaches it without any traffic", async () => {
+    it("arms an idle shard for the time its live run is due again, so the root tick dispatches it then without any traffic", async () => {
         const t0 = Date.now();
 
         await harness.run(async (ctx: any) => {
@@ -485,7 +486,16 @@ describe("the sweep and the clear", () => {
 
         await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
 
-        expect(scheduled.armed).toEqual([t0 + EXPORT_PIECE_TTL_MS]);
+        // The real census write: the user's shard is armed for the run's next due time.
+        expect(await dueAtOf(A)).toBe(t0 + EXPORT_PIECE_TTL_MS);
+
+        // Before that time the root tick dispatches nothing; at that time it dispatches the user's shard.
+        await harness.run(async (ctx: any) => await ctx.runMutation(dispatchDueShards, {}));
+        expect(scheduled.shards).toEqual([]);
+
+        vi.setSystemTime(t0 + EXPORT_PIECE_TTL_MS);
+        await harness.run(async (ctx: any) => await ctx.runMutation(dispatchDueShards, {}));
+        expect(scheduled.shards).toEqual([A]);
     });
 
     it("does not let a keyed run whose purge keeps failing block the expired runs behind it", async () => {

@@ -219,9 +219,10 @@ const isRunLive = async (ctx: MutationCtx | QueryCtx, runKey: string, userId: st
  * Sets a run's due time, and arms its shard for the root tick at that time. The tick reaches a shard by its due time, not by its
  * traffic, so an idle shard's runs are still acted on.
  */
-const armRun = async (ctx: MutationCtx, runId: Id<"usageExportRuns">, deleteAt: number): Promise<void> => {
+const armRun = async (ctx: MutationCtx, runId: Id<"usageExportRuns">, userId: string, deleteAt: number): Promise<void> => {
     await ctx.db.patch("usageExportRuns", runId, { deleteAt });
-    await noteShardDue(ctx, deleteAt);
+    // The run's user's shard, named outright: the sweep's own shard is not always that user's (`currentUserShard()` is undefined off a shard).
+    await noteShardDue(ctx, deleteAt, userId);
 };
 
 /**
@@ -258,7 +259,7 @@ export const sweepUsageExportPieces = internalMutation
                 }
 
                 if (await isRunLive(ctx, run.requestId, run.userId)) {
-                    await armRun(ctx, run._id, ctx.now + EXPORT_PIECE_TTL_MS);
+                    await armRun(ctx, run._id, run.userId, ctx.now + EXPORT_PIECE_TTL_MS);
                     continue;
                 }
 
@@ -291,7 +292,7 @@ export const sweepUsageExportPieces = internalMutation
                     await ctx.db.delete("usageExportRuns", run._id);
                 } else {
                     // Pieces remain, so the run is due again at once. A keyed run waits for its purge a time to live from now.
-                    await armRun(ctx, run._id, more ? ctx.now : ctx.now + EXPORT_PIECE_TTL_MS);
+                    await armRun(ctx, run._id, run.userId, more ? ctx.now : ctx.now + EXPORT_PIECE_TTL_MS);
                 }
 
                 handled += 1;
