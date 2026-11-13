@@ -12,14 +12,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const DAY = 24 * 60 * 60 * 1000;
 const ACTIVE_UNTIL = /^Link active until/u;
+const toastError = vi.hoisted(() => vi.fn());
 const revoke = vi.fn(async (_args: { confirmedNotes: string[]; linkId: string }) => null);
 const readLink = vi.fn(async () => {
-    return { link: null as { id: string } | null, messages: [] as { id: string; status: string }[] };
+    return { link: null as { bound?: boolean; expiresAt?: number; id: string } | null, messages: [] as { id: string; status: string }[] };
 });
 
 // The query client tells its observers on a microtask, not a timer, so an update lands inside `act`.
 notifyManager.setScheduler(queueMicrotask);
 
+vi.mock("sonner", () => {
+    return { toast: { error: toastError, info: vi.fn(), success: vi.fn() } };
+});
 vi.mock("@lingui/react/macro", () => {
     return {
         useLingui: () => {
@@ -114,16 +118,17 @@ const start = (run: () => Promise<boolean>) => {
 afterEach(() => {
     vi.useRealTimers();
     revoke.mockReset();
-    readLink.mockClear();
+    readLink.mockReset();
 });
 
 describe("GuestLinkPanel", () => {
     it("shows a made address only while the live read holds that link, not once it is replaced or revoked elsewhere", async () => {
         const readNow = showPanel({ link: null, messages: [] });
 
+        // The panel reads the link again after making it (a live read can fall back to one-shot): that read holds it.
+        readLink.mockResolvedValueOnce({ link: { bound: false, expiresAt: Date.now() + DAY, id: "link-1" }, messages: [] });
         fireEvent.click(screen.getByRole("button", { name: "Create guest link" }));
-        await readNow({ link: { bound: false, expiresAt: Date.now() + DAY, id: "link-1" }, messages: [] });
-        expect(screen.getByRole("textbox", { name: "Guest link" })).toBeTruthy();
+        expect(await screen.findByRole("textbox", { name: "Guest link" })).toBeTruthy();
 
         // Another tab made a new link (same end time is possible): the address made here is not the live one any more.
         await readNow({ link: { bound: false, expiresAt: Date.now() + DAY, id: "link-2" }, messages: [] });
@@ -133,9 +138,9 @@ describe("GuestLinkPanel", () => {
         expect(screen.queryByRole("textbox", { name: "Guest link" })).toBeNull();
     });
 
-    it("offers Create once the link ends, without a new read", () => {
+    it("offers Create once the link ends, without a new read, and hides its notes", () => {
         vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
-        showPanel({ link: { bound: false, expiresAt: Date.now() + 1000, id: "link-1" }, messages: [] });
+        showPanel({ link: { bound: false, expiresAt: Date.now() + 1000, id: "link-1" }, messages: [{ createdAt: 0, id: "n", status: "held", text: "hi" }] });
 
         expect(screen.getByText(ACTIVE_UNTIL)).toBeTruthy();
 
@@ -143,7 +148,20 @@ describe("GuestLinkPanel", () => {
 
         expect(screen.queryByText(ACTIVE_UNTIL)).toBeNull();
         expect(screen.getByRole("button", { name: "Create guest link" })).toBeTruthy();
+        expect(screen.queryByRole("list", { name: "Guest messages" })).toBeNull();
     });
+
+    it("tells the owner to copy the address by hand where the browser has no Clipboard API", async () => {
+        showPanel({ link: null, messages: [] });
+        readLink.mockResolvedValueOnce({ link: { bound: false, expiresAt: Date.now() + DAY, id: "link-1" }, messages: [] });
+        fireEvent.click(screen.getByRole("button", { name: "Create guest link" }));
+        await screen.findByRole("textbox", { name: "Guest link" });
+
+        fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+
+        expect(toastError).toHaveBeenCalledWith("The link could not be copied. Select it and copy it yourself.");
+    });
+
     it("does not show a link as live that ended before the read answered", async () => {
         vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
         const mountedAt = Date.now();

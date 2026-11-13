@@ -143,7 +143,14 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
     const handleCreate = () => {
         create.mutate(
             { threadId: threadId as Id<"threads"> },
-            { onError: reportError, onSuccess: ({ id, linkToken }) => setMadeLink({ id, url: guestLinkUrl(linkToken) }) },
+            {
+                onError: reportError,
+                onSuccess: ({ id, linkToken }) => {
+                    setMadeLink({ id, url: guestLinkUrl(linkToken) });
+                    // The address shows once the read holds the new link: read it now, as a live read can fall back to one-shot.
+                    void linkQuery.refetch();
+                },
+            },
         );
     };
 
@@ -160,6 +167,7 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
             if (shownLinkId !== undefined && (await revokeLink(shownLinkId, waitingNotes))) {
                 setMadeLink(undefined);
                 focusCreateRef.current = true;
+                void linkQuery.refetch();
             }
         } catch (error) {
             reportError(error);
@@ -173,12 +181,23 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
     const linkUrl = live && madeLink !== undefined && madeLink.id === data?.link?.id ? madeLink.url : undefined;
 
     const handleCopy = () => {
-        if (linkUrl) {
-            void navigator.clipboard
-                .writeText(linkUrl)
-                .then(() => toast.success(t`Guest link copied`))
-                .catch(() => toast.error(t`The link could not be copied. Select it and copy it yourself.`));
+        if (!linkUrl) {
+            return;
         }
+
+        const copyByHand = () => toast.error(t`The link could not be copied. Select it and copy it yourself.`);
+
+        // No Clipboard API (an insecure page, an old browser): the owner copies it from the field.
+        if (globalThis.navigator?.clipboard === undefined) {
+            copyByHand();
+
+            return;
+        }
+
+        void globalThis.navigator.clipboard
+            .writeText(linkUrl)
+            .then(() => toast.success(t`Guest link copied`))
+            .catch(copyByHand);
     };
 
     const expiresAt = live ? formatDateTime(linkEnd, i18n.locale) : undefined;
@@ -230,7 +249,8 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
                     {t`Create guest link`}
                 </Button>
             )}
-            {data && data.messages.length > 0 && (
+            {/* A lapsed link's notes are hidden, as the server hides them. */}
+            {live && data && data.messages.length > 0 && (
                 <ul aria-label={t`Guest messages`} className="flex flex-col gap-2">
                     {data.messages.map((note) => (
                         <li className="border-border flex flex-col gap-2 rounded-md border p-2" key={note.id}>
