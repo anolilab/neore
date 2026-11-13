@@ -143,9 +143,12 @@ const ThreadList: FC = () => {
         setShownAnswer({ data: askedSearch.data, organizationId, query: askedQuery, type: searchType });
     }
 
-    // An answer for another search type or another organization is never shown: until this one's first answer, every thread is.
-    const visibleAnswer =
-        typedQuery !== "" && shownAnswer !== null && shownAnswer.type === searchType && shownAnswer.organizationId === organizationId ? shownAnswer : null;
+    // An answer for another search type is never shown, nor a thread search from another organization (thread search is asked per
+    // organization; message search is the person's own, so its hits stay across a switch): until this one's first answer, every
+    // thread is.
+    const isAnswerForThisSearch =
+        shownAnswer !== null && shownAnswer.type === searchType && (shownAnswer.type === "messages" || shownAnswer.organizationId === organizationId);
+    const visibleAnswer = typedQuery !== "" && isAnswerForThisSearch ? shownAnswer : null;
     // A search that failed shows that it failed, not the full list as if no search ran.
     const isSearchError = typedQuery !== "" && askedQuery !== "" && askedSearch.isError;
     const shownQuery = isSearchError ? askedQuery : (visibleAnswer?.query ?? "");

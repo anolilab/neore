@@ -409,6 +409,29 @@ describe("the sidebar search, as shown", () => {
         expect(screen.getByText("Org B plan")).toBeTruthy();
     });
 
+    it("keeps a message search's hits across an organization switch: message search is the person's own", async () => {
+        act(() => {
+            useThreadListUIStore.getState().setSearchType("messages");
+        });
+        await renderList();
+
+        type("alpha");
+        await settle();
+        await answer(0, [messageHit("release", "Release notes", `${FILLER} the alpha release ships.`)]);
+
+        expect(screen.getByText("Release notes")).toBeTruthy();
+
+        act(() => {
+            organization.set("org-b");
+        });
+        await settle(0);
+
+        // Nothing new is asked, and the hits stay.
+        expect(searches).toHaveLength(1);
+        expect(screen.getByText("Release notes")).toBeTruthy();
+        expect(snippetNames()).toStrictEqual([expect.stringMatching(ALPHA_SNIPPET)]);
+    });
+
     it("does not ask the cleared query again when the box is cleared and typed into within the pause", async () => {
         await renderList();
 
