@@ -769,8 +769,9 @@ function breakMarkFor(node: Node, options: Options): string | undefined {
     return heading ? headingBreakMark(heading) : undefined;
 }
 
-const PRIVATE_USE_START = 0xe0_00;
-const PRIVATE_USE_END = 0xf8_ff;
+// The Unicode private-use area, U+E000 to U+F8FF.
+const PRIVATE_USE_START = "".codePointAt(0) ?? 0;
+const PRIVATE_USE_END = "".codePointAt(0) ?? 0;
 
 /**
  * A private-use character that the heading's markup does not contain. A break in the heading is written as this
