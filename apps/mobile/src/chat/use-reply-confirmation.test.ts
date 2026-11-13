@@ -24,10 +24,14 @@ const fetchPage = vi.fn(
 const onEnded = () => {};
 const onRefused = () => {};
 const pending: Confirmation = { holdsSend: false, messageId: "sent", steers: 0, threadId: "t1" };
+/** The history re-reads the checks asked for so far (`confirmTick` as the screen last rendered it). */
+const rendered = { confirmTick: 0 };
 
 /** A chat screen that has just sent: one confirmation waits, and `isPaused` is whether it is on screen and in front. */
 const Chat = ({ isPaused }: { isPaused: boolean }) => {
-    const { addConfirmation } = useReplyConfirmation({ fetchPage, isPaused, onEnded, onRefused, threadId: "t1" });
+    const { addConfirmation, confirmTick } = useReplyConfirmation({ fetchPage, isPaused, onEnded, onRefused, threadId: "t1" });
+
+    rendered.confirmTick = confirmTick;
 
     useEffect(() => {
         addConfirmation(pending);
@@ -55,6 +59,7 @@ describe(useReplyConfirmation, () => {
     beforeEach(() => {
         vi.useFakeTimers();
         fetchPage.mockClear();
+        rendered.confirmTick = 0;
         // React reads this to allow `act` outside a testing library.
         Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
         mounted.root = createRoot(document.createElement("div"));
@@ -90,5 +95,20 @@ describe(useReplyConfirmation, () => {
         await wait(2);
 
         expect(fetchPage).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps the count of checks across a pause: the sixth check overall asks for the re-read", async () => {
+        show(false);
+        await wait(5);
+
+        expect(rendered.confirmTick).toBe(0);
+
+        show(true);
+        await wait(10);
+        show(false);
+        await wait(1);
+
+        expect(fetchPage).toHaveBeenCalledTimes(6);
+        expect(rendered.confirmTick).toBe(1);
     });
 });
