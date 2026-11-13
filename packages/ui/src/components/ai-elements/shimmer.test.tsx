@@ -3,6 +3,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -20,7 +21,12 @@ const renderShimmer = (node = <Shimmer>Thinking...</Shimmer>) => {
         root.render(node);
     });
 
-    return { element: container.firstElementChild as HTMLElement, unmount: () => act(() => root.unmount()) };
+    return {
+        current: () => container.firstElementChild as HTMLElement,
+        element: container.firstElementChild as HTMLElement,
+        rerender: (next: ReactNode) => act(() => root.render(next)),
+        unmount: () => act(() => root.unmount()),
+    };
 };
 
 // The animation is declared in the utility, i.e. on the shimmering element, where its inline `--shimmer-duration` is
@@ -137,6 +143,23 @@ describe("Shimmer off-screen", () => {
         expect(element.classList.contains("animate-text-shimmer")).toBe(true);
         unmount();
     });
+    it("does not pause a replacement element for its predecessor, when no observer can start for it", () => {
+        vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+        const { current, element, rerender, unmount } = renderShimmer();
+
+        report(false);
+
+        expect("paused" in element.dataset).toBe(true);
+
+        // Another element (`as` changed) while the observer can no longer start.
+        vi.stubGlobal("IntersectionObserver", ThrowingObserver);
+        rerender(<Shimmer as="span">Thinking...</Shimmer>);
+
+        expect(current().tagName).toBe("SPAN");
+        expect("paused" in current().dataset).toBe(false);
+        unmount();
+    });
+
     it("keeps running when IntersectionObserver throws on construction", () => {
         vi.stubGlobal("IntersectionObserver", ThrowingObserver);
         const { element, unmount } = renderShimmer();

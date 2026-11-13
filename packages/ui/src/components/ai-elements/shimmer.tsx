@@ -54,14 +54,17 @@ const watchOnScreen = (target: Element, onChange: (onScreen: boolean) => void): 
 const ShimmerComponent = ({ as = "p", children, className, duration = 2, spread = 2 }: TextShimmerProps) => {
     // A callback ref into state: the effect runs again for a new element (another `as`).
     const [target, setTarget] = useState<HTMLElement | null>(null);
-    const [offScreen, setOffScreen] = useState(false);
+    // The element an observer last reported out of view. Kept per element: a replacement (another `as`) is not paused
+    // by its predecessor's report, also when no observer can start for it.
+    const [offScreenElement, setOffScreenElement] = useState<HTMLElement | null>(null);
+    const offScreen = offScreenElement !== null && offScreenElement === target;
 
     useEffect(() => {
         if (!target) {
             return undefined;
         }
 
-        return watchOnScreen(target, (onScreen: boolean) => setOffScreen(!onScreen));
+        return watchOnScreen(target, (onScreen: boolean) => setOffScreenElement(onScreen ? null : target));
     }, [target]);
 
     return createElement(
