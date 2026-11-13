@@ -9,15 +9,23 @@ export interface SendSession {
 /**
  * The sends of the signed-in session. A send keeps retrying with the token it fetched (`startWithRetries`), and ending
  * the auth epoch stops no request, so sign-out stops every send still going (`signOut`): a retry can never save a message
- * for an account that is gone. A send stopped that way goes through the stopped-send path but gives nothing back.
+ * for an account that is gone. A send stopped that way goes through the stopped-send path but gives nothing back. The
+ * sessions stay closed until the next sign-in (`open`): a send begun during the sign-out's teardown, while the account
+ * still reads as signed in, is stopped at once and counts as signed out too.
  */
 export const createSendSessions = () => {
     let session = 0;
+    let isClosed = false;
     const controllers = new Set<AbortController>();
 
     return {
         begin: (controller: AbortController): SendSession => {
-            const startedIn = session;
+            // A send begun while a sign-out runs belongs to the departing account: stopped, and never its own session.
+            const startedIn = isClosed ? -1 : session;
+
+            if (isClosed) {
+                controller.abort();
+            }
 
             controllers.add(controller);
 
@@ -28,8 +36,13 @@ export const createSendSessions = () => {
                 isSignedOut: () => startedIn !== session,
             };
         },
+        /** At a sign-in: sends begin normally again. */
+        open: (): void => {
+            isClosed = false;
+        },
         signOut: (): void => {
             session += 1;
+            isClosed = true;
 
             for (const controller of controllers) {
                 controller.abort();

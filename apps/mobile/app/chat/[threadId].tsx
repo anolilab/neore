@@ -187,6 +187,10 @@ const Chat = () => {
         setDraftState(next);
     }, []);
     const [sending, setSending] = useState(false);
+    // `sending` as the last write left it, read where a kept prompt is offered outside a render (`followUnsentPrompts`).
+    const sendingRef = useRef(false);
+    // Offers this chat's kept prompts again once the screen can take one (its send ended, its hold was used).
+    const offerUnsent = useRef<() => void>(() => {});
     const [error, setError] = useState<string | null>(null);
     // The words land in the draft, after anything typed meanwhile; they are never sent on their own.
     const voice = useDictation({ onText: (text) => setDraft((current) => appendTranscript(current, text)) });
@@ -434,7 +438,7 @@ const Chat = () => {
         }
     }, [confirmTick, hasToken, loadMessages, refreshTick, sending, status, threadId]);
 
-    // A send the server did not accept, or whose answer was lost, gives its prompt back and drops its local rows: no read
+    // A send the server did not didTake, or whose answer was lost, gives its prompt back and drops its local rows: no read
     // will confirm them. The prompt keeps its `clientMessageId`, so sending it again cannot save it twice; the server answers
     // a resend of a saved one with its ids. Only an id the server says belongs to another request is dropped.
     const settleFailedSend = ({
@@ -478,24 +482,38 @@ const Chat = () => {
         return { isMerged };
     };
 
-    // A prompt given back while this chat's screen was gone comes back into the composer with its held send: one kept before
-    // this mount at once, and one kept while it is mounted (a send left during its token mint that settles after the
-    // person came back) when it lands. Each is taken once. A hold the screen already has is kept (`withUnsentPrompt`).
+    // Prompts given back while this chat's screen was gone come back into the composer, each with its own held send: those
+    // kept before this mount at once, and one kept while it is mounted (a send left during its token mint that settles
+    // after the person came back) when it lands. One at a time, taken only while the screen holds no send and none is
+    // going, so `planSend` resends each under its own id; the next is offered when a send ends.
     useEffect(() => {
         if (accountId === undefined) {
             return undefined;
         }
 
-        return followUnsentPrompts({
-            apply: (entry) => {
-                const next = withUnsentPrompt({ draft: draftRef.current, held: heldSend.current }, entry);
+        const follow = followUnsentPrompts({
+            didTake: (entry) => {
+                if (heldSend.current !== null || sendingRef.current) {
+                    return false;
+                }
+
+                const next = withUnsentPrompt(draftRef.current, entry);
 
                 setDraft(next.draft);
                 heldSend.current = next.held;
+
+                return true;
             },
             key: unsentPromptKey(accountId, threadId),
             store: unsentPrompts,
         });
+
+        offerUnsent.current = follow.offer;
+
+        return () => {
+            offerUnsent.current = () => {};
+            follow.stop();
+        };
     }, [accountId, setDraft, threadId]);
 
     const send = async () => {
@@ -527,6 +545,7 @@ const Chat = () => {
         const sendSession = sendSessions.begin(controller);
 
         setSending(true);
+        sendingRef.current = true;
         setError(null);
         // Announced when a reply starts and when it finishes. The deltas stay silent: an announcement on each would flood the reader.
         AccessibilityInfo.announceForAccessibility("Assistant is replying");
@@ -678,6 +697,9 @@ const Chat = () => {
         } finally {
             sendSession.end();
             setSending(false);
+            sendingRef.current = false;
+            // The screen may take the next kept prompt now (its hold was used or never set).
+            offerUnsent.current();
         }
     };
 

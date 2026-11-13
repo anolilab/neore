@@ -38,6 +38,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [refreshTick, setRefreshTick] = useState(0);
     // Bumped by every sign-in and sign-out: a mint still out from before applies nothing.
     const [epoch] = useState(createAuthEpoch);
+
+    // Signed in again: sends begin and unsent prompts are kept again (a sign-out closed both, `sendSessions`, `unsentPrompts`).
+    useEffect(() => {
+        if (status !== "signed-in") {
+            return;
+        }
+
+        sendSessions.open();
+        unsentPrompts.open();
+    }, [status]);
     // Callers of `retryToken` waiting for the attempt they asked for to end.
     const renewalWaiters = useRef<(() => void)[]>([]);
     const [config] = useState(loadConfig);
@@ -96,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (jwt === null) {
                 dispatch({ type: "signed-out" });
                 sendSessions.signOut();
-                unsentPrompts.clear();
+                unsentPrompts.close();
                 // Retries a cache wipe that failed at sign-out; the credential side never waits on it.
                 await emptyCacheWhileSignedOut({ clearCache: () => getOfflineCache().clear(), forgetLastChat: clearLastThread, warn: console.warn });
 
@@ -151,14 +161,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // From here on, no prompt and no registration for the account that is leaving.
         endPhonePushForAccount();
         // Its sends still going stop (no retry saves a message for it), and its unsent prompts are dropped with it: they
-        // never come back into another account's composer.
+        // never come back into another account's composer. Both stay closed for the whole sign-out, so a send begun during
+        // the teardown (the account still reads as signed in) keeps nothing either; the next sign-in opens them.
         sendSessions.signOut();
-        unsentPrompts.clear();
+        unsentPrompts.close();
 
         // A mint still out when sign-out starts applies nothing: the epoch ends before the first await (`runSignOut`).
         await runSignOut({
             endMints: () => epoch.end(),
             finish: () => {
+                unsentPrompts.clear();
                 client.setAuthToken(null);
                 dispatch({ type: "signed-out" });
             },

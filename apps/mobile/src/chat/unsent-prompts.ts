@@ -1,6 +1,6 @@
 import type { HeldSend } from "./start-send";
 import { holdFor } from "./start-send";
-import { draftAfterUnsent, giveBackDraft } from "./unsent-send";
+import { giveBackDraft } from "./unsent-send";
 
 /** A prompt given back after its chat screen was gone, with the send it holds (`null` when its id was dropped). */
 export interface UnsentPrompt {
@@ -13,16 +13,21 @@ export const unsentPromptKey = (accountId: string, threadId: string | undefined)
 
 /**
  * Prompts given back while their chat's screen was unmounted (left during a token mint or a retry), kept in memory until
- * that screen mounts again. Without it the prompt and its held `clientMessageId` would land in the state of a component
- * that is gone. Emptied at sign-out.
+ * that chat's screen takes them. Without it the prompt and its held `clientMessageId` would land in the state of a
+ * component that is gone. Each prompt is its own entry with its own held send, in order; none is merged into another.
+ * Closed for the whole of a sign-out (`close`): nothing is kept for the departing account, and it is emptied.
  */
 export const createUnsentPrompts = () => {
-    const entries = new Map<string, UnsentPrompt>();
+    const entries = new Map<string, UnsentPrompt[]>();
     const watchers = new Map<string, Set<() => void>>();
+    let isClosed = false;
     const take = (key: string): UnsentPrompt | undefined => {
-        const entry = entries.get(key);
+        const list = entries.get(key);
+        const entry = list?.shift();
 
-        entries.delete(key);
+        if (list?.length === 0) {
+            entries.delete(key);
+        }
 
         return entry;
     };
@@ -31,48 +36,62 @@ export const createUnsentPrompts = () => {
         clear: (): void => {
             entries.clear();
         },
+        /** From the start of a sign-out until the next sign-in: empties the store and keeps nothing more. */
+        close: (): void => {
+            isClosed = true;
+            entries.clear();
+        },
 
-        /**
-         * A second prompt for the same chat goes after the first, which keeps its hold (`planSend` sends the held one first).
-         * A chat screen mounted meanwhile (`watch`) is told at once, so a prompt kept after it mounted is not left waiting.
-         */
+        /** A chat screen watching the key (`watch`) is offered the prompt at once, so one kept after it mounted is not left waiting. */
         keep: (key: string, entry: UnsentPrompt): void => {
-            const earlier = entries.get(key);
+            if (isClosed) {
+                return;
+            }
 
-            entries.set(key, earlier ? { held: earlier.held, prompt: draftAfterUnsent(entry.prompt, earlier.prompt) } : entry);
-
+            const list = entries.get(key) ?? [];
             const keyWatchers = watchers.get(key) ?? new Set<() => void>();
 
-            for (const notify of keyWatchers) {
-                notify();
+            entries.set(key, [...list, entry]);
+
+            for (const offer of keyWatchers) {
+                offer();
             }
+        },
+        /** At a sign-in: the store keeps prompts again. */
+        open: (): void => {
+            isClosed = false;
         },
         take,
 
         /**
-         * Hands `key`'s prompt to `onEntry` now, and each one kept later until unwatched. Each is taken, so it is handed over
-         * once: to the first watcher, never again on a later mount.
+         * Offers `key`'s prompts to `didTake` one at a time, oldest first: now, on each `keep`, and on `offer` (the screen can
+         * take one again). A prompt is taken only when `didTake` takes it, so each reaches one screen once, and one the
+         * screen cannot take yet (it holds a send) waits its turn.
          */
-        watch: (key: string, onEntry: (entry: UnsentPrompt) => void): () => void => {
-            const deliver = (): void => {
-                const entry = take(key);
+        watch: (key: string, didTake: (entry: UnsentPrompt) => boolean): { offer: () => void; stop: () => void } => {
+            const offer = (): void => {
+                let next = entries.get(key)?.[0];
 
-                if (entry) {
-                    onEntry(entry);
+                while (next !== undefined && didTake(next)) {
+                    take(key);
+                    next = entries.get(key)?.[0];
                 }
             };
             const keyWatchers = watchers.get(key) ?? new Set<() => void>();
 
-            keyWatchers.add(deliver);
+            keyWatchers.add(offer);
             watchers.set(key, keyWatchers);
-            deliver();
+            offer();
 
-            return () => {
-                keyWatchers.delete(deliver);
+            return {
+                offer,
+                stop: () => {
+                    keyWatchers.delete(offer);
 
-                if (keyWatchers.size === 0) {
-                    watchers.delete(key);
-                }
+                    if (keyWatchers.size === 0) {
+                        watchers.delete(key);
+                    }
+                },
             };
         },
     };
@@ -108,30 +127,27 @@ export const giveBackOrKeep = ({
 };
 
 /**
- * For as long as a chat screen is mounted: the prompt kept while it was gone, and any kept later (a send the person left
- * that settles after they came back), into its composer with its held send. Returns the stop for its unmount.
+ * For as long as a chat screen is mounted: the prompts kept while it was gone, and any kept later (a send the person left
+ * that settles after they came back), offered one at a time (`didTake` takes one only while the screen holds no send).
+ * `offer` offers again once the screen can take one; `stop` is for its unmount.
  */
-export const followUnsentPrompts = ({ apply, key, store }: { apply: (entry: UnsentPrompt) => void; key: string; store: UnsentPrompts }): () => void =>
-    store.watch(key, apply);
+export const followUnsentPrompts = ({
+    didTake,
+    key,
+    store,
+}: {
+    didTake: (entry: UnsentPrompt) => boolean;
+    key: string;
+    store: UnsentPrompts;
+}): { offer: () => void; stop: () => void } => store.watch(key, didTake);
 
 /**
- * A chat screen's composer and hold after a kept prompt reaches it. With no hold of its own, the prompt goes back as any
- * failed send's does: ahead of what is typed, with its held send (`holdFor`, so the app's merge is recorded). With a hold
- * of its own, the prompt goes after the composer's text, and the screen's hold now records that text as the app's merge,
- * so its held prompt is still sent alone first under its id. One hold at a time: the late prompt then goes as a new message.
+ * A chat screen's composer and hold after it takes a kept prompt (only while it holds no send of its own): the prompt
+ * goes back as any failed send's does, ahead of what is typed, with its own held send (`holdFor` records the app's merge).
  */
-export const withUnsentPrompt = (
-    { draft, held }: { draft: string; held: HeldSend | null },
-    entry: UnsentPrompt,
-): { draft: string; held: HeldSend | null } => {
-    if (held === null) {
-        const given = giveBackDraft(draft, entry.prompt);
+export const withUnsentPrompt = (draft: string, entry: UnsentPrompt): { draft: string; held: HeldSend | null } => {
+    const given = giveBackDraft(draft, entry.prompt);
 
-        // eslint-disable-next-line unicorn/no-null -- a hold is `HeldSend | null` across the screen and `planSend`
-        return { draft: given.draft, held: entry.held ? holdFor(entry.held, given.draft) : null };
-    }
-
-    const next = draftAfterUnsent(entry.prompt, draft);
-
-    return { draft: next, held: holdFor(held, next) };
+    // eslint-disable-next-line unicorn/no-null -- a hold is `HeldSend | null` across the screen and `planSend`
+    return { draft: given.draft, held: entry.held ? holdFor(entry.held, given.draft) : null };
 };

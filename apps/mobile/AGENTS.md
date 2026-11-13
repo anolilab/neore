@@ -46,10 +46,11 @@
     (recorded as `mergedRest`), Send sends it first and keeps the rest for the next send; any other edit, a paragraph
     added included, makes a new message.
   - A send stopped before its first try sends nothing; sign-out ends the mint epoch before its first await (`runSignOut`).
-  - Sign-out stops every send still retrying (`sendSessions`) and drops its prompt and held id.
-  - A prompt given back after its chat screen unmounted waits in `unsentPrompts` (per account and chat, cleared at
-    sign-out) and returns, with its held id, to that chat's screen: at its next mount, or at once to one already mounted
-    (`watch`); each is taken once. A screen holding its own send keeps it first (`withUnsentPrompt`).
+  - Sign-out stops every send still retrying (`sendSessions`) and drops its prompt and held id; sends and kept prompts
+    stay closed until the next sign-in (a send begun mid-teardown is stopped at once, and nothing is kept).
+  - A prompt given back after its chat screen unmounted waits in `unsentPrompts`, one entry per prompt with its own held id
+    (per account and chat). A mounted screen of that chat takes them one at a time, only while it holds no send and none
+    is going (`watch`); the next is offered when a send ends.
   - A start with `streaming: false` (no `streamToken`) follows no stream: the chat's saved reply is read instead.
   - Match codes lower-cased: the gateway passes `/chat/start`'s SCREAMING_CASE, the public API uses snake_case.
   - Nothing is held and polled for: the resend is idempotent.

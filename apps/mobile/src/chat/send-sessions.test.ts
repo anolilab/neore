@@ -26,10 +26,12 @@ describe("a send still retrying at sign-out", () => {
         expect(session.isSignedOut()).toBe(true);
     });
 
-    it("leaves a send that began after the sign-out alone", () => {
+    it("leaves a send that began after the next sign-in alone", () => {
         const sessions = createSendSessions();
 
         sessions.signOut();
+        // The next sign-in opens the sessions again.
+        sessions.open();
 
         const controller = new AbortController();
         const session = sessions.begin(controller);
