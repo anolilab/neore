@@ -1337,6 +1337,103 @@ describe("deleting a thread", () => {
         expect(await parentReplies()).toHaveLength(1);
     });
 
+    it("ends every run it delegated, past the first page of 20", async () => {
+        await run(async (context) => {
+            const now = Date.now();
+
+            for (let index = 0; index < 25; index += 1) {
+                await context.db.insert("subAgentRuns", {
+                    createdAt: now + index,
+                    depth: 1,
+                    parentThreadId: parentId,
+                    status: "queued",
+                    task: `Delegated ${String(index)}`,
+                    toolCallId: `call-delegated-${String(index)}`,
+                    updatedAt: now,
+                    userId: OWNER,
+                });
+            }
+        });
+
+        await deleteThread(parentId);
+
+        const left = await run(
+            async (context) =>
+                await context.db
+                    .query("subAgentRuns")
+                    .withIndex("by_parentThreadId_and_status", (q: any) => q.eq("parentThreadId", parentId).eq("status", "queued"))
+                    .collect(),
+        );
+
+        expect(left).toStrictEqual([]);
+    });
+
+    /** A worker (live) with host runs queued for a lead that is being deleted. */
+    const workerForGoingLead = async (queued: number) =>
+        await run(async (context) => {
+            const now = Date.now();
+            const lead = await context.db.insert("threads", { deletingAt: now, status: "active", title: "Lead", userId: OWNER });
+            const worker = await context.db.insert("threads", { status: "active", title: "Worker", userId: OWNER });
+            const base = {
+                childThreadId: worker,
+                depth: 1,
+                mode: "worker" as const,
+                parentThreadId: lead,
+                runner: { deviceId: "device-1", kind: "host" as const },
+                updatedAt: now,
+                userId: OWNER,
+            };
+            const current = await context.db.insert("subAgentRuns", {
+                ...base,
+                createdAt: now - 1,
+                startedAt: now,
+                status: "running",
+                task: "Current",
+                toolCallId: "call-lead-current",
+            });
+            const ids = [];
+
+            for (let index = 0; index < queued; index += 1) {
+                ids.push(
+                    await context.db.insert("subAgentRuns", {
+                        ...base,
+                        createdAt: now + index,
+                        status: "queued",
+                        task: `Queued ${String(index)}`,
+                        toolCallId: `call-lead-${String(index)}`,
+                    }),
+                );
+            }
+
+            return { current, ids, worker };
+        });
+
+    it("refuses at claim a queued run whose lead is being deleted", async () => {
+        const { ids } = await workerForGoingLead(1);
+
+        expect(await run(async (context) => await claimQueuedRun(context, ids[0]!))).toBeNull();
+
+        const row = await run(async (context) => await context.db.get("subAgentRuns", ids[0]!));
+
+        expect(row.status).toBe("cancelled");
+    });
+
+    it("does not walk a worker's line of runs whose lead is being deleted from one run's end", async () => {
+        const { current, worker } = await workerForGoingLead(205);
+
+        await run(async (context) => await finishRun(context, current, { kind: "cancelled" }));
+
+        const queued = await run(
+            async (context) =>
+                await context.db
+                    .query("subAgentRuns")
+                    .withIndex("by_childThreadId_and_status", (q: any) => q.eq("childThreadId", worker).eq("status", "queued"))
+                    .collect(),
+        );
+
+        expect(queued).toHaveLength(205);
+    });
+
     it("cancels a deleted worker's queue past one call's 200, in a continuation", async () => {
         const worker = await run(async (context) => {
             const now = Date.now();

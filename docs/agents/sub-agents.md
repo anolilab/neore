@@ -25,6 +25,10 @@ detail. Paths are relative to `backend/lunora/`.
   - It ends the runs the thread is the child of first, so the Stop path then reaches what that child delegated. Then it
     ends what the thread delegated, including worker messages the user typed, which a Stop leaves alone
     (`delegatedTree`'s `withTyped`).
+  - The tree reads one page per status, so the rest of what the thread delegated ends in batches of 100 with a
+    continuation (`cancelDeletedThreadDelegated`), scheduled only after a pass that ended something. Before then, a
+    queued run of a going or missing lead is refused at claim (`claimQueuedRun`, `isLeadGoing`). A worker's line stops
+    at such a run (`startNextWorkerRun`), so the refusal doesn't walk the line.
 - **A result waits while its parent has a request its owner can still answer** (pending, unexpired, and open on the
   parent's latest turn; `waitsOnOpenRequest`), as well as while the parent's one-shot run goes.
   - An answer (`resumeClaimedRun`) or a send releases it.

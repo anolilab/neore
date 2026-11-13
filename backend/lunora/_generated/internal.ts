@@ -1220,6 +1220,7 @@ export interface InternalApiTypes {
             attachChildThread: FunctionReference<"mutation", { childThreadId: string; runId: Id<"subAgentRuns"> }, boolean>;
             awaitApproval: FunctionReference<"mutation", { resumedWith?: number; runId: Id<"subAgentRuns"> }, boolean>;
             beatRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
+            cancelDeletedThreadDelegated: FunctionReference<"mutation", { threadId: string }, null>;
             cancelDeletedThreadQueue: FunctionReference<"mutation", { threadId: string }, null>;
             claimRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, { childThreadId?: string; clientId?: string; depth: number; dispatchedBy?: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; mode?: "run" | "worker"; model?: string; organizationId?: string; parentModel?: string; parentThreadId: string; skillSlug?: string; task: string; toolAllowlist?: Array<string>; userId: string } | null>;
             completeResumedRun: FunctionReference<"mutation", { messageIds?: Array<string>; outcome: { error: string; kind: "failed" } | { kind: "succeeded" }; resumedWith?: number; runId: Id<"subAgentRuns"> }, boolean>;
@@ -2567,6 +2568,7 @@ export const internal: InternalApiTypes = {
             attachChildThread: { __lunoraRef: "sub_agents_functions:attachChildThread" },
             awaitApproval: { __lunoraRef: "sub_agents_functions:awaitApproval" },
             beatRun: { __lunoraRef: "sub_agents_functions:beatRun" },
+            cancelDeletedThreadDelegated: { __lunoraRef: "sub_agents_functions:cancelDeletedThreadDelegated" },
             cancelDeletedThreadQueue: { __lunoraRef: "sub_agents_functions:cancelDeletedThreadQueue" },
             claimRun: { __lunoraRef: "sub_agents_functions:claimRun" },
             completeResumedRun: { __lunoraRef: "sub_agents_functions:completeResumedRun" },

@@ -1040,6 +1040,15 @@ export const claimQueuedRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">
         return null;
     }
 
+    // A run whose parent is gone or being hard-deleted starts nothing: its result has nowhere to go, and it would spend.
+    // Every delegated run starts here, however many there are. `startNextWorkerRun` stops a worker's line at such a run
+    // first, so this cancel does not walk the line; the delete's batched cleanup ends the rest.
+    if (await isLeadGoing(ctx, run.parentThreadId)) {
+        await finishRun(ctx, run._id, { kind: "cancelled" });
+
+        return null;
+    }
+
     // A worker's thread exists already, so the link `linkChildThread` makes for a one-shot run is not made again.
     const worker = run.mode === "worker" && run.childThreadId ? await ctx.db.get("threads", run.childThreadId as Id<"threads">) : null;
 
@@ -1216,6 +1225,13 @@ const DELETING_HOLDS_MS = 60 * 60_000;
 const isGoingThread = (thread: Pick<Doc<"threads">, "deletingAt">, now: number): boolean =>
     thread.deletingAt !== undefined && now - thread.deletingAt < DELETING_HOLDS_MS;
 
+/** Whether a run's parent (lead) thread is gone or being hard-deleted: one that starts nothing more. */
+const isLeadGoing = async (ctx: Pick<MutationCtx, "db" | "now">, parentThreadId: string): Promise<boolean> => {
+    const lead = await ctx.db.get("threads", parentThreadId as Id<"threads">);
+
+    return !lead || isGoingThread(lead, ctx.now);
+};
+
 /** A deleted parent, one being deleted, or one no longer the run owner's, can never take the post. */
 const isGoneParent = (thread: Doc<"threads"> | null, run: RunDoc, now: number): boolean =>
     !thread || thread.deleted === true || isGoingThread(thread, now) || thread.userId !== run.userId;
@@ -1263,6 +1279,12 @@ const startNextWorkerRun = async (ctx: MutationCtx, childThreadId: string): Prom
     }
 
     const next = nextQueuedWorkerRun(await latestWorkerRuns(ctx, childThreadId));
+
+    // Nor at a run whose lead is gone or going: its claim would cancel it through `finishRun`, which would start the next,
+    // and so on down the line. The lead's delete ends those runs in bounded batches (`cancelDeletedThreadDelegated`).
+    if (next && (await isLeadGoing(ctx, next.parentThreadId))) {
+        return;
+    }
 
     if (next) {
         await startQueuedRun(ctx, next);
@@ -2254,6 +2276,54 @@ export const markDeletedThreadResults = internalMutation
         return null;
     });
 
+/** Delegated runs of a deleted thread ended per call; past them a continuation goes on. */
+const DELETED_DELEGATED_CANCEL_MAX = 100;
+
+/**
+ * Ends the runs a deleted thread delegated that are still active, {@link DELETED_DELEGATED_CANCEL_MAX} per call, with a
+ * continuation ({@link cancelDeletedThreadDelegated}) while more remain. A continuation is scheduled only after a pass that
+ * ended a run, so one that cannot end anything stops instead of looping.
+ */
+const cancelDelegatedOfDeletedThread = async (ctx: MutationCtx, threadId: string): Promise<void> => {
+    let budget = DELETED_DELEGATED_CANCEL_MAX;
+    let ended = 0;
+    let more = false;
+
+    for (const status of ["queued", "awaiting", "running"] as const) {
+        if (budget === 0) {
+            more = true;
+
+            break;
+        }
+
+        const runs = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", threadId).eq("status", status))
+            .take(budget + 1);
+
+        more ||= runs.length > budget;
+
+        for (const run of runs.slice(0, budget)) {
+            budget -= 1;
+            ended += (await cancelSubAgentRun(ctx, run._id)) ? 1 : 0;
+        }
+    }
+
+    if (more && ended > 0) {
+        await ctx.scheduler.runAfter(0, internal.sub_agents.functions.cancelDeletedThreadDelegated, { threadId });
+    }
+};
+
+/** The rest of a deleted thread's delegated runs, past what one call ends ({@link cancelDelegatedOfDeletedThread}). */
+export const cancelDeletedThreadDelegated = internalMutation
+    .input({ threadId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await cancelDelegatedOfDeletedThread(ctx, args.threadId);
+
+        return null;
+    });
+
 /** Queued runs of a deleted worker thread cancelled per call; past them a continuation goes on. */
 const DELETED_QUEUE_CANCEL_MAX = 200;
 
@@ -2317,6 +2387,9 @@ export const endSubAgentRunsOfDeletedThread = async (ctx: MutationCtx, threadId:
     if (userId !== undefined) {
         await cancelRuns(ctx, await delegatedTree(ctx, threadId, { withTyped: true }), userId);
     }
+
+    // The tree reads one page per status: the rest of what the thread delegated ends in bounded batches.
+    await cancelDelegatedOfDeletedThread(ctx, threadId);
 };
 
 /**
