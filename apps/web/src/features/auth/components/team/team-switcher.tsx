@@ -10,8 +10,10 @@ import { Building, Check, ChevronsUpDown, Users } from "lucide-react";
 import type { ComponentProps } from "react";
 import { useCallback, useState } from "react";
 
+import { useAuthActiveOrganization } from "@/features/auth/hooks/use-auth-session";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useCRPC } from "@/lib/lunora/crpc";
+import settle from "@/lib/settle";
 
 import { getLocalizedError } from "../../lib/utilities";
 
@@ -32,12 +34,12 @@ export interface TeamSwitcherProps extends Omit<ComponentProps<typeof Button>, "
 }
 
 const TeamSwitcher = ({ className, showAllOrganization = true, ...props }: TeamSwitcherProps) => {
-    const { hooks, toast } = useAuth();
+    const { toast } = useAuth();
     const { t } = useLingui();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
 
-    const { data: activeOrganization, isPending: isOrgPending } = hooks.useActiveOrganization();
+    const { data: activeOrganization, isPending: isOrgPending } = useAuthActiveOrganization();
 
     // Only fetch teams when in an organization
     const { data: myTeams, isPending: isTeamsPending } = useQuery(crpc.auth.team.getMyTeams.queryOptions(activeOrganization ? {} : undefined));
@@ -59,28 +61,35 @@ const TeamSwitcher = ({ className, showAllOrganization = true, ...props }: TeamS
 
             setIsChangingTeam(true);
 
-            try {
-                await setActiveTeamAsync({
-                    teamId,
-                });
+            // Chosen before the `try` (the React Compiler cannot lower a conditional inside one), translated when the toast
+            // posts, so a language change during the switch is the one it shows.
+            const switchedMessage = teamId ? () => t`Switched to team view` : () => t`Switched to organization view`;
 
-                setActiveTeamId(teamId);
+            await settle(
+                async () => {
+                    try {
+                        await setActiveTeamAsync({
+                            teamId,
+                        });
 
-                // Invalidate thread queries to refetch with new team filter
-                await queryClient.invalidateQueries({ queryKey: ["chat", "threads"] });
+                        setActiveTeamId(teamId);
 
-                toast({
-                    message: teamId ? t`Switched to team view` : t`Switched to organization view`,
-                    variant: "success",
-                });
-            } catch (error) {
-                toast({
-                    message: getLocalizedError({ error, t }),
-                    variant: "error",
-                });
-            } finally {
-                setIsChangingTeam(false);
-            }
+                        // Invalidate thread queries to refetch with new team filter
+                        await queryClient.invalidateQueries({ queryKey: ["chat", "threads"] });
+
+                        toast({
+                            message: switchedMessage(),
+                            variant: "success",
+                        });
+                    } catch (error) {
+                        toast({
+                            message: getLocalizedError({ error, t }),
+                            variant: "error",
+                        });
+                    }
+                },
+                () => setIsChangingTeam(false),
+            );
         },
         [activeTeamId, setActiveTeamAsync, queryClient, toast, t],
     );

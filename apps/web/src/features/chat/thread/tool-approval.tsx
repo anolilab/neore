@@ -26,7 +26,7 @@ import { Check, Clock, ShieldAlert, ShieldCheck, X } from "lucide-react";
 import type { FC } from "react";
 import { useId, useState } from "react";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
@@ -154,8 +154,7 @@ export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({ approvalId, canAll
 const ToolApproval: FC<{ part: ToolPart }> = ({ part }) => {
     const { t } = useLingui();
     const { thread, threadId } = useChatThread();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
 
     const mcp = resolveMcpToolName(part);
     const server = mcp?.serverName;

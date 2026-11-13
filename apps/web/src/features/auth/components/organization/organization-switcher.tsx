@@ -7,11 +7,13 @@ import { useNavigate } from "@tanstack/react-router";
 import type { FC } from "react";
 import { useCallback, useEffect, useState } from "react";
 
+import { useAuthActiveOrganization, useAuthOrganizationList, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import authViewPaths from "@/features/auth/lib/auth-view-paths";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import type { User } from "@/features/auth/types/auth-core-types";
 import { useCRPC } from "@/lib/lunora/crpc";
+import settle from "@/lib/settle";
 
 import CreateOrganizationDialog from "./create-organization-dialog";
 
@@ -21,6 +23,8 @@ export interface OrganizationSwitcherProps {
     onSetActive?: (organizationId: string | null) => void;
     size?: "default" | "icon" | "sm";
 }
+
+const noop = (): void => {};
 
 const OrganizationSwitcher: FC<OrganizationSwitcherProps> = ({ className, hidePersonal, onSetActive, size }) => {
     const authContext = useAuth();
@@ -32,11 +36,11 @@ const OrganizationSwitcher: FC<OrganizationSwitcherProps> = ({ className, hidePe
     const [isPending, setIsPending] = useState(false);
     const [isCreateOrgDialogOpen, setIsCreateOrgDialogOpen] = useState(false);
 
-    const { data: sessionData } = authContext.hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const user = sessionData?.user;
 
-    const { data: organizations } = authContext.hooks.useListOrganizations();
-    const { data: activeOrganization, refetch: refetchActiveOrganization } = authContext.hooks.useActiveOrganization();
+    const { data: organizations } = useAuthOrganizationList();
+    const { data: activeOrganization, refetch: refetchActiveOrganization } = useAuthActiveOrganization();
 
     const switchOrganization = useCallback(
         async (organizationId: string | null) => {
@@ -46,23 +50,30 @@ const OrganizationSwitcher: FC<OrganizationSwitcherProps> = ({ className, hidePe
 
             setIsPending(true);
 
-            try {
-                onSetActive?.(organizationId);
-                await authContext.authClient.organization.setActive({
-                    fetchOptions: { throw: true },
-                    organizationId,
-                });
-                // The billing read follows the session's active organization, so drop the previous one's cached plan.
-                void queryClient.resetQueries({ queryKey: crpc.auth.billing.getBillingInfo.queryKey({}) });
-                await refetchActiveOrganization?.();
-            } catch (error) {
-                authContext.toast({
-                    message: getLocalizedError({ error, t }),
-                    variant: "error",
-                });
-            } finally {
-                setIsPending(false);
-            }
+            // Resolved before the `try`: the React Compiler cannot lower optional calls inside one.
+            const notifySetActive = onSetActive ?? noop;
+            const refetchActive = refetchActiveOrganization ?? noop;
+
+            await settle(
+                async () => {
+                    try {
+                        notifySetActive(organizationId);
+                        await authContext.authClient.organization.setActive({
+                            fetchOptions: { throw: true },
+                            organizationId,
+                        });
+                        // The billing read follows the session's active organization, so drop the previous one's cached plan.
+                        void queryClient.resetQueries({ queryKey: crpc.auth.billing.getBillingInfo.queryKey({}) });
+                        await refetchActive();
+                    } catch (error) {
+                        authContext.toast({
+                            message: getLocalizedError({ error, t }),
+                            variant: "error",
+                        });
+                    }
+                },
+                () => setIsPending(false),
+            );
         },
         [authContext, crpc, hidePersonal, onSetActive, queryClient, refetchActiveOrganization, t],
     );

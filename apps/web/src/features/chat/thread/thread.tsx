@@ -20,8 +20,8 @@ import { ArrowDownIcon, CornerLeftUpIcon } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useMemo, useRef } from "react";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import AskAsideShortcutListener from "@/features/chat/aside/ask-aside-shortcut-listener";
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { useChatActions, useChatIsEmpty, useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
@@ -133,8 +133,7 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
     const isEmpty = useChatIsEmpty();
     const { activeStreamId, isStreaming } = useChatIsStreaming();
     const { isNewThread, thread, threadId } = useChatThread();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     // Only the owner may archive or delete from the keyboard; a shared thread's viewer gets the server's refusal otherwise.
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
 
