@@ -274,6 +274,52 @@ describe("thread viewport while message rows settle", () => {
         expect(gap()).toBe(0);
     });
 
+    it("lets a second smooth scroll run its course when the first one's fallback timer comes due", () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+        try {
+            const ref = createRef<ThreadViewportRef>();
+            const viewport = mount(ref);
+
+            scrolledTo(viewport, 2000);
+            act(() => ref.current?.scrollToBottom("smooth"));
+            act(() => {
+                vi.advanceTimersByTime(600);
+            });
+            // The reader taps the button again before the first scroll's timer is due.
+            act(() => ref.current?.scrollToBottom("smooth"));
+            act(() => {
+                vi.advanceTimersByTime(500);
+            });
+
+            // The second animation still runs: growth is left to it, not pinned by the first scroll's timer.
+            layout.scrollHeight += 900;
+            playResize();
+
+            expect(layout.scrollTop).toBe(2000);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("follows growth it skipped while a wheel turn went to an inner panel", () => {
+        const viewport = mount();
+
+        // An upward wheel turn that a nested scroller takes: the thread view does not move.
+        act(() => {
+            viewport.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: -100 }));
+        });
+        layout.scrollHeight += 900;
+        playResize();
+
+        expect(gap()).toBe(900);
+
+        // No scroll event comes; once the input expires, the growth is followed.
+        runFrames(2);
+
+        expect(gap()).toBe(0);
+    });
+
     it("does not scroll past a block the reader opens in the last row", () => {
         const viewport = mount();
 

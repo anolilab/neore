@@ -32,10 +32,10 @@ export interface ThreadViewportRef {
 }
 
 // Threshold in pixels to consider "at bottom"
+const SCROLL_THRESHOLD = 50;
+
 /** How long a smooth scroll to the bottom may run before growth is followed again, where `scrollend` does not fire. */
 const SMOOTH_SCROLL_TIMEOUT_MS = 1000;
-
-const SCROLL_THRESHOLD = 50;
 
 // Distance from the top of content at which we pre-fetch older messages.
 // Large enough that messages are loaded before the user reaches them.
@@ -89,6 +89,8 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
     // Where the last scroll event left the view, and whether a smooth scroll to the bottom is on its way there.
     const lastScrollTopRef = useRef(0);
     const smoothToBottomRef = useRef(false);
+    // Ends the smooth scroll to the bottom under way: its `scrollend` listener and fallback timer.
+    const endSmoothScrollRef = useRef<(() => void) | null>(null);
     // The reader asked to scroll up (wheel, key, touch) and that scroll's event has not come yet. Content growing in the
     // same frame can move the view down by more than they scrolled up, so the position alone would not show it.
     const upwardInputRef = useRef(false);
@@ -143,25 +145,40 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
                 return;
             }
 
+            // A newer scroll replaces the one under way: its listener and timer must not settle this one.
+            endSmoothScrollRef.current?.();
             smoothToBottomRef.current = behavior === "smooth";
 
             if (behavior === "smooth") {
                 // Growth is not followed while the animation runs (`followGrowth`). If it ends short of the bottom (the
                 // content grew past its target), its end closes the gap; a timer stands in where `scrollend` never fires.
+                const listening = new AbortController();
+                let timer: ReturnType<typeof setTimeout> | undefined;
+                const end = () => {
+                    listening.abort();
+                    globalThis.clearTimeout(timer);
+
+                    if (endSmoothScrollRef.current === end) {
+                        endSmoothScrollRef.current = null;
+                    }
+                };
                 const settled = () => {
+                    end();
+
                     if (!smoothToBottomRef.current) {
                         return;
                     }
 
                     smoothToBottomRef.current = false;
 
-                    if (isAtBottomRef.current && !userScrolledRef.current) {
+                    if (isAtBottomRef.current && !userScrolledRef.current && !upwardInputRef.current) {
                         pinToBottom(viewport);
                     }
                 };
 
-                viewport.addEventListener("scrollend", settled, { once: true });
-                globalThis.setTimeout(settled, SMOOTH_SCROLL_TIMEOUT_MS);
+                endSmoothScrollRef.current = end;
+                viewport.addEventListener("scrollend", settled, { signal: listening.signal });
+                timer = globalThis.setTimeout(settled, SMOOTH_SCROLL_TIMEOUT_MS);
                 viewport.scrollTo({ behavior, top: viewport.scrollHeight });
             } else {
                 pinToBottom(viewport);
@@ -174,6 +191,8 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
         },
         [pinToBottom, setIsAtBottom],
     );
+
+    useEffect(() => () => endSmoothScrollRef.current?.(), []);
 
     // Handle scroll events — also drives the load-more preload trigger
     const handleScroll = useCallback(() => {
@@ -286,12 +305,19 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
                 return;
             }
 
+            const markedAt = viewport.scrollTop;
+
             upwardInputRef.current = true;
             // Its scroll event comes on the next frame; an input that scrolled nothing (a nested scroller took it) expires.
+            // Growth skipped meanwhile is followed then, as no scroll event will come to close the gap.
             cancelAnimationFrame(clearFrame);
             clearFrame = requestAnimationFrame(() => {
                 clearFrame = requestAnimationFrame(() => {
                     upwardInputRef.current = false;
+
+                    if (viewport.scrollTop === markedAt) {
+                        followGrowth(viewport);
+                    }
                 });
             });
         };
@@ -342,7 +368,7 @@ const ThreadViewport = ({ children, className, ref }: ThreadViewportProps & { re
             viewport.removeEventListener("touchstart", handleTouchStart);
             viewport.removeEventListener("touchmove", handleTouchMove);
         };
-    }, [handleScroll]);
+    }, [followGrowth, handleScroll]);
 
     // Initial scroll to bottom when messages become ready
     useEffect(() => {
