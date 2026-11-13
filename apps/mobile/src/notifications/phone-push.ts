@@ -19,6 +19,9 @@ import {
 import { getItemAsync, setItemAsync } from "expo-secure-store";
 import { Platform } from "react-native";
 
+import { sharedKeychainOps } from "../auth/secure-store";
+import { writeIfDifferent } from "../auth/shared-keychain";
+import { loadConfig } from "../lib/config";
 import { registerApprovalActions } from "./approval-actions";
 import type { PushPlatform, PushServer } from "./push-registration";
 import { createPendingWork, createSerialSteps, languageTag, noteAccountOnPhone, onceItWorks } from "./push-registration";
@@ -115,6 +118,9 @@ export const backendPushServer = (client: LunoraClient): PushServer => {
  * Android gets the channel its pushes show on (Android 8+ shows nothing on a channel that does not exist). A failed
  * step is tried again the next time this is called (the app coming back to the front).
  */
+/** The backend's address, for the notification extension: it reads it from the shared keychain group to fetch a push's text. */
+const EXTENSION_LUNORA_URL_KEY = "neore.mobile.lunora-url";
+
 export const configurePhoneNotifications = onceItWorks(async () => {
     setNotificationHandler({
         handleNotification: async () => {
@@ -124,6 +130,14 @@ export const configurePhoneNotifications = onceItWorks(async () => {
 
     if (Platform.OS === "android") {
         await setNotificationChannelAsync(ANDROID_CHANNEL_ID, { importance: AndroidImportance.HIGH, name: channelName(deviceLocale()) });
+    } else {
+        // The extension's address does not gate the approval actions: a failed write only warns, and setup goes on.
+        try {
+            await writeIfDifferent(EXTENSION_LUNORA_URL_KEY, loadConfig().lunoraUrl, sharedKeychainOps);
+        } catch (error) {
+            // eslint-disable-next-line no-console -- no logger in the app; a failed write must not be silent
+            console.warn("Could not give the notification extension the server address.", error);
+        }
     }
 });
 

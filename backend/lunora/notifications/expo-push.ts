@@ -24,6 +24,8 @@ export interface ExpoMessage {
     /** Opaque ids only. */
     data: Record<string, string>;
     priority: "high" | "normal";
+    /** iOS: the Notification Service Extension may rewrite the alert before it shows. */
+    mutableContent?: boolean;
     sound?: "default";
     title?: string;
     to: string;

@@ -158,6 +158,7 @@ export const phoneMessage = (device: { language?: string; platform: PhonePlatfor
         data,
         priority: message.urgency,
         sound: "default",
+        ...(device.platform === "ios" && { mutableContent: true }),
         title: PHONE_PLACEHOLDER_TITLE,
         to: device.token,
         ttl: PUSH_TTL_SECONDS,
