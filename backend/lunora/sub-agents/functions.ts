@@ -1291,6 +1291,16 @@ const oneShotRunGoesOn = async (ctx: Pick<QueryCtx, "db">, threadId: string): Pr
     return false;
 };
 
+/** Whether `threadId` has an unexpired pending request: one indexed read, the gate of the turn's check below. */
+const hasPendingRequest = async (ctx: Pick<QueryCtx, "db">, threadId: string, now: number): Promise<boolean> => {
+    const pending = await ctx.db
+        .query("toolApprovalRuns")
+        .withIndex("by_threadId_status_createdAt", (q) => q.eq("threadId", threadId).eq("status", "pending").gte("createdAt", pendingApprovalCutoff(now)))
+        .first();
+
+    return pending !== null;
+};
+
 /**
  * Whether `thread` waits on a request its owner can still answer: open on its latest turn, pending and not expired. A post
  * would move the thread past it, and then it could not be answered. One indexed read gates the turn's: a thread with no
@@ -1298,12 +1308,7 @@ const oneShotRunGoesOn = async (ctx: Pick<QueryCtx, "db">, threadId: string): Pr
  * requests and closed its stream: a post in that gap would land past them.
  */
 const waitsOnOpenRequest = async (ctx: Pick<QueryCtx, "db">, thread: Doc<"threads">, now: number): Promise<boolean> => {
-    const anyPending = await ctx.db
-        .query("toolApprovalRuns")
-        .withIndex("by_threadId_status_createdAt", (q) => q.eq("threadId", thread._id).eq("status", "pending").gte("createdAt", pendingApprovalCutoff(now)))
-        .first();
-
-    if (anyPending === null) {
+    if (!(await hasPendingRequest(ctx, thread._id, now))) {
         return false;
     }
 
@@ -1379,7 +1384,7 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
     // a request it waits on, the post would move its thread past that request, which then could not be answered. Its run's
     // end posts it (`finishRun`). Nor does any parent that waits on a request its owner can still answer: the answer posts
     // it (`resumeClaimedRun`). This check, backing off, covers an end or an expiry that did not.
-    if ((await oneShotRunGoesOn(ctx, run.parentThreadId)) || (parent !== null && (await waitsOnOpenRequest(ctx, parent, Date.now())))) {
+    if ((await oneShotRunGoesOn(ctx, run.parentThreadId)) || (parent !== null && (await waitsOnOpenRequest(ctx, parent, ctx.now)))) {
         await ctx.scheduler.runAfter(heldPostDelayMs(waits), internal.sub_agents.functions.postResult, { attempt, failures, runId, waits: waits + 1 });
 
         return false;
@@ -1700,11 +1705,24 @@ export const endApprovalWaits = async (ctx: MutationCtx, childThreadId: string):
     return ended;
 };
 
-/** A new message was saved in a child thread: its waiting runs end ({@link endApprovalWaits}). Returns how many ended. */
-export const endApprovalWaitForMessage = internalMutation
+/**
+ * The send saved a message in `threadId` (`chat/http.ts`, after the save and its claim, any content type): a run waiting
+ * on this child thread ends its wait ({@link endApprovalWaits}), and a result held while the owner had a request of
+ * their own open here is released ({@link releaseHeldResults}; `postRunResult` checks again). Its own transaction, which
+ * the send calls and does not fail on. Returns how many waits ended.
+ */
+export const afterOwnerMessage = internalMutation
     .input({ threadId: v.string().max(MAX_LENGTH.id) })
     .output(v.number())
-    .mutation(async ({ args, ctx }) => await endApprovalWaits(ctx, args.threadId));
+    .mutation(async ({ args, ctx }) => {
+        const ended = (await hasWaitingSubAgentRun(ctx, args.threadId)) ? await endApprovalWaits(ctx, args.threadId) : 0;
+
+        if (await hasPendingRequest(ctx, args.threadId, ctx.now)) {
+            await releaseHeldResults(ctx, args.threadId);
+        }
+
+        return ended;
+    });
 
 /**
  * `running` → `awaiting`: the child stopped on an approval request recorded on its thread. The run keeps its fan-out
@@ -2132,6 +2150,58 @@ const cancelRuns = async (ctx: MutationCtx, targets: ReadonlyArray<RunDoc>, user
     return cancelled;
 };
 
+/** Statuses whose runs a deleted thread's results are marked for: active ones first, few by the fan-out cap. */
+const GONE_MARK_STATUSES = ["queued", "running", "awaiting", "succeeded", "failed", "cancelled"] as const;
+
+/** Runs read per page, and at most per call, when a deleted thread's results are marked; past them a continuation goes on. */
+const GONE_MARK_PAGE = 50;
+const GONE_MARK_READ_MAX = 200;
+
+/**
+ * Marks every unposted result bound for `threadId` gone (`postFailed`), page by page through each status. Bounded per
+ * call by the runs it reads ({@link GONE_MARK_READ_MAX}; a status with none costs nothing), past which it goes on in
+ * {@link markDeletedThreadResults} from where it stopped. The active statuses come first, so the runs the delete ends
+ * are marked in the delete's own transaction.
+ */
+const markResultsGone = async (ctx: MutationCtx, threadId: string, from: { cursor: string | null; status: number }): Promise<void> => {
+    let { cursor, status } = from;
+    let read = 0;
+
+    while (status < GONE_MARK_STATUSES.length) {
+        if (read >= GONE_MARK_READ_MAX) {
+            await ctx.scheduler.runAfter(0, internal.sub_agents.functions.markDeletedThreadResults, { cursor, status, threadId });
+
+            return;
+        }
+
+        const page = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", threadId).eq("status", GONE_MARK_STATUSES[status]!))
+            .paginate({ cursor, numItems: GONE_MARK_PAGE });
+
+        read += page.page.length;
+
+        for (const run of page.page) {
+            if (run.resultPostedAt === undefined && run.postFailed === undefined) {
+                await patchById(ctx.db, "subAgentRuns", run._id, { postFailed: GONE_PARENT_REASON });
+            }
+        }
+
+        cursor = page.isDone ? null : page.continueCursor;
+        status += page.isDone ? 1 : 0;
+    }
+};
+
+/** The rest of a deleted thread's results, past what one call marks ({@link markResultsGone}). */
+export const markDeletedThreadResults = internalMutation
+    .input({ cursor: v.union(v.string(), v.null()), status: v.number(), threadId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await markResultsGone(ctx, args.threadId, { cursor: args.cursor, status: args.status });
+
+        return null;
+    });
+
 /**
  * A thread is being hard-deleted: the runs it is the child of end as cancelled, and so do the runs it delegated, as a
  * Stop would end them. A waiting run's request goes with the thread, so nothing would answer it: left alone, the run
@@ -2142,18 +2212,7 @@ const cancelRuns = async (ctx: MutationCtx, targets: ReadonlyArray<RunDoc>, user
 export const endSubAgentRunsOfDeletedThread = async (ctx: MutationCtx, threadId: string, userId: string | undefined): Promise<void> => {
     // A result bound for this thread has nowhere to go: one posted behind the delete's cursor would outlive it. Marked
     // first, so neither the ends below (and the results they release) nor a retry already scheduled posts here.
-    for (const status of ["queued", "running", "awaiting", "succeeded", "failed", "cancelled"] as const) {
-        const runs = await ctx.db
-            .query("subAgentRuns")
-            .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", threadId).eq("status", status))
-            .take(CANCEL_THREAD_MAX);
-
-        for (const run of runs) {
-            if (run.resultPostedAt === undefined && run.postFailed === undefined) {
-                await patchById(ctx.db, "subAgentRuns", run._id, { postFailed: GONE_PARENT_REASON });
-            }
-        }
-    }
+    await markResultsGone(ctx, threadId, { cursor: null, status: 0 });
 
     await cancelQueuedWorkerRuns(ctx, threadId);
 

@@ -1216,6 +1216,7 @@ export interface InternalApiTypes {
             runSubAgent: FunctionReference<"action", { runId: Id<"subAgentRuns"> }, void>;
         };
         functions: {
+            afterOwnerMessage: FunctionReference<"mutation", { threadId: string }, number>;
             attachChildThread: FunctionReference<"mutation", { childThreadId: string; runId: Id<"subAgentRuns"> }, boolean>;
             awaitApproval: FunctionReference<"mutation", { resumedWith?: number; runId: Id<"subAgentRuns"> }, boolean>;
             beatRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
@@ -1224,8 +1225,8 @@ export interface InternalApiTypes {
             completeRun: FunctionReference<"mutation", { outcome: { error: string; kind: "failed" } | { kind: "succeeded"; result: string }; runId: Id<"subAgentRuns"> }, boolean>;
             continuingRun: FunctionReference<"query", { runId: Id<"subAgentRuns"> }, null | number>;
             createRun: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; host?: { agentKey: string; deviceId: string; folderId: string }; leadTools?: Array<string>; model?: string; name?: string; organizationId?: string; parentModel?: string; parentThreadId: string; persistent?: boolean; skillSlug?: string; task: string; toolAllowlist?: Array<string>; toolCallId?: string; userId: string }, { runId: Id<"subAgentRuns">; workerId?: string } | { error: string }>;
-            endApprovalWaitForMessage: FunctionReference<"mutation", { threadId: string }, number>;
             isHostWorker: FunctionReference<"query", { userId: string; workerId: string }, boolean>;
+            markDeletedThreadResults: FunctionReference<"mutation", { cursor: string | null; status: number; threadId: string }, null>;
             messageWorker: FunctionReference<"mutation", { dispatchedBy: "lead" | "user" | "trigger" | "messenger" | "outside_agent"; headless?: boolean; message: string; organizationId?: string; parentThreadId: string; toolCallId: string; userId: string; workerId: string }, { runId: Id<"subAgentRuns">; state: "queued" | "running" | "awaiting" | "succeeded" | "failed" | "cancelled"; workerId: string } | { error: string }>;
             postResult: FunctionReference<"mutation", { attempt: number; failures?: number; runId: Id<"subAgentRuns">; waits?: number }, null>;
             reapOverdueWaits: FunctionReference<"mutation", {}, number>;
@@ -2561,6 +2562,7 @@ export const internal: InternalApiTypes = {
             runSubAgent: { __lunoraRef: "sub_agents_execute:runSubAgent" },
         },
         functions: {
+            afterOwnerMessage: { __lunoraRef: "sub_agents_functions:afterOwnerMessage" },
             attachChildThread: { __lunoraRef: "sub_agents_functions:attachChildThread" },
             awaitApproval: { __lunoraRef: "sub_agents_functions:awaitApproval" },
             beatRun: { __lunoraRef: "sub_agents_functions:beatRun" },
@@ -2569,8 +2571,8 @@ export const internal: InternalApiTypes = {
             completeRun: { __lunoraRef: "sub_agents_functions:completeRun" },
             continuingRun: { __lunoraRef: "sub_agents_functions:continuingRun" },
             createRun: { __lunoraRef: "sub_agents_functions:createRun" },
-            endApprovalWaitForMessage: { __lunoraRef: "sub_agents_functions:endApprovalWaitForMessage" },
             isHostWorker: { __lunoraRef: "sub_agents_functions:isHostWorker" },
+            markDeletedThreadResults: { __lunoraRef: "sub_agents_functions:markDeletedThreadResults" },
             messageWorker: { __lunoraRef: "sub_agents_functions:messageWorker" },
             postResult: { __lunoraRef: "sub_agents_functions:postResult" },
             reapOverdueWaits: { __lunoraRef: "sub_agents_functions:reapOverdueWaits" },

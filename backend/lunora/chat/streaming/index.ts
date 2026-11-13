@@ -11,7 +11,6 @@ import { threadForViewer } from "../../agent/threads";
 import { vThreadDoc } from "../../agent/validators";
 import { endActiveGoals } from "../goals/rows";
 import { optionalAuthQuery } from "../../lib/crpc";
-import { streamLogger } from "../../lib/logger";
 import { MAX_LENGTH } from "../../lib/validators";
 import { throwThreadLocked } from "../../lib/thread-lock";
 import { deliveredSteerIds, type SteerEntry } from "../lib/steer-queue";
@@ -177,32 +176,12 @@ export const createStreamWithMessage = internalMutation
             await recordStartStream(context, startClaim, streamId);
         }
 
-        // A sub-agent whose request this message moves past waits on nothing now: its wait ends, freeing its slot. Only read
-        // here and only scheduled when a run waits on this child thread, so the end can never fail this send (whose prompt is
-        // saved and charged). Loaded lazily, as every reader of the sub-agent module from the chat path.
-        const { hasWaitingSubAgentRun, releaseHeldResults } = await import("../../sub-agents/functions");
-
-        if (await hasWaitingSubAgentRun(context, threadId)) {
-            // A failed schedule must not fail the send either: the run's request expires on its own.
-            await context.scheduler.runAfter(0, internal.sub_agents.functions.endApprovalWaitForMessage, { threadId }).catch((error: unknown) => {
-                streamLogger.error("[chat] Could not schedule the end of a sub-agent's approval wait", error);
-            });
-        }
-
         // The thread shows as running from the moment its stream exists. This
         // was a scheduled `updateThread` that `/chat/start` awaited after
         // enqueueing the run — one more round trip before the client could
         // start streaming, and, on the one-at-a-time scheduler, able to land
         // AFTER a short run had already set the thread back to `active`.
         const thread = await context.db.get("threads", threadId as Id<"threads">);
-
-        // The owner moved past a request of their own: a sub-agent's result held for it is posted now, after this reply
-        // (`postRunResult` waits out the stream). Its backed-off recheck covers a failure, which must not fail the send.
-        if (thread?.awaitingInput !== undefined) {
-            await releaseHeldResults(context, threadId).catch((error: unknown) => {
-                streamLogger.error("[chat] Could not release a sub-agent's held results", error);
-            });
-        }
 
         if (thread) {
             await patchThread(context.db, thread._id, { status: "running", updatedAt: context.now });

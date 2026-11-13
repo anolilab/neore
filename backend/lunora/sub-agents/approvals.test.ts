@@ -11,7 +11,6 @@ import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { respondToToolApproval } from "../chat/tool-permissions";
 import { stopActiveForThread } from "../chat/streaming/persistent/library";
 import { _deletePageForThreadId } from "../agent/threads";
-import { createStreamWithMessage } from "../chat/streaming/index";
 import { clearAwaitingInput } from "../agent/table-writes";
 import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
 import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
@@ -20,7 +19,8 @@ import schema from "../schema";
 import {
     cancelSubAgentRunsForStop,
     completeResumedRun,
-    endApprovalWaitForMessage,
+    markDeletedThreadResults,
+    afterOwnerMessage,
     finishRun,
     listSubAgentApprovals,
     markRunAwaiting,
@@ -1015,15 +1015,11 @@ describe("a result for a parent that waits on its own request", () => {
         expect(await parentReplies()).toHaveLength(0);
     });
 
-    it("is released when the owner sends a new message past the request", async () => {
+    it("is released when the owner sends a new message past the request, though the thread does not show it waits yet", async () => {
         const before = heldPosts().length;
 
-        await internalCall(createStreamWithMessage, {
-            messageId: "message-past",
-            streamingConfig: { contentType: "text", model: "m" },
-            threadId: parentId,
-            userId: OWNER,
-        });
+        await run(async (context) => await clearAwaitingInput(context.db, parentId as Id<"threads">));
+        await internalCall(afterOwnerMessage, { threadId: parentId });
 
         expect(
             heldPosts()
@@ -1047,6 +1043,19 @@ describe("a result for a parent that waits on its own request", () => {
 
 describe("deleting a thread", () => {
     const deleteThread = async (threadId: string): Promise<unknown> => await internalCall(_deletePageForThreadId, { threadId });
+    const ran = new Set<string>();
+    /** The next marking continuation not yet run, by its args (the harness names no function path). */
+    const continuation = (): Record<string, unknown> | undefined => {
+        const job = harness.scheduler
+            .list()
+            .find((entry) => (entry.args as { status?: number } | undefined)?.status !== undefined && !ran.has(String(entry.id)));
+
+        if (job) {
+            ran.add(String(job.id));
+        }
+
+        return job?.args as Record<string, unknown> | undefined;
+    };
 
     /** A run the child delegated itself, still working. */
     const nestedRun = async (): Promise<Id<"subAgentRuns">> =>
@@ -1099,6 +1108,37 @@ describe("deleting a thread", () => {
         expect(await parentReplies()).toHaveLength(0);
     });
 
+    it("marks every unposted result bound for it gone, past the first page of runs that posted", async () => {
+        const unposted = await run(async (context) => {
+            const now = Date.now();
+            const ended = {
+                childThreadId: childId,
+                createdAt: now,
+                depth: 1,
+                parentThreadId: parentId,
+                status: "succeeded",
+                task: "Old",
+                updatedAt: now,
+                userId: OWNER,
+            };
+
+            for (let index = 0; index < 205; index += 1) {
+                await context.db.insert("subAgentRuns", { ...ended, resultPostedAt: now, toolCallId: `call-old-${String(index)}` });
+            }
+
+            return await context.db.insert("subAgentRuns", { ...ended, task: "New", toolCallId: "call-new" });
+        });
+
+        await deleteThread(parentId);
+
+        // Past one call's pages, the marking goes on in continuations, each from where the last stopped.
+        for (let job = continuation(); job !== undefined; job = continuation()) {
+            await internalCall(markDeletedThreadResults, job);
+        }
+
+        expect(await run(async (context) => await context.db.get("subAgentRuns", unposted))).toMatchObject({ postFailed: expect.stringMatching(GONE) });
+    });
+
     it("stops a resumed run's live continuation on the deleted child", async () => {
         await run(async (context) => await markRunAwaiting(context, runId));
         await answer(APPROVAL_ID, "approve");
@@ -1110,14 +1150,7 @@ describe("deleting a thread", () => {
 });
 
 describe("a new message in a waiting child", () => {
-    const send = async (threadId: string): Promise<unknown> =>
-        await internalCall(createStreamWithMessage, {
-            messageId: "message-new",
-            streamingConfig: { contentType: "text", model: "m" },
-            threadId,
-            userId: OWNER,
-        });
-    const waitEnds = (threadId: string) => harness.scheduler.list().filter((job) => JSON.stringify(job.args) === JSON.stringify({ threadId }));
+    const after = async (threadId: string): Promise<unknown> => await internalCall(afterOwnerMessage, { threadId });
     /** A row on the child's thread at `order`: the owner's new message, or an assistant turn with a request of the run. */
     const childRow = async (order: number, approvalId?: string): Promise<void> =>
         await run(async (context) => {
@@ -1155,22 +1188,16 @@ describe("a new message in a waiting child", () => {
     it("ends the run's wait, which frees its slot and closes its requests", async () => {
         await run(async (context) => await markRunAwaiting(context, runId));
         await childRow(2);
-        await send(childId);
 
-        expect(waitEnds(childId)).toHaveLength(1);
-        expect(await internalCall(endApprovalWaitForMessage, { threadId: childId })).toBe(1);
+        expect(await after(childId)).toBe(1);
         expect(await runStatus()).toBe("cancelled");
         expect(await pendingRequests()).toHaveLength(0);
     });
 
-    it("schedules nothing for a child whose run does not wait, whatever requests are open there", async () => {
+    it("ends nothing for a child whose run does not wait, whatever requests are open there", async () => {
         // The run is still running, its requests recorded: a pending sub-agent request alone is no wait to end.
-        await send(childId);
-        // Nor does a thread that is no sub-agent's child.
-        await send(parentId);
-
-        expect(waitEnds(childId)).toHaveLength(0);
-        expect(waitEnds(parentId)).toHaveLength(0);
+        expect(await after(childId)).toBe(0);
+        expect(await runStatus()).toBe("running");
     });
 
     it("leaves a wait the continuation started again on a request still open", async () => {
@@ -1179,7 +1206,7 @@ describe("a new message in a waiting child", () => {
         // The owner answered meanwhile, and the continuation paused on a new request: the run waits on that one.
         await childRow(3, "approval-3");
 
-        expect(await internalCall(endApprovalWaitForMessage, { threadId: childId })).toBe(0);
+        expect(await after(childId)).toBe(0);
         expect(await runStatus()).toBe("awaiting");
     });
 
@@ -1187,7 +1214,7 @@ describe("a new message in a waiting child", () => {
         await run(async (context) => await markRunAwaiting(context, runId));
         await answer(APPROVAL_ID, "approve");
 
-        expect(await internalCall(endApprovalWaitForMessage, { threadId: childId })).toBe(0);
+        expect(await after(childId)).toBe(0);
         expect(await runStatus()).toBe("running");
     });
 });

@@ -1398,6 +1398,13 @@ const runChatStartOnShard = async (
         // `createStreamWithMessage`.
     }
 
+    // The message is saved, whatever its content: a sub-agent waiting on this thread ends its wait, and a result held for
+    // the owner's own request here is released (`afterOwnerMessage`). Its own transaction, after the save and its claim:
+    // a failure is logged and never fails this send, whose prompt is saved and charged.
+    await context.runMutation(internal.sub_agents.functions.afterOwnerMessage, { threadId }).catch((error: unknown) => {
+        chatLogger.error("[chat] Could not end a sub-agent's wait or release its held results", error);
+    });
+
     // A claimed send records each title job it scheduled, so a resend schedules only one it could not.
     const scheduledTitleJobs = await runTitleJobs();
 

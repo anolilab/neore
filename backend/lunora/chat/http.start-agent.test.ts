@@ -69,6 +69,9 @@ const ids: Record<string, string> = {};
 let streamingConfigs: { model: string }[] = [];
 let agentModelQueries = 0;
 let activeLeafCalls: { runModel?: string }[] = [];
+/** Every mutation a send made, by reference, and whether the sub-agent side's call after the save fails. */
+let mutationCalls: { args: unknown; ref: string }[] = [];
+let failAfterMessage = false;
 
 const run = async <T>(body: (ctx: any) => Promise<T>): Promise<T> => await harness.run(body);
 
@@ -97,6 +100,12 @@ const fakeContext = (): any => {
             },
         },
         runMutation: async (reference: { __lunoraRef: string }, args: any) => {
+            mutationCalls.push({ args, ref: reference.__lunoraRef });
+
+            if (reference.__lunoraRef === "sub_agents_functions:afterOwnerMessage" && failAfterMessage) {
+                throw new Error("afterOwnerMessage failed");
+            }
+
             if (reference.__lunoraRef === "chat_streaming:createStreamWithMessage") {
                 streamingConfigs.push(args.streamingConfig);
 
@@ -157,6 +166,8 @@ beforeEach(async () => {
     streamingConfigs = [];
     agentModelQueries = 0;
     activeLeafCalls = [];
+    mutationCalls = [];
+    failAfterMessage = false;
     harness = lunoraTest(schema as never);
     threadId = await run(async (ctx) => await ctx.db.insert("threads", { model: A, status: "active", title: "T", userId: OWNER }));
     await insertRow("u1", 0, 0, "user", "hello");
@@ -389,5 +400,26 @@ describe("/chat/start organization", () => {
 
         await expect(runChatStart(inOrganization(true), { model: A, prompt: "hi" } as never, "secret")).rejects.toThrow("session read failed");
         expect(createdThreads).toStrictEqual([]);
+    });
+});
+
+describe("/chat/start and a sub-agent's wait", () => {
+    const afterMessageCalls = () => mutationCalls.filter((call) => call.ref === "sub_agents_functions:afterOwnerMessage").map((call) => call.args);
+
+    it("tells the sub-agent side about the saved message, for a text send and an image send alike", async () => {
+        const text = await start({ model: A });
+        const image = await start({ model: "google/gemini-2.5-flash-image" });
+
+        expect([text.status, image.status]).toStrictEqual([200, 200]);
+        expect(afterMessageCalls()).toStrictEqual([{ threadId }, { threadId }]);
+    });
+
+    it("does not fail the send when that call fails", async () => {
+        failAfterMessage = true;
+
+        const response = await start({ model: A });
+
+        expect(response.status).toBe(200);
+        expect(afterMessageCalls()).toHaveLength(1);
     });
 });
