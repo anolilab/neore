@@ -19,6 +19,8 @@ import type { MessageRow } from "../offline/types";
 
 /** The part of a row the history reads. */
 export interface HistoryRow {
+    /** When the server made the message: along the chat's active path, each row is newer than the one before it. */
+    createdAt?: number;
     finished?: boolean;
     id: string;
     status: string;
@@ -73,6 +75,10 @@ const anchorAt = (rows: ReadonlyArray<HistoryRow>, anchorId: string): number => 
 
 /** A row the server holds: rows made on this screen (sending, or sent and not read back yet) are not. */
 const isServerRow = (row: HistoryRow): boolean => row.status !== "local" && row.finished !== true;
+
+/** Whether `row` was made after `oldest`, a page's oldest row: the page would hold it, were it on the chat. */
+const isWithin = (row: HistoryRow, oldest: HistoryRow): boolean =>
+    row.createdAt !== undefined && oldest.createdAt !== undefined && row.createdAt > oldest.createdAt;
 
 /** Where "Load older messages" and the fill read next: the hole first, then below the run. `null`: nothing to read. */
 export const nextOlderCursor = (history: ChatHistory<HistoryRow>): string | null => {
@@ -143,6 +149,9 @@ const gapOf = (anchorId: string, cursor: string, kept: KeptState): HistoryGap =>
  * branch, a deleted message): nothing the page skipped lies between its rows and the run, so they go;
  * - kept rows older than the oldest one the page holds go below the page, in their order. If there are none, the run now
  * reaches the page's oldest row and the cursor below it takes over;
+ * - kept rows made after the page's oldest row and not in the page are not on the chat's active path either, wherever
+ * they sit among the kept rows: the page holds every row of the chat from its oldest one up (a deleted message the cache
+ * still had, say). They go, so the hole closes instead of reading on to the chat's start for a row no page holds again;
  * - those older rows join the run only when they are one run the server served (`keptCursor`) and the page's oldest row
  * is the newest of them it reached: then nothing lies between, and the cursor below them takes over. Otherwise they
  * stay below a hole at the page's oldest row, read from the page's cursor until a page reaches them;
@@ -172,14 +181,14 @@ const merged = <R extends HistoryRow>({ kept, keptCursor, keptGap, run }: Split<
     const pageIds = new Set(pageRows.map((row) => row.id));
     const candidates = kept.filter((row) => isServerRow(row) && !runIds.has(row.id));
     const firstReached = candidates.findIndex((row) => pageIds.has(row.id));
-    const below = firstReached === -1 ? candidates : candidates.slice(0, firstReached);
+    const isJoined = candidates[firstReached]?.id === pageOldest.id;
+    const below = (firstReached === -1 ? candidates : candidates.slice(0, firstReached)).filter((row) => !isWithin(row, pageOldest));
 
     if (below.length === 0) {
         return { olderCursor: page.olderCursor, rows: body };
     }
 
     const rows = [...below, ...body];
-    const isJoined = candidates[firstReached]?.id === pageOldest.id;
     const stillKept = new Set(below.map((row) => row.id));
 
     if (isJoined) {
@@ -366,7 +375,8 @@ interface FillRequest<K> {
  * Runs at most one fill of a screen at a time. A read that asks for a fill while one runs for the same chat does not
  * start another (both would read the same cursors): the running fill reads the history afresh before each page, so it
  * goes on from what that read left, and once it ends it runs again, in case it stopped before that read landed. A
- * request for another chat, or one no longer current, stops the running fill at its next check.
+ * request for another chat, or one no longer current, stops the running fill at its next check, and it stays stopped
+ * when the screen comes back to its chat (the fill that comes back with it starts afresh).
  */
 export const createFillRunner = <K>() => {
     let latest: FillRequest<K> | undefined;
@@ -378,10 +388,13 @@ export const createFillRunner = <K>() => {
             while (isRequested && latest !== undefined) {
                 isRequested = false;
 
-                const { fill, key } = latest;
+                const request = latest;
+                const { fill, key } = request;
 
+                // Its own request must stay current too: a screen that left this chat and came back asks with a check
+                // of its own, which would otherwise let this fill write into the chat opened anew.
                 // eslint-disable-next-line no-await-in-loop -- one fill at a time is the point
-                await fill(key, () => latest?.key === key && latest.isCurrent());
+                await fill(key, () => request.isCurrent() && latest?.key === key && latest.isCurrent());
             }
         } finally {
             running = undefined;

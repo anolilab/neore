@@ -553,6 +553,85 @@ describe("the chat screen filling its history after the newest page", () => {
         }
     });
 
+    it("neither shows nor saves a fill's older page that lands while a refused chat's saved copy is being dropped", async () => {
+        const calls: string[] = [];
+        let answerOlder: (() => void) | undefined;
+        let finishForget: (() => void) | undefined;
+        const before = stable.offline;
+
+        stable.offline = {
+            ...before,
+            cache: {
+                forgetThreads: async () => {
+                    calls.push("forget");
+
+                    // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+                    await new Promise<void>((resolve) => {
+                        finishForget = resolve;
+                    });
+                },
+                loadMessages: async () => [],
+                saveMessages: async (_threadId: string, messages: ReadonlyArray<{ id: string }>) => {
+                    calls.push(`save:${messages.map((row) => row.id).join(",")}`);
+                },
+            } as never,
+        };
+        harness.olderPage = async () => {
+            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+            await new Promise<void>((resolve) => {
+                answerOlder = resolve;
+            });
+
+            return {
+                continueCursor: "",
+                isDone: true,
+                page: [{ _creationTime: 0, id: "q0", parts: [{ text: "An older question", type: "text" }], role: "user", status: "success" }],
+            };
+        };
+
+        try {
+            act(() => {
+                mounted.root?.render(createElement(ChatScreen));
+            });
+            await vi.waitFor(() => {
+                expect(answerOlder).toBeDefined();
+            });
+
+            // A reconnect re-reads the newest page, and the server now refuses the chat.
+            harness.newestPageGate = async () => {
+                throw Object.assign(new Error("Forbidden"), { code: "FORBIDDEN" });
+            };
+            stable.offline = { ...stable.offline, refreshTick: before.refreshTick + 1 };
+
+            await act(async () => {
+                mounted.root?.render(createElement(ChatScreen));
+            });
+            await vi.waitFor(() => {
+                expect(finishForget).toBeDefined();
+            });
+
+            // The fill's page answers while the saved copy is still being dropped.
+            await act(async () => {
+                answerOlder?.();
+            });
+
+            expect(mounted.container?.textContent).not.toContain("An older question");
+
+            await act(async () => {
+                finishForget?.();
+            });
+            await vi.waitFor(() => {
+                expect(mounted.container?.textContent).toContain("This chat is locked or no longer available.");
+            });
+
+            expect(mounted.container?.textContent).not.toContain("An older question");
+            expect(calls.slice(calls.indexOf("forget"))).toStrictEqual(["forget"]);
+        } finally {
+            harness.newestPageGate = undefined;
+            stable.offline = before;
+        }
+    });
+
     it("saves an older page's rows with the time its read started, not when it answered", async () => {
         const saved: { id: string; syncedAt?: number }[] = [];
         const clock = { now: 1000 };

@@ -253,16 +253,21 @@ const Chat = () => {
 
     useEffect(() => () => sendAbort.current?.abort(), []);
 
+    // Every refusal path (a newest-page read, a fill's older page, a reply check) stops what could still write into the
+    // chat: the send streaming into it, any read in flight and the fill. A read calls it as soon as the server refuses,
+    // before the saved copy is dropped, so a fill page landing meanwhile neither shows nor saves its rows.
+    const stopWrites = useCallback(() => {
+        sendAbort.current?.abort();
+        readGate.current.invalidate();
+        isRefused.current = true;
+        fillEpoch.current += 1;
+    }, []);
+
     // Locked, gone or no longer shared: the saved copy is dropped, and nothing of it stays on screen.
     const showRefused = useCallback(
         (refusedThreadId: string) => {
-            // Every refusal path (a newest-page read, a fill's older page, a reply check) stops what could still write
-            // into the chat: the send streaming into it and any read in flight.
-            sendAbort.current?.abort();
-            readGate.current.invalidate();
-            isRefused.current = true;
+            stopWrites();
             hasLiveRows.current = false;
-            fillEpoch.current += 1;
             historyRef.current = { olderCursor: undefined };
             writeRows([]);
             setCanLoadOlder(false);
@@ -270,7 +275,7 @@ const Chat = () => {
             // A chat the server refuses is not reopened on launch, and only this account's record of it is forgotten.
             settleQuietly(accountId ? forgetLastThread({ threadId: refusedThreadId, userId: accountId }) : undefined);
         },
-        [accountId, writeRows],
+        [accountId, stopWrites, writeRows],
     );
 
     // One older page of chat `id` from `cursor`, as the history takes it; `undefined` when it cannot be shown. A chat the
@@ -293,6 +298,7 @@ const Chat = () => {
                 },
                 gate: readGate.current,
                 isCurrent,
+                onRefusal: stopWrites,
                 threadId: id,
             });
 
@@ -303,7 +309,7 @@ const Chat = () => {
                 },
             });
         },
-        [cache, showRefused],
+        [cache, showRefused, stopWrites],
     );
 
     // The run that joins the newest row is the chat's newest messages: saved as they are, up to the cache's limit, so a
@@ -372,6 +378,7 @@ const Chat = () => {
                         (message) => toRow(message, id, startedAt),
                     ),
                 gate: readGate.current,
+                onRefusal: stopWrites,
                 threadId: id,
             });
 
@@ -428,7 +435,7 @@ const Chat = () => {
                 }
             }
         },
-        [accountId, cache, fillOlderRows, fillRunner, readHistory, reportRead, showRefused, writeHistory],
+        [accountId, cache, fillOlderRows, fillRunner, readHistory, reportRead, showRefused, stopWrites, writeHistory],
     );
 
     // One older page: the rest of a hole first, then below the run (`nextOlderCursor`).

@@ -188,8 +188,8 @@ describe("redactUIMessagesForPublicViewer", () => {
         expect(rest).toEqual([]);
         expect(redacted).toEqual({
             _creationTime: 1_700_000_000_000,
-            id: "m0",
-            key: "m0",
+            id: "m3.1",
+            key: "m3.1",
             order: 3,
             parts: [
                 { text: "Answer", type: "text" },
@@ -202,6 +202,25 @@ describe("redactUIMessagesForPublicViewer", () => {
             text: "Answer",
         });
         expect(JSON.stringify(redacted)).not.toContain("secret");
+    });
+
+    it("gives a message the same id on every page, from its place in the thread, never its real id", () => {
+        const row = (order: number, text: string) => {
+            return {
+                ...message("user", [{ text, type: "text" }]),
+                _id: `secret-${String(order)}`,
+                id: `secret-${String(order)}`,
+                order,
+                status: "success",
+                stepOrder: 0,
+            };
+        };
+        const newer = redactUIMessagesForPublicViewer([row(20, "c"), row(21, "d")]);
+        const older = redactUIMessagesForPublicViewer([row(0, "a"), row(1, "b")]);
+
+        expect([...older, ...newer].map((item) => item.id)).toEqual(["m0.0", "m1.0", "m20.0", "m21.0"]);
+        expect(redactUIMessagesForPublicViewer([row(21, "d")])[0]?.id).toBe("m21.0");
+        expect(JSON.stringify([...older, ...newer])).not.toContain("secret");
     });
 
     it("drops user attachments entirely rather than exposing their URL", () => {

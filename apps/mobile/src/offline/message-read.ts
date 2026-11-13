@@ -77,6 +77,7 @@ const failureOf = async (
     cache: ScopedCache | undefined,
     threadId: string,
     gate: MessageReadGate,
+    onRefusal: (() => void) | undefined,
 ): Promise<{ kind: "failed"; message: string } | { kind: "refused" } | { kind: "unreachable" }> => {
     if (isNetworkFailure(error)) {
         return { kind: "unreachable" };
@@ -84,8 +85,10 @@ const failureOf = async (
 
     if (isThreadRefusal(error)) {
         // Every read in flight is stale from here: one landing while the saved copy is dropped must neither show nor save
-        // its rows, or the save could put them back after the deletion.
+        // its rows, or the save could put them back after the deletion. The screen stops what else writes into the
+        // chat (a fill, a send) now as well, not once the deletion is done.
         gate.invalidate();
+        onRefusal?.();
 
         // A chat that is locked shows no cached content, and nothing of it stays on the device.
         try {
@@ -106,6 +109,8 @@ interface ReadInput {
     fetchRows: (startedAt: number) => Promise<{ olderCursor: string | null; rows: MessageRow[] }>;
     gate: MessageReadGate;
     now?: () => number;
+    /** Called as soon as the server refuses the chat, before its saved copy is dropped. */
+    onRefusal?: () => void;
     threadId: string;
 }
 
@@ -114,7 +119,7 @@ interface ReadInput {
  * with the moment the read began), a refusal of the chat drops the saved copy, and a read that a newer one overtook
  * does neither and says so.
  */
-export const readThreadMessages = async ({ cache, fetchRows, gate, now = Date.now, threadId }: ReadInput): Promise<MessageReadResult> => {
+export const readThreadMessages = async ({ cache, fetchRows, gate, now = Date.now, onRefusal, threadId }: ReadInput): Promise<MessageReadResult> => {
     const isCurrent = gate.begin();
     const startedAt = now();
 
@@ -133,7 +138,7 @@ export const readThreadMessages = async ({ cache, fetchRows, gate, now = Date.no
             return { kind: "superseded" };
         }
 
-        return failureOf(error, cache, threadId, gate);
+        return failureOf(error, cache, threadId, gate, onRefusal);
     }
 };
 
@@ -154,6 +159,8 @@ interface OlderInput {
      * landing meanwhile does not throw the page away (it is placed by the cursor it was read from, `withOlderPage`).
      */
     isCurrent?: () => boolean;
+    /** Called as soon as the server refuses the chat, before its saved copy is dropped. */
+    onRefusal?: () => void;
     threadId: string;
 }
 
@@ -161,12 +168,12 @@ interface OlderInput {
  * One older page of a chat. A refusal of the chat is handled exactly as for the newest pages (the saved copy is
  * dropped); a page that the screen moved on from is dropped. The rows are not saved: the cache keeps the newest.
  */
-export const readOlderMessages = async ({ cache, fetchPage, gate, isCurrent = gate.watch(), threadId }: OlderInput): Promise<OlderPageResult> => {
+export const readOlderMessages = async ({ cache, fetchPage, gate, isCurrent = gate.watch(), onRefusal, threadId }: OlderInput): Promise<OlderPageResult> => {
     try {
         const { olderCursor, rows } = await fetchPage();
 
         return isCurrent() ? { kind: "page", olderCursor, rows } : { kind: "superseded" };
     } catch (error: unknown) {
-        return isCurrent() ? failureOf(error, cache, threadId, gate) : { kind: "superseded" };
+        return isCurrent() ? failureOf(error, cache, threadId, gate, onRefusal) : { kind: "superseded" };
     }
 };

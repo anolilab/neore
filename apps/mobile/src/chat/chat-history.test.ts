@@ -430,6 +430,48 @@ describe(createFillRunner, () => {
 
         expect(checks).toStrictEqual([true, false, true]);
     });
+
+    it("keeps a fill stopped once the screen left its chat, even when the screen comes back to that chat meanwhile", async () => {
+        const runner = createFillRunner<string>();
+        const checks: string[] = [];
+        let release: (() => void) | undefined;
+        let epoch = 1;
+        const requestFor = (key: string) => {
+            const mine = epoch;
+
+            return runner.request({
+                fill: async (_key, check) => {
+                    checks.push(`${key}@${String(mine)}:${String(check())}`);
+
+                    if (mine === 1) {
+                        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` needs Node 22.11; the package allows 22.0
+                        await new Promise<void>((resolve) => {
+                            release = resolve;
+                        });
+                        checks.push(`${key}@${String(mine)}:${String(check())}`);
+                    }
+                },
+                isCurrent: () => epoch === mine,
+                key,
+            });
+        };
+
+        const first = requestFor("t1");
+
+        // The screen goes to another chat and back while the first fill's page is in flight.
+        epoch = 2;
+
+        const second = requestFor("t2");
+
+        epoch = 3;
+
+        const third = requestFor("t1");
+
+        release?.();
+        await Promise.all([first, second, third]);
+
+        expect(checks).toStrictEqual(["t1@1:true", "t1@1:false", "t1@3:true"]);
+    });
 });
 
 describe("a chat opened on saved rows", () => {
@@ -661,6 +703,93 @@ describe("any split of a chat into pages", () => {
             expect(ids(screen.history.rows), `seed ${seed}: the whole chat`).toStrictEqual(ids(run(1, last)));
         }
         // 400 seeds take a few seconds alone, and several times that beside the other test files.
+    }, 60_000);
+});
+
+describe("saved rows the server no longer holds", () => {
+    /** A row made at `createdAt`, as the server stamps every message. */
+    const at = (id: string, createdAt: number) => row(id, { createdAt });
+
+    it("drops a saved row a page reached past, and closes the hole instead of reading on below it", () => {
+        // The cache painted c1 and c2; c1 was deleted on the server since. The newest page does not reach them.
+        const opened = withNewestPage({ olderCursor: undefined, rows: [at("c1", 2), at("c2", 3)] }, { olderCursor: "k", rows: [at("n1", 4)] });
+        // The page below the newest one holds x and c2: c1, made after x, would be in it were it on the chat.
+        const next = withOlderPage(opened, { olderCursor: "j", rows: [at("x", 1), at("c2", 3)] }, "k");
+
+        expect(ids(next.rows)).toStrictEqual(["x", "c2", "n1"]);
+        expect(next.gap).toBeUndefined();
+        expect(nextOlderCursor(next)).toBe("j");
+    });
+
+    it("keeps rows below an older hole when a page reaches past a deleted row above it", () => {
+        // A run served down to r5 (r4 of it deleted since), kept above a hole over r1 and r2, kept from before.
+        const history: ChatHistory<HistoryRow> = {
+            gap: { anchorId: "n1", cursor: "k", keptCursor: undefined, keptGap: { anchorId: "r4", cursor: "h", keptCursor: "older" } },
+            olderCursor: undefined,
+            rows: [at("r1", 1), at("r2", 2), at("r4", 4), at("r5", 5), at("n1", 6)],
+        };
+        const next = withOlderPage(history, { olderCursor: "j", rows: [at("r3", 3), at("r5", 5)] }, "k");
+
+        expect(ids(next.rows)).toStrictEqual(["r1", "r2", "r3", "r5", "n1"]);
+        expect(next.gap?.anchorId).toBe("r3");
+        expect(next.gap?.cursor).toBe("j");
+    });
+
+    it("keeps saved rows older than the page below a hole, wherever the cache missed rows", () => {
+        // The cache has c1 and c3 (c2 was never saved), and c4, deleted on the server since.
+        const opened = withNewestPage({ olderCursor: undefined, rows: [at("c1", 1), at("c3", 3), at("c4", 4)] }, { olderCursor: "k", rows: [at("n1", 6)] });
+        const next = withOlderPage(opened, { olderCursor: "j", rows: [at("c2", 2), at("c3", 3), at("c5", 5)] }, "k");
+
+        expect(ids(next.rows)).toStrictEqual(["c1", "c2", "c3", "c5", "n1"]);
+        expect(next.gap?.anchorId).toBe("c2");
+    });
+
+    it("ends a fill where it would end without them, and shows no row of them above an older one, for any split", async () => {
+        const made = (id: string) => at(id, Number(id.slice(1)));
+
+        for (let seed = 1; seed <= 400; seed += 1) {
+            const random = randomOf(seed);
+            const last = 100 + random(300);
+            const target = 20 + random(40);
+            // The cache holds the newest stretch the chat had, with some of its rows deleted on the server since.
+            const cacheFrom = Math.max(1, last - random(80));
+            const deleted = new Set(ids(run(cacheFrom, last)).filter(() => random(6) === 0));
+            const onServer = ids(run(1, last)).filter((id) => !deleted.has(id));
+            const position = (id: string) => onServer.indexOf(id);
+            /** Pages of random size; the cursor is the position of the oldest row already served. */
+            const fetchFrom = (before: number): HistoryPage<HistoryRow> => {
+                const from = Math.max(0, before - 1 - random(25));
+
+                return { olderCursor: from === 0 ? null : String(from), rows: onServer.slice(from, before).map((id) => made(id)) };
+            };
+            const cached = ids(run(cacheFrom, last)).filter(() => random(5) !== 0).map((id) => made(id));
+            const { read, screen, update } = screenOf({ olderCursor: undefined, rows: cached });
+            const asked: number[] = [];
+            const fetchOlder = async (cursor: string) => {
+                asked.push(Number(cursor));
+
+                return fetchFrom(Number(cursor));
+            };
+
+            update((history) => withFillTarget(withNewestPage(history, fetchFrom(onServer.length)), target));
+
+            for (let fills = 0; fills < 40 && requiresFill(screen.history); fills += 1) {
+                // eslint-disable-next-line no-await-in-loop -- each fill goes on from where the one before stopped
+                await fillHistory({ fetchOlder, read, save: () => {}, update });
+            }
+
+            const shown = ids(screen.history.rows).map((id) => Number(id.slice(1)));
+
+            expect(shown, `seed ${seed}: order`).toStrictEqual(shown.toSorted((a, b) => a - b));
+            expect(requiresFill(screen.history), `seed ${seed}: the fill ended`).toBe(false);
+
+            // Down to the oldest saved row, or as far as the target, and at most one page below that.
+            const needed = Math.min(position(onServer.find((id) => Number(id.slice(1)) >= cacheFrom) ?? ""), onServer.length - target);
+            const lowest = Math.min(...asked);
+
+            expect(lowest, `seed ${seed}: read to ${String(lowest)}, needed ${String(needed)}`).toBeGreaterThanOrEqual(Math.max(1, needed - 25));
+            expect(ids(screen.history.rows).filter((id) => deleted.has(id)), `seed ${seed}: deleted rows left on screen`).toStrictEqual([]);
+        }
     }, 60_000);
 });
 
