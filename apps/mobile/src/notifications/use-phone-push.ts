@@ -1,12 +1,15 @@
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
-import { addPushTokenListener } from "expo-notifications";
-import { useEffect } from "react";
+import { addPushTokenListener, DEFAULT_ACTION_IDENTIFIER, useLastNotificationResponse } from "expo-notifications";
+import { useRouter, useSegments } from "expo-router";
+import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 
 import { useAuth } from "../auth/auth-state";
+import { canClaimLaunchReopen } from "../chat/launch-reopen";
 import { getClient } from "../lib/lunora";
 import { listenForApprovalTaps } from "./approval-actions";
+import { canNavigateToTap, holdTapRoute, takeTapRoute } from "./pending-tap";
 import {
     backendPushServer,
     configurePhoneNotifications,
@@ -18,7 +21,7 @@ import {
     syncApprovalActions,
     syncExtensionAddress,
 } from "./phone-push";
-import { createAccountChecks, createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
+import { createAccountChecks, createForegroundGate, createPromptOffer, createTokenChangeFilter, pushIdsFromNotification, registerPhoneForPush, routeForPush } from "./push-registration";
 
 /** `didRun`: no error (offline, no answer). `isRegistered`: the server now holds the token for this account. */
 interface RegisterResult {
@@ -55,8 +58,13 @@ const promptOffer = createPromptOffer();
 /** The signed-in account's registrations carry `isCurrent`; false while nobody is, or once its sign-out began. */
 const signedIn: { account?: { isCurrent: boolean } } = {};
 
+/** Set when the signed-in account's sign-out begins, cleared when it finishes (the status goes signed-out): a tap in between waits for the next sign-in. */
+const signOutState = { isBegun: false };
+
 /** Sign-out has begun: no prompt and no registration, offered or in the background, for the account that is leaving. */
 export const endPhonePushForAccount = (): void => {
+    signOutState.isBegun = true;
+
     if (signedIn.account) {
         signedIn.account.isCurrent = false;
     }
@@ -189,7 +197,41 @@ export const offerPhonePush = async (userId: string): Promise<void> => {
  */
 export const usePhonePush = (): void => {
     const { hasToken, status, user } = useAuth();
+    const router = useRouter();
+    const response = useLastNotificationResponse();
+    const isOnSignIn = useSegments()[0] === "sign-in";
+    const handled = useRef<string | undefined>(undefined);
     const userId = status === "signed-in" && hasToken ? user?.id : undefined;
+
+    // A tapped notification opens its chat (the chat list when it names none). An approval alert's body opens its chat too;
+    // its approve and deny buttons answer it (`approval-tap-listener`), and a tap is never an answer.
+    useEffect(() => {
+        // A sign-out ends with the status going signed-out: from then on a tap belongs to the next sign-in, not the one that left.
+        if (status === "signed-out") {
+            signOutState.isBegun = false;
+        }
+
+        // A tap during a sign-out waits for the next sign-in instead of navigating to the account that is leaving.
+        const isSigningOut = signOutState.isBegun;
+
+        if (response?.actionIdentifier === DEFAULT_ACTION_IDENTIFIER && handled.current !== response.notification.request.identifier) {
+            const { request } = response.notification;
+
+            handled.current = request.identifier;
+            // A launch from a notification opens its chat, not the one the launch would reopen.
+            canClaimLaunchReopen();
+            holdTapRoute(routeForPush(pushIdsFromNotification(request)), { whileSignedOut: status !== "signed-in" || isSigningOut });
+        }
+
+        // Still signing in (or on the sign-in screen): the sign-in gate goes there instead of the chat list.
+        if (!isSigningOut && canNavigateToTap({ isOnSignIn, status })) {
+            const route = takeTapRoute();
+
+            if (route !== undefined) {
+                router.push(route);
+            }
+        }
+    }, [isOnSignIn, response, router, status]);
 
     // Set up early, so an alert that arrives as the phone registers already carries its approve and deny actions. Every
     // registration tries the same setup first (`registerAfterSetUp`).
