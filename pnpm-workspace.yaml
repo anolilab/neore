@@ -329,12 +329,14 @@ catalogs:
     "@streamdown/math": 1.0.3
     "@streamdown/mermaid": 1.0.3
     "@tanstack/highlight": 1.2.11
+    hast-util-to-jsx-runtime: 2.3.6
     rehype-parse: 9.0.1
     rehype-remark: 10.0.1
     remark-directive: ^4.0.0
     remark-gfm: 4.0.1
     remark-html: 16.0.1
     remark-parse: 11.0.0
+    remark-rehype: 11.1.2
     remark-stringify: 11.0.0
     streamdown: 2.7.1
     unified: 11.0.5
