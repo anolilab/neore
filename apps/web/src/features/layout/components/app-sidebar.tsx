@@ -33,7 +33,14 @@ const AppSidebar: FC<
     return (
         <>
             <SidebarShortcut />
-            <Sidebar className={cn("left-16 [&>div]:flex-row", className)} collapsible="offcanvas" data-focus-area="sidebar" name="left" variant="inset">
+            <Sidebar
+                className={cn("left-16 [--sidebar-offset:4rem] [&>div]:flex-row", className)}
+                collapsible="offcanvas"
+                data-focus-area="sidebar"
+                name="left"
+                rail={<SidebarRail className="in-data-[side=left]:left-[calc(var(--sidebar-width)+4.1rem)]" name="left" side="left" />}
+                variant="inset"
+            >
                 <div className="relative z-10 flex w-(--sidebar-width) flex-col rounded-l-xl">
                     {header && <SidebarHeader>{header}</SidebarHeader>}
                     <SidebarContent>
@@ -77,7 +84,6 @@ const AppSidebar: FC<
                         )}
                     </SidebarFooter>
                 </div>
-                <SidebarRail className="in-data-[side=left]:left-[calc(var(--sidebar-width)+4.1rem)]" name="left" side="left" />
             </Sidebar>
         </>
     );
