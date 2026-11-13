@@ -16,6 +16,7 @@ import schema from "../schema";
 import {
     cancelSubAgentRunsForStop,
     completeResumedRun,
+    listSubAgentApprovals,
     markRunAwaiting,
     postRunResult,
     reapOverdueWaits,
@@ -107,6 +108,13 @@ const pendingRequests = async (): Promise<any[]> =>
 const answer = async (approvalId: string, decision: string): Promise<unknown> =>
     await as(OWNER).mutation(respondToToolApproval as never, { approvalId, decision, threadId: childId } as never);
 const continuations = () => jobsQueueMessages.filter((message) => message.body.functionPath.includes("continueAfterToolApproval"));
+const listing = async (userId = OWNER, threadId = parentId): Promise<{ cut: string[]; requests: any[] }> =>
+    (await as(userId).query(listSubAgentApprovals as never, { parentThreadId: threadId } as never)) as never;
+const listed = async (userId?: string, threadId?: string): Promise<any[]> => {
+    const { requests } = await listing(userId, threadId);
+
+    return requests;
+};
 const runStatus = async (): Promise<string> => {
     const row = await runRow();
 
@@ -166,10 +174,23 @@ beforeEach(async () => {
         await context.db.insert("messages", {
             message: {
                 content: [
-                    { input: { path: "/tmp/old.txt" }, toolCallId: "call-1", toolName: TOOL, type: "tool-call" },
+                    // The labels a pause stamps on the call: a tool name may hold a colon, and a connector has no `mcp:` key.
+                    {
+                        input: { path: "/tmp/old.txt" },
+                        providerOptions: { neore: { mcpServerName: "Files", mcpToolName: "files:delete" } },
+                        toolCallId: "call-1",
+                        toolName: TOOL,
+                        type: "tool-call",
+                    },
                     { approvalId: APPROVAL_ID, toolCallId: "call-1", type: "tool-approval-request" },
                     // A sibling: the same step asked for a second tool at once.
-                    { input: { path: "/tmp/other.txt" }, toolCallId: "call-2", toolName: TOOL, type: "tool-call" },
+                    {
+                        input: { path: "/tmp/other.txt" },
+                        providerOptions: { neore: { mcpServerName: "GitHub", mcpToolName: "create_issue" } },
+                        toolCallId: "call-2",
+                        toolName: TOOL,
+                        type: "tool-call",
+                    },
                     { approvalId: SIBLING_ID, toolCallId: "call-2", type: "tool-approval-request" },
                 ],
                 role: "assistant",
@@ -551,5 +572,238 @@ describe("a child that waited on a request", () => {
         const rowsAfter = await childRows();
 
         expect(JSON.stringify(rowsAfter.at(-1)?.message)).toContain("The grandchild's answer.");
+    });
+});
+
+describe("a waiting child's requests in its parent conversation", () => {
+    it("lists nothing while the child runs, then each request with the tool and server stamped on its call, and its input", async () => {
+        expect(await listing()).toStrictEqual({ cut: [], requests: [] });
+
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        const requests = await listed();
+
+        expect(requests.map((request) => request.approvalId).toSorted((left: string, right: string) => left.localeCompare(right))).toStrictEqual([
+            APPROVAL_ID,
+            SIBLING_ID,
+        ]);
+        expect(requests.find((request) => request.approvalId === APPROVAL_ID)).toStrictEqual({
+            approvalId: APPROVAL_ID,
+            childThreadId: childId,
+            input: JSON.stringify({ path: "/tmp/old.txt" }, null, 2),
+            omittedCharacters: 0,
+            runId,
+            server: "Files",
+            skillSlug: null,
+            toolName: "files:delete",
+        });
+        expect(requests.find((request) => request.approvalId === SIBLING_ID)).toMatchObject({ server: "GitHub", toolName: "create_issue" });
+    });
+
+    it("answers the parent's owner alone: a stranger's read is NOT_FOUND, a locked parent needs its unlock, a locked child is left out", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        await expect(listed(STRANGER)).rejects.toThrow(NOT_FOUND);
+
+        await run(async (context) => await context.db.patch("threads", childId as Id<"threads">, { lockedAt: Date.now() }));
+        expect(await listed()).toStrictEqual([]);
+
+        await run(async (context) => await context.db.patch("threads", parentId as Id<"threads">, { lockedAt: Date.now() }));
+        await expect(listed()).rejects.toMatchObject({ data: { code: THREAD_LOCKED_CODE } });
+    });
+
+    it("leaves out another run's request, one the child's latest turn has moved past, one on another thread and one answered", async () => {
+        await run(async (context) => {
+            const [row] = await context.db
+                .query("toolApprovalRuns")
+                .withIndex("by_approvalId", (q: any) => q.eq("approvalId", SIBLING_ID))
+                .collect();
+
+            await context.db.patch("toolApprovalRuns", row._id, { config: { ...CONFIG(), subAgentRunId: undefined } });
+            await context.db.insert("toolApprovalRuns", {
+                approvalId: "approval-old",
+                config: CONFIG(),
+                createdAt: Date.now(),
+                status: "pending",
+                threadId: childId,
+                userId: OWNER,
+            });
+        });
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        const requests = await listed();
+
+        expect(requests.map((request) => request.approvalId)).toStrictEqual([APPROVAL_ID]);
+
+        // Nor a request whose row is on another thread, or already answered.
+        const patchRequest = async (fields: Record<string, unknown>) =>
+            await run(async (context) => {
+                const [row] = await context.db
+                    .query("toolApprovalRuns")
+                    .withIndex("by_approvalId", (q: any) => q.eq("approvalId", APPROVAL_ID))
+                    .collect();
+
+                await context.db.patch("toolApprovalRuns", row._id, fields);
+            });
+
+        await patchRequest({ threadId: parentId });
+        expect(await listed()).toStrictEqual([]);
+
+        await patchRequest({ status: "denied", threadId: childId });
+        expect(await listed()).toStrictEqual([]);
+    });
+
+    it("is bounded: ten requests at most across its waiting sub-agents, a long input cut whole characters short with the count of what it left out, and no input shown as none", async () => {
+        const ids = Array.from({ length: 12 }, (_, index) => `approval-many-${String(index)}`);
+        // A cut at 4,000 units would split the first emoji's surrogate pair.
+        const long = `${"x".repeat(3999)}${"😀".repeat(1000)}`;
+
+        await run(async (context) => {
+            await context.db.insert("messages", {
+                message: {
+                    content: ids.flatMap((approvalId, index) => [
+                        {
+                            input: index < 2 ? [long, undefined][index] : { index },
+                            toolCallId: `call-many-${String(index)}`,
+                            toolName: TOOL,
+                            type: "tool-call",
+                        },
+                        { approvalId, toolCallId: `call-many-${String(index)}`, type: "tool-approval-request" },
+                    ]),
+                    role: "assistant",
+                },
+                order: 2,
+                status: "success",
+                stepOrder: 0,
+                threadId: childId,
+                tool: true,
+                userId: OWNER,
+            });
+
+            for (const approvalId of ids) {
+                await context.db.insert("toolApprovalRuns", {
+                    approvalId,
+                    // Another run's requests, among the first ten (it takes no slot) and last (dropping it cuts nothing).
+                    config: ["approval-many-2", "approval-many-11"].includes(approvalId) ? { ...CONFIG(), subAgentRunId: undefined } : CONFIG(),
+                    createdAt: Date.now(),
+                    status: "pending",
+                    threadId: childId,
+                    userId: OWNER,
+                });
+            }
+        });
+        await run(async (context) => await markRunAwaiting(context, runId));
+        // A second waiting sub-agent in the same conversation: the cap holds across runs, not per run.
+        await run(async (context) => {
+            const now = Date.now();
+            const otherChild = await context.db.insert("threads", { status: "active", title: "Sub-agent: other", userId: OWNER });
+            const otherRun = await context.db.insert("subAgentRuns", {
+                childThreadId: otherChild,
+                createdAt: now,
+                depth: 1,
+                parentThreadId: parentId,
+                startedAt: now,
+                status: "awaiting",
+                task: "Something else",
+                toolCallId: "call-parent-2",
+                updatedAt: now,
+                userId: OWNER,
+            });
+
+            await context.db.insert("messages", {
+                message: {
+                    content: [
+                        { input: {}, toolCallId: "call-other", toolName: TOOL, type: "tool-call" },
+                        { approvalId: "approval-other", toolCallId: "call-other", type: "tool-approval-request" },
+                    ],
+                    role: "assistant",
+                },
+                order: 0,
+                status: "success",
+                stepOrder: 0,
+                threadId: otherChild,
+                tool: true,
+                userId: OWNER,
+            });
+            await context.db.insert("toolApprovalRuns", {
+                approvalId: "approval-other",
+                config: { ...CONFIG(), subAgentRunId: otherRun },
+                createdAt: now,
+                status: "pending",
+                threadId: otherChild,
+                userId: OWNER,
+            });
+        });
+
+        const { cut, requests } = await listing();
+        const byId = new Map(requests.map((request) => [request.approvalId, request]));
+
+        expect(requests).toHaveLength(10);
+        // Only the second run's card says more is waiting: the first run's last request was not its own.
+        expect(cut).toHaveLength(1);
+        expect(cut).not.toContain(runId);
+        expect([...byId.keys()]).not.toContain("approval-many-2");
+        expect([...byId.keys()]).toContain("approval-many-10");
+        // 1,000 emoji left out: characters, not UTF-16 units.
+        expect(byId.get("approval-many-0")).toMatchObject({ input: "x".repeat(3999), omittedCharacters: 1000 });
+        // An unlabelled call shows its runtime name and no server.
+        expect(byId.get("approval-many-1")).toMatchObject({ input: "", omittedCharacters: 0, server: null, toolName: TOOL });
+    });
+
+    it("reads each child's latest turn on its own, past newer messages in the parent conversation", async () => {
+        await run(async (context) => {
+            await context.db.insert("messages", {
+                message: { content: "Tidy up, please.", role: "user" },
+                order: 4,
+                status: "success",
+                stepOrder: 0,
+                threadId: parentId,
+                tool: false,
+                userId: OWNER,
+            });
+            await context.db.insert("messages", {
+                message: {
+                    content: [{ input: { task: "Tidy up the files" }, toolCallId: "call-parent", toolName: "delegateToSubAgent", type: "tool-call" }],
+                    role: "assistant",
+                },
+                order: 5,
+                status: "success",
+                stepOrder: 0,
+                threadId: parentId,
+                tool: true,
+                userId: OWNER,
+            });
+        });
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        const requests = await listed();
+
+        expect(requests.map((request) => request.approvalId).toSorted((left: string, right: string) => left.localeCompare(right))).toStrictEqual([
+            APPROVAL_ID,
+            SIBLING_ID,
+        ]);
+    });
+
+    it("is answered from the parent through the child's own claim, which resumes the run once and takes the request off the list", async () => {
+        await run(async (context) => await markRunAwaiting(context, runId));
+
+        const requests = await listed();
+        const request = requests.find((row) => row.approvalId === APPROVAL_ID);
+
+        await expect(
+            as(OWNER).mutation(respondToToolApproval as never, { approvalId: request.approvalId, decision: "today", threadId: request.childThreadId } as never),
+        ).rejects.toThrow(ONCE_OR_ALWAYS);
+        expect(await runStatus()).toBe("awaiting");
+
+        expect(
+            await as(OWNER).mutation(
+                respondToToolApproval as never,
+                { approvalId: request.approvalId, decision: "deny", threadId: request.childThreadId } as never,
+            ),
+        ).toMatchObject({ alreadyResolved: false });
+        expect(continuations()).toHaveLength(1);
+        expect(continuations()[0]!.body.args).toMatchObject({ approved: false, threadId: childId });
+        expect(await runStatus()).toBe("running");
+        expect(await listed()).toStrictEqual([]);
     });
 });

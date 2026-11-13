@@ -37,6 +37,10 @@ msgstr "-- NORMALNY --"
 msgid ", unread"
 msgstr ", nieprzeczytane"
 
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:63
+msgid "… ({omitted, plural, one {# more character not shown} other {# more characters not shown}}; approving runs the whole call)"
+msgstr "… ({omitted, plural, one {nie pokazano jeszcze # znaku} few {nie pokazano jeszcze # znaków} many {nie pokazano jeszcze # znaków} other {nie pokazano jeszcze # znaku}}; zatwierdzenie uruchamia całe wywołanie)"
+
 #. placeholder {0}: state.conversations.length - 10
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:373
 msgid "...and {0} more"
@@ -1230,6 +1234,10 @@ msgstr "Usunięto {name} z oznaczonych gwiazdką"
 msgid "{name} resumed"
 msgstr "Wznowiono {name}"
 
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:71
+msgid "{name} wants to run \"{tool}\""
+msgstr "{name} chce uruchomić „{tool}”"
+
 #: ../../packages/ui/src/components/file-renderers/pdf-thumbnail.tsx:69
 msgid "{name}, {pages, plural, one {# page} other {# pages}}"
 msgstr "{name}, {pages, plural, one {# strona} few {# strony} many {# stron} other {# strony}}"
@@ -1926,6 +1934,10 @@ msgstr "Szablon dodaje swoich uczestników do Twoich umiejętności, gdzie może
 #: src/features/settings/components/chat/event-trigger-fields.tsx:57
 msgid "A thread gets a reply"
 msgstr "Wątek otrzymuje odpowiedź"
+
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:58
+msgid "a tool"
+msgstr "narzędzie"
 
 #: src/features/notifications/lib/notification-labels.ts:73
 msgid "A tool call needs your approval"
@@ -3258,11 +3270,11 @@ msgstr ""
 msgid "All Users"
 msgstr "Wszyscy użytkownicy"
 
-#: src/features/chat/thread/tool-approval.tsx:100
+#: src/features/chat/thread/tool-approval.tsx:170
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "Zezwolić na „{tool}” z {server}?"
 
-#: src/features/chat/thread/tool-approval.tsx:100
+#: src/features/chat/thread/tool-approval.tsx:170
 msgid "Allow \"{tool}\"?"
 msgstr "Zezwolić na „{tool}”?"
 
@@ -3270,19 +3282,19 @@ msgstr "Zezwolić na „{tool}”?"
 msgid "Allow \"delete_files\" from the drafts server?"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:133
+#: src/features/chat/thread/tool-approval.tsx:138
 msgid "Allow {tool} for 1 hour"
 msgstr "Zezwól na {tool} na 1 godzinę"
 
-#: src/features/chat/thread/tool-approval.tsx:137
+#: src/features/chat/thread/tool-approval.tsx:142
 msgid "Allow {tool} for today"
 msgstr "Zezwól na {tool} na dziś"
 
-#: src/features/chat/thread/tool-approval.tsx:135
+#: src/features/chat/thread/tool-approval.tsx:140
 msgid "Allow for 1 hour"
 msgstr "Zezwól na 1 godzinę"
 
-#: src/features/chat/thread/tool-approval.tsx:139
+#: src/features/chat/thread/tool-approval.tsx:144
 msgid "Allow for today"
 msgstr "Zezwól na dziś"
 
@@ -3333,12 +3345,12 @@ msgstr "Już połączono z tym wątkiem."
 msgid "Also viewing"
 msgstr "Oglądają też"
 
-#: src/features/chat/thread/tool-approval.tsx:129
+#: src/features/chat/thread/tool-approval.tsx:134
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
 msgstr "Zawsze zezwalaj"
 
-#: src/features/chat/thread/tool-approval.tsx:127
+#: src/features/chat/thread/tool-approval.tsx:132
 msgid "Always allow {tool}"
 msgstr "Zawsze zezwalaj na {tool}"
 
@@ -3777,14 +3789,14 @@ msgid "Approvals in Neore: a tool you set to Ask stops before it runs, and you d
 msgstr ""
 
 #: src/features/auth/components/device-approval.tsx:242
-#: src/features/chat/thread/tool-approval.tsx:121
+#: src/features/chat/thread/tool-approval.tsx:126
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:32
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "Zatwierdź"
 
-#: src/features/chat/thread/tool-approval.tsx:119
+#: src/features/chat/thread/tool-approval.tsx:124
 msgid "Approve {tool} once"
 msgstr "Zatwierdź {tool} jednorazowo"
 
@@ -3808,7 +3820,7 @@ msgstr ""
 msgid "Approved"
 msgstr ""
 
-#: src/features/chat/thread/tool-approval.tsx:79
+#: src/features/chat/thread/tool-approval.tsx:83
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:23
 msgid "Approved — running tool"
 msgstr "Zatwierdzono — uruchamianie narzędzia"
@@ -7880,7 +7892,7 @@ msgid "Conversations on lines this diff no longer shows"
 msgstr "Rozmowy dotyczące wierszy, których ten diff już nie pokazuje"
 
 #: src/features/chat/thread/composer-input.tsx:811
-#: src/features/chat/thread/composer-input.tsx:1550
+#: src/features/chat/thread/composer-input.tsx:1551
 msgid "Conversion failed"
 msgstr "Konwersja nie powiodła się"
 
@@ -8200,7 +8212,7 @@ msgstr "Nie udało się dołączyć: {0}. Pozostałe pliki zostały dołączone;
 msgid "Could not attach {0}. Try those again."
 msgstr "Nie udało się dołączyć: {0}. Spróbuj ponownie."
 
-#: src/features/chat/thread/composer-input.tsx:1572
+#: src/features/chat/thread/composer-input.tsx:1573
 msgid "Could not attach the chat"
 msgstr "Nie udało się dołączyć czatu"
 
@@ -8387,6 +8399,10 @@ msgstr "Nie udało się wczytać podziału według projektów."
 msgid "Could not load the skill breakdown."
 msgstr "Nie udało się wczytać podziału według umiejętności."
 
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:40
+msgid "Could not load the sub-agent's requests."
+msgstr "Nie udało się wczytać próśb podagenta."
+
 #: src/features/develop/components/work-on-pull-request.tsx:73
 msgid "Could not load the threads for this {requestNoun}."
 msgstr "Nie udało się wczytać wątków dla tego {requestNoun}."
@@ -8480,11 +8496,11 @@ msgstr "Nie udało się połączyć z serwerem, aby rozpocząć generowanie. Spr
 msgid "Could not reach the server. Try again."
 msgstr "Nie udało się połączyć z serwerem. Spróbuj ponownie."
 
-#: src/features/chat/thread/composer-input.tsx:1575
+#: src/features/chat/thread/composer-input.tsx:1576
 msgid "Could not read that chat"
 msgstr "Nie udało się odczytać tego czatu"
 
-#: src/features/chat/thread/composer-input.tsx:1576
+#: src/features/chat/thread/composer-input.tsx:1577
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Nie udało się odczytać tego czatu. Jeśli jest zablokowany, najpierw go odblokuj."
 
@@ -8569,7 +8585,7 @@ msgid "Could not send your answer."
 msgstr "Nie udało się wysłać odpowiedzi."
 
 #: src/features/chat/thread/ask-user-prompt.tsx:116
-#: src/features/chat/thread/tool-approval.tsx:68
+#: src/features/chat/thread/tool-approval.tsx:72
 msgid "Could not send your answer. Please try again."
 msgstr "Nie udało się wysłać twojej odpowiedzi. Spróbuj ponownie."
 
@@ -8615,7 +8631,7 @@ msgstr "Nie udało się zatrzymać odpowiedzi. Spróbuj ponownie."
 msgid "Could not stop the reply. Your message is queued; send it next when you are ready."
 msgstr "Nie udało się zatrzymać odpowiedzi. Wiadomość czeka w kolejce; wyślij ją następną, gdy będziesz gotowy."
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:42
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:47
 msgid "Could not stop the sub-agent."
 msgstr "Nie udało się zatrzymać sub-agenta."
 
@@ -10038,7 +10054,7 @@ msgstr "Wymagające zadania, w których najważniejsze są maksymalne możliwoś
 msgid "Denied"
 msgstr "Odrzucono"
 
-#: src/features/chat/thread/tool-approval.tsx:77
+#: src/features/chat/thread/tool-approval.tsx:81
 msgid "Denied — continuing without it"
 msgstr "Odrzucono — kontynuacja bez niego"
 
@@ -10059,12 +10075,12 @@ msgid "Density updated"
 msgstr "Zaktualizowano gęstość"
 
 #: src/features/auth/components/device-approval.tsx:233
-#: src/features/chat/thread/tool-approval.tsx:125
+#: src/features/chat/thread/tool-approval.tsx:130
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:34
 msgid "Deny"
 msgstr "Odrzuć"
 
-#: src/features/chat/thread/tool-approval.tsx:123
+#: src/features/chat/thread/tool-approval.tsx:128
 msgid "Deny {tool}"
 msgstr "Odrzuć {tool}"
 
@@ -10646,7 +10662,7 @@ msgstr "Nie masz konta?"
 #: src/features/devices/components/devices-settings.tsx:383
 #: src/features/onboarding/components/setup-checklist.tsx:135
 #: src/features/skills/components/bundle-import-dialog.tsx:248
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:57
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:62
 #: src/features/sub-agents/components/worker-run-log.tsx:29
 #: src/features/tasks/components/task-status.tsx:16
 msgid "Done"
@@ -10876,7 +10892,7 @@ msgstr "Upuść plik lub kliknij, aby przesłać"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1760
+#: src/features/chat/thread/composer-input.tsx:1761
 msgid "Drop files here"
 msgstr "Upuść pliki tutaj"
 
@@ -12825,7 +12841,7 @@ msgstr "niezaliczone"
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:181
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:54
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:59
 #: src/features/sub-agents/components/worker-run-log.tsx:29
 #: src/features/tasks/components/task-status.tsx:17
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:64
@@ -12868,7 +12884,7 @@ msgid "Failed to attach collection"
 msgstr "Nie udało się dołączyć kolekcji"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1401
+#: src/features/chat/thread/composer-input.tsx:1402
 msgid "Failed to attach file"
 msgstr "Nie udało się dołączyć pliku"
 
@@ -13265,7 +13281,7 @@ msgstr "Nie udało się wysłać żądania eksportu"
 msgid "Failed to reset to defaults"
 msgstr "Nie udało się przywrócić ustawień domyślnych"
 
-#: src/features/chat/thread/composer-input.tsx:1433
+#: src/features/chat/thread/composer-input.tsx:1434
 msgid "Failed to restore attachment"
 msgstr "Nie udało się przywrócić załącznika"
 
@@ -18773,6 +18789,10 @@ msgstr "Wczytywanie przewodnika"
 msgid "Loading the linked pull requests…"
 msgstr "Wczytywanie połączonych pull requestów…"
 
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:48
+msgid "Loading the sub-agent's requests…"
+msgstr "Wczytywanie próśb podagenta…"
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:59
 msgid "Loading threads"
 msgstr "Wczytywanie wątków"
@@ -20398,6 +20418,10 @@ msgstr "Więcej opcji"
 #: ../../packages/ui/src/components/pagination.tsx:69
 msgid "More pages"
 msgstr "Więcej stron"
+
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:85
+msgid "More requests are waiting in the sub-agent's thread."
+msgstr "W wątku podagenta czekają kolejne prośby."
 
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:172
 msgid "More steps = higher quality, longer generation"
@@ -22224,7 +22248,7 @@ msgstr "Nie ustawiono"
 msgid "Not shown to this model: {0}"
 msgstr "Nie pokazano temu modelowi: {0}"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:78
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:83
 msgid "Not started"
 msgstr "Nie rozpoczęto"
 
@@ -23056,7 +23080,7 @@ msgstr "Otwórz rozmowę przebiegu"
 msgid "Open the side-question panel without interrupting a running reply ({0})"
 msgstr "Otwórz panel pytania pobocznego bez przerywania trwającej odpowiedzi ({0})"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:129
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:136
 msgid "Open the sub-agent's thread"
 msgstr "Otwórz wątek podagenta"
 
@@ -25748,7 +25772,7 @@ msgstr "Dodaj wiadomość do kolejki — zostanie wysłana, gdy bieżąca odpowi
 #: src/features/home/components/home-page.tsx:111
 #: src/features/home/components/home-page.tsx:184
 #: src/features/home/components/home-page.tsx:192
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:55
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
 #: src/features/sub-agents/components/worker-list.tsx:80
 #: src/features/sub-agents/components/worker-run-log.tsx:29
 #: src/features/tasks/components/task-status.tsx:19
@@ -28225,7 +28249,7 @@ msgstr "Wynik"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Ocenia każdą odpowiedź w skali 0–100% względem oczekiwanej odpowiedzi lub kryteriów oceny. Dodaje małe wywołanie modelu na przypadek."
 
-#: src/features/chat/thread/composer-input.tsx:1360
+#: src/features/chat/thread/composer-input.tsx:1361
 msgid "Screen capture failed. Please try again."
 msgstr "Przechwytywanie ekranu nie powiodło się. Spróbuj ponownie."
 
@@ -29445,7 +29469,7 @@ msgstr "Pokazuj znaczniki czasu"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "Pokaż do {rowLimit} wierszy ({byteCount} bajtów)"
 
-#: src/features/chat/thread/tool-approval.tsx:110
+#: src/features/chat/thread/tool-approval.tsx:115
 msgid "Show what it will send"
 msgstr "Pokaż, co zostanie wysłane"
 
@@ -30692,7 +30716,7 @@ msgstr "uruchomiono według harmonogramu"
 msgid "started when its dependencies finished"
 msgstr "uruchomiono po zakończeniu zależności"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:83
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:88
 msgid "Starting"
 msgstr "Uruchamianie"
 
@@ -30835,7 +30859,7 @@ msgstr "Akcje giełdowe"
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:380
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:118
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:125
 #: src/features/sub-agents/components/worker-stop-bar.tsx:56
 #: src/features/workflow/components/canvas/workflow-controls.tsx:618
 msgid "Stop"
@@ -30898,7 +30922,7 @@ msgid "Stop watching {0}"
 msgstr "Przestań obserwować {0}"
 
 #: src/features/chat/goal/goal-notes.tsx:65
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:53
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:58
 #: src/features/sub-agents/components/worker-run-log.tsx:29
 msgid "Stopped"
 msgstr "Zatrzymano"
@@ -31320,7 +31344,7 @@ msgstr "Wynik stylizacji"
 msgid "stylized animation"
 msgstr "stylizowana animacja"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:102
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:107
 msgid "Sub-agent"
 msgstr "Podagent"
 
@@ -31332,7 +31356,7 @@ msgstr "Podagent zakończył się błędem"
 msgid "Sub-agent finished"
 msgstr "Podagent zakończył pracę"
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:66
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:71
 msgid "Sub-agent was not approved."
 msgstr "Podagent nie został zatwierdzony."
 
@@ -32461,7 +32485,7 @@ msgstr "Zmiana jest za duża, aby pokazać ją w całości."
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "Agent czatu wykonuje zadanie za pomocą swoich narzędzi, opcjonalnie według umiejętności."
 
-#: src/features/chat/thread/composer-input.tsx:984
+#: src/features/chat/thread/composer-input.tsx:987
 msgid "The chat changed before the paste was ready, so it was not inserted."
 msgstr "Czat zmienił się, zanim wklejanie było gotowe, więc nic nie zostało wstawione."
 
@@ -32497,7 +32521,7 @@ msgstr ""
 msgid "The comparison could not be loaded."
 msgstr "Nie udało się wczytać porównania."
 
-#: src/features/chat/thread/composer-input.tsx:992
+#: src/features/chat/thread/composer-input.tsx:995
 #: src/features/chat/thread/composer-input.tsx:1017
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "Pole wiadomości zostało zablokowane, zanim wklejenie było gotowe, więc nie zostało wstawione."
@@ -32877,7 +32901,7 @@ msgstr "Strona pokazuje teraz drugą wersję. Skopiuj ze swojej wszystko, co chc
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "Strona, wszystkie podstrony, komentarze i historia wersji zostaną usunięte. Tej operacji nie można cofnąć."
 
-#: src/features/chat/thread/composer-input.tsx:1042
+#: src/features/chat/thread/composer-input.tsx:1043
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "Nie udało się załączyć wklejonego tekstu i nie został wstawiony."
 
@@ -32982,7 +33006,11 @@ msgstr "Serwer nie ma jeszcze żadnych modeli — najpierw pobierz lub załaduj 
 msgid "The skill could not be imported."
 msgstr "Nie udało się zaimportować umiejętności."
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:70
+#: src/features/sub-agents/components/sub-agent-approvals.tsx:57
+msgid "The sub-agent"
+msgstr "Podagent"
+
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:75
 msgid "The sub-agent could not start."
 msgstr "Nie udało się uruchomić podagenta."
 
@@ -33722,7 +33750,7 @@ msgstr "Ten slug jest dostępny"
 msgid "This spreadsheet appears to be empty or could not be parsed."
 msgstr "Ten arkusz kalkulacyjny wydaje się pusty lub nie udało się go przetworzyć."
 
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:72
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:77
 msgid "This sub-agent run is no longer available."
 msgstr "To uruchomienie podagenta nie jest już dostępne."
 
@@ -34784,7 +34812,7 @@ msgid "Type your answer…"
 msgstr "Wpisz odpowiedź…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1750
+#: src/features/chat/thread/composer-input.tsx:1751
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:195
 msgid "Type your message..."
 msgstr "Wpisz wiadomość..."
@@ -35197,7 +35225,7 @@ msgstr "Aktualna dokumentacja dowolnej biblioteki lub frameworka"
 msgid "Update Duration"
 msgstr "Zmień czas trwania"
 
-#: src/features/chat/thread/composer-input.tsx:1607
+#: src/features/chat/thread/composer-input.tsx:1608
 msgid "Update failed"
 msgstr "Aktualizacja nie powiodła się"
 
@@ -35387,12 +35415,12 @@ msgstr "Przesyłaj dokumenty do bazy wiedzy i grupuj je w kolekcje. AI przeszuku
 
 #: src/features/chat/thread/composer-input.tsx:422
 #: src/features/chat/thread/composer-input.tsx:666
-#: src/features/chat/thread/composer-input.tsx:1528
+#: src/features/chat/thread/composer-input.tsx:1529
 msgid "Upload failed"
 msgstr "Przesyłanie nie powiodło się"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1521
+#: src/features/chat/thread/composer-input.tsx:1522
 msgid "Upload failed: {0}"
 msgstr "Przesyłanie nie powiodło się: {0}"
 
@@ -36583,7 +36611,7 @@ msgstr "Oczekiwanie na właściciela"
 msgid "Waiting for the owner to answer"
 msgstr "Oczekiwanie na odpowiedź właściciela"
 
-#: src/features/chat/thread/tool-approval.tsx:74
+#: src/features/chat/thread/tool-approval.tsx:78
 msgid "Waiting for the owner to approve"
 msgstr "Oczekiwanie na zatwierdzenie przez właściciela"
 
@@ -36611,10 +36639,10 @@ msgstr "Czeka na twoją odpowiedź w: {0}"
 
 #: src/features/chat/thread-list/thread-node.tsx:634
 #: src/features/chat/thread-list/thread-node.tsx:641
-#: src/features/chat/thread/tool-approval.tsx:74
+#: src/features/chat/thread/tool-approval.tsx:78
 #: src/features/home/components/home-page.tsx:114
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:52
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:57
 msgid "Waiting for your approval"
 msgstr "Oczekuje na twoje zatwierdzenie"
 
@@ -37141,7 +37169,7 @@ msgid "Workflows"
 msgstr "Przepływy pracy"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:493
-#: src/features/sub-agents/components/sub-agent-tool-view.tsx:56
+#: src/features/sub-agents/components/sub-agent-tool-view.tsx:61
 #: src/features/sub-agents/components/worker-list.tsx:80
 #: src/features/sub-agents/components/worker-run-log.tsx:29
 #: src/features/sub-agents/components/worker-run-log.tsx:29
@@ -37398,8 +37426,8 @@ msgstr "Nie obserwujesz żadnego repozytorium."
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "Brak połączenia z internetem. Neore połączy się ponownie, gdy sieć wróci."
 
-#: src/features/chat/thread/composer-input.tsx:1100
-#: src/features/chat/thread/composer-input.tsx:1175
+#: src/features/chat/thread/composer-input.tsx:1101
+#: src/features/chat/thread/composer-input.tsx:1176
 #: src/features/chat/thread/composer-prompt-queue.tsx:111
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "Jesteś offline. Twoja wiadomość zostaje tutaj; wyślij ją, gdy wrócisz do sieci."

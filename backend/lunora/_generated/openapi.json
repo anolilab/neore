@@ -56212,6 +56212,153 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#sub_agents_functions:listSubAgentApprovals": {
+      "post": {
+        "description": "Invoke the `query` `sub_agents_functions:listSubAgentApprovals` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "sub_agents_functions:listSubAgentApprovals",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "parentThreadId": {
+                        "description": "Id<\"threads\">",
+                        "type": "string",
+                        "x-lunora-table": "threads"
+                      },
+                      "unlockProof": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "parentThreadId"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "sub_agents_functions:listSubAgentApprovals",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "cut": {
+                      "items": {
+                        "description": "Id<\"subAgentRuns\">",
+                        "type": "string",
+                        "x-lunora-table": "subAgentRuns"
+                      },
+                      "type": "array"
+                    },
+                    "requests": {
+                      "items": {
+                        "properties": {
+                          "approvalId": {
+                            "type": "string"
+                          },
+                          "childThreadId": {
+                            "description": "Id<\"threads\">",
+                            "type": "string",
+                            "x-lunora-table": "threads"
+                          },
+                          "input": {
+                            "type": "string"
+                          },
+                          "omittedCharacters": {
+                            "type": "number"
+                          },
+                          "runId": {
+                            "description": "Id<\"subAgentRuns\">",
+                            "type": "string",
+                            "x-lunora-table": "subAgentRuns"
+                          },
+                          "server": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "skillSlug": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "toolName": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "approvalId",
+                          "childThreadId",
+                          "input",
+                          "omittedCharacters",
+                          "runId",
+                          "server",
+                          "skillSlug",
+                          "toolName"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "cut",
+                    "requests"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: sub_agents_functions:listSubAgentApprovals",
+        "tags": [
+          "sub-agents"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#sub_agents_functions:listWorkers": {
       "post": {
         "description": "Invoke the `query` `sub_agents_functions:listWorkers` over the Lunora RPC envelope (POST /_lunora/rpc).",

@@ -63,12 +63,15 @@ import { notifyQuietly } from "../notifications/notify";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
 import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
-import { findPendingRequestOnLatestTurn, SUB_AGENT_RUN_ENDED_BY } from "../chat/lib/tool-approval-claim";
+import type { PendingToolRequest } from "../chat/lib/tool-approval-claim";
+import { findPendingRequestOnLatestTurn, latestTurnRows, openRequestsOfLatestTurn, SUB_AGENT_RUN_ENDED_BY } from "../chat/lib/tool-approval-claim";
 import { denyToolApprovalRun, PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
 import { MAX_LENGTH } from "../lib/validators";
 import { RUN_STALE_MS, RUN_WATCH_RETRY } from "../chat/lib/interrupted-run";
 import { HOST_SESSION_BUSY_RETRY_MS, HOST_START_MAX_ATTEMPTS, hostRunActivity, hostStartRetryDelayMs, sendHostRunTurn } from "./host-runs";
 
+import { admittedThreadMessages } from "../agent/admitted-thread-db";
+import { admitOwnedThread, requireOwnedThread } from "../agent/thread-read-access";
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import {
     beatWatchDecision,
@@ -1971,6 +1974,147 @@ export const getRunByToolCall = authQuery
             status: run.status,
             task: run.task,
         };
+    });
+
+/** Waiting runs read per parent conversation: at most `SUB_AGENT_MAX_CONCURRENT` go at once, so this is far past real. */
+const AWAITING_RUNS_READ = 10;
+
+/** Requests listed per parent conversation at most, across its waiting sub-agents. */
+const SUB_AGENT_APPROVALS_LISTED_MAX = 10;
+
+/** Characters of a request's tool input sent to the card: approving runs the whole call, and the card says how much is cut. */
+const SUB_AGENT_APPROVAL_INPUT_MAX = 4000;
+
+/** The first `max` UTF-16 units of `text`, one fewer when the cut would split a surrogate pair. */
+const cutAt = (text: string, max: number): string => {
+    const cut = text.slice(0, max);
+    const last = cut.codePointAt(cut.length - 1);
+
+    return last !== undefined && text.length > max && last >= 0xd8_00 && last <= 0xdb_ff ? cut.slice(0, -1) : cut;
+};
+
+const vSubAgentApproval = v.object({
+    approvalId: v.string(),
+    childThreadId: v.id("threads"),
+    input: v.string(),
+    omittedCharacters: v.number(),
+    runId: v.id("subAgentRuns"),
+    server: v.union(v.string(), v.null()),
+    skillSlug: v.union(v.string(), v.null()),
+    toolName: v.union(v.string(), v.null()),
+});
+
+type SubAgentApproval = Infer<typeof vSubAgentApproval>;
+
+/** What the parent's card shows of one open request: the tool input is cut, and the card says by how much. */
+const approvalView = (run: RunDoc, row: Doc<"toolApprovalRuns">, request: PendingToolRequest): SubAgentApproval => {
+    let input = "";
+
+    if (typeof request.input === "string") {
+        input = request.input;
+    } else if (request.input !== undefined && request.input !== null) {
+        input = JSON.stringify(request.input, null, 2);
+    }
+
+    const shown = cutAt(input, SUB_AGENT_APPROVAL_INPUT_MAX);
+
+    return {
+        approvalId: row.approvalId,
+        childThreadId: row.threadId as Id<"threads">,
+        input: shown,
+        // Characters as the card counts them: code points, not UTF-16 units.
+        omittedCharacters: [...input].length - [...shown].length,
+        runId: run._id,
+        // The labels the pause stamped on the call (MCP, connector or device), as the chat's own card shows them.
+        server: request.label?.server ?? null,
+        skillSlug: run.skillSlug ?? null,
+        toolName: request.label?.tool ?? request.toolName,
+    };
+};
+
+/**
+ * Up to `room` open requests of one waiting run, and whether the cap dropped one (`cut`: the card says more wait in the
+ * child's thread); none for a child that is not the caller's or is locked. Reads the child, its latest turn once
+ * (through a reader keyed on the child alone; it returns at most `LATEST_MESSAGE_WINDOW` rows) and, by id, the approval
+ * row of each open request on that turn until one passes past the cap.
+ */
+const openRequestsOfRun = async (ctx: QueryCtx, run: RunDoc, userId: string, room: number): Promise<{ cut: boolean; requests: SubAgentApproval[] }> => {
+    if (run.userId !== userId || run.childThreadId === undefined) {
+        return { cut: false, requests: [] };
+    }
+
+    const child = await ctx.db.get("threads", run.childThreadId as Id<"threads">);
+
+    if (!child || child.deleted === true || child.userId !== userId || isThreadLocked(child)) {
+        return { cut: false, requests: [] };
+    }
+
+    // Proven the caller's own above: its rows (and a grantee's replies in it) are theirs to read through it.
+    admitOwnedThread(ctx, child, userId);
+
+    // Only the requests still open on the child's latest turn: the ones an answer is checked against.
+    const open = openRequestsOfLatestTurn(await latestTurnRows(admittedThreadMessages(ctx, child._id), child._id, child.activeLeafMessageId));
+    const requests: SubAgentApproval[] = [];
+
+    // Filtered first, then capped: a row left out takes no slot, and `cut` means a listable request was dropped.
+    for (const [approvalId, request] of open) {
+        const row = await ctx.db
+            .query("toolApprovalRuns")
+            .withIndex("by_approvalId", (q) => q.eq("approvalId", approvalId))
+            .first();
+
+        if (row?.threadId !== child._id || row.status !== "pending" || row.userId !== userId || row.config.subAgentRunId !== run._id) {
+            continue;
+        }
+
+        if (requests.length >= room) {
+            return { cut: true, requests };
+        }
+
+        requests.push(approvalView(run, row, request));
+    }
+
+    return { cut: false, requests };
+};
+
+/**
+ * The open approval requests of the sub-agents waiting in a conversation, for the cards in that (parent) conversation.
+ * Bounded: at most `AWAITING_RUNS_READ` runs, each costing its child, one latest-turn read and one approval row by id
+ * per open request on that turn (the requests of one assistant message); ten requests
+ * listed in all, with the runs the cap cut short in `cut`. Its owner only: a stranger's parent answers NOT_FOUND, a locked parent asks for its unlock proof, and a locked child's
+ * requests stay out (its owner unlocks the child to answer). The answer goes through `respondToToolApproval` on the
+ * child thread, so the claim there decides it.
+ */
+export const listSubAgentApprovals = authQuery
+    .input({ parentThreadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
+    .output(v.object({ cut: v.array(v.id("subAgentRuns")), requests: v.array(vSubAgentApproval) }))
+    .query(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        const parent = await requireOwnedThread(ctx, args.parentThreadId, userId, args.unlockProof);
+
+        if (parent.deleted === true) {
+            throw new LunoraError("NOT_FOUND", "Thread not found");
+        }
+
+        const runs = await ctx.db
+            .query("subAgentRuns")
+            .withIndex("by_parentThreadId_and_status", (q) => q.eq("parentThreadId", parent._id).eq("status", "awaiting"))
+            .take(AWAITING_RUNS_READ);
+        const requests: SubAgentApproval[] = [];
+        // Runs whose requests the cap left out: their cards point to the child's thread.
+        const cut: Id<"subAgentRuns">[] = [];
+
+        for (const run of runs) {
+            const listed = await openRequestsOfRun(ctx, run, userId, SUB_AGENT_APPROVALS_LISTED_MAX - requests.length);
+
+            requests.push(...listed.requests);
+
+            if (listed.cut) {
+                cut.push(run._id);
+            }
+        }
+
+        return { cut, requests };
     });
 
 /**
