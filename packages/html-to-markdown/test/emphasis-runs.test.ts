@@ -175,3 +175,21 @@ describe("nested emphasis beside a block that a custom rule renders as nothing",
         expect(service.turndown("<em><em>a</em><p>b</p></em>")).toBe("_*a*_");
     });
 });
+
+/*
+ * Only a real break moves outside the delimiters. Inline text cannot carry a newline (whitespace collapses to a
+ * space), so text that looks like the break marker never sits at an emphasis edge as a marker.
+ */
+
+describe("text that looks like the break marker inside emphasis", () => {
+    it.each([
+        ["at the start", "<em>X\nfoo</em>", "_X foo_"],
+        ["at the end", "<em>fooX\n</em>", "_fooX_"],
+    ])("stays inside the delimiters %s", (_name, html, expected) => {
+        expect(new TurndownService({ br: "X" }).turndown(html)).toBe(expected);
+    });
+
+    it("moves a real break outside the delimiters", () => {
+        expect(new TurndownService({ br: "X" }).turndown("<em><br>foo</em>")).toBe("X\n_foo_");
+    });
+});
