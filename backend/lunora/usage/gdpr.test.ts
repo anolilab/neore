@@ -14,6 +14,7 @@ import {
     EXPORT_PIECE_TTL_MS,
     eraseUsageForUser,
     keyedUsageRuns,
+    purgeObject,
     releaseUsageKey,
     sweepUsageExportPieces,
 } from "./gdpr";
@@ -158,38 +159,73 @@ describe("eraseUsageForUser", () => {
         expect(await countOf("usageExportPieces", B)).toBe(1);
     });
 
-    it("fails when a delete fails, so the erasure step fails and its retry finishes what is left", async () => {
-        const failing = {
-            db: {
-                delete: async () => {
-                    throw new Error("delete failed");
-                },
-                query: () => {
-                    return {
-                        withIndex: () => {
-                            return { take: async () => [{ _id: "row-1" }] };
-                        },
+    it("fails when a delete fails, so the erasure step fails, and its retry finishes what the failed attempt left", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("usageExportPieces", piece("retry:1", A));
+            await ctx.db.insert("usageDaily", usageRow(A, "2026-11-01"));
+        });
+
+        // The first delete the erasure makes throws; every later one goes through.
+        let failures = 1;
+
+        await harness.run(async (ctx: any) => {
+            const flakyDb = new Proxy(ctx.db, {
+                get: (target, prop) => {
+                    const value = Reflect.get(target, prop, target);
+
+                    if (prop !== "delete") {
+                        return typeof value === "function" ? value.bind(target) : value;
+                    }
+
+                    return async (...args: unknown[]) => {
+                        if (failures > 0) {
+                            failures -= 1;
+
+                            throw new Error("delete failed");
+                        }
+
+                        return await value.apply(target, args);
                     };
                 },
-                usageExportPieces: {
-                    findMany: async () => {
-                        return { page: [] };
-                    },
-                },
-                usageExportProjects: {
-                    findMany: async () => {
-                        return { page: [] };
-                    },
-                },
-                usageExportRuns: {
-                    findMany: async () => {
-                        return { page: [] };
-                    },
-                },
+            });
+            const flaky = Object.create(ctx, { db: { value: flakyDb } });
+
+            await expect(eraseUsageForUser(flaky, A)).rejects.toThrow("delete failed");
+        });
+
+        expect(failures).toBe(0);
+
+        await eraseAll(A);
+
+        expect(await countOf("usageExportPieces", A)).toBe(0);
+        expect(await countOf("usageDaily", A)).toBe(0);
+    });
+});
+
+describe("the purge's object steps", () => {
+    it("keeps the run's record when the object's delete fails, and releases it only once a retry has deleted the object", async () => {
+        const release = vi.fn(async () => null);
+        let deleteFails = true;
+        const storage = {
+            delete: async () => {
+                if (deleteFails) {
+                    throw new Error("storage down");
+                }
+
+                return null;
+            },
+            getMetadata: async () => {
+                return { size: 1 };
             },
         };
 
-        await expect(eraseUsageForUser(failing as never, A)).rejects.toThrow("delete failed");
+        await expect(purgeObject(storage, "gdpr-exports/failing.json", release)).rejects.toThrow("storage down");
+        expect(release).not.toHaveBeenCalled();
+
+        deleteFails = false;
+
+        await purgeObject(storage, "gdpr-exports/failing.json", release);
+        expect(release).toHaveBeenCalledTimes(1);
     });
 });
 
@@ -496,6 +532,35 @@ describe("the sweep and the clear", () => {
         vi.setSystemTime(t0 + EXPORT_PIECE_TTL_MS);
         await harness.run(async (ctx: any) => await ctx.runMutation(dispatchDueShards, {}));
         expect(scheduled.shards).toEqual([A]);
+    });
+
+    it("schedules a keyed run's purge once, when its pieces are drained, not on each pass that clears some of them", async () => {
+        const old = Date.now() - EXPORT_PIECE_TTL_MS - 60_000;
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("usageExportRuns", {
+                createdAt: old,
+                deleteAt: old,
+                requestId: "many:1",
+                usageKey: "gdpr-exports/many-pieces.json",
+                userId: A,
+            });
+
+            for (let index = 0; index < 25; index += 1) {
+                await ctx.db.insert("usageExportPieces", piece("many:1", A, index));
+            }
+        });
+
+        // Two full passes of ten pieces each leave the run due again at once, and no purge is queued while pieces remain.
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+        expect(scheduled.keys).toEqual([]);
+
+        // The last five drain the run: its purge is queued exactly once.
+        await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
+
+        expect(await countOf("usageExportPieces", A)).toBe(0);
+        expect(scheduled.keys).toEqual(["gdpr-exports/many-pieces.json"]);
     });
 
     it("does not let a keyed run whose purge keeps failing block the expired runs behind it", async () => {

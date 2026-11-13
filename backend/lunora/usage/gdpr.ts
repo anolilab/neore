@@ -59,14 +59,26 @@ export const purgeUsageFile = internalAction
     .input({ key: v.string().max(MAX_LENGTH.key), runId: v.id("usageExportRuns") })
     .output(v.null())
     .action(async ({ args: { key, runId }, ctx }) => {
-        if (await ctx.storage.getMetadata(key)) {
-            await ctx.storage.delete(key);
-        }
-
-        await ctx.runMutation(internal.usage.gdpr.releaseUsageKey, { runId });
+        await purgeObject(ctx.storage, key, async () => await ctx.runMutation(internal.usage.gdpr.releaseUsageKey, { runId }));
 
         return null;
     });
+
+/**
+ * The purge's two steps: the object is deleted, then the run is released. A delete that throws stops here, so the release never runs
+ * for an object still in storage.
+ */
+export const purgeObject = async (
+    storage: { delete: (key: string) => Promise<unknown>; getMetadata: (key: string) => Promise<unknown> },
+    key: string,
+    release: () => Promise<unknown>,
+): Promise<void> => {
+    if (await storage.getMetadata(key)) {
+        await storage.delete(key);
+    }
+
+    await release();
+};
 
 /**
  * Releases a run's record once its object is gone: the key is cleared, and the row removed when no piece and no index row of the run
@@ -284,7 +296,9 @@ export const sweepUsageExportPieces = internalMutation
 
                 const more = pieces.page.length >= limit || fullPieces(projects.page);
 
-                if (run.usageKey !== undefined) {
+                // Scheduled once the run's pieces and index rows are drained, not on every pass that clears some: a run with pieces
+                // left is due again at once, and a purge per pass would queue duplicates while the first one is still running.
+                if (run.usageKey !== undefined && !more) {
                     await schedulePurge(ctx, run);
                 }
 
