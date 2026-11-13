@@ -78,6 +78,20 @@ describe(redactPromptFromEvent, () => {
         expect(JSON.stringify(event)).toContain("model%3Dgpt");
     });
 
+    it("removes sign-up's invitation token, in the address, in a nested return address and with an encoded name", () => {
+        const event = redactPromptFromEvent(
+            pageView({
+                $current_url: "https://app.test/auth/sign-up?invite=tok-secret-1&lang=de",
+                $referrer: `https://app.test/auth/sign-in?redirectTo=${encodeURIComponent("/auth/sign-up?invite=tok-secret-2&lang=de")}`,
+                url: "https://app.test/auth/sign-up?%69nvite=tok-secret-3",
+            }),
+        );
+
+        expect(JSON.stringify(event)).not.toContain("tok-secret");
+        expect(event?.properties.$current_url).toBe("https://app.test/auth/sign-up?invite=redacted&lang=de");
+        expect(event?.properties.$referrer).toContain("lang%3Dde");
+    });
+
     it("removes the text of a nested link whose separator is encoded but whose = is not", () => {
         const event = redactPromptFromEvent(pageView({ $current_url: "https://app.test/auth/sign-in?redirectTo=%2Fchat%3Fprompt=my+secret%26model%3Dgpt" }));
 

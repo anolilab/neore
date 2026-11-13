@@ -1,10 +1,10 @@
 "use client";
 
 import { Trans } from "@lingui/react/macro";
-import { usePostHog } from "posthog-js/react";
 import type { ErrorInfo, ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
+import { captureException } from "@/lib/analytics/posthog-client";
 import { ErrorUtilities } from "@/lib/errors";
 import { UserErrorMessage } from "@/lib/localized-message";
 import { showError } from "@/lib/toast";
@@ -15,13 +15,24 @@ interface GlobalErrorBoundaryProviderProperties {
     children: ReactNode;
 }
 
+/**
+ * How many entries a storage holds, for an error report: never their values (what the person wrote) nor their keys,
+ * which name accounts and chats (`neore-draft:<user>:<chat>`). `undefined` when the storage cannot be read.
+ */
+export const storageSize = (getStorage: () => Storage): number | undefined => {
+    try {
+        return getStorage().length;
+    } catch {
+        return undefined;
+    }
+};
+
 const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderProperties) => {
     const [isOnline, setIsOnline] = useState(true);
     // Identifies the error occurrence for support. Minted when the boundary
     // catches, not while rendering the fallback — `Date.now()` in render would
     // hand out a different id on every re-paint of the same crash.
     const [errorId, setErrorId] = useState<string | null>(null);
-    const posthog = usePostHog();
 
     // Network status for the fallback's note. The banner (`OfflineBanner`) tells a working app it is offline.
     useEffect(() => {
@@ -68,15 +79,13 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
             showError(error);
 
             // Send error to PostHog
-            if (posthog && typeof posthog.captureException === "function") {
-                posthog.captureException(error, {
-                    errorType: "unhandled-promise-rejection",
-                    isOnline,
-                    timestamp: new Date().toISOString(),
-                    url: globalThis.location.href,
-                    userAgent: navigator.userAgent,
-                });
-            }
+            captureException(error, {
+                errorType: "unhandled-promise-rejection",
+                isOnline,
+                timestamp: new Date().toISOString(),
+                url: globalThis.location.href,
+                userAgent: navigator.userAgent,
+            });
 
             // Prevent default browser error handling
             event.preventDefault();
@@ -87,7 +96,7 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
         return () => {
             globalThis.removeEventListener("unhandledrejection", handleUnhandledRejection);
         };
-    }, [posthog, isOnline]);
+    }, [isOnline]);
 
     // Global error handler for JavaScript errors
     useEffect(() => {
@@ -111,18 +120,16 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
             showError(error);
 
             // Send error to PostHog
-            if (posthog && typeof posthog.captureException === "function") {
-                posthog.captureException(error, {
-                    colno: event.colno,
-                    errorType: "javascript-error",
-                    filename: event.filename,
-                    isOnline,
-                    lineno: event.lineno,
-                    timestamp: new Date().toISOString(),
-                    url: globalThis.location.href,
-                    userAgent: navigator.userAgent,
-                });
-            }
+            captureException(error, {
+                colno: event.colno,
+                errorType: "javascript-error",
+                filename: event.filename,
+                isOnline,
+                lineno: event.lineno,
+                timestamp: new Date().toISOString(),
+                url: globalThis.location.href,
+                userAgent: navigator.userAgent,
+            });
         };
 
         globalThis.addEventListener("error", handleError);
@@ -130,43 +137,7 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
         return () => {
             globalThis.removeEventListener("error", handleError);
         };
-    }, [posthog, isOnline]);
-
-    const getLocalStorageSnapshot = useCallback(() => {
-        try {
-            const snapshot: Record<string, string | null> = {};
-
-            for (let index = 0; index < localStorage.length; index += 1) {
-                const key = localStorage.key(index);
-
-                if (key && !key.includes("password") && !key.includes("token")) {
-                    snapshot[key] = localStorage.getItem(key);
-                }
-            }
-
-            return snapshot;
-        } catch {
-            return {};
-        }
-    }, []);
-
-    const getSessionStorageSnapshot = useCallback(() => {
-        try {
-            const snapshot: Record<string, string | null> = {};
-
-            for (let index = 0; index < sessionStorage.length; index += 1) {
-                const key = sessionStorage.key(index);
-
-                if (key && !key.includes("password") && !key.includes("token")) {
-                    snapshot[key] = sessionStorage.getItem(key);
-                }
-            }
-
-            return snapshot;
-        } catch {
-            return {};
-        }
-    }, []);
+    }, [isOnline]);
 
     const handleGlobalError = (error: Error, errorInfo: ErrorInfo) => {
         setErrorId(`global_${Date.now().toString(36)}`);
@@ -178,21 +149,20 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
         console.groupEnd();
 
         // Send comprehensive error report to PostHog
-        if (posthog && typeof posthog.captureException === "function") {
-            posthog.captureException(error, {
-                componentStack: errorInfo.componentStack,
-                context: {
-                    isOnline,
-                    localStorage: getLocalStorageSnapshot(),
-                    sessionStorage: getSessionStorageSnapshot(),
-                    timestamp: new Date().toISOString(),
-                    url: globalThis.location.href,
-                    userAgent: navigator.userAgent,
-                },
-                errorBoundary: "global",
-                errorType: "react-error-boundary",
-            });
-        }
+        captureException(error, {
+            componentStack: errorInfo.componentStack,
+            context: {
+                isOnline,
+                // Counts only: values hold unsent drafts and prompts, and keys name accounts and chats.
+                localStorageSize: storageSize(() => globalThis.localStorage),
+                sessionStorageSize: storageSize(() => globalThis.sessionStorage),
+                timestamp: new Date().toISOString(),
+                url: globalThis.location.href,
+                userAgent: navigator.userAgent,
+            },
+            errorBoundary: "global",
+            errorType: "react-error-boundary",
+        });
     };
 
     const renderGlobalFallback = (error: Error) => {
@@ -277,6 +247,7 @@ const GlobalErrorBoundaryProvider = ({ children }: GlobalErrorBoundaryProviderPr
     return (
         <ErrorBoundary
             fallback={renderGlobalFallback}
+            isReportedByOnError
             onError={handleGlobalError}
             showToast={false} // We handle our own notifications
         >

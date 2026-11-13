@@ -1,74 +1,55 @@
 "use client";
 
 /**
- * Keeps PostHog identity in sync with the Better Auth session.
- *
- * - Calls `posthog.identify()` when the user signs in
- * - Calls `posthog.group("organization", orgId)` when the org changes
- * - Calls `posthog.reset()` when the user signs out
+ * Publishes the Better Auth session's identity for PostHog (`setAnalyticsIdentity`): who is signed in and their
+ * active organization. `posthog-client.ts` applies it, `identify`, `group("organization", …)` and `reset()` on
+ * sign-out, both when PostHog starts (before anything queued is sent) and on every later change.
  */
-import { usePostHog } from "posthog-js/react";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { setAnalyticsIdentity, setIdentityExpected } from "@/lib/analytics/posthog-client";
 
 const usePostHogIdentity = (): void => {
-    const posthog = usePostHog();
     const { hooks } = useAuth();
 
-    const { data: sessionData } = hooks.useSession();
+    // The identity is expected while this publisher is mounted. A crash that unmounts it (the router's error component in
+    // place of the root) lets PostHog start without one, instead of holding every capture for the rest of the page.
+    useEffect(() => {
+        setIdentityExpected(true);
+
+        return () => {
+            setIdentityExpected(false);
+        };
+    }, []);
+
+    const { data: sessionData, isPending: isSessionPending } = hooks.useSession();
     const user = sessionData?.user;
-    const isAnonymous = user?.isAnonymous ?? true;
+    const isSignedIn = Boolean(user && !user.isAnonymous);
 
-    const { data: orgData } = hooks.useActiveOrganization();
-    const activeOrgId = orgData?.id;
-    const activeOrgName = orgData?.name;
+    // Without a session this read is skipped and stays pending; only a signed-in user's organization is read at all, so
+    // a cached one never follows a sign-out onto the anonymous client.
+    const { data: orgData, isPending: isOrgPending } = hooks.useActiveOrganization();
 
-    const previousUserIdRef = useRef<string | null>(null);
-    const previousOrgIdRef = useRef<string | null>(null);
+    const userId = isSignedIn ? user?.id : undefined;
+    const email = user?.email;
+    const name = user?.name;
+    // The user is published as soon as the session knows them; the organization follows when it answers.
+    const isOrganizationPending = userId !== undefined && isOrgPending;
+    const orgId = userId === undefined || isOrganizationPending ? undefined : orgData?.id;
+    const orgName = orgData?.name;
 
-    // Identify / reset user and set super properties
     useEffect(() => {
-        if (!posthog) {
+        if (isSessionPending) {
             return;
         }
 
-        // Register is_anonymous as a super property so it's attached to every event
-        posthog.register({ is_anonymous: isAnonymous });
-
-        const userId = user?.id ?? null;
-        const wasIdentified = previousUserIdRef.current;
-
-        // User signed in (or anonymous → authenticated)
-        if (userId && !isAnonymous && wasIdentified !== userId) {
-            posthog.identify(userId, {
-                email: user?.email,
-                name: user?.name,
-            });
-        }
-
-        // User signed out (was identified, now is not)
-        if (wasIdentified && (!userId || isAnonymous)) {
-            posthog.reset();
-        }
-
-        previousUserIdRef.current = isAnonymous ? null : userId;
-    }, [posthog, user?.id, user?.email, user?.name, isAnonymous]);
-
-    // Set organization group
-    useEffect(() => {
-        if (!posthog) {
-            return;
-        }
-
-        if (activeOrgId && activeOrgId !== previousOrgIdRef.current) {
-            posthog.group("organization", activeOrgId, {
-                name: activeOrgName,
-            });
-        }
-
-        previousOrgIdRef.current = activeOrgId ?? null;
-    }, [posthog, activeOrgId, activeOrgName]);
+        setAnalyticsIdentity({
+            isOrganizationPending,
+            organization: orgId ? { id: orgId, name: orgName } : undefined,
+            user: userId ? { email, id: userId, name } : undefined,
+        });
+    }, [isSessionPending, isOrganizationPending, userId, email, name, orgId, orgName]);
 };
 
 export default usePostHogIdentity;
