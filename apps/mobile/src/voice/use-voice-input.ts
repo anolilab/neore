@@ -321,6 +321,9 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
 
             try {
                 await recorder.prepareToRecordAsync();
+                // Read before any release below: a released recorder may no longer say where its file is, and the file
+                // must be deleted either way.
+                clipUri.current = recorder.uri ?? undefined;
             } finally {
                 isPreparing.current = false;
 
@@ -329,8 +332,6 @@ export const useVoiceInput = ({ onText }: { onText: (text: string) => void }) =>
                     recorders.release();
                 }
             }
-
-            clipUri.current = recorder.uri ?? undefined;
 
             // Released while the recorder was starting (or while the first permission prompt was up): nothing to record.
             if (!isHeld.current || !isMounted.current) {

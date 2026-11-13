@@ -20,6 +20,8 @@ const deferred = <T>() => {
 const native = vi.hoisted(() => {
     return {
         created: 0,
+        /** The clip files deleted, by path. */
+        deleted: [] as string[],
         prepare: undefined as Promise<void> | undefined,
         released: 0,
     };
@@ -44,16 +46,26 @@ vi.mock(import("expo-audio"), () => {
     const AudioRecorder = function AudioRecorder() {
         native.created += 1;
 
+        let isReleased = false;
+
         return {
             prepareToRecordAsync: async () => {
                 await native.prepare;
             },
             record: () => {},
             release: () => {
+                isReleased = true;
                 native.released += 1;
             },
             stop: async () => {},
-            uri: "file:///clip.m4a",
+            // A released native object can refuse to answer: this one throws, as the worst case.
+            get uri() {
+                if (isReleased) {
+                    throw new Error("The recorder was released.");
+                }
+
+                return "file:///clip.m4a";
+            },
         };
     };
 
@@ -71,8 +83,13 @@ vi.mock(import("expo-audio/build/utils/options"), () => ({ createRecordingOption
 // eslint-disable-next-line no-restricted-syntax -- the file system is a native module; no clip is written here
 vi.mock(import("expo-file-system"), () => {
     // Called with `new` by the hook, like the recorder above.
-    const File = function File() {
-        return { delete: () => {}, exists: false };
+    const File = function File(uri: string) {
+        return {
+            delete: () => {
+                native.deleted.push(uri);
+            },
+            exists: true,
+        };
     };
 
     return { File } as never;
@@ -111,6 +128,7 @@ describe(useVoiceInput, () => {
     beforeEach(() => {
         native.created = 0;
         native.released = 0;
+        native.deleted = [];
         native.prepare = undefined;
         vi.clearAllMocks();
         // React reads this to allow `act` outside a testing library.
@@ -173,6 +191,25 @@ describe(useVoiceInput, () => {
 
         expect(native.released).toBe(1);
         expect(audio.setAudioModeAsync.mock.calls.at(-1)?.[0].allowsRecording).toBe(false);
+    });
+
+    it("deletes the clip of a press whose screen went mid-prepare, though the released recorder no longer answers", async () => {
+        const preparing = deferred<undefined>();
+
+        native.prepare = preparing.promise;
+        mount();
+
+        const pressing = hook.start?.();
+
+        await vi.waitFor(() => {
+            expect(native.created).toBe(1);
+        });
+        unmount();
+        preparing.resolve(undefined);
+        await pressing;
+
+        expect(native.released).toBe(1);
+        expect(native.deleted).toStrictEqual(["file:///clip.m4a"]);
     });
 
     it("releases the recorder of a screen that goes after it was made, as before", async () => {
