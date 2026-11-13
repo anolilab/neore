@@ -20,8 +20,8 @@
   signs out and empties the cache. Live queries wait for a JWT. A project subscription also counts as answered when the
   client's `onSyncStatus` says its own query's subscriptions are acked (`ownSyncState`, from `debug().subscriptions`;
   the aggregate `synced` only over polling) after registering (a reconnect's `resume` frame calls no rows callback). That
-  report waits a microtask: Lunora reports a refused subscription `synced` before its error callback, so an error in
-  between drops it, and a refused subscription counts no `synced` until its rows arrive. A 401/403 mint clears the stored
+  report waits a microtask and counts only while it is still the latest report (a drop in between voids it): Lunora
+  reports a refused subscription `synced` before its error callback, so an error in between drops it, and a refused subscription counts no `synced` until its rows arrive. A 401/403 mint clears the stored
   grant only while it still holds the grant that mint sent (a new sign-in's grant survives an old mint's refusal); every
   grant read, write and clear goes through one queue (`serializeGrantStore`), so that check-and-clear is atomic.
   **Stamps and races:** a read stamps its rows with the moment it STARTED (`syncedAt`), and only the newest read of a
@@ -49,8 +49,8 @@
   - Sign-out stops every send still retrying (`sendSessions`) and drops its prompt and held id; sends and kept prompts
     stay closed until the next sign-in (a send begun mid-teardown is stopped at once, and nothing is kept).
   - A prompt given back after its chat screen unmounted waits in `unsentPrompts`, one entry per prompt with its own held id
-    (per account and chat). A mounted screen of that chat takes them one at a time, only while it holds no send and none
-    is going (`watch`); the next is offered when a send ends.
+    (per account and chat). A mounted screen of that chat takes them one at a time, only into an empty composer with no
+    send going, never merged into what is there (`takeUnsentPrompt`); the next is offered when the composer empties.
   - A start with `streaming: false` (no `streamToken`) follows no stream: the chat's saved reply is read instead.
   - Match codes lower-cased: the gateway passes `/chat/start`'s SCREAMING_CASE, the public API uses snake_case.
   - Nothing is held and polled for: the resend is idempotent.

@@ -1,6 +1,4 @@
 import type { HeldSend } from "./start-send";
-import { holdFor } from "./start-send";
-import { giveBackDraft } from "./unsent-send";
 
 /** A prompt given back after its chat screen was gone, with the send it holds (`null` when its id was dropped). */
 export interface UnsentPrompt {
@@ -128,7 +126,7 @@ export const giveBackOrKeep = ({
 
 /**
  * For as long as a chat screen is mounted: the prompts kept while it was gone, and any kept later (a send the person left
- * that settles after they came back), offered one at a time (`didTake` takes one only while the screen holds no send).
+ * that settles after they came back), offered one at a time (`didTake` takes one only into an empty composer, `takeUnsentPrompt`).
  * `offer` offers again once the screen can take one; `stop` is for its unmount.
  */
 export const followUnsentPrompts = ({
@@ -142,12 +140,18 @@ export const followUnsentPrompts = ({
 }): { offer: () => void; stop: () => void } => store.watch(key, didTake);
 
 /**
- * A chat screen's composer and hold after it takes a kept prompt (only while it holds no send of its own): the prompt
- * goes back as any failed send's does, ahead of what is typed, with its own held send (`holdFor` records the app's merge).
+ * Whether a chat screen takes a kept prompt now, and its composer and hold if it does. Only into an empty composer with
+ * no send going: the prompt becomes the draft as it is, with its own held send (or none), and is never merged into text
+ * already there, which may be another prompt given back (held or not) or the person's own. The next is offered when the
+ * composer is empty again (sent, or cleared).
  */
-export const withUnsentPrompt = (draft: string, entry: UnsentPrompt): { draft: string; held: HeldSend | null } => {
-    const given = giveBackDraft(draft, entry.prompt);
+export const takeUnsentPrompt = (
+    { draft, isSending }: { draft: string; isSending: boolean },
+    entry: UnsentPrompt,
+): { draft: string; held: HeldSend | null } | undefined => {
+    if (isSending || draft.trim() !== "") {
+        return undefined;
+    }
 
-    // eslint-disable-next-line unicorn/no-null -- a hold is `HeldSend | null` across the screen and `planSend`
-    return { draft: given.draft, held: entry.held ? holdFor(entry.held, given.draft) : null };
+    return { draft: entry.prompt, held: entry.held };
 };

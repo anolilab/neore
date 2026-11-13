@@ -2,22 +2,29 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createSendSessions } from "./send-sessions";
 import type { HeldSend } from "./start-send";
-import { GIVE_BACK_SEPARATOR, planSend } from "./start-send";
+import { planSend } from "./start-send";
 import type { UnsentPrompt } from "./unsent-prompts";
-import { createUnsentPrompts, followUnsentPrompts, giveBackOrKeep, unsentPromptKey, withUnsentPrompt } from "./unsent-prompts";
+import { createUnsentPrompts, followUnsentPrompts, giveBackOrKeep, takeUnsentPrompt, unsentPromptKey } from "./unsent-prompts";
 
 const HELD = { held: { clientMessageId: "first-id", prompt: "hello" }, prompt: "hello" };
 const SECOND = { held: { clientMessageId: "second-id", prompt: "and more" }, prompt: "and more" };
 
-/** A chat screen as `followUnsentPrompts` sees it: its composer and its one hold, taking a prompt only while it holds none. */
+/**
+ * A chat screen as `followUnsentPrompts` sees it: its composer and its one hold, taking a kept prompt only into an empty
+ * composer (`takeUnsentPrompt`), and offered the next one whenever its composer empties, as the screen's `setDraft` does.
+ */
 const fakeScreen = () => {
     const screen = {
+        /** Wires the re-offer the screen's effect stores (`offerUnsent`). */
+        bindOffer: (offer: () => void) => {
+            screen.offer = offer;
+        },
         didTake: (entry: UnsentPrompt): boolean => {
-            if (screen.held !== null) {
+            const next = takeUnsentPrompt({ draft: screen.draft, isSending: false }, entry);
+
+            if (next === undefined) {
                 return false;
             }
-
-            const next = withUnsentPrompt(screen.draft, entry);
 
             screen.draft = next.draft;
             screen.held = next.held;
@@ -26,18 +33,36 @@ const fakeScreen = () => {
         },
         draft: "",
         held: null as HeldSend | null,
+        offer: () => {},
         /** A press of Send that goes through: it uses the hold, and what `planSend` left stays in the composer. */
         send: () => {
             const plan = planSend(screen.held, screen.draft);
 
             screen.held = null;
-            screen.draft = plan.rest;
+            screen.setDraft(plan.rest);
 
             return plan;
+        },
+        /** The person edits the composer; emptied, it is offered the next kept prompt. */
+        setDraft: (draft: string) => {
+            screen.draft = draft;
+
+            if (draft.trim() === "") {
+                screen.offer();
+            }
         },
     };
 
     return screen;
+};
+
+/** Mounts `screen` on `key`, wiring its re-offer as the screen's effect does. */
+const mount = (screen: ReturnType<typeof fakeScreen>, key: string, store: ReturnType<typeof createUnsentPrompts>) => {
+    const follow = followUnsentPrompts({ didTake: screen.didTake, key, store });
+
+    screen.bindOffer(follow.offer);
+
+    return follow;
 };
 
 describe("a prompt given back after its chat screen unmounted", () => {
@@ -122,19 +147,51 @@ describe("two prompts given back for the same chat", () => {
         giveBackOrKeep({ apply: vi.fn(), entry: SECOND, isMounted: false, key, store });
 
         const screen = fakeScreen();
-        const follow = followUnsentPrompts({ didTake: screen.didTake, key, store });
+        const follow = mount(screen, key, store);
 
-        // The first, with its hold; the second waits while the screen holds a send.
+        // The first, with its hold; the second waits while the composer holds the first.
         expect(screen).toMatchObject({ draft: "hello", held: HELD.held });
+        // Sent, the composer empties and the next comes in, under its own id.
         expect(screen.send()).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "" });
-
-        // The send ended: the screen takes the next one, under its own id.
-        follow.offer();
         expect(screen).toMatchObject({ draft: "and more", held: SECOND.held });
         expect(screen.send()).toStrictEqual({ heldId: "second-id", prompt: "and more", rest: "" });
-
-        follow.offer();
         expect(screen.draft).toBe("");
+        follow.stop();
+    });
+
+    it("never merges the next one into a refused prompt without a hold that sits in the composer", () => {
+        const store = createUnsentPrompts();
+        const key = unsentPromptKey("user-a", "thread-1");
+
+        store.keep(key, { held: null, prompt: "refused" });
+        store.keep(key, SECOND);
+
+        const screen = fakeScreen();
+        const follow = mount(screen, key, store);
+
+        expect(screen).toMatchObject({ draft: "refused", held: null });
+
+        // Offered again (a send ended elsewhere): the composer still holds the refused prompt, so the next waits.
+        follow.offer();
+        expect(screen).toMatchObject({ draft: "refused", held: null });
+        expect(store.take(key)).toStrictEqual(SECOND);
+        follow.stop();
+    });
+
+    it("offers the next one when the person clears the composer holding the first", () => {
+        const store = createUnsentPrompts();
+        const key = unsentPromptKey("user-a", "thread-1");
+
+        store.keep(key, HELD);
+        store.keep(key, SECOND);
+
+        const screen = fakeScreen();
+        const follow = mount(screen, key, store);
+
+        expect(screen.draft).toBe("hello");
+
+        screen.setDraft("");
+        expect(screen).toMatchObject({ draft: "and more", held: SECOND.held });
         follow.stop();
     });
 
@@ -189,13 +246,11 @@ describe("a sign-out with a send still going", () => {
     });
 });
 
-describe(withUnsentPrompt, () => {
-    it("puts a kept prompt back ahead of what is typed, with its own held send and the app's merge recorded", () => {
-        expect(withUnsentPrompt("", HELD)).toStrictEqual({ draft: "hello", held: HELD.held });
-
-        const merged = withUnsentPrompt("typed since", HELD);
-
-        expect(merged.draft).toBe(`hello${GIVE_BACK_SEPARATOR}typed since`);
-        expect(planSend(merged.held, merged.draft)).toStrictEqual({ heldId: "first-id", prompt: "hello", rest: "typed since" });
+describe(takeUnsentPrompt, () => {
+    it("takes a kept prompt only into an empty composer with no send going, as it is, with its own hold", () => {
+        expect(takeUnsentPrompt({ draft: "", isSending: false }, HELD)).toStrictEqual({ draft: "hello", held: HELD.held });
+        expect(takeUnsentPrompt({ draft: "  \n", isSending: false }, { held: null, prompt: "refused" })).toStrictEqual({ draft: "refused", held: null });
+        expect(takeUnsentPrompt({ draft: "typed since", isSending: false }, HELD)).toBeUndefined();
+        expect(takeUnsentPrompt({ draft: "", isSending: true }, HELD)).toBeUndefined();
     });
 });

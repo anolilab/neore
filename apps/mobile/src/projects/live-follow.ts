@@ -64,7 +64,8 @@ export const liveFor = <T>(state: Scoped<T>, scope: string | undefined): Live<T>
  * stood (a held or cached value counts as unanswered there, and nothing was asked since), so it is not. A refusal is
  * reported `synced` too: the client marks the subscription answered (`markQueryRejected`, which emits the sync status)
  * BEFORE it calls the error callback (`failSubscription`), in one call. So a `synced` report waits a microtask and is
- * dropped when the error came in between, and a refused subscription counts no `synced` until its rows arrive again.
+ * dropped when the error came in between, and a refused subscription counts no `synced` until its rows arrive again. It
+ * is dropped as well when any later report came before it ran (the connection dropped, say): only the latest counts.
  */
 export const followLive = <T>(
     scope: string,
@@ -94,17 +95,20 @@ export const followLive = <T>(
     );
 
     let isRegistering = true;
-    let isReportPending = false;
+    // Reports so far: only the latest one's check may report, so one followed by a drop (or by anything) never lands.
+    let reports = 0;
     const stopSync = watchSync?.((status) => {
-        if (isRegistering || isReportPending || !status.synced) {
+        reports += 1;
+
+        if (isRegistering || !status.synced) {
             return;
         }
 
-        isReportPending = true;
-        queueMicrotask(() => {
-            isReportPending = false;
+        const report = reports;
 
-            if (!isRefused && !isStopped) {
+        queueMicrotask(() => {
+            // Still the latest report (no drop or other report since), no refusal and no unsubscribe: the read was answered.
+            if (report === reports && !isRefused && !isStopped) {
                 onAnswered();
             }
         });

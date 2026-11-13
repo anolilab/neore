@@ -171,6 +171,38 @@ describe("followLive", () => {
         expect(answered).toBe(1);
     });
 
+    it("reports nothing when the connection drops before a synced report's turn comes", async () => {
+        let answered = 0;
+        let report: ((status: SyncState) => void) | undefined;
+
+        followLive(
+            "a:projects",
+            fakeWatch().watch,
+            recorder().publish,
+            () => {
+                answered += 1;
+            },
+            (listener) => {
+                report = listener;
+
+                return () => {};
+            },
+        );
+
+        report?.({ synced: true });
+        // The connection drops before the deferred report runs.
+        report?.({ synced: false });
+        await Promise.resolve();
+        expect(answered).toBe(0);
+
+        // A drop and a return in one turn: the report from before the drop does not count, the answer after it does, once.
+        report?.({ synced: true });
+        report?.({ synced: false });
+        report?.({ synced: true });
+        await Promise.resolve();
+        expect(answered).toBe(1);
+    });
+
     it("drops the rows when the subscription fails", () => {
         const fake = fakeWatch();
         const seen = recorder();

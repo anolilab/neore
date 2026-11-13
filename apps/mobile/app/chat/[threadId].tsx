@@ -21,7 +21,7 @@ import { shareableMessageText, shareLabel } from "@/chat/share-message";
 import type { HeldSend } from "@/chat/start-send";
 import { holdFor, planSend, replyStreamOf, startWithRetries } from "@/chat/start-send";
 import { relayReply } from "@/chat/stream";
-import { followUnsentPrompts, giveBackOrKeep, unsentPromptKey, unsentPrompts, withUnsentPrompt } from "@/chat/unsent-prompts";
+import { followUnsentPrompts, giveBackOrKeep, takeUnsentPrompt, unsentPromptKey, unsentPrompts } from "@/chat/unsent-prompts";
 import type { SendStage } from "@/chat/unsent-send";
 import { failedSendMessage, failedSendOutcome, giveBackDraft, shouldKeepClientMessageId, withoutUnsentRows } from "@/chat/unsent-send";
 import { useReplyConfirmation } from "@/chat/use-reply-confirmation";
@@ -180,17 +180,22 @@ const Chat = () => {
     // The composer as the last write left it, like `rowsRef`: a failed send decides whether its prompt lands alone or ahead
     // of text typed meanwhile against the composer as it is, not as it was when the send started.
     const draftRef = useRef("");
+    // `sending` as the last write left it, read where a kept prompt is offered outside a render (`followUnsentPrompts`).
+    const sendingRef = useRef(false);
+    // Offers this chat's kept prompts again once the screen can take one: its composer is empty and no send is going.
+    const offerUnsent = useRef<() => void>(() => {});
     const setDraft = useCallback((update: string | ((current: string) => string)) => {
         const next = typeof update === "function" ? update(draftRef.current) : update;
 
         draftRef.current = next;
         setDraftState(next);
+
+        // Emptied (sent, or cleared by the person): the next kept prompt, if any, may come in now.
+        if (next.trim() === "") {
+            offerUnsent.current();
+        }
     }, []);
     const [sending, setSending] = useState(false);
-    // `sending` as the last write left it, read where a kept prompt is offered outside a render (`followUnsentPrompts`).
-    const sendingRef = useRef(false);
-    // Offers this chat's kept prompts again once the screen can take one (its send ended, its hold was used).
-    const offerUnsent = useRef<() => void>(() => {});
     const [error, setError] = useState<string | null>(null);
     // The words land in the draft, after anything typed meanwhile; they are never sent on their own.
     const voice = useDictation({ onText: (text) => setDraft((current) => appendTranscript(current, text)) });
@@ -484,8 +489,9 @@ const Chat = () => {
 
     // Prompts given back while this chat's screen was gone come back into the composer, each with its own held send: those
     // kept before this mount at once, and one kept while it is mounted (a send left during its token mint that settles
-    // after the person came back) when it lands. One at a time, taken only while the screen holds no send and none is
-    // going, so `planSend` resends each under its own id; the next is offered when a send ends.
+    // after the person came back) when it lands. One at a time, taken only into an empty composer with no send going, so
+    // `planSend` resends each under its own id and none is merged into another; the next is offered when the composer is
+    // empty again (sent, or cleared) and when a send ends.
     useEffect(() => {
         if (accountId === undefined) {
             return undefined;
@@ -493,11 +499,12 @@ const Chat = () => {
 
         const follow = followUnsentPrompts({
             didTake: (entry) => {
-                if (heldSend.current !== null || sendingRef.current) {
+                // Only into an empty composer with no send going, never merged into what is there (`takeUnsentPrompt`).
+                const next = takeUnsentPrompt({ draft: draftRef.current, isSending: sendingRef.current }, entry);
+
+                if (next === undefined) {
                     return false;
                 }
-
-                const next = withUnsentPrompt(draftRef.current, entry);
 
                 setDraft(next.draft);
                 heldSend.current = next.held;
