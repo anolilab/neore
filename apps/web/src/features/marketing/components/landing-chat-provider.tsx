@@ -95,7 +95,10 @@ const LandingChatProvider = ({ children }: LandingChatProviderProps) => {
             lunora,
             regenerate: noop,
             reloadMessage: noop,
-            sendMessage: noop,
+            // The landing page sends nothing: nothing started.
+            sendMessage: async () => {
+                return { refused: false, started: false };
+            },
         };
     }, [lunora]);
 

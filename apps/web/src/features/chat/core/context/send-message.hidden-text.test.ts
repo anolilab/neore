@@ -33,7 +33,7 @@ const localEnv = (sendLocalTurn: ReturnType<typeof vi.fn>): SendMessageEnv =>
         setOptimisticMessages: vi.fn(),
         startTurn: () => 1,
         streamingMessageRef: { current: null },
-        texts: { bannedContent: () => "", localTextOnly: () => "", sessionNotReady: () => "" },
+        texts: { bannedContent: () => "", guestNoteNotLocal: () => "", localTextOnly: () => "", sessionNotReady: () => "" },
         threadDataRef: { current: null },
         threadId: undefined,
         turnRef: { current: 0 },
