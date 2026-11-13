@@ -21,6 +21,8 @@ const harness = vi.hoisted(() => {
         actions: {} as Record<string, unknown>,
         ActionsContext: undefined as Context<Record<string, unknown>> | undefined,
         contentRenders: new Map<string, number>(),
+        /** Renders the list inside the real shortcut manager and the thread's find bar. */
+        withFind: false,
         activeStreamId: null as string | null,
         goal: null as unknown,
         /** Gives the scroller a layout; jsdom has none. */
@@ -165,8 +167,42 @@ vi.mock("./fork-branch-dialog", () => {
     return { default: () => null };
 });
 
+// The shortcut chain the thread's find answers to: bindings as a user has them, a router it does not use here.
+vi.mock("@/features/layout/hooks/use-ui-state", () => {
+    return {
+        useKeyboardShortcuts: () => {
+            return { keyboardShortcuts: { findInThread: "ctrl+f" }, resetKeyboardShortcuts: () => {}, setKeyboardShortcuts: () => {} };
+        },
+    };
+});
+
+vi.mock("@/features/keyboard/components/keyboard-shortcuts-sheet", () => {
+    return { default: () => null };
+});
+
+vi.mock("@tanstack/react-router", () => {
+    return { useNavigate: () => () => {} };
+});
+
 // Imported after the mocks.
 const { default: MessageList, scrollToMessage } = await import("./message-list");
+const { KeyboardShortcutsManager } = await import("@/features/keyboard/components/keyboard-shortcuts-manager");
+const { default: useKeyboardShortcutHandler } = await import("@/features/keyboard/hooks/use-keyboard-shortcut-handler");
+const { default: ThreadFindBar } = await import("./find/thread-find-bar");
+
+/** What `_shortcut.tsx` and `thread.tsx` wrap an open thread in: the app's shortcuts, and the find bar on the thread host. */
+const FindShell = ({ children }: { children: ReactNode }): ReactNode => {
+    const handleShortcut = useKeyboardShortcutHandler();
+
+    return (
+        <KeyboardShortcutsManager onShortcut={handleShortcut}>
+            <div data-find-in-thread-host="">
+                <ThreadFindBar />
+                {children}
+            </div>
+        </KeyboardShortcutsManager>
+    );
+};
 
 const THREAD_LENGTH = 200;
 
@@ -199,7 +235,7 @@ const Host = (): ReactNode => {
     }, []);
 
     // The scroller ThreadViewport renders around the list; the virtualized head finds it by this slot.
-    return (
+    const list = (
         <div
             data-slot="scroll-area-viewport"
             ref={(element) => {
@@ -215,6 +251,8 @@ const Host = (): ReactNode => {
             </MessagesContext>
         </div>
     );
+
+    return harness.withFind ? <FindShell>{list}</FindShell> : list;
 };
 
 const mountInto = () => {
@@ -454,14 +492,17 @@ class InertResizeObserver {
 
 /** A Cmd/Ctrl+F keydown, as it reaches the document. */
 const pressFind = (): void => {
+    const target = document.activeElement ?? document.body;
+
     act(() => {
-        document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ctrlKey: true, key: "f" }));
+        target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, code: "KeyF", ctrlKey: true, key: "f" }));
     });
 };
 
 const focusedMessageId = (): string | undefined => (document.activeElement as HTMLElement | null)?.dataset.listMessageId;
 
-describe("a long thread", () => {
+// Several cases mount the whole thread from cold; see RENDER_TEST_TIMEOUT_MS.
+describe("a long thread", { timeout: RENDER_TEST_TIMEOUT_MS }, () => {
     const VIEWPORT_HEIGHT = 800;
     const ROW_HEIGHT = 100;
     // How many frames late the scroller reports a programmatic scroll (a slow layout under load).
@@ -519,6 +560,7 @@ describe("a long thread", () => {
         harness.activeStreamId = null;
         harness.layoutViewport = undefined;
         harness.loadMore = () => {};
+        harness.withFind = false;
         scrollReportDelayFrames = 0;
         vi.unstubAllGlobals();
         vi.restoreAllMocks();
@@ -573,17 +615,45 @@ describe("a long thread", () => {
         await vi.waitFor(() => expect(focusedMessageId()).toBe("m100"), { timeout: 5000 });
     });
 
-    it("stays virtualized when the thread's own find takes Cmd/Ctrl+F", () => {
+    it("opens the thread's own find on Cmd/Ctrl+F and stays virtualized", async () => {
+        harness.withFind = true;
         mountInto();
 
-        // The find-in-thread shortcut handles the chord on the document and keeps it from the browser.
-        const takeChord = (event: KeyboardEvent) => event.preventDefault();
+        expect(screen.queryByRole("search", { name: "Find in thread" })).toBeNull();
 
-        document.addEventListener("keydown", takeChord);
         pressFind();
-        document.removeEventListener("keydown", takeChord);
 
+        expect(await screen.findByRole("search", { name: "Find in thread" })).toBeTruthy();
         expect(mountedIds().length).toBeLessThan(THREAD_LENGTH / 2);
+    });
+
+    it("lands on the newest of two quick jumps, and the older one's pending reveal stops", async () => {
+        // The first target is in the virtualized head and mounts late; the second is in the tail and is revealed at once.
+        scrollReportDelayFrames = 8;
+        mountInto();
+
+        const revealed = vi.mocked(Element.prototype.scrollIntoView);
+
+        act(() => scrollToMessage("m100"));
+        // The first jump has scrolled the virtualizer towards its row; the row has not mounted yet.
+        await vi.waitFor(() => expect(document.querySelector('[data-slot="scroll-area-viewport"]')?.scrollTop).toBeGreaterThan(0));
+        expect(mountedIds()).not.toContain("m100");
+
+        act(() => scrollToMessage(`m${THREAD_LENGTH - 5}`));
+
+        await vi.waitFor(() => expect(focusedMessageId()).toBe(`m${THREAD_LENGTH - 5}`), { timeout: 5000 });
+
+        // Long enough for the first target's row to mount and its retries to run out.
+        await act(
+            () =>
+                new Promise<void>((resolve) => {
+                    setTimeout(resolve, 1000);
+                }),
+        );
+
+        expect(mountedIds()).toContain("m100");
+        expect(focusedMessageId()).toBe(`m${THREAD_LENGTH - 5}`);
+        expect(revealed.mock.contexts.some((element) => (element as HTMLElement).dataset.listMessageId === "m100")).toBe(false);
     });
 
     it("mounts every message once Cmd/Ctrl+F reaches the browser's find", () => {

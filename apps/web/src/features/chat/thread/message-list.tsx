@@ -255,6 +255,16 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
         virtualizerRef.current = virtualizer;
     }, []);
 
+    // Each jump's generation: a newer jump, or unmounting, retires an older one's pending reveal so it cannot take focus later.
+    const jumpGenerationRef = useRef(0);
+
+    useEffect(
+        () => () => {
+            jumpGenerationRef.current += 1;
+        },
+        [],
+    );
+
     const jumpTo = useCallback((requestedId: string, position?: MessagePosition, focus = true): boolean => {
         const { messages: currentMessages, plan: currentPlan } = jumpStateRef.current;
         const messageId = resolveJumpMessageId(currentMessages, requestedId, position);
@@ -272,6 +282,9 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
         if (target.kind === "missing") {
             return false;
         }
+
+        jumpGenerationRef.current += 1;
+        const generation = jumpGenerationRef.current;
 
         // Whether the row was in the DOM to reveal.
         const reveal = (): boolean => {
@@ -306,6 +319,10 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
 
             let framesLeft = HEAD_REVEAL_FRAMES;
             const revealWhenMounted = () => {
+                if (jumpGenerationRef.current !== generation) {
+                    return;
+                }
+
                 framesLeft -= 1;
 
                 if (!reveal() && framesLeft > 0) {
@@ -334,6 +351,8 @@ const MessageList: FC<MessageListProps> = memo(({ className, editComposerCompone
     });
 
     const requestJump = useCallback(({ focus, messageId, position, threadId: targetThreadId }: ScrollToMessageDetail) => {
+        // A request retires the reveal an earlier jump still has pending, even before its own target loads.
+        jumpGenerationRef.current += 1;
         pendingJumpRef.current = { focus, messageId, pagesLoaded: 0, position, threadId: targetThreadId };
         setJumpRequest((value) => value + 1);
     }, []);
