@@ -283,3 +283,44 @@ describe("gfm review cases, fifth round", () => {
         expect(service.turndown(`<table><tr><th>A</th></tr><tr><td><pre>a<br class="gone">b</pre></td></tr></table>`)).toBe("| A |\n| --- |\n| `ab` |");
     });
 });
+
+describe("gfm review cases, sixth round", () => {
+    it("ends a group of loose rows at a row group a remove filter drops", () => {
+        // Rows straight in a table exist only in a DOM built by script: the HTML parser wraps them in a row group.
+        const document = createDocument("");
+        const table = document.createElement("table");
+        const row = (cells: string): Element => {
+            const element = document.createElement("tr");
+
+            element.innerHTML = cells;
+
+            return element;
+        };
+        const gone = document.createElement("tbody");
+
+        gone.setAttribute("class", "gone");
+        /* eslint-disable unicorn/prefer-dom-node-append -- domino, the test parser, has no Element#append. */
+        table.appendChild(row("<th>A</th><th>B</th>"));
+        table.appendChild(row(`<td rowspan="0">a</td><td>b</td>`));
+        table.appendChild(gone);
+        table.appendChild(row("<td>c</td><td>d</td>"));
+        document.body.appendChild(table);
+        /* eslint-enable unicorn/prefer-dom-node-append */
+
+        const service = new TurndownService().use(gfm);
+
+        service.remove((node) => node.getAttribute("class") === "gone");
+
+        expect(service.turndown(document.body)).toBe("| A | B |\n| --- | --- |\n| a | b |\n| c | d |");
+    });
+
+    it("reads a span with a non-breaking space before its digits as no span, as HTML does", () => {
+        expect(convert(`<table><tr><th colspan="\u{A0}2">a</th><th>b</th></tr><tr><td>1</td><td>2</td></tr></table>`)).toBe(
+            "| a | b |\n| --- | --- |\n| 1 | 2 |",
+        );
+    });
+
+    it("keeps a private-use character an item's own text holds", () => {
+        expect(convert("<table><tr><th>A</th></tr><tr><td><ul><li>a\u{F8FE}b</li></ul></td></tr></table>")).toBe("| A |\n| --- |\n| a\u{F8FE}b |");
+    });
+});

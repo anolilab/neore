@@ -14,7 +14,8 @@ const MAX_TABLE_CELLS = 100_000;
 const ROW_GROUPS = new Set(["TBODY", "TFOOT", "THEAD"]);
 const CELLS = new Set(["TD", "TH"]);
 // The leading digits of a span attribute, as HTML reads it: `2abc` is 2.
-const LEADING_DIGITS = /^\s*(\d+)/;
+// HTML skips only ASCII whitespace before the digits, so a non-breaking space makes the value invalid.
+const LEADING_DIGITS = /^[\t\n\f\r ]*(\d+)/;
 const PIPE = /\|/g;
 const HEADINGS = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
 const LISTS = new Set(["OL", "UL"]);
@@ -129,6 +130,11 @@ function sectionsOf(table: Element, lookup: RuleLookup): Sections {
 
     for (const child of childElements(table)) {
         if (isRemoved(child, lookup)) {
+            // A row group ends the loose rows before it, even when it is removed.
+            if (ROW_GROUPS.has(child.nodeName)) {
+                loose = undefined;
+            }
+
             continue;
         }
 
@@ -228,8 +234,24 @@ function grid(rows: ReadonlyArray<Row>, lookup: RuleLookup): { lines: string[][]
 }
 
 const ITEM_SEPARATOR = "; ";
-// Written by a list nested in an item, in place of the separator, so the item can tell its own text from it.
-const NESTED_LIST_MARK = "\u{F8FE}";
+
+/** The lists nested in a cell's list item that wrote items, so the separator before them. */
+const listsWithItems = new WeakSet<Node>();
+
+/** True when the item's first content is a nested list that wrote items: no text comes before its separator. */
+function isOpenedByWrittenList(item: Element): boolean {
+    for (let child = item.firstChild; child; child = child.nextSibling) {
+        if (child.nodeType === 1) {
+            return listsWithItems.has(child);
+        }
+
+        if (child.nodeType === 3 && (child.nodeValue ?? "").trim() !== "") {
+            return false;
+        }
+    }
+
+    return false;
+}
 
 /** True when a list item that a remove filter keeps follows this one. */
 function hasNextItem(item: Element, lookup: RuleLookup): boolean {
@@ -353,7 +375,13 @@ const tableRules: Record<string, Rule> = {
             const items = content.trim();
 
             if (node.parentNode?.nodeName === "LI") {
-                return items === "" ? "" : `${NESTED_LIST_MARK}${items} `;
+                if (items === "") {
+                    return "";
+                }
+
+                listsWithItems.add(node);
+
+                return `${ITEM_SEPARATOR}${items} `;
             }
 
             return ` ${items} `;
@@ -364,12 +392,9 @@ const tableRules: Record<string, Rule> = {
         filter: (node, _options, lookup) => node.nodeName === "LI" && cellOf(node) !== null && !lookup.isRemoved(node),
         replacement(content, node, _options, lookup) {
             const text = oneLine(content);
-            // A nested list that opens the item has no item text to keep apart from, so its mark is dropped. Every other
-            // mark a nested list wrote becomes the separator; text of the item's own, a semicolon too, stays as it is.
-            const own = (text.startsWith(NESTED_LIST_MARK) ? text.slice(NESTED_LIST_MARK.length).trim() : text).replaceAll(
-                NESTED_LIST_MARK,
-                () => ITEM_SEPARATOR,
-            );
+            // A nested list that opens the item and wrote items has no item text before it to keep apart from, so its
+            // separator is taken off. Text of the item's own, a semicolon too, stays as it is.
+            const own = isOpenedByWrittenList(node) ? text.slice(ITEM_SEPARATOR.trim().length).trim() : text;
 
             return `${own}${hasNextItem(node, lookup) ? ITEM_SEPARATOR : ""}`;
         },
