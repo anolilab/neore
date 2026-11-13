@@ -12,8 +12,9 @@ export default class Rules implements RuleLookup {
 
     private readonly removeList: Rule[] = [];
 
-    // The rule each node was given, or undefined when none matched. Keyed by node, so it lives with the parsed document.
-    private readonly decided = new WeakMap<Node, Rule | undefined>();
+    // The rule each node was given, or undefined when none matched. Replaced whenever a rule is added, so a
+    // negative answer given before the rule existed is not reused.
+    private decided = new WeakMap<Node, Rule | undefined>();
 
     // The lists a node is searched in, in order: added and built-in rules, then keep, then remove.
     private readonly searchOrder: ReadonlyArray<ReadonlyArray<Rule>> = [this.array, this.keepList, this.removeList];
@@ -41,6 +42,7 @@ export default class Rules implements RuleLookup {
 
     add(_key: string, rule: Rule): void {
         this.array.unshift(rule);
+        this.decided = new WeakMap();
     }
 
     keep(filter: Rule["filter"]): void {
@@ -48,6 +50,7 @@ export default class Rules implements RuleLookup {
             filter,
             replacement: this.keepReplacement,
         });
+        this.decided = new WeakMap();
     }
 
     remove(filter: Rule["filter"]): void {
@@ -55,6 +58,7 @@ export default class Rules implements RuleLookup {
             filter,
             replacement: () => "",
         });
+        this.decided = new WeakMap();
     }
 
     forNode(node: AnnotatedNode): Rule {
