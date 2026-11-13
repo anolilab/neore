@@ -55,32 +55,58 @@ const IconsColumnSkeleton = () => (
     </div>
 );
 
-const useIconsData = () => {
+type IconsStatus = "failed" | "idle" | "loading" | "ready";
+
+/** Loads the icon list and the icon map, the latter of which can fail. */
+const loadIcons = async (): Promise<IconData[]> => {
+    const [{ default: iconsData }, getLucideIcon] = await Promise.all([import("../data/icons-data"), loadLucideIconMap()]);
+
+    return iconsData.filter((icon: IconData) => getLucideIcon(icon.name) !== undefined);
+};
+
+/**
+ * The picker's icons, loaded only once `enabled` (the popover is open), so a form
+ * that shows a picker downloads nothing until someone opens it. A failed download
+ * is reported (`failed`) and `retry` loads again.
+ */
+const useIconsData = (enabled: boolean) => {
     const [icons, setIcons] = useState<IconData[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [status, setStatus] = useState<IconsStatus>("idle");
+    // Bumped by `retry` to load again.
+    const [attempt, setAttempt] = useState(0);
+    const shouldLoad = enabled && status !== "ready";
 
     useEffect(() => {
+        if (!shouldLoad) {
+            return undefined;
+        }
+
         let isMounted = true;
 
-        const loadIcons = async () => {
-            setIsLoading(true);
+        setStatus("loading");
+        loadIcons()
+            .then((loaded: IconData[]) => {
+                if (isMounted) {
+                    setIcons(loaded);
+                    setStatus("ready");
+                }
 
-            const [{ default: iconsData }, getLucideIcon] = await Promise.all([import("../data/icons-data"), loadLucideIconMap()]);
-
-            if (isMounted) {
-                setIcons(iconsData.filter((icon: IconData) => getLucideIcon(icon.name) !== undefined));
-                setIsLoading(false);
-            }
-        };
-
-        loadIcons();
+                return undefined;
+            })
+            .catch(() => {
+                if (isMounted) {
+                    setStatus("failed");
+                }
+            });
 
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [attempt, shouldLoad]);
 
-    return { icons, isLoading };
+    const retry = useCallback(() => setAttempt((count: number) => count + 1), []);
+
+    return { icons, retry, status };
 };
 
 const IconPicker = ({
@@ -107,8 +133,9 @@ const IconPicker = ({
     const [search, setSearch] = useState("");
     const setSearchDebounced = useDebounce(setSearch, 100);
     const [isPopoverVisible, setIsPopoverVisible] = useState(false);
-    const { icons } = useIconsData();
-    const [isLoading, setIsLoading] = useState(true);
+    // The list and map load when the popover opens; a caller's own `iconsList` needs neither list nor wait.
+    const { icons, retry: retryIcons, status: iconsStatus } = useIconsData((open ?? isOpen) && !iconsList);
+    const isLoading = !iconsList && iconsStatus !== "ready" && iconsStatus !== "failed";
 
     const iconsToUse = useMemo(() => iconsList || icons, [iconsList, icons]);
 
@@ -261,11 +288,8 @@ const IconPicker = ({
             setIsPopoverVisible(newOpen);
 
             if (newOpen) {
-                setIsLoading(true);
-
                 setTimeout(() => {
                     virtualizer.measure();
-                    setIsLoading(false);
                 }, 1);
             }
         },
@@ -401,7 +425,6 @@ const IconPicker = ({
     React.useEffect(() => {
         if (isPopoverVisible) {
             const timer = setTimeout(() => {
-                setIsLoading(false);
                 virtualizer.measure();
             }, 10);
 
@@ -421,6 +444,21 @@ const IconPicker = ({
 
         return undefined;
     }, [isPopoverVisible, virtualizer]);
+
+    const renderIconsArea = () => {
+        if (iconsStatus === "failed" && !iconsList) {
+            return (
+                <div className="flex flex-col items-center gap-2 py-6 text-center text-sm" role="alert">
+                    <span className="text-muted-foreground">{t`The icons could not be loaded.`}</span>
+                    <Button onClick={retryIcons} size="sm" type="button" variant="outline">
+                        {t`Try again`}
+                    </Button>
+                </div>
+            );
+        }
+
+        return isLoading ? <IconsColumnSkeleton /> : renderVirtualContent();
+    };
 
     const defaultTrigger = (
         <Button ref={ref as React.Ref<HTMLButtonElement> | undefined} variant="outline">
@@ -445,7 +483,7 @@ const IconPicker = ({
                 )}
                 {categorized && search.trim() === "" && <div className="mt-2 flex flex-row gap-1 overflow-x-auto pb-2">{categoryButtons}</div>}
                 <div className="max-h-60 overflow-auto" ref={parentRef} style={{ scrollbarWidth: "thin" }}>
-                    {isLoading ? <IconsColumnSkeleton /> : renderVirtualContent()}
+                    {renderIconsArea()}
                 </div>
             </PopoverContent>
         </Popover>

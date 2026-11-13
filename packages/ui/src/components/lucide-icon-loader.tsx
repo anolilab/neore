@@ -2,6 +2,15 @@ import type { LucideIcon } from "lucide-react";
 
 export type GetLucideIcon = (name: string) => LucideIcon | undefined;
 
+const ICON_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+
+/**
+ * Whether a string has the shape of a lucide name (lowercase kebab-case). Checked
+ * before loading the icon map: a name that cannot be one ("Rocket", "") is known
+ * to be missing at once, without downloading anything.
+ */
+export const isLucideIconNameShape = (name: string): boolean => ICON_NAME_RE.test(name);
+
 const iconMap: { loaded?: GetLucideIcon; pending?: Promise<GetLucideIcon> } = {};
 
 /** The icon map if it has already loaded, so a later mount can render at once. */
