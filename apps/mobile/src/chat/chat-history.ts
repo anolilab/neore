@@ -70,71 +70,106 @@ export const newestRun = <R extends HistoryRow>(history: ChatHistory<R>): R[] =>
     return history.rows.slice(start).filter((row) => isServerRow(row));
 };
 
+/** The rows on screen as the merges read them: the confirmed run that joins the newest row, and the rows kept below it. */
+interface Split<R> {
+    /** Rows below the run whose place on the chat's active path the server has not confirmed against the run. */
+    kept: R[];
+    /** The cursor below `kept[0]` when the kept rows are one run the server served; `undefined` when not known (saved rows). */
+    keptCursor: string | null | undefined;
+    /** The run that joins the newest row: the server served it without a hole, down to its oldest row. */
+    run: R[];
+}
+
+const splitOf = <R extends HistoryRow>(history: ChatHistory<R>): Split<R> => {
+    if (history.gap !== undefined) {
+        const { anchorId, keptCursor } = history.gap;
+        const at = Math.max(0, history.rows.findIndex((row) => row.id === anchorId));
+
+        return { kept: history.rows.slice(0, at), keptCursor, run: history.rows.slice(at) };
+    }
+
+    // Rows the cache painted, not read since: nothing on screen is confirmed yet.
+    if (history.olderCursor === undefined) {
+        return { kept: history.rows, keptCursor: undefined, run: [] };
+    }
+
+    return { kept: [], keptCursor: undefined, run: history.rows };
+};
+
+/**
+ * One page the server served, oldest first and without a hole, that ends right below `run` (or is the newest page, when
+ * `run` is empty), merged with the rows kept below it. The page tells where the kept rows go:
+ * - kept rows newer than the oldest one the page holds, and not in it, are not on the chat's active path (another
+ * branch, a deleted message): nothing the page skipped lies between its rows and the run, so they go;
+ * - kept rows older than the oldest one the page holds go below the page, in their order. If there are none, the run now
+ * reaches the page's oldest row and the cursor below it takes over;
+ * - those older rows join the run only when they are one run the server served (`keptCursor`) and the page's oldest row
+ * is the newest of them it reached: then nothing lies between, and the cursor below them takes over. Otherwise they
+ * stay below a hole at the page's oldest row, read from the page's cursor until a page reaches them;
+ * - at the start of the chat (`olderCursor: null`), rows older than the page are not on the chat, and go.
+ * No row of the page is lost, none of the run is read again, and the cursor stays below the run's oldest row.
+ */
+const merged = <R extends HistoryRow>({ kept, keptCursor, run }: Split<R>, page: HistoryPage<R>): ChatHistory<R> => {
+    const runIds = new Set(run.map((row) => row.id));
+    const pageRows = page.rows.filter((row) => !runIds.has(row.id));
+    const [pageOldest] = pageRows;
+    const body = [...pageRows, ...run];
+
+    if (pageOldest === undefined || page.olderCursor === null) {
+        return { olderCursor: page.olderCursor, rows: body };
+    }
+
+    const pageIds = new Set(pageRows.map((row) => row.id));
+    const candidates = kept.filter((row) => isServerRow(row) && !runIds.has(row.id));
+    const firstReached = candidates.findIndex((row) => pageIds.has(row.id));
+    const below = firstReached === -1 ? candidates : candidates.slice(0, firstReached);
+
+    if (below.length === 0) {
+        return { olderCursor: page.olderCursor, rows: body };
+    }
+
+    if (keptCursor !== undefined && candidates[firstReached]?.id === pageOldest.id) {
+        return { olderCursor: keptCursor, rows: [...below, ...body] };
+    }
+
+    return { gap: { anchorId: pageOldest.id, cursor: page.olderCursor, keptCursor }, olderCursor: undefined, rows: [...below, ...body] };
+};
+
 /**
  * A fresh read of the newest page. Rows on screen older than it are kept (rows loaded before, saved rows the cache
  * painted), so they stay when the app goes offline again:
- * - when the screen reaches the page's oldest row, they join it; the cursor below them stays if it was known;
- * - when it does not (more than a page came since, or another branch of the chat is active now), they are kept below
- * a gap, which the fill reads down to, dropping what turns out not to be on the chat's active path;
+ * - when the run on screen holds the page's oldest row, the page replaces the run from there up; a hole below the run
+ * and the cursor stay as they were;
+ * - otherwise the run is no longer known to join the newest row, and the page is {@link merged} with the rows on screen;
  * - when the page is the whole chat, nothing older exists, and older rows on screen go.
  * Rows made on this screen are not kept: the page holds their server copies.
  */
 const newestPageOf = <R extends HistoryRow>(history: ChatHistory<R>, page: HistoryPage<R>): ChatHistory<R> => {
     const [oldest] = page.rows;
 
-    if (oldest === undefined) {
-        // eslint-disable-next-line unicorn/no-null -- an empty newest page is the whole chat: nothing older
-        return { olderCursor: null, rows: [] };
+    if (oldest === undefined || page.olderCursor === null) {
+        // eslint-disable-next-line unicorn/no-null -- the newest page is the whole chat: nothing older
+        return { olderCursor: null, rows: page.rows };
     }
 
-    const pageIds = new Set(page.rows.map((row) => row.id));
-    const boundary = history.rows.findIndex((row) => row.id === oldest.id);
+    const split = splitOf(history);
+    const boundary = split.run.findIndex((row) => row.id === oldest.id);
 
     if (boundary !== -1) {
-        const kept = history.rows.slice(0, boundary).filter((row) => isServerRow(row) && !pageIds.has(row.id));
-        const rows = [...kept, ...page.rows];
+        const pageIds = new Set(page.rows.map((row) => row.id));
+        const runBelow = split.run.slice(0, boundary).filter((row) => isServerRow(row) && !pageIds.has(row.id));
 
-        if (kept.length === 0) {
-            return { olderCursor: page.olderCursor, rows };
-        }
-
-        // An earlier hole is still below the page: it is filled from where it stopped.
-        if (history.gap !== undefined && rows.some((row) => row.id === history.gap?.anchorId)) {
-            return { gap: history.gap, olderCursor: undefined, rows };
-        }
-
-        if (history.olderCursor !== undefined) {
-            return { olderCursor: history.olderCursor, rows };
-        }
-
-        // Saved rows below the page, not read since: kept, and confirmed by the fill from the page's cursor.
-        return page.olderCursor === null
-            ? { olderCursor: page.olderCursor, rows: page.rows }
-            : { gap: { anchorId: oldest.id, cursor: page.olderCursor, keptCursor: undefined }, olderCursor: undefined, rows };
+        return { ...history, rows: [...split.kept, ...runBelow, ...page.rows] };
     }
 
-    // The page does not reach the rows on screen. With no hole yet, all of them are kept below a new one. Below an earlier
-    // hole, the rows under it stay, with what is known of them, and only the run above it is replaced by the page: the
-    // hole now reaches from the page down to them, and the fill reads that run again on its way.
-    const below = history.gap === undefined ? history.rows : history.rows.slice(0, Math.max(0, history.rows.findIndex((row) => row.id === history.gap?.anchorId)));
-    const kept = below.filter((row) => isServerRow(row) && !pageIds.has(row.id));
-
-    if (kept.length === 0 || page.olderCursor === null) {
-        return { olderCursor: page.olderCursor, rows: page.rows };
-    }
-
-    const keptCursor = history.gap === undefined ? history.olderCursor : history.gap.keptCursor;
-
-    return { gap: { anchorId: oldest.id, cursor: page.olderCursor, keptCursor }, olderCursor: undefined, rows: [...kept, ...page.rows] };
+    // The page does not reach the run: with no hole, the run becomes the kept rows, and the cursor below it theirs. Below
+    // a hole, the run above it is not known to join the page; the fill reads it again on its way down to the kept rows.
+    return merged(history.gap === undefined ? { kept: history.rows, keptCursor: history.olderCursor, run: [] } : { ...split, run: [] }, page);
 };
 
 /**
- * One older page, read at {@link nextOlderCursor}. Below a hole, it goes right under the run that joins the newest row:
- * - when it reaches the kept rows, the hole is closed; kept rows newer than the newest one it reached are not on the
- * chat's active path (another branch, a deleted message) and go; the cursor below the kept rows takes over;
- * - when it reaches the start of the chat without them, none of the kept rows is on the active path, and they go;
- * - otherwise the hole moves down to the page's oldest row.
- * With no hole, the page extends the run downward.
+ * One older page, read at {@link nextOlderCursor}. With no hole, it extends the run downward. Below a hole, it goes right
+ * under the run that joins the newest row and is {@link merged} with the kept rows.
  *
  * `from` is the cursor the page was read from. A page lands later than it was asked for: when a read of the newest page
  * moved the history meanwhile (a new hole, or a cursor kept from below), the page no longer belongs where it would go,
@@ -145,60 +180,13 @@ const olderPageApplied = <R extends HistoryRow>(history: ChatHistory<R>, page: H
         return history;
     }
 
-    const onScreen = new Set(history.rows.map((row) => row.id));
-
     if (history.gap === undefined) {
+        const onScreen = new Set(history.rows.map((row) => row.id));
+
         return { olderCursor: page.olderCursor, rows: [...page.rows.filter((row) => !onScreen.has(row.id)), ...history.rows] };
     }
 
-    const { anchorId, keptCursor } = history.gap;
-    const at = Math.max(0, history.rows.findIndex((row) => row.id === anchorId));
-    const kept = history.rows.slice(0, at);
-    const run = history.rows.slice(at);
-    const runIds = new Set(run.map((row) => row.id));
-    const pageIds = new Set(page.rows.map((row) => row.id));
-    const lastReached = kept.findLastIndex((row) => pageIds.has(row.id));
-
-    if (lastReached === -1) {
-        const below = page.rows.filter((row) => !runIds.has(row.id));
-        const [pageOldest] = page.rows;
-
-        if (pageOldest === undefined || page.olderCursor === null) {
-            return { olderCursor: page.olderCursor, rows: [...below, ...run] };
-        }
-
-        return { gap: { anchorId: pageOldest.id, cursor: page.olderCursor, keptCursor }, olderCursor: undefined, rows: [...kept, ...below, ...run] };
-    }
-
-    const joined = kept.slice(0, lastReached + 1);
-    const joinedIds = new Set(joined.map((row) => row.id));
-    const reachedInPage = page.rows.findLastIndex((row) => joinedIds.has(row.id));
-    const between = page.rows.slice(reachedInPage + 1).filter((row) => !runIds.has(row.id));
-    // A page that reaches below the oldest kept row: its rows under the first one it shares go below them.
-    const firstReachedInPage = page.rows.findIndex((row) => joinedIds.has(row.id));
-    const beneath = firstReachedInPage > 0 && kept[0] !== undefined && pageIds.has(kept[0].id) ? page.rows.slice(0, firstReachedInPage).filter((row) => !onScreen.has(row.id)) : [];
-    const rows = [...beneath, ...joined, ...between, ...run];
-
-    if (keptCursor !== undefined) {
-        return { olderCursor: keptCursor, rows };
-    }
-
-    // The kept rows are saved ones the cache painted: no cursor below them is known, and only the ones the page holds are
-    // confirmed now. Saved rows older than the page stay below the hole, which moves down to the page's oldest confirmed
-    // row; the cursor goes below the saved rows only once the server has confirmed down to them.
-    const firstConfirmed = joined.findIndex((row) => pageIds.has(row.id));
-    const confirmedOldest = joined[firstConfirmed];
-
-    if (confirmedOldest === undefined || firstConfirmed <= 0) {
-        return { olderCursor: page.olderCursor, rows };
-    }
-
-    if (page.olderCursor === null) {
-        // The chat starts here: saved rows below the page are not on it.
-        return { olderCursor: page.olderCursor, rows: rows.slice(firstConfirmed) };
-    }
-
-    return { gap: { anchorId: confirmedOldest.id, cursor: page.olderCursor, keptCursor: undefined }, olderCursor: undefined, rows };
+    return merged(splitOf(history), page);
 };
 
 /** Carries the fill target over a read, until it is reached or nothing older is left. */

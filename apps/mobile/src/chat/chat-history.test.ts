@@ -333,3 +333,126 @@ describe("a chat opened on saved rows", () => {
         expect(nextOlderCursor(screen.history)).toBe("241");
     });
 });
+
+describe("an older page that shares only some of the kept rows", () => {
+    it("keeps the page's rows older than the first kept row it shares, and the kept rows older still below a hole", () => {
+        // The screen keeps saved rows A and B below a hole; the next page holds X, B and Y.
+        const history: ChatHistory<HistoryRow> = { gap: { anchorId: "r1", cursor: "r1", keptCursor: undefined }, olderCursor: undefined, rows: [row("A"), row("B"), row("r1")] };
+
+        const next = withOlderPage(history, { olderCursor: "X", rows: [row("X"), row("B"), row("Y")] }, "r1");
+
+        expect(ids(next.rows)).toStrictEqual(["A", "X", "B", "Y", "r1"]);
+        expect(next.gap).toStrictEqual({ anchorId: "X", cursor: "X", keptCursor: undefined });
+
+        // The page below reaches A: the hole closes, and nothing on screen is read again.
+        const closed = withOlderPage(next, { olderCursor: "W", rows: [row("W"), row("A")] }, "X");
+
+        expect(ids(closed.rows)).toStrictEqual(["W", "A", "X", "B", "Y", "r1"]);
+        expect(closed.gap).toBeUndefined();
+        expect(nextOlderCursor(closed)).toBe("W");
+    });
+});
+
+describe("a chat opened on saved rows with some missing", () => {
+    it("keeps every row the server serves between them, and reads none of the run again", async () => {
+        const served = serverOf();
+        const asked: string[] = [];
+        // The cache holds 251-260 and 271-300 (261-270 were never saved); the newest page is 281-300.
+        const painted: ChatHistory<HistoryRow> = { olderCursor: undefined, rows: [...run(251, 260), ...run(271, 300)] };
+        const { read, screen, update } = screenOf(newest(painted, "281", run(281, 300)));
+        const fetchOlder = async (cursor: string) => {
+            asked.push(cursor);
+
+            const page = await served(cursor);
+            const runIds = new Set(ids(newestRun(screen.history)));
+
+            expect(ids(page.rows).filter((id) => runIds.has(id))).toStrictEqual([]);
+
+            return page;
+        };
+
+        await fillHistory({ fetchOlder, read, save: () => {}, update });
+
+        expect(asked).toStrictEqual(["281", "261"]);
+        expect(ids(screen.history.rows)).toStrictEqual(ids(run(241, 300)));
+        expect(screen.history.gap).toBeUndefined();
+        expect(nextOlderCursor(screen.history)).toBe("241");
+    });
+});
+
+/** A small deterministic random source (Park-Miller), so a failing case can be replayed from its seed. */
+const randomOf = (seed: number) => {
+    let state = seed;
+
+    return (below: number): number => {
+        state = (state * 48_271) % 2_147_483_647;
+
+        return state % below;
+    };
+};
+
+describe("any split of a chat into pages", () => {
+    it("never reads a row of the run again, loses no row, keeps the order, and drops rows not on the chat", async () => {
+        for (let seed = 1; seed <= 400; seed += 1) {
+            const random = randomOf(seed);
+            let last = 20 + random(100);
+            const pageSize = () => 1 + random(25);
+            /** Pages of random size: the cursor is the number of the oldest message already served. */
+            const fetchFrom = (before: number): HistoryPage<HistoryRow> => {
+                const from = Math.max(1, before - pageSize());
+
+                return { olderCursor: from === 1 ? null : String(from), rows: run(from, before - 1) };
+            };
+            const newestPage = () => fetchFrom(last + 1);
+            // The cache holds a stretch of the chat with rows missing, and some rows of another branch.
+            const cacheFrom = 1 + random(last);
+            const cached = run(cacheFrom, Math.min(last, cacheFrom + random(60))).filter(() => random(5) !== 0);
+            const painted = cached.flatMap((shown) => [...random(8) === 0 ? [row(`x${shown.id}`)] : [], shown]);
+            const { read, screen, update } = screenOf({ olderCursor: undefined, rows: painted });
+            const check = () => {
+                const shown = ids(screen.history.rows).filter((id) => id.startsWith("m")).map((id) => Number(id.slice(1)));
+
+                expect(shown, `seed ${seed}: order`).toStrictEqual(shown.toSorted((a, b) => a - b));
+
+                const newestRunIds = ids(newestRun(screen.history));
+                const oldest = Number(newestRunIds[0]?.slice(1) ?? last + 1);
+
+                expect(newestRunIds, `seed ${seed}: the run joins the newest row`).toStrictEqual(ids(run(oldest, last)));
+                const isUnread = screen.history.olderCursor === undefined && screen.history.gap === undefined;
+
+                expect(nextOlderCursor(screen.history), `seed ${seed}: the cursor is below the run`).toBe(isUnread || oldest === 1 ? null : String(oldest));
+            };
+            const fetchOlder = async (cursor: string) => {
+                const runIds = new Set(ids(newestRun(screen.history)));
+                const page = fetchFrom(Number(cursor));
+
+                expect(ids(page.rows).filter((id) => runIds.has(id)), `seed ${seed}: a row of the run read again`).toStrictEqual([]);
+
+                return page;
+            };
+
+            update((history) => withFillTarget(withNewestPage(history, newestPage()), Infinity));
+            check();
+
+            for (let step = 0; step < 4; step += 1) {
+                if (random(2) === 0) {
+                    last += random(30);
+                    update((history) => withNewestPage(history, newestPage()));
+                    check();
+                }
+
+                // eslint-disable-next-line no-await-in-loop -- each step reads after the one before
+                await fillHistory({ fetchOlder, read, save: () => {}, update });
+                check();
+            }
+
+            while (nextOlderCursor(screen.history) !== null) {
+                // eslint-disable-next-line no-await-in-loop -- each fill goes on from where the one before stopped
+                await fillHistory({ fetchOlder, read, save: () => {}, update });
+                check();
+            }
+
+            expect(ids(screen.history.rows), `seed ${seed}: the whole chat`).toStrictEqual(ids(run(1, last)));
+        }
+    });
+});
