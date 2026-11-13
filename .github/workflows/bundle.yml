@@ -47,9 +47,7 @@ jobs:
 
             # The client build only reads these to validate its env schema; the
             # values are not deployed. Same placeholders as the E2E job.
-            # The OG image must exist before Vite copies public/, and the service
-            # worker is written from dist/client afterwards. Both run here so a
-            # break in either fails the PR instead of the next push to main.
+            # The OG image must exist before Vite copies public/.
             - name: "Build the web client"
               shell: "bash"
               env:
@@ -60,8 +58,17 @@ jobs:
               run: |
                   pnpm --filter @neore/web exec node scripts/generate-og.mjs
                   pnpm --filter @neore/web exec vite build
-                  pnpm --filter @neore/web exec node scripts/generate-sw.mjs
 
+            # Reads `.vite/manifest.json`, so it must run before the service-worker step: that step deletes `.vite/`.
             - name: "Check the web client bundle budget"
               shell: "bash"
               run: "pnpm exec tsx scripts/check-web-bundle.ts"
+
+            - name: "Generate the service worker"
+              shell: "bash"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+                  VITE_LUNORA_URL: "http://localhost:8788"
+                  VITE_SITE_URL: "http://localhost:5173"
+                  VITE_LLM_GATEWAY_URL: "http://localhost:5173/llm-gateway"
+              run: "pnpm --filter @neore/web exec node scripts/generate-sw.mjs"
