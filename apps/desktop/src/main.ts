@@ -37,6 +37,8 @@ import { createDebouncer, DEFAULT_SIZE, readWindowState, restorableState, SAVE_D
 
 interface ShellState {
     composer?: BrowserWindow;
+    /** Set while a new composer loads: presses then only flip whether it opens at its first paint. */
+    composerOpening?: { wanted: boolean };
     /** Set once `registerDeviceIpc` has run: the core loaded. */
     deviceReady: boolean;
     /** Set in `start`: the tray's "Dictation settings…" opens its local window. */
@@ -1002,16 +1004,32 @@ const revealQuickComposer = (composer: BrowserWindow): void => {
 
 /**
  * The composer is created on its first use, not at start-up, so a launch spends no renderer on it while the site
- * loads. That first open waits for `ready-to-show`: its page focuses the prompt on the window's `focus`, which a
- * window shown before its script ran would miss.
+ * loads. Until its `ready-to-show` it is never shown: its page focuses the prompt on the window's `focus`, which a
+ * window shown before its script ran would miss. A press while it loads opens or closes it once it is ready.
  */
 const toggleQuickComposer = (): void => {
     const { composer } = state;
 
     if (composer === undefined) {
         const created = createQuickComposer();
+        const opening = { wanted: true };
 
-        created.once("ready-to-show", () => revealQuickComposer(created));
+        state.composerOpening = opening;
+        created.once("ready-to-show", () => {
+            if (state.composerOpening === opening) {
+                state.composerOpening = undefined;
+            }
+
+            if (opening.wanted) {
+                revealQuickComposer(created);
+            }
+        });
+
+        return;
+    }
+
+    if (state.composerOpening !== undefined) {
+        state.composerOpening.wanted = !state.composerOpening.wanted;
 
         return;
     }

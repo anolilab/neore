@@ -343,14 +343,41 @@ const topFrameOf = (window: FakeWindow, url: string) => {
 /** The main window is the only window the hand-offs are sent to, so only its frame may take them. */
 const siteSender = () => topFrameOf(mainWindow(), `${SITE}/chat`);
 const mainWindow = (): FakeWindow => fake().windows[0];
-/** The Quick Composer: the window on its own local page, which exists only after its first use. */
-const composerWindows = (): FakeWindow[] => fake().windows.filter((window) => SITE_HTML_PATTERN.test(window.loaded[0] ?? ""));
-const composer = (): FakeWindow => composerWindows()[0] as FakeWindow;
+const isComposer = (window: FakeWindow): boolean => SITE_HTML_PATTERN.test(window.loaded[0] ?? "");
+/** The Quick Composer windows still open: it exists only after its first use. */
+const composerWindows = (): FakeWindow[] => fake().windows.filter((window) => isComposer(window) && !window.destroyed);
+/** The composer the last `newComposer` made. */
+const composer = (): FakeWindow => composerWindows().at(-1) as FakeWindow;
+const pressComposerShortcut = (): void => fake().shortcuts.get(COMPOSER_SHORTCUT)?.();
+const composerReady = (window: FakeWindow): void => window.handlers.get("ready-to-show")?.({ preventDefault: () => {} }, "");
+
+/**
+ * A composer of this case's own: an open one is closed (as at quit) so that the shortcut makes a new one, whatever
+ * ran before. `ready` fires its first paint.
+ */
+const newComposer = ({ ready }: { ready: boolean }): FakeWindow => {
+    for (const window of composerWindows()) {
+        window.destroyed = true;
+        window.handlers.get("closed")?.({ preventDefault: () => {} }, "");
+    }
+
+    pressComposerShortcut();
+
+    const created = composer();
+
+    if (ready) {
+        composerReady(created);
+    }
+
+    return created;
+};
 
 /** The composer's own sender: its window's webContents, on its own file URL. */
 const composerSender = () => topFrameOf(composer(), composer().loaded[0]);
 
 const guardOf = (window: FakeWindow, event: string) => window.webContents.handlers.get(event);
+/** What the start-up made, before any case ran: a case that restarts the shell adds its own. */
+const startup: { composerShortcut: boolean; trays: number; windows: FakeWindow[] } = { composerShortcut: false, trays: 0, windows: [] };
 const takeSignIn = () => fake().ipc.get("neore:take-pending-sign-in")?.(siteSender());
 
 beforeAll(async () => {
@@ -360,6 +387,7 @@ beforeAll(async () => {
 
     // The `ready` event runs the start-up (windows, tray, IPC) once.
     fake().appHandlers.get("ready")?.();
+    Object.assign(startup, { composerShortcut: fake().shortcuts.has(COMPOSER_SHORTCUT), trays: fake().trays, windows: [...fake().windows] });
 });
 
 describe("main window", () => {
@@ -387,12 +415,13 @@ describe("main window", () => {
     });
 
     it("hands a popup to another origin to the system browser and opens no window", async () => {
+        const windowCount = fake().windows.length;
+        const openedCount = fake().opened.length;
         const result = mainWindow().webContents.windowOpen?.({ url: "https://example.org/x" });
 
         expect(result).toStrictEqual({ action: "deny" });
-        await vi.waitFor(() => expect(fake().opened).toStrictEqual(["https://example.org/x"]));
-        // The main window only: no composer before its first use, and nothing else.
-        expect(fake().windows).toHaveLength(1);
+        await vi.waitFor(() => expect(fake().opened.slice(openedCount)).toStrictEqual(["https://example.org/x"]));
+        expect(fake().windows).toHaveLength(windowCount);
     });
 
     it("opens a same-origin popup in its own window and leaves the main window on its page", () => {
@@ -453,38 +482,66 @@ describe("main window", () => {
 
 describe("tray and Quick Composer", () => {
     it("creates the tray and registers the shortcut, but no composer window, at start-up", () => {
-        expect(fake().trays).toBe(1);
-        expect(fake().shortcuts.has(COMPOSER_SHORTCUT)).toBe(true);
-        expect(composerWindows()).toHaveLength(0);
+        expect(startup.trays).toBe(1);
+        expect(startup.composerShortcut).toBe(true);
+        expect(startup.windows).toHaveLength(1);
+        expect(startup.windows.filter((window) => isComposer(window))).toHaveLength(0);
     });
 
     it("creates the composer on its own local page at the first shortcut press, and shows it once it is ready", () => {
-        const toggle = fake().shortcuts.get(COMPOSER_SHORTCUT);
+        const created = newComposer({ ready: false });
 
-        toggle?.();
-        expect(composerWindows()).toHaveLength(1);
-        expect(composer().loaded).toStrictEqual([expect.stringMatching(SITE_HTML_PATTERN)]);
+        expect(composerWindows()).toStrictEqual([created]);
+        expect(created.loaded).toStrictEqual([expect.stringMatching(SITE_HTML_PATTERN)]);
         // Shown at its first paint, when its script is there to focus the prompt.
-        expect(composer().shown).toBe(false);
+        expect(created.shown).toBe(false);
 
-        composer().handlers.get("ready-to-show")?.({ preventDefault: () => {} }, "");
-        expect(composer().shown).toBe(true);
+        composerReady(created);
+        expect(created.calls).toStrictEqual(["show"]);
     });
 
     it("reuses the same composer window on later presses, toggling it", () => {
-        const toggle = fake().shortcuts.get(COMPOSER_SHORTCUT);
+        const created = newComposer({ ready: true });
 
-        toggle?.();
-        expect(composer().shown).toBe(false);
-        toggle?.();
-        expect(composer().shown).toBe(true);
-        toggle?.();
-        expect(composerWindows()).toHaveLength(1);
-        expect(composer().loaded).toHaveLength(1);
+        pressComposerShortcut();
+        expect(created.shown).toBe(false);
+        pressComposerShortcut();
+        expect(created.shown).toBe(true);
+        pressComposerShortcut();
+        expect(composerWindows()).toStrictEqual([created]);
+        expect(created.loaded).toHaveLength(1);
+    });
+
+    it("keeps a composer closed by a second press before its first paint closed", () => {
+        const created = newComposer({ ready: false });
+
+        pressComposerShortcut();
+        expect(created.calls).toStrictEqual([]);
+
+        composerReady(created);
+        expect(created.calls).toStrictEqual([]);
+        expect(created.shown).toBe(false);
+
+        // Ready now: the next press opens it as usual.
+        pressComposerShortcut();
+        expect(created.shown).toBe(true);
+    });
+
+    it("shows a composer pressed open, closed and open again before its first paint once, at that paint", () => {
+        const created = newComposer({ ready: false });
+
+        pressComposerShortcut();
+        pressComposerShortcut();
+        expect(created.calls).toStrictEqual([]);
+
+        composerReady(created);
+        expect(created.calls).toStrictEqual(["show"]);
+        expect(composerWindows()).toStrictEqual([created]);
     });
 
     it("hands a composed text to the main window once, and hides the composer", () => {
-        composer().shown = true;
+        newComposer({ ready: true });
+        expect(composer().shown).toBe(true);
 
         const quickCompose = fake().ipc.get("neore:quick-compose");
 
@@ -496,6 +553,9 @@ describe("tray and Quick Composer", () => {
 
     it("refuses quick-compose from the site, from another local page, and from an empty text", () => {
         const quickCompose = fake().ipc.get("neore:quick-compose");
+
+        newComposer({ ready: true });
+
         const otherPage = topFrameOf(composer(), "file:///elsewhere/index.html");
 
         expect(() => quickCompose?.(siteSender(), "hi")).toThrow("untrusted");
@@ -508,7 +568,8 @@ describe("tray and Quick Composer", () => {
 
         expect(() => close?.(siteSender())).toThrow("untrusted");
 
-        composer().shown = true;
+        newComposer({ ready: true });
+        expect(composer().shown).toBe(true);
         close?.(composerSender());
         expect(composer().shown).toBe(false);
     });
@@ -516,6 +577,7 @@ describe("tray and Quick Composer", () => {
     it("keeps the composer's page out of the site's channels", () => {
         const notify = fake().ipc.get("neore:notify");
 
+        newComposer({ ready: true });
         expect(() => notify?.(composerSender(), { title: "hi" })).toThrow("untrusted");
     });
 });
@@ -841,7 +903,7 @@ describe("look and application menu", () => {
         fake().payloads.length = 0;
         fake().focusedWindow = win;
         menuItem("New Chat")?.click?.();
-        fake().focusedWindow = composer();
+        fake().focusedWindow = newComposer({ ready: true });
         menuItem("Settings…")?.click?.();
         fake().focusedWindow = null;
 
