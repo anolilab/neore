@@ -2,6 +2,7 @@ import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { AccessibilityInfo, FlatList, Pressable, Text } from "react-native";
 
+import { withFinally } from "@/lib/guarded";
 import { getClient } from "@/lib/lunora";
 import { useOffline, useWriteControl } from "@/offline/offline-context";
 import { isWriteBlocked, startProjectThread, writeErrorMessage } from "@/projects/projects-api";
@@ -28,18 +29,23 @@ const ProjectScreen = () => {
         setStarting(true);
         setError(null);
 
-        try {
-            const threadId = await startProjectThread(getClient(), { defaultModel: project.defaultModel, id: projectId });
+        const attempt = async () => {
+            try {
+                const threadId = await startProjectThread(getClient(), { defaultModel: project.defaultModel, id: projectId });
 
-            router.push(`/chat/${threadId}`);
-        } catch (error_: unknown) {
-            const message = writeErrorMessage(error_);
+                router.push(`/chat/${threadId}`);
+            } catch (error_: unknown) {
+                const message = writeErrorMessage(error_);
 
-            setError(message);
-            AccessibilityInfo.announceForAccessibility(message);
-        } finally {
+                setError(message);
+                AccessibilityInfo.announceForAccessibility(message);
+            }
+        };
+
+        // `withFinally`, not `try … finally`: the React Compiler skips a component that holds a `finally`.
+        await withFinally(attempt, () => {
             setStarting(false);
-        }
+        });
     };
 
     const blocked = isWriteBlocked({ busy: starting, offline: startControl.disabled }) || !project;

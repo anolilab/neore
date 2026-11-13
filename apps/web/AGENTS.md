@@ -80,7 +80,7 @@ pnpm lint:types           # TypeScript check (NOT pnpm typecheck); inside apps/w
   (`features/auth/hooks/use-auth-session.ts`), never `useAuth().hooks.useX()`.
   `scripts/react-compiler-bailouts.test.ts` lists components that must compile.
 - **Chat rows are memoized on message IDENTITY**: keep `useUIMessages`' structural sharing
-  (`lib/agent/share-unchanged-messages.ts`); chat action callbacks read `messagesRef`, never close over `messages`;
+  (`lib/agent/share-unchanged-messages.ts`, per-turn reuse in `combine-unchanged-turns.ts`); chat action callbacks read `messagesRef`, never close over `messages`;
   stream chunks are batched per frame (`createFrameBatcher`).
 - KaTeX/Mermaid stay off the startup path: import `@streamdown/math`/`@streamdown/mermaid` only via
   `@neore/ui/hooks/use-streamdown-plugins`; keep the tiptap editors `lazy()` at chat-route call sites; never put a
