@@ -827,13 +827,14 @@ const subscribeStarted = (onChange: () => void): (() => void) => {
     };
 };
 
+/** Whether the started client's flags missed `FLAGS_WAIT_MS`: what waits for them stops waiting. */
+const readFlagsWaitOver = (): boolean => flagsWait.isOver;
+
 /**
  * The client once PostHog has started: the reset after a sign-out, the session's identity and the queued captures are
  * applied. What captures on its own (the onboarding plugin) takes this one, not `usePostHog()`'s, which is provided as
  * soon as `init` ran and still holds the identity it was bootstrapped with.
  */
-const readFlagsWaitOver = (): boolean => flagsWait.isOver;
-
 export const useStartedPostHog = (): PostHog | undefined => useSyncExternalStore(subscribeStarted, getStartedPostHog, () => undefined);
 
 /** The PostHog client, or `undefined` until it has loaded and been initialised. */
