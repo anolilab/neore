@@ -2,12 +2,13 @@ import COMMONMARK_RULES, { isRenderedLink } from "./commonmark-rules";
 import annotateNode from "./node";
 import rootNode from "./root-node";
 import Rules from "./rules";
-import type { AnnotatedNode, Options, Rule } from "./types";
+import type { AnnotatedNode, Options, Rule, RuleLookup } from "./types";
 import {
     defaultBlankReplacement,
     defaultElementReplacement,
     escapeMarkdown,
     isBlock,
+    removeReplacement,
     trimKeepingBreaks,
     trimLeadingBreaks,
     trimLeadingNewlines,
@@ -164,7 +165,7 @@ function escapeText(service: TurndownService, node: Node, text: string): string 
         return escaped;
     }
 
-    if (!isFollowedByHtmlOpener(node, service.options, opener.length > 1)) {
+    if (!isFollowedByHtmlOpener(node, service.options, service.rules, opener.length > 1)) {
         return escaped;
     }
 
@@ -177,10 +178,10 @@ function escapeText(service: TurndownService, node: Node, text: string): string 
  * character that decides: a letter, `/`, `!` or `?` decides at once, and a local part decides at
  * its `@`. The check is conservative: a `<` that cannot open HTML may still be escaped.
  */
-function isFollowedByHtmlOpener(node: Node, options: Options, isAfterLocalPart: boolean): boolean {
+function isFollowedByHtmlOpener(node: Node, options: Options, rules: RuleLookup, isAfterLocalPart: boolean): boolean {
     let isInLocalPart = isAfterLocalPart;
 
-    for (const piece of followingText(node, options)) {
+    for (const piece of followingText(node, options, rules)) {
         for (const char of piece) {
             const step: Step = isInLocalPart ? stepInLocalPart(char) : stepAfterLessThan(char);
 
@@ -229,12 +230,12 @@ function stepInLocalPart(char: string): Step {
  * A block ends it too, since a block starts on a new line. An `<a>` that prints no link is looked
  * past, like any inline parent.
  */
-function* followingText(node: Node, options: Options): Generator<string> {
+function* followingText(node: Node, options: Options, rules: RuleLookup): Generator<string> {
     let current: Node | null = node;
 
     while (current) {
         for (let sibling = current.nextSibling; sibling; sibling = sibling.nextSibling) {
-            yield* textOf(sibling);
+            yield* textOf(sibling, rules);
         }
 
         const parent: Node | null = current.parentNode;
@@ -248,13 +249,16 @@ function* followingText(node: Node, options: Options): Generator<string> {
     }
 }
 
-/** The text nodes under a node, in order. A comment prints nothing, so it is skipped. */
-function* textOf(node: Node): Generator<string> {
+/**
+ * The text nodes under a node, in order. A comment prints nothing, so it is skipped, and so is an element that a
+ * remove rule drops, with everything in it.
+ */
+function* textOf(node: Node, rules: RuleLookup): Generator<string> {
     if (node.nodeType === 3 || node.nodeType === 4) {
         yield node.nodeValue ?? "";
-    } else if (node.nodeType === 1) {
+    } else if (node.nodeType === 1 && rules.ruleFor(node)?.replacement !== removeReplacement) {
         for (let child = node.firstChild; child; child = child.nextSibling) {
-            yield* textOf(child);
+            yield* textOf(child, rules);
         }
     }
 }

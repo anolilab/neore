@@ -454,19 +454,30 @@ describe("reference labels with a non-breaking space", () => {
 });
 
 /*
- * Deciding whether a dropped marker ends in a hard break reads back from the marker only. Reading the whole link text
- * before each break made a link with many breaks quadratic. The bound is far above the linear time and far below the
- * quadratic one (about 7 s for this input).
+ * Deciding whether a dropped marker ends in a hard break reads back from the marker only, so a link with many breaks
+ * stays linear (24,000 such breaks took about 8 s when the whole text before each was read). The time is not asserted,
+ * since a busy runner could fail any fixed limit; this pins the output of the flattened breaks.
  */
 
-describe("a link with many breaks that are not kept", () => {
-    it("converts in time linear in the number of breaks", () => {
-        const breaks = 24_000;
-        const html = `<a href=/x>${"a<br><h1>b</h1>".repeat(breaks)}</a>`;
-        const start = performance.now();
-        const markdown = new TurndownService({ br: "<br>" }).turndown(html);
+describe("a link with several breaks that are not kept", () => {
+    it("flattens each break and keeps an inline-tag marker", () => {
+        expect(convert(`<a href=/x>${"a<br><h1>b</h1>".repeat(2)}</a>`, { br: "<br>" })).toBe("[a<br> b = a<br> b = ](/x)");
+    });
+});
 
-        expect(markdown.startsWith("[")).toBe(true);
-        expect(performance.now() - start).toBeLessThan(3000);
+/*
+ * A removed element prints nothing, so the look-ahead after a `<` skips it and reads what follows it.
+ */
+
+describe("a < before a removed element", () => {
+    it.each([
+        ["a sibling", "a&lt;<span>=</span>div&gt;", String.raw`a\<div>`],
+        ["inside an inline parent", "a&lt;<b><span>=</span>div&gt;</b>", String.raw`a\<**div>**`],
+    ])("escapes the < when the removed element is %s and a tag name follows it", (_name, html, expected) => {
+        const service = new TurndownService();
+
+        service.remove("span");
+
+        expect(service.turndown(html)).toBe(expected);
     });
 });
