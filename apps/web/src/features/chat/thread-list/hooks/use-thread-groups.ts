@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import { titleOnScreen, useTitleSaveRevision } from "@/features/chat/core/lib/thread-title-saves";
@@ -11,7 +11,8 @@ import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import { useDateBoundaries } from "../contexts/date-boundaries-context";
 import { isIdleThread, nextSnoozeWake, partitionDerivedSections } from "../lib/derived-sections";
-import { createNodeSharer } from "../lib/share-unchanged-nodes";
+import type { NodesById } from "../lib/share-unchanged-nodes";
+import { shareUnchangedNodes } from "../lib/share-unchanged-nodes";
 import { selectSelectedTagIds, useThreadListUIStore } from "../stores/thread-list-ui-store";
 import type { BranchNode, GroupType, MinimalThreadRelationship, ThreadGroup } from "../types";
 import { usePersistThreadList, useThreadListPlaceholder } from "./use-thread-list-cache";
@@ -111,8 +112,9 @@ const useThreadGroups = (
 
     // Snoozes end on their own (the timer below re-arms per wake); idle rows read the same clock.
     const [now, setNow] = useState(() => Date.now());
-    // Gives an unchanged thread the node it had: rows are memoized on their node, so only changed threads re-render.
-    const [shareUnchangedNodes] = useState(createNodeSharer);
+    // The nodes the COMMITTED list shows: an unchanged thread gets its node back, so only changed rows re-render. Read during
+    // render, replaced only in the layout effect below, so a render React throws away cannot change what later ones compare against.
+    const committedNodesReference = useRef<NodesById>(new Map());
 
     // --- Stage 1: Build lookup maps (only recomputes when raw data changes) ---
     const lookupMaps = useMemo(() => {
@@ -276,7 +278,8 @@ const useThreadGroups = (
         const builtTemporaryThreadsList: BranchNode[] = temporaryRootThreads
             .map((thread: any) => buildHierarchy(thread._id))
             .filter((node: BranchNode | null): node is BranchNode => node !== null && node.expiresAt !== undefined);
-        const [allThreadsList = [], temporaryThreadsList = []] = shareUnchangedNodes([builtThreadsList, builtTemporaryThreadsList]);
+        const shared = shareUnchangedNodes(committedNodesReference.current, [builtThreadsList, builtTemporaryThreadsList]);
+        const [allThreadsList = [], temporaryThreadsList = []] = shared.lists;
 
         // Single pass: separate threads by type (more efficient than multiple filters)
         // Apply category + tag filters if selected
@@ -309,23 +312,18 @@ const useThreadGroups = (
 
         return {
             allThreadsList,
+            nodesById: shared.byId,
             regularThreads,
             statelessThreads,
             temporaryThreadsList: filteredTemporaryThreadsList,
         };
-    }, [
-        lookupMaps,
-        optimisticPins,
-        optimisticStatuses,
-        optimisticDeletions,
-        selectedCategory,
-        selectedTagIds,
-        compositeData?.tags,
-        titleRevision,
-        now,
-        t,
-        shareUnchangedNodes,
-    ]);
+    }, [lookupMaps, optimisticPins, optimisticStatuses, optimisticDeletions, selectedCategory, selectedTagIds, compositeData?.tags, titleRevision, now, t]);
+
+    useLayoutEffect(() => {
+        if (hierarchyData) {
+            committedNodesReference.current = hierarchyData.nodesById;
+        }
+    }, [hierarchyData]);
 
     // --- Stage 3: Sort callback for search results (stable reference) ---
     const sortThreadsByPriority = useCallback(

@@ -1,4 +1,5 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, render, renderHook } from "@testing-library/react";
+import { startTransition, Suspense, use, useLayoutEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupType } from "../types";
@@ -279,5 +280,69 @@ describe("node identity across rebuilds", () => {
         for (const [threadId, node] of after) {
             expect(node).toBe(before.get(threadId));
         }
+    });
+
+    it("compares with the list on screen, not with a render React threw away", async () => {
+        const collapsedGroups = new Set<GroupType>();
+        const collapsedProjects = new Set<string>();
+        const harness: { abandon?: () => void; groups?: ReturnType<typeof groupsFor>; push?: () => void } = {};
+        // A render that suspends here never commits: the transition that asked for it is thrown away.
+        const never = new Promise<never>(() => {});
+        const Pending = ({ abandon }: { abandon: boolean }) => {
+            if (abandon) {
+                use(never);
+            }
+
+            return null;
+        };
+        const List = () => {
+            const { threadGroups } = useThreadGroups(collapsedGroups, collapsedProjects, "", "threads", undefined, [], undefined, undefined);
+
+            // Only what commits is on screen.
+            useLayoutEffect(() => {
+                harness.groups = threadGroups;
+            });
+
+            return null;
+        };
+        const Host = () => {
+            const [abandon, setAbandon] = useState(false);
+            const [, setPush] = useState(0);
+
+            useLayoutEffect(() => {
+                harness.abandon = () => startTransition(() => setAbandon(true));
+                harness.push = () => setPush((value) => value + 1);
+            }, []);
+
+            return (
+                <Suspense fallback={null}>
+                    <List />
+                    <Pending abandon={abandon} />
+                </Suspense>
+            );
+        };
+        const { page } = composite.threads;
+
+        render(<Host />);
+        const before = nodesOf(harness.groups ?? []);
+
+        // A push changes "c", and the only render that read it is thrown away...
+        composite.threads.page = (structuredClone(page) as { _id: string; status: string }[]).map((thread) =>
+            thread._id === "c" ? { ...thread, status: "running" } : thread,
+        ) as never;
+        await act(async () => {
+            harness.abandon?.();
+        });
+
+        // ...then the next push brings "c" back as it is on screen: its row keeps its node.
+        composite.threads.page = structuredClone(page);
+        act(() => {
+            harness.push?.();
+        });
+        const after = nodesOf(harness.groups ?? []);
+
+        expect(after.get("c")?.status).toBe("active");
+        expect(after.get("c")).toBe(before.get("c"));
+        expect(after.get("a")).toBe(before.get("a"));
     });
 });
