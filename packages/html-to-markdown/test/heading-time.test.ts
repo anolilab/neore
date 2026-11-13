@@ -13,7 +13,14 @@ describe("a heading with many breaks and a block", () => {
         const markdown = new TurndownService({ br: "\n", headingStyle: "atx" }).turndown(`<h1>${"a<br>".repeat(8000)}<div>c</div></h1>`);
         const elapsed = performance.now() - started;
 
-        expect(markdown.endsWith("\n\nc")).toBe(true);
+        expect(markdown).toBe(`# ${Array.from({ length: 8000 }).fill("a").join(" ")}\n\nc`);
         expect(elapsed).toBeLessThan(8000);
+    });
+
+    it("keeps every word of a long heading, in order", () => {
+        const words = Array.from({ length: 2000 }, (_value, index) => `w${index}`);
+        const markdown = new TurndownService({ br: "\n", headingStyle: "atx" }).turndown(`<h1>${words.map((word) => `${word}<br>`).join("")}<div>c</div></h1>`);
+
+        expect(markdown).toBe(`# ${words.join(" ")}\n\nc`);
     });
 });
