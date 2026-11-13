@@ -58,8 +58,13 @@ const promptOffer = createPromptOffer();
 /** The signed-in account's registrations carry `isCurrent`; false while nobody is, or once its sign-out began. */
 const signedIn: { account?: { isCurrent: boolean } } = {};
 
+/** Set when the signed-in account's sign-out begins, cleared by the next sign-in: a tap in between waits for that sign-in. */
+const signOutState = { isBegun: false };
+
 /** Sign-out has begun: no prompt and no registration, offered or in the background, for the account that is leaving. */
 export const endPhonePushForAccount = (): void => {
+    signOutState.isBegun = true;
+
     if (signedIn.account) {
         signedIn.account.isCurrent = false;
     }
@@ -201,8 +206,8 @@ export const usePhonePush = (): void => {
     // A tapped notification opens its chat (the chat list when it names none). An approval alert's body opens its chat too;
     // its approve and deny buttons answer it (`approval-tap-listener`), and a tap is never an answer.
     useEffect(() => {
-        // A sign-out that has begun still shows the account on the phone until it finishes: a tap then waits for the sign-in.
-        const isAccountCurrent = signedIn.account?.isCurrent === true;
+        // A tap during a sign-out waits for the next sign-in instead of navigating to the account that is leaving.
+        const isSigningOut = signOutState.isBegun;
 
         if (response?.actionIdentifier === DEFAULT_ACTION_IDENTIFIER && handled.current !== response.notification.request.identifier) {
             const { request } = response.notification;
@@ -210,11 +215,11 @@ export const usePhonePush = (): void => {
             handled.current = request.identifier;
             // A launch from a notification opens its chat, not the one the launch would reopen.
             canClaimLaunchReopen();
-            holdTapRoute(routeForPush(pushIdsFromNotification(request)), { whileSignedOut: status !== "signed-in" || !isAccountCurrent });
+            holdTapRoute(routeForPush(pushIdsFromNotification(request)), { whileSignedOut: status !== "signed-in" || isSigningOut });
         }
 
         // Still signing in (or on the sign-in screen): the sign-in gate goes there instead of the chat list.
-        if (isAccountCurrent && canNavigateToTap({ isOnSignIn, status })) {
+        if (!isSigningOut && canNavigateToTap({ isOnSignIn, status })) {
             const route = takeTapRoute();
 
             if (route !== undefined) {
@@ -277,6 +282,7 @@ export const usePhonePush = (): void => {
         checkAccount(userId, isCurrent);
 
         pushRegistrations.open();
+        signOutState.isBegun = false;
         signedIn.account = account;
         promptOffer.begin(userId);
         foreground.run(registerSilently);
