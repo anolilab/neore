@@ -438,7 +438,13 @@ describe("the sweep and the clear", () => {
 
         const runId = await harness.run(
             async (ctx: any) =>
-                await ctx.db.insert("usageExportRuns", { createdAt: t0, deleteAt: t0 + EXPORT_PIECE_TTL_MS, requestId: `${request}:1`, userId: A }),
+                // Created three hours before the erasure re-arms it: the window runs from the re-arm, not from the export's start.
+                await ctx.db.insert("usageExportRuns", {
+                    createdAt: t0 - 3 * 60 * 60 * 1000,
+                    deleteAt: t0 + EXPORT_PIECE_TTL_MS,
+                    requestId: `${request}:1`,
+                    userId: A,
+                }),
         );
 
         await harness.run(async (ctx: any) => await ctx.runMutation(rearmLiveUsageRun, { runId, userId: A }));
@@ -446,9 +452,9 @@ describe("the sweep and the clear", () => {
         expect(await dueAtOf(A)).toBe(Date.now() + LIVE_RECHECK_MS);
         const run = await harness.run(async (ctx: any) => await ctx.db.usageExportRuns.findFirst({ where: { _id: runId } }));
 
-        expect(run).toMatchObject({ erasing: true });
+        expect(run).toMatchObject({ erasingSince: Date.now() });
 
-        // The sweep finds the still-live run marked `erasing` and keeps checking it a minute apart, not a time to live apart.
+        // The sweep finds the still-live run marked `erasingSince` and keeps checking it a minute apart, not a time to live apart.
         vi.setSystemTime(Date.now() + LIVE_RECHECK_MS);
         await harness.run(async (ctx: any) => await ctx.runMutation(sweepUsageExportPieces, {}));
         const after = await harness.run(async (ctx: any) => await ctx.db.usageExportRuns.findFirst({ where: { _id: runId } }));

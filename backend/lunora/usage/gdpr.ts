@@ -233,20 +233,20 @@ const armRun = async (ctx: MutationCtx, runId: Id<"usageExportRuns">, userId: st
 };
 
 /**
- * How soon the sweep checks a live run the erasure has re-armed (`erasing`). A live export can store its object at any moment, so such a
+ * How soon the sweep checks a live run the erasure has re-armed (`erasingSince`). A live export can store its object at any moment, so such a
  * run is checked a minute after the last check, and its object goes about a minute after the export ends. Other live runs keep the
  * time to live, so an ended export's object stays downloadable for a day.
  */
 export const LIVE_RECHECK_MS = 60 * 1000;
 
 /**
- * How long a re-armed run is checked a minute apart, counted from its export's start. An export that runs longer is checked at the time
- * to live again, so a stuck export does not wake its shard every minute for weeks; its object then goes at the first check after it ends.
+ * How long after the erasure re-armed a run it is checked a minute apart. Past that the run is checked at the time to live again, so a
+ * stuck export does not wake its shard every minute for weeks; its object then goes at the first check after the export ends.
  */
 export const LIVE_FAST_WINDOW_MS = 60 * 60 * 1000;
 
 /**
- * Hands a live run the erasure could not finish to the sweep: the run is marked `erasing` and checked a minute on. The run's record is
+ * Hands a live run the erasure could not finish to the sweep: the run is marked `erasingSince` and checked a minute on. The run's record is
  * kept while its export is live, so anything the export stores later is found, and the sweep purges it once the export has ended.
  */
 export const rearmLiveUsageRun = internalMutation
@@ -256,7 +256,7 @@ export const rearmLiveUsageRun = internalMutation
         const run = await ctx.db.usageExportRuns.findFirst({ consistency: "primary", where: { _id: runId, userId } });
 
         if (run) {
-            await ctx.db.patch("usageExportRuns", run._id, { erasing: true });
+            await ctx.db.patch("usageExportRuns", run._id, { erasingSince: ctx.now });
             await armRun(ctx, run._id, userId, ctx.now + LIVE_RECHECK_MS);
         }
 
@@ -300,7 +300,7 @@ export const sweepUsageExportPieces = internalMutation
                 }
 
                 if (await isRunLive(ctx, run.requestId, run.userId)) {
-                    const fast = run.erasing === true && ctx.now - run.createdAt < LIVE_FAST_WINDOW_MS;
+                    const fast = run.erasingSince !== undefined && ctx.now - run.erasingSince < LIVE_FAST_WINDOW_MS;
 
                     await armRun(ctx, run._id, run.userId, ctx.now + (fast ? LIVE_RECHECK_MS : EXPORT_PIECE_TTL_MS));
                     continue;

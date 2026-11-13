@@ -3562,13 +3562,13 @@ export const schema = defineSchema({
     // One small row per export run: its key, its owner, when it began, and the key of the usage JSON object it stored, if any. The
     // row is that object's record: kept until the object is confirmed deleted, so the sweep can retry the purge from it. `deleteAt` is
     // the time the sweep next acts on the run: each sweep that finds the run live sets it one time to live ahead, so a dead run's pieces
-    // go at that time. A run the account erasure re-armed (`erasing`) is checked a minute ahead instead, so its object goes soon after its
+    // go at that time. A run the account erasure re-armed (`erasingSince`) is checked a minute ahead instead, so its object goes soon after its
     // export ends. A run is stored with its `deleteAt`, so the sweep finds every run. The sweep reads these rows, which hold no payloads.
     usageExportRuns: defineTable({
         createdAt: v.number(),
         deleteAt: v.number(),
-        // Set by the erasure when it re-arms a live run it could not finish. Such a run is checked a minute ahead while live, for its first hour.
-        erasing: v.optional(v.boolean()),
+        // When the erasure re-armed a live run it could not finish. Such a run is checked a minute ahead while live, for an hour from then.
+        erasingSince: v.optional(v.number()),
         requestId: v.string(),
         usageKey: v.optional(v.string()),
         userId: v.string(),
