@@ -17,7 +17,12 @@ const NORMAL_END = "\u{2}";
 const BOLD_WEIGHTS = new Set(["600", "700", "800", "900", "bold", "bolder"]);
 
 // `lighter` is not here: it is relative, and under a heavy weight it is still bold.
-export const NORMAL_WEIGHTS = new Set(["100", "200", "300", "400", "normal"]);
+// Up to 500, medium, which is not bold either.
+export const NORMAL_WEIGHTS = new Set(["100", "200", "300", "400", "500", "normal"]);
+// The whitespace between the keywords of a CSS value.
+const CSS_SPACE = /[\t\n\f\r ]+/;
+// An angle, as `oblique` may take: `10deg`, `-0.5turn`.
+const ANGLE = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:deg|grad|rad|turn)$/;
 
 const BOLD_NAMES = new Set(["B", "STRONG"]);
 const ITALIC_NAMES = new Set(["EM", "I"]);
@@ -71,11 +76,14 @@ function emphasisOf(element: Element): Emphasis {
 function isItalicStyle(style: string): boolean {
     const value = declaredStyle(style, "font-style");
 
-    return value === "italic" || value.startsWith("oblique");
+    const [keyword, angle, ...rest] = value.split(CSS_SPACE);
+
+    // `oblique` alone or with an angle: a value a browser cannot read sets nothing.
+    return value === "italic" || (keyword === "oblique" && rest.length === 0 && (angle === undefined || ANGLE.test(angle)));
 }
 
 function isStruckStyle(style: string): boolean {
-    return ["text-decoration", "text-decoration-line"].some((property) => declaredStyle(style, property).split(" ").includes("line-through"));
+    return ["text-decoration", "text-decoration-line"].some((property) => declaredStyle(style, property).split(CSS_SPACE).includes("line-through"));
 }
 
 function isNamed(element: Element): boolean {

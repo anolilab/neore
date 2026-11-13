@@ -188,3 +188,25 @@ describe("paste styles: review cases, second round", () => {
         expect(convert(`<p><b>🎉</b><span hidden>\u{200D}</span></p>`)).toBe("**🎉**");
     });
 });
+
+describe("paste styles: review cases, third round", () => {
+    it("leaves medium weight inside bold out of the bold, as 500 is not bold", () => {
+        expect(convert(`<b>a<span style="font-weight:500">b</span>c</b>`)).toBe("**a**b**c**");
+    });
+
+    it("puts headings, quotes and list items inside a code block on lines of their own", () => {
+        expect(convert("<pre><h1>one</h1><h2>two</h2><blockquote>q</blockquote><ul><li>i</li><li>j</li></ul></pre>")).toBe("```\none\ntwo\nq\ni\nj\n```");
+    });
+
+    it("reads a decoration whose keywords a tab parts", () => {
+        expect(convert(`<p><span style="text-decoration:line-through\tunderline">x</span></p>`)).toBe("~~x~~");
+    });
+
+    it("reads oblique as italic only alone or with an angle, as a browser does", () => {
+        expect(
+            convert(
+                `<p><span style="font-style:obliquefoo">a</span> <span style="font-style:oblique 10deg">b</span> <span style="font-style:oblique">c</span> <span style="font-style:oblique 10px">d</span></p>`,
+            ),
+        ).toBe("a *b* *c* d");
+    });
+});
