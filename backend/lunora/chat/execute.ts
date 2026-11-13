@@ -1084,7 +1084,20 @@ export const continueAfterToolApproval = internalAction
             if (!(await ctx.runQuery(internal.chat.streaming.streamRunThread, { streamId: streamId as Id<"persistentStreams">, userId }))) {
                 streamLogger.warn(`[ToolApproval] Stream ${streamId} belongs to a locked or unreachable chat — not resumed`);
 
-                // The run's end first: a failure closing the stream must not leave the run `running` until its reaper.
+                // The stream closes first, with its error line: ending the run stops a continuation still live
+                // (`finishRun`), which would end it without one. A failure closing it must still end the run, not leave it
+                // `running` until its reaper.
+                try {
+                    await failRun(ctx, {
+                        safeMessage: "This chat can no longer continue the response.",
+                        streamId,
+                        threadId,
+                        threadStatus: "active",
+                    });
+                } catch (error) {
+                    streamLogger.error(`[ToolApproval] Could not close the locked chat's stream ${streamId}:`, error);
+                }
+
                 await settleSubAgentRun(
                     ctx,
                     subAgentRunId,
@@ -1092,12 +1105,6 @@ export const continueAfterToolApproval = internalAction
                     subAgentResume ?? undefined,
                 );
                 settled = true;
-                await failRun(ctx, {
-                    safeMessage: "This chat can no longer continue the response.",
-                    streamId,
-                    threadId,
-                    threadStatus: "active",
-                });
 
                 return;
             }

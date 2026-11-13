@@ -47,7 +47,9 @@
   (`settleSubAgentRun`): every write is bound to the resume it runs under (`resumedWith` = that resume's `reapAt`), so a
   further pause waits again and an end finishes the run once (`completeResumedRun`) only while that resume is current;
   a failed write is scheduled again, bound the same way. A continuation that already settled is not ended by a later
-  error.
+  error. A resumed run ended from outside (a Stop, the reaper) also stops its live continuation stream at once
+  (`liveContinuationOf`: the stream keyed on the run's `resumedBy` approval id, read exactly; `stopActiveForThread` with
+  `onlyNamed`), so a tool in it gets the abort; only that stream and its goal.
 - **The parent conversation shows a waiting child's requests** (`listSubAgentApprovals`, the card's `SubAgentApprovals`):
   the parent's owner only (NOT_FOUND otherwise, a locked parent needs its proof), bounded, with a locked child left out
   (its owner unlocks the child to answer). It admits the parent and every child, so it reads each child's latest turn

@@ -105,3 +105,37 @@ export const deleteGoalsForThread = async (ctx: Pick<MutationCtx, "db">, threadI
         await ctx.db.delete("threadGoals", goal._id);
     }
 };
+
+/** The prompt row a run answers: named directly, or read off the run's stream. */
+export const runPromptId = async (ctx: Pick<QueryCtx, "db">, run: { messageId?: string; streamId?: Id<"persistentStreams"> }): Promise<string | undefined> => {
+    if (run.messageId !== undefined || run.streamId === undefined) {
+        return run.messageId;
+    }
+
+    const stream = await ctx.db.get("persistentStreams", run.streamId);
+
+    if (!stream) {
+        return undefined;
+    }
+
+    // An approval continuation's stream is keyed on the approval id; the paused run's prompt is in its snapshot.
+    const approval = await ctx.db
+        .query("toolApprovalRuns")
+        .withIndex("by_approvalId", (q) => q.eq("approvalId", stream.messageId))
+        .first();
+
+    return approval?.config.promptMessageId ?? stream.messageId;
+};
+
+/** Ends only the goal whose current round the run on `streamId` answers: a goal the stream does not run is left alone. */
+export const endGoalsOfStream = async (ctx: GoalCtx, threadId: Id<"threads">, streamId: Id<"persistentStreams">, reason: GoalStopReason): Promise<boolean> => {
+    const promptId = await runPromptId(ctx, { streamId });
+    const active = await activeGoalsOf(ctx, threadId);
+    const own = active.filter((goal) => promptId !== undefined && goal.promptMessageId === promptId);
+
+    for (const goal of own) {
+        await stopGoalRow(ctx, goal, reason);
+    }
+
+    return own.length > 0;
+};

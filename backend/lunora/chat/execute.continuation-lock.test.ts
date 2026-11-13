@@ -242,6 +242,8 @@ describe("a sub-agent child's continuation", () => {
         questionMeanwhile?: boolean;
         resumed?: { awaitingInput?: "approval"; paused: boolean; stopped: boolean };
         status?: "cancelled";
+        /** Records the run's status at the moment the continuation closes its stream (`failRun`). */
+        watchClose?: boolean;
     }) => {
         const harness = lunoraTest(schema as never);
 
@@ -293,6 +295,18 @@ describe("a sub-agent child's continuation", () => {
                 });
             }
 
+            let statusWhenClosed: string | undefined;
+
+            if (options.watchClose) {
+                vi.mocked(failRun).mockImplementationOnce(async () => {
+                    const row = await harness.run(async (ctx: any) => await ctx.db.get("subAgentRuns", runId));
+
+                    statusWhenClosed = row.status;
+
+                    return { replaced: false };
+                });
+            }
+
             if (options.failAfterSettling) {
                 vi.mocked(noteGoalPaused).mockRejectedValueOnce(new Error("goal write failed"));
             }
@@ -340,6 +354,7 @@ describe("a sub-agent child's continuation", () => {
                     ...row,
                     childAwaitingInput: child?.awaitingInput,
                     openRequests: approvals.filter((approval: { status: string }) => approval.status === "pending").length,
+                    statusWhenClosed,
                 };
             });
         } finally {
@@ -353,6 +368,10 @@ describe("a sub-agent child's continuation", () => {
             error: "The sub-agent's conversation can no longer continue.",
             status: "failed",
         });
+    });
+
+    it("closes a locked child's stream before ending its run, so the run's end does not stop it first", async () => {
+        expect(await resumeChild({ lockedAt: Date.now() + 60_000, watchClose: true })).toMatchObject({ status: "failed", statusWhenClosed: "running" });
     });
 
     it("runs nothing for a run stopped or reaped between the answer and the job's start", async () => {

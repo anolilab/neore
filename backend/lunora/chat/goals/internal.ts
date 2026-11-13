@@ -19,7 +19,7 @@
 import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../../_generated/dataModel";
-import type { MutationCtx, QueryCtx } from "../../_generated/server";
+import type { MutationCtx } from "../../_generated/server";
 import { internalMutation, internalQuery } from "../../_generated/server";
 import { candidatesOnActivePath } from "../../agent/branch-rows";
 import { isThreadLocked } from "../../lib/thread-lock";
@@ -42,7 +42,7 @@ import {
     GOAL_TEXT_MAX,
     type GoalStopReason,
 } from "./logic";
-import { activeGoalsOf, endActiveGoals, giveThreadBack, hasLiveStream, stopGoalRow } from "./rows";
+import { activeGoalsOf, endActiveGoals, endGoalsOfStream, giveThreadBack, hasLiveStream, runPromptId, stopGoalRow } from "./rows";
 import { GOAL_CONTINUATION_AGENT } from "./shared";
 import { vGoalRunConfig, vGoalStopReason } from "./validators";
 
@@ -50,27 +50,6 @@ import { vGoalRunConfig, vGoalStopReason } from "./validators";
 const ROUND_ROWS_SCAN = 200;
 
 const ANONYMOUS_GOALS_MESSAGE = "Goals need an account. Sign up to run until a goal is met.";
-
-/** The prompt row a run answers: named directly, or read off the run's stream. */
-const runPromptId = async (ctx: Pick<QueryCtx, "db">, run: { messageId?: string; streamId?: Id<"persistentStreams"> }): Promise<string | undefined> => {
-    if (run.messageId !== undefined || run.streamId === undefined) {
-        return run.messageId;
-    }
-
-    const stream = await ctx.db.get("persistentStreams", run.streamId);
-
-    if (!stream) {
-        return undefined;
-    }
-
-    // An approval continuation's stream is keyed on the approval id; the paused run's prompt is in its snapshot.
-    const approval = await ctx.db
-        .query("toolApprovalRuns")
-        .withIndex("by_approvalId", (q) => q.eq("approvalId", stream.messageId))
-        .first();
-
-    return approval?.config.promptMessageId ?? stream.messageId;
-};
 
 /**
  * Ends the thread's active goals. Given a run (`streamId`), only the goal whose current round that run answers:
@@ -84,15 +63,7 @@ export const endGoalsForThread = internalMutation
             return await endActiveGoals(ctx, args.threadId, args.reason);
         }
 
-        const promptId = await runPromptId(ctx, { streamId: args.streamId });
-        const goals = await activeGoalsOf(ctx, args.threadId);
-        const own = goals.filter((goal) => promptId !== undefined && goal.promptMessageId === promptId);
-
-        for (const goal of own) {
-            await stopGoalRow(ctx, goal, args.reason);
-        }
-
-        return own.length > 0;
+        return await endGoalsOfStream(ctx, args.threadId, args.streamId, args.reason);
     });
 
 /**

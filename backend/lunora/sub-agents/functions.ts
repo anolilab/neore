@@ -1309,6 +1309,28 @@ export const postRunResult = async (ctx: MutationCtx, runId: Id<"subAgentRuns">,
 };
 
 /**
+ * The key of a resumed run's live continuation on its child thread, if one streams: the approval id it last resumed with
+ * (`resumedBy`), which keys the stream its answer opened (`resumeClaimedRun`). Exact: one indexed read, however many
+ * other replies are live. Only the latest resume can still stream: an earlier continuation closed its stream before the
+ * run waited again.
+ */
+const liveContinuationOf = async (ctx: Pick<QueryCtx, "db">, run: Pick<RunDoc, "childThreadId" | "resumedBy">): Promise<string | undefined> => {
+    const { childThreadId, resumedBy } = run;
+
+    if (childThreadId === undefined || resumedBy === undefined) {
+        return undefined;
+    }
+
+    // One stream per approval id: a claim happens once, and a retried answer returns the stream it opened.
+    const streams = await ctx.db
+        .query("persistentStreams")
+        .withIndex("by_threadId_messageId", (q) => q.eq("threadId", childThreadId as Id<"threads">).eq("messageId", resumedBy))
+        .collect();
+
+    return streams.some((stream) => stream.status === "pending" || stream.status === "streaming") ? resumedBy : undefined;
+};
+
+/**
  * Ends an active run and posts its result — once: a run already ended (a
  * redelivered finish, the reaper after a late success) is left alone. Ending
  * frees the run's fan-out slot at once and starts the worker's next queued run;
@@ -1357,6 +1379,23 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
     if (run.childThreadId !== undefined && run.mode !== "worker") {
         await closeChildApprovals(ctx, run.childThreadId, run._id, now);
         await releaseHeldResults(ctx, run.childThreadId);
+    }
+
+    // A resumed run (one that waited has a `reapAt`) ended from outside (a Stop, the reaper) streams its continuation on the
+    // child thread, which `shouldRunStop` halts only at its next step: its stream is stopped now, so a tool in it gets the
+    // abort. Only that stream: a reply the owner started in the child meanwhile keeps going. A continuation that ends
+    // itself closes its stream before it settles (`continueAfterToolApproval`, every path), so nothing is found then.
+    if (wasRunning && !hostRun && run.mode !== "worker" && run.reapAt !== undefined && outcome.kind !== "succeeded" && run.childThreadId !== undefined) {
+        const continuation = await liveContinuationOf(ctx, run);
+
+        if (continuation !== undefined) {
+            // The continuation may end before this runs: `onlyNamed` then stops nothing, not every live reply of the child.
+            await ctx.scheduler.runAfter(0, internal.chat.streaming.persistent.library.stopActiveForThread, {
+                messageId: continuation,
+                onlyNamed: true,
+                threadId: run.childThreadId,
+            });
+        }
     }
 
     // A run ended from this side (stopped, reaped) while its turn still runs: the computer is told to stop. A run ended by
@@ -1570,7 +1609,7 @@ export const awaitApproval = internalMutation
  * second answer to the same run is refused until the child waits again (`claimToolApproval`). The run gets a fresh run
  * window, with its reaper. A no-op for a run that is not waiting: stopped, failed by its reaper, or already resumed.
  */
-export const resumeRunForAnswer = async (ctx: MutationCtx, runId: Id<"subAgentRuns">): Promise<boolean> => {
+export const resumeRunForAnswer = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, approvalId: string): Promise<boolean> => {
     const run = await ctx.db.get("subAgentRuns", runId);
 
     if (run?.status !== "awaiting") {
@@ -1580,7 +1619,8 @@ export const resumeRunForAnswer = async (ctx: MutationCtx, runId: Id<"subAgentRu
     const now = Date.now();
     const reapAt = now + SUB_AGENT_STALE_MS;
 
-    await patchById(ctx.db, "subAgentRuns", run._id, { reapAt, status: "running", updatedAt: now });
+    // `resumedBy` names the continuation's stream, so an end from outside can stop it (`liveContinuationOf`).
+    await patchById(ctx.db, "subAgentRuns", run._id, { reapAt, resumedBy: approvalId, status: "running", updatedAt: now });
     await scheduleReaperAt(ctx, run._id, reapAt, now);
 
     return true;
