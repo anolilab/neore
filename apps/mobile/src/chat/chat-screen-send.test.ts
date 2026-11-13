@@ -13,7 +13,7 @@ const MOVES_ROUTE_ONLY_UNSTOPPED = /if \(shouldMoveRoute\(routeThreadId, control
 
 describe("the chat screen's send", () => {
     it("sends the composer as the last write left it, not as the render saw it", () => {
-        expect(screen).toContain("const prompt = draftRef.current.trim();");
+        expect(screen).toContain("const prompt = draft.get().trim();");
         expect(screen).not.toContain("const prompt = draft.trim();");
     });
 

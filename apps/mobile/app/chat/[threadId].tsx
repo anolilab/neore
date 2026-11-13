@@ -6,7 +6,7 @@ import { randomUUID } from "expo-crypto";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import type { ComponentRef } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Pressable, Share, Text, TextInput, View } from "react-native";
+import { AccessibilityInfo, Keyboard, KeyboardAvoidingView, Pressable, Share, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/auth/auth-state";
@@ -14,6 +14,8 @@ import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
 import type { StartedChat } from "@/chat/chat-api";
 import { ChatError, startChat } from "@/chat/chat-api";
+import { ChatComposer } from "@/chat/chat-composer";
+import { createDraftStore } from "@/chat/draft-store";
 import { forgetLastThread, rememberLastThread } from "@/chat/last-thread-store";
 import { displayTextOf, shareTextOf } from "@/chat/message-parts";
 import { isScrolledToEnd, scrollToLatestLabel, scrollToLatestText, shouldShowScrollToLatest } from "@/chat/scroll-to-latest";
@@ -39,9 +41,6 @@ import { useOffline, useWriteControl } from "@/offline/offline-context";
 import { settleQuietly } from "@/offline/quietly";
 import type { MessageRow } from "@/offline/types";
 import { requireOnline } from "@/offline/write-gate";
-import { useDictation } from "@/voice/use-dictation";
-import { VoiceButton, VoiceStatus } from "@/voice/voice-button";
-import { appendTranscript } from "@/voice/voice-input";
 
 /** A row on this screen; `finished` marks a local row whose send completed, which no server read has confirmed yet. */
 type Row = MessageRow & { finished?: boolean };
@@ -170,20 +169,12 @@ const Chat = () => {
     // Where the next older page starts; null once the whole history is loaded.
     const [olderCursor, setOlderCursor] = useState<string | null>(null);
     const [isLoadingOlder, setIsLoadingOlder] = useState(false);
-    const [draft, setDraftState] = useState("");
-    // The composer as the last write left it, like `rowsRef`: a failed send decides whether its prompt lands alone or ahead
-    // of text typed meanwhile against the composer as it is, not as it was when the send started.
-    const draftRef = useRef("");
-    const setDraft = useCallback((update: string | ((current: string) => string)) => {
-        const next = typeof update === "function" ? update(draftRef.current) : update;
-
-        draftRef.current = next;
-        setDraftState(next);
-    }, []);
+    // The composer's text. Only `ChatComposer` subscribes, so typing never re-renders this screen or its message list.
+    // Like `rowsRef`, it is the composer as the last write left it: a failed send decides whether its prompt lands alone or
+    // ahead of text typed meanwhile against the composer as it is, not as it was when the send started.
+    const [draft] = useState(createDraftStore);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    // The words land in the draft, after anything typed meanwhile; they are never sent on their own.
-    const voice = useDictation({ onText: (text) => setDraft((current) => appendTranscript(current, text)) });
     const listRef = useRef<LegendListRef>(null);
     // Whether the list shows its last message: the jump button shows whenever it does not, and while a reply streams.
     const [isAtEnd, setIsAtEnd] = useState(true);
@@ -450,9 +441,9 @@ const Chat = () => {
 
         // Back to this screen's composer, ahead of anything typed meanwhile, with its held id: the same prompt sent again
         // alone and unchanged is the same send (`clientMessageIdFor`). A screen left meanwhile is gone, and so is the prompt.
-        const { draft: given, isMerged } = giveBackDraft(draftRef.current, prompt);
+        const { draft: given, isMerged } = giveBackDraft(draft.get(), prompt);
 
-        setDraft(given);
+        draft.set(given);
         writeRows((current) => withoutUnsentRows(current, [ids.user, ids.assistant]));
         heldSend.current = shouldKeepClientMessageId(failure) ? { clientMessageId, prompt } : null;
 
@@ -500,9 +491,9 @@ const Chat = () => {
     };
 
     const send = async () => {
-        // The composer as the last write left it (`draftRef`), not as this render saw it: an edit made just before the press
+        // The composer as the last write left it (`draft`), not as this render saw it: an edit made just before the press
         // is what is sent.
-        const prompt = draftRef.current.trim();
+        const prompt = draft.get().trim();
 
         if (!prompt || sending || sendControl.disabled) {
             return;
@@ -530,7 +521,7 @@ const Chat = () => {
         setError(null);
         // Announced when a reply starts and when it finishes. The deltas stay silent: an announcement on each would flood the reader.
         AccessibilityInfo.announceForAccessibility("Assistant is replying");
-        setDraft("");
+        draft.set("");
         const stamp = Date.now();
         const userId = `user-${stamp}`;
         const assistantId = `pending-${stamp}`;
@@ -806,32 +797,7 @@ const Chat = () => {
                     </Text>
                     )
                     : null}
-                <View style={{ flexDirection: "row", gap: 8, padding: 12, paddingBottom: sendReason ? 12 : 12 + safeBottom }}>
-                    <TextInput
-                        accessibilityHint={composer.reason}
-                        accessibilityLabel="Message"
-                        accessibilityState={{ disabled: composer.disabled }}
-                        editable={!composer.disabled}
-                        multiline
-                        onChangeText={setDraft}
-                        placeholder="Message"
-                        style={{ borderColor: "#ccc", borderRadius: 10, borderWidth: 1, flex: 1, padding: 10 }}
-                        value={draft}
-                    />
-                    <VoiceButton disabledReason={composer.reason} isDisabled={composer.disabled} voice={voice} />
-                    <Pressable
-                        accessibilityHint={sendReason}
-                        accessibilityRole="button"
-                        accessibilityState={{ disabled: isSendBlocked }}
-                        disabled={isSendBlocked}
-                        onPress={send}
-                        style={{ justifyContent: "center", opacity: isSendBlocked ? 0.5 : 1, padding: 12 }}
-                    >
-                        <Text style={{ fontWeight: "600" }}>Send</Text>
-                    </Pressable>
-                </View>
-                <VoiceStatus error={voice.error} phase={voice.phase} />
-                {sendReason ? <Text style={{ fontSize: 12, paddingBottom: 8 + safeBottom, paddingHorizontal: 12 }}>{sendReason}</Text> : null}
+                <ChatComposer control={composer} draft={draft} isSendBlocked={isSendBlocked} onSend={send} safeBottom={safeBottom} sendReason={sendReason} />
             </KeyboardAvoidingView>
         </View>
     );
