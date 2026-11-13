@@ -11,7 +11,7 @@ import { Plural, useLingui } from "@lingui/react/macro";
 import { isFetchableUrl, useFetchableOrigins } from "@ui/hooks/use-fetchable-origins";
 import cn from "@ui/utils/cn";
 import { pdfFileKey } from "@ui/utils/pdf-preview-event";
-import { cachePdfThumbnail, getCachedPdfThumbnail, pdfThumbnailCacheGeneration } from "@ui/utils/pdf-thumbnail-cache";
+import { cachePdfThumbnail, pdfThumbnailCacheGeneration, peekCachedPdfThumbnail, touchCachedPdfThumbnail } from "@ui/utils/pdf-thumbnail-cache";
 import type { FC } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
@@ -42,7 +42,8 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
     const { t } = useLingui();
     const fileKey = pdfFileKey(url);
     // A thumbnail drawn before (this file, any signature) starts out drawn: no document, no worker, no placeholder.
-    const [cached] = useState(() => getCachedPdfThumbnail(fileKey));
+    // Read-only here (a render can be discarded); the effect below marks the entry used once this thumbnail mounts.
+    const [cached] = useState(() => peekCachedPdfThumbnail(fileKey));
     // The cache's generation when this thumbnail's draw starts: a sign-out (cache clear) before it finishes discards it.
     const [cacheGeneration] = useState(pdfThumbnailCacheGeneration);
     const [pages, setPages] = useState(cached?.pages ?? 0);
@@ -71,12 +72,19 @@ const PdfThumbnail: FC<PdfThumbnailProps> = ({ className, filename, onOpen, url 
         return () => clearTimeout(timer);
     }, [loading, progress]);
 
-    // Kept once both the drawn page and the page count are in, whichever arrives last.
     useEffect(() => {
-        if (snapshot && pages > 0) {
+        if (cached) {
+            touchCachedPdfThumbnail(fileKey, cached, cacheGeneration);
+        }
+    }, [cacheGeneration, cached, fileKey]);
+
+    // Kept once both the drawn page and the page count are in, whichever arrives last. A thumbnail shown from the cache
+    // writes nothing: its entry is already there, and marking it used is the effect above's job.
+    useEffect(() => {
+        if (snapshot && pages > 0 && (snapshot !== cached?.snapshot || pages !== cached.pages)) {
             cachePdfThumbnail(fileKey, { pages, snapshot }, cacheGeneration);
         }
-    }, [cacheGeneration, fileKey, pages, snapshot]);
+    }, [cacheGeneration, cached, fileKey, pages, snapshot]);
 
     const name = filename ? t`Open ${filename}` : t`Open PDF`;
     const pagesLabel = pages > 0 ? t`${name}, ${plural(pages, { one: "# page", other: "# pages" })}` : name;

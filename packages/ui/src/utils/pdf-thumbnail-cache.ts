@@ -21,15 +21,23 @@ const cacheState = { generation: 0 };
 /** The cache's current generation; a thumbnail takes it when its draw starts and hands it back with the result. */
 export const pdfThumbnailCacheGeneration = (): number => cacheState.generation;
 
-export const getCachedPdfThumbnail = (fileKey: string): CachedPdfThumbnail | undefined => {
-    const cached = thumbnails.get(fileKey);
+/**
+ * The cached thumbnail of a file, read-only: a render may be thrown away before it commits, so looking up must not
+ * reorder the cache. A thumbnail that does mount marks its entry used with `touchCachedPdfThumbnail`.
+ */
+export const peekCachedPdfThumbnail = (fileKey: string): CachedPdfThumbnail | undefined => thumbnails.get(fileKey);
 
-    if (cached) {
-        thumbnails.delete(fileKey);
-        thumbnails.set(fileKey, cached);
+/**
+ * Marks a mounted thumbnail's entry as the most recently used, after commit. Only the entry it looked up counts, and
+ * only in the generation it looked it up in: a clear or a newer drawing since then leaves the order alone.
+ */
+export const touchCachedPdfThumbnail = (fileKey: string, thumbnail: CachedPdfThumbnail, generation: number): void => {
+    if (generation !== cacheState.generation || thumbnails.get(fileKey) !== thumbnail) {
+        return;
     }
 
-    return cached;
+    thumbnails.delete(fileKey);
+    thumbnails.set(fileKey, thumbnail);
 };
 
 /**

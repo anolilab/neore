@@ -3,8 +3,9 @@
 import { FetchableOriginsProvider } from "@ui/components/file-renderers/fetchable-origins-provider";
 import { originsOf } from "@ui/hooks/use-fetchable-origins";
 import { forgetPdfUrls } from "@ui/utils/pdf-preview-event";
+import { cachePdfThumbnail, MAX_CACHED_PDF_THUMBNAILS, pdfThumbnailCacheGeneration, peekCachedPdfThumbnail } from "@ui/utils/pdf-thumbnail-cache";
 import type { ReactNode } from "react";
-import { act } from "react";
+import { act, Suspense, use } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -287,5 +288,91 @@ describe("the thumbnail's worker and cache", () => {
 
         expect(container.querySelector("img")).toBeNull();
         expect(container.querySelector("button")?.getAttribute("aria-busy")).toBe("true");
+    });
+});
+
+describe("the thumbnail cache's eviction order", () => {
+    let container: HTMLDivElement;
+    let root: Root;
+
+    const A_URL = `${ORIGIN}/a.pdf?sig=1`;
+    const A_KEY = `${ORIGIN}/a.pdf`;
+    const otherKey = (index: number) => `${ORIGIN}/other-${String(index)}.pdf`;
+    const thumbnail = { pages: 1, snapshot: "data:image/png;base64,YQ==" };
+
+    /** Caches A first (the least recently used), then fills the cache with other files. */
+    const fillWithAOldest = () => {
+        cachePdfThumbnail(A_KEY, thumbnail, pdfThumbnailCacheGeneration());
+
+        for (let index = 1; index < MAX_CACHED_PDF_THUMBNAILS; index += 1) {
+            cachePdfThumbnail(otherKey(index), thumbnail, pdfThumbnailCacheGeneration());
+        }
+    };
+
+    /** One more file: the least recently used entry is evicted. */
+    const addOneMore = () => {
+        cachePdfThumbnail(otherKey(MAX_CACHED_PDF_THUMBNAILS), thumbnail, pdfThumbnailCacheGeneration());
+    };
+
+    // Suspends forever: the render it is part of is never committed.
+    const never = new Promise<never>(() => {});
+    const Suspends = () => use(never);
+
+    beforeEach(() => {
+        firstPage.documentPending = true;
+        container = document.createElement("div");
+        document.body.append(container);
+        root = createRoot(container);
+    });
+
+    afterEach(() => {
+        act(() => {
+            root.unmount();
+        });
+        container.remove();
+    });
+
+    it("is not changed by a render that is thrown away", async () => {
+        fillWithAOldest();
+
+        await act(async () => {
+            root.render(
+                <FetchableOriginsProvider origins={originsOf(ORIGIN)}>
+                    <Suspense fallback={<p>waiting</p>}>
+                        <PdfThumbnail onOpen={() => {}} url={A_URL} />
+                        <Suspends />
+                    </Suspense>
+                </FetchableOriginsProvider>,
+            );
+        });
+
+        // The thumbnail rendered (it looked A up) but never mounted.
+        expect(container.textContent).toBe("waiting");
+
+        addOneMore();
+
+        // A is still the least recently used, so it is the one evicted.
+        expect(peekCachedPdfThumbnail(A_KEY)).toBeUndefined();
+        expect(peekCachedPdfThumbnail(otherKey(1))).toBeDefined();
+    });
+
+    it("marks the entry used when the thumbnail mounts", async () => {
+        fillWithAOldest();
+
+        await act(async () => {
+            root.render(
+                <FetchableOriginsProvider origins={originsOf(ORIGIN)}>
+                    <PdfThumbnail onOpen={() => {}} url={A_URL} />
+                </FetchableOriginsProvider>,
+            );
+        });
+
+        expect(container.querySelector("img")?.getAttribute("src")).toBe(thumbnail.snapshot);
+
+        addOneMore();
+
+        // A was used after the others: the oldest other file goes instead.
+        expect(peekCachedPdfThumbnail(A_KEY)).toBe(thumbnail);
+        expect(peekCachedPdfThumbnail(otherKey(1))).toBeUndefined();
     });
 });
