@@ -58,7 +58,7 @@ const promptOffer = createPromptOffer();
 /** The signed-in account's registrations carry `isCurrent`; false while nobody is, or once its sign-out began. */
 const signedIn: { account?: { isCurrent: boolean } } = {};
 
-/** Set when the signed-in account's sign-out begins, cleared by the next sign-in: a tap in between waits for that sign-in. */
+/** Set when the signed-in account's sign-out begins, cleared when it finishes (the status goes signed-out): a tap in between waits for the next sign-in. */
 const signOutState = { isBegun: false };
 
 /** Sign-out has begun: no prompt and no registration, offered or in the background, for the account that is leaving. */
