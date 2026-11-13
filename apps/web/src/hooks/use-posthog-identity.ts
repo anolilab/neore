@@ -11,7 +11,6 @@ import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks
 import { setAnalyticsIdentity, setIdentityExpected } from "@/lib/analytics/posthog-client";
 
 const usePostHogIdentity = (): void => {
-
     // The identity is expected while this publisher is mounted. A crash that unmounts it (the router's error component in
     // place of the root) lets PostHog start without one, instead of holding every capture for the rest of the page.
     useEffect(() => {

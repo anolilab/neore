@@ -81,18 +81,25 @@ const declarationLine = (code: string, name: string): number => {
 };
 
 describe("react Compiler coverage of the chat components", () => {
-    it.each(Object.entries(MUST_COMPILE))("compiles every listed component in %s", (file: string, names: string[]) => {
-        const { code, events } = compile(file);
+    it.each(Object.entries(MUST_COMPILE))(
+        "compiles every listed component in %s",
+        (file: string, names: string[]) => {
+            const { code, events } = compile(file);
 
-        for (const name of names) {
-            const line = declarationLine(code, name);
-            const ownEvents = events.filter((event: CompilerEvent) => event.fnLoc?.start.line === line);
-            const reasons = ownEvents
-                .filter((event: CompilerEvent) => event.kind === "CompileError" || event.kind === "PipelineError")
-                .map((event: CompilerEvent) => event.detail?.options?.reason ?? event.detail?.reason ?? event.kind);
+            for (const name of names) {
+                const line = declarationLine(code, name);
+                const ownEvents = events.filter((event: CompilerEvent) => event.fnLoc?.start.line === line);
+                const reasons = ownEvents
+                    .filter((event: CompilerEvent) => event.kind === "CompileError" || event.kind === "PipelineError")
+                    .map((event: CompilerEvent) => event.detail?.options?.reason ?? event.detail?.reason ?? event.kind);
 
-            expect({ name, reasons }).toStrictEqual({ name, reasons: [] });
-            expect(ownEvents.some((event: CompilerEvent) => event.kind === "CompileSuccess"), `${name} was not compiled`).toBe(true);
-        }
-    }, 60_000);
+                expect({ name, reasons }).toStrictEqual({ name, reasons: [] });
+                expect(
+                    ownEvents.some((event: CompilerEvent) => event.kind === "CompileSuccess"),
+                    `${name} was not compiled`,
+                ).toBe(true);
+            }
+        },
+        60_000,
+    );
 });
