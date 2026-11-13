@@ -128,8 +128,16 @@ export const withNewestPage = <R extends HistoryRow>(history: ChatHistory<R>, pa
  * - when it reaches the start of the chat without them, none of the kept rows is on the active path, and they go;
  * - otherwise the hole moves down to the page's oldest row.
  * With no hole, the page extends the run downward.
+ *
+ * `from` is the cursor the page was read from. A page lands later than it was asked for: when a read of the newest page
+ * moved the history meanwhile (a new hole, or a cursor kept from below), the page no longer belongs where it would go,
+ * and the history stays as it is.
  */
-export const withOlderPage = <R extends HistoryRow>(history: ChatHistory<R>, page: HistoryPage<R>): ChatHistory<R> => {
+export const withOlderPage = <R extends HistoryRow>(history: ChatHistory<R>, page: HistoryPage<R>, from: string): ChatHistory<R> => {
+    if (nextOlderCursor(history) !== from) {
+        return history;
+    }
+
     const onScreen = new Set(history.rows.map((row) => row.id));
 
     if (history.gap === undefined) {
@@ -196,7 +204,7 @@ const readFill = async <R extends HistoryRow>({
             return "stopped";
         }
 
-        update((current) => withOlderPage(current, page));
+        update((current) => withOlderPage(current, page, cursor));
     }
 
     return "filled";

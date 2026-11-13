@@ -310,7 +310,13 @@ const Chat = () => {
             await withFinally(
                 async () =>
                     await fillHistory({
-                        fetchOlder: async (cursor) => await readOlderPage(id, cursor, () => {}),
+                        // A failure of this fill shows as "Load older messages" shows it; one the screen moved on from does not.
+                        fetchOlder: async (cursor) =>
+                            await readOlderPage(id, cursor, (message) => {
+                                if (isCurrent()) {
+                                    setError(message);
+                                }
+                            }),
                         fillTo,
                         read: readHistory,
                         save: (run) => {
@@ -409,7 +415,8 @@ const Chat = () => {
             const page = await readOlderPage(id, cursor, setError);
 
             if (page !== undefined) {
-                writeHistory((history) => withOlderPage(history, page));
+                // Applied only where it was read from: a newest-page read that landed meanwhile may have moved the history.
+                writeHistory((history) => withOlderPage(history, page, cursor));
             }
         }, end);
         saveNewestRun(id, startedAt, isCurrent);

@@ -149,7 +149,7 @@ describe("another branch of the chat", () => {
     it("drops every kept row when the fill reaches the start of the chat without meeting them", () => {
         const history: ChatHistory<HistoryRow> = { gap: { anchorId: "b1", cursor: "start", keptCursor: null }, olderCursor: undefined, rows: [...run(1, 5, "a"), ...run(1, 5, "b")] };
 
-        const next = withOlderPage(history, { olderCursor: null, rows: [] });
+        const next = withOlderPage(history, { olderCursor: null, rows: [] }, "start");
 
         expect(ids(next.rows)).toStrictEqual(ids(run(1, 5, "b")));
         expect(next.gap).toBeUndefined();
@@ -213,5 +213,32 @@ describe(createLoadingOwner, () => {
         endSecond();
 
         expect(setLoading.mock.calls.at(-1)).toStrictEqual([false]);
+    });
+});
+
+describe("an older page that lands after the history moved", () => {
+    it("is dropped when a newest-page read opened a hole meanwhile, so no row lands in the wrong place", () => {
+        // Rows 81-100 are on screen; "Load older messages" reads from "81".
+        const pressed: ChatHistory<HistoryRow> = { olderCursor: "81", rows: run(81, 100) };
+        const asked = nextOlderCursor(pressed);
+        // Before the page lands, a newest-page read finds 40 new messages: a hole now sits below 121-140.
+        const refreshed = withNewestPage(pressed, { olderCursor: "121", rows: run(121, 140) });
+
+        const landed = withOlderPage(refreshed, { olderCursor: "61", rows: run(61, 80) }, asked ?? "");
+
+        expect(landed).toBe(refreshed);
+        expect(ids(landed.rows)).toStrictEqual(ids([...run(81, 100), ...run(121, 140)]));
+        expect(nextOlderCursor(landed)).toBe("121");
+    });
+
+    it("is applied when the history still reads from where the page was asked for", () => {
+        const pressed: ChatHistory<HistoryRow> = { olderCursor: "81", rows: run(81, 100) };
+        // A newest-page read that reaches the rows keeps the cursor below them.
+        const refreshed = withNewestPage(pressed, { olderCursor: "82", rows: run(82, 101) });
+
+        const landed = withOlderPage(refreshed, { olderCursor: "61", rows: run(61, 80) }, "81");
+
+        expect(ids(landed.rows)).toStrictEqual(ids(run(61, 101)));
+        expect(nextOlderCursor(landed)).toBe("61");
     });
 });

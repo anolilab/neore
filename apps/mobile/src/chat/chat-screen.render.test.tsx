@@ -19,8 +19,12 @@ const harness = vi.hoisted(() => {
         finishReply: undefined as ((outcome: string) => void) | undefined,
         /** Frames requested by the screen, run by the test. */
         frames: [] as (() => void)[],
+        /** Whether the chat has history below its newest page, which the screen fills after the paint. */
+        hasOlder: false,
         /** One entry per render of the message list: it renders exactly when the screen does. */
         listRenders: [] as number[],
+        /** Answers a read of an older page; each test that has older history sets it. */
+        olderPage: async (_cursor: string): Promise<unknown> => { throw new Error("This test has no older page."); },
         /** The delta handler the screen gave the stream. */
         onDelta: undefined as ((delta: { reasoning: string; text: string }) => void) | undefined,
         /** What each `Text` rendered: a row skipped by its memo adds nothing. */
@@ -33,10 +37,14 @@ const stable = vi.hoisted(() => {
 
     return {
         client: {
-            query: async () => {
+            query: async (_query: unknown, args: { paginationOpts: { cursor: string | null } }) => {
+                if (args.paginationOpts.cursor !== null) {
+                    return await harness.olderPage(args.paginationOpts.cursor);
+                }
+
                 return {
-                    continueCursor: "",
-                    isDone: true,
+                    continueCursor: "older",
+                    isDone: !harness.hasOlder,
                     page: [
                         { _creationTime: 1, id: "q1", parts: [{ text: "Why?", type: "text" }], role: "user", status: "success" },
                         { _creationTime: 2, id: "a1", parts: [{ text: "An earlier answer", type: "text" }], role: "assistant", status: "success" },
@@ -277,5 +285,39 @@ describe("the chat screen streaming a reply", () => {
             harness.finishReply?.("finished");
             await Promise.resolve();
         });
+    });
+});
+
+describe("the chat screen filling its history after the newest page", () => {
+    const mounted: { container?: HTMLElement; root?: Root } = {};
+
+    beforeEach(() => {
+        harness.hasOlder = true;
+        // React reads this to allow `act` outside a testing library.
+        Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
+        mounted.container = document.createElement("div");
+        mounted.root = createRoot(mounted.container);
+    });
+
+    afterEach(() => {
+        act(() => {
+            mounted.root?.unmount();
+        });
+        harness.hasOlder = false;
+    });
+
+    it("shows why an older page of the fill could not be read, as Load older messages does", async () => {
+        harness.olderPage = async () => {
+            throw new Error("The server could not read older messages.");
+        };
+
+        act(() => {
+            mounted.root?.render(createElement(ChatScreen));
+        });
+
+        await vi.waitFor(() => {
+            expect(mounted.container?.textContent).toContain("The server could not read older messages.");
+        });
+        expect(mounted.container?.textContent).toContain("An earlier answer");
     });
 });
