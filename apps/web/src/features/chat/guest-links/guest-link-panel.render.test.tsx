@@ -14,7 +14,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const ACTIVE_UNTIL = /^Link active until/u;
 const revoke = vi.fn(async (_args: { confirmedNotes: string[]; linkId: string }) => null);
 const readLink = vi.fn(async () => {
-    return { link: null, messages: [] as { id: string; status: string }[] };
+    return { link: null as { id: string } | null, messages: [] as { id: string; status: string }[] };
 });
 
 // The query client tells its observers on a microtask, not a timer, so an update lands inside `act`.
@@ -92,7 +92,7 @@ const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider 
 
 /** Starts a revoke and tracks whether it has settled, without waiting on real time. */
 const start = (run: () => Promise<boolean>) => {
-    const outcome: { failed?: boolean; settled: boolean; value?: boolean } = { settled: false };
+    const outcome: { error?: unknown; settled: boolean; value?: boolean } = { settled: false };
 
     act(() => {
         void run()
@@ -102,9 +102,9 @@ const start = (run: () => Promise<boolean>) => {
 
                 return value;
             })
-            .catch(() => {
+            .catch((error: unknown) => {
                 outcome.settled = true;
-                outcome.failed = true;
+                outcome.error = error;
             });
     });
 
@@ -167,6 +167,16 @@ describe("GuestLinkPanel", () => {
         expect(screen.getByText(ACTIVE_UNTIL)).toBeTruthy();
     });
 
+    it("moves focus to Create when the link ends while Revoke has it", () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+        showPanel({ link: { bound: false, expiresAt: Date.now() + 1000, id: "link-1" }, messages: [] });
+
+        act(() => screen.getByRole("button", { name: "Revoke link" }).focus());
+        act(() => vi.advanceTimersByTime(1000));
+
+        expect(screen.getByRole("button", { name: "Create guest link" }).matches(":focus")).toBe(true);
+    });
+
     it("waits again even when its timer fires at the very time the panel last read", () => {
         vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
         showPanel({ link: { bound: false, expiresAt: Date.now() + 1000, id: "link-1" }, messages: [] });
@@ -216,7 +226,7 @@ describe(useGuestLinkRevoke, () => {
 
         // Note A was sent from another device and a guest left B: the server refuses the ids the owner confirmed.
         revoke.mockRejectedValueOnce({ code: "BAD_REQUEST", data: { code: "GUEST_NOTES_WAITING", waiting: 1 } });
-        readLink.mockResolvedValueOnce({ link: null, messages: [{ id: "note-b", status: "held" }] });
+        readLink.mockResolvedValueOnce({ link: { id: "link-1" }, messages: [{ id: "note-b", status: "held" }] });
 
         const outcome = start(() => result.current.revokeLink("link-1", ["note-a"]));
 
@@ -236,13 +246,29 @@ describe(useGuestLinkRevoke, () => {
 
         // The server counts a note on another live link, which the read does not list: there is nothing new to ask about.
         revoke.mockRejectedValueOnce({ code: "BAD_REQUEST", data: { code: "GUEST_NOTES_WAITING", waiting: 2 } });
-        readLink.mockResolvedValueOnce({ link: null, messages: [{ id: "note-a", status: "held" }] });
+        readLink.mockResolvedValueOnce({ link: { id: "link-1" }, messages: [{ id: "note-a", status: "held" }] });
 
         const outcome = start(() => result.current.revokeLink("link-1", ["note-a"]));
 
         await act(async () => (result.current.confirmDialog as { props: { onConfirm: () => void } }).props.onConfirm());
 
         expect(revoke).toHaveBeenCalledTimes(1);
-        expect(outcome).toMatchObject({ failed: true, settled: true });
+        expect(outcome).toMatchObject({ error: { message: "The revoke was refused, and no unconfirmed note is shown." }, settled: true });
+    });
+
+    it("asks nothing about a link replaced since the owner confirmed, and reports it ended", async () => {
+        const { result } = renderHook(() => useGuestLinkRevoke("thread-1"), { wrapper });
+
+        // Refused, and the fresh read finds another tab's new link, with its own note.
+        revoke.mockRejectedValueOnce({ code: "BAD_REQUEST", data: { code: "GUEST_NOTES_WAITING", waiting: 1 } });
+        readLink.mockResolvedValueOnce({ link: { id: "link-2" }, messages: [{ id: "note-new", status: "held" }] });
+
+        const outcome = start(() => result.current.revokeLink("link-1", ["note-a"]));
+
+        await act(async () => (result.current.confirmDialog as { props: { onConfirm: () => void } }).props.onConfirm());
+
+        expect((result.current.confirmDialog as { props: { open: boolean } }).props.open).toBe(false);
+        expect(revoke).toHaveBeenCalledTimes(1);
+        expect(outcome).toMatchObject({ error: { data: { code: "GUEST_LINK_ENDED" } }, settled: true });
     });
 });

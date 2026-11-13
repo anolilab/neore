@@ -33,11 +33,17 @@ const useGuestLinkRevoke = (
     }
 
     /** The notes waiting now, read afresh: the panel's live read may not have caught up with a note just left. */
-    const waitingNow = async (forThread: string | undefined): Promise<string[]> => {
+    const waitingNow = async (forThread: string | undefined, linkId: string): Promise<string[]> => {
         const read = await queryClient.fetchQuery({
             ...crpc.chat.guest_links.getGuestLink.queryOptions({ threadId: forThread as Id<"threads">, unlockProof }, { live: false }),
             staleTime: 0,
         });
+
+        // The link the owner saw is gone or replaced (another tab): its notes are not this link's, so nothing is asked. The panel
+        // reads this as it does the server's own `GUEST_LINK_ENDED`.
+        if (read.link?.id !== linkId) {
+            throw Object.assign(new Error("The guest link was replaced or has ended."), { data: { code: "GUEST_LINK_ENDED" } });
+        }
 
         return read.messages.filter((note) => note.status === "held").map((note) => note.id);
     };
@@ -68,7 +74,7 @@ const useGuestLinkRevoke = (
                 throw error;
             }
 
-            const waiting = await waitingNow(forThread);
+            const waiting = await waitingNow(forThread, linkId);
 
             // Asked again only about a note the owner has not confirmed yet, and only through the confirm. When the read shows
             // none (the server counts a note this read does not list), stop: never a retry without a click, never a loop.

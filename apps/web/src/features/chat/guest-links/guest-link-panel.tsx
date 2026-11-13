@@ -46,6 +46,13 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
     const create = useMutation(crpc.chat.guest_links.createGuestLink.mutationOptions({ gcTime: 0 }));
     // After a revoke, focus goes to "Create guest link" once it shows, not to the page: the Revoke button is gone.
     const focusCreateRef = useRef(false);
+    const revokeButtonRef = useRef<HTMLButtonElement>(null);
+    // The link ends while focus is on Revoke, which then goes: focus moves on to "Create guest link", as after a revoke.
+    const keepFocusAtEnd = () => {
+        if (revokeButtonRef.current !== null && revokeButtonRef.current === document.activeElement) {
+            focusCreateRef.current = true;
+        }
+    };
     const [revoking, setRevoking] = useState(false);
     // A link past its end is not live, even before the next read says so (a read reruns on writes, not on time): the panel
     // re-renders when it ends.
@@ -66,6 +73,7 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
         // catch up once. Once `now` has passed the end there is nothing left to do.
         if (linkEnd <= current) {
             if (now < linkEnd) {
+                keepFocusAtEnd();
                 setNow(current);
             }
 
@@ -76,7 +84,13 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
         // `now` moves while the link is still ahead: a timer can fire early, or the clock move back.
         const timer = setTimeout(
             () => {
-                setNow(Date.now());
+                const fired = Date.now();
+
+                if (fired >= linkEnd) {
+                    keepFocusAtEnd();
+                }
+
+                setNow(fired);
                 setTicks((count) => count + 1);
             },
             Math.min(linkEnd - current, MAX_TIMEOUT_MS),
@@ -194,6 +208,7 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, t
                         onClick={() => {
                             void handleRevoke();
                         }}
+                        ref={revokeButtonRef}
                         variant="outline"
                     >
                         {t`Revoke link`}
