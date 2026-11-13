@@ -152,14 +152,15 @@ function hasEdgeSpace(element: Element): boolean {
  * of it and step into it (`isTransparentWrapper` in src/commonmark-rules.ts), so the neighbour test does too.
  */
 function isWrapper(node: Node): boolean {
-    return (
-        node.nodeType === 1 &&
-        !isBlock(node) &&
-        !isVoid(node) &&
-        !EMPHASIS_NAMES.has(node.nodeName) &&
-        !NO_WORD_EDGE.has(node.nodeName) &&
-        !BLANK_TEXT.test(node.textContent ?? "")
-    );
+    if (node.nodeType !== 1 || isBlock(node) || isVoid(node)) {
+        return false;
+    }
+
+    if (EMPHASIS_NAMES.has(node.nodeName) || NO_WORD_EDGE.has(node.nodeName)) {
+        return false;
+    }
+
+    return !BLANK_TEXT.test(node.textContent ?? "");
 }
 
 /** The nearest non-empty node on one side, looking out of and into wrappers as the converter's runs do. */
