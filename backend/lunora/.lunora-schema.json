@@ -22234,6 +22234,12 @@
         }
       },
       "indexes": {
+        "by_lastRequest": {
+          "fields": [
+            "lastRequest"
+          ],
+          "unique": false
+        },
         "key": {
           "fields": [
             "key"
@@ -22277,6 +22283,12 @@
         "by_key": {
           "fields": [
             "key"
+          ],
+          "unique": false
+        },
+        "by_ts": {
+          "fields": [
+            "ts"
           ],
           "unique": false
         }

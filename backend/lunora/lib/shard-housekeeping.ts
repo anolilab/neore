@@ -68,6 +68,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "cleanupStaleWorkflowPresence", ref: internal.workflow.presence.cleanupStalePresence },
     { name: "reapLapsedClaims", ref: internal.lib.claim_once.reapLapsedClaims },
     { name: "purgeIdempotencyClaims", ref: internal.lib.claim_once.purgeExpiredClaims },
+    // Rate-limit rows charged on this shard, past every limit's window (`lib/rate-limit-sweep.ts`).
+    { name: "sweepExpiredRateLimits", ref: internal.lib.rate_limit_sweep.sweepExpiredRateLimits },
     { name: "deleteExpiredTemporaryChats", ref: internal.crons.deleteExpiredTemporaryChats },
     // Per-user setting (`autoArchiveAfterDays`); does nothing for users who left it off.
     { name: "autoArchiveInactiveThreads", ref: internal.agent.auto_archive.autoArchiveInactiveThreads },

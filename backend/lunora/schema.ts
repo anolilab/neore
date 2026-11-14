@@ -2294,7 +2294,9 @@ export const schema = defineSchema({
     })
         .externallyManaged()
         .global()
-        .index("key", ["key"]),
+        .index("key", ["key"])
+        // `auth/rate-limit-sweep.ts` deletes rows past every limiter window.
+        .index("by_lastRequest", ["lastRequest"]),
 
     /**
      * Backing table for `@lunora/ratelimit`'s `createDbStore`.
@@ -2317,7 +2319,9 @@ export const schema = defineSchema({
         value: v.number(),
     })
         .externallyManaged()
-        .index("by_key", ["key"]),
+        .index("by_key", ["key"])
+        // `lib/rate-limit-sweep.ts` deletes rows past every limit's retention.
+        .index("by_ts", ["ts"]),
 
     /**
      * A value the agent asked the user for with `requestSecret` (an API key, a token),
