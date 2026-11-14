@@ -7,7 +7,7 @@ import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@neore/ui/components/responsive-popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Switch } from "@neore/ui/components/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@neore/ui/components/tabs";
@@ -248,8 +248,8 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
     };
 
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger
+        <Popover>
+            <PopoverTrigger
                 render={
                     <Button className={cn(classes?.button, "text-white")} size="icon" variant="ghost">
                         <Share2 className={cn(classes?.icon, "h-4 w-4")} />
@@ -257,7 +257,8 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
                     </Button>
                 }
             />
-            <DropdownMenuContent className="w-[420px] p-0">
+            {/* A popover, not a menu: it holds tabs and a form, which a `role="menu"` may not contain. */}
+            <PopoverContent align="end" aria-label={t`Share Thread`} className="w-[420px] p-0">
                 <Tabs className="w-full" onValueChange={handleTabChange} value={shownTab}>
                     <TabsList className={cn("grid w-full", showGuests ? "grid-cols-4" : "grid-cols-3")}>
                         <TabsTrigger value="access">{t`Access`}</TabsTrigger>
@@ -415,7 +416,7 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
                         </TabsContent>
                     )}
                 </Tabs>
-            </DropdownMenuContent>
+            </PopoverContent>
             <DeleteConfirmationDialog
                 description={t`Are you sure you want to remove ${userToRemoveName} from this thread?`}
                 itemName={userToRemove?.name}
@@ -436,7 +437,7 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
                 title={t`Remove User`}
             />
             {guestRevokeDialog}
-        </DropdownMenu>
+        </Popover>
     );
 };
 
