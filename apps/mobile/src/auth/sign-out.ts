@@ -1,3 +1,4 @@
+import type { StoredGrant } from "./grant";
 import { StoredGrantNotClearedError } from "./stored-grant-error";
 
 /** How long sign-out waits for the server to drop this phone's push token before it carries on without it. */
@@ -13,6 +14,8 @@ interface SignOutSteps {
     dismissNotifications?: () => Promise<void>;
     /** Forgets the chat saved to reopen on launch. */
     forgetLastChat: () => Promise<void>;
+    /** Records the token of the grant being signed out, so a background task refuses it even if the stored session stays readable. */
+    markSignedOut?: (token: string) => Promise<void>;
     /** Tells the server this phone stops getting the account's pushes. Signs in with the in-memory JWT. */
     releasePush?: () => Promise<void>;
     /** Revokes the session server-side. May fail, or never answer, with no network. */
@@ -61,10 +64,14 @@ const revokeStored = async (token: string | undefined, revokeSession: (token: st
  * phone's push token is released while the in-memory sign-in still works, waited on for at most
  * {@link RELEASE_PUSH_TIMEOUT_MS}. Last the session is revoked server-side with the token taken above.
  */
+/** Whether `markedToken` is the token a sign-out recorded for `grant`: a grant left readable by a failed clear is refused. */
+export const wasSignedOut = (grant: StoredGrant, markedToken: string | null): boolean => markedToken === grant.token;
+
 export const signOutOnDevice = async ({
     clearCache,
     dismissNotifications,
     forgetLastChat,
+    markSignedOut,
     releasePush,
     revokeSession,
     takeCredential,
@@ -92,6 +99,14 @@ export const signOutOnDevice = async ({
         // warning gets only the keychain failure: the error itself carries the session token.
         token = error instanceof StoredGrantNotClearedError ? error.token : undefined;
         warn("Could not clear the stored sign-in.", error instanceof StoredGrantNotClearedError ? error.cause : error);
+    }
+
+    if (token !== undefined && markSignedOut) {
+        try {
+            await markSignedOut(token);
+        } catch (error) {
+            warn("Could not record the sign-out for the background task.", error);
+        }
     }
 
     await removeAlerts(dismissNotifications, warn);

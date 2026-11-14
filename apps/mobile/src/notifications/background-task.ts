@@ -17,7 +17,7 @@ import {
 import { defineTask } from "expo-task-manager";
 import { Platform } from "react-native";
 
-import { secureGrantStore } from "../auth/secure-store";
+import { readSignedInGrant } from "../auth/signed-out-grant";
 import { loadConfig } from "../lib/config";
 import { ANDROID_CHANNEL_ID, channelName, deviceLocale } from "./push-channel";
 import type { PushText } from "./push-content";
@@ -80,7 +80,7 @@ if (Platform.OS === "android") {
                         await dismissNotificationAsync(ids.notificationId);
                     }
                 },
-                session: async () => await secureGrantStore.get() ?? undefined,
+                session: readSignedInGrant,
                 show: post,
             });
         } catch (taskError) {
