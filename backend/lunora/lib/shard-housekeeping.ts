@@ -17,6 +17,13 @@
  *   {@link runShardHousekeeping} to each shard active since its last sweep, and
  *   at least daily to any shard active in the last {@link HOUSEKEEPING_HORIZON_MS}
  *   — an expiry does not wait for its owner to come back.
+ * - **Dormant shards** (idle past that horizon): only the `rateLimits` sweep.
+ *   The census flag `rateLimitsPending` says a shard may hold rows: activity and
+ *   any charge that adds a row set it, and the dormant sweep clears it when it
+ *   leaves the table empty. A daily job reads only flagged dormant rows, through
+ *   their index, and dispatches `sweepDormantShardRateLimits`
+ *   (`lib/rate-limit-sweep.ts`) to each, so a shard that stays dormant and empty
+ *   costs nothing.
  *
  * Each dispatch goes on the target user's own scheduler lane
  * (`shard-scheduler.ts`), so shards are swept side by side, not one at a time.
@@ -27,6 +34,7 @@ import { v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { internalAction, internalMutation } from "../_generated/server";
+import { enqueueJob } from "./job-queue";
 import { cronsLogger } from "./logger";
 import { patchRow } from "./patch";
 import { currentUserShard } from "./shard-context";
@@ -40,8 +48,9 @@ export const HOUSEKEEPING_IDLE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const ACTIVITY_THROTTLE_MS = 10 * 60 * 1000;
 /** A shard tick re-arms no sooner than this, so a stuck due row cannot spin. */
 const MIN_TICK_INTERVAL_MS = 60 * 1000;
+
 /** Shards dispatched per root run; the rest wait for the next one. */
-const DISPATCH_BATCH = 200;
+export const DISPATCH_BATCH = 200;
 
 /** An argument-less internal mutation, as in `crons.ts`. */
 interface Sweep {
@@ -122,7 +131,9 @@ const bestEffort = async (what: string, write: () => Promise<void>): Promise<boo
     }
 };
 
-const censusRow = async (ctx: CensusCtx, shardKey: string) => await ctx.db.shardActivity.findFirst({ where: { shardKey } });
+/** `primary` for a read whose answer decides a flag write: a lagging replica could still show a flag the sweep cleared. */
+const censusRow = async (ctx: CensusCtx, shardKey: string, consistency?: "primary") =>
+    await ctx.db.shardActivity.findFirst({ ...(consistency && { consistency }), where: { shardKey } });
 
 const touchedAt = new Map<string, number>();
 
@@ -141,9 +152,9 @@ export const noteShardActivity = async (ctx: CensusCtx, shardKey: string | undef
         const row = await censusRow(ctx, shardKey);
 
         if (row) {
-            await ctx.db.patch("shardActivity", row._id, { lastActiveAt: now });
+            await ctx.db.patch("shardActivity", row._id, { lastActiveAt: now, rateLimitsPending: true });
         } else {
-            await ctx.db.insert("shardActivity", { lastActiveAt: now, shardKey });
+            await ctx.db.insert("shardActivity", { lastActiveAt: now, rateLimitsPending: true, shardKey });
         }
     });
 };
@@ -170,6 +181,93 @@ export const noteShardDue = async (ctx: CensusCtx, dueAt: number, shardKey: stri
             await ctx.db.patch("shardActivity", row._id, { nextDueAt: dueAt });
         }
     });
+};
+
+/** Before the retry of a failed {@link noteRateLimitsPending} write, so a passing D1 failure has cleared. */
+export const RATE_LIMITS_PENDING_RETRY_MS = 30 * 1000;
+
+const markRateLimitsPendingRow = async (ctx: CensusCtx, shardKey: string): Promise<void> => {
+    const row = await censusRow(ctx, shardKey, "primary");
+
+    if (!row) {
+        await ctx.db.insert("shardActivity", { lastActiveAt: Date.now(), rateLimitsPending: true, shardKey });
+    } else if (row.rateLimitsPending !== true) {
+        await ctx.db.patch("shardActivity", row._id, { rateLimitsPending: true });
+    }
+};
+
+/**
+ * On a user shard: a charge added a `rateLimits` row, so the dormant-shard dispatch must visit this shard. A charge need
+ * not move `lastActiveAt` (a guest's post on the owner's shard), so this is its own note. Writes only when the flag is
+ * off; a charge that only updates a row needs none, since a table holding a row keeps the flag on
+ * ({@link settleRateLimitsPending} re-checks after clearing).
+ *
+ * The row is already written, and a later charge on that key only updates it, so a failed write would leave the flag off
+ * for good: it is retried out of band, by {@link markRateLimitsPending} on this shard through the jobs queue (whose own
+ * redelivery bounds it to three tries). Neither the write nor the send ever fails the charge.
+ */
+export const noteRateLimitsPending = async (ctx: CensusCtx, shardKey: string | undefined = currentUserShard()): Promise<void> => {
+    if (shardKey === undefined) {
+        return;
+    }
+
+    if (await bestEffort("noteRateLimitsPending", async () => await markRateLimitsPendingRow(ctx, shardKey))) {
+        return;
+    }
+
+    await bestEffort("noteRateLimitsPending retry", async () => {
+        await enqueueJob(internal.lib.shard_housekeeping.markRateLimitsPending, { shardKey }, { delayMs: RATE_LIMITS_PENDING_RETRY_MS, shardKey });
+    });
+};
+
+/** The retry of a failed {@link noteRateLimitsPending} write. It throws on failure, so the queue delivers it again. */
+export const markRateLimitsPending = internalMutation
+    .input({ shardKey: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await markRateLimitsPendingRow(ctx, args.shardKey);
+
+        return null;
+    });
+
+/**
+ * On a user shard, from the dormant sweep: set the flag to whether the `rateLimits` table still holds a row. Clearing
+ * writes first and reads again after, so a charge racing the sweep is never lost: a row added before the second read
+ * is seen there and sets the flag back, and a charge after it finds the flag off and sets it itself
+ * ({@link noteRateLimitsPending}, which runs after its row is written). Returns whether the flag is now off.
+ */
+export const settleRateLimitsPending = async (ctx: Pick<MutationCtx, "db">, shardKey: string | undefined = currentUserShard()): Promise<boolean> => {
+    if (shardKey === undefined || (await ctx.db.query("rateLimits").first()) !== null) {
+        return false;
+    }
+
+    let cleared = false;
+
+    const settled = await bestEffort("settleRateLimitsPending", async () => {
+        const row = await censusRow(ctx, shardKey, "primary");
+
+        if (!row) {
+            return;
+        }
+
+        await ctx.db.patch("shardActivity", row._id, { rateLimitsPending: false });
+
+        if ((await ctx.db.query("rateLimits").first()) === null) {
+            cleared = true;
+        } else {
+            await ctx.db.patch("shardActivity", row._id, { rateLimitsPending: true });
+        }
+    });
+
+    // A census write failed partway: the flag may now be off while a racing charge left a row. Put it back out of band,
+    // as a failed charge note does, so the dormant dispatch still finds this shard.
+    if (!settled && (await ctx.db.query("rateLimits").first()) !== null) {
+        await bestEffort("settleRateLimitsPending retry", async () => {
+            await enqueueJob(internal.lib.shard_housekeeping.markRateLimitsPending, { shardKey }, { delayMs: RATE_LIMITS_PENDING_RETRY_MS, shardKey });
+        });
+    }
+
+    return cleared;
 };
 
 /** `noteShardActivity` for callers outside a shard (the HTTP layer), run on the user's shard. */
@@ -222,6 +320,50 @@ export const dispatchShardHousekeeping = internalMutation
         }
 
         return { dispatched: due.length };
+    });
+
+/**
+ * Root, daily: send `sweepDormantShardRateLimits` (`lib/rate-limit-sweep.ts`) to each flagged shard idle past
+ * {@link HOUSEKEEPING_HORIZON_MS}, which {@link dispatchShardHousekeeping} no longer visits. It reads only flagged rows,
+ * through `by_rateLimitsPending_lastActiveAt`, a page per run; a full page schedules the next one after the last row's
+ * (`lastActiveAt`, `_id`). That key is unique and stable, so a shard turning active between pages (it leaves the range)
+ * or a tie on `lastActiveAt` cannot make the next page skip one. `before` is fixed by the first run, so the chain pages
+ * one range, which never overlaps the housekeeping range (`lastActiveAt >= now - horizon`). A shard crossing the horizon
+ * on the day may meet both; the sweep only deletes rows past every window, so a second run is a no-op.
+ */
+export const dispatchDormantRateLimitSweeps = internalMutation
+    .input({
+        after: v.optional(v.object({ id: v.id("shardActivity"), lastActiveAt: v.number() })),
+        before: v.optional(v.number()),
+    })
+    .output(v.object({ dispatched: v.number() }))
+    .mutation(async ({ args, ctx }) => {
+        const before = args.before ?? ctx.now - HOUSEKEEPING_HORIZON_MS;
+        const { after } = args;
+        const { page } = await ctx.db.shardActivity.findMany({
+            limit: DISPATCH_BATCH,
+            orderBy: [{ lastActiveAt: "asc" }, { _id: "asc" }],
+            where: {
+                lastActiveAt: { lt: before },
+                rateLimitsPending: true,
+                ...(after && { OR: [{ lastActiveAt: { gt: after.lastActiveAt } }, { _id: { gt: after.id }, lastActiveAt: after.lastActiveAt }] }),
+            },
+        });
+
+        for (const row of page) {
+            await runAfterOnShard(ctx.scheduler, 0, internal.lib.rate_limit_sweep.sweepDormantShardRateLimits, {}, row.shardKey);
+        }
+
+        const last = page.at(-1);
+
+        if (page.length === DISPATCH_BATCH && last) {
+            await ctx.scheduler.runAfter(0, internal.lib.shard_housekeeping.dispatchDormantRateLimitSweeps, {
+                after: { id: last._id, lastActiveAt: last.lastActiveAt },
+                before,
+            });
+        }
+
+        return { dispatched: page.length };
     });
 
 /**

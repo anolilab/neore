@@ -6,6 +6,7 @@ import { internal } from "../_generated/internal";
 import type { ActionCtx as ActionContext, MutationCtx as MutationContext } from "../_generated/server";
 import { getSessionNetworkSignals } from "../auth";
 import type { SessionUser } from "../auth/functions";
+import { noteRateLimitsPending } from "./shard-housekeeping";
 
 /**
  * The earlier `Ratelimit.fixedWindow(rate, period)` / `.tokenBucket(...)` builders and
@@ -732,9 +733,31 @@ export const createRatelimit = (
         throw new LunoraError("BAD_REQUEST", `Unknown rate limit config: ${name}`);
     }
 
+    // A charge that adds a row must flag the shard for the dormant sweep (`lib/shard-housekeeping.ts`); one that only
+    // updates a row needs nothing, since a table holding a row keeps the flag on.
+    let inserts = 0;
+    const store = createDbStore({
+        db: new Proxy(database, {
+            get: (target, property) => {
+                if (property === "insert") {
+                    return async (...args: Parameters<RateLimitDb["insert"]>) => {
+                        const id = await target.insert(...args);
+
+                        inserts += 1;
+
+                        return id;
+                    };
+                }
+
+                const value: unknown = Reflect.get(target, property, target);
+
+                return typeof value === "function" ? value.bind(target) : value;
+            },
+        }),
+    });
     const limiter = new RateLimiter({
         config: { [name]: config },
-        store: createDbStore({ db: database }),
+        store,
         ...(clock && { now: clock }),
     });
 
@@ -756,7 +779,13 @@ export const createRatelimit = (
         /** `reserve`: book the units even past what is left (the window goes into debt, so later calls are refused). */
         limit: async (identifier: string, args?: { count?: number; reserve?: boolean }) => {
             try {
+                const insertsBefore = inserts;
                 const status = await limiter.limit(name, { count: args?.count, key: `neore:${name}:${identifier}`, reserve: args?.reserve });
+
+                if (inserts > insertsBefore) {
+                    // `database` is the charging mutation's `ctx.db`, typed here by the store's narrower interface.
+                    await noteRateLimitsPending({ db: database as unknown as MutationContext["db"] });
+                }
 
                 // The earlier implementation reported an absolute `reset` timestamp; Lunora reports a
                 // relative `retryAfter`. Callers want the timestamp, so convert.

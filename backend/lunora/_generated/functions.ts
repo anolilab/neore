@@ -1013,11 +1013,14 @@ export const LUNORA_FUNCTION_MANIFEST: Readonly<Record<string, FunctionManifestE
     "lib_document_history:recordHistory": {"argumentDescriptors":[{"kind":"any","name":"attribution","optional":true},{"kind":"any","name":"doc","optional":false},{"kind":"string","name":"documentId","optional":false},{"kind":"boolean","name":"isDeleted","optional":false},{"kind":"any","name":"oldDoc","optional":true},{"kind":"string","name":"organizationId","optional":true},{"kind":"string","name":"tableName","optional":false},{"kind":"string","name":"userId","optional":true}],"exportName":"recordHistory","kind":"mutation","moduleId":"lunora_lib_document_history_153","visibility":"internal"},
     "lib_document_history:vacuumHistory": {"argumentDescriptors":[{"kind":"number","name":"minTsToKeep","optional":false}],"exportName":"vacuumHistory","kind":"mutation","moduleId":"lunora_lib_document_history_153","visibility":"internal"},
     "lib_job_once:runJobOnce": {"argumentDescriptors":[{"kind":"any","name":"args","optional":true},{"kind":"string","name":"jobId","optional":false},{"kind":"object","name":"onLapse","optional":true},{"kind":"string","name":"target","optional":false},{"kind":"string","name":"userId","optional":true}],"exportName":"runJobOnce","kind":"action","moduleId":"lunora_lib_job_once_154","visibility":"internal"},
-    "lib_rate_limit_sweep:sweepExpiredRateLimits": {"argumentDescriptors":[{"kind":"string","name":"debtCursor","optional":true}],"exportName":"sweepExpiredRateLimits","kind":"mutation","moduleId":"lunora_lib_rate_limit_sweep_155","visibility":"internal"},
+    "lib_rate_limit_sweep:sweepDormantShardRateLimits": {"argumentDescriptors":[],"exportName":"sweepDormantShardRateLimits","kind":"mutation","moduleId":"lunora_lib_rate_limit_sweep_155","visibility":"internal"},
+    "lib_rate_limit_sweep:sweepExpiredRateLimits": {"argumentDescriptors":[{"kind":"string","name":"debtCursor","optional":true},{"kind":"boolean","name":"dormant","optional":true}],"exportName":"sweepExpiredRateLimits","kind":"mutation","moduleId":"lunora_lib_rate_limit_sweep_155","visibility":"internal"},
     "lib_rate_limiter_mutations:applyRateLimit": {"argumentDescriptors":[{"kind":"number","name":"count","optional":true},{"kind":"string","name":"identifier","optional":false},{"kind":"string","name":"key","optional":false},{"kind":"boolean","name":"reserve","optional":true}],"exportName":"applyRateLimit","kind":"mutation","moduleId":"lunora_lib_rate_limiter_mutations_156","visibility":"internal"},
     "lib_rate_limiter_mutations:resetRateLimit": {"argumentDescriptors":[{"kind":"string","name":"identifier","optional":false},{"kind":"string","name":"key","optional":false}],"exportName":"resetRateLimit","kind":"mutation","moduleId":"lunora_lib_rate_limiter_mutations_156","visibility":"internal"},
+    "lib_shard_housekeeping:dispatchDormantRateLimitSweeps": {"argumentDescriptors":[{"kind":"object","name":"after","optional":true},{"kind":"number","name":"before","optional":true}],"exportName":"dispatchDormantRateLimitSweeps","kind":"mutation","moduleId":"lunora_lib_shard_housekeeping_157","visibility":"internal"},
     "lib_shard_housekeeping:dispatchDueShards": {"argumentDescriptors":[],"exportName":"dispatchDueShards","kind":"mutation","moduleId":"lunora_lib_shard_housekeeping_157","visibility":"internal"},
     "lib_shard_housekeeping:dispatchShardHousekeeping": {"argumentDescriptors":[],"exportName":"dispatchShardHousekeeping","kind":"mutation","moduleId":"lunora_lib_shard_housekeeping_157","visibility":"internal"},
+    "lib_shard_housekeeping:markRateLimitsPending": {"argumentDescriptors":[{"kind":"string","name":"shardKey","optional":false}],"exportName":"markRateLimitsPending","kind":"mutation","moduleId":"lunora_lib_shard_housekeeping_157","visibility":"internal"},
     "lib_shard_housekeeping:recordShardActivity": {"argumentDescriptors":[{"kind":"string","name":"shardKey","optional":false}],"exportName":"recordShardActivity","kind":"mutation","moduleId":"lunora_lib_shard_housekeeping_157","visibility":"internal"},
     "lib_shard_housekeeping:runShardHousekeeping": {"argumentDescriptors":[],"exportName":"runShardHousekeeping","kind":"action","moduleId":"lunora_lib_shard_housekeeping_157","visibility":"internal"},
     "lib_shard_housekeeping:runShardTick": {"argumentDescriptors":[],"exportName":"runShardTick","kind":"mutation","moduleId":"lunora_lib_shard_housekeeping_157","visibility":"internal"},
@@ -2844,11 +2847,14 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "lib_document_history:recordHistory": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"any","name":"attribution","optional":true},{"kind":"any","name":"doc","optional":false},{"kind":"string","name":"documentId","optional":false},{"kind":"boolean","name":"isDeleted","optional":false},{"kind":"any","name":"oldDoc","optional":true},{"kind":"string","name":"organizationId","optional":true},{"kind":"string","name":"tableName","optional":false},{"kind":"string","name":"userId","optional":true}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "lib_document_history:vacuumHistory": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"number","name":"minTsToKeep","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "lib_job_once:runJobOnce": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"any","name":"args","optional":true},{"kind":"string","name":"jobId","optional":false},{"kind":"object","name":"onLapse","optional":true},{"kind":"string","name":"target","optional":false},{"kind":"string","name":"userId","optional":true}],"kind":"action","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
-    "lib_rate_limit_sweep:sweepExpiredRateLimits": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"debtCursor","optional":true}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
+    "lib_rate_limit_sweep:sweepDormantShardRateLimits": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
+    "lib_rate_limit_sweep:sweepExpiredRateLimits": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"debtCursor","optional":true},{"kind":"boolean","name":"dormant","optional":true}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "lib_rate_limiter_mutations:applyRateLimit": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"number","name":"count","optional":true},{"kind":"string","name":"identifier","optional":false},{"kind":"string","name":"key","optional":false},{"kind":"boolean","name":"reserve","optional":true}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "lib_rate_limiter_mutations:resetRateLimit": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"identifier","optional":false},{"kind":"string","name":"key","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
+    "lib_shard_housekeeping:dispatchDormantRateLimitSweeps": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"object","name":"after","optional":true},{"kind":"number","name":"before","optional":true}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "lib_shard_housekeeping:dispatchDueShards": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "lib_shard_housekeeping:dispatchShardHousekeeping": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
+    "lib_shard_housekeeping:markRateLimitsPending": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"shardKey","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "lib_shard_housekeeping:recordShardActivity": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"shardKey","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "lib_shard_housekeeping:runShardHousekeeping": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[],"kind":"action","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "lib_shard_housekeeping:runShardTick": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
@@ -4737,15 +4743,18 @@ export interface Caller {
             runJobOnce: (args: { args?: unknown; jobId: string; onLapse?: { args?: string; target: string }; target: string; userId?: string }) => Promise<null>;
         };
         rate_limit_sweep: {
-            sweepExpiredRateLimits: (args: { debtCursor?: string }) => Promise<number>;
+            sweepDormantShardRateLimits: (args?: {}) => Promise<{ cleared: boolean; deleted: number }>;
+            sweepExpiredRateLimits: (args: { debtCursor?: string; dormant?: boolean }) => Promise<number>;
         };
         rate_limiter_mutations: {
             applyRateLimit: (args: { count?: number; identifier: string; key: string; reserve?: boolean }) => Promise<{ ok: boolean; retryAfter: number | undefined; }>;
             resetRateLimit: (args: { identifier: string; key: string }) => Promise<void>;
         };
         shard_housekeeping: {
+            dispatchDormantRateLimitSweeps: (args: { after?: { id: Id<"shardActivity">; lastActiveAt: number }; before?: number }) => Promise<{ dispatched: number }>;
             dispatchDueShards: (args?: {}) => Promise<{ dispatched: number }>;
             dispatchShardHousekeeping: (args?: {}) => Promise<{ dispatched: number }>;
+            markRateLimitsPending: (args: { shardKey: string }) => Promise<null>;
             recordShardActivity: (args: { shardKey: string }) => Promise<null>;
             runShardHousekeeping: (args?: {}) => Promise<{ failed: Array<string> }>;
             runShardTick: (args?: {}) => Promise<null>;
@@ -6833,6 +6842,7 @@ export const createCaller = (context: CallerCtx): Caller => ({
             runJobOnce: (args) => callRegistered(context, "lib_job_once:runJobOnce", args),
         },
         rate_limit_sweep: {
+            sweepDormantShardRateLimits: (args) => callRegistered(context, "lib_rate_limit_sweep:sweepDormantShardRateLimits", args),
             sweepExpiredRateLimits: (args) => callRegistered(context, "lib_rate_limit_sweep:sweepExpiredRateLimits", args),
         },
         rate_limiter_mutations: {
@@ -6840,8 +6850,10 @@ export const createCaller = (context: CallerCtx): Caller => ({
             resetRateLimit: (args) => callRegistered(context, "lib_rate_limiter_mutations:resetRateLimit", args),
         },
         shard_housekeeping: {
+            dispatchDormantRateLimitSweeps: (args) => callRegistered(context, "lib_shard_housekeeping:dispatchDormantRateLimitSweeps", args),
             dispatchDueShards: (args) => callRegistered(context, "lib_shard_housekeeping:dispatchDueShards", args),
             dispatchShardHousekeeping: (args) => callRegistered(context, "lib_shard_housekeeping:dispatchShardHousekeeping", args),
+            markRateLimitsPending: (args) => callRegistered(context, "lib_shard_housekeeping:markRateLimitsPending", args),
             recordShardActivity: (args) => callRegistered(context, "lib_shard_housekeeping:recordShardActivity", args),
             runShardHousekeeping: (args) => callRegistered(context, "lib_shard_housekeeping:runShardHousekeeping", args),
             runShardTick: (args) => callRegistered(context, "lib_shard_housekeeping:runShardTick", args),

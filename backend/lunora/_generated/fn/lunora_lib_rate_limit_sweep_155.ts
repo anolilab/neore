@@ -16,6 +16,13 @@ if (source["debtCursor"].length > 1024) return DEFER;
 __val1 = source["debtCursor"];
 __has1 = true;
 }
-return { ...(__has1 ? { "debtCursor": __val1 } : {}) };
+let __has2 = false;
+let __val2;
+if (source["dormant"] !== undefined) {
+if (typeof source["dormant"] !== "boolean") return DEFER;
+__val2 = source["dormant"];
+__has2 = true;
+}
+return { ...(__has1 ? { "debtCursor": __val1 } : {}), ...(__has2 ? { "dormant": __val2 } : {}) };
 });
 export * from "../../lib/rate-limit-sweep.js";
