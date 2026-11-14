@@ -22,4 +22,4 @@ export const isPhonePushConfigured = (env: Record<string, unknown>): boolean => 
  * `ANDROID_DATA_ONLY_PUSH=off` before rolling an Android build back to one without the background task. The server then
  * sends the notification-style push to every Android phone again, without waiting for each phone to register.
  */
-export const isAndroidDataOnlyPushOn = (env: Record<string, unknown>): boolean => read(env, "ANDROID_DATA_ONLY_PUSH") !== "off";
+export const isAndroidDataOnlyPushOn = (env: Record<string, unknown>): boolean => read(env, "ANDROID_DATA_ONLY_PUSH").toLowerCase() !== "off";

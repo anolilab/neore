@@ -1,10 +1,18 @@
 import type { NotificationTrigger } from "expo-notifications";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { StoredGrant } from "../auth/grant";
 import { channelName } from "./push-channel";
 import type { PushText } from "./push-content";
-import { fetchPushContent, isDataOnlyPush, NOT_THIS_ACCOUNT, pushPlaceholder, showDataOnlyPush, WITHHELD } from "./push-content";
+import {
+    fetchPushContent,
+    isDataOnlyPush,
+    NOT_THIS_ACCOUNT,
+    PUSH_CONTENT_TIMEOUT_MS,
+    pushPlaceholder,
+    showDataOnlyPush,
+    WITHHELD,
+} from "./push-content";
 
 const LUNORA = "https://api.test";
 const TOKEN_URL = `${LUNORA}/extension/auth/token`;
@@ -74,6 +82,37 @@ describe("fetchPushContent", () => {
 
         expect(await fetchPushContent({ fetch: fetch as never, grant: grantOf("u1"), lunoraUrl: LUNORA, notificationId: "n1" })).toBeUndefined();
         expect(fetch).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("fetchPushContent's time budget", () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("aborts a request that outlives the budget, and answers nothing", async () => {
+        vi.useFakeTimers();
+
+        const fetch = vi.fn(
+            (_url: string, init?: RequestInit) =>
+                new Promise<Response>((_resolve, reject) => {
+                    init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+                }),
+        );
+        const pending = fetchPushContent({ fetch: fetch as never, grant: grantOf("u1"), lunoraUrl: LUNORA, notificationId: "n1" });
+
+        await vi.advanceTimersByTimeAsync(PUSH_CONTENT_TIMEOUT_MS);
+
+        expect(await pending).toBeUndefined();
+        expect(fetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+    });
+
+    it("clears its timer once the request answers", async () => {
+        vi.useFakeTimers();
+
+        await fetchWith({ body: { body: "x", title: "y" } });
+
+        expect(vi.getTimerCount()).toBe(0);
     });
 });
 
@@ -181,6 +220,20 @@ describe("showDataOnlyPush", () => {
 
         expect(result).toBe(true);
         expect(show).toHaveBeenCalledWith({ body: "Release run", title: "Approval" }, PUSH);
+    });
+
+    it("keeps the placeholder when the account switches before the post", async () => {
+        const { retract, show } = await runTask({ body: "Release run", title: "Approval" }, ["u1", "u2", "u2"]);
+
+        expect(show).toHaveBeenCalledWith(pushPlaceholder("de-DE"), { notificationId: "n1" });
+        expect(retract).not.toHaveBeenCalled();
+    });
+
+    it("shows nothing when the phone is signed out before the post", async () => {
+        const { result, show } = await runTask({ body: "Release run", title: "Approval" }, ["u1", undefined]);
+
+        expect(result).toBe(false);
+        expect(show).not.toHaveBeenCalled();
     });
 
     it("lets an error while posting reach the caller, which answers it", async () => {

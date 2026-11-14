@@ -33,6 +33,11 @@ const registerPushTask = async (): Promise<void> => {
     }
 };
 
+/** The attempt to register the task. The first device registration waits for it, so it never reads the task as missing. */
+let taskRegistration: Promise<void> = Promise.resolve();
+
+export const pushTaskRegistration = async (): Promise<void> => await taskRegistration;
+
 if (Platform.OS === "android") {
     defineTask(PHONE_PUSH_TASK, async ({ data, error }) => {
         if (error) {
@@ -95,5 +100,5 @@ if (Platform.OS === "android") {
     });
 
     // eslint-disable-next-line unicorn/prefer-top-level-await -- Hermes has no top-level await; the app must not wait on this
-    registerPushTask();
+    taskRegistration = registerPushTask();
 }

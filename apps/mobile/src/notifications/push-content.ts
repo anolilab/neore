@@ -194,7 +194,13 @@ export const showDataOnlyPush = async (payload: unknown, steps: PushTaskSteps): 
     }
 
     const current = await steps.session();
-    const isSameSession = current?.user.id === fetchedFor;
+
+    // A phone signed out by now shows nothing.
+    if (current === undefined) {
+        return false;
+    }
+
+    const isSameSession = current.user.id === fetchedFor;
     const realText = isSameSession && typeof fetched === "object" ? fetched : undefined;
     const text = realText ?? pushPlaceholder(steps.locale);
     const shownIds = fetched === WITHHELD || !isSameSession ? { notificationId: ids.notificationId } : ids;
@@ -207,7 +213,8 @@ export const showDataOnlyPush = async (payload: unknown, steps: PushTaskSteps): 
     try {
         const afterPost = await steps.session();
 
-        isUnchanged = afterPost?.user.id === fetchedFor;
+        // The alert is for the account read just before the post, so a change to any other account takes it back.
+        isUnchanged = afterPost?.user.id === current.user.id;
     } catch {
         // A read that fails leaves the account unconfirmed, so the alert is taken back.
     }

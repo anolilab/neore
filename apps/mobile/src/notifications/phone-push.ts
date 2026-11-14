@@ -25,6 +25,7 @@ import { sharedKeychainOps } from "../auth/secure-store";
 import { writeIfDifferent } from "../auth/shared-keychain";
 import { loadConfig } from "../lib/config";
 import { registerApprovalActions } from "./approval-actions";
+import { pushTaskRegistration } from "./background-task";
 import { clearTapRoute } from "./pending-tap";
 import { ANDROID_CHANNEL_ID, channelName, deviceLocale } from "./push-channel";
 import { isDataOnlyPush, PHONE_PUSH_TASK } from "./push-content";
@@ -65,6 +66,9 @@ export const devicePushPlatform: PushPlatform = {
 /** Whether this build's background task is registered: the phone builds its own Android alerts only while it is. */
 const isPhoneTaskRegistered = async (): Promise<boolean> => {
     try {
+        // The first registration can run before the task has registered: wait for that attempt, or the phone reads as built without it.
+        await pushTaskRegistration();
+
         return await isTaskRegisteredAsync(PHONE_PUSH_TASK);
     } catch {
         return false;

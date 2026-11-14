@@ -206,6 +206,7 @@ describe("the Android data-only switch", () => {
         expect(isAndroidDataOnlyPushOn({})).toBe(true);
         expect(isAndroidDataOnlyPushOn({ ANDROID_DATA_ONLY_PUSH: "on" })).toBe(true);
         expect(isAndroidDataOnlyPushOn({ ANDROID_DATA_ONLY_PUSH: "off" })).toBe(false);
+        expect(isAndroidDataOnlyPushOn({ ANDROID_DATA_ONLY_PUSH: "OFF" })).toBe(false);
     });
 });
 
@@ -289,6 +290,29 @@ describe("deliverToPhones", () => {
 
         await expect(deliverToPhones(ctx as never, USER, { notificationId: "n1", urgency: "normal" })).resolves.toBeUndefined();
         expect(ctx.log.event).toHaveBeenCalledWith("notifications.native_push", { delivered: 1, failed: 0, gone: 0 });
+    });
+
+    it("sends an Android phone that builds its own alert the generic alert while the switch is off", async () => {
+        vi.stubEnv("ANDROID_DATA_ONLY_PUSH", "off");
+        const ctx = actionCtx([{ buildsAlert: true, id: "d2", platform: "android", sessionId: "s1", token: SECOND_PHONE }]);
+
+        vi.mocked(sendExpoMessages).mockResolvedValueOnce([{ id: "r2", status: "ok" }]);
+
+        await deliverToPhones(ctx as never, USER, { notificationId: "n1", urgency: "normal" });
+
+        expect(sendExpoMessages).toHaveBeenCalledWith("expo-secret", [expect.objectContaining({ body: expect.any(String), title: "Neore", to: SECOND_PHONE })]);
+    });
+
+    it("sends that same phone only its ids while the switch is on", async () => {
+        const ctx = actionCtx([{ buildsAlert: true, id: "d2", platform: "android", sessionId: "s1", token: SECOND_PHONE }]);
+
+        vi.mocked(sendExpoMessages).mockResolvedValueOnce([{ id: "r2", status: "ok" }]);
+
+        await deliverToPhones(ctx as never, USER, { notificationId: "n1", urgency: "normal" });
+
+        const [[, messages]] = vi.mocked(sendExpoMessages).mock.calls;
+        expect(messages).toStrictEqual([expect.objectContaining({ data: { notificationId: "n1" }, to: SECOND_PHONE })]);
+        expect(messages[0]).not.toHaveProperty("title");
     });
 
     it("checks no receipt for a ticket that came back without an id", async () => {
