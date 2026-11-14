@@ -60,7 +60,7 @@ import { loadEligibleThread } from "../devices/internal";
 import { isDeviceInScope, resolveThreadProject } from "../devices/lib/scope";
 import { isDeviceOnline } from "../devices/lib/state";
 import { type DeviceTaintSource, mergeTaint } from "../devices/lib/taint";
-import { claimedAtOf, claimOnce } from "../lib/claim-once";
+import { claimedAtOf, claimOnce, hasClaim } from "../lib/claim-once";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
@@ -495,8 +495,7 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
     }
 
     // A switch to a coding agent starts one on a computer: the organization that caps the chat must allow that.
-    const capOrganizationId = toHost ? hostOrganizationOf(thread, args.organizationId) : undefined;
-    const refused = await hostOrganizationRefusal(ctx, capOrganizationId, args.userId);
+    const refused = toHost ? await hostOrganizationRefusal(ctx, hostOrganizationOf(thread, args.organizationId), args.userId) : null;
 
     if (refused) {
         throw new LunoraError("FORBIDDEN", refused);
@@ -540,7 +539,6 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
     const handoff = await handoffFor(ctx, thread, leaf, target, { lenient: native !== undefined });
     const taintedBy = target.kind === "host" ? await takeoverTaint(ctx, { current, fromHost, leaf, thread }) : [];
     const result = await write(ctx, {
-        capOrganizationId,
         clientId: args.clientId,
         current,
         handoff,
@@ -577,8 +575,6 @@ const takeoverTaint = async (
     args.fromHost ? mergeTaint(args.current.session?.taintedBy, HOST_HANDOFF_TAINT) : await threadPathTaint(ctx, args.thread._id, args.leaf);
 
 interface WriteArgs {
-    /** The organization that admitted a switch to a computer, kept on a new host thread that is filed under none. */
-    capOrganizationId: string | undefined;
     clientId: string;
     current: { agent: SwitchAgentRef; session?: Session };
     handoff: string;
@@ -696,8 +692,9 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
                   model: target.offer.agentKey,
                   ...(thread.projectId && { projectId: thread.projectId }),
                   ...(thread.organizationId && { organizationId: thread.organizationId }),
-                  // A personal chat keeps its list, and its new host thread keeps the cap it was admitted under.
-                  ...(!thread.organizationId && args.capOrganizationId && { capOrganizationId: args.capOrganizationId }),
+                  // An unfiled chat keeps the organization that caps it (`capOrganizationId`); a personal one stays capped by the
+                  // space it is used from, so the caller's space is not stamped on it.
+                  ...(!thread.organizationId && thread.capOrganizationId && { capOrganizationId: thread.capOrganizationId }),
                   ...(thread.teamId && { teamId: thread.teamId }),
                   runner: "host",
                   status: "active",
@@ -799,6 +796,11 @@ export const clearHostSessionHandler = async (
         throw new LunoraError("CONFLICT", "Wait for the agent to be ready before clearing the context", {
             data: { code: CONTEXT_CLEAR_CONFLICT.agentStarting },
         });
+    }
+
+    // A click already answered stays answered, whatever the cap has become since.
+    if (await hasClaim(ctx, "switch", claimKeyOf(args))) {
+        throw new LunoraError("CONFLICT", "This clear was already made", { data: { code: CONTEXT_CLEAR_CONFLICT.alreadyMade } });
     }
 
     // A clear opens a new session on the computer, so it is held to the organization's cap as a start is.

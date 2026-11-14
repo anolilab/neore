@@ -39,7 +39,8 @@ const devices = await import("../devices/functions");
 const { signDevicePayload } = await import("../devices/lib/signing");
 const { applyHostEvents } = await import("./ingest");
 const { agentSwitchOf } = await import("../agent/agent-switch-logic");
-const { runAgentSwitch } = await import("../chat/agent-switch");
+const { claimKeyOf, runAgentSwitch } = await import("../chat/agent-switch");
+const { claimOnce } = await import("../lib/claim-once");
 const { HOST_HANDOFF_MAX_BYTES, pendingHandoffOf } = await import("./lib/pending-handoff");
 const { jsonBytes } = await import("../agent/handoff");
 const { assembleHandoffContext } = await import("../agent/handoff-context");
@@ -939,18 +940,28 @@ describe("an organization's cap on a computer", () => {
         expect(await rows("acpSessions")).toHaveLength(0);
     });
 
-    it("keeps the cap a personal chat's switch was admitted under on its new host thread, without filing it", async () => {
+    it("carries an unfiled chat's own cap across switches, and stamps no space on a personal chat", async () => {
         const device = await pairedDevice(ownerId);
-        const source = await cloudThread();
+        const personal = await cloudThread();
 
         await capped("auto");
 
-        const result = await runAgentSwitch(
+        // A personal chat switched from an organization's space is capped by the space it is used from, not stamped.
+        const stamped = await runAgentSwitch(
             runner,
-            { clientId: nextClick(), target: hostTarget(device) as never, threadId: source as never, userId: ownerId },
+            { clientId: nextClick(), target: hostTarget(device) as never, threadId: personal as never, userId: ownerId },
             summary,
             "org-1",
         );
+
+        expect(await run(async (ctx) => await ctx.db.get("threads", stamped.forkedThreadId as never))).not.toHaveProperty("capOrganizationId");
+
+        // A chat capped by an organization it is not filed under keeps that cap on the computer's thread.
+        const source = await cloudThread();
+
+        await run(async (ctx) => await ctx.db.patch("threads", source as never, { capOrganizationId: "org-1" } as never));
+
+        const result = await switchTo(source, hostTarget(device));
         const fork = await run(async (ctx) => await ctx.db.get("threads", result.forkedThreadId as never));
 
         expect(fork).toMatchObject({ capOrganizationId: "org-1" });
@@ -1012,6 +1023,22 @@ describe("an organization's cap on a computer", () => {
 
         await expect(clear("clear-capped")).rejects.toMatchObject({ data: { code: "CONTEXT_CLEAR_NOT_ALLOWED" } });
         expect(await rows("acpSessions", { threadId })).toHaveLength(1);
+    });
+
+    it("answers a /clear already made as made, even after the cap tightened", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await hostThread(device, 1);
+
+        await fileUnder(threadId);
+        await capped("ask");
+        await run(
+            async (ctx) =>
+                await claimOnce(ctx, "switch", claimKeyOf({ clientId: "clear-once", threadId: threadId as never, userId: ownerId }), 60_000, ownerId),
+        );
+
+        await expect(
+            run(async (ctx) => await switchModule.clearHostSessionHandler(ctx, { clientId: "clear-once", threadId: threadId as never, userId: ownerId })),
+        ).rejects.toMatchObject({ data: { code: "CONTEXT_CLEAR_ALREADY_MADE" } });
     });
 });
 
