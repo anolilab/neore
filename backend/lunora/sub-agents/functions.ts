@@ -1967,16 +1967,6 @@ export const markRunAwaiting = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
 };
 
 /**
- * {@link markRunAwaiting}, for a run whose loop or continuation paused. `resumedWith` is the deadline the resume that
- * paused again set (`continuingRun`), or 0 for the first pause (never resumed): a later answer replaced it, so a write
- * for an older pause changes nothing.
- */
-export const awaitApproval = internalMutation
-    .input({ resumedWith: v.optional(v.number()), runId: v.id("subAgentRuns") })
-    .output(v.boolean())
-    .mutation(async ({ args, ctx }) => await markRunAwaiting(ctx, args.runId, args.resumedWith));
-
-/**
  * `awaiting` → `running`, in the transaction that claims the owner's answer (`chat/lib/tool-approval-resume.ts`), so a
  * second answer to the same run is refused until the child waits again (`claimToolApproval`). The run gets a fresh run
  * window, with its reaper. A no-op for a run that is not waiting: stopped, failed by its reaper, or already resumed.
@@ -2000,7 +1990,7 @@ export const resumeRunForAnswer = async (ctx: MutationCtx, runId: Id<"subAgentRu
 
 /**
  * The run a continuation resumes, read when its job starts: `null` once it is no longer running (stopped or reaped since
- * the answer), else the deadline its resume set (`reapAt`), which names that resume for a later pause ({@link awaitApproval}).
+ * the answer), else the deadline its resume set (`reapAt`), which names that resume for a later pause ({@link markRunAwaiting}).
  */
 export const continuingRun = internalQuery
     .input({ runId: v.id("subAgentRuns") })

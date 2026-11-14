@@ -22983,6 +22983,12 @@
           "optional": true,
           "unique": false
         },
+        "rateLimitsPending": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "shardKey": {
           "kind": "string",
           "nullable": false,
@@ -23000,6 +23006,13 @@
         "by_nextDueAt": {
           "fields": [
             "nextDueAt"
+          ],
+          "unique": false
+        },
+        "by_rateLimitsPending_lastActiveAt": {
+          "fields": [
+            "rateLimitsPending",
+            "lastActiveAt"
           ],
           "unique": false
         },

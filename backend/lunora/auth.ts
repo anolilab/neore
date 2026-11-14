@@ -30,6 +30,7 @@ import { clientGrantCookie } from "./auth/client-grant-cookie";
 import type { HostPairingOptions } from "./auth/cli-device-auth";
 import { cliDeviceAuth } from "./auth/cli-device-auth";
 import { guestConversion } from "./auth/guest-conversion";
+import { impersonationCredentialGuard } from "./auth/impersonation-credential-guard";
 import { deletedOrganizationOf, queueOrganizationBillingCancel } from "./billing/gdpr";
 import { queueOrganizationPolicyErase } from "./auth/organization-policy-erase";
 import { queueOrganizationRepoErase } from "./projects/gdpr";
@@ -370,6 +371,8 @@ export const buildAuthOptions = (hooks: AuthOptionHooks = {}): BetterAuthOptions
                   ]
                 : []),
             apiKey(API_KEY_OPTIONS),
+            // No API key, passkey, password or sign-in method added while an admin acts as the account: none would carry the mark.
+            impersonationCredentialGuard(),
             // `neore login --device`: signs the CLI in by code, answered with a read-only API key.
             ...cliDeviceAuth({
                 // `neore-host pair`: a headless machine pairs itself as a device of the approving account. The

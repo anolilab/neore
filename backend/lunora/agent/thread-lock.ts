@@ -63,6 +63,17 @@ export const checkPasscode = async (context: MutationCtx, row: PasscodeRow, pass
     return { ok: false, retryAfterMs: wait > 0 ? wait : undefined };
 };
 
+/**
+ * The pattern of `setThreadPermissionMode` and the guest-link writes: an admin acting as the owner sets, re-locks, changes or
+ * removes no passcode. Locking also withdraws the chat's guest link and held notes. `unlockThread` stays open: it changes
+ * nothing about the chat, only proves the passcode for reading, and reads are not guarded.
+ */
+const refuseImpersonation = (impersonatedBy: string | null | undefined, refused: string): void => {
+    if (impersonatedBy) {
+        throw new LunoraError("FORBIDDEN", `${refused} while impersonating`);
+    }
+};
+
 const requireLockedRow = async (context: MutationCtx, threadId: Id<"threads">) => {
     const row = await readPasscodeRow(context.db, threadId);
 
@@ -81,6 +92,8 @@ export const enableThreadLock = authMutation
     })
     .output(vLockResult)
     .mutation(async ({ args: { passcode, threadId }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy, "A chat cannot be locked");
+
         const { userId } = context.user;
         const { now } = context;
 
@@ -183,6 +196,8 @@ export const lockThread = authMutation
     .input({ threadId: v.id("threads") })
     .output(vLockResult)
     .mutation(async ({ args: { threadId }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy, "A chat cannot be locked");
+
         const { userId } = context.user;
         const { now } = context;
         const thread = await requireOwnedThreadIgnoringLock(context, threadId, userId);
@@ -219,6 +234,8 @@ export const changeThreadPasscode = authMutation
     })
     .output(vLockResult)
     .mutation(async ({ args: { currentPasscode, newPasscode, threadId }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy, "A chat's passcode cannot be changed");
+
         const { userId } = context.user;
         const { now } = context;
         const thread = await requireOwnedThreadIgnoringLock(context, threadId, userId);
@@ -261,6 +278,8 @@ export const removeThreadPasscode = authMutation
     })
     .output(vLockResult)
     .mutation(async ({ args: { passcode, threadId }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy, "A chat's passcode cannot be removed");
+
         const { userId } = context.user;
         const { now } = context;
         const thread = await requireOwnedThreadIgnoringLock(context, threadId, userId);

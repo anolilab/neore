@@ -46,6 +46,7 @@ import type { FC } from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
+import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import type { ThreadLockMode } from "@/features/chat/lock/thread-lock-dialog";
@@ -241,6 +242,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const hasOpenedMoveToProject = useHasOpened(showMoveToProjectDialog);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [lockMode, setLockMode] = useState<ThreadLockMode | null>(null);
+    // An admin acting as the owner may not lock, archive or delete: the server refuses each, as each withdraws the guest link.
+    const isImpersonating = useImpersonating();
     // "Lock now" makes the server refuse the old proof (epoch rotated): forget it here too, and refetch so the locked gate shows at once.
     const { mutate: lockNow } = useMutation(
         crpc.agent.thread_lock.lockThread.mutationOptions({
@@ -838,54 +841,60 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     />
                 )}
 
-                <DropdownMenu>
-                    <Tooltip>
-                        <TooltipTrigger
-                            render={
-                                <DropdownMenuTrigger
-                                    render={
-                                        <Button
-                                            aria-label={named(isLocked ? t`Chat lock: locked` : t`Chat lock`)}
-                                            className="hover:text-primary-text h-6 w-6 p-0"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
+                {(!isImpersonating || (isLocked && !isUnlocked)) && (
+                    <DropdownMenu>
+                        <Tooltip>
+                            <TooltipTrigger
+                                render={
+                                    <DropdownMenuTrigger
+                                        render={
+                                            <Button
+                                                aria-label={named(isLocked ? t`Chat lock: locked` : t`Chat lock`)}
+                                                className="hover:text-primary-text h-6 w-6 p-0"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                }}
+                                                size="icon-sm"
+                                                variant="ghost"
+                                            >
+                                                <Lock aria-hidden="true" className="h-3 w-3" />
+                                            </Button>
+                                        }
+                                    />
+                                }
+                            />
+                            <TooltipContent>{t`Chat lock`}</TooltipContent>
+                        </Tooltip>
+                        <DropdownMenuContent
+                            onClick={(e) => {
+                                e.stopPropagation();
+                            }}
+                        >
+                            {isLocked ? (
+                                <>
+                                    {isUnlocked && !isImpersonating && (
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                lockNow({ threadId: node.threadId as Id<"threads"> });
                                             }}
-                                            size="icon-sm"
-                                            variant="ghost"
                                         >
-                                            <Lock aria-hidden="true" className="h-3 w-3" />
-                                        </Button>
-                                    }
-                                />
-                            }
-                        />
-                        <TooltipContent>{t`Chat lock`}</TooltipContent>
-                    </Tooltip>
-                    <DropdownMenuContent
-                        onClick={(e) => {
-                            e.stopPropagation();
-                        }}
-                    >
-                        {isLocked ? (
-                            <>
-                                {isUnlocked && (
-                                    <DropdownMenuItem
-                                        onClick={() => {
-                                            lockNow({ threadId: node.threadId as Id<"threads"> });
-                                        }}
-                                    >
-                                        {t`Lock now`}
-                                    </DropdownMenuItem>
-                                )}
-                                {!isUnlocked && <DropdownMenuItem onClick={() => setLockMode("unlock")}>{t`Unlock chat`}</DropdownMenuItem>}
-                                <DropdownMenuItem onClick={() => setLockMode("change")}>{t`Change passcode`}</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setLockMode("remove")}>{t`Remove passcode`}</DropdownMenuItem>
-                            </>
-                        ) : (
-                            <DropdownMenuItem onClick={() => setLockMode("set")}>{t`Lock chat`}</DropdownMenuItem>
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                                            {t`Lock now`}
+                                        </DropdownMenuItem>
+                                    )}
+                                    {!isUnlocked && <DropdownMenuItem onClick={() => setLockMode("unlock")}>{t`Unlock chat`}</DropdownMenuItem>}
+                                    {!isImpersonating && (
+                                        <>
+                                            <DropdownMenuItem onClick={() => setLockMode("change")}>{t`Change passcode`}</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setLockMode("remove")}>{t`Remove passcode`}</DropdownMenuItem>
+                                        </>
+                                    )}
+                                </>
+                            ) : (
+                                !isImpersonating && <DropdownMenuItem onClick={() => setLockMode("set")}>{t`Lock chat`}</DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
                 {/* Only roots are sorted into the Snoozed section, so a child has no snooze to set. */}
                 {isRootThread && (node.lastReplyAt !== undefined || snoozedUntil !== undefined) && (
                     <DropdownMenu
@@ -986,41 +995,43 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Tooltip>
-                    <TooltipTrigger
-                        render={
-                            <Button
-                                aria-label={named(i18n._(getArchiveTooltip(isArchiving, node.status)))}
-                                className="hover:text-primary-text h-6 w-6 p-0"
-                                disabled={isArchiving}
-                                onClick={(e) => {
-                                    e.stopPropagation();
+                {!isImpersonating && (
+                    <Tooltip>
+                        <TooltipTrigger
+                            render={
+                                <Button
+                                    aria-label={named(i18n._(getArchiveTooltip(isArchiving, node.status)))}
+                                    className="hover:text-primary-text h-6 w-6 p-0"
+                                    disabled={isArchiving}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
 
-                                    if (isArchiving) {
-                                        return;
-                                    }
+                                        if (isArchiving) {
+                                            return;
+                                        }
 
-                                    const model = node.model || "gemini-1.5-flash"; // Default model
+                                        const model = node.model || "gemini-1.5-flash"; // Default model
 
-                                    if (node.status === "archived") {
-                                        updateThread(node.threadId, model, "active");
-                                    } else {
-                                        updateThread(node.threadId, model, "archived");
-                                    }
-                                }}
-                                size="icon-sm"
-                                variant="ghost"
-                            >
-                                {isArchiving ? (
-                                    <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                                ) : (
-                                    <ArchiveIcon aria-hidden="true" className="h-3 w-3" />
-                                )}
-                            </Button>
-                        }
-                    />
-                    <TooltipContent>{i18n._(getArchiveTooltip(isArchiving, node.status))} </TooltipContent>
-                </Tooltip>
+                                        if (node.status === "archived") {
+                                            updateThread(node.threadId, model, "active");
+                                        } else {
+                                            updateThread(node.threadId, model, "archived");
+                                        }
+                                    }}
+                                    size="icon-sm"
+                                    variant="ghost"
+                                >
+                                    {isArchiving ? (
+                                        <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                        <ArchiveIcon aria-hidden="true" className="h-3 w-3" />
+                                    )}
+                                </Button>
+                            }
+                        />
+                        <TooltipContent>{i18n._(getArchiveTooltip(isArchiving, node.status))} </TooltipContent>
+                    </Tooltip>
+                )}
 
                 {isTemporary && (
                     <Tooltip>
@@ -1062,45 +1073,49 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     </Tooltip>
                 )}
 
-                <Tooltip>
-                    <TooltipTrigger
-                        render={
-                            <Button
-                                aria-label={named(isDeleting ? t`Deleting...` : t`Delete thread`)}
-                                className="hover:text-destructive h-6 w-6 p-0"
-                                disabled={isDeleting}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowDeleteDialog(true);
-                                }}
-                                size="icon-sm"
-                                variant="ghost"
-                            >
-                                {isDeleting ? (
-                                    <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                                ) : (
-                                    <TrashIcon aria-hidden="true" className="h-3 w-3" />
-                                )}
-                            </Button>
-                        }
-                    />
-                    <TooltipContent>{isDeleting ? t`Deleting...` : t`Delete thread`}</TooltipContent>
-                </Tooltip>
-                <DeleteConfirmationDialog
-                    description={t`Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation.`}
-                    isDeleting={isDeleting}
-                    onConfirm={() => {
-                        if (isDeleting) {
-                            return; // Prevent multiple clicks
-                        }
+                {!isImpersonating && (
+                    <>
+                        <Tooltip>
+                            <TooltipTrigger
+                                render={
+                                    <Button
+                                        aria-label={named(isDeleting ? t`Deleting...` : t`Delete thread`)}
+                                        className="hover:text-destructive h-6 w-6 p-0"
+                                        disabled={isDeleting}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowDeleteDialog(true);
+                                        }}
+                                        size="icon-sm"
+                                        variant="ghost"
+                                    >
+                                        {isDeleting ? (
+                                            <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                            <TrashIcon aria-hidden="true" className="h-3 w-3" />
+                                        )}
+                                    </Button>
+                                }
+                            />
+                            <TooltipContent>{isDeleting ? t`Deleting...` : t`Delete thread`}</TooltipContent>
+                        </Tooltip>
+                        <DeleteConfirmationDialog
+                            description={t`Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation.`}
+                            isDeleting={isDeleting}
+                            onConfirm={() => {
+                                if (isDeleting) {
+                                    return; // Prevent multiple clicks
+                                }
 
-                        handleDeleteThread(node.threadId);
-                        setShowDeleteDialog(false);
-                    }}
-                    onOpenChange={setShowDeleteDialog}
-                    open={showDeleteDialog}
-                    title={t`Delete Thread`}
-                />
+                                handleDeleteThread(node.threadId);
+                                setShowDeleteDialog(false);
+                            }}
+                            onOpenChange={setShowDeleteDialog}
+                            open={showDeleteDialog}
+                            title={t`Delete Thread`}
+                        />
+                    </>
+                )}
                 {lockMode !== null && (
                     <ThreadLockDialog
                         mode={lockMode}

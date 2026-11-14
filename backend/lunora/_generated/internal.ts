@@ -905,15 +905,18 @@ export interface InternalApiTypes {
             runJobOnce: FunctionReference<"action", { args?: unknown; jobId: string; onLapse?: { args?: string; target: string }; target: string; userId?: string }, null>;
         };
         rate_limit_sweep: {
-            sweepExpiredRateLimits: FunctionReference<"mutation", { debtCursor?: string }, number>;
+            sweepDormantShardRateLimits: FunctionReference<"mutation", {}, { cleared: boolean; deleted: number }>;
+            sweepExpiredRateLimits: FunctionReference<"mutation", { debtCursor?: string; dormant?: boolean }, number>;
         };
         rate_limiter_mutations: {
             applyRateLimit: FunctionReference<"mutation", { count?: number; identifier: string; key: string; reserve?: boolean }, { ok: boolean; retryAfter: number | undefined; }>;
             resetRateLimit: FunctionReference<"mutation", { identifier: string; key: string }, void>;
         };
         shard_housekeeping: {
+            dispatchDormantRateLimitSweeps: FunctionReference<"mutation", { after?: { id: Id<"shardActivity">; lastActiveAt: number }; before?: number }, { dispatched: number }>;
             dispatchDueShards: FunctionReference<"mutation", {}, { dispatched: number }>;
             dispatchShardHousekeeping: FunctionReference<"mutation", {}, { dispatched: number }>;
+            markRateLimitsPending: FunctionReference<"mutation", { shardKey: string }, null>;
             recordShardActivity: FunctionReference<"mutation", { shardKey: string }, null>;
             runShardHousekeeping: FunctionReference<"action", {}, { failed: Array<string> }>;
             runShardTick: FunctionReference<"mutation", {}, null>;
@@ -1225,7 +1228,6 @@ export interface InternalApiTypes {
         functions: {
             afterOwnerMessage: FunctionReference<"mutation", { threadId: string }, number>;
             attachChildThread: FunctionReference<"mutation", { childThreadId: string; runId: Id<"subAgentRuns"> }, boolean>;
-            awaitApproval: FunctionReference<"mutation", { resumedWith?: number; runId: Id<"subAgentRuns"> }, boolean>;
             beatRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
             cancelDeletedThreadDelegated: FunctionReference<"mutation", { threadId: string }, null>;
             cancelDeletedThreadQueue: FunctionReference<"mutation", { threadId: string }, null>;
@@ -2260,6 +2262,7 @@ export const internal: InternalApiTypes = {
             runJobOnce: { __lunoraRef: "lib_job_once:runJobOnce" },
         },
         rate_limit_sweep: {
+            sweepDormantShardRateLimits: { __lunoraRef: "lib_rate_limit_sweep:sweepDormantShardRateLimits" },
             sweepExpiredRateLimits: { __lunoraRef: "lib_rate_limit_sweep:sweepExpiredRateLimits" },
         },
         rate_limiter_mutations: {
@@ -2267,8 +2270,10 @@ export const internal: InternalApiTypes = {
             resetRateLimit: { __lunoraRef: "lib_rate_limiter_mutations:resetRateLimit" },
         },
         shard_housekeeping: {
+            dispatchDormantRateLimitSweeps: { __lunoraRef: "lib_shard_housekeeping:dispatchDormantRateLimitSweeps" },
             dispatchDueShards: { __lunoraRef: "lib_shard_housekeeping:dispatchDueShards" },
             dispatchShardHousekeeping: { __lunoraRef: "lib_shard_housekeeping:dispatchShardHousekeeping" },
+            markRateLimitsPending: { __lunoraRef: "lib_shard_housekeeping:markRateLimitsPending" },
             recordShardActivity: { __lunoraRef: "lib_shard_housekeeping:recordShardActivity" },
             runShardHousekeeping: { __lunoraRef: "lib_shard_housekeeping:runShardHousekeeping" },
             runShardTick: { __lunoraRef: "lib_shard_housekeeping:runShardTick" },
@@ -2580,7 +2585,6 @@ export const internal: InternalApiTypes = {
         functions: {
             afterOwnerMessage: { __lunoraRef: "sub_agents_functions:afterOwnerMessage" },
             attachChildThread: { __lunoraRef: "sub_agents_functions:attachChildThread" },
-            awaitApproval: { __lunoraRef: "sub_agents_functions:awaitApproval" },
             beatRun: { __lunoraRef: "sub_agents_functions:beatRun" },
             cancelDeletedThreadDelegated: { __lunoraRef: "sub_agents_functions:cancelDeletedThreadDelegated" },
             cancelDeletedThreadQueue: { __lunoraRef: "sub_agents_functions:cancelDeletedThreadQueue" },

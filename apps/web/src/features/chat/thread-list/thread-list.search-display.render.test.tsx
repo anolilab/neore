@@ -155,6 +155,10 @@ vi.mock("@/features/auth/hooks/use-auth-session", () => {
 
             return { data: { id } };
         },
+        // The account's own session, not an impersonated one.
+        useAuthSession: () => {
+            return { data: { session: { impersonatedBy: null } }, error: null, isPending: false };
+        },
     };
 });
 

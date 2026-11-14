@@ -257,6 +257,12 @@ export const PERIODIC_JOBS: ReadonlyArray<CronJob & PeriodicJob> = [
     },
     // Rate-limit rows past every window: our limits (`lib/rate-limit-sweep.ts`) and better-auth's (`auth/rate-limit-sweep.ts`).
     { name: "sweepExpiredRateLimits", ref: internal.lib.rate_limit_sweep.sweepExpiredRateLimits, schedule: { everyMinutes: 60, kind: "interval" } },
+    // Dormant shards, which housekeeping no longer visits, still get the `rateLimits` sweep (`lib/shard-housekeeping.ts`).
+    {
+        name: "dispatchDormantRateLimitSweeps",
+        ref: internal.lib.shard_housekeeping.dispatchDormantRateLimitSweeps,
+        schedule: { hourUTC: 5, kind: "daily", minuteUTC: 0 },
+    },
     { name: "sweepExpiredAuthRateLimits", ref: internal.auth.rate_limit_sweep.sweepExpiredAuthRateLimits, schedule: { everyMinutes: 60, kind: "interval" } },
     // Claim-once rows past their TTL (`lib/claim-once.ts`).
     { name: "purgeIdempotencyClaims", ref: internal.lib.claim_once.purgeExpiredClaims, schedule: { everyMinutes: 60, kind: "interval" } },
