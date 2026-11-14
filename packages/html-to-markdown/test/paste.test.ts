@@ -294,3 +294,14 @@ describe("paste: paragraphs in a heading, review cases", () => {
         expect(convert(`<h3><div class="language-js"><pre>let x=1</pre></div></h3>`)).toBe("```js\nlet x=1\n```");
     });
 });
+
+describe("paste: paragraphs nested deeper in a heading", () => {
+    it("keeps the text of a paragraph inside a wrapper on the heading's line", () => {
+        expect(convert("<h2><div><p>Title</p></div></h2>")).toBe("## Title");
+        expect(convert("<h2><span><p>Title</p></span></h2>")).toBe("## Title");
+    });
+
+    it("leaves a paragraph inside a quote in a heading in its block", () => {
+        expect(convert("<h2>T<blockquote><p>q</p></blockquote></h2>")).toContain("> q");
+    });
+});

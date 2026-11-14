@@ -298,7 +298,7 @@ function collapsedLength(text: string): number {
 }
 
 /**
- * Writes the paragraphs and divs that are children of a heading as spans, their text kept on the heading's line: a
+ * Writes the paragraphs and divs on a heading's line as spans, their text kept on the heading's line: a
  * heading holds one line, and `<h2><p>Title</p></h2>` is the heading `Title`. The span keeps every attribute, so what
  * hides the text, its style and its class (a code block's language) still apply. A space on each side keeps its words
  * apart from those around it; HTML whitespace collapses any extra. Other blocks in a heading, such as a code block,
@@ -311,7 +311,7 @@ export function unwrapHeadingParagraphs(root: Node, shown: Shown): void {
         const node = pending.pop() as Node;
 
         if (HEADINGS.has(node.nodeName)) {
-            inlineParagraphChildren(node as Element);
+            inlineParagraphChildren(node as Element, shown);
         }
 
         for (let child = node.firstChild; child; child = child.nextSibling) {
@@ -322,17 +322,43 @@ export function unwrapHeadingParagraphs(root: Node, shown: Shown): void {
     }
 }
 
-function inlineParagraphChildren(heading: Element): void {
-    const document = heading.ownerDocument;
+/**
+ * The paragraphs and divs on a heading's line, in order: its own, and those inside an inline element, a paragraph or a
+ * div on that line. A code block, a list, a table or a quote holds lines of its own, so the walk stops there.
+ */
+function headingParagraphs(heading: Element, shown: Shown): Element[] {
     const paragraphs: Element[] = [];
+    const pending: Element[] = [];
 
-    for (let child = heading.firstElementChild; child; child = child.nextElementSibling) {
-        if (HEADING_PARAGRAPHS.has(child.nodeName)) {
-            paragraphs.push(child);
+    for (let child = heading.lastElementChild; child; child = child.previousElementSibling) {
+        pending.push(child);
+    }
+
+    while (pending.length > 0) {
+        const element = pending.pop() as Element;
+        const isParagraph = HEADING_PARAGRAPHS.has(element.nodeName);
+
+        if (shown.isHidden(element) || (!isParagraph && isBlock(element))) {
+            continue;
+        }
+
+        if (isParagraph) {
+            paragraphs.push(element);
+        }
+
+        for (let child = element.lastElementChild; child; child = child.previousElementSibling) {
+            pending.push(child);
         }
     }
 
-    for (const paragraph of paragraphs) {
+    return paragraphs;
+}
+
+function inlineParagraphChildren(heading: Element, shown: Shown): void {
+    const document = heading.ownerDocument;
+
+    for (const paragraph of headingParagraphs(heading, shown)) {
+        const parent = paragraph.parentNode as Node;
         const span = document.createElement("span");
 
         for (let index = 0; index < paragraph.attributes.length; index += 1) {
@@ -346,10 +372,10 @@ function inlineParagraphChildren(heading: Element): void {
             span.appendChild(paragraph.firstChild);
         }
 
-        heading.insertBefore(document.createTextNode(" "), paragraph);
+        parent.insertBefore(document.createTextNode(" "), paragraph);
         // eslint-disable-next-line unicorn/prefer-modern-dom-apis -- domino, the parser on servers, has no before.
-        heading.insertBefore(span, paragraph);
-        heading.insertBefore(document.createTextNode(" "), paragraph);
+        parent.insertBefore(span, paragraph);
+        parent.insertBefore(document.createTextNode(" "), paragraph);
         paragraph.remove();
     }
 }
