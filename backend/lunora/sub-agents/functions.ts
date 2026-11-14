@@ -919,6 +919,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
     }
 
     const row: Omit<RunDoc, "_creationTime" | "_id"> = {
+        ...(args.chainSource !== undefined && { chainSource: args.chainSource }),
         childThreadId,
         clientId: args.toolCallId === undefined ? args.clientId : undefined,
         createdAt: Math.max(now, newestRunAt + 1),
@@ -992,9 +993,14 @@ export const createRun = internalMutation
     })
     .output(v.union(v.object({ runId: v.id("subAgentRuns"), workerId: v.optional(v.string()) }), v.object({ error: v.string() })))
     .mutation(async ({ args: { chainSource, host, persistent, ...args }, ctx }) => {
-        // A worker never waits for approval, so it carries no chain source.
+        // A worker never waits for approval, but it carries the chain source on, so the one-shot children it delegates
+        // count toward their task's or trigger's limit, and an eval's still never pause.
         if (persistent) {
-            const dispatched = await dispatchWorkerRun(ctx, { ...args, ...(host && { runner: { ...host, kind: "host" as const } }) });
+            const dispatched = await dispatchWorkerRun(ctx, {
+                ...args,
+                ...(chainSource !== undefined && { chainSource }),
+                ...(host && { runner: { ...host, kind: "host" as const } }),
+            });
 
             return "error" in dispatched ? { error: dispatched.error } : { runId: dispatched.runId, workerId: dispatched.workerId };
         }
@@ -1019,6 +1025,8 @@ export const createRun = internalMutation
  */
 export const messageWorker = internalMutation
     .input({
+        // The lead run's chain (`chainSourceKey`), carried on to what the worker delegates during this message.
+        chainSource: v.optional(v.string().max(200)),
         dispatchedBy: vDispatchSource,
         headless: v.optional(v.boolean()),
         message: v.string().max(SUB_AGENT_TASK_MAX),
@@ -1031,6 +1039,7 @@ export const messageWorker = internalMutation
     .output(v.union(v.object({ runId: v.id("subAgentRuns"), state: vSubAgentRunStatus, workerId: v.string() }), v.object({ error: v.string() })))
     .mutation(async ({ args, ctx }) => {
         const dispatched = await dispatchWorkerRun(ctx, {
+            ...(args.chainSource !== undefined && { chainSource: args.chainSource }),
             childThreadId: args.workerId,
             dispatchedBy: args.dispatchedBy,
             ...(args.headless !== undefined && { headless: args.headless }),

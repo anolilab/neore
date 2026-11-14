@@ -20,8 +20,11 @@ detail. Paths are relative to `backend/lunora/`.
     `subAgentRuns.chainSource`, `task:<taskId>` / `trigger:<triggerId>`), a nested child inherits it, and while a run of
     that source is `awaiting` (`by_chainSource_and_status`) its next delegation is refused with `chainWaitProblem`, which
     the delegating run reads as the tool's error. Runs a single round admits before any of them waits can all wait (at most
-    3, the per-thread cap). The pause's snapshot does not keep the source: a resumed child's own sub-agents fall back to
-    the per-thread cap. A chat-started chain has only the per-thread cap.
+    3, the per-thread cap). The pause's snapshot keeps the source (`ToolRunConfig.chainSource`) and the continuation puts
+    it back on its tool context, so a resumed child's own sub-agents still count; an older snapshot without it falls back
+    to the per-thread cap. A worker never waits, but its runs carry the source too (`createRun` and `messageWorker` store
+    it, `claimRun` hands it to the run), so a one-shot child a worker delegates counts toward the limit, and in an eval's
+    chain it never pauses. A chat-started chain has only the per-thread cap.
   - **The owner is told** by the pause itself: `recordPendingToolApprovals` writes a `tool_approval` (or `ask_user`,
     `secret_request`) notification to the child thread's owner, linking to the child's thread, plus the phone push and the
     four-hour reminder; the dedupe key is the approval id. A sub-agent's pause names who started its chain in the body

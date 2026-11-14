@@ -74,3 +74,31 @@ export const backfillApprovalOrganization = defineMigration({
         return { ...document, config: { ...config, organizationId } };
     },
 });
+
+/**
+ * Records the chain source (`config.chainSource`) on paused sub-agent approvals that predate it, read from the run the
+ * pause belongs to, so a child answered after this lands still counts what it delegates toward its task's or trigger's
+ * limit. Only a pending row of a sub-agent's pause can be continued, so every other row is left as it is.
+ *
+ * There is no `down`, for the reason `backfillApprovalOrganization` gives: the rows it filled cannot be told apart.
+ */
+export const backfillApprovalChainSource = defineMigration({
+    id: "backfill-approval-chain-source",
+    table: "toolApprovalRuns",
+    up: async (document, ctx) => {
+        const config = document.config as { chainSource?: string; subAgentRunId?: string };
+
+        if (document.status !== "pending" || config.subAgentRunId === undefined || config.chainSource !== undefined) {
+            return undefined;
+        }
+
+        const run = await ctx.db.get("subAgentRuns", String(config.subAgentRunId));
+        const chainSource = run?.chainSource;
+
+        if (typeof chainSource !== "string") {
+            return undefined;
+        }
+
+        return { ...document, config: { ...config, chainSource } };
+    },
+});

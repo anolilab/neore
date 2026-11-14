@@ -438,6 +438,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // or a messenger reply's child still dispatches as that source, not as the lead.
             const snapshot: ToolRunConfig = {
                 autoMediaEnrichment: false,
+                // The continuation's own children stay on the chain, so its source's one-waiting-child limit still holds.
+                ...(options.chainSource !== undefined && { chainSource: options.chainSource }),
                 ...(options.origin !== "lead" && { dispatchOrigin: options.origin }),
                 instructions: system ?? agent.options.instructions,
                 mcpServerNames: toolResult.mcpServerNames,

@@ -3,6 +3,7 @@
   "migrationIds": [
     "add-headless-approved",
     "add-headless-resume-bounds",
+    "backfill-approval-chain-source",
     "backfill-approval-organization"
   ],
   "tables": {
@@ -27838,6 +27839,13 @@
               "nullable": false,
               "optional": false,
               "unique": false
+            },
+            "chainSource": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
             },
             "contextFromOrder": {
               "kind": "number",

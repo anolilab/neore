@@ -1345,6 +1345,8 @@ export const resumeApprovedRun = async (
         setResearchDepth(ctx, config.researchDepth);
         // The snapshot keeps what started the run: a person answering an approval does not make it the lead's.
         setDispatchOrigin(ctx, config.dispatchOrigin ?? "lead");
+        // And the chain it belongs to, so what it delegates next still counts toward its task's or trigger's limit.
+        setChainSource(ctx, config.chainSource);
 
         if (subAgentChild) {
             setHeadlessRun(ctx);
