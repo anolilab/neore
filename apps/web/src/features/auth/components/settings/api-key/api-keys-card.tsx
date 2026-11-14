@@ -6,6 +6,7 @@ import type { ComponentProps, ReactNode } from "react";
 import { useMemo, useState } from "react";
 
 import SettingsCard from "@/components/settings/settings-card";
+import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { useListApiKeys } from "@/features/auth/hooks/api-key-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
@@ -18,6 +19,8 @@ export type APIKeysCardProperties = ComponentProps<typeof SettingsCard>;
 const APIKeysCard = ({ ...properties }: APIKeysCardProperties) => {
     const { authClient } = useAuth();
     const { t } = useLingui();
+    // The server refuses a key to an admin acting as this account: it would carry no impersonation mark.
+    const isImpersonating = useImpersonating();
 
     const { data, isError, isPending } = useListApiKeys(authClient);
     const apiKeys = data?.apiKeys;
@@ -71,7 +74,9 @@ const APIKeysCard = ({ ...properties }: APIKeysCardProperties) => {
                     </>
                 }
                 description={t`Create and manage API keys for programmatic access to your account.`}
+                disabled={isImpersonating}
                 header={t`API Keys`}
+                instructions={isImpersonating ? t`API keys can't be created while impersonating.` : undefined}
             >
                 {listBody}
             </SettingsCard>
@@ -82,7 +87,7 @@ const APIKeysCard = ({ ...properties }: APIKeysCardProperties) => {
                     setDisplayAPIKey(apiKey);
                     setShowCreateDialog(false);
                 }}
-                open={showCreateDialog}
+                open={showCreateDialog && !isImpersonating}
             />
 
             <APIKeyDisplayDialog apiKey={displayAPIKey || ""} onOpenChange={(open) => !open && setDisplayAPIKey(null)} open={Boolean(displayAPIKey)} />

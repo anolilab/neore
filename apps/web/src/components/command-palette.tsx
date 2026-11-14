@@ -368,7 +368,10 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             return;
         }
 
-        deleteBranch(currentThreadId);
+        // The row reappears if the server refuses; nothing is reported deleted before it confirms.
+        deleteBranch(currentThreadId).catch((error: unknown) => {
+            console.error("Failed to delete thread:", error);
+        });
         close();
     };
 

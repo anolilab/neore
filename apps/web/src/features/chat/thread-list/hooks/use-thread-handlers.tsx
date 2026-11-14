@@ -273,35 +273,38 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
                 return;
             }
 
-            const isDeletingCurrentThread = currentThreadId && threadIds.includes(currentThreadId);
-
-            if (isDeletingCurrentThread) {
-                // The delete below does not wait for this: the survivor is read, then the route moves only if it still shows a deleted chat.
-                // With the split view on, the other open panes stay: the route moves to one of them instead of `/chat`.
-                void (async () => {
-                    const survivor = await survivingPaneAfterDelete(threadIds, (id) => {
-                        const args = { threadId: id as Id<"threads"> };
-
-                        return lunora.query(api.chat.functions.getThread, args, shardOptionsFor(args));
-                    });
-
-                    if (!routeIsOn(threadIds)) {
-                        return;
-                    }
-
-                    navigate(
-                        survivor === undefined ? { replace: true, to: "/chat" } : { params: { threadId: survivor }, replace: true, to: "/chat/$threadId" },
-                    );
-                })();
-            }
-
-            for (const id of threadIds) {
-                deleteThreadMetadata(id);
-            }
-
             deleteThreadsMutation({ threadIds })
                 .then((result) => {
                     const count = result.deletedCount;
+
+                    // Local metadata goes only once the server has deleted the rows.
+                    for (const id of threadIds) {
+                        deleteThreadMetadata(id);
+                    }
+
+                    const isDeletingCurrentThread = currentThreadId && threadIds.includes(currentThreadId);
+
+                    if (isDeletingCurrentThread) {
+                        // Once the server has deleted them: the survivor is read, then the route moves only if it still shows a deleted chat.
+                        // With the split view on, the other open panes stay: the route moves to one of them instead of `/chat`.
+                        void (async () => {
+                            const survivor = await survivingPaneAfterDelete(threadIds, (id) => {
+                                const args = { threadId: id as Id<"threads"> };
+
+                                return lunora.query(api.chat.functions.getThread, args, shardOptionsFor(args));
+                            });
+
+                            if (!routeIsOn(threadIds)) {
+                                return;
+                            }
+
+                            navigate(
+                                survivor === undefined
+                                    ? { replace: true, to: "/chat" }
+                                    : { params: { threadId: survivor }, replace: true, to: "/chat/$threadId" },
+                            );
+                        })();
+                    }
 
                     showSuccess(t`${plural(count, { one: "# thread deleted.", other: "# threads deleted." })}`);
 
