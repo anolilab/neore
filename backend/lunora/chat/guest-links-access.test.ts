@@ -26,12 +26,18 @@ vi.mock("../lib/cross-shard", () => {
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
 vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
 
-const { sessionFrom } = vi.hoisted(() => {
+const { impersonation, sessionFrom } = vi.hoisted(() => {
+    // Set while a test acts as an admin impersonating the signed-in user.
+    const state = { by: undefined as string | undefined };
+
     return {
+        impersonation: state,
         sessionFrom: async (context: { auth: { userId?: string | null } }) => {
             const { userId } = context.auth;
 
-            return userId ? { activeOrganization: null, email: `${userId}@example.com`, id: userId, isAdmin: false, name: userId, userId } : null;
+            return userId
+                ? { activeOrganization: null, email: `${userId}@example.com`, id: userId, impersonatedBy: state.by, isAdmin: false, name: userId, userId }
+                : null;
         },
     };
 });
@@ -143,8 +149,33 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+    impersonation.by = undefined;
     vi.useRealTimers();
     harness.close();
+});
+
+const IMPERSONATING = /while impersonating/u;
+
+describe("an admin impersonating the owner", () => {
+    it("can neither make, withdraw, send on nor dismiss: nothing changes, and the link stays readable", async () => {
+        const { id: linkId, linkToken } = await createLink();
+        const { messageId } = await hold(linkToken, "please call me back");
+
+        impersonation.by = "admin-1";
+
+        await expect(asOwner().mutation(guestLinks.createGuestLink as never, { discardWaiting: true, threadId } as never)).rejects.toThrow(IMPERSONATING);
+        await expect(asOwner().mutation(guestLinks.revokeGuestLink as never, { confirmedNotes: [messageId], linkId, threadId } as never)).rejects.toThrow(
+            IMPERSONATING,
+        );
+
+        for (const name of ["sendHeldGuestMessage", "dismissHeldGuestMessage"] as const) {
+            await expect(asOwner().mutation(guestLinks[name] as never, { messageId } as never)).rejects.toThrow(IMPERSONATING);
+        }
+
+        expect(await rows("threadGuestLinks")).toMatchObject([{ _id: linkId }]);
+        expect(await rows("threadGuestMessages")).toMatchObject([{ _id: messageId, status: "held" }]);
+        expect(await asOwner().query(guestLinks.getGuestLink as never, { threadId } as never)).toMatchObject({ link: { id: linkId } });
+    });
 });
 
 describe("creating a link", () => {

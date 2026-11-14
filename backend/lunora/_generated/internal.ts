@@ -304,7 +304,7 @@ export interface InternalApiTypes {
         };
         session_organization: {
             getActiveOrganizationIdForSession: FunctionReference<"query", { sessionId: string; userId: string }, string | null>;
-            getSessionOrganizationForCap: FunctionReference<"query", { sessionId: string; userId: string }, { organizationId: string | null } | null>;
+            getSessionOrganizationForCap: FunctionReference<"query", { sessionId: string; userId: string }, { impersonating?: boolean; organizationId: string | null } | null>;
         };
     };
     billing: {
