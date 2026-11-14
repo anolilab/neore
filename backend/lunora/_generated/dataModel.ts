@@ -1510,7 +1510,7 @@ export interface Doc_shardActivity {
     housekeptAt?: number;
     lastActiveAt: number;
     nextDueAt?: number;
-    rateLimitsClearedAt?: number;
+    rateLimitsPending?: boolean;
     shardKey: string;
 }
 
@@ -2689,7 +2689,7 @@ export interface IndexNamesByTable {
     sandboxActions: "by_sessionId_timestamp";
     sandboxSessions: "by_threadId_status" | "by_botId_status" | "by_userId" | "by_status";
     session: "expiresAt_userId" | "token" | "userId";
-    shardActivity: "by_shardKey" | "by_lastActiveAt" | "by_nextDueAt";
+    shardActivity: "by_shardKey" | "by_lastActiveAt" | "by_nextDueAt" | "by_rateLimitsPending_lastActiveAt";
     shardRoutes: "by_key" | "by_owner";
     signUpInvitation: "email" | "expiresAt";
     skillFiles: "by_skill_and_type" | "by_hash";
@@ -4729,7 +4729,7 @@ export interface Insert_shardActivity {
     housekeptAt?: number;
     lastActiveAt: number;
     nextDueAt?: number;
-    rateLimitsClearedAt?: number;
+    rateLimitsPending?: boolean;
     shardKey: string;
 }
 

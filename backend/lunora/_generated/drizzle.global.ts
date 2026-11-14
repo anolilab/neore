@@ -527,12 +527,13 @@ export const shardActivity = sqliteTable("shardActivity", {
     housekeptAt: real("housekeptAt"),
     lastActiveAt: real("lastActiveAt").notNull(),
     nextDueAt: real("nextDueAt"),
-    rateLimitsClearedAt: real("rateLimitsClearedAt"),
+    rateLimitsPending: integer("rateLimitsPending", { mode: "boolean" }),
     shardKey: text("shardKey").notNull(),
 }, (t) => ({
     by_shardKey: index("by_shardKey").on(t.shardKey),
     by_lastActiveAt: index("by_lastActiveAt").on(t.lastActiveAt),
     by_nextDueAt: index("by_nextDueAt").on(t.nextDueAt),
+    by_rateLimitsPending_lastActiveAt: index("by_rateLimitsPending_lastActiveAt").on(t.rateLimitsPending, t.lastActiveAt),
 }));
 
 export const shardRoutes = sqliteTable("shardRoutes", {

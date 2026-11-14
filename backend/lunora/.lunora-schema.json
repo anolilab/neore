@@ -22977,8 +22977,8 @@
           "optional": true,
           "unique": false
         },
-        "rateLimitsClearedAt": {
-          "kind": "number",
+        "rateLimitsPending": {
+          "kind": "boolean",
           "nullable": false,
           "optional": true,
           "unique": false
@@ -23000,6 +23000,13 @@
         "by_nextDueAt": {
           "fields": [
             "nextDueAt"
+          ],
+          "unique": false
+        },
+        "by_rateLimitsPending_lastActiveAt": {
+          "fields": [
+            "rateLimitsPending",
+            "lastActiveAt"
           ],
           "unique": false
         },

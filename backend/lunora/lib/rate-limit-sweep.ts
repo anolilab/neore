@@ -24,7 +24,7 @@ import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { RATE_LIMIT_CONFIGS } from "./rate-limiter";
-import { noteRateLimitsCleared } from "./shard-housekeeping";
+import { settleRateLimitsPending } from "./shard-housekeeping";
 
 /** Rows deleted per run; a full page schedules the next one. */
 export const RATE_LIMIT_SWEEP_PAGE = 200;
@@ -97,15 +97,15 @@ export const sweepExpiredRateLimits = internalMutation
 
 /**
  * On a dormant user shard (`dispatchDormantRateLimitSweeps` in `lib/shard-housekeeping.ts`): the sweep alone. When it leaves
- * the table empty, the census says so and the daily dispatch skips this shard until it is active again. A row still inside
- * its window, or a full page the sweep continues on its own, leaves the mark off, so the shard is visited again the next day.
+ * the table empty, the census flag `rateLimitsPending` goes off and the daily dispatch skips this shard until activity or a
+ * charge sets it again. A row still inside its window, or a full page the sweep continues on its own, keeps the flag on,
+ * so the shard is visited again the next day.
  */
 export const sweepDormantShardRateLimits = internalMutation
     .input({})
     .output(v.object({ cleared: v.boolean(), deleted: v.number() }))
     .mutation(async ({ ctx }) => {
         const deleted = await sweepRateLimitPage(ctx, undefined);
-        const left = await ctx.db.query("rateLimits").first();
 
-        return { cleared: left === null && (await noteRateLimitsCleared(ctx, ctx.now)), deleted };
+        return { cleared: await settleRateLimitsPending(ctx), deleted };
     });

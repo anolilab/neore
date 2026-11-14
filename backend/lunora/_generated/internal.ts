@@ -913,7 +913,7 @@ export interface InternalApiTypes {
             resetRateLimit: FunctionReference<"mutation", { identifier: string; key: string }, void>;
         };
         shard_housekeeping: {
-            dispatchDormantRateLimitSweeps: FunctionReference<"mutation", { before?: number; cursor?: string }, { dispatched: number }>;
+            dispatchDormantRateLimitSweeps: FunctionReference<"mutation", { after?: { id: Id<"shardActivity">; lastActiveAt: number }; before?: number }, { dispatched: number }>;
             dispatchDueShards: FunctionReference<"mutation", {}, { dispatched: number }>;
             dispatchShardHousekeeping: FunctionReference<"mutation", {}, { dispatched: number }>;
             recordShardActivity: FunctionReference<"mutation", { shardKey: string }, null>;

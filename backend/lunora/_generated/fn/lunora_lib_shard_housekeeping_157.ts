@@ -5,6 +5,29 @@ import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash
 import * as lunora_lib_shard_housekeeping_157 from "../../lib/shard-housekeeping.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
+installCompiledValidatorMap(lunora_lib_shard_housekeeping_157.dispatchDormantRateLimitSweeps.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has2 = false;
+let __val2;
+if (source["after"] !== undefined) {
+if (typeof source["after"] !== "object" || source["after"] === null || Array.isArray(source["after"])) return DEFER;
+if (Object.getPrototypeOf(source["after"]) !== Object.prototype && Object.getPrototypeOf(source["after"]) !== null) return DEFER;
+if (typeof source["after"]["id"] !== "string") return DEFER;
+if (typeof source["after"]["lastActiveAt"] !== "number" || !Number.isFinite(source["after"]["lastActiveAt"])) return DEFER;
+const __obj1 = { "id": source["after"]["id"], "lastActiveAt": source["after"]["lastActiveAt"] };
+__val2 = __obj1;
+__has2 = true;
+}
+let __has3 = false;
+let __val3;
+if (source["before"] !== undefined) {
+if (typeof source["before"] !== "number" || !Number.isFinite(source["before"])) return DEFER;
+__val3 = source["before"];
+__has3 = true;
+}
+return { ...(__has2 ? { "after": __val2 } : {}), ...(__has3 ? { "before": __val3 } : {}) };
+});
 installCompiledValidatorMap(lunora_lib_shard_housekeeping_157.recordShardActivity.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

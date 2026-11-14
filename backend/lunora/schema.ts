@@ -2445,14 +2445,18 @@ export const schema = defineSchema({
         lastActiveAt: v.number(),
         /** The earliest time this shard has timed work due (a schedule trigger, a recurring task); cleared while a tick is in flight. */
         nextDueAt: v.optional(v.number()),
-        /** When a dormant-shard rate-limit sweep left this shard's `rateLimits` empty (`lib/shard-housekeeping.ts`). */
-        rateLimitsClearedAt: v.optional(v.number()),
+        /**
+         * The shard may hold `rateLimits` rows: set by activity and by a charge that adds a row, cleared by the
+         * dormant-shard sweep that leaves the table empty (`lib/shard-housekeeping.ts`).
+         */
+        rateLimitsPending: v.optional(v.boolean()),
         shardKey: v.string(),
     })
         .global()
         .index("by_shardKey", ["shardKey"])
         .index("by_lastActiveAt", ["lastActiveAt"])
-        .index("by_nextDueAt", ["nextDueAt"]),
+        .index("by_nextDueAt", ["nextDueAt"])
+        .index("by_rateLimitsPending_lastActiveAt", ["rateLimitsPending", "lastActiveAt"]),
 
     /**
      * Lookup from a key known BEFORE the owner is to the owner's shard:

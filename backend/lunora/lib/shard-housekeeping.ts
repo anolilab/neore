@@ -18,10 +18,12 @@
  *   at least daily to any shard active in the last {@link HOUSEKEEPING_HORIZON_MS}
  *   — an expiry does not wait for its owner to come back.
  * - **Dormant shards** (idle past that horizon): only the `rateLimits` sweep.
- *   A daily job pages the rest of the census with a cursor and dispatches
- *   `sweepDormantShardRateLimits` (`lib/rate-limit-sweep.ts`) to each shard whose rows are not yet
- *   known to be gone; a sweep that empties the table marks the census, so a
- *   shard that stays dormant is not visited again.
+ *   The census flag `rateLimitsPending` says a shard may hold rows: activity and
+ *   any charge that adds a row set it, and the dormant sweep clears it when it
+ *   leaves the table empty. A daily job reads only flagged dormant rows, through
+ *   their index, and dispatches `sweepDormantShardRateLimits`
+ *   (`lib/rate-limit-sweep.ts`) to each, so a shard that stays dormant and empty
+ *   costs nothing.
  *
  * Each dispatch goes on the target user's own scheduler lane
  * (`shard-scheduler.ts`), so shards are swept side by side, not one at a time.
@@ -36,7 +38,6 @@ import { cronsLogger } from "./logger";
 import { patchRow } from "./patch";
 import { currentUserShard } from "./shard-context";
 import { runAfterOnShard } from "./shard-scheduler";
-import { MAX_LENGTH } from "./validators";
 
 /** How long a shard stays in the daily sweep after its last activity. */
 export const HOUSEKEEPING_HORIZON_MS = 30 * 24 * 60 * 60 * 1000;
@@ -46,6 +47,7 @@ export const HOUSEKEEPING_IDLE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const ACTIVITY_THROTTLE_MS = 10 * 60 * 1000;
 /** A shard tick re-arms no sooner than this, so a stuck due row cannot spin. */
 const MIN_TICK_INTERVAL_MS = 60 * 1000;
+
 /** Shards dispatched per root run; the rest wait for the next one. */
 export const DISPATCH_BATCH = 200;
 
@@ -112,13 +114,6 @@ export const needsHousekeeping = (row: { housekeptAt?: number; lastActiveAt: num
 };
 
 /**
- * Pure: whether the dormant-shard dispatch visits a census row. A shard is skipped once a sweep has left its
- * `rateLimits` empty, until new activity may have charged a limit there again. Pinned by `shard-housekeeping.test.ts`.
- */
-export const needsDormantRateLimitSweep = (row: { lastActiveAt: number; rateLimitsClearedAt?: number }): boolean =>
-    row.rateLimitsClearedAt === undefined || row.rateLimitsClearedAt < row.lastActiveAt;
-
-/**
  * The census is a HINT for the root tick, written beside the caller's own work
  * (a sign-up, a trigger save) in D1 — not atomically with it. A failed hint must
  * never fail that work; the worst it costs is a late sweep.
@@ -154,9 +149,9 @@ export const noteShardActivity = async (ctx: CensusCtx, shardKey: string | undef
         const row = await censusRow(ctx, shardKey);
 
         if (row) {
-            await ctx.db.patch("shardActivity", row._id, { lastActiveAt: now });
+            await ctx.db.patch("shardActivity", row._id, { lastActiveAt: now, rateLimitsPending: true });
         } else {
-            await ctx.db.insert("shardActivity", { lastActiveAt: now, shardKey });
+            await ctx.db.insert("shardActivity", { lastActiveAt: now, rateLimitsPending: true, shardKey });
         }
     });
 };
@@ -185,23 +180,58 @@ export const noteShardDue = async (ctx: CensusCtx, dueAt: number, shardKey: stri
     });
 };
 
-/** On a user shard: record that its `rateLimits` table is empty, so the dormant-shard dispatch skips it until it is active again. */
-export const noteRateLimitsCleared = async (ctx: CensusCtx, now: number, shardKey: string | undefined = currentUserShard()): Promise<boolean> => {
+/**
+ * On a user shard: a charge added a `rateLimits` row, so the dormant-shard dispatch must visit this shard. A charge need
+ * not move `lastActiveAt` (a guest's post on the owner's shard), so this is its own note. Writes only when the flag is
+ * off; a charge that only updates a row needs none, since a table holding a row keeps the flag on
+ * ({@link settleRateLimitsPending} re-checks after clearing).
+ */
+export const noteRateLimitsPending = async (ctx: CensusCtx, shardKey: string | undefined = currentUserShard()): Promise<void> => {
     if (shardKey === undefined) {
+        return;
+    }
+
+    await bestEffort("noteRateLimitsPending", async () => {
+        const row = await censusRow(ctx, shardKey);
+
+        if (!row) {
+            await ctx.db.insert("shardActivity", { lastActiveAt: Date.now(), rateLimitsPending: true, shardKey });
+        } else if (row.rateLimitsPending !== true) {
+            await ctx.db.patch("shardActivity", row._id, { rateLimitsPending: true });
+        }
+    });
+};
+
+/**
+ * On a user shard, from the dormant sweep: set the flag to whether the `rateLimits` table still holds a row. Clearing
+ * writes first and reads again after, so a charge racing the sweep is never lost: a row added before the second read
+ * is seen there and sets the flag back, and a charge after it finds the flag off and sets it itself
+ * ({@link noteRateLimitsPending}, which runs after its row is written). Returns whether the flag is now off.
+ */
+export const settleRateLimitsPending = async (ctx: Pick<MutationCtx, "db">, shardKey: string | undefined = currentUserShard()): Promise<boolean> => {
+    if (shardKey === undefined || (await ctx.db.query("rateLimits").first()) !== null) {
         return false;
     }
 
-    let marked = false;
-    const written = await bestEffort("noteRateLimitsCleared", async () => {
+    let cleared = false;
+
+    await bestEffort("settleRateLimitsPending", async () => {
         const row = await censusRow(ctx, shardKey);
 
-        if (row) {
-            await ctx.db.patch("shardActivity", row._id, { rateLimitsClearedAt: now });
-            marked = true;
+        if (!row) {
+            return;
+        }
+
+        await ctx.db.patch("shardActivity", row._id, { rateLimitsPending: false });
+
+        if ((await ctx.db.query("rateLimits").first()) === null) {
+            cleared = true;
+        } else {
+            await ctx.db.patch("shardActivity", row._id, { rateLimitsPending: true });
         }
     });
 
-    return written && marked;
+    return cleared;
 };
 
 /** `noteShardActivity` for callers outside a shard (the HTTP layer), run on the user's shard. */
@@ -257,34 +287,47 @@ export const dispatchShardHousekeeping = internalMutation
     });
 
 /**
- * Root, daily: send `sweepDormantShardRateLimits` (`lib/rate-limit-sweep.ts`) to each shard idle past {@link HOUSEKEEPING_HORIZON_MS}, which
- * {@link dispatchShardHousekeeping} no longer visits. One page of the census per run; a run that did not reach the end
- * schedules the next page with its cursor. `before` is fixed by the first run, so the chain pages one range, and it never
- * overlaps the housekeeping range (`lastActiveAt >= now - horizon`): an active shard is not swept twice by this path. A shard
- * crossing the horizon on the day may meet both; the sweep only deletes rows past every window, so a second run is a no-op.
+ * Root, daily: send `sweepDormantShardRateLimits` (`lib/rate-limit-sweep.ts`) to each flagged shard idle past
+ * {@link HOUSEKEEPING_HORIZON_MS}, which {@link dispatchShardHousekeeping} no longer visits. It reads only flagged rows,
+ * through `by_rateLimitsPending_lastActiveAt`, a page per run; a full page schedules the next one after the last row's
+ * (`lastActiveAt`, `_id`). That key is unique and stable, so a shard turning active between pages (it leaves the range)
+ * or a tie on `lastActiveAt` cannot make the next page skip one. `before` is fixed by the first run, so the chain pages
+ * one range, which never overlaps the housekeeping range (`lastActiveAt >= now - horizon`). A shard crossing the horizon
+ * on the day may meet both; the sweep only deletes rows past every window, so a second run is a no-op.
  */
 export const dispatchDormantRateLimitSweeps = internalMutation
-    .input({ before: v.optional(v.number()), cursor: v.optional(v.string().max(MAX_LENGTH.cursor)) })
+    .input({
+        after: v.optional(v.object({ id: v.id("shardActivity"), lastActiveAt: v.number() })),
+        before: v.optional(v.number()),
+    })
     .output(v.object({ dispatched: v.number() }))
     .mutation(async ({ args, ctx }) => {
         const before = args.before ?? ctx.now - HOUSEKEEPING_HORIZON_MS;
-        const page = await ctx.db.shardActivity.findMany({
-            cursor: args.cursor ?? null,
+        const { after } = args;
+        const { page } = await ctx.db.shardActivity.findMany({
             limit: DISPATCH_BATCH,
-            orderBy: [{ lastActiveAt: "asc" }],
-            where: { lastActiveAt: { lt: before } },
+            orderBy: [{ lastActiveAt: "asc" }, { _id: "asc" }],
+            where: {
+                lastActiveAt: { lt: before },
+                rateLimitsPending: true,
+                ...(after && { OR: [{ lastActiveAt: { gt: after.lastActiveAt } }, { _id: { gt: after.id }, lastActiveAt: after.lastActiveAt }] }),
+            },
         });
-        const due = page.page.filter((row) => needsDormantRateLimitSweep(row));
 
-        for (const row of due) {
+        for (const row of page) {
             await runAfterOnShard(ctx.scheduler, 0, internal.lib.rate_limit_sweep.sweepDormantShardRateLimits, {}, row.shardKey);
         }
 
-        if (!page.isDone && page.continueCursor) {
-            await ctx.scheduler.runAfter(0, internal.lib.shard_housekeeping.dispatchDormantRateLimitSweeps, { before, cursor: page.continueCursor });
+        const last = page.at(-1);
+
+        if (page.length === DISPATCH_BATCH && last) {
+            await ctx.scheduler.runAfter(0, internal.lib.shard_housekeeping.dispatchDormantRateLimitSweeps, {
+                after: { id: last._id, lastActiveAt: last.lastActiveAt },
+                before,
+            });
         }
 
-        return { dispatched: due.length };
+        return { dispatched: page.length };
     });
 
 /**
