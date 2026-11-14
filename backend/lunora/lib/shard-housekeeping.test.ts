@@ -2,7 +2,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { RATE_LIMIT_RETENTION_MS, sweepDormantShardRateLimits } from "./rate-limit-sweep";
+import { RATE_LIMIT_RETENTION_MS, RATE_LIMIT_SWEEP_PAGE, sweepDormantShardRateLimits, sweepExpiredRateLimits } from "./rate-limit-sweep";
 import { createRatelimit, getRateLimitKey } from "./rate-limiter";
 import { runInShard } from "./shard-context";
 import {
@@ -10,8 +10,21 @@ import {
     DISPATCH_BATCH,
     HOUSEKEEPING_HORIZON_MS,
     HOUSEKEEPING_IDLE_INTERVAL_MS,
+    markRateLimitsPending,
     needsHousekeeping,
 } from "./shard-housekeeping";
+
+const enqueued = vi.hoisted(() => [] as { args: Record<string, unknown>; options: { delayMs?: number; shardKey?: string }; path: string }[]);
+
+vi.mock(
+    import("./job-queue"),
+    () =>
+        ({
+            enqueueJob: async (reference: { __lunoraRef: string }, args: Record<string, unknown>, options: { delayMs?: number; shardKey?: string } = {}) => {
+                enqueued.push({ args, options, path: reference.__lunoraRef });
+            },
+        }) as never,
+);
 
 const NOW = 10_000_000_000;
 
@@ -42,6 +55,7 @@ describe("the dormant-shard rate-limit sweep", () => {
     beforeEach(() => {
         vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
         harness = lunoraTest(schema as never);
+        enqueued.length = 0;
     });
 
     afterEach(() => {
@@ -209,5 +223,84 @@ describe("the dormant-shard rate-limit sweep", () => {
         const run = await dispatch();
 
         expect(sweeps(run).map((job) => job.shardKey)).toStrictEqual(["dormant"]);
+    });
+
+    it("settles the flag in the continuation of a dormant sweep that needed more than one page", async () => {
+        await census([{ lastActiveAt: DORMANT, rateLimitsPending: true, shardKey: "dormant" }]);
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index <= RATE_LIMIT_SWEEP_PAGE; index += 1) {
+                await ctx.db.insert("rateLimits", { key: `old-${index}`, ts: NOW - RATE_LIMIT_RETENTION_MS - 1 - index, value: 1 });
+            }
+        });
+
+        const next: Record<string, unknown>[] = [];
+        const runOnShard = async (run: (ctx: any) => Promise<unknown>) =>
+            await runInShard(
+                "dormant",
+                async () =>
+                    await harness.run(async (ctx: any) => {
+                        ctx.scheduler.runAfter = async (_delay: number, _reference: unknown, args: Record<string, unknown>) => {
+                            next.push(args);
+
+                            return "job";
+                        };
+
+                        return await run(ctx);
+                    }),
+            );
+
+        expect(await runOnShard(async (ctx) => await ctx.runMutation(sweepDormantShardRateLimits, {}))).toStrictEqual({
+            cleared: false,
+            deleted: RATE_LIMIT_SWEEP_PAGE,
+        });
+        expect(await pendingOf("dormant")).toBe(true);
+        expect(next).toStrictEqual([{ dormant: true }]);
+
+        expect(await runOnShard(async (ctx) => await ctx.runMutation(sweepExpiredRateLimits, next[0]))).toBe(1);
+        expect(await pendingOf("dormant")).toBe(false);
+    });
+
+    it("retries a census write that failed after a charge added a row, so the flag still goes on", async () => {
+        await census([{ lastActiveAt: DORMANT, rateLimitsPending: false, shardKey: "dormant" }]);
+
+        await runInShard("dormant", async () => {
+            await harness.run(async (ctx: any) => {
+                // The charge's own table works; the census read beside it fails.
+                const database = new Proxy(ctx.db, {
+                    get: (target, property) => {
+                        if (property === "shardActivity") {
+                            return {
+                                findFirst: async () => {
+                                    throw new Error("D1 unavailable");
+                                },
+                            };
+                        }
+
+                        const value: unknown = Reflect.get(target, property, target);
+
+                        return typeof value === "function" ? value.bind(target) : value;
+                    },
+                });
+
+                const { ok } = await createRatelimit(getRateLimitKey("guest/message", "public"), database).limit("share:link");
+
+                expect(ok).toBe(true);
+            });
+        });
+
+        expect(await pendingOf("dormant")).toBe(false);
+        expect(enqueued).toStrictEqual([
+            {
+                args: { shardKey: "dormant" },
+                options: { delayMs: expect.any(Number), shardKey: "dormant" },
+                path: "lib_shard_housekeeping:markRateLimitsPending",
+            },
+        ]);
+
+        await runInShard("dormant", async () => {
+            await harness.run(async (ctx: any) => await ctx.runMutation(markRateLimitsPending, enqueued[0]!.args));
+        });
+
+        expect(await pendingOf("dormant")).toBe(true);
     });
 });

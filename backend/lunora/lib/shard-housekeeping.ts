@@ -34,6 +34,7 @@ import { v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { internalAction, internalMutation } from "../_generated/server";
+import { enqueueJob } from "./job-queue";
 import { cronsLogger } from "./logger";
 import { patchRow } from "./patch";
 import { currentUserShard } from "./shard-context";
@@ -180,27 +181,52 @@ export const noteShardDue = async (ctx: CensusCtx, dueAt: number, shardKey: stri
     });
 };
 
+/** Before the retry of a failed {@link noteRateLimitsPending} write, so a passing D1 failure has cleared. */
+export const RATE_LIMITS_PENDING_RETRY_MS = 30 * 1000;
+
+const markRateLimitsPendingRow = async (ctx: CensusCtx, shardKey: string): Promise<void> => {
+    const row = await censusRow(ctx, shardKey);
+
+    if (!row) {
+        await ctx.db.insert("shardActivity", { lastActiveAt: Date.now(), rateLimitsPending: true, shardKey });
+    } else if (row.rateLimitsPending !== true) {
+        await ctx.db.patch("shardActivity", row._id, { rateLimitsPending: true });
+    }
+};
+
 /**
  * On a user shard: a charge added a `rateLimits` row, so the dormant-shard dispatch must visit this shard. A charge need
  * not move `lastActiveAt` (a guest's post on the owner's shard), so this is its own note. Writes only when the flag is
  * off; a charge that only updates a row needs none, since a table holding a row keeps the flag on
  * ({@link settleRateLimitsPending} re-checks after clearing).
+ *
+ * The row is already written, and a later charge on that key only updates it, so a failed write would leave the flag off
+ * for good: it is retried out of band, by {@link markRateLimitsPending} on this shard through the jobs queue (whose own
+ * redelivery bounds it to three tries). Neither the write nor the send ever fails the charge.
  */
 export const noteRateLimitsPending = async (ctx: CensusCtx, shardKey: string | undefined = currentUserShard()): Promise<void> => {
     if (shardKey === undefined) {
         return;
     }
 
-    await bestEffort("noteRateLimitsPending", async () => {
-        const row = await censusRow(ctx, shardKey);
+    if (await bestEffort("noteRateLimitsPending", async () => await markRateLimitsPendingRow(ctx, shardKey))) {
+        return;
+    }
 
-        if (!row) {
-            await ctx.db.insert("shardActivity", { lastActiveAt: Date.now(), rateLimitsPending: true, shardKey });
-        } else if (row.rateLimitsPending !== true) {
-            await ctx.db.patch("shardActivity", row._id, { rateLimitsPending: true });
-        }
+    await bestEffort("noteRateLimitsPending retry", async () => {
+        await enqueueJob(internal.lib.shard_housekeeping.markRateLimitsPending, { shardKey }, { delayMs: RATE_LIMITS_PENDING_RETRY_MS, shardKey });
     });
 };
+
+/** The retry of a failed {@link noteRateLimitsPending} write. It throws on failure, so the queue delivers it again. */
+export const markRateLimitsPending = internalMutation
+    .input({ shardKey: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await markRateLimitsPendingRow(ctx, args.shardKey);
+
+        return null;
+    });
 
 /**
  * On a user shard, from the dormant sweep: set the flag to whether the `rateLimits` table still holds a row. Clearing

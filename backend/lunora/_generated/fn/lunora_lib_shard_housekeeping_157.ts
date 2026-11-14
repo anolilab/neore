@@ -28,6 +28,12 @@ __has3 = true;
 }
 return { ...(__has2 ? { "after": __val2 } : {}), ...(__has3 ? { "before": __val3 } : {}) };
 });
+installCompiledValidatorMap(lunora_lib_shard_housekeeping_157.markRateLimitsPending.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["shardKey"] !== "string") return DEFER;
+return { "shardKey": source["shardKey"] };
+});
 installCompiledValidatorMap(lunora_lib_shard_housekeeping_157.recordShardActivity.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
