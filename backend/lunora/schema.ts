@@ -3169,7 +3169,8 @@ export const schema = defineSchema({
         // The organization a temporary chat was started in, kept for its permission cap only
         // (`chat/lib/run-permission-cap.ts`). A temporary chat is never filed under `organizationId`, so it stays off that
         // organization's list, but a later turn sent from another space must not lift the cap it started under.
-        // Written only by `agent/threads.ts#createTemporaryThread`.
+        // Written only by `agent/threads.ts#createTemporaryThread`. Saving or branching the chat files the lasting chat under
+        // this organization.
         capOrganizationId: v.optional(v.string()),
         category: v.optional(v.string()),
         // The newest context reset on the ACTIVE path, kept by `syncActiveAgent` and the clear writers so a reply reads it in

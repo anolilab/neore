@@ -6,7 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { createTemporaryThread } from "./threads";
+import { convertTemporaryToPermanent, createTemporaryThread, threadForViewer } from "./threads";
 
 let harness: ReturnType<typeof lunoraTest>;
 let threadId: string;
@@ -35,5 +35,34 @@ describe("createTemporaryThread", () => {
 
         expect(await thread()).toMatchObject({ isTemporary: true });
         expect(await thread()).not.toHaveProperty("capOrganizationId");
+    });
+});
+
+describe("convertTemporaryToPermanent", () => {
+    it("files a kept chat under the organization it was started in, so it keeps that organization's cap", async () => {
+        await harness.run(async (ctx: any) => await ctx.runMutation(createTemporaryThread, { capOrganizationId: "org-a", expiresAt: 1, threadId }));
+        await harness.run(async (ctx: any) => await ctx.runMutation(convertTemporaryToPermanent, { threadId }));
+
+        expect(await thread()).toMatchObject({ organizationId: "org-a" });
+        expect(await thread()).not.toHaveProperty("capOrganizationId");
+        expect(await thread()).not.toHaveProperty("isTemporary");
+    });
+
+    it("leaves a kept chat from the personal space unfiled", async () => {
+        await harness.run(async (ctx: any) => await ctx.runMutation(createTemporaryThread, { expiresAt: 1, threadId }));
+        await harness.run(async (ctx: any) => await ctx.runMutation(convertTemporaryToPermanent, { threadId }));
+
+        expect(await thread()).not.toHaveProperty("organizationId");
+        expect(await thread()).not.toHaveProperty("isTemporary");
+    });
+});
+
+describe("threadForViewer", () => {
+    it("shows the organization a temporary chat was started in to its owner only", async () => {
+        await harness.run(async (ctx: any) => await ctx.runMutation(createTemporaryThread, { capOrganizationId: "org-a", expiresAt: 1, threadId }));
+        const row = (await thread()) as never;
+
+        expect(threadForViewer(row, "owner")).toMatchObject({ capOrganizationId: "org-a" });
+        expect(threadForViewer(row, "grantee")).not.toHaveProperty("capOrganizationId");
     });
 });

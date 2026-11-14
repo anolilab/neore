@@ -3757,11 +3757,14 @@ export const branchThread = authAction
             throw new LunoraError("CONFLICT", "This thread runs on a paired computer, so it cannot be branched.");
         }
 
-        const { language, model, organizationId } = parentThread;
+        const { language, model } = parentThread;
 
         if (!model) {
             throw new LunoraError("BAD_REQUEST", "Parent thread is missing model");
         }
+
+        // A branch is a lasting chat: one taken from a temporary chat started in an organization is filed under it, as saving it would be.
+        const organizationId = parentThread.organizationId ?? parentThread.capOrganizationId;
 
         // Resolved along the ACTIVE path: a branched thread also stores
         // off-path siblings, which a raw row index would count.

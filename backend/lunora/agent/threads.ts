@@ -50,10 +50,10 @@ export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
 };
 
 /**
- * Unread, snooze and "needs you" belong to the thread's OWNER; the row is shared with grantees, who must not see
- * (or act on) them. Reads that can reach a grantee return the row through here.
+ * Unread, snooze and "needs you" belong to the thread's OWNER, as does the organization a temporary chat was started in; the
+ * row is shared with grantees, who must not see (or act on) them. Reads that can reach a grantee return the row through here.
  */
-const OWNER_STATE_KEYS = ["awaitingInput", "lastReplyAt", "lastViewedAt", "permissionMode", "snoozeChosenAt", "snoozedUntil"] as const;
+const OWNER_STATE_KEYS = ["awaitingInput", "capOrganizationId", "lastReplyAt", "lastViewedAt", "permissionMode", "snoozeChosenAt", "snoozedUntil"] as const;
 
 export const threadForViewer = (thread: Doc<"threads">, viewerId: string | undefined): ThreadDoc => {
     const isOwner = thread.userId !== undefined && thread.userId === viewerId;
@@ -1452,9 +1452,16 @@ export const convertTemporaryToPermanent = internalMutation
             throw new LunoraError("NOT_FOUND", `Temporary thread ${args.threadId} not found`);
         }
 
+        const thread = await ctx.db.get("threads", args.threadId);
+
         await ctx.db.delete("temporaryThreads", temporaryThread._id);
-        // Clear denormalized flag
-        await patchById(ctx.db, "threads", args.threadId, { isTemporary: undefined });
+        // A kept chat started in an organization is filed under it, as a lasting chat started there is, so it keeps that
+        // organization's cap and switching spaces cannot lift it.
+        await patchById(ctx.db, "threads", args.threadId, {
+            capOrganizationId: undefined,
+            isTemporary: undefined,
+            ...(!thread?.organizationId && thread?.capOrganizationId && { organizationId: thread.capOrganizationId }),
+        });
 
         return null;
     });
