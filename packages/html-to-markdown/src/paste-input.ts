@@ -4,6 +4,7 @@
  * text instead. Text placed straight in a list, outside any item, becomes an item of its own.
  */
 import { isUnsafeDestination } from "./commonmark-rules";
+import { declaredProperties } from "./inline-style";
 import { isBlock } from "./utilities";
 
 /** Elements deep the conversion goes, well before the stack runs out. A table and its cell count as one level. */
@@ -40,8 +41,10 @@ const TABLE_PARTS = new Set(["TBODY", "TFOOT", "THEAD", "TR"]);
 const NON_BLANK = /[^\t\n\f\r ]/;
 // What `previousItem` gives for loose text that follows a block, not an item.
 const AFTER_BLOCK = Symbol("after a block");
-// The `font` shorthand, which may set a weight or a style; `font-family` and the other longhands are not it.
-const FONT_SHORTHAND = /(?:^|[\s;])font\s*:/;
+// The properties the paste style rules read.
+const FORMATTING_PROPERTIES = new Set(["font-style", "font-weight", "text-decoration", "text-decoration-line"]);
+// The characters Markdown escaping may put a backslash before: each may be written as two.
+const ESCAPABLE = new Set("\\`*_{}[]()#+-.!|<>~");
 const WHITESPACE = new Set([" ", "\t", "\n", "\r", "\f"]);
 
 /** What the page shows: the elements it hides, and the text an image stands for ("" for an image that is none). */
@@ -157,13 +160,21 @@ function isIndenting(element: Element): boolean {
 }
 
 /**
- * True for a style that may set formatting: a weight, a font style or a text decoration, alone or in the `font`
- * shorthand. A color, a size or a font family formats nothing, so it costs no work.
+ * True for a style that declares a property the style rules read: a weight, a font style or a text decoration. A
+ * color, a size, a font family or a custom property formats nothing, so it costs no work.
  */
 function isFormattingStyle(style: string): boolean {
-    const lower = style.toLowerCase();
+    if (style === "") {
+        return false;
+    }
 
-    return lower.includes("font-weight") || lower.includes("font-style") || lower.includes("text-decoration") || FONT_SHORTHAND.test(lower);
+    for (const property of declaredProperties(style)) {
+        if (FORMATTING_PROPERTIES.has(property)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /** The work left after the element's rule does its work on what it holds. Throws once a budget is spent. */
@@ -197,8 +208,12 @@ function writtenLength(element: Element, shown: Shown): number {
     }
 
     // A link to an unsafe destination is written as its text alone: its destination and title cost nothing.
-    if (element.nodeName === "A" && !isUnsafeDestination(element.getAttribute("href") ?? "")) {
-        return (element.getAttribute("href")?.length ?? 0) + (element.getAttribute("title")?.length ?? 0);
+    const attribute = element.nodeName === "A" ? element.getAttribute("href") : null;
+    const href = attribute ?? "";
+
+    // Only a link written as one: with a destination, and a safe one. Any other is its text alone.
+    if (href !== "" && !isUnsafeDestination(href)) {
+        return href.length + (element.getAttribute("title")?.length ?? 0);
     }
 
     return 0;
@@ -268,8 +283,11 @@ function collapsedLength(text: string): number {
     for (const char of text) {
         const isWhitespace = WHITESPACE.has(char);
 
-        // A character outside the Basic Multilingual Plane, such as an emoji, is two units of a JavaScript string.
-        length += isWhitespace && isSpace ? 0 : char.length;
+        // A character outside the Basic Multilingual Plane, such as an emoji, is two units of a JavaScript string; one
+        // Markdown escapes is written with a backslash before it.
+        const written = char.length + (ESCAPABLE.has(char) ? 1 : 0);
+
+        length += isWhitespace && isSpace ? 0 : written;
         isSpace = isWhitespace;
     }
 

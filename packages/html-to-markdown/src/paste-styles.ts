@@ -229,6 +229,7 @@ const EMOJI_EDGE = /^[\p{Extended_Pictographic}\p{Emoji_Modifier}\u{FE0F}]$/u;
 // What a paste starts with that is no content: blank lines and the spaces before the first text. A non-breaking space
 // the page shows is kept.
 const LEADING_SPACE = /^[\t\n\r ]+/;
+const CONVERTIBLE_NODE_TYPES = new Set([1, 9, 11]);
 // A blank line, which may hold a line break's mark, kept as the separator when content is split on it.
 // eslint-disable-next-line no-control-regex, sonarjs/no-control-regex -- U+0010 is the preset's own line break mark.
 const BLANK_LINE = /(\n\u{10}?\n)/u;
@@ -1230,6 +1231,17 @@ function stripMarks(root: Node): Node {
     return root;
 }
 
+/** True for a node the conversion takes: an element, a document or a fragment. */
+function isConvertibleNode(input: unknown): input is Node {
+    if (typeof input !== "object" || input === null) {
+        return false;
+    }
+
+    const node = input as Partial<Node>;
+
+    return CONVERTIBLE_NODE_TYPES.has(node.nodeType ?? 0) && typeof node.cloneNode === "function";
+}
+
 /**
  * Takes the marks out of what is converted, so only the preset writes them, and out of what it gives back. The output
  * also loses the blank text before its first content, such as the spaces between the elements of a pasted `<head>`.
@@ -1242,7 +1254,8 @@ export function guardMarks(service: TurndownService, prepare: (root: Node) => vo
         withoutMarks(writeDelimiters(markdown, service.options)).replaceAll(LINE_BREAK_MARK, "").replace(LEADING_SPACE, "").trimEnd();
 
     const turndown = (input: TurndownInput): string => {
-        const isNode = typeof input === "object" && input !== null && typeof (input as Partial<Node>).nodeType === "number";
+        // The nodes the conversion takes: an element, a document or a fragment. Any other input reaches its error.
+        const isNode = isConvertibleNode(input);
 
         // Nothing to parse in an empty string: the conversion gives "" without a parser.
         if (input === "" || (typeof input !== "string" && !isNode)) {

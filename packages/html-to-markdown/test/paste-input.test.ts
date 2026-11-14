@@ -321,7 +321,7 @@ describe("paste input: review cases, eleventh round", () => {
 describe("paste input: review cases, twelfth round", () => {
     it("counts no formatting work for a font family, which formats nothing", () => {
         expect(convert(`${`<span style="font-family:Arial">`.repeat(450)}${"word ".repeat(20_000)}`)).toContain("word word");
-        expect(() => convert(`${`<span style="font: bold 12px Arial">`.repeat(450)}${"word ".repeat(20_000)}`)).toThrow(RangeError);
+        expect(() => convert(`${`<span style="font-style:italic">`.repeat(450)}${"word ".repeat(20_000)}`)).toThrow(RangeError);
     });
 
     it("keeps a blank line for each line break of a div that holds only breaks", () => {
@@ -365,5 +365,27 @@ describe("paste input: review cases, fifteenth round", () => {
     it("drops only the last <br> of a div, which shows no line, and keeps the blank line of one before it", () => {
         expect(convert("<div>a<br><br></div><div>b</div>")).toBe("a\n\nb");
         expect(convert("<div>a<br></div><div>b</div>")).toBe("a\nb");
+    });
+});
+
+describe("paste input: review cases, sixteenth round", () => {
+    it("counts the backslash an escaped character is written with", () => {
+        expect(() => convert(`${"<span>".repeat(450)}${"*".repeat(150_000)}`)).toThrow(RangeError);
+    });
+
+    it("counts formatting work only for the properties the style rules read, not names that contain them", () => {
+        for (const style of ["--my-font-weight:bold", "text-decoration-color:red", "font: bold 12px Arial"]) {
+            expect(convert(`${`<span style="${style}">`.repeat(450)}${"word ".repeat(20_000)}`)).toContain("word word");
+        }
+    });
+
+    it("counts no title for a link with no destination, which is written as its text", () => {
+        expect(convert(`${"<b>".repeat(450)}<a title="${"t".repeat(50_000)}">label</a>`)).toContain("label");
+    });
+
+    it("rejects a text node as the conversion does, not converting it to nothing", () => {
+        const document = createDocument("<p>text</p>");
+
+        expect(() => convert((document.querySelector("p") as Element).firstChild as Node)).toThrow(TypeError);
     });
 });

@@ -44,6 +44,21 @@ export function declaredStyle(
     return value;
 }
 
+/** The property names an inline style declares, in lower case. */
+export function declaredProperties(style: string): Set<string> {
+    const names = new Set<string>();
+
+    for (const declaration of declarations(style)) {
+        const colon = declaration.indexOf(":");
+
+        if (colon !== -1) {
+            names.add(declaration.slice(0, colon).trim().toLowerCase());
+        }
+    }
+
+    return names;
+}
+
 /**
  * The declarations of an inline style, without its comments: split at each `;` that is not inside a quoted string or
  * parentheses, so a value such as `url('a;b')` or `"x; y"` stays whole.
