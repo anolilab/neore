@@ -8,7 +8,7 @@
 import { gfm } from "./gfm";
 import { declaredStyle } from "./inline-style";
 import { codeRules } from "./paste-code";
-import { checkWork, wrapLooseListText } from "./paste-input";
+import { checkWork, shownText, wrapLooseListText } from "./paste-input";
 import { isWordMarker, LINE_BREAK_MARK, listRules, prefixLines, unlessRemoved } from "./paste-lists";
 import { guardMarks, isSetToNormal, styleRules } from "./paste-styles";
 import type TurndownService from "./turndown";
@@ -104,8 +104,6 @@ const HIDING_VISIBILITY = new Set(["collapse", "hidden"]);
 const SCRIPT_FROM = [..."0123456789+-\u{2212}=()"];
 const SUPERSCRIPTS = new Map([...SCRIPT_FROM, "n", "i"].map((char, index) => [char, [..."⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁻⁼⁽⁾ⁿⁱ"][index] as string]));
 const SUBSCRIPTS = new Map(SCRIPT_FROM.map((char, index) => [char, [..."₀₁₂₃₄₅₆₇₈₉₊₋₋₌₍₎"][index] as string]));
-// A Markdown escape: a backslash before ASCII punctuation.
-const ESCAPED = /\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g;
 const OUTER_DISPLAY = new Set(["block", "inline", "run-in"]);
 const INNER_DISPLAY = new Set(["flex", "flow", "flow-root", "grid", "ruby", "table"]);
 
@@ -329,16 +327,17 @@ const pasteRules: Record<string, Rule> = {
     // Raised and lowered text: no Markdown writes it, so it keeps its meaning in Unicode where Unicode can.
     script: {
         filter: unlessRemoved((node) => node.nodeName === "SUP" || node.nodeName === "SUB"),
-        replacement: (content, node) => scriptText(content, node.nodeName === "SUP" ? SUPERSCRIPTS : SUBSCRIPTS),
+        replacement: (content, node) => scriptText(content, node, node.nodeName === "SUP" ? SUPERSCRIPTS : SUBSCRIPTS),
     },
 };
 
 /**
- * Raised or lowered text in the Unicode forms of its characters, when each has one; otherwise as written: an ordinal
- * (`12<sup>th</sup>`) or a footnote mark (`<sup>[1]</sup>`) reads the same on the line.
+ * Raised or lowered text in the Unicode forms of the characters the page shows, when each has one; otherwise as
+ * written: an ordinal (`12<sup>th</sup>`) or a footnote mark (`<sup>[1]</sup>`) reads the same on the line. The forms
+ * are read from the text, not the Markdown, so an escape or a delimiter in it is no character of its own.
  */
-function scriptText(content: string, forms: ReadonlyMap<string, string>): string {
-    const chars = [...content.replaceAll(ESCAPED, "$1")];
+function scriptText(content: string, node: Element, forms: ReadonlyMap<string, string>): string {
+    const chars = [...shownText(node, isHiddenElement).trim()];
 
     return chars.length > 0 && chars.every((char) => forms.has(char)) ? chars.map((char) => forms.get(char)).join("") : content;
 }
@@ -409,8 +408,9 @@ export function paste(service: TurndownService): void {
         service.addRule(key, rule);
     }
 
+    // The loose list text is put in items first, so the work is measured on the items the conversion writes.
     guardMarks(service, (root) => {
-        checkWork(root);
         wrapLooseListText(root, isHiddenElement);
+        checkWork(root);
     });
 }

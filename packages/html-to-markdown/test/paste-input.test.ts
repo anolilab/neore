@@ -1,4 +1,4 @@
-/* eslint-disable no-secrets/no-secrets -- HTML samples, not secrets. */
+/* eslint-disable no-secrets/no-secrets, unicorn/prefer-dom-node-append -- HTML samples, not secrets; domino, the test parser, has no append. */
 import { createDocument } from "@mixmark-io/domino";
 import { describe, expect, it } from "vitest";
 
@@ -100,5 +100,54 @@ describe("paste: a div per line", () => {
 
     it("parts a div that holds blocks from what is around it, as any block", () => {
         expect(convert("<div><p>a</p><p>b</p></div><div>c<br></div>")).toBe("a\n\nb\n\nc");
+    });
+});
+
+describe("paste input: review cases", () => {
+    it("refuses table parts nested in each other past the depth any element may reach, before copying a node", () => {
+        const document = createDocument("<table></table>");
+        let parent = document.querySelector("table") as Element;
+
+        for (let level = 0; level < 1100; level += 1) {
+            const row = document.createElement("tr");
+
+            parent.appendChild(row);
+            parent = row;
+        }
+
+        parent.appendChild(document.createTextNode("x"));
+
+        expect(() => convert(document.body)).toThrow(RangeError);
+    });
+
+    it("measures the items it makes of loose list text, so lists nested through them count against the budget", () => {
+        expect(() => convert(`${"<ul><span>".repeat(160)}${"a<br>".repeat(1000)}`)).toThrow(RangeError);
+    });
+
+    it("counts the re-indenting of a list placed straight in a list", () => {
+        expect(() => convert(`${"<ul><li>a</li>".repeat(450)}<li>${"a<br>".repeat(300)}</li>`)).toThrow(RangeError);
+    });
+
+    it("counts formatting nested around one long line", () => {
+        expect(() => convert(`${`<span style="color:red">`.repeat(450)}${"word ".repeat(20_000)}`)).toThrow(RangeError);
+    });
+
+    it("counts a run of whitespace once and the text of a script as none, as the conversion sees them", () => {
+        expect(convert(`<b>a<br>${" ".repeat(3_000_000)}b</b>`)).toBe("**a\nb**");
+        expect(convert(`<b>a<br><script>${"x".repeat(3_000_000)}</script>b</b>`)).toBe("**a\nb**");
+    });
+
+    it("makes no item of loose text that the page hides inside a shown element", () => {
+        expect(convert(`<ul><li>a</li><span><span style="display:none">hidden</span></span><li>b</li></ul>`)).toBe("- a\n- b");
+    });
+
+    it("keeps loose text on one line across a block the page hides", () => {
+        expect(convert("<ul>before<div hidden>ignored</div>after</ul>")).toBe("- beforeafter");
+    });
+
+    it("reads raised text from the text the page shows, not from its Markdown", () => {
+        expect(convert(String.raw`<p>x<sup>\-2</sup></p>`)).toBe(String.raw`x\\-2`);
+        expect(convert("<p>E=mc<sup><strong>2</strong></sup></p>")).toBe("E=mc²");
+        expect(convert(`<p>E=mc<sup>2<span style="display:none">x</span></sup></p>`)).toBe("E=mc²");
     });
 });

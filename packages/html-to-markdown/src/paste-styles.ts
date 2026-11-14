@@ -8,6 +8,7 @@
  */
 import { escapeTildes } from "./gfm";
 import { declaredStyle } from "./inline-style";
+import { checkDepth } from "./paste-input";
 import { LINE_BREAK_MARK } from "./paste-lists";
 import { parseRoot } from "./root-node";
 import type TurndownService from "./turndown";
@@ -1234,7 +1235,12 @@ export function guardMarks(service: TurndownService, prepare: (root: Node) => vo
             return convert(input);
         }
 
-        const root = typeof input === "string" ? parseRoot(withoutAnyMarks(input)) : copyWithoutMarks(input);
+        if (isNode) {
+            // A node passed in is copied below: one nested too deep is refused before the copy walks it.
+            checkDepth(input as Node);
+        }
+
+        const root = typeof input === "string" ? parseRoot(withoutAnyMarks(input)) : copyWithoutMarks(input as Node);
 
         prepare(root);
 
