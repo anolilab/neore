@@ -72,9 +72,13 @@ if (Platform.OS === "android") {
                     await setNotificationChannelAsync(ANDROID_CHANNEL_ID, { importance: AndroidImportance.HIGH, name: channelName(locale) });
                 },
                 retract: async (ids) => {
-                    // Queued but not yet shown is still a live alert: cancel it as well as dismissing it.
-                    await cancelScheduledNotificationAsync(ids.notificationId);
-                    await dismissNotificationAsync(ids.notificationId);
+                    // Queued but not yet shown is still a live alert: cancel it as well as dismissing it. A failed cancel must
+                    // not leave the shown alert up, so the dismiss runs either way.
+                    try {
+                        await cancelScheduledNotificationAsync(ids.notificationId);
+                    } finally {
+                        await dismissNotificationAsync(ids.notificationId);
+                    }
                 },
                 session: async () => await secureGrantStore.get() ?? undefined,
                 show: post,

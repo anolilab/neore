@@ -157,6 +157,9 @@ export const dataOnlyPushIds = (payload: unknown): PushIds | undefined => {
     return pushIdsIn(payload);
 };
 
+/** The same sign-in, not just the same account: signing out and in again to the same account gets a new grant. */
+const isSameSignIn = (now: StoredGrant | undefined, then: StoredGrant): boolean => now?.user.id === then.user.id && now.token === then.token;
+
 /**
  * Android's data-only push, in the background task: read the ids, fetch the text with the grant read here, and show the
  * notification on the device, the placeholder when the fetch fails. The text shows only if the account that fetched it is
@@ -179,7 +182,6 @@ export const showDataOnlyPush = async (payload: unknown, steps: PushTaskSteps): 
         return false;
     }
 
-    const fetchedFor = grant.user.id;
     const fetched = await steps.fetchContent(grant, ids.notificationId);
 
     // Another account's notification: post nothing, so its ids never land under the account signed in now.
@@ -200,7 +202,7 @@ export const showDataOnlyPush = async (payload: unknown, steps: PushTaskSteps): 
         return false;
     }
 
-    const isSameSession = current.user.id === fetchedFor;
+    const isSameSession = isSameSignIn(current, grant);
     const realText = isSameSession && typeof fetched === "object" ? fetched : undefined;
     const text = realText ?? pushPlaceholder(steps.locale);
     const shownIds = fetched === WITHHELD || !isSameSession ? { notificationId: ids.notificationId } : ids;
@@ -214,7 +216,7 @@ export const showDataOnlyPush = async (payload: unknown, steps: PushTaskSteps): 
         const afterPost = await steps.session();
 
         // The alert is for the account read just before the post, so a change to any other account takes it back.
-        isUnchanged = afterPost?.user.id === current.user.id;
+        isUnchanged = isSameSignIn(afterPost, current);
     } catch {
         // A read that fails leaves the account unconfirmed, so the alert is taken back.
     }

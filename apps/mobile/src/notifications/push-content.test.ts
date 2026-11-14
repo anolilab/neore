@@ -222,6 +222,27 @@ describe("showDataOnlyPush", () => {
         expect(show).toHaveBeenCalledWith({ body: "Release run", title: "Approval" }, PUSH);
     });
 
+    it("treats a sign-in again to the same account as another session", async () => {
+        const reads = [
+            { ...grantOf("u1"), token: "first" },
+            { ...grantOf("u1"), token: "second" },
+            { ...grantOf("u1"), token: "second" },
+        ];
+        const show = vi.fn(async () => undefined);
+        const retract = vi.fn(async () => undefined);
+
+        await showDataOnlyPush(PUSH, {
+            fetchContent: vi.fn(async () => ({ body: "Release run", title: "Approval" })),
+            locale: "de-DE",
+            retract,
+            session: async () => reads.shift(),
+            show,
+        });
+
+        expect(show).toHaveBeenCalledWith(pushPlaceholder("de-DE"), { notificationId: "n1" });
+        expect(retract).not.toHaveBeenCalled();
+    });
+
     it("keeps the placeholder when the account switches before the post", async () => {
         const { retract, show } = await runTask({ body: "Release run", title: "Approval" }, ["u1", "u2", "u2"]);
 
