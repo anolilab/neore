@@ -495,7 +495,8 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
     }
 
     // A switch to a coding agent starts one on a computer: the organization that caps the chat must allow that.
-    const refused = toHost ? await hostOrganizationRefusal(ctx, hostOrganizationOf(thread, args.organizationId), args.userId) : null;
+    const capOrganizationId = toHost ? hostOrganizationOf(thread, args.organizationId) : undefined;
+    const refused = await hostOrganizationRefusal(ctx, capOrganizationId, args.userId);
 
     if (refused) {
         throw new LunoraError("FORBIDDEN", refused);
@@ -538,7 +539,20 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
     const native = await nativePlanFor(ctx, { current, leaf, target, thread, to });
     const handoff = await handoffFor(ctx, thread, leaf, target, { lenient: native !== undefined });
     const taintedBy = target.kind === "host" ? await takeoverTaint(ctx, { current, fromHost, leaf, thread }) : [];
-    const result = await write(ctx, { clientId: args.clientId, current, handoff, leaf, native, now, taintedBy, target, thread, to, userId: args.userId });
+    const result = await write(ctx, {
+        capOrganizationId,
+        clientId: args.clientId,
+        current,
+        handoff,
+        leaf,
+        native,
+        now,
+        taintedBy,
+        target,
+        thread,
+        to,
+        userId: args.userId,
+    });
 
     if (!(await claimOnce(ctx, "switch", claimKey, AGENT_SWITCH_CLAIM_TTL_MS, args.userId))) {
         // Another click took it between the check and here: this transaction's writes go with the throw.
@@ -563,6 +577,8 @@ const takeoverTaint = async (
     args.fromHost ? mergeTaint(args.current.session?.taintedBy, HOST_HANDOFF_TAINT) : await threadPathTaint(ctx, args.thread._id, args.leaf);
 
 interface WriteArgs {
+    /** The organization that admitted a switch to a computer, kept on a new host thread that is filed under none. */
+    capOrganizationId: string | undefined;
     clientId: string;
     current: { agent: SwitchAgentRef; session?: Session };
     handoff: string;
@@ -680,6 +696,8 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
                   model: target.offer.agentKey,
                   ...(thread.projectId && { projectId: thread.projectId }),
                   ...(thread.organizationId && { organizationId: thread.organizationId }),
+                  // A personal chat keeps its list, and its new host thread keeps the cap it was admitted under.
+                  ...(!thread.organizationId && args.capOrganizationId && { capOrganizationId: args.capOrganizationId }),
                   ...(thread.teamId && { teamId: thread.teamId }),
                   runner: "host",
                   status: "active",

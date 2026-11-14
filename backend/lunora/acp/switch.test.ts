@@ -939,6 +939,24 @@ describe("an organization's cap on a computer", () => {
         expect(await rows("acpSessions")).toHaveLength(0);
     });
 
+    it("keeps the cap a personal chat's switch was admitted under on its new host thread, without filing it", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await capped("auto");
+
+        const result = await runAgentSwitch(
+            runner,
+            { clientId: nextClick(), target: hostTarget(device) as never, threadId: source as never, userId: ownerId },
+            summary,
+            "org-1",
+        );
+        const fork = await run(async (ctx) => await ctx.db.get("threads", result.forkedThreadId as never));
+
+        expect(fork).toMatchObject({ capOrganizationId: "org-1" });
+        expect(fork?.organizationId).toBeUndefined();
+    });
+
     it("refuses a switch to another agent on the computer too, and lets the chat leave the computer for a cloud model", async () => {
         const device = await pairedDevice(ownerId);
         const source = await hostThread(device);
