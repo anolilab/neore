@@ -13,7 +13,6 @@ import { canNavigateToTap, holdTapRoute, takeTapRoute } from "./pending-tap";
 import {
     backendPushServer,
     configurePhoneNotifications,
-    deviceLocale,
     devicePushPlatform,
     dismissAccountNotifications,
     noteSignedInAccount,
@@ -21,6 +20,7 @@ import {
     syncApprovalActions,
     syncExtensionAddress,
 } from "./phone-push";
+import { deviceLocale } from "./push-channel";
 import { createAccountChecks, createForegroundGate, createPromptOffer, createTokenChangeFilter, pushIdsFromNotification, registerPhoneForPush, routeForPush } from "./push-registration";
 
 /** `didRun`: no error (offline, no answer). `isRegistered`: the server now holds the token for this account. */

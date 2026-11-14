@@ -225,6 +225,28 @@ describe("phoneMessage", () => {
         expect(message).not.toHaveProperty("mutableContent");
     });
 
+    it("gives an Android phone whose app builds the alert a data-only message: no text leaves us at all", () => {
+        const message = phoneMessage(
+            { buildsAlert: true, language: "de-DE", platform: "android", token: PHONE },
+            { notificationId: "n1", threadId: "t1", urgency: "high" },
+        );
+
+        expect(message).toStrictEqual({ data: { notificationId: "n1", threadId: "t1" }, priority: "high", to: PHONE, ttl: 86_400 });
+    });
+
+    it("keeps a tool approval notification-style on an Android phone that builds its own alerts", () => {
+        const message = phoneMessage(
+            { buildsAlert: true, platform: "android", token: PHONE },
+            { approval: { approvalId: "a1", teammate: "Mira", tool: "shell" }, notificationId: "n1", urgency: "high" },
+        );
+
+        expect(message).toMatchObject({ body: "Mira", title: "shell" });
+    });
+
+    it("keeps the generic alert for an Android phone whose build does not build it", () => {
+        expect(phoneMessage({ platform: "android", token: PHONE }, { notificationId: "n1", urgency: "normal" })).toHaveProperty("title", "Neore");
+    });
+
     it("falls back to English for a language without a placeholder", () => {
         expect(phoneMessage({ language: "sv", platform: "ios", token: PHONE }, { notificationId: "n1", urgency: "high" }).body).toBe(
             "You have a new notification",

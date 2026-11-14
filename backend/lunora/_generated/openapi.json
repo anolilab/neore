@@ -38400,6 +38400,9 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "buildsAlert": {
+                        "type": "boolean"
+                      },
                       "language": {
                         "type": "string"
                       },
