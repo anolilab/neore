@@ -68,14 +68,16 @@ const PopoverTrigger = ({ children, className, render, ...rest }: React.Componen
 /**
  * Responsive popover content. Renders a positioned popup on desktop and
  * a DrawerContent bottom sheet on mobile. Positioning props (align, side,
- * sideOffset, alignOffset) are ignored on mobile.
+ * sideOffset, alignOffset) are ignored on mobile. On mobile an `aria-label`
+ * names the drawer's dialog through a visually hidden title.
  */
-const PopoverContent = ({ align, alignOffset, children, className, side, sideOffset, ...props }: PopoverContentProps) => {
+const PopoverContent = ({ align, alignOffset, "aria-label": ariaLabel, children, className, side, sideOffset, ...props }: PopoverContentProps) => {
     const isMobile = React.use(IsMobileContext);
 
     if (isMobile) {
         return (
             <DrawerContent>
+                {ariaLabel !== undefined && <DrawerTitle className="sr-only">{ariaLabel}</DrawerTitle>}
                 <div className={cn("max-h-[60vh] overflow-y-auto p-4", className)} {...(props as React.ComponentProps<"div">)}>
                     {children}
                 </div>
@@ -84,7 +86,7 @@ const PopoverContent = ({ align, alignOffset, children, className, side, sideOff
     }
 
     return (
-        <BasePopoverContent align={align} alignOffset={alignOffset} className={className} side={side} sideOffset={sideOffset} {...props}>
+        <BasePopoverContent align={align} alignOffset={alignOffset} aria-label={ariaLabel} className={className} side={side} sideOffset={sideOffset} {...props}>
             {children}
         </BasePopoverContent>
     );
