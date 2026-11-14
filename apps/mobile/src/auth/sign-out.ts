@@ -56,6 +56,9 @@ const revokeStored = async (token: string | undefined, revokeSession: (token: st
     }
 };
 
+/** Whether `markedToken` is the token a sign-out recorded for `grant`: a grant left readable by a failed clear is refused. */
+export const wasSignedOut = (grant: StoredGrant, markedToken: string | null): boolean => markedToken === grant.token;
+
 /**
  * Signing out takes the person's saved chats off the device FIRST, locally, before the server is asked anything: a
  * sign-out request that fails or hangs offline must not leave their chats behind for the next person to open.
@@ -64,9 +67,6 @@ const revokeStored = async (token: string | undefined, revokeSession: (token: st
  * phone's push token is released while the in-memory sign-in still works, waited on for at most
  * {@link RELEASE_PUSH_TIMEOUT_MS}. Last the session is revoked server-side with the token taken above.
  */
-/** Whether `markedToken` is the token a sign-out recorded for `grant`: a grant left readable by a failed clear is refused. */
-export const wasSignedOut = (grant: StoredGrant, markedToken: string | null): boolean => markedToken === grant.token;
-
 export const signOutOnDevice = async ({
     clearCache,
     dismissNotifications,
