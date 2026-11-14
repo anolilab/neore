@@ -1,7 +1,7 @@
 import { api } from "@neore/backend/api";
 
 import { DAY, HOUR, STORY_NOW as NOW } from "../clock";
-import { lunora, onStoryReset } from "../lunora";
+import { lunora, lunoraError, onStoryReset } from "../lunora";
 import type { LunoraFixture } from "../lunora";
 
 /** A thread's guest notes as the owner's `getGuestLink` reads them. */
@@ -47,6 +47,15 @@ export const guestLinksFixtures = ({
     onStoryReset(reset);
 
     const current = () => notes.map((row) => (savedByChatStart.has(row.id) ? { ...row, status: "sent" as const } : row));
+    const whileNoteExists = (reference: Parameters<typeof lunoraError>[0], fixture: LunoraFixture): LunoraFixture => {
+        const gone = lunoraError(reference, "NOT_FOUND", "That message is no longer waiting.", 404, { code: "GUEST_NOTE_GONE" });
+
+        return {
+            answer: async (args) =>
+                notes.some(({ id }) => id === (args as { messageId?: string } | undefined)?.messageId) ? await fixture.answer(args) : await gone.answer(args),
+            functionPath: fixture.functionPath,
+        };
+    };
 
     return [
         lunora(api.chat.guest_links.getGuestLink, ({ threadId }) => {
@@ -59,20 +68,28 @@ export const guestLinksFixtures = ({
             // An obviously fake token of the minted shape (64 hex characters).
             return { expiresAt: NOW + DAY, id: linkIdOf(threadId), linkToken: "ab".repeat(32) };
         }),
-        lunora(api.chat.guest_links.sendHeldGuestMessage, ({ messageId }) => {
-            const note = current().find(({ id }) => id === messageId);
+        // Review of a note that is gone (dismissed, or its link revoked) fails as the backend's does.
+        whileNoteExists(
+            api.chat.guest_links.sendHeldGuestMessage,
+            lunora(api.chat.guest_links.sendHeldGuestMessage, ({ messageId }) => {
+                const note = current().find(({ id }) => id === messageId);
 
-            if (!note || note.status === "sent") {
-                return { status: "sent" as const };
-            }
+                return note?.status === "held" ? { status: "ready" as const, text: note.text, threadId: "thread" } : { status: "sent" as const };
+            }),
+        ),
+        whileNoteExists(
+            api.chat.guest_links.dismissHeldGuestMessage,
+            lunora(api.chat.guest_links.dismissHeldGuestMessage, ({ messageId }) => {
+                // A note chat start already saved stays, and reads as sent.
+                if (current().some(({ id, status }) => id === messageId && status === "sent")) {
+                    return { status: "sent" as const };
+                }
 
-            return { status: "ready" as const, text: note.text, threadId: "thread" };
-        }),
-        lunora(api.chat.guest_links.dismissHeldGuestMessage, ({ messageId }) => {
-            notes = notes.filter(({ id }) => id !== messageId);
+                notes = notes.filter(({ id }) => id !== messageId);
 
-            return { status: "dismissed" as const };
-        }),
+                return { status: "dismissed" as const };
+            }),
+        ),
         lunora(api.chat.guest_links.revokeGuestLink, () => {
             live = false;
             notes = [];

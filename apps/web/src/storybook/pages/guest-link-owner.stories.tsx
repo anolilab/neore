@@ -21,6 +21,7 @@ const PAGE_WAIT = { timeout: 5000 } as const;
 const STATE_WAIT = { timeout: 15_000 } as const;
 
 const HELD = GUEST_NOTES[0]?.text ?? "";
+const SENT = GUEST_NOTES[1]?.text ?? "";
 // The panel names a note's buttons by its first 40 characters.
 const SEND_HELD = /^Send: Could you check the deploy tonight/u;
 const DISMISS_HELD = /^Dismiss note: Could you check the deploy tonight/u;
@@ -127,9 +128,14 @@ export const NotesWaiting: Story = {
     play: async ({ canvas }) => {
         const notes = await openGuestsTab(canvas);
 
-        await expect(within(notes).getByText(HELD)).toBeVisible();
-        await expect(within(notes).getByText("Waiting")).toBeVisible();
-        await expect(within(notes).getByRole("button", { name: SEND_HELD })).toBeEnabled();
+        const held = within(within(notes).getByText(HELD).closest("li") as HTMLElement);
+        const sent = within(within(notes).getByText(SENT).closest("li") as HTMLElement);
+
+        await expect(held.getByText("Waiting")).toBeVisible();
+        await expect(held.getByRole("button", { name: SEND_HELD })).toBeEnabled();
+        await expect(held.getByRole("button", { name: DISMISS_HELD })).toBeEnabled();
+        await expect(sent.getByText("Sent")).toBeVisible();
+        await expect(sent.queryByRole("button", { name: /^(Send|Dismiss note):/u })).toBeNull();
         await lunoraIdle();
     },
 };
