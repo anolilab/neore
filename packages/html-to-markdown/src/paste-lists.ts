@@ -57,8 +57,6 @@ const ROMAN: ReadonlyArray<readonly [bigint, string]> = [
     [1n, "i"],
 ];
 const BULLET: Marker = { text: "- ", width: 2 };
-// The start of each line that is not blank.
-const LINE_WITH_TEXT = /^(?=.)/gm;
 
 /** A filter that matches only what no remove filter drops: the preset's rules are added, so they come before those. */
 export function unlessRemoved(isMatch: (node: Element) => boolean): FilterFunction {
@@ -384,11 +382,57 @@ function bulletMarker(options: Options): Marker {
     return { text: `${options.bulletListMarker} `, width: options.bulletListMarker.length + 1 };
 }
 
+/**
+ * The preset's `br` option: a mark before the newline of a line break, taken out at the end. A line break is then not
+ * blank text, so two breaks in a row stay two lines, as the page shows them, and are not joined into one.
+ */
+export const LINE_BREAK_MARK = "\u{10}";
+
+/**
+ * The text without the newlines and line breaks at its ends: a page shows no blank line for a `<br>` that starts or
+ * ends a block.
+ */
+export function trimBreaks(text: string): string {
+    let start = 0;
+    let end = text.length;
+
+    while (start < end && isBreakChar(text.charAt(start))) {
+        start += 1;
+    }
+
+    while (end > start && isBreakChar(text.charAt(end - 1))) {
+        end -= 1;
+    }
+
+    return text.slice(start, end);
+}
+
+function isBreakChar(char: string): boolean {
+    return char === "\n" || char === LINE_BREAK_MARK;
+}
+
+/**
+ * `prefix` before each line of the text from line `from` on, and `blank` before a blank one, so no line ends in spaces
+ * a composer would hide. A line that holds only a line break's mark is blank.
+ */
+export function prefixLines(text: string, prefix: string, blank: string, from = 0): string {
+    return text
+        .split("\n")
+        .map((line, index) => {
+            if (index < from) {
+                return line;
+            }
+
+            return (line === "" || line === LINE_BREAK_MARK ? blank : prefix) + line;
+        })
+        .join("\n");
+}
+
 /** An item's text after its marker, with its later lines indented to the text's column. */
 function writeItem(place: ItemPlace, content: string): string {
     const indent = " ".repeat(place.indent + place.marker.width);
 
-    return `${" ".repeat(place.indent)}${place.marker.text}${content.replaceAll("\n", () => `\n${indent}`)}`;
+    return `${" ".repeat(place.indent)}${place.marker.text}${prefixLines(content, indent, "", 1)}`;
 }
 
 /**
@@ -416,9 +460,7 @@ export function listRules(isHiddenOnPage: (element: Element) => boolean): Record
                 }
 
                 const place = itemPlace(anchor, options, lookup);
-                const indent = " ".repeat(place.indent + place.marker.width);
-                // Blank lines stay blank: no trailing spaces.
-                const indented = items.replaceAll(LINE_WITH_TEXT, () => indent);
+                const indented = prefixLines(items, " ".repeat(place.indent + place.marker.width), "");
 
                 return `\n${indented}${node.nextSibling ? "\n" : ""}`;
             },
@@ -428,7 +470,7 @@ export function listRules(isHiddenOnPage: (element: Element) => boolean): Record
         listItem: {
             filter: unlessRemoved((node) => node.nodeName === "LI"),
             replacement(content, node, options, lookup) {
-                return `${writeItem(itemPlace(node, options, lookup), trimNewlines(content))}${node.nextSibling ? "\n" : ""}`;
+                return `${writeItem(itemPlace(node, options, lookup), trimBreaks(content))}${node.nextSibling ? "\n" : ""}`;
             },
         },
 
@@ -439,7 +481,7 @@ export function listRules(isHiddenOnPage: (element: Element) => boolean): Record
             replacement(content, node, _options, lookup) {
                 const place = wordPlace(node, lookup, isHiddenOnPage);
 
-                return `${place.isListStart ? "\n\n" : "\n"}${writeItem(place, content.trim())}\n`;
+                return `${place.isListStart ? "\n\n" : "\n"}${writeItem(place, trimBreaks(content.trim()).trim())}\n`;
             },
         },
     };

@@ -11,6 +11,8 @@ import type { AnnotatedNode, Options, Rule, RuleLookup } from "./types";
 // A table with more cells than this, once its spans are laid out, is written as the text of its cells, a line per row:
 // a grid that big would only bury its text in pipes.
 const MAX_TABLE_CELLS = 100_000;
+// A character that shows: not whitespace and not a control character.
+const VISIBLE = /[^\s\p{Cc}]/u;
 const ROW_GROUPS = new Set(["TBODY", "TFOOT", "THEAD"]);
 const CELLS = new Set(["TD", "TH"]);
 // The leading digits of a span attribute, as HTML reads it: `2abc` is 2.
@@ -93,12 +95,15 @@ function tableOf(node: Node): Element | null {
     return nearestAncestor(node, TABLE_NAMES, tableAncestors);
 }
 
-/** Text on one line: each line break and the whitespace around it becomes one space. */
+/**
+ * Text on one line: each line break and the whitespace around it becomes one space. A line that shows nothing (blank,
+ * or only control characters, such as a mark a preset writes for a line break) adds no space.
+ */
 function oneLine(text: string): string {
     return text
         .split("\n")
         .map((line) => line.trim())
-        .filter((line) => line !== "")
+        .filter((line) => VISIBLE.test(line))
         .join(" ");
 }
 

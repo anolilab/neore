@@ -8,6 +8,9 @@
  */
 import { escapeTildes } from "./gfm";
 import { declaredStyle } from "./inline-style";
+import { checkDepth } from "./paste-input";
+import { LINE_BREAK_MARK } from "./paste-lists";
+import { parseRoot } from "./root-node";
 import type TurndownService from "./turndown";
 import type { TurndownInput } from "./turndown";
 import type { Options, Rule, RuleLookup } from "./types";
@@ -27,8 +30,9 @@ interface Delimiter {
 const STRONG: Delimiter = { close: "\u{4}", open: "\u{3}" };
 const EMPHASIS: Delimiter = { close: "\u{6}", open: "\u{5}" };
 const STRIKE: Delimiter = { close: "\u{F}", open: "\u{E}" };
+
 // Every mark the preset writes, taken out of the input so only the preset writes them.
-const ALL_MARKS = [NORMAL_START, NORMAL_END, STRONG.open, STRONG.close, EMPHASIS.open, EMPHASIS.close, STRIKE.open, STRIKE.close];
+const ALL_MARKS = [NORMAL_START, NORMAL_END, STRONG.open, STRONG.close, EMPHASIS.open, EMPHASIS.close, STRIKE.open, STRIKE.close, LINE_BREAK_MARK];
 const BOLD_WEIGHTS = new Set(["600", "700", "800", "900", "bold", "bolder"]);
 
 // `lighter` is not here: it is relative, and under a heavy weight it is still bold.
@@ -225,6 +229,10 @@ const EMOJI_EDGE = /^[\p{Extended_Pictographic}\p{Emoji_Modifier}\u{FE0F}]$/u;
 // What a paste starts with that is no content: blank lines and the spaces before the first text. A non-breaking space
 // the page shows is kept.
 const LEADING_SPACE = /^[\t\n\r ]+/;
+const CONVERTIBLE_NODE_TYPES = new Set([1, 9, 11]);
+// A blank line, which may hold a line break's mark, kept as the separator when content is split on it.
+// eslint-disable-next-line no-control-regex, sonarjs/no-control-regex -- U+0010 is the preset's own line break mark.
+const BLANK_LINE = /(\n\u{10}?\n)/u;
 const STRUCTURE = new Set(["BLOCKQUOTE", "H1", "H2", "H3", "H4", "H5", "H6", "HR", "OL", "PRE", "TABLE", "UL"]);
 
 /** The formatting an element gives its text, by its name or its style. */
@@ -898,17 +906,32 @@ function writeDelimiters(markdown: string, options: Options): string {
     return text;
 }
 
-/** The delimiter around the text, with the whitespace at its ends kept outside, where Markdown lets a delimiter be. */
-function wrapEdges(text: string, marker: Delimiter): string {
-    const core = text.trim();
+/** True for whitespace and a line break's mark, which stay outside a delimiter. */
+function isEdgeSpace(char: string): boolean {
+    return char === LINE_BREAK_MARK || char.trim() === "";
+}
 
-    if (core === "") {
+/**
+ * The delimiter around the text, with the whitespace and line breaks at its ends kept outside, where Markdown lets a
+ * delimiter be.
+ */
+function wrapEdges(text: string, marker: Delimiter): string {
+    let start = 0;
+    let end = text.length;
+
+    while (start < end && isEdgeSpace(text.charAt(start))) {
+        start += 1;
+    }
+
+    while (end > start && isEdgeSpace(text.charAt(end - 1))) {
+        end -= 1;
+    }
+
+    if (start === end) {
         return text;
     }
 
-    const start = text.length - text.trimStart().length;
-
-    return `${text.slice(0, start)}${marker.open}${core}${marker.close}${text.slice(start + core.length)}`;
+    return `${text.slice(0, start)}${marker.open}${text.slice(start, end)}${marker.close}${text.slice(end)}`;
 }
 
 /**
@@ -916,22 +939,29 @@ function wrapEdges(text: string, marker: Delimiter): string {
  * blank line. A normal-weight run that goes on past one is closed before it and opened again after it.
  */
 function wrapRuns(content: string, marker: Delimiter, isBold: boolean): string {
-    if (!content.includes("\n\n")) {
+    // A blank line parts paragraphs; it may hold the mark of the line break that made it.
+    const pieces = content.split(BLANK_LINE);
+
+    if (pieces.length === 1) {
         return wrapParagraph(content, marker, isBold);
     }
 
     let isOpen = false;
 
-    return content
-        .split("\n\n")
-        .map((piece) => {
+    // The pieces alternate: a paragraph, then the blank line after it, kept as it is.
+    return pieces
+        .map((piece, index) => {
+            if (index % 2 === 1) {
+                return piece;
+            }
+
             const opened = isOpen ? `${NORMAL_START}${piece}` : piece;
 
             isOpen = opened.lastIndexOf(NORMAL_START) > opened.lastIndexOf(NORMAL_END);
 
             return wrapParagraph(isOpen ? `${opened}${NORMAL_END}` : opened, marker, isBold);
         })
-        .join("\n\n");
+        .join("");
 }
 
 /**
@@ -1174,33 +1204,12 @@ function attributesOf(element: Element): Attr[] {
     return Array.from({ length: attributes.length }, (_unused, index) => attributes[index] as Attr);
 }
 
-/** True when the node's text or an attribute in it holds a mark. */
-function hasMarks(root: Node): boolean {
+/**
+ * Takes the marks out of the node's text and attributes, in place. A parsed string needs it too: a character reference
+ * such as `&#3;` decodes into a mark.
+ */
+function stripMarks(root: Node): Node {
     const pending: Node[] = [root];
-
-    while (pending.length > 0) {
-        const node = pending.pop() as Node;
-
-        if (TEXT_TYPES.has(node.nodeType) && withoutAnyMarks(node.nodeValue ?? "") !== node.nodeValue) {
-            return true;
-        }
-
-        if (node.nodeType === 1 && attributesOf(node as Element).some(({ value }) => withoutAnyMarks(value) !== value)) {
-            return true;
-        }
-
-        for (let child = node.firstChild; child; child = child.nextSibling) {
-            pending.push(child);
-        }
-    }
-
-    return false;
-}
-
-/** A copy of the node with the marks taken out of its text and attributes. */
-function copyWithoutMarks(input: Node): Node {
-    const copy = input.cloneNode(true);
-    const pending: Node[] = [copy];
 
     while (pending.length > 0) {
         const node = pending.pop() as Node;
@@ -1219,25 +1228,51 @@ function copyWithoutMarks(input: Node): Node {
         }
     }
 
-    return copy;
+    return root;
+}
+
+/** True for a node the conversion takes: an element, a document or a fragment. */
+function isConvertibleNode(input: unknown): input is Node {
+    if (typeof input !== "object" || input === null) {
+        return false;
+    }
+
+    const node = input as Partial<Node>;
+
+    return CONVERTIBLE_NODE_TYPES.has(node.nodeType ?? 0) && typeof node.cloneNode === "function";
 }
 
 /**
  * Takes the marks out of what is converted, so only the preset writes them, and out of what it gives back. The output
  * also loses the blank text before its first content, such as the spaces between the elements of a pasted `<head>`.
+ * `prepare` sees the parsed input, or a copy of the node passed in, before it is converted.
  */
-export function guardMarks(service: TurndownService): void {
+export function guardMarks(service: TurndownService, prepare: (root: Node) => void): void {
     const convert = service.turndown.bind(service);
-    const finish = (markdown: string): string => withoutMarks(writeDelimiters(markdown, service.options)).replace(LEADING_SPACE, "");
+    const finish = (markdown: string): string =>
+        // The end is trimmed again once the line break marks are out: the conversion's own trim stops at a mark.
+        withoutMarks(writeDelimiters(markdown, service.options)).replaceAll(LINE_BREAK_MARK, "").replace(LEADING_SPACE, "").trimEnd();
 
     const turndown = (input: TurndownInput): string => {
-        if (typeof input === "string") {
-            return finish(convert(withoutAnyMarks(input)));
+        // The nodes the conversion takes: an element, a document or a fragment. Any other input reaches its error.
+        const isNode = isConvertibleNode(input);
+
+        // Nothing to parse in an empty string: the conversion gives "" without a parser.
+        if (input === "" || (typeof input !== "string" && !isNode)) {
+            return convert(input);
         }
 
-        const isNode = typeof input === "object" && input !== null && typeof (input as Partial<Node>).nodeType === "number";
+        // A node passed in is copied below: one nested too deep is refused before the copy walks it. Parsed input is
+        // checked before anything else walks it.
+        const root = typeof input === "string" ? parseRoot(withoutAnyMarks(input)) : input;
 
-        return finish(convert(isNode && hasMarks(input) ? copyWithoutMarks(input) : input));
+        checkDepth(root);
+
+        const copy = stripMarks(root === input ? root.cloneNode(true) : root);
+
+        prepare(copy);
+
+        return finish(convert(copy));
     };
 
     Object.assign(service, { turndown });

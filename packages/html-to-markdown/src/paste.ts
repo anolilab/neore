@@ -8,22 +8,26 @@
 import { gfm } from "./gfm";
 import { declaredStyle } from "./inline-style";
 import { codeRules } from "./paste-code";
-import { isWordMarker, listRules, unlessRemoved } from "./paste-lists";
+import { checkWork, shownText, wrapLooseListText } from "./paste-input";
+import { isWordMarker, LINE_BREAK_MARK, listRules, prefixLines, trimBreaks, unlessRemoved } from "./paste-lists";
 import { guardMarks, isSetToNormal, styleRules } from "./paste-styles";
 import type TurndownService from "./turndown";
 import type { Options, Rule } from "./types";
+import { isBlock } from "./utilities";
 
 /**
  * The options the preset is written for. A line break is a plain newline, with no trailing spaces a composer would
- * hide; lists use `- `; code is fenced; links whose destination is not safe are written as their text.
+ * hide (the preset takes out the mark it writes before it); lists use `- `; code is fenced, and inline code keeps the
+ * spaces it holds; links whose destination is not safe are written as their text.
  */
 export const PASTE_OPTIONS: Partial<Options> = {
-    br: "",
+    br: LINE_BREAK_MARK,
     bulletListMarker: "-",
     codeBlockStyle: "fenced",
     emDelimiter: "*",
     headingStyle: "atx",
     hr: "---",
+    preformattedCode: true,
     safeLinks: true,
 };
 
@@ -96,6 +100,12 @@ const VISIBILITY_VALUES = new Set(["collapse", "hidden", "visible", ...GLOBAL_VA
 const CONTENT_VISIBILITY_VALUES = new Set(["auto", "hidden", "visible", ...GLOBAL_VALUES]);
 // `collapse` hides an element as `hidden` does, except in a table, where it also takes the row's or column's space.
 const HIDING_VISIBILITY = new Set(["collapse", "hidden"]);
+// The characters Unicode has raised and lowered forms of, so `E=mc<sup>2</sup>` stays `E=mc²` in plain Markdown.
+const SCRIPT_FROM = [..."0123456789+-\u{2212}=()"];
+const SUPERSCRIPTS = new Map([...SCRIPT_FROM, "n", "i"].map((char, index) => [char, [..."⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁻⁼⁽⁾ⁿⁱ"][index] as string]));
+const SUBSCRIPTS = new Map(SCRIPT_FROM.map((char, index) => [char, [..."₀₁₂₃₄₅₆₇₈₉₊₋₋₌₍₎"][index] as string]));
+// Elements in raised or lowered text that are more than its characters, so it is written as it is.
+const SCRIPT_STRUCTURE = new Set(["A", "BR", "CODE", "IMG", "KBD", "MATH", "SAMP", "SUB", "SUP", "TT"]);
 const OUTER_DISPLAY = new Set(["block", "inline", "run-in"]);
 const INNER_DISPLAY = new Set(["flex", "flow", "flow-root", "grid", "ruby", "table"]);
 
@@ -258,6 +268,17 @@ function inlineMath(source: string): string {
 }
 
 const pasteRules: Record<string, Rule> = {
+    // A quote with no trailing space on its blank lines, which a composer would hide.
+    blockquote: {
+        filter: unlessRemoved((node) => node.nodeName === "BLOCKQUOTE"),
+        replacement(content) {
+            const quoted = trimBreaks(content);
+
+            // A quote that holds only what the page hides writes no marker.
+            return quoted.trim() === "" ? "" : `\n\n${prefixLines(quoted, "> ", ">")}\n\n`;
+        },
+    },
+
     // A closed details shows its summary alone. Its other elements are hidden; its loose text is left out here.
     closedDetails: {
         filter: unlessRemoved(isClosedDetails),
@@ -284,6 +305,23 @@ const pasteRules: Record<string, Rule> = {
         replacement: (_content, node) => imageText(node),
     },
 
+    // A div that holds only inline content is a line, as mail and editors write one per line: a run of them is not
+    // parted by blank lines. A `<br>` that ends it makes no line of its own, so a div that holds only one is a blank line;
+    // one that holds nothing the page shows writes nothing.
+    lineDiv: {
+        filter: unlessRemoved((node) => node.nodeName === "DIV" && !hasBlockChild(node)),
+        replacement(content) {
+            // Blank only for a line break: a div that holds what the page hides or drops shows nothing.
+            if (trimBreaks(content).trim() === "") {
+                return blankLines(content.split(LINE_BREAK_MARK).length - 1);
+            }
+
+            // The last `<br>` of a block ends its last line and makes no line of its own; any before it, and one that
+            // starts the div, each show a line.
+            return `\n${withoutLastBreak(content)}\n`;
+        },
+    },
+
     // A formula with a TeX source is written as inline math. Without one, its visible text stays (its other annotations
     // are skipped).
     math: {
@@ -296,7 +334,127 @@ const pasteRules: Record<string, Rule> = {
         filter: unlessRemoved((node) => (node.nodeName === "B" || node.nodeName === "STRONG") && isSetToNormal(node)),
         replacement: (content) => content,
     },
+
+    // Raised and lowered text: no Markdown writes it, so it keeps its meaning in Unicode where Unicode can.
+    script: {
+        filter: unlessRemoved((node) => node.nodeName === "SUP" || node.nodeName === "SUB"),
+        replacement: (content, node) => scriptText(content, node, node.nodeName === "SUP" ? SUPERSCRIPTS : SUBSCRIPTS),
+    },
 };
+
+/**
+ * Raised or lowered text in the Unicode forms of its characters, when the page shows only text in it and each character
+ * has a form; otherwise as written: an ordinal (`12<sup>th</sup>`), a footnote mark (`<sup>[1]</sup>`), or one that holds
+ * a line break, a link, code, an image or raised text of its own. The characters are mapped in the Markdown, so
+ * emphasis around them stays, and an escaped one is mapped without its backslash.
+ */
+function scriptText(content: string, node: Element, forms: ReadonlyMap<string, string>): string {
+    const chars = [...shownText(node, isHiddenElement).trim()];
+
+    if (chars.length === 0 || chars.some((char) => !forms.has(char)) || hasScriptStructure(node)) {
+        return content;
+    }
+
+    const written: string[] = [];
+    const contentChars = [...content];
+
+    for (let index = 0; index < contentChars.length; index += 1) {
+        const char = contentChars[index] as string;
+        const next = contentChars[index + 1];
+        const isEscape = char === "\\" && next !== undefined && forms.has(next);
+        const mapped = isEscape ? next : char;
+
+        written.push(forms.get(mapped) ?? mapped);
+        index += isEscape ? 1 : 0;
+    }
+
+    return written.join("");
+}
+
+/** True when the element holds an element it shows that is more than text: a line break, a link, code, an image. */
+function hasScriptStructure(node: Element): boolean {
+    const pending: Element[] = [];
+
+    for (let child = node.firstElementChild; child; child = child.nextElementSibling) {
+        pending.push(child);
+    }
+
+    while (pending.length > 0) {
+        const element = pending.pop() as Element;
+
+        if (isHiddenElement(element)) {
+            continue;
+        }
+
+        if (SCRIPT_STRUCTURE.has(element.nodeName) || isBlock(element)) {
+            return true;
+        }
+
+        for (let child = element.firstElementChild; child; child = child.nextElementSibling) {
+            pending.push(child);
+        }
+    }
+
+    return false;
+}
+
+/**
+ * The blank lines of a div that holds only line breaks: one per break, as the page shows them. Each is a mark line,
+ * which the end of the conversion takes out, so the blank lines of divs side by side are not joined into one.
+ */
+function blankLines(breaks: number): string {
+    return breaks === 0 ? "" : `\n${`${LINE_BREAK_MARK}\n`.repeat(breaks)}`;
+}
+
+// Each div's answer, found once: its rule's filter may be asked more than once.
+const blockHolders = new WeakMap<Element, boolean>();
+
+/** The content without the newlines at its end and the one line break mark before them, if any. */
+function withoutLastBreak(content: string): string {
+    let end = content.length;
+
+    while (end > 0 && content.charAt(end - 1) === "\n") {
+        end -= 1;
+    }
+
+    return content.slice(0, end - (content.charAt(end - 1) === LINE_BREAK_MARK ? 1 : 0));
+}
+
+/** True when the element holds a block the page shows, which starts a line of its own. */
+function hasBlockChild(element: Element): boolean {
+    const known = blockHolders.get(element);
+
+    if (known !== undefined) {
+        return known;
+    }
+
+    // A block the page shows, at any depth: one inside an inline wrapper starts a line of its own too. The walk stops
+    // at the first block, so a div of divs is read no deeper than its first.
+    const pending: Element[] = [];
+    let hasBlock = false;
+
+    for (let child = element.lastElementChild; child; child = child.previousElementSibling) {
+        pending.push(child);
+    }
+
+    while (!hasBlock && pending.length > 0) {
+        const current = pending.pop() as Element;
+
+        if (current.nodeName === "BR" || isHiddenElement(current)) {
+            continue;
+        }
+
+        hasBlock = isBlock(current);
+
+        for (let child = current.lastElementChild; !hasBlock && child; child = child.previousElementSibling) {
+            pending.push(child);
+        }
+    }
+
+    blockHolders.set(element, hasBlock);
+
+    return hasBlock;
+}
 
 /** A media type without its parameters, in lower case: `application/x-tex; charset=utf-8` is `application/x-tex`. */
 function mediaType(value: string): string {
@@ -353,5 +511,12 @@ export function paste(service: TurndownService): void {
         service.addRule(key, rule);
     }
 
-    guardMarks(service);
+    // The loose list text is put in items first, so the work is measured on the items the conversion writes.
+    guardMarks(service, (root) => {
+        const shown = { imageText, isHidden: isHiddenElement, mathText: texSource };
+
+        wrapLooseListText(root, shown);
+        // A Word marker is hidden only so its item's rule writes it: the work check counts its text.
+        checkWork(root, { ...shown, isHidden: (node) => node.nodeType === 1 && isHiddenOnPage(node as Element) });
+    });
 }
