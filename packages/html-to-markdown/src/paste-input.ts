@@ -39,6 +39,8 @@ const TABLE_PARTS = new Set(["TBODY", "TFOOT", "THEAD", "TR"]);
 const NON_BLANK = /[^\t\n\f\r ]/;
 // What `previousItem` gives for loose text that follows a block, not an item.
 const AFTER_BLOCK = Symbol("after a block");
+// The `font` shorthand, which may set a weight or a style; `font-family` and the other longhands are not it.
+const FONT_SHORTHAND = /(?:^|[\s;])font\s*:/;
 const WHITESPACE = new Set([" ", "\t", "\n", "\r", "\f"]);
 
 /** What the page shows: the elements it hides, and the text an image stands for ("" for an image that is none). */
@@ -153,12 +155,12 @@ function isIndenting(element: Element): boolean {
 
 /**
  * True for a style that may set formatting: a weight, a font style or a text decoration, alone or in the `font`
- * shorthand. A color or a size formats nothing, so it costs no work.
+ * shorthand. A color, a size or a font family formats nothing, so it costs no work.
  */
 function isFormattingStyle(style: string): boolean {
     const lower = style.toLowerCase();
 
-    return lower.includes("font") || lower.includes("text-decoration");
+    return lower.includes("font-weight") || lower.includes("font-style") || lower.includes("text-decoration") || FONT_SHORTHAND.test(lower);
 }
 
 /** The work left after the element's rule does its work on what it holds. Throws once a budget is spent. */

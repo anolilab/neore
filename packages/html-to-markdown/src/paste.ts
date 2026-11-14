@@ -316,7 +316,7 @@ const pasteRules: Record<string, Rule> = {
 
             // Blank only for a line break: a div that holds what the page hides or drops shows nothing.
             if (text.trim() === "") {
-                return content.includes(LINE_BREAK_MARK) ? "\n\n" : "";
+                return blankLines(content.split(LINE_BREAK_MARK).length - 1);
             }
 
             return `\n${text}\n`;
@@ -397,6 +397,14 @@ function hasScriptStructure(node: Element): boolean {
     }
 
     return false;
+}
+
+/**
+ * The blank lines of a div that holds only line breaks: one per break, as the page shows them. The first is the
+ * break between blocks; the others are kept by marks, which the end of the conversion takes out.
+ */
+function blankLines(breaks: number): string {
+    return breaks === 0 ? "" : `\n${`${LINE_BREAK_MARK}\n`.repeat(breaks - 1)}\n`;
 }
 
 /** True when one of the element's children is a block, which starts a line of its own. */

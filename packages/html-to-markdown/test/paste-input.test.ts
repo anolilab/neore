@@ -316,3 +316,15 @@ describe("paste input: review cases, eleventh round", () => {
         expect(convert(`<ul><li>a</li><div style="display:none"><ol>secret<li>x</li></ol></div><li>b</li></ul>`)).toBe("- a\n- b");
     });
 });
+
+describe("paste input: review cases, twelfth round", () => {
+    it("counts no formatting work for a font family, which formats nothing", () => {
+        expect(convert(`${`<span style="font-family:Arial">`.repeat(450)}${"word ".repeat(20_000)}`)).toContain("word word");
+        expect(() => convert(`${`<span style="font: bold 12px Arial">`.repeat(450)}${"word ".repeat(20_000)}`)).toThrow(RangeError);
+    });
+
+    it("keeps a blank line for each line break of a div that holds only breaks", () => {
+        expect(convert("<div>two</div><div><br><br></div><div>four</div>")).toBe("two\n\n\nfour");
+        expect(convert("<div>two</div><div><br></div><div>four</div>")).toBe("two\n\nfour");
+    });
+});
