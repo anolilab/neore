@@ -131,7 +131,9 @@ const bestEffort = async (what: string, write: () => Promise<void>): Promise<boo
     }
 };
 
-const censusRow = async (ctx: CensusCtx, shardKey: string) => await ctx.db.shardActivity.findFirst({ where: { shardKey } });
+/** `primary` for a read whose answer decides a flag write: a lagging replica could still show a flag the sweep cleared. */
+const censusRow = async (ctx: CensusCtx, shardKey: string, consistency?: "primary") =>
+    await ctx.db.shardActivity.findFirst({ ...(consistency && { consistency }), where: { shardKey } });
 
 const touchedAt = new Map<string, number>();
 
@@ -185,7 +187,7 @@ export const noteShardDue = async (ctx: CensusCtx, dueAt: number, shardKey: stri
 export const RATE_LIMITS_PENDING_RETRY_MS = 30 * 1000;
 
 const markRateLimitsPendingRow = async (ctx: CensusCtx, shardKey: string): Promise<void> => {
-    const row = await censusRow(ctx, shardKey);
+    const row = await censusRow(ctx, shardKey, "primary");
 
     if (!row) {
         await ctx.db.insert("shardActivity", { lastActiveAt: Date.now(), rateLimitsPending: true, shardKey });
@@ -242,7 +244,7 @@ export const settleRateLimitsPending = async (ctx: Pick<MutationCtx, "db">, shar
     let cleared = false;
 
     const settled = await bestEffort("settleRateLimitsPending", async () => {
-        const row = await censusRow(ctx, shardKey);
+        const row = await censusRow(ctx, shardKey, "primary");
 
         if (!row) {
             return;
