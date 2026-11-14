@@ -36,6 +36,9 @@ const FORMATTING = new Set(["B", "CODE", "DEL", "EM", "I", "S", "STRIKE", "STRON
 // Elements whose whitespace the preset keeps as written: code (`preformattedCode`) and code blocks.
 const KEEPS_WHITESPACE = new Set(["CODE", "PRE"]);
 const LISTS = new Set(["OL", "UL"]);
+const HEADINGS = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
+// The blocks in a heading that hold its text: their text goes on the heading's line.
+const HEADING_PARAGRAPHS = new Set(["DIV", "P"]);
 // The parts of a table between a table and its cells, which add no depth of their own: the cell is the next level.
 const TABLE_PARTS = new Set(["TBODY", "TFOOT", "THEAD", "TR"]);
 const NON_BLANK = /[^\t\n\f\r ]/;
@@ -292,6 +295,90 @@ function collapsedLength(text: string): number {
     }
 
     return length;
+}
+
+/**
+ * Writes the paragraphs and divs on a heading's line as spans, their text kept on the heading's line: a
+ * heading holds one line, and `<h2><p>Title</p></h2>` is the heading `Title`. The span keeps every attribute, so what
+ * hides the text, its style and its class (a code block's language) still apply. A space on each side keeps its words
+ * apart from those around it; HTML whitespace collapses any extra. Other blocks in a heading, such as a code block,
+ * stay blocks.
+ */
+export function unwrapHeadingParagraphs(root: Node, shown: Shown): void {
+    const pending: Node[] = [root];
+
+    while (pending.length > 0) {
+        const node = pending.pop() as Node;
+
+        if (HEADINGS.has(node.nodeName)) {
+            inlineParagraphChildren(node as Element, shown);
+        }
+
+        // A code block is read as its text, a line per div: a heading in it is no heading, so it is left as it is.
+        for (let child = node.firstChild; child; child = child.nextSibling) {
+            if (child.nodeType === 1 && child.nodeName !== "PRE" && !shown.isHidden(child)) {
+                pending.push(child);
+            }
+        }
+    }
+}
+
+/**
+ * The paragraphs and divs on a heading's line, in order: its own, and those inside an inline element, a paragraph or a
+ * div on that line. A code block, a list, a table or a quote holds lines of its own, so the walk stops there.
+ */
+function headingParagraphs(heading: Element, shown: Shown): Element[] {
+    const paragraphs: Element[] = [];
+    const pending: Element[] = [];
+
+    for (let child = heading.lastElementChild; child; child = child.previousElementSibling) {
+        pending.push(child);
+    }
+
+    while (pending.length > 0) {
+        const element = pending.pop() as Element;
+        const isParagraph = HEADING_PARAGRAPHS.has(element.nodeName);
+
+        if (shown.isHidden(element) || (!isParagraph && isBlock(element))) {
+            continue;
+        }
+
+        if (isParagraph) {
+            paragraphs.push(element);
+        }
+
+        for (let child = element.lastElementChild; child; child = child.previousElementSibling) {
+            pending.push(child);
+        }
+    }
+
+    return paragraphs;
+}
+
+function inlineParagraphChildren(heading: Element, shown: Shown): void {
+    const document = heading.ownerDocument;
+
+    for (const paragraph of headingParagraphs(heading, shown)) {
+        const parent = paragraph.parentNode as Node;
+        const span = document.createElement("span");
+
+        for (let index = 0; index < paragraph.attributes.length; index += 1) {
+            const attribute = paragraph.attributes[index] as Attr;
+
+            span.setAttribute(attribute.name, attribute.value);
+        }
+
+        while (paragraph.firstChild) {
+            // eslint-disable-next-line unicorn/prefer-dom-node-append -- domino, the parser on servers, has no append.
+            span.appendChild(paragraph.firstChild);
+        }
+
+        parent.insertBefore(document.createTextNode(" "), paragraph);
+        // eslint-disable-next-line unicorn/prefer-modern-dom-apis -- domino, the parser on servers, has no before.
+        parent.insertBefore(span, paragraph);
+        parent.insertBefore(document.createTextNode(" "), paragraph);
+        paragraph.remove();
+    }
 }
 
 /**

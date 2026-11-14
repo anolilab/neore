@@ -8,7 +8,7 @@
 import { gfm } from "./gfm";
 import { declaredStyle } from "./inline-style";
 import { codeRules } from "./paste-code";
-import { checkWork, shownText, wrapLooseListText } from "./paste-input";
+import { checkWork, shownText, unwrapHeadingParagraphs, wrapLooseListText } from "./paste-input";
 import { isWordMarker, LINE_BREAK_MARK, listRules, prefixLines, trimBreaks, unlessRemoved } from "./paste-lists";
 import { guardMarks, isSetToNormal, styleRules } from "./paste-styles";
 import type TurndownService from "./turndown";
@@ -106,6 +106,7 @@ const SUPERSCRIPTS = new Map([...SCRIPT_FROM, "n", "i"].map((char, index) => [ch
 const SUBSCRIPTS = new Map(SCRIPT_FROM.map((char, index) => [char, [..."₀₁₂₃₄₅₆₇₈₉₊₋₋₌₍₎"][index] as string]));
 // Elements in raised or lowered text that are more than its characters, so it is written as it is.
 const SCRIPT_STRUCTURE = new Set(["A", "BR", "CODE", "IMG", "KBD", "MATH", "SAMP", "SUB", "SUP", "TT"]);
+const HEADINGS = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
 const OUTER_DISPLAY = new Set(["block", "inline", "run-in"]);
 const INNER_DISPLAY = new Set(["flex", "flow", "flow-root", "grid", "ruby", "table"]);
 
@@ -267,6 +268,26 @@ function inlineMath(source: string): string {
     return `${fence}${pad}${tex}${pad}${fence}`;
 }
 
+// A heading line with no text: `#` to `######` and nothing after it but spaces and a line break's mark.
+// eslint-disable-next-line no-control-regex, sonarjs/no-control-regex -- U+0010 is the preset's own line break mark.
+const EMPTY_HEADING_LINE = /^#{1,6}[ \u{10}]*(?:\n+|$)/u;
+
+/**
+ * A heading whose only content is a block it cannot hold, such as a code block, writes no heading line of its own:
+ * an empty `### ` would be a heading with no text. Only such a heading is taken here; any other is the built-in
+ * rule's, which also folds a `<br>` into the heading's one line.
+ */
+const headingRule: Rule = {
+    filter: unlessRemoved((node) => HEADINGS.has(node.nodeName) && !hasLineText(node)),
+    replacement(content, node, options, lookup) {
+        const next = lookup.ruleAfter(headingRule, node);
+        const written = next.replacement.call(next, content, node, options, lookup);
+        const start = written.length - written.trimStart().length;
+
+        return written.slice(0, start) + written.slice(start).replace(EMPTY_HEADING_LINE, "");
+    },
+};
+
 const pasteRules: Record<string, Rule> = {
     // A quote with no trailing space on its blank lines, which a composer would hide.
     blockquote: {
@@ -298,6 +319,8 @@ const pasteRules: Record<string, Rule> = {
             return "";
         },
     },
+
+    heading: headingRule,
 
     // An image is an emoji's or a formula's text, or nothing: a pasted picture arrives as a file, if at all.
     image: {
@@ -420,6 +443,51 @@ function withoutLastBreak(content: string): string {
     return content.slice(0, end - (content.charAt(end - 1) === LINE_BREAK_MARK ? 1 : 0));
 }
 
+/**
+ * True when the heading shows text on its line, before its first block: text, or an image that stands for text. One
+ * walk in order, which does not go into a hidden element and stops at the first block.
+ */
+function hasLineText(heading: Element): boolean {
+    const pending: Node[] = [];
+
+    pushChildren(pending, heading);
+
+    while (pending.length > 0) {
+        const node = pending.pop() as Node;
+
+        if (isShownText(node)) {
+            return true;
+        }
+
+        if (node.nodeType === 1 && !isHiddenElement(node)) {
+            // The heading line ends at its first block: text after one does not fill the line.
+            if (isBlock(node)) {
+                return false;
+            }
+
+            pushChildren(pending, node);
+        }
+    }
+
+    return false;
+}
+
+/** True for text that is not blank, and for an image that stands for text. */
+function isShownText(node: Node): boolean {
+    if (node.nodeType === 3 || node.nodeType === 4) {
+        return (node.nodeValue ?? "").trim() !== "";
+    }
+
+    return node.nodeName === "IMG" && !isHiddenElement(node) && imageText(node as Element) !== "";
+}
+
+/** Pushes the node's children, last first, so the first comes off the stack first. */
+function pushChildren(pending: Node[], node: Node): void {
+    for (let child = node.lastChild; child; child = child.previousSibling) {
+        pending.push(child);
+    }
+}
+
 /** True when the element holds a block the page shows, which starts a line of its own. */
 function hasBlockChild(element: Element): boolean {
     const known = blockHolders.get(element);
@@ -516,6 +584,7 @@ export function paste(service: TurndownService): void {
         const shown = { imageText, isHidden: isHiddenElement, mathText: texSource };
 
         wrapLooseListText(root, shown);
+        unwrapHeadingParagraphs(root, shown);
         // A Word marker is hidden only so its item's rule writes it: the work check counts its text.
         checkWork(root, { ...shown, isHidden: (node) => node.nodeType === 1 && isHiddenOnPage(node as Element) });
     });

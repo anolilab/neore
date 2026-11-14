@@ -249,3 +249,69 @@ describe("paste: review cases, seventh round", () => {
         expect(convert(`<ol><li value="-1">a</li><li>b</li></ol>`)).toBe("- -1. a\n0. b");
     });
 });
+
+describe("paste: a heading that holds only a code block", () => {
+    it("writes the code block alone, with no empty heading line", () => {
+        expect(convert("<h3><pre>only code</pre></h3>")).toBe("```\nonly code\n```");
+        expect(convert("<h2>Setup<pre>npm i</pre></h2>")).toBe("## Setup\n\n```\nnpm i\n```");
+        expect(convert("<h2>Use <code>npm</code></h2>")).toBe("## Use `npm`");
+    });
+});
+
+describe("paste: a heading broken by a line break", () => {
+    it("keeps the text on both sides of the break in the heading", () => {
+        expect(convert("<h2>First<br>Second</h2>")).toBe("## First Second");
+    });
+});
+
+describe("paste: headings holding blocks", () => {
+    it("writes no empty heading line when a line break comes before the code block", () => {
+        expect(convert("<h2><br><pre>code</pre></h2>")).toBe("```\ncode\n```");
+    });
+
+    it("keeps the text of a paragraph or a div in a heading on the heading's line", () => {
+        expect(convert("<h2><p>Title</p></h2>")).toBe("## Title");
+        expect(convert("<h2><div>A</div><div>B</div></h2>")).toBe("## A B");
+        expect(convert("<h2><p>Setup</p><pre>npm i</pre></h2>")).toBe("## Setup\n\n```\nnpm i\n```");
+    });
+});
+
+describe("paste: paragraphs in a heading, review cases", () => {
+    it("keeps text the page hides in a heading's paragraph or div hidden", () => {
+        expect(convert(`<h2><p>Title</p><div style="display:none">x</div></h2>`)).toBe("## Title");
+        expect(convert("<h2>Title<p hidden>x</p></h2>")).toBe("## Title");
+    });
+
+    it("keeps the words of a heading's paragraph apart from the text after it", () => {
+        expect(convert("<h2><p>First</p>Second</h2>")).toBe("## First Second");
+    });
+
+    it("keeps the formatting a heading's paragraph sets", () => {
+        expect(convert(`<h2><p style="font-style:italic">Title</p></h2>`)).toBe("## *Title*");
+    });
+
+    it("keeps the language a div around a heading's code block names", () => {
+        expect(convert(`<h3><div class="language-js"><pre>let x=1</pre></div></h3>`)).toBe("```js\nlet x=1\n```");
+    });
+});
+
+describe("paste: paragraphs nested deeper in a heading", () => {
+    it("keeps the text of a paragraph inside a wrapper on the heading's line", () => {
+        expect(convert("<h2><div><p>Title</p></div></h2>")).toBe("## Title");
+        expect(convert("<h2><span><p>Title</p></span></h2>")).toBe("## Title");
+    });
+
+    it("leaves a paragraph inside a quote in a heading in its block", () => {
+        expect(convert("<h2>T<blockquote><p>q</p></blockquote></h2>")).toContain("> q");
+    });
+});
+
+describe("paste: headings and code blocks, review cases", () => {
+    it("leaves a heading inside a code block as the code's lines", () => {
+        expect(convert("<pre><h2><div>one</div><div>two</div></h2></pre>")).toBe("```\none\ntwo\n```");
+    });
+
+    it("writes no empty heading line when text comes only after the heading's code block", () => {
+        expect(convert("<h2><pre>x</pre>Tail</h2>")).toBe("```\nx\n```\n\nTail");
+    });
+});
