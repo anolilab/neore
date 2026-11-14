@@ -184,9 +184,13 @@ export const syncApprovalActions = async (): Promise<void> => {
 /** Removes the alerts still on this phone. */
 export const dismissAccountNotifications = async (): Promise<void> => {
     clearTapRoute();
-    // Queued alerts too: the task's alerts for the account being removed must not appear after its sign-out.
-    await cancelAllScheduledNotificationsAsync();
-    await dismissAllNotificationsAsync();
+    // Queued alerts too: the task's alerts for the account being removed must not appear after its sign-out. The dismiss runs
+    // even when the cancel fails, so an alert already shown does not stay up.
+    try {
+        await cancelAllScheduledNotificationsAsync();
+    } finally {
+        await dismissAllNotificationsAsync();
+    }
 };
 
 /** Records the account signed in on this phone; `onSwitch` removes the previous person's alerts first when it differs. */
