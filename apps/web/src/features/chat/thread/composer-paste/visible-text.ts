@@ -46,8 +46,8 @@ const CELLS = new Set(["TD", "TH"]);
 const HTML_SPACE = /[\t\n\f\r ]+/g;
 const BLANK_LINES = /\n{3,}/g;
 // Control characters, which show nothing and have no place in a message; the whitespace among them stays.
-// eslint-disable-next-line no-control-regex, sonarjs/no-control-regex -- the control characters are what it matches.
-const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000E-\u001F\u007F]/g;
+// eslint-disable-next-line no-control-regex -- the control characters are what it matches.
+const CONTROL_CHARS = /[\u{0}-\u{8}\v\u{E}-\u{1F}\u{7F}]/gu;
 const LEADING_NEWLINE = /^\n{1,2}/;
 const TRAILING_NEWLINE = /\n{1,2}$/;
 const EMOJI_NAME = /^:[\w+-]{1,40}:$/;
