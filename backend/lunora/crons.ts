@@ -255,6 +255,9 @@ export const PERIODIC_JOBS: ReadonlyArray<CronJob & PeriodicJob> = [
         ref: internal.crons.deleteExpiredTemporaryChats,
         schedule: { everyMinutes: 60, kind: "interval" },
     },
+    // Rate-limit rows past every window: our limits (`lib/rate-limit-sweep.ts`) and better-auth's (`auth/rate-limit-sweep.ts`).
+    { name: "sweepExpiredRateLimits", ref: internal.lib.rate_limit_sweep.sweepExpiredRateLimits, schedule: { everyMinutes: 60, kind: "interval" } },
+    { name: "sweepExpiredAuthRateLimits", ref: internal.auth.rate_limit_sweep.sweepExpiredAuthRateLimits, schedule: { everyMinutes: 60, kind: "interval" } },
     // Claim-once rows past their TTL (`lib/claim-once.ts`).
     { name: "purgeIdempotencyClaims", ref: internal.lib.claim_once.purgeExpiredClaims, schedule: { everyMinutes: 60, kind: "interval" } },
     // 0 */6 * * *

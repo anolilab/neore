@@ -302,6 +302,9 @@ export interface InternalApiTypes {
             deleteOrganizationPolicy: FunctionReference<"mutation", { organizationId: string }, null>;
             sweepOrphanedOrganizationPolicies: FunctionReference<"mutation", { cursor?: string }, null>;
         };
+        rate_limit_sweep: {
+            sweepExpiredAuthRateLimits: FunctionReference<"mutation", {}, number>;
+        };
         session_organization: {
             getActiveOrganizationIdForSession: FunctionReference<"query", { sessionId: string; userId: string }, string | null>;
             getSessionOrganizationForCap: FunctionReference<"query", { sessionId: string; userId: string }, { organizationId: string | null } | null>;
@@ -900,6 +903,9 @@ export interface InternalApiTypes {
         };
         job_once: {
             runJobOnce: FunctionReference<"action", { args?: unknown; jobId: string; onLapse?: { args?: string; target: string }; target: string; userId?: string }, null>;
+        };
+        rate_limit_sweep: {
+            sweepExpiredRateLimits: FunctionReference<"mutation", {}, number>;
         };
         rate_limiter_mutations: {
             applyRateLimit: FunctionReference<"mutation", { count?: number; identifier: string; key: string; reserve?: boolean }, { ok: boolean; retryAfter: number | undefined; }>;
@@ -1651,6 +1657,9 @@ export const internal: InternalApiTypes = {
             deleteOrganizationPolicy: { __lunoraRef: "auth_organization_policy_erase:deleteOrganizationPolicy" },
             sweepOrphanedOrganizationPolicies: { __lunoraRef: "auth_organization_policy_erase:sweepOrphanedOrganizationPolicies" },
         },
+        rate_limit_sweep: {
+            sweepExpiredAuthRateLimits: { __lunoraRef: "auth_rate_limit_sweep:sweepExpiredAuthRateLimits" },
+        },
         session_organization: {
             getActiveOrganizationIdForSession: { __lunoraRef: "auth_session_organization:getActiveOrganizationIdForSession" },
             getSessionOrganizationForCap: { __lunoraRef: "auth_session_organization:getSessionOrganizationForCap" },
@@ -2249,6 +2258,9 @@ export const internal: InternalApiTypes = {
         },
         job_once: {
             runJobOnce: { __lunoraRef: "lib_job_once:runJobOnce" },
+        },
+        rate_limit_sweep: {
+            sweepExpiredRateLimits: { __lunoraRef: "lib_rate_limit_sweep:sweepExpiredRateLimits" },
         },
         rate_limiter_mutations: {
             applyRateLimit: { __lunoraRef: "lib_rate_limiter_mutations:applyRateLimit" },
