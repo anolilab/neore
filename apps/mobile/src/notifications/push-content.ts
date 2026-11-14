@@ -201,8 +201,7 @@ export const showDataOnlyPush = async (payload: unknown, steps: PushTaskSteps): 
 
     await steps.show(text, shownIds);
 
-    // A sign-out or account switch can land between the check above and the post. A read that fails counts as changed: the
-    // account cannot be confirmed, so the alert is taken back, text or placeholder.
+    // A sign-out or account switch can land between the check above and the post: the alert is taken back, text or placeholder.
     let isUnchanged = false;
 
     try {
@@ -210,7 +209,7 @@ export const showDataOnlyPush = async (payload: unknown, steps: PushTaskSteps): 
 
         isUnchanged = afterPost?.user.id === fetchedFor;
     } catch {
-        // Not confirmed: the alert is taken back below.
+        // A read that fails leaves the account unconfirmed, so the alert is taken back.
     }
 
     if (!isUnchanged) {

@@ -227,7 +227,9 @@ describe("showDataOnlyPush when the account cannot be read after posting", () =>
         const show = vi.fn(async () => undefined);
 
         await showDataOnlyPush(PUSH, {
-            fetchContent: vi.fn(async () => { return { body: "Release run", title: "Approval" }; }),
+            fetchContent: vi.fn(async () => {
+                return { body: "Release run", title: "Approval" };
+            }),
             locale: "de-DE",
             retract,
             session: () => {
