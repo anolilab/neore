@@ -1656,6 +1656,7 @@ export interface Doc_subAgentRuns {
     organizationId?: string;
     parentModel?: string;
     parentThreadId: string;
+    postCheckAt?: number;
     postCheckId?: string;
     postFailed?: string;
     reapAt?: number;
@@ -4871,6 +4872,7 @@ export interface Insert_subAgentRuns {
     organizationId?: string;
     parentModel?: string;
     parentThreadId: string;
+    postCheckAt?: number;
     postCheckId?: string;
     postFailed?: string;
     reapAt?: number;

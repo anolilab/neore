@@ -55,27 +55,6 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["workerId"] !== "string") return DEFER;
 return { "workerId": source["workerId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_222.postResult.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (typeof source["attempt"] !== "number" || !Number.isFinite(source["attempt"])) return DEFER;
-let __has1 = false;
-let __val1;
-if (source["failures"] !== undefined) {
-if (typeof source["failures"] !== "number" || !Number.isFinite(source["failures"])) return DEFER;
-__val1 = source["failures"];
-__has1 = true;
-}
-if (typeof source["runId"] !== "string") return DEFER;
-let __has2 = false;
-let __val2;
-if (source["waits"] !== undefined) {
-if (typeof source["waits"] !== "number" || !Number.isFinite(source["waits"])) return DEFER;
-__val2 = source["waits"];
-__has2 = true;
-}
-return { "attempt": source["attempt"], ...(__has1 ? { "failures": __val1 } : {}), "runId": source["runId"], ...(__has2 ? { "waits": __val2 } : {}) };
-});
 installCompiledValidatorMap(lunora_sub_agents_functions_222.reapRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

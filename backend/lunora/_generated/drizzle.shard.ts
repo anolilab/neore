@@ -1380,6 +1380,7 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     organizationId: text("organizationId"),
     parentModel: text("parentModel"),
     parentThreadId: text("parentThreadId").notNull(),
+    postCheckAt: real("postCheckAt"),
     postCheckId: text("postCheckId"),
     postFailed: text("postFailed"),
     reapAt: real("reapAt"),

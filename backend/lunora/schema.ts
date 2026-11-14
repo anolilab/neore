@@ -2702,7 +2702,10 @@ export const schema = defineSchema({
         // The delegating run's model, inherited when still allowed.
         parentModel: v.optional(v.string()),
         parentThreadId: v.string(),
-        // The run's one pending post check (`postResult`), so a release replaces it instead of adding a second loop.
+        // When the run's current post check is due: a release that would not move it forward schedules nothing.
+        postCheckAt: v.optional(v.number()),
+        // The token of the run's current post check (`postResult`): a check acts only while its token is current, so a
+        // release supersedes the pending one instead of adding a second loop.
         postCheckId: v.optional(v.string()),
         // Why the result never reached the parent thread, once the retries ran out. Terminal: set
         // instead of `resultPostedAt`, never with it.
