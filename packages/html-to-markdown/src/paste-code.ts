@@ -82,23 +82,33 @@ function languageOf(pre: Element, lookup: RuleLookup): string {
 
 /** The first `<code>` in the block that the page shows: a hidden one's language is not the shown code's. */
 function shownCode(pre: Element, lookup: RuleLookup): Element | null {
-    const found = pre.querySelectorAll("code");
-    // Copied by index: domino's NodeList is not iterable.
-    const codes = Array.from({ length: found.length }, (_unused, index) => found[index] as Element);
+    // One walk down the block in order, past hidden elements and all they hold: each element is read once.
+    const pending: Element[] = [];
 
-    for (const code of codes) {
-        let isShown = true;
+    pushElementChildren(pending, pre);
 
-        for (let element: Element | null = code; element && element !== pre && isShown; element = element.parentElement) {
-            isShown = !lookup.isRemoved(element);
+    while (pending.length > 0) {
+        const element = pending.pop() as Element;
+
+        if (lookup.isRemoved(element)) {
+            continue;
         }
 
-        if (isShown) {
-            return code;
+        if (element.nodeName === "CODE") {
+            return element;
         }
+
+        pushElementChildren(pending, element);
     }
 
     return null;
+}
+
+/** Pushes the element's child elements, last first, so the first comes off the stack first. */
+function pushElementChildren(pending: Element[], element: Element): void {
+    for (let child = element.lastElementChild; child; child = child.previousElementSibling) {
+        pending.push(child);
+    }
 }
 
 /** The language the first class with a language prefix names, in lower case; or "". */
