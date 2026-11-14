@@ -489,23 +489,35 @@ function isUnbold(element: Element): boolean {
 const CODE_NAMES = new Set(["CODE", "KBD", "PRE", "SAMP", "TT"]);
 const inCode = new WeakMap<Node, boolean>();
 
+const HEADING_NAMES = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
+const inHeading = new WeakMap<Node, boolean>();
+
 /** True for an element inside code, whose text is written as it is, with no formatting. Each element is asked once. */
 function isInCode(element: Element): boolean {
+    return hasAncestorIn(element, CODE_NAMES, inCode);
+}
+
+function isInHeading(element: Element): boolean {
+    return hasAncestorIn(element, HEADING_NAMES, inHeading);
+}
+
+/** True when an element around this one has one of the names; the answer is remembered for each on the way up. */
+function hasAncestorIn(element: Element, names: ReadonlySet<string>, known: WeakMap<Node, boolean>): boolean {
     const chain: Node[] = [];
     let current: Node | null = element.parentNode;
     let isFound = false;
 
     while (current?.nodeType === 1) {
-        const known = inCode.get(current);
+        const cached = known.get(current);
 
-        if (known !== undefined) {
-            isFound = known;
+        if (cached !== undefined) {
+            isFound = cached;
             break;
         }
 
         chain.push(current);
 
-        if (CODE_NAMES.has(current.nodeName)) {
+        if (names.has(current.nodeName)) {
             isFound = true;
             break;
         }
@@ -514,7 +526,7 @@ function isInCode(element: Element): boolean {
     }
 
     for (const member of chain) {
-        inCode.set(member, isFound);
+        known.set(member, isFound);
     }
 
     return isFound;
@@ -922,9 +934,16 @@ function canWrap(element: Element, lookup: RuleLookup): boolean {
  * that can write it. A styled block holding a list writes none, so the formatting inside it writes its own.
  */
 function isFormattedAbove(element: Element, kind: Kind, lookup: RuleLookup): boolean {
+    // A heading is bold already: Markdown writes it so.
+    if (kind === "isBold" && isInHeading(element)) {
+        return true;
+    }
+
     const above = formattingFrom(element.parentNode, kind);
 
-    return above !== null && (isNamed(above) || canWrap(above, lookup));
+    // A built-in rule writes `<b>`, `<i>` or `<s>` whatever it holds; the preset's rule writes one it took over only
+    // when it can.
+    return above !== null && ((isNamed(above) && !carriersOf(above).has(above)) || canWrap(above, lookup));
 }
 
 /**

@@ -10,6 +10,9 @@ import type { Rule, RuleLookup } from "./types";
 // `language-js`, `lang-js`, and GitHub's `highlight-source-shell` (or `highlight-js`) on the element around the block.
 // Longest first, so `highlight-source-shell` is read as `shell`.
 const LANGUAGE_PREFIXES = ["highlight-source-", "highlight-", "language-", "lang-"];
+// On the elements around the block only the prefixes that name a language and nothing else: `lang-en` or
+// `highlight-yellow` on a page wrapper is a locale or a color.
+const WRAPPER_PREFIXES = ["highlight-source-", "language-"];
 const LANGUAGE_NAME = /^[\w#+.-]{1,30}$/;
 const CLASS_SEPARATOR = /[\t\n\f\r ]+/;
 // Elements that start a line of their own inside a code block, as a page shows them.
@@ -58,8 +61,16 @@ const MIN_FENCE = 3;
 function languageOf(pre: Element, lookup: RuleLookup): string {
     const parent = pre.parentElement;
 
-    for (const element of [shownCode(pre, lookup), pre, parent, parent?.parentElement]) {
-        const language = classLanguage(element?.getAttribute("class") ?? "");
+    for (const element of [shownCode(pre, lookup), pre]) {
+        const language = classLanguage(element?.getAttribute("class") ?? "", LANGUAGE_PREFIXES);
+
+        if (language !== "") {
+            return language;
+        }
+    }
+
+    for (const element of [parent, parent?.parentElement]) {
+        const language = classLanguage(element?.getAttribute("class") ?? "", WRAPPER_PREFIXES);
 
         if (language !== "") {
             return language;
@@ -91,9 +102,9 @@ function shownCode(pre: Element, lookup: RuleLookup): Element | null {
 }
 
 /** The language the first class with a language prefix names, in lower case; or "". */
-function classLanguage(classes: string): string {
+function classLanguage(classes: string, prefixes: ReadonlyArray<string>): string {
     for (const name of classes.toLowerCase().split(CLASS_SEPARATOR)) {
-        const prefix = LANGUAGE_PREFIXES.find((candidate) => name.startsWith(candidate));
+        const prefix = prefixes.find((candidate) => name.startsWith(candidate));
         const language = prefix === undefined ? "" : name.slice(prefix.length);
 
         // GitHub's `highlight-source` names no language on its own.

@@ -309,3 +309,21 @@ describe("paste styles: review cases, eighth round", () => {
         expect(convert(`<b>a <code>c<span style="font-weight:normal">d</span></code> e</b>`)).toBe("**a `cd` e**");
     });
 });
+
+describe("paste styles: review cases, ninth round", () => {
+    it("keeps the bold of a span in a list under a bold element that writes none, as it holds the list", () => {
+        expect(convert(`<b><ul><li><span style="font-weight:700">x</span> y</li></ul><span style="font-weight:normal">n</span></b>`)).toBe("- **x** y\n\nn");
+    });
+
+    it("writes no bold for a bold-styled span in a heading, which is bold already", () => {
+        expect(convert(`<h2><span style="font-weight:700">Title</span></h2>`)).toBe("## Title");
+    });
+
+    it("reads a language from the elements around a code block only from a class that names nothing else", () => {
+        expect(
+            convert(
+                `<div class="lang-en"><div><pre>x</pre></div></div><div class="highlight-yellow"><pre>y</pre></div><div class="highlight highlight-source-shell"><pre>z</pre></div><pre class="lang-py">w</pre>`,
+            ),
+        ).toBe("```\nx\n```\n\n```\ny\n```\n\n```shell\nz\n```\n\n```py\nw\n```");
+    });
+});
