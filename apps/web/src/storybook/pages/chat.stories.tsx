@@ -1,5 +1,6 @@
 import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { onlineManager } from "@tanstack/react-query";
 import { expect, userEvent, waitFor } from "storybook/test";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
@@ -220,6 +221,11 @@ export const Reconnecting: Story = {
 };
 
 export const Offline: Story = {
+    // The event below also takes Query's page-wide `onlineManager` offline, which no later `online` event reaches once this
+    // story's client has unmounted: put it back when the story ends.
+    beforeEach: () => () => {
+        onlineManager.setOnline(true);
+    },
     play: async ({ canvas }) => {
         // The "offline" view comes from the browser's offline event, not the live status: fire it once the page has mounted.
         await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT);
@@ -230,6 +236,18 @@ export const Offline: Story = {
         await bannerShown(banner);
     },
     parameters: { connection: "offline" },
+};
+
+/**
+ * The story after `Offline` starts online: Query's `onlineManager` is one per page, so an `offline` event left standing pauses
+ * every later story's queries and mutations in the same iframe (the Storybook UI keeps one for the whole session).
+ */
+export const OnlineAfterOffline: Story = {
+    play: async ({ canvas }) => {
+        await expect(onlineManager.isOnline()).toBe(true);
+        await settle(canvas);
+        await expect(canvas.queryByText("Offline – reconnecting…")).not.toBeInTheDocument();
+    },
 };
 
 /** A fresh chat, before the first message. */
