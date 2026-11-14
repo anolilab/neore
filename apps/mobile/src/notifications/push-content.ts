@@ -128,8 +128,9 @@ const isNotificationStyle = (payload: unknown): boolean =>
  * Android's data-only push, in the background task: read the ids, fetch the text, and show the notification on the
  * device, the placeholder when the fetch fails. The text shows only if the account that fetched it is still the one
  * signed in when it is about to show: a sign-out or account switch while it was on its way gets the placeholder. A
- * notification the server says is not the signed-in account's shows nothing at all. A withheld chat keeps the
- * placeholder but loses its thread, so a tap opens the chat list. Resolves whether a notification was shown.
+ * notification the server says is not the signed-in account's shows nothing at all. A withheld chat, or one whose account
+ * changed meanwhile, keeps the placeholder but loses its thread, so a tap opens the chat list. Resolves whether a
+ * notification was shown.
  */
 export const showDataOnlyPush = async (payload: unknown, steps: PushTaskSteps): Promise<boolean> => {
     const ids = isNotificationStyle(payload) ? undefined : pushIdsIn(payload);
@@ -156,7 +157,6 @@ export const showDataOnlyPush = async (payload: unknown, steps: PushTaskSteps): 
     const isSameSession = await steps.sessionUserId() === fetchedFor;
     const realText = isSameSession && typeof fetched === "object" ? fetched : undefined;
     const text = realText ?? pushPlaceholder(steps.locale);
-    // A chat the server withholds, or one that belonged to an account since signed out, keeps no thread: a tap must not open it.
     const shownIds = fetched === WITHHELD || !isSameSession ? { notificationId: ids.notificationId } : ids;
 
     await steps.show(text, shownIds);
