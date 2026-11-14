@@ -718,6 +718,8 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
                   model: target.model,
                   ...(thread.projectId && { projectId: thread.projectId }),
                   ...(thread.organizationId && { organizationId: thread.organizationId }),
+                  // An unfiled chat keeps the organization that caps it, so a later switch back to a computer is checked against it.
+                  ...(!thread.organizationId && thread.capOrganizationId && { capOrganizationId: thread.capOrganizationId }),
                   ...(thread.teamId && { teamId: thread.teamId }),
                   status: "active",
                   tags: ["chat"],

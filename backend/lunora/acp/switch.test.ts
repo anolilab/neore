@@ -955,6 +955,30 @@ describe("an organization's cap on a computer", () => {
 
         expect(fork).toMatchObject({ capOrganizationId: "org-1" });
         expect(fork?.organizationId).toBeUndefined();
+
+        // Back to a cloud model, and from there to the computer from the personal space: still held by that cap.
+        const [session] = await rows("acpSessions", { threadId: result.forkedThreadId });
+
+        await run(async (ctx) => {
+            await ctx.db.patch("acpSessions", session?._id as never, { status: "idle" } as never);
+        });
+
+        const back = await switchTo(result.forkedThreadId as string, { kind: "model", model: OTHER_MODEL });
+        const cloud = await run(async (ctx) => await ctx.db.get("threads", back.forkedThreadId as never));
+
+        expect(cloud).toMatchObject({ capOrganizationId: "org-1" });
+
+        const [policy] = await rows("organizationPolicies");
+
+        await run(async (ctx) => {
+            await ctx.db.patch(
+                "organizationPolicies",
+                policy?._id as never,
+                { document: JSON.stringify({ permissionCap: "ask", schemaVersion: 1 }), revision: 2 } as never,
+            );
+        });
+
+        await expect(switchTo(back.forkedThreadId as string, hostTarget(device))).rejects.toThrow(NOT_ALLOWED);
     });
 
     it("refuses a switch to another agent on the computer too, and lets the chat leave the computer for a cloud model", async () => {
