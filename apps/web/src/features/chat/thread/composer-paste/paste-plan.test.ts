@@ -976,6 +976,12 @@ describe("block content in a pasted table cell", () => {
     });
 });
 
+describe("an HTML-only copy with control characters, pasted plain", () => {
+    it("leaves them out, as they show nothing", async () => {
+        await expect(paste({ "text/html": "<p>a\u{1}b\u{2}c\u{3}d\u{10}e</p>" }, { plainOnly: true, selectedText: "" })).resolves.toBe("abcde");
+    });
+});
+
 describe("an HTML-only copy with an emoji picture, pasted plain", () => {
     it("keeps the emoji from its alt text", async () => {
         await expect(paste({ "text/html": '<p>Done <img alt="🎉" src="x.png"></p>' }, { plainOnly: true, selectedText: "" })).resolves.toBe("Done 🎉");
