@@ -1381,21 +1381,29 @@ const waitsOnOpenRequest = async (ctx: Pick<QueryCtx, "db">, thread: Doc<"thread
 const HELD_RESULTS_RELEASED = 20;
 
 /**
- * Schedules `run`'s next post check under a fresh token, recorded as the run's `postCheckId` in the same mutation. A
- * check acts only while its token is current (`postResult`), so a release supersedes the pending one instead of adding a
- * second backoff loop, and nothing is cancelled: if this mutation rolls back, neither the new token nor its check exists,
- * and the old check is still the current one.
+ * Schedules `run`'s next post check under a fresh token, recorded with its due time as the run's `postCheckId` and
+ * `postCheckAt` in the same mutation. A check acts only while its token is current (`postResult`), and nothing is
+ * cancelled: if this mutation rolls back, neither the new token nor its check exists, and the old check is still current.
+ * With `coalesce` (a release), a check that would be due no sooner than the current one schedules nothing, so repeated
+ * releases queue no extra jobs; only one that moves the check forward supersedes it.
  */
 const schedulePostCheck = async (
     ctx: MutationCtx,
-    run: Pick<RunDoc, "_id">,
+    run: Pick<RunDoc, "_id" | "postCheckAt" | "postCheckId">,
     delayMs: number,
     args: { attempt: number; failures?: number; waits?: number },
+    { coalesce = false }: { coalesce?: boolean } = {},
 ): Promise<void> => {
+    const due = ctx.now + delayMs;
+
+    if (coalesce && run.postCheckId !== undefined && run.postCheckAt !== undefined && run.postCheckAt <= due) {
+        return;
+    }
+
     const check = crypto.randomUUID();
 
     await ctx.scheduler.runAfter(delayMs, internal.sub_agents.functions.postResult, { ...args, check, runId: run._id });
-    await patchById(ctx.db, "subAgentRuns", run._id, { postCheckId: check });
+    await patchById(ctx.db, "subAgentRuns", run._id, { postCheckAt: due, postCheckId: check });
 };
 
 /**
@@ -1412,7 +1420,7 @@ export const releaseHeldResults = async (ctx: MutationCtx, childThreadId: string
 
         for (const row of nested) {
             if (row.resultPostedAt === undefined && row.postFailed === undefined && postsBack(row)) {
-                await schedulePostCheck(ctx, row, 0, { attempt: 0 });
+                await schedulePostCheck(ctx, row, 0, { attempt: 0 }, { coalesce: true });
             }
         }
     }

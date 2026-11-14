@@ -957,7 +957,9 @@ describe("a result for a parent that waits on its own request", () => {
         return heldPosts()
             .filter((job) => (job.args as { check?: string }).check === row.postCheckId)
             .map((job) => {
-                const { check: _check, ...args } = job.args as Record<string, unknown>;
+                const args = { ...(job.args as Record<string, unknown>) };
+
+                delete args.check;
 
                 return args;
             });
@@ -1054,29 +1056,35 @@ describe("a result for a parent that waits on its own request", () => {
         expect(await currentChecks()).toStrictEqual([{ attempt: 0, runId }]);
     });
 
-    it("keeps one check, however many sends release it while it is still held", async () => {
+    it("queues one job for any number of sends while the result is still held", async () => {
+        const before = heldPosts().length;
+
         for (let send = 0; send < 3; send += 1) {
             await internalCall(afterOwnerMessage, { threadId: parentId });
         }
 
+        // The first send moves the check forward; the next two would not, so they queue nothing.
+        expect(heldPosts()).toHaveLength(before + 1);
         expect(await currentChecks()).toHaveLength(1);
 
-        // A superseded check does nothing when it runs: no post, and no backoff loop of its own.
-        const { postCheckId } = await runRow();
-        const stale = heldPosts().find((job) => (job.args as { check?: string }).check !== postCheckId);
-        const before = heldPosts().length;
+        // The check it superseded does nothing when it runs: no post, and no backoff loop of its own.
+        const row = await runRow();
+        const stale = heldPosts().find((job) => (job.args as { check?: string }).check !== row.postCheckId);
 
         await internalCall(postResult, stale!.args as Record<string, unknown>);
-        expect(heldPosts()).toHaveLength(before);
-        expect((await runRow()).postCheckId).toBe(postCheckId);
+
+        const after = await runRow();
+
+        expect(heldPosts()).toHaveLength(before + 1);
+        expect(after.postCheckId).toBe(row.postCheckId);
         expect(await parentReplies()).toHaveLength(0);
     });
 
-    it("keeps the check it had when a release rolls back, and that check still posts", async () => {
-        const { postCheckId } = await runRow();
+    it("keeps its queued check through a release that rolls back, and that same job still posts", async () => {
+        const row = await runRow();
         const [held] = heldPosts();
 
-        // A release whose mutation fails after scheduling: nothing it did is kept.
+        // A release that would move the check forward, in a mutation that then fails: nothing it did is kept.
         await expect(
             run(async (context) => {
                 await releaseHeldResults(context, parentId);
@@ -1084,19 +1092,27 @@ describe("a result for a parent that waits on its own request", () => {
                 throw new Error("rolled back");
             }),
         ).rejects.toThrow("rolled back");
-        expect((await runRow()).postCheckId).toBe(postCheckId);
 
-        // The request closes; the check it kept runs and posts.
+        const after = await runRow();
+
+        // The job is still queued with its token, still the run's current one, and no replacement was committed.
+        expect(heldPosts().map((job) => job.id)).toStrictEqual([held!.id]);
+        expect(after.postCheckId).toBe(row.postCheckId);
+        expect((held!.args as { check?: string }).check).toBe(row.postCheckId);
+
+        // The request closes; that retained job, as the scheduler holds it, runs and posts.
         await run(async (context) => {
-            const [row] = await context.db
+            const [request] = await context.db
                 .query("toolApprovalRuns")
                 .withIndex("by_approvalId", (q: any) => q.eq("approvalId", PARENT_REQUEST))
                 .collect();
 
-            await context.db.patch("toolApprovalRuns", row._id, { resolvedAt: Date.now(), status: "denied" });
+            await context.db.patch("toolApprovalRuns", request._id, { resolvedAt: Date.now(), status: "denied" });
         });
-        await internalCall(postResult, held!.args as Record<string, unknown>);
 
+        const retained = harness.scheduler.list().find((job) => job.id === held!.id);
+
+        await internalCall(postResult, retained!.args);
         expect(await parentReplies()).toHaveLength(1);
     });
 
