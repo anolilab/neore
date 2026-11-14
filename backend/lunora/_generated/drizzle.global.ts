@@ -527,6 +527,7 @@ export const shardActivity = sqliteTable("shardActivity", {
     housekeptAt: real("housekeptAt"),
     lastActiveAt: real("lastActiveAt").notNull(),
     nextDueAt: real("nextDueAt"),
+    rateLimitsClearedAt: real("rateLimitsClearedAt"),
     shardKey: text("shardKey").notNull(),
 }, (t) => ({
     by_shardKey: index("by_shardKey").on(t.shardKey),

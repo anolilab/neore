@@ -1510,6 +1510,7 @@ export interface Doc_shardActivity {
     housekeptAt?: number;
     lastActiveAt: number;
     nextDueAt?: number;
+    rateLimitsClearedAt?: number;
     shardKey: string;
 }
 
@@ -4728,6 +4729,7 @@ export interface Insert_shardActivity {
     housekeptAt?: number;
     lastActiveAt: number;
     nextDueAt?: number;
+    rateLimitsClearedAt?: number;
     shardKey: string;
 }
 

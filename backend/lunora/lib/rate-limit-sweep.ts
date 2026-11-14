@@ -14,14 +14,17 @@
  * so its refill can outlast the retention. It goes once its debt has refilled (`debtSettledAt`).
  *
  * Rows live on the shard whose mutation charged them, so the sweep runs on `__root__`
- * from the cron tick and on each user shard from `lib/shard-housekeeping.ts`.
+ * from the cron tick, on each active user shard from `lib/shard-housekeeping.ts`, and on
+ * each dormant one, alone, through {@link sweepDormantShardRateLimits}.
  */
 import type { RateLimitConfig } from "lunorash/ratelimit";
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
+import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { RATE_LIMIT_CONFIGS } from "./rate-limiter";
+import { noteRateLimitsCleared } from "./shard-housekeeping";
 
 /** Rows deleted per run; a full page schedules the next one. */
 export const RATE_LIMIT_SWEEP_PAGE = 200;
@@ -52,35 +55,57 @@ export const SLOWEST_REFILL_PER_MS = Math.min(
 /** When a row in debt reads as a full bucket under every limit: its retention plus the time its debt takes to refill. */
 export const debtSettledAt = (row: { ts: number; value: number }): number => row.ts + RATE_LIMIT_RETENTION_MS + -row.value / SLOWEST_REFILL_PER_MS;
 
+/**
+ * One run of the sweep on the calling shard: a page of expired rows and a page of settled debt go, and a run that did not
+ * reach the end schedules {@link sweepExpiredRateLimits} to continue. Returns the rows deleted. Also run on its own on a
+ * dormant shard (`lib/shard-housekeeping.ts`).
+ */
+export const sweepRateLimitPage = async (ctx: Pick<MutationCtx, "db" | "now" | "scheduler">, debtCursor: string | undefined): Promise<number> => {
+    const cutoff = ctx.now - RATE_LIMIT_RETENTION_MS;
+    const [{ page: expired }, inDebt] = await Promise.all([
+        ctx.db.rateLimits.findMany({ limit: RATE_LIMIT_SWEEP_PAGE, orderBy: [{ ts: "asc" }], where: { ts: { lt: cutoff }, value: { gte: 0 } } }),
+        ctx.db.rateLimits.findMany({
+            cursor: debtCursor,
+            limit: RATE_LIMIT_SWEEP_PAGE,
+            orderBy: [{ ts: "asc" }],
+            where: { ts: { lt: cutoff }, value: { lt: 0 } },
+        }),
+    ]);
+    const settled = inDebt.page.filter((row) => debtSettledAt(row) < ctx.now);
+    const rows = [...expired, ...settled];
+
+    await Promise.all(rows.map(async (row) => await ctx.db.delete("rateLimits", row._id)));
+
+    const moreDebt = !inDebt.isDone && inDebt.continueCursor !== null && inDebt.continueCursor !== undefined;
+
+    if (expired.length === RATE_LIMIT_SWEEP_PAGE || moreDebt) {
+        await ctx.scheduler.runAfter(
+            0,
+            internal.lib.rate_limit_sweep.sweepExpiredRateLimits,
+            moreDebt ? { debtCursor: inDebt.continueCursor ?? undefined } : {},
+        );
+    }
+
+    return rows.length;
+};
+
 export const sweepExpiredRateLimits = internalMutation
     // Where the rows still in debt left off: each run moves past them, so rows still owed can't hide settled ones behind them.
     .input({ debtCursor: v.optional(v.string().max(1024)) })
     .output(v.number())
-    .mutation(async ({ args: { debtCursor }, ctx }) => {
-        const cutoff = ctx.now - RATE_LIMIT_RETENTION_MS;
-        const [{ page: expired }, inDebt] = await Promise.all([
-            ctx.db.rateLimits.findMany({ limit: RATE_LIMIT_SWEEP_PAGE, orderBy: [{ ts: "asc" }], where: { ts: { lt: cutoff }, value: { gte: 0 } } }),
-            ctx.db.rateLimits.findMany({
-                cursor: debtCursor,
-                limit: RATE_LIMIT_SWEEP_PAGE,
-                orderBy: [{ ts: "asc" }],
-                where: { ts: { lt: cutoff }, value: { lt: 0 } },
-            }),
-        ]);
-        const settled = inDebt.page.filter((row) => debtSettledAt(row) < ctx.now);
-        const rows = [...expired, ...settled];
+    .mutation(async ({ args: { debtCursor }, ctx }) => await sweepRateLimitPage(ctx, debtCursor));
 
-        await Promise.all(rows.map(async (row) => await ctx.db.delete("rateLimits", row._id)));
+/**
+ * On a dormant user shard (`dispatchDormantRateLimitSweeps` in `lib/shard-housekeeping.ts`): the sweep alone. When it leaves
+ * the table empty, the census says so and the daily dispatch skips this shard until it is active again. A row still inside
+ * its window, or a full page the sweep continues on its own, leaves the mark off, so the shard is visited again the next day.
+ */
+export const sweepDormantShardRateLimits = internalMutation
+    .input({})
+    .output(v.object({ cleared: v.boolean(), deleted: v.number() }))
+    .mutation(async ({ ctx }) => {
+        const deleted = await sweepRateLimitPage(ctx, undefined);
+        const left = await ctx.db.query("rateLimits").first();
 
-        const moreDebt = !inDebt.isDone && inDebt.continueCursor !== null && inDebt.continueCursor !== undefined;
-
-        if (expired.length === RATE_LIMIT_SWEEP_PAGE || moreDebt) {
-            await ctx.scheduler.runAfter(
-                0,
-                internal.lib.rate_limit_sweep.sweepExpiredRateLimits,
-                moreDebt ? { debtCursor: inDebt.continueCursor ?? undefined } : {},
-            );
-        }
-
-        return rows.length;
+        return { cleared: left === null && (await noteRateLimitsCleared(ctx, ctx.now)), deleted };
     });

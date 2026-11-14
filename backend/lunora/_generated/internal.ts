@@ -905,6 +905,7 @@ export interface InternalApiTypes {
             runJobOnce: FunctionReference<"action", { args?: unknown; jobId: string; onLapse?: { args?: string; target: string }; target: string; userId?: string }, null>;
         };
         rate_limit_sweep: {
+            sweepDormantShardRateLimits: FunctionReference<"mutation", {}, { cleared: boolean; deleted: number }>;
             sweepExpiredRateLimits: FunctionReference<"mutation", { debtCursor?: string }, number>;
         };
         rate_limiter_mutations: {
@@ -912,6 +913,7 @@ export interface InternalApiTypes {
             resetRateLimit: FunctionReference<"mutation", { identifier: string; key: string }, void>;
         };
         shard_housekeeping: {
+            dispatchDormantRateLimitSweeps: FunctionReference<"mutation", { before?: number; cursor?: string }, { dispatched: number }>;
             dispatchDueShards: FunctionReference<"mutation", {}, { dispatched: number }>;
             dispatchShardHousekeeping: FunctionReference<"mutation", {}, { dispatched: number }>;
             recordShardActivity: FunctionReference<"mutation", { shardKey: string }, null>;
@@ -2259,6 +2261,7 @@ export const internal: InternalApiTypes = {
             runJobOnce: { __lunoraRef: "lib_job_once:runJobOnce" },
         },
         rate_limit_sweep: {
+            sweepDormantShardRateLimits: { __lunoraRef: "lib_rate_limit_sweep:sweepDormantShardRateLimits" },
             sweepExpiredRateLimits: { __lunoraRef: "lib_rate_limit_sweep:sweepExpiredRateLimits" },
         },
         rate_limiter_mutations: {
@@ -2266,6 +2269,7 @@ export const internal: InternalApiTypes = {
             resetRateLimit: { __lunoraRef: "lib_rate_limiter_mutations:resetRateLimit" },
         },
         shard_housekeeping: {
+            dispatchDormantRateLimitSweeps: { __lunoraRef: "lib_shard_housekeeping:dispatchDormantRateLimitSweeps" },
             dispatchDueShards: { __lunoraRef: "lib_shard_housekeeping:dispatchDueShards" },
             dispatchShardHousekeeping: { __lunoraRef: "lib_shard_housekeeping:dispatchShardHousekeeping" },
             recordShardActivity: { __lunoraRef: "lib_shard_housekeeping:recordShardActivity" },

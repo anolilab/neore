@@ -2445,6 +2445,8 @@ export const schema = defineSchema({
         lastActiveAt: v.number(),
         /** The earliest time this shard has timed work due (a schedule trigger, a recurring task); cleared while a tick is in flight. */
         nextDueAt: v.optional(v.number()),
+        /** When a dormant-shard rate-limit sweep left this shard's `rateLimits` empty (`lib/shard-housekeeping.ts`). */
+        rateLimitsClearedAt: v.optional(v.number()),
         shardKey: v.string(),
     })
         .global()

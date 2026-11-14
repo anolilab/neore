@@ -22977,6 +22977,12 @@
           "optional": true,
           "unique": false
         },
+        "rateLimitsClearedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "shardKey": {
           "kind": "string",
           "nullable": false,

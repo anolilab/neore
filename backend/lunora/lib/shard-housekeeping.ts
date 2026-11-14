@@ -17,6 +17,11 @@
  *   {@link runShardHousekeeping} to each shard active since its last sweep, and
  *   at least daily to any shard active in the last {@link HOUSEKEEPING_HORIZON_MS}
  *   — an expiry does not wait for its owner to come back.
+ * - **Dormant shards** (idle past that horizon): only the `rateLimits` sweep.
+ *   A daily job pages the rest of the census with a cursor and dispatches
+ *   `sweepDormantShardRateLimits` (`lib/rate-limit-sweep.ts`) to each shard whose rows are not yet
+ *   known to be gone; a sweep that empties the table marks the census, so a
+ *   shard that stays dormant is not visited again.
  *
  * Each dispatch goes on the target user's own scheduler lane
  * (`shard-scheduler.ts`), so shards are swept side by side, not one at a time.
@@ -31,6 +36,7 @@ import { cronsLogger } from "./logger";
 import { patchRow } from "./patch";
 import { currentUserShard } from "./shard-context";
 import { runAfterOnShard } from "./shard-scheduler";
+import { MAX_LENGTH } from "./validators";
 
 /** How long a shard stays in the daily sweep after its last activity. */
 export const HOUSEKEEPING_HORIZON_MS = 30 * 24 * 60 * 60 * 1000;
@@ -41,7 +47,7 @@ const ACTIVITY_THROTTLE_MS = 10 * 60 * 1000;
 /** A shard tick re-arms no sooner than this, so a stuck due row cannot spin. */
 const MIN_TICK_INTERVAL_MS = 60 * 1000;
 /** Shards dispatched per root run; the rest wait for the next one. */
-const DISPATCH_BATCH = 200;
+export const DISPATCH_BATCH = 200;
 
 /** An argument-less internal mutation, as in `crons.ts`. */
 interface Sweep {
@@ -104,6 +110,13 @@ export const needsHousekeeping = (row: { housekeptAt?: number; lastActiveAt: num
 
     return row.housekeptAt === undefined || row.lastActiveAt >= row.housekeptAt || now - row.housekeptAt >= HOUSEKEEPING_IDLE_INTERVAL_MS;
 };
+
+/**
+ * Pure: whether the dormant-shard dispatch visits a census row. A shard is skipped once a sweep has left its
+ * `rateLimits` empty, until new activity may have charged a limit there again. Pinned by `shard-housekeeping.test.ts`.
+ */
+export const needsDormantRateLimitSweep = (row: { lastActiveAt: number; rateLimitsClearedAt?: number }): boolean =>
+    row.rateLimitsClearedAt === undefined || row.rateLimitsClearedAt < row.lastActiveAt;
 
 /**
  * The census is a HINT for the root tick, written beside the caller's own work
@@ -172,6 +185,25 @@ export const noteShardDue = async (ctx: CensusCtx, dueAt: number, shardKey: stri
     });
 };
 
+/** On a user shard: record that its `rateLimits` table is empty, so the dormant-shard dispatch skips it until it is active again. */
+export const noteRateLimitsCleared = async (ctx: CensusCtx, now: number, shardKey: string | undefined = currentUserShard()): Promise<boolean> => {
+    if (shardKey === undefined) {
+        return false;
+    }
+
+    let marked = false;
+    const written = await bestEffort("noteRateLimitsCleared", async () => {
+        const row = await censusRow(ctx, shardKey);
+
+        if (row) {
+            await ctx.db.patch("shardActivity", row._id, { rateLimitsClearedAt: now });
+            marked = true;
+        }
+    });
+
+    return written && marked;
+};
+
 /** `noteShardActivity` for callers outside a shard (the HTTP layer), run on the user's shard. */
 export const recordShardActivity = internalMutation
     .input({ shardKey: v.string() })
@@ -219,6 +251,37 @@ export const dispatchShardHousekeeping = internalMutation
         for (const row of due) {
             await runAfterOnShard(ctx.scheduler, 0, internal.lib.shard_housekeeping.runShardHousekeeping, {}, row.shardKey);
             await ctx.db.patch("shardActivity", row._id, { housekeptAt: now });
+        }
+
+        return { dispatched: due.length };
+    });
+
+/**
+ * Root, daily: send `sweepDormantShardRateLimits` (`lib/rate-limit-sweep.ts`) to each shard idle past {@link HOUSEKEEPING_HORIZON_MS}, which
+ * {@link dispatchShardHousekeeping} no longer visits. One page of the census per run; a run that did not reach the end
+ * schedules the next page with its cursor. `before` is fixed by the first run, so the chain pages one range, and it never
+ * overlaps the housekeeping range (`lastActiveAt >= now - horizon`): an active shard is not swept twice by this path. A shard
+ * crossing the horizon on the day may meet both; the sweep only deletes rows past every window, so a second run is a no-op.
+ */
+export const dispatchDormantRateLimitSweeps = internalMutation
+    .input({ before: v.optional(v.number()), cursor: v.optional(v.string().max(MAX_LENGTH.cursor)) })
+    .output(v.object({ dispatched: v.number() }))
+    .mutation(async ({ args, ctx }) => {
+        const before = args.before ?? ctx.now - HOUSEKEEPING_HORIZON_MS;
+        const page = await ctx.db.shardActivity.findMany({
+            cursor: args.cursor ?? null,
+            limit: DISPATCH_BATCH,
+            orderBy: [{ lastActiveAt: "asc" }],
+            where: { lastActiveAt: { lt: before } },
+        });
+        const due = page.page.filter((row) => needsDormantRateLimitSweep(row));
+
+        for (const row of due) {
+            await runAfterOnShard(ctx.scheduler, 0, internal.lib.rate_limit_sweep.sweepDormantShardRateLimits, {}, row.shardKey);
+        }
+
+        if (!page.isDone && page.continueCursor) {
+            await ctx.scheduler.runAfter(0, internal.lib.shard_housekeeping.dispatchDormantRateLimitSweeps, { before, cursor: page.continueCursor });
         }
 
         return { dispatched: due.length };
