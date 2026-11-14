@@ -42,7 +42,8 @@ export const getSessionOrganizationForCap = internalQuery
             return null;
         }
 
-        // Set when an admin opened this session to act as the user, for the writes refused to them (a guest note's send).
+        // Set when an admin opened this session to act as the user, for the writes refused to them (a guest note's send,
+        // an app's sign-in: `extension-grant-http.ts`).
         const impersonating = session.impersonatedBy ? { impersonating: true } : {};
 
         if (!session.activeOrganizationId) {

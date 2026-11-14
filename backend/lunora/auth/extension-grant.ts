@@ -19,7 +19,8 @@
  *    `/auth/extension` page with `code_challenge = BASE64URL(SHA-256(verifier))`
  *    and `redirect_uri = identity.getRedirectURL()`.
  * 2. The user signs in there however they like (password, Google, passkey…) and
- *    approves. The page calls `authorizeExtension` below as that user, which
+ *    approves. The page calls `authorizeExtension` below as that user (never
+ *    a session an admin is impersonating with), which
  *    stores a single-use code bound to the user, the challenge and the redirect
  *    URI for `CODE_TTL_MS`, and navigates to `redirect_uri?code=…`. The browser
  *    intercepts that navigation and hands the URL to the extension unloaded.
@@ -204,10 +205,24 @@ const assertEligible = (user: ExtensionGrantUser | null): ExtensionGrantUser => 
  */
 export const authorizeExtension = async (
     store: ExtensionGrantStore,
-    input: { codeChallenge: string; now?: number; redirectUri: string; trustedRedirectUris: ReadonlyArray<string>; userId: null | string | undefined },
+    input: {
+        codeChallenge: string;
+        now?: number;
+        redirectUri: string;
+        /** The web sign-in approving, as read from its session row; `null` when it is not one, or is gone. */
+        session: null | { impersonating?: boolean };
+        trustedRedirectUris: ReadonlyArray<string>;
+        userId: null | string | undefined;
+    },
 ): Promise<{ code: string; expiresAt: number }> => {
-    if (!input.userId) {
+    if (!input.userId || !input.session) {
         throw new ExtensionGrantError("unauthorized", "Not signed in.");
+    }
+
+    // The grant's session is a fresh one with no impersonation mark, so an app an admin signed in while acting as
+    // the user would pass every impersonation guard. As `refuseGuestApproval` for device codes.
+    if (input.session.impersonating) {
+        throw new ExtensionGrantError("access_denied", "Apps can't be signed in while impersonating. Sign in as yourself to connect one.");
     }
 
     if (!input.trustedRedirectUris.includes(input.redirectUri)) {
