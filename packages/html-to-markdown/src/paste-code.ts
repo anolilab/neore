@@ -3,6 +3,7 @@
  * copy code as a bare `<pre>`. The text is read from the DOM as the page shows it, and the language from a class on
  * the code, the block or the two elements around it, as GitHub and highlighters write it.
  */
+import { declaredStyle } from "./inline-style";
 import { unlessRemoved } from "./paste-lists";
 import type { Rule, RuleLookup } from "./types";
 
@@ -46,6 +47,10 @@ const LINE_ELEMENTS = new Set([
     "TR",
     "UL",
 ]);
+// Display types that keep an element in its line, and those that put it on lines of its own.
+const INLINE_DISPLAYS = new Set(["contents", "inline", "inline-block", "inline-flex", "inline-grid", "inline-table", "ruby", "ruby-base", "ruby-text"]);
+const BLOCK_DISPLAYS = new Set(["block", "flex", "flow-root", "grid", "list-item", "table", "table-caption", "table-row", "table-row-group"]);
+const DISPLAY_SPACE = /[\t\n\f\r ]+/;
 const BACKTICK_RUN = /`+/g;
 const MIN_FENCE = 3;
 
@@ -154,7 +159,7 @@ function codeText(pre: Element, lookup: RuleLookup): string {
             continue;
         }
 
-        const isLine = LINE_ELEMENTS.has(node.nodeName);
+        const isLine = isLineElement(node as Element);
 
         if (!hasNewlineEnd && isLine && parts.length > 0) {
             // The one break between the two lines: the one the line before asked for is this one.
@@ -173,6 +178,22 @@ function codeText(pre: Element, lookup: RuleLookup): string {
     const code = parts.join("");
 
     return code.endsWith("\n") ? code.slice(0, -1) : code;
+}
+
+/**
+ * True when the element starts a line of its own: by its style's display type, as the page shows it, or by its name
+ * when the style sets none it knows.
+ */
+function isLineElement(element: Element): boolean {
+    const style = element.getAttribute("style") ?? "";
+    const display = style === "" ? "" : declaredStyle(style, "display");
+    const outer = display.split(DISPLAY_SPACE)[0] ?? "";
+
+    if (INLINE_DISPLAYS.has(outer)) {
+        return false;
+    }
+
+    return BLOCK_DISPLAYS.has(outer) || LINE_ELEMENTS.has(element.nodeName);
 }
 
 /** Pushes the node's children, last first, so the first comes off the stack first. */

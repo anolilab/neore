@@ -483,7 +483,41 @@ function nearestWeight(start: Node | null): Element | null {
 function isUnbold(element: Element): boolean {
     const weight = element.parentNode ? nearestWeight(element.parentNode) : null;
 
-    return emphasisOf(element).isNormal && weight !== null && emphasisOf(weight).isBold;
+    return emphasisOf(element).isNormal && weight !== null && emphasisOf(weight).isBold && !isInCode(element);
+}
+
+const CODE_NAMES = new Set(["CODE", "KBD", "PRE", "SAMP", "TT"]);
+const inCode = new WeakMap<Node, boolean>();
+
+/** True for an element inside code, whose text is written as it is, with no formatting. Each element is asked once. */
+function isInCode(element: Element): boolean {
+    const chain: Node[] = [];
+    let current: Node | null = element.parentNode;
+    let isFound = false;
+
+    while (current?.nodeType === 1) {
+        const known = inCode.get(current);
+
+        if (known !== undefined) {
+            isFound = known;
+            break;
+        }
+
+        chain.push(current);
+
+        if (CODE_NAMES.has(current.nodeName)) {
+            isFound = true;
+            break;
+        }
+
+        current = current.parentNode;
+    }
+
+    for (const member of chain) {
+        inCode.set(member, isFound);
+    }
+
+    return isFound;
 }
 
 const tops = new WeakMap<Node, Node>();
@@ -667,6 +701,23 @@ function edgeChild(node: Node, side: "first" | "last"): Node | null {
     return side === "first" ? node.firstChild : node.lastChild;
 }
 
+function isEmojiBefore(element: Element, lookup: RuleLookup): boolean {
+    return EMOJI_EDGE.test(lastCodePoint(neighbourText(element, "last", lookup)));
+}
+
+function isEmojiAfter(element: Element, lookup: RuleLookup): boolean {
+    return EMOJI_EDGE.test(firstCodePoint(neighbourText(element, "first", lookup)));
+}
+
+function firstCodePoint(text: string): string {
+    return text === "" ? "" : String.fromCodePoint(text.codePointAt(0) ?? 0);
+}
+
+/** True for an emoji edge, or no text: the emoji may start in the next node. */
+function isEmojiOrEmpty(character: string): boolean {
+    return character === "" || EMOJI_EDGE.test(character);
+}
+
 /** The last character of the text, a whole code point: its last two code units are one when they are a surrogate pair. */
 function lastCodePoint(text: string): string {
     return [...text.slice(-2)].at(-1) ?? "";
@@ -680,13 +731,19 @@ function isInEmojiSequence(element: Element, lookup: RuleLookup): boolean {
     const first = edgeText(element, "first", lookup);
     const last = edgeText(element, "last", lookup);
 
-    if (first.trimStart().startsWith(JOINER) || last.trimEnd().endsWith(JOINER)) {
+    const head = first.trimStart();
+    const tail = last.trimEnd();
+    // A joiner at an edge joins an emoji inside to one outside; one beside plain text joins nothing.
+    const isJoinedAtStart = head.startsWith(JOINER) && isEmojiOrEmpty(firstCodePoint(head.slice(1))) && isEmojiBefore(element, lookup);
+    const isJoinedAtEnd = tail.endsWith(JOINER) && EMOJI_EDGE.test(lastCodePoint(tail.slice(0, -1))) && isEmojiAfter(element, lookup);
+
+    if (isJoinedAtStart || isJoinedAtEnd) {
         return true;
     }
 
     const isJoinedAfter = EMOJI_EDGE.test(lastCodePoint(last)) && neighbourText(element, "first", lookup).startsWith(JOINER);
 
-    return isJoinedAfter || (EMOJI_EDGE.test(String.fromCodePoint(first.codePointAt(0) ?? 0)) && neighbourText(element, "last", lookup).endsWith(JOINER));
+    return isJoinedAfter || (EMOJI_EDGE.test(firstCodePoint(first)) && neighbourText(element, "last", lookup).endsWith(JOINER));
 }
 
 const textsAfter = new WeakMap<Node, string>();
@@ -916,7 +973,7 @@ function formatted(content: string, node: Element, options: Options, lookup: Rul
 // its formatted text on to the rule that writes the block: a paragraph, a list item, a table cell.
 const styledText: Rule = {
     filter: (node, _options, lookup) => {
-        if (lookup.isRemoved(node)) {
+        if (lookup.isRemoved(node) || isInCode(node)) {
             return false;
         }
 

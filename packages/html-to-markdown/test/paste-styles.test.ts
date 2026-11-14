@@ -293,3 +293,19 @@ describe("paste styles: review cases, seventh round", () => {
         ).toBe("~~x~~ ~~y~~");
     });
 });
+
+describe("paste styles: review cases, eighth round", () => {
+    it("starts a line in a code block by an element's display type, as the page shows it", () => {
+        expect(convert(`<pre><div style="display:inline">a</div>b<span style="display:block">c</span>d</pre>`)).toBe("```\nab\nc\nd\n```");
+    });
+
+    it("keeps formatting beside a joiner that joins no emoji", () => {
+        expect(convert("<p><b>x\u{200D}</b>y</p>")).toBe("**x\u{200D}**y");
+        expect(convert("<p><b>👩\u{200D}</b>👩</p>")).toBe("👩\u{200D}👩");
+    });
+
+    it("writes no formatting inside inline code, and lets no normal-weight run cross into it", () => {
+        expect(convert(`<p>run <code><span style="font-weight:bold">x</span></code></p>`)).toBe("run `x`");
+        expect(convert(`<b>a <code>c<span style="font-weight:normal">d</span></code> e</b>`)).toBe("**a `cd` e**");
+    });
+});
