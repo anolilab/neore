@@ -123,7 +123,7 @@ type Step = { node: Node } | { lineEnd: true };
  * The text of a code block as the page shows it, whitespace kept: no hidden parts, a line per `<br>` and per line
  * element. Read in one walk without recursion, so deep nesting costs no stack.
  */
-function codeText(pre: Element, lookup: RuleLookup): string {
+function codeText(pre: Element, lookup: RuleLookup, imageAlt: (image: Element) => string): string {
     const parts: string[] = [];
     let hasNewlineEnd = false;
     // A line element ends its line: what follows it, text or another element, starts the next one.
@@ -154,19 +154,10 @@ function codeText(pre: Element, lookup: RuleLookup): string {
         }
 
         const { node } = step;
+        const leaf = leafText(node, lookup, imageAlt);
 
-        // Text, and CDATA, which a DOM passed in may hold.
-        if (node.nodeType === 3 || node.nodeType === 4) {
-            push(node.nodeValue ?? "");
-            continue;
-        }
-
-        if (node.nodeType !== 1 || lookup.isRemoved(node)) {
-            continue;
-        }
-
-        if (node.nodeName === "BR") {
-            push("\n");
+        if (leaf !== undefined) {
+            push(leaf);
             continue;
         }
 
@@ -207,6 +198,28 @@ function isLineElement(element: Element): boolean {
     return BLOCK_DISPLAYS.has(outer) || LINE_ELEMENTS.has(element.nodeName);
 }
 
+/**
+ * The text a node adds to a code block when it holds no lines of its own: text and CDATA (which a DOM passed in may
+ * hold) as written, a line break, an image's emoji or formula, and "" for a hidden element or a comment. Undefined for
+ * an element whose children are read.
+ */
+function leafText(node: Node, lookup: RuleLookup, imageAlt: (image: Element) => string): string | undefined {
+    if (node.nodeType === 3 || node.nodeType === 4) {
+        return node.nodeValue ?? "";
+    }
+
+    if (node.nodeType !== 1 || lookup.isRemoved(node)) {
+        return "";
+    }
+
+    if (node.nodeName === "BR") {
+        return "\n";
+    }
+
+    // An image is the emoji or formula its alt text names, as code writes it: the text alone.
+    return node.nodeName === "IMG" ? imageAlt(node as Element) : undefined;
+}
+
 /** Pushes the node's children, last first, so the first comes off the stack first. */
 function pushChildren(steps: Step[], node: Node): void {
     for (let child = node.lastChild; child; child = child.previousSibling) {
@@ -225,14 +238,17 @@ function fenceFor(code: string): string {
     return "`".repeat(Math.max(MIN_FENCE, longest + 1));
 }
 
-export const codeRules: Record<string, Rule> = {
-    codeBlock: {
-        filter: unlessRemoved((node) => node.nodeName === "PRE"),
-        replacement(_content, node, _options, lookup) {
-            const code = codeText(node, lookup);
-            const fence = fenceFor(code);
+/** The code rules. `imageAlt` gives the text an image stands for, or "" for one that is no text. */
+export function codeRules(imageAlt: (image: Element) => string): Record<string, Rule> {
+    return {
+        codeBlock: {
+            filter: unlessRemoved((node) => node.nodeName === "PRE"),
+            replacement(_content, node, _options, lookup) {
+                const code = codeText(node, lookup, imageAlt);
+                const fence = fenceFor(code);
 
-            return `\n\n${fence}${languageOf(node, lookup)}\n${code}\n${fence}\n\n`;
+                return `\n\n${fence}${languageOf(node, lookup)}\n${code}\n${fence}\n\n`;
+            },
         },
-    },
-};
+    };
+}

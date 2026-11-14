@@ -339,3 +339,14 @@ describe("paste styles: review cases, tenth round", () => {
         ).toBe("~~x~~ ~~x~~ ~~x~~ ~~y~~");
     });
 });
+
+describe("paste styles: review cases, eleventh round", () => {
+    it("keeps the text of an emoji or a formula drawn as an image in a code block, and drops other images", () => {
+        expect(convert(`<pre>ok <img alt="🎉"> <img class="math" alt="x^2"> <img alt="A chart"> done</pre>`)).toBe("```\nok 🎉 x^2  done\n```");
+    });
+
+    it("gives <b> set to inherit or unset the parent's weight, and <b> reverted the browser's bolder one", () => {
+        expect(convert(`<p><b style="font-weight:inherit">x</b> <b style="font-weight:unset">y</b> <b style="font-weight:revert">z</b></p>`)).toBe("x y **z**");
+        expect(convert(`<p><span style="font-weight:bold"><b style="font-weight:inherit">x</b> y</span></p>`)).toBe("**x y**");
+    });
+});

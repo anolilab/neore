@@ -28,7 +28,9 @@ const GLOBAL_VALUES = new Set(["inherit", "initial", "revert", "revert-layer", "
 const NUMBER = /^\d+(?:\.\d+)?$/;
 const MAX_WEIGHT = 1000;
 // Values that take the parent's weight, as no declaration does.
-const INHERITING = new Set(["inherit", "revert", "revert-layer", "unset"]);
+// Values that take the parent's weight. `revert` goes back to the browser's own style, which for `<b>` is bolder.
+const INHERITING = new Set(["inherit", "unset"]);
+const REVERTING = new Set(["revert", "revert-layer"]);
 const DEFAULT_WEIGHT = 400;
 const BOLD_WEIGHT = 700;
 // A weight from 600 up shows as bold.
@@ -257,7 +259,7 @@ function declaredWeight(element: Element): string {
 
     const value = declaredStyle(style, "font-weight", isWeightValue);
 
-    return INHERITING.has(value) ? "" : value;
+    return REVERTING.has(value) ? "" : value;
 }
 
 const weights = new WeakMap<Element, number>();
@@ -284,9 +286,10 @@ function computedWeight(element: Element): number {
         const member = chain[index] as Element;
         const declared = declaredWeight(member);
 
-        if (declared !== "") {
+        // `inherit` keeps the parent's weight, even on `<b>`.
+        if (declared !== "" && !INHERITING.has(declared)) {
             weight = resolvedWeight(declared, weight);
-        } else if (BOLD_NAMES.has(member.nodeName)) {
+        } else if (declared === "" && BOLD_NAMES.has(member.nodeName)) {
             weight = bolder(weight);
         }
 

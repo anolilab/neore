@@ -215,10 +215,17 @@ function isClosedDetails(node: Element): boolean {
 
 /** The text an image stands for: an emoji's alt text, or a formula's. Any other image is not text, so it has none. */
 function imageText(image: Element): string {
+    const alt = imageAlt(image);
+
+    return alt !== "" && isFormulaImage(image) ? inlineMath(alt) : alt;
+}
+
+/** The alt text of an image that draws an emoji or a formula, or "" for any other image. */
+function imageAlt(image: Element): string {
     const alt = image.getAttribute("alt")?.trim() ?? "";
 
     if (alt !== "" && isFormulaImage(image)) {
-        return inlineMath(alt);
+        return alt;
     }
 
     return EMOJI_NAME.test(alt) || (alt.length <= MAX_EMOJI_ALT && PICTOGRAPHIC.test(alt) && EMOJI_ONLY.test(alt)) ? alt : "";
@@ -331,7 +338,7 @@ function texSource(node: Element): string {
 export function paste(service: TurndownService): void {
     service.remove(isHiddenElement);
 
-    const rules = { ...pasteRules, ...listRules(isHiddenOnPage), ...codeRules };
+    const rules = { ...pasteRules, ...listRules(isHiddenOnPage), ...codeRules(imageAlt) };
 
     for (const [key, rule] of Object.entries(rules)) {
         service.addRule(key, rule);
