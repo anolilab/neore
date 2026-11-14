@@ -24,6 +24,11 @@ const harness = vi.hoisted(() => {
     };
 });
 
+// An admin impersonating the owner hides the chat's archive and delete; these tests act as the owner themselves.
+vi.mock("@/features/admin/hooks/use-is-impersonating", () => {
+    return { useImpersonating: () => false };
+});
+
 vi.mock("@lingui/react/macro", () => {
     return {
         useLingui: () => {

@@ -122,12 +122,26 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
     const handleDeleteThread = useCallback(
         (threadId: string) => {
             deleteBranch(threadId)
-                .then((deletedIds) => {
-                    showSuccess(
-                        <>
-                            {t`Thread deleted.`} <button onClick={() => handleUndoDeleteThread(deletedIds)} type="button">{t`Undo`}</button>
-                        </>,
-                    );
+                .then(({ deletedIds, threadDeleted }) => {
+                    const undo = <button onClick={() => handleUndoDeleteThread(deletedIds)} type="button">{t`Undo`}</button>;
+
+                    if (threadDeleted) {
+                        showSuccess(
+                            <>
+                                {t`Thread deleted.`} {undo}
+                            </>,
+                        );
+                    } else if (deletedIds.length > 0) {
+                        // The thread was refused but some of its branches were deleted: those can still be brought back.
+                        showError(
+                            <>
+                                {t`Failed to delete the thread. ${plural(deletedIds.length, { one: "# branch was deleted.", other: "# branches were deleted." })}`}{" "}
+                                {undo}
+                            </>,
+                        );
+                    } else {
+                        showError(t`Failed to delete threads`);
+                    }
 
                     return undefined;
                 })
@@ -273,35 +287,38 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
                 return;
             }
 
-            const isDeletingCurrentThread = currentThreadId && threadIds.includes(currentThreadId);
-
-            if (isDeletingCurrentThread) {
-                // The delete below does not wait for this: the survivor is read, then the route moves only if it still shows a deleted chat.
-                // With the split view on, the other open panes stay: the route moves to one of them instead of `/chat`.
-                void (async () => {
-                    const survivor = await survivingPaneAfterDelete(threadIds, (id) => {
-                        const args = { threadId: id as Id<"threads"> };
-
-                        return lunora.query(api.chat.functions.getThread, args, shardOptionsFor(args));
-                    });
-
-                    if (!routeIsOn(threadIds)) {
-                        return;
-                    }
-
-                    navigate(
-                        survivor === undefined ? { replace: true, to: "/chat" } : { params: { threadId: survivor }, replace: true, to: "/chat/$threadId" },
-                    );
-                })();
-            }
-
-            for (const id of threadIds) {
-                deleteThreadMetadata(id);
-            }
-
             deleteThreadsMutation({ threadIds })
                 .then((result) => {
                     const count = result.deletedCount;
+
+                    // Local metadata goes only once the server has deleted the rows.
+                    for (const id of threadIds) {
+                        deleteThreadMetadata(id);
+                    }
+
+                    const isDeletingCurrentThread = currentThreadId && threadIds.includes(currentThreadId);
+
+                    if (isDeletingCurrentThread) {
+                        // Once the server has deleted them: the survivor is read, then the route moves only if it still shows a deleted chat.
+                        // With the split view on, the other open panes stay: the route moves to one of them instead of `/chat`.
+                        void (async () => {
+                            const survivor = await survivingPaneAfterDelete(threadIds, (id) => {
+                                const args = { threadId: id as Id<"threads"> };
+
+                                return lunora.query(api.chat.functions.getThread, args, shardOptionsFor(args));
+                            });
+
+                            if (!routeIsOn(threadIds)) {
+                                return;
+                            }
+
+                            navigate(
+                                survivor === undefined
+                                    ? { replace: true, to: "/chat" }
+                                    : { params: { threadId: survivor }, replace: true, to: "/chat/$threadId" },
+                            );
+                        })();
+                    }
 
                     showSuccess(t`${plural(count, { one: "# thread deleted.", other: "# threads deleted." })}`);
 

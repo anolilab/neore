@@ -13,6 +13,7 @@ import type { FC, ReactNode } from "react";
 import { lazy, memo, startTransition, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
+import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { PullRequestCountsProvider } from "@/features/develop/components/pull-request-counts";
 import {
     useDeleteProject,
@@ -65,6 +66,8 @@ const SelectionToolbar: FC<{
     selectedCount: number;
 }> = memo(({ isAllSelected, onClearSelection, onDeleteSelected, onDone, onSelectAll, onSelectByDate, selectedCount }) => {
     const { t } = useLingui();
+    // An admin acting as the owner may not delete their chats: the server refuses it.
+    const isImpersonating = useImpersonating();
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
     const [dateRange, setDateRange] = useState<ThreadDateRange>({ from: "", to: "" });
@@ -104,7 +107,7 @@ const SelectionToolbar: FC<{
                     >
                         {t`Select by date`}
                     </Button>
-                    {selectedCount > 0 && (
+                    {selectedCount > 0 && !isImpersonating && (
                         <Button className="text-destructive hover:bg-destructive/20 h-6 px-2 text-xs" onClick={handleDeleteClick} size="sm" variant="ghost">
                             <Trash2 className="mr-1 h-3 w-3" />
                             {t`Delete`}

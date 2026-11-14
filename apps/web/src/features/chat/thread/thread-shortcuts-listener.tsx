@@ -5,6 +5,7 @@ import type { FC } from "react";
 import { useEffect, useState } from "react";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
+import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import useCurrentModel from "@/features/chat/core/hooks/use-current-model";
 import { useCurrentThreadId, useOptimisticStatuses } from "@/features/chat/core/stores/thread-store-hooks";
 import useThreadHandlers from "@/features/chat/thread-list/hooks/use-thread-handlers";
@@ -32,12 +33,15 @@ const ThreadShortcutsListener: FC<ThreadShortcutsListenerProperties> = ({ isOwne
     const optimisticStatuses = useOptimisticStatuses();
     const currentModel = useCurrentModel();
     const { handleDeleteThread, updateThread } = useThreadHandlers(() => {}, currentThreadId);
+    // An admin acting as the owner may not archive or delete: the server refuses both.
+    const isImpersonating = useImpersonating();
+    const mayChange = isOwner && !isImpersonating;
     // The thread the delete was asked for. The route can change while the dialog is open, so confirming uses this, not the live thread.
     const [deleteTargetId, setDeleteTargetId] = useState<string | undefined>(undefined);
 
     useEffect(() => {
         const archive = () => {
-            if (!isOwner || currentThreadId === undefined || currentThreadId === "default") {
+            if (!mayChange || currentThreadId === undefined || currentThreadId === "default") {
                 return;
             }
 
@@ -48,7 +52,7 @@ const ThreadShortcutsListener: FC<ThreadShortcutsListenerProperties> = ({ isOwne
         };
 
         const askToDelete = () => {
-            if (!isOwner || currentThreadId === undefined || currentThreadId === "default") {
+            if (!mayChange || currentThreadId === undefined || currentThreadId === "default") {
                 return;
             }
 
@@ -62,7 +66,7 @@ const ThreadShortcutsListener: FC<ThreadShortcutsListenerProperties> = ({ isOwne
             globalThis.removeEventListener("archiveThread", archive);
             globalThis.removeEventListener("deleteThread", askToDelete);
         };
-    }, [currentModel, currentThreadId, isOwner, model, optimisticStatuses, status, updateThread]);
+    }, [currentModel, currentThreadId, mayChange, model, optimisticStatuses, status, updateThread]);
 
     return (
         <DeleteConfirmationDialog

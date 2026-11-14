@@ -1,5 +1,6 @@
 import { skipToken, useQuery } from "@tanstack/react-query";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
@@ -24,3 +25,28 @@ export const useIsImpersonating = () => {
 
     return useQuery({ ...options, queryFn: isAuthenticated && afterFirstPaint ? options.queryFn : skipToken });
 };
+
+export type ImpersonationState = "impersonating" | "self" | "unknown";
+
+/**
+ * Whether an admin acts as this account, read off the session the app already holds (its `impersonatedBy`, the mark
+ * the server checks), not off `useIsImpersonating`, which waits for first paint. `unknown` while the session is read
+ * or after a failed read.
+ */
+export const useImpersonationState = (): ImpersonationState => {
+    const { data, error, isPending } = useAuthSession();
+
+    if (isPending || error != null) {
+        return "unknown";
+    }
+
+    return data?.session?.impersonatedBy ? "impersonating" : "self";
+};
+
+/**
+ * Whether to withhold the controls the server refuses to an impersonated session: true while an admin acts as this
+ * account, and while that is not known yet. In the gap before first paint Delete showed to an impersonating admin. A
+ * signed-in person's session is read before the chat renders, so the unknown state lasts at most the hydration
+ * render, while menus are still closed.
+ */
+export const useImpersonating = (): boolean => useImpersonationState() !== "self";
