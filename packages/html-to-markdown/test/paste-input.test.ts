@@ -234,3 +234,15 @@ describe("paste input: review cases, fifth round", () => {
         expect(convert("<table><tr><th>A</th></tr><tr><td>a<br><br>b</td></tr><tr><td><br>c</td></tr></table>")).toBe("| A |\n| --- |\n| a b |\n| c |");
     });
 });
+
+describe("paste input: review cases, sixth round", () => {
+    it("counts the formula an image stands for, which may be long", () => {
+        const formula = `<img class="math" alt="${"x+".repeat(25_000)}1" src="f.png">`;
+
+        expect(() => convert(`${"<b>".repeat(450)}${formula}`)).toThrow(RangeError);
+    });
+
+    it("takes out marks a character reference decodes into, so only the preset writes them", () => {
+        expect(convert("<p>a&#3;b&#4;c&#16;d&#1;e</p>")).toBe("abcde");
+    });
+});

@@ -89,7 +89,7 @@ export function checkDepth(root: Node): void {
  * more characters re-indented or re-written than the conversion is given. The content is measured once, in one walk
  * without recursion, so the check itself costs no stack.
  */
-export function checkWork(root: Node, isHidden: (node: Node) => boolean): void {
+export function checkWork(root: Node, shown: Shown): void {
     const measures = new Map<Node, Measure>();
     const steps: Step[] = [];
     let work: Work = { format: 0, indent: 0, wrap: 0 };
@@ -115,13 +115,18 @@ export function checkWork(root: Node, isHidden: (node: Node) => boolean): void {
         }
 
         // What the page hides is not converted: it costs no work, and holds none for the elements around it.
-        if (isHidden(element)) {
+        if (shown.isHidden(element)) {
             dropMeasures(element, measures);
             measures.set(element, { lines: 0, size: 0 });
             continue;
         }
 
         const measure = measureOf(element, measures, step.isCode || KEEPS_WHITESPACE.has(element.nodeName));
+
+        // An image is written as the text it stands for: an emoji's, or a formula's, which may be long.
+        if (element.nodeName === "IMG") {
+            measure.size += shown.imageText(element).length;
+        }
 
         work = spend(work, element, measure);
         measures.set(element, measure);

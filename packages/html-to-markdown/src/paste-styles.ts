@@ -1193,10 +1193,12 @@ function attributesOf(element: Element): Attr[] {
     return Array.from({ length: attributes.length }, (_unused, index) => attributes[index] as Attr);
 }
 
-/** A copy of the node with the marks taken out of its text and attributes. */
-function copyWithoutMarks(input: Node): Node {
-    const copy = input.cloneNode(true);
-    const pending: Node[] = [copy];
+/**
+ * Takes the marks out of the node's text and attributes, in place. A parsed string needs it too: a character reference
+ * such as `&#3;` decodes into a mark.
+ */
+function stripMarks(root: Node): Node {
+    const pending: Node[] = [root];
 
     while (pending.length > 0) {
         const node = pending.pop() as Node;
@@ -1215,7 +1217,7 @@ function copyWithoutMarks(input: Node): Node {
         }
     }
 
-    return copy;
+    return root;
 }
 
 /**
@@ -1243,7 +1245,7 @@ export function guardMarks(service: TurndownService, prepare: (root: Node) => vo
 
         checkDepth(root);
 
-        const copy = root === input ? copyWithoutMarks(root) : root;
+        const copy = stripMarks(root === input ? root.cloneNode(true) : root);
 
         prepare(copy);
 
