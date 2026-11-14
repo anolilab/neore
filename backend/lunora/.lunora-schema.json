@@ -27143,6 +27143,12 @@
           "unique": false,
           "ref": "bots"
         },
+        "capOrganizationId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "category": {
           "kind": "string",
           "nullable": false,

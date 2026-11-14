@@ -258,7 +258,9 @@ export const admitSubAgentRun = async (
         return { error: capProblem };
     }
 
-    const leftOrganization = await membershipRefusal(ctx, parent.organizationId ?? args.organizationId, args.userId);
+    // The organization the run is stamped with: the lead chat's, or the one a temporary lead chat was started in, else the caller's.
+    const organizationId = parent.organizationId ?? parent.capOrganizationId ?? args.organizationId;
+    const leftOrganization = await membershipRefusal(ctx, organizationId, args.userId);
 
     if (leftOrganization) {
         return { error: leftOrganization };
@@ -281,7 +283,7 @@ export const admitSubAgentRun = async (
             createdAt: now,
             depth,
             dispatchedBy: args.dispatchedBy ?? "lead",
-            organizationId: parent.organizationId ?? args.organizationId,
+            organizationId,
             parentModel: args.parentModel,
             parentThreadId: parent._id,
             skillSlug,
@@ -737,7 +739,8 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
     // The owner must still be a member, before anything is created or charged; a worker on a computer also needs the
     // organization's cap at `auto` (`hostOrganizationRefusal`), before any thread, session or start call exists. A new worker
     // takes the organization its thread is stamped with; an existing one keeps its own.
-    const workerOrganizationId = child?.organizationId ?? parent.organizationId ?? args.organizationId;
+    const newWorkerOrganizationId = parent.organizationId ?? parent.capOrganizationId ?? args.organizationId;
+    const workerOrganizationId = child?.organizationId ?? newWorkerOrganizationId;
     const organizationRefusal =
         runnerKind === "host"
             ? await hostOrganizationRefusal(ctx, workerOrganizationId, args.userId)
@@ -861,7 +864,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
             createdAt: now,
             // A host worker runs on its agent, not on a cloud model.
             model: host ? host.offer.agentKey : model,
-            organizationId: parent.organizationId ?? args.organizationId,
+            organizationId: newWorkerOrganizationId,
             ...(host && { runner: "host" as const }),
             status: "active",
             tags: ["sub-agent", "worker"],
@@ -906,7 +909,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         dispatchedBy: args.dispatchedBy ?? "lead",
         mode: "worker",
         // An existing worker keeps the organization its thread was stamped with, so a follow-up is capped as the first run was.
-        organizationId: child?.organizationId ?? parent.organizationId ?? args.organizationId,
+        organizationId: workerOrganizationId,
         parentModel: args.parentModel,
         parentThreadId: parent._id,
         runner: origin?.runner ?? (host ? { deviceId: host.device._id, kind: "host" } : { kind: "headless" }),

@@ -331,29 +331,38 @@ export const threadModeForApp = async (
     allowed: boolean;
     connectorAccess: { connectorSlug: string; level: "none" | "read_only" | "read_write" }[];
     mode: ThreadPermissionMode | null;
+    organizationId: string | null;
 }> => {
     const access = await resolveThreadReadAccess(ctx, threadId as Id<"threads">, userId);
 
     if (access?.kind !== "full" && access?.kind !== "locked") {
-        return { allowed: false, connectorAccess: [], mode: null };
+        return { allowed: false, connectorAccess: [], mode: null, organizationId: null };
     }
 
     // A thread with no owner on record is not reachable through an app call: the same refusal as a thread that is not there.
     const owner = access.thread.userId;
 
     if (owner === undefined) {
-        return { allowed: false, connectorAccess: [], mode: null };
+        return { allowed: false, connectorAccess: [], mode: null, organizationId: null };
     }
 
     const connectorAccess = await threadConnectorAccess(ctx, { threadId: access.thread._id, userId: owner });
 
-    return { allowed: true, connectorAccess, mode: await modeOfThread(ctx, access.thread, userId) };
+    // The organization whose cap holds the thread's tools, as `readRunPermissionCap` reads it: the one it is filed under,
+    // else the one a temporary chat was started in.
+    return {
+        allowed: true,
+        connectorAccess,
+        mode: await modeOfThread(ctx, access.thread, userId),
+        organizationId: access.thread.organizationId ?? access.thread.capOrganizationId ?? null,
+    };
 };
 
 /**
- * The mode of the thread an MCP App is shown in, with whether the caller may reach that thread at all. The content read gate is
- * not applied: the app was already rendered, and a passcode-locked chat's owner (no unlock proof here) is who it belongs to.
- * `allowed` is the owner, or someone with a live grant; a locked thread is the owner's alone.
+ * The mode of the thread an MCP App is shown in, with whether the caller may reach that thread at all, and the organization
+ * whose cap holds it. The content read gate is not applied: the app was already rendered, and a passcode-locked chat's
+ * owner (no unlock proof here) is who it belongs to. `allowed` is the owner, or someone with a live grant; a locked thread
+ * is the owner's alone.
  */
 export const getThreadPermissionModeForApp = internalQuery
     .input({ threadId: v.string().max(MAX_LENGTH.id), userId: v.string() })
@@ -362,6 +371,7 @@ export const getThreadPermissionModeForApp = internalQuery
             allowed: v.boolean(),
             connectorAccess: v.array(v.object({ connectorSlug: v.string(), level: vAccessLevel })),
             mode: v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"), v.null()),
+            organizationId: v.union(v.string(), v.null()),
         }),
     )
     .query(async ({ args: { threadId, userId }, ctx }) => await threadModeForApp(ctx, threadId, userId));

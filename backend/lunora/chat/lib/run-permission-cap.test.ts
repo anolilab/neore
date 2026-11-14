@@ -50,6 +50,18 @@ describe("readRunPermissionCap", () => {
         expect(runQuery).toHaveBeenLastCalledWith(expect.anything(), { organizationId: "org_other" });
     });
 
+    it("keeps a temporary chat's starting organization over the space a later turn is sent from", async () => {
+        // A temporary chat is never filed under its organization, so a turn sent later from the personal space (no run
+        // organization) or from another organization must still read the one it was started in.
+        const fromPersonal = vi.fn().mockResolvedValueOnce({ capOrganizationId: "org_started" }).mockResolvedValueOnce("off");
+        const fromOther = vi.fn().mockResolvedValueOnce({ capOrganizationId: "org_started" }).mockResolvedValueOnce("off");
+
+        expect(await readRunPermissionCap(fakeCtx(fromPersonal), { organizationId: null, threadId: "thread_1" })).toBe("off");
+        expect(fromPersonal).toHaveBeenNthCalledWith(2, expect.anything(), { organizationId: "org_started" });
+        expect(await readRunPermissionCap(fakeCtx(fromOther), { organizationId: "org_other", threadId: "thread_1" })).toBe("off");
+        expect(fromOther).toHaveBeenNthCalledWith(2, expect.anything(), { organizationId: "org_started" });
+    });
+
     it("gives auto for a thread and a run with no organization", async () => {
         const runQuery = vi.fn().mockResolvedValueOnce({ organizationId: undefined });
 

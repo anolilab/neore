@@ -604,6 +604,8 @@ export const createThread = authMutation
                 const expiresAt = context.now + retentionHoursToUse! * 60 * 60 * 1000;
 
                 await context.runMutation(internal.agent.threads.createTemporaryThread, {
+                    // Not filed under it, but capped by it (`threads.capOrganizationId`).
+                    ...(organizationId && { capOrganizationId: organizationId }),
                     expiresAt,
                     retentionHours: retentionHoursToUse!,
                     threadId: threadId as Id<"threads">,
@@ -714,7 +716,13 @@ export const createThreadWithInitialMessage = internalMutation
                     .unique();
                 const hours = retentionHours ?? storedRetentionHours(userSettings?.temporaryChatRetentionHours);
 
-                await insertTemporaryThread(context, { expiresAt: context.now + hours * 60 * 60 * 1000, retentionHours: hours, threadId });
+                await insertTemporaryThread(context, {
+                    // Not filed under it, but capped by it (`threads.capOrganizationId`).
+                    ...(organizationId && { capOrganizationId: organizationId }),
+                    expiresAt: context.now + hours * 60 * 60 * 1000,
+                    retentionHours: hours,
+                    threadId,
+                });
             }
 
             const messageId = await savePromptInTransaction(context, {
@@ -3749,11 +3757,14 @@ export const branchThread = authAction
             throw new LunoraError("CONFLICT", "This thread runs on a paired computer, so it cannot be branched.");
         }
 
-        const { language, model, organizationId } = parentThread;
+        const { language, model } = parentThread;
 
         if (!model) {
             throw new LunoraError("BAD_REQUEST", "Parent thread is missing model");
         }
+
+        // A branch is a lasting chat: one taken from a temporary chat started in an organization is placed as saving it would be.
+        const placement = await context.runQuery(internal.agent.threads.lastingChatPlacement, { threadId: threadId as Id<"threads"> });
 
         // Resolved along the ACTIVE path: a branched thread also stores
         // off-path siblings, which a raw row index would count.
@@ -3771,8 +3782,8 @@ export const branchThread = authAction
         // Create the new thread
         const newThread = await context.runMutation(internal.agent.threads.createThread, {
             language,
+            ...placement,
             model,
-            organizationId,
             title: branchName || "",
             userId,
         });

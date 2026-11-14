@@ -17,7 +17,7 @@ import type { ThreadPermissionMode } from "./thread-permission-mode";
 import type { ToolAnnotationHints, ToolDescriptor, ToolPermissionMode, ToolPermissionOverrides } from "./tool-permissions";
 import { clampToolPermission, isToolPermissionMode, resolveToolPermission, toolPermissionKey } from "./tool-permissions";
 import type { RequestPermissionCap } from "./run-permission-cap";
-import { readRequestPermissionCap } from "./run-permission-cap";
+import { readPermissionCap, readRequestPermissionCap } from "./run-permission-cap";
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -97,10 +97,14 @@ const descriptorFor = (config: Pick<MCPServerConfig, "connectorSlug" | "name">, 
  * `full` is not passed on. It turns `ask` defaults into `auto`, which is the model's turn to take; an app iframe is not a turn, and
  * the proxy cannot ask anyone, so a tool that needs approval stays refused here under `full` too.
  */
-/** What an app call reads from its thread: the mode it runs under, and the teammate's connection levels (`connectors/access.ts`). */
+/**
+ * What an app call reads from its thread: the mode it runs under, the teammate's connection levels (`connectors/access.ts`),
+ * and the organization whose cap holds it.
+ */
 interface ThreadAppAccess {
     connectorAccess: { connectorSlug: string; level: ConnectorAccessLevel }[];
     mode: ThreadPermissionMode | undefined;
+    organizationId: string | null;
 }
 
 const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: string): Promise<ThreadAppAccess | "denied"> => {
@@ -124,7 +128,11 @@ const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: s
         return "denied";
     }
 
-    return { connectorAccess: found.connectorAccess, mode: found.mode === "full" ? undefined : (found.mode ?? undefined) };
+    return {
+        connectorAccess: found.connectorAccess,
+        mode: found.mode === "full" ? undefined : (found.mode ?? undefined),
+        organizationId: found.organizationId,
+    };
 };
 
 /**
@@ -390,15 +398,26 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
         return Response.json({ error: "Missing serverName or toolName" }, { status: 400 });
     }
 
-    // The caller's session names the organization that caps the call (the thread an app names sets only its mode, below).
-    // Read before the server is resolved: an app call runs only at `auto`, so under any lower cap every call is refused,
-    // and no credential is refreshed and no server is contacted for it.
-    const { cap: permissionCap, unresolved } = await readRequestPermissionCap(context, user._id);
+    // Both are read before the server is resolved: an app call runs only at `auto`, so under any lower cap every call is
+    // refused, and no credential is refreshed and no server is contacted for it. The chat the app is shown in gives its mode
+    // and the organization it is filed or was started in; the session gives the space the caller is in. A call that names
+    // no chat (a client from before the chat was sent) is capped by the session alone, as before, so it keeps working.
+    const [thread, { cap: requestCap, unresolved }] = await Promise.all([
+        threadId ? threadModeFor(context, user._id, threadId) : undefined,
+        readRequestPermissionCap(context, user._id),
+    ]);
+
+    if (thread === "denied") {
+        return Response.json({ error: "This chat is not available to you" }, { status: 403 });
+    }
 
     // The caller's space could not be told, so no organization's policy is the reason: say what would get the call through.
     if (unresolved) {
         return Response.json({ error: UNRESOLVED_SPACE_REFUSALS[unresolved](toolName) }, { status: 403 });
     }
+
+    // The stricter of the chat's organization's cap and the session's holds, so switching spaces cannot lift a chat's cap.
+    const permissionCap = thread ? clampToolPermission(requestCap, await readPermissionCap(context, thread.organizationId)) : requestCap;
 
     if (permissionCap !== "auto") {
         const identity = await findUserMcpServerIdentity(context, user._id, serverName);
@@ -422,13 +441,7 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
 
     // The app's call runs under the thread's mode, as the model's calls do: the proxy is no way around a supervised thread. A call
     // that names no thread (a client built before the thread was sent) has no thread mode, so it gets the default: a read-only tool
-    // runs, and one that would ask is refused, since no person is there to answer it. Rejecting it would break every such client.
-    const thread = threadId ? await threadModeFor(context, user._id, threadId) : undefined;
-
-    if (thread === "denied") {
-        return Response.json({ error: "This chat is not available to you" }, { status: 403 });
-    }
-
+    // runs, and one that would ask is refused, since no person is there to answer it.
     const threadMode = thread?.mode;
 
     // The teammate's access to this connection. `none` runs nothing; `read_only` runs only what the server marks read only, checked

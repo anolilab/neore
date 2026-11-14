@@ -16486,6 +16486,9 @@
                               "autoModel": {
                                 "type": "boolean"
                               },
+                              "capOrganizationId": {
+                                "type": "string"
+                              },
                               "category": {
                                 "type": "string"
                               },
@@ -19247,6 +19250,9 @@
                     "properties": {
                       "autoModel": {
                         "type": "boolean"
+                      },
+                      "capOrganizationId": {
+                        "type": "string"
                       },
                       "category": {
                         "type": "string"

@@ -51,9 +51,11 @@ export const readRunPermissionCap = async (
             return "ask";
         }
 
-        // A thread's stored organization wins. A thread that has none (created before the stamp, or by a path that
-        // does not write one) takes the organization its run was started from, so it is never uncapped by default.
-        return await readPermissionCap(ctx, thread.organizationId ?? organizationId);
+        // A thread's stored organization wins, then the one a temporary chat was started in (kept for the cap alone, as
+        // the chat is not filed under it), so a later turn from another space cannot lift it. A thread with neither
+        // (created before the stamp, or by a path that does not write one) takes the organization its run was started
+        // from, so it is never uncapped by default.
+        return await readPermissionCap(ctx, thread.organizationId ?? thread.capOrganizationId ?? organizationId);
     } catch (error: unknown) {
         toolsLogger.warn("[TOOLS] Run thread unavailable for its permission cap; capping at ask:", error);
 

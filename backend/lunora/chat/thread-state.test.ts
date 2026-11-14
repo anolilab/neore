@@ -435,21 +435,35 @@ describe("threadModeForApp", () => {
             await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: GRANTEE });
         });
 
-        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, connectorAccess: [], mode: "supervised" });
-        expect(await readFor(STRANGER)).toStrictEqual({ allowed: false, connectorAccess: [], mode: null });
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, connectorAccess: [], mode: "supervised", organizationId: null });
+        expect(await readFor(STRANGER)).toStrictEqual({ allowed: false, connectorAccess: [], mode: null, organizationId: null });
 
         // An open chat whose owner chose full: the grantee gets the defaults, never the owner's full.
         await harness.run(async (context: any) => {
             await context.db.patch("threads", threadId, { permissionMode: "full" });
         });
 
-        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, connectorAccess: [], mode: null });
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: true, connectorAccess: [], mode: null, organizationId: null });
 
         await harness.run(async (context: any) => {
             await context.db.patch("threads", threadId, { lockedAt: 2 });
         });
 
-        expect(await readFor(OWNER)).toStrictEqual({ allowed: true, connectorAccess: [], mode: "full" });
-        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: false, connectorAccess: [], mode: null });
+        expect(await readFor(OWNER)).toStrictEqual({ allowed: true, connectorAccess: [], mode: "full", organizationId: null });
+        expect(await readFor(GRANTEE)).toStrictEqual({ allowed: false, connectorAccess: [], mode: null, organizationId: null });
+    });
+
+    it("names the organization whose cap holds the chat: the one it is filed under, else the one a temporary chat started in", async () => {
+        await harness.run(async (context: any) => {
+            await context.db.patch("threads", threadId, { capOrganizationId: "org-started" });
+        });
+
+        expect(await readFor(OWNER)).toMatchObject({ allowed: true, organizationId: "org-started" });
+
+        await harness.run(async (context: any) => {
+            await context.db.patch("threads", threadId, { organizationId: "org-filed" });
+        });
+
+        expect(await readFor(OWNER)).toMatchObject({ allowed: true, organizationId: "org-filed" });
     });
 });
