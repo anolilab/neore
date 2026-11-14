@@ -283,8 +283,8 @@ describe("paste input: review cases, ninth round", () => {
         expect(convert(`${`<span style="color:red">`.repeat(450)}${"word ".repeat(20_000)}`)).toContain("word word");
     });
 
-    it("writes no blank line for a <br> that starts a div", () => {
-        expect(convert("<div>a</div><div><br>b</div>")).toBe("a\nb");
+    it("writes the line a <br> that starts a div shows, as the page does", () => {
+        expect(convert("<div>a</div><div><br>b</div>")).toBe("a\n\nb");
     });
 
     it("keeps loose text in a numbered list out of an item the page hides", () => {
@@ -358,5 +358,12 @@ describe("paste input: review cases, fourteenth round", () => {
     it("keeps each blank line of break-only divs side by side", () => {
         expect(convert("<div>a</div><div><br></div><div><br></div><div>b</div>")).toBe("a\n\n\nb");
         expect(convert("<div>two</div><div><br></div><div>four</div>")).toBe("two\n\nfour");
+    });
+});
+
+describe("paste input: review cases, fifteenth round", () => {
+    it("drops only the last <br> of a div, which shows no line, and keeps the blank line of one before it", () => {
+        expect(convert("<div>a<br><br></div><div>b</div>")).toBe("a\n\nb");
+        expect(convert("<div>a<br></div><div>b</div>")).toBe("a\nb");
     });
 });

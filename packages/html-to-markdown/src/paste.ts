@@ -311,15 +311,14 @@ const pasteRules: Record<string, Rule> = {
     lineDiv: {
         filter: unlessRemoved((node) => node.nodeName === "DIV" && !hasBlockChild(node)),
         replacement(content) {
-            // A `<br>` at either edge makes no line of its own.
-            const text = trimBreaks(content);
-
             // Blank only for a line break: a div that holds what the page hides or drops shows nothing.
-            if (text.trim() === "") {
+            if (trimBreaks(content).trim() === "") {
                 return blankLines(content.split(LINE_BREAK_MARK).length - 1);
             }
 
-            return `\n${text}\n`;
+            // The last `<br>` of a block ends its last line and makes no line of its own; any before it, and one that
+            // starts the div, each show a line.
+            return `\n${withoutLastBreak(content)}\n`;
         },
     },
 
@@ -409,6 +408,17 @@ function blankLines(breaks: number): string {
 
 // Each div's answer, found once: its rule's filter may be asked more than once.
 const blockHolders = new WeakMap<Element, boolean>();
+
+/** The content without the newlines at its end and the one line break mark before them, if any. */
+function withoutLastBreak(content: string): string {
+    let end = content.length;
+
+    while (end > 0 && content.charAt(end - 1) === "\n") {
+        end -= 1;
+    }
+
+    return content.slice(0, end - (content.charAt(end - 1) === LINE_BREAK_MARK ? 1 : 0));
+}
 
 /** True when the element holds a block the page shows, which starts a line of its own. */
 function hasBlockChild(element: Element): boolean {
