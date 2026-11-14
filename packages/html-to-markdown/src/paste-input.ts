@@ -47,6 +47,8 @@ const WHITESPACE = new Set([" ", "\t", "\n", "\r", "\f"]);
 export interface Shown {
     imageText: (image: Element) => string;
     isHidden: (node: Node) => boolean;
+    // The TeX source a formula is written as, from an annotation the page hides; "" for a formula written as its text.
+    mathText: (math: Element) => string;
 }
 
 /** What an element's content measures: its characters once whitespace is collapsed, and its line breaks. */
@@ -181,12 +183,16 @@ function spend(work: Work, element: Element, measure: Measure): Work {
 }
 
 /**
- * What the element's rule writes besides what it holds: an image's emoji or formula text, which may be long, and a
- * link's destination and title.
+ * What the element's rule writes besides what it holds: an image's emoji or formula text, which may be long, a
+ * formula's TeX source, and a link's destination and title.
  */
 function writtenLength(element: Element, shown: Shown): number {
     if (element.nodeName === "IMG") {
         return shown.imageText(element).length;
+    }
+
+    if (element.nodeName.toUpperCase() === "MATH") {
+        return shown.mathText(element).length;
     }
 
     if (element.nodeName === "A") {
@@ -312,17 +318,18 @@ function placeRun(list: Element, run: Node[], shown: Shown): void {
     if (list.nodeName === "OL") {
         const item = previousItem(first, shown);
 
-        if (item === null) {
+        if (item === null && list.parentNode !== null) {
             for (const node of run) {
-                list.parentNode?.insertBefore(node, list);
+                list.parentNode.insertBefore(node, list);
             }
 
             return;
         }
 
         // After a block or a list the page shows, the text stays in place as a block of its own: moved into the
-        // item before, it would go ahead of what comes between.
-        if (item === AFTER_BLOCK) {
+        // item before, it would go ahead of what comes between. So does text that leads a list converted on its own,
+        // which has nothing around it to move the text to.
+        if (item === AFTER_BLOCK || item === null) {
             target = document.createElement("div");
             // eslint-disable-next-line unicorn/prefer-modern-dom-apis -- domino, the parser on servers, has no before.
             list.insertBefore(target, first);

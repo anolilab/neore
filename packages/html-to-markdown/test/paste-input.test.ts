@@ -188,6 +188,7 @@ describe("paste input: review cases, second round", () => {
 
                 return false;
             },
+            mathText: () => "",
         };
 
         wrapLooseListText(document.body, shown);
@@ -326,5 +327,21 @@ describe("paste input: review cases, twelfth round", () => {
     it("keeps a blank line for each line break of a div that holds only breaks", () => {
         expect(convert("<div>two</div><div><br><br></div><div>four</div>")).toBe("two\n\n\nfour");
         expect(convert("<div>two</div><div><br></div><div>four</div>")).toBe("two\n\nfour");
+    });
+});
+
+describe("paste input: review cases, thirteenth round", () => {
+    it("counts the TeX source a formula is written as", () => {
+        const tex = `<math><semantics><mi>x</mi><annotation encoding="application/x-tex">${"x+".repeat(25_000)}1</annotation></semantics></math>`;
+
+        expect(() => convert(`${"<b>".repeat(450)}${tex}`)).toThrow(RangeError);
+    });
+
+    it("keeps text that leads a numbered list passed in on its own off the first item's line", () => {
+        const document = createDocument("<ol>note<li>a</li></ol>");
+        const list = document.querySelector("ol") as Element;
+
+        expect(convert(list)).toBe("note\n1. a");
+        expect(list.outerHTML).toBe("<ol>note<li>a</li></ol>");
     });
 });

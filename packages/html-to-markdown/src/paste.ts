@@ -475,7 +475,7 @@ export function paste(service: TurndownService): void {
 
     // The loose list text is put in items first, so the work is measured on the items the conversion writes.
     guardMarks(service, (root) => {
-        const shown = { imageText, isHidden: isHiddenElement };
+        const shown = { imageText, isHidden: isHiddenElement, mathText: texSource };
 
         wrapLooseListText(root, shown);
         checkWork(root, shown);
