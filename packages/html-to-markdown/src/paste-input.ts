@@ -17,6 +17,12 @@ const MAX_INDENT_WORK = 20_000_000;
  * of elements around the same lines.
  */
 const MAX_WRAP_WORK = 2_000_000;
+
+/**
+ * Characters all elements may join of what they hold: a real paste nests its text some tens of elements deep, a crafted
+ * one hundreds of plain elements around long text.
+ */
+const MAX_ELEMENT_WORK = 100_000_000;
 /** Characters formatting may write in all, on one line or many: each element around a text writes all of it again. */
 const MAX_FORMAT_WORK = 20_000_000;
 // The characters each level of a quote or a list item puts before a line: `> `, or an item's indent.
@@ -31,6 +37,8 @@ const LISTS = new Set(["OL", "UL"]);
 // The parts of a table between a table and its cells, which add no depth of their own: the cell is the next level.
 const TABLE_PARTS = new Set(["TBODY", "TFOOT", "THEAD", "TR"]);
 const NON_BLANK = /[^\t\n\f\r ]/;
+// What `previousItem` gives for loose text that follows a block, not an item.
+const AFTER_BLOCK = Symbol("after a block");
 const WHITESPACE = new Set([" ", "\t", "\n", "\r", "\f"]);
 
 /** What the page shows: the elements it hides, and the text an image stands for ("" for an image that is none). */
@@ -59,6 +67,8 @@ interface Step {
 
 /** The work the conversion is given, spent as the walk measures what each element holds. */
 interface Work {
+    // What every element's rule joins of what it holds: nesting plain elements around long text costs work too.
+    all: number;
     format: number;
     indent: number;
     wrap: number;
@@ -94,7 +104,7 @@ export function checkDepth(root: Node): void {
 export function checkWork(root: Node, shown: Shown): void {
     const measures = new Map<Node, Measure>();
     const steps: Step[] = [];
-    let work: Work = { format: 0, indent: 0, wrap: 0 };
+    let work: Work = { all: 0, format: 0, indent: 0, wrap: 0 };
 
     pushElements(steps, root, { depth: 1, isCode: false, isHidden: false, level: 1 });
 
@@ -153,15 +163,15 @@ function isFormattingStyle(style: string): boolean {
 
 /** The work left after the element's rule does its work on what it holds. Throws once a budget is spent. */
 function spend(work: Work, element: Element, measure: Measure): Work {
-    let spent = work;
+    let spent: Work = { ...work, all: work.all + measure.size };
 
     if (isIndenting(element)) {
-        spent = { ...work, indent: work.indent + measure.size };
+        spent = { ...spent, indent: spent.indent + measure.size };
     } else if (FORMATTING.has(element.nodeName) || isFormattingStyle(element.getAttribute("style") ?? "")) {
-        spent = { ...work, format: work.format + measure.size, wrap: work.wrap + (measure.lines > 0 ? measure.size : 0) };
+        spent = { ...spent, format: spent.format + measure.size, wrap: spent.wrap + (measure.lines > 0 ? measure.size : 0) };
     }
 
-    if (spent.indent > MAX_INDENT_WORK || spent.wrap > MAX_WRAP_WORK || spent.format > MAX_FORMAT_WORK) {
+    if (spent.all > MAX_ELEMENT_WORK || spent.indent > MAX_INDENT_WORK || spent.wrap > MAX_WRAP_WORK || spent.format > MAX_FORMAT_WORK) {
         throw new RangeError("Too much work to convert");
     }
 
@@ -240,7 +250,7 @@ function newlines(text: string): number {
     return count;
 }
 
-/** The length of the text with each run of whitespace counted as one character. */
+/** The length of the text in string units, with each run of whitespace counted as one. */
 function collapsedLength(text: string): number {
     let length = 0;
     let isSpace = false;
@@ -248,7 +258,8 @@ function collapsedLength(text: string): number {
     for (const char of text) {
         const isWhitespace = WHITESPACE.has(char);
 
-        length += isWhitespace && isSpace ? 0 : 1;
+        // A character outside the Basic Multilingual Plane, such as an emoji, is two units of a JavaScript string.
+        length += isWhitespace && isSpace ? 0 : char.length;
         isSpace = isWhitespace;
     }
 
@@ -306,6 +317,21 @@ function placeRun(list: Element, run: Node[], shown: Shown): void {
             return;
         }
 
+        // After a block or a list the page shows, the text stays in place as a block of its own: moved into the
+        // item before, it would go ahead of what comes between.
+        if (item === AFTER_BLOCK) {
+            target = document.createElement("div");
+            // eslint-disable-next-line unicorn/prefer-modern-dom-apis -- domino, the parser on servers, has no before.
+            list.insertBefore(target, first);
+
+            for (const node of run) {
+                // eslint-disable-next-line unicorn/prefer-dom-node-append -- domino, the parser on servers, has no append.
+                target.appendChild(node);
+            }
+
+            return;
+        }
+
         target = item;
         // eslint-disable-next-line unicorn/prefer-dom-node-append -- domino, the parser on servers, has no append.
         item.appendChild(document.createElement("br"));
@@ -321,11 +347,18 @@ function placeRun(list: Element, run: Node[], shown: Shown): void {
     }
 }
 
-/** The nearest item the page shows before the node among its siblings, or null: a hidden one is dropped with all it holds. */
-function previousItem(node: Node, shown: Shown): Element | null {
+/**
+ * The item the page shows right before the node, past hidden elements and blank text; AFTER_BLOCK when another
+ * element the page shows comes first; or null when nothing does. A hidden item is dropped with all it holds.
+ */
+function previousItem(node: Node, shown: Shown): Element | typeof AFTER_BLOCK | null {
     for (let sibling = node.previousSibling; sibling; sibling = sibling.previousSibling) {
-        if (sibling.nodeName === "LI" && !shown.isHidden(sibling)) {
-            return sibling as Element;
+        if (sibling.nodeType === 1 && !shown.isHidden(sibling)) {
+            return sibling.nodeName === "LI" ? (sibling as Element) : AFTER_BLOCK;
+        }
+
+        if ((sibling.nodeType === 3 || sibling.nodeType === 4) && NON_BLANK.test(sibling.nodeValue ?? "")) {
+            return AFTER_BLOCK;
         }
     }
 

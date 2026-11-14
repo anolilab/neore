@@ -294,3 +294,18 @@ describe("paste input: review cases, ninth round", () => {
         expect(convert("<ul><li>a</li><ol>note<li>b</li></ol></ul>")).toBe("- a\n- note\n  1. b");
     });
 });
+
+describe("paste input: review cases, tenth round", () => {
+    it("counts an emoji as the two string units it is rebuilt as", () => {
+        expect(() => convert(`${"<b>".repeat(400)}${"😀".repeat(26_000)}`)).toThrow(RangeError);
+    });
+
+    it("counts plain elements nested around long text, each of which joins all it holds again", () => {
+        expect(() => convert(`<span>${"x".repeat(1000)}`.repeat(450))).toThrow(RangeError);
+        expect(convert(`${"<span>".repeat(20)}${"x ".repeat(100_000)}`)).toContain("x x");
+    });
+
+    it("keeps loose text after a block in a numbered list in its place", () => {
+        expect(convert("<ol><li>a</li><div>block</div>note</ol>")).toBe("1. a\nblock\nnote");
+    });
+});
