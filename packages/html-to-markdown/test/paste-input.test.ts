@@ -3,6 +3,7 @@ import { createDocument } from "@mixmark-io/domino";
 import { describe, expect, it } from "vitest";
 
 import TurndownService, { paste, PASTE_OPTIONS } from "../src/index";
+import { wrapLooseListText } from "../src/paste-input";
 
 /*
  * The paste preset's budgets, and the forms of raised and lowered text, inline code, line breaks and loose list text.
@@ -121,7 +122,7 @@ describe("paste input: review cases", () => {
     });
 
     it("measures the items it makes of loose list text, so lists nested through them count against the budget", () => {
-        expect(() => convert(`${"<ul><span>".repeat(160)}${"a<br>".repeat(1000)}`)).toThrow(RangeError);
+        expect(() => convert(`${"<ul>a<span>".repeat(160)}${"a<br>".repeat(1000)}`)).toThrow(RangeError);
     });
 
     it("counts the re-indenting of a list placed straight in a list", () => {
@@ -147,7 +148,45 @@ describe("paste input: review cases", () => {
 
     it("reads raised text from the text the page shows, not from its Markdown", () => {
         expect(convert(String.raw`<p>x<sup>\-2</sup></p>`)).toBe(String.raw`x\\-2`);
-        expect(convert("<p>E=mc<sup><strong>2</strong></sup></p>")).toBe("E=mc²");
+        expect(convert("<p>E=mc<sup><strong>2</strong></sup></p>")).toBe("E=mc**²**");
         expect(convert(`<p>E=mc<sup>2<span style="display:none">x</span></sup></p>`)).toBe("E=mc²");
+    });
+});
+
+describe("paste input: review cases, second round", () => {
+    it("counts inline code nested around a long text, which reads all of it again", () => {
+        expect(() => convert(`${"<code>".repeat(450)}${"x".repeat(50_000)}`)).toThrow(RangeError);
+    });
+
+    it("keeps raised text as written when it holds a line break, a link or lowered text of its own", () => {
+        expect(convert("<p>x<sup>2<br>3</sup></p>")).toBe("x2\n3");
+        expect(convert(`<p>Fact<sup><a href="https://x.y/">1</a></sup></p>`)).toBe("Fact[1](https://x.y/)");
+        expect(convert("<p>x<sup>2<sub>3</sub></sup></p>")).toBe("x2₃");
+    });
+
+    it("counts no work for text the page hides, such as a text area's", () => {
+        expect(convert(`<b>a<br><textarea>${"x".repeat(3_000_000)}</textarea>b</b>`)).toBe("**a\nb**");
+    });
+
+    it("makes an item of an emoji placed straight in a list", () => {
+        expect(convert(`<ul><li>a</li><img alt="🎉" src="x.png"><li>b</li></ul>`)).toBe("- a\n- 🎉\n- b");
+        expect(convert(`<ul><li>a</li><span><img alt="🎉" src="x.png"></span></ul>`)).toBe("- a\n- 🎉");
+    });
+
+    it("reads each list's loose text once, not again for each list around it", () => {
+        const document = createDocument(`${"<ul><span>".repeat(200)}${"x ".repeat(50)}`);
+        let asked = 0;
+        const shown = {
+            imageText: () => "",
+            isHidden: () => {
+                asked += 1;
+
+                return false;
+            },
+        };
+
+        wrapLooseListText(document.body, shown);
+
+        expect(asked).toBeLessThan(200 * 10);
     });
 });

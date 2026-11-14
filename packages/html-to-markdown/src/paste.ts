@@ -104,6 +104,8 @@ const HIDING_VISIBILITY = new Set(["collapse", "hidden"]);
 const SCRIPT_FROM = [..."0123456789+-\u{2212}=()"];
 const SUPERSCRIPTS = new Map([...SCRIPT_FROM, "n", "i"].map((char, index) => [char, [..."⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁻⁼⁽⁾ⁿⁱ"][index] as string]));
 const SUBSCRIPTS = new Map(SCRIPT_FROM.map((char, index) => [char, [..."₀₁₂₃₄₅₆₇₈₉₊₋₋₌₍₎"][index] as string]));
+// Elements in raised or lowered text that are more than its characters, so it is written as it is.
+const SCRIPT_STRUCTURE = new Set(["A", "BR", "CODE", "IMG", "KBD", "MATH", "SAMP", "SUB", "SUP", "TT"]);
 const OUTER_DISPLAY = new Set(["block", "inline", "run-in"]);
 const INNER_DISPLAY = new Set(["flex", "flow", "flow-root", "grid", "ruby", "table"]);
 
@@ -332,14 +334,59 @@ const pasteRules: Record<string, Rule> = {
 };
 
 /**
- * Raised or lowered text in the Unicode forms of the characters the page shows, when each has one; otherwise as
- * written: an ordinal (`12<sup>th</sup>`) or a footnote mark (`<sup>[1]</sup>`) reads the same on the line. The forms
- * are read from the text, not the Markdown, so an escape or a delimiter in it is no character of its own.
+ * Raised or lowered text in the Unicode forms of its characters, when the page shows only text in it and each character
+ * has a form; otherwise as written: an ordinal (`12<sup>th</sup>`), a footnote mark (`<sup>[1]</sup>`), or one that holds
+ * a line break, a link, code, an image or raised text of its own. The characters are mapped in the Markdown, so
+ * emphasis around them stays, and an escaped one is mapped without its backslash.
  */
 function scriptText(content: string, node: Element, forms: ReadonlyMap<string, string>): string {
     const chars = [...shownText(node, isHiddenElement).trim()];
 
-    return chars.length > 0 && chars.every((char) => forms.has(char)) ? chars.map((char) => forms.get(char)).join("") : content;
+    if (chars.length === 0 || chars.some((char) => !forms.has(char)) || hasScriptStructure(node)) {
+        return content;
+    }
+
+    const written: string[] = [];
+    const contentChars = [...content];
+
+    for (let index = 0; index < contentChars.length; index += 1) {
+        const char = contentChars[index] as string;
+        const next = contentChars[index + 1];
+        const isEscape = char === "\\" && next !== undefined && forms.has(next);
+        const mapped = isEscape ? next : char;
+
+        written.push(forms.get(mapped) ?? mapped);
+        index += isEscape ? 1 : 0;
+    }
+
+    return written.join("");
+}
+
+/** True when the element holds an element it shows that is more than text: a line break, a link, code, an image. */
+function hasScriptStructure(node: Element): boolean {
+    const pending: Element[] = [];
+
+    for (let child = node.firstElementChild; child; child = child.nextElementSibling) {
+        pending.push(child);
+    }
+
+    while (pending.length > 0) {
+        const element = pending.pop() as Element;
+
+        if (isHiddenElement(element)) {
+            continue;
+        }
+
+        if (SCRIPT_STRUCTURE.has(element.nodeName) || isBlock(element)) {
+            return true;
+        }
+
+        for (let child = element.firstElementChild; child; child = child.nextElementSibling) {
+            pending.push(child);
+        }
+    }
+
+    return false;
 }
 
 /** True when one of the element's children is a block, which starts a line of its own. */
@@ -410,7 +457,7 @@ export function paste(service: TurndownService): void {
 
     // The loose list text is put in items first, so the work is measured on the items the conversion writes.
     guardMarks(service, (root) => {
-        wrapLooseListText(root, isHiddenElement);
-        checkWork(root);
+        wrapLooseListText(root, { imageText, isHidden: isHiddenElement });
+        checkWork(root, isHiddenElement);
     });
 }

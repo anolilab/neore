@@ -1235,16 +1235,17 @@ export function guardMarks(service: TurndownService, prepare: (root: Node) => vo
             return convert(input);
         }
 
-        if (isNode) {
-            // A node passed in is copied below: one nested too deep is refused before the copy walks it.
-            checkDepth(input as Node);
-        }
+        // A node passed in is copied below: one nested too deep is refused before the copy walks it. Parsed input is
+        // checked before anything else walks it.
+        const root = typeof input === "string" ? parseRoot(withoutAnyMarks(input)) : input;
 
-        const root = typeof input === "string" ? parseRoot(withoutAnyMarks(input)) : copyWithoutMarks(input as Node);
+        checkDepth(root);
 
-        prepare(root);
+        const copy = root === input ? copyWithoutMarks(root) : root;
 
-        return finish(convert(root));
+        prepare(copy);
+
+        return finish(convert(copy));
     };
 
     Object.assign(service, { turndown });

@@ -22,14 +22,19 @@ const MAX_FORMAT_WORK = 20_000_000;
 // The characters each level of a quote or a list item puts before a line: `> `, or an item's indent.
 const INDENT_WIDTH = 2;
 const INDENTING = new Set(["BLOCKQUOTE", "LI"]);
-const FORMATTING = new Set(["B", "DEL", "EM", "I", "S", "STRIKE", "STRONG"]);
+// Elements whose rule writes all they hold again: formatting, and inline code, which reads its text for backticks.
+const FORMATTING = new Set(["B", "CODE", "DEL", "EM", "I", "S", "STRIKE", "STRONG"]);
 const LISTS = new Set(["OL", "UL"]);
 // The parts of a table between a table and its cells, which add no depth of their own: the cell is the next level.
 const TABLE_PARTS = new Set(["TBODY", "TFOOT", "THEAD", "TR"]);
-// Elements whose text the conversion removes before it starts.
-const NON_CONTENT = new Set(["NOSCRIPT", "SCRIPT", "STYLE", "TEMPLATE", "TITLE"]);
 const NON_BLANK = /[^\t\n\f\r ]/;
 const WHITESPACE = new Set([" ", "\t", "\n", "\r", "\f"]);
+
+/** What the page shows: the elements it hides, and the text an image stands for ("" for an image that is none). */
+export interface Shown {
+    imageText: (image: Element) => string;
+    isHidden: (node: Node) => boolean;
+}
 
 /** What an element's content measures: its characters once whitespace is collapsed, and its line breaks. */
 interface Measure {
@@ -79,7 +84,7 @@ export function checkDepth(root: Node): void {
  * more characters re-indented or re-written than the conversion is given. The content is measured once, in one walk
  * without recursion, so the check itself costs no stack.
  */
-export function checkWork(root: Node): void {
+export function checkWork(root: Node, isHidden: (node: Node) => boolean): void {
     const measures = new Map<Node, Measure>();
     const steps: Step[] = [];
     let work: Work = { format: 0, indent: 0, wrap: 0 };
@@ -97,6 +102,13 @@ export function checkWork(root: Node): void {
 
             steps.push({ ...step, isClosing: true });
             pushElements(steps, element, TABLE_PARTS.has(element.nodeName) ? step.depth : step.depth + 1, step.level + 1);
+            continue;
+        }
+
+        // What the page hides is not converted: it costs no work, and holds none for the elements around it.
+        if (isHidden(element)) {
+            dropMeasures(element, measures);
+            measures.set(element, { lines: 0, size: 0 });
             continue;
         }
 
@@ -139,10 +151,9 @@ function pushElements(steps: Step[], parent: Node, depth: number, level: number)
 
 /**
  * The element's measure, from its text and its child elements' measures, which are taken out of the map once read. Text
- * is counted as the conversion sees it: a run of whitespace is one space, and the text of a script or a style is none.
+ * is counted as the conversion sees it: a run of whitespace is one space.
  */
 function measureOf(element: Element, measures: Map<Node, Measure>): Measure {
-    const isNonContent = NON_CONTENT.has(element.nodeName);
     const measure: Measure = { lines: element.nodeName === "BR" || isBlock(element) ? 1 : 0, size: 1 };
 
     for (let child = element.firstChild; child; child = child.nextSibling) {
@@ -150,13 +161,6 @@ function measureOf(element: Element, measures: Map<Node, Measure>): Measure {
 
         if (inner) {
             measures.delete(child);
-        }
-
-        if (isNonContent) {
-            continue;
-        }
-
-        if (inner) {
             measure.lines += inner.lines;
             measure.size += inner.size;
         } else if (child.nodeType === 3 || child.nodeType === 4) {
@@ -170,6 +174,13 @@ function measureOf(element: Element, measures: Map<Node, Measure>): Measure {
     }
 
     return measure;
+}
+
+/** Takes the measures of the element's children out of the map, unread. */
+function dropMeasures(element: Element, measures: Map<Node, Measure>): void {
+    for (let child = element.firstElementChild; child; child = child.nextElementSibling) {
+        measures.delete(child);
+    }
 }
 
 /** The length of the text with each run of whitespace counted as one character. */
@@ -189,9 +200,9 @@ function collapsedLength(text: string): number {
 
 /**
  * Puts text placed straight in a list, outside any item, in an item of its own, as a page shows it on a line of its own:
- * each run of text and inline elements between the items that holds text. `isHidden` tells an element the page hides.
+ * each run of text and inline elements between the items that holds text, or an image that stands for text.
  */
-export function wrapLooseListText(root: Node, isHidden: (node: Node) => boolean): void {
+export function wrapLooseListText(root: Node, shown: Shown): void {
     const lists: Element[] = [];
     const pending: Node[] = [root];
 
@@ -210,7 +221,7 @@ export function wrapLooseListText(root: Node, isHidden: (node: Node) => boolean)
     }
 
     for (const list of lists) {
-        for (const run of looseRuns(list, isHidden)) {
+        for (const run of looseRuns(list, shown)) {
             const item = list.ownerDocument.createElement("li");
 
             list.insertBefore(item, run[0] as Node);
@@ -224,7 +235,7 @@ export function wrapLooseListText(root: Node, isHidden: (node: Node) => boolean)
 }
 
 /** The list's runs of children outside its items that hold text the page shows. */
-function looseRuns(list: Element, isHidden: (node: Node) => boolean): Node[][] {
+function looseRuns(list: Element, shown: Shown): Node[][] {
     const runs: Node[][] = [];
     let run: Node[] = [];
     let hasText = false;
@@ -239,11 +250,11 @@ function looseRuns(list: Element, isHidden: (node: Node) => boolean): Node[][] {
 
     for (let child = list.firstChild; child; child = child.nextSibling) {
         // A hidden element parts no run: the page shows the text around it on one line.
-        if (child.nodeType === 1 && !isHidden(child) && (child.nodeName === "LI" || LISTS.has(child.nodeName) || isBlock(child))) {
+        if (child.nodeType === 1 && !shown.isHidden(child) && (child.nodeName === "LI" || LISTS.has(child.nodeName) || isBlock(child))) {
             close();
         } else {
             run.push(child);
-            hasText ||= hasShownText(child, isHidden);
+            hasText ||= hasShownText(child, shown);
         }
     }
 
@@ -252,8 +263,36 @@ function looseRuns(list: Element, isHidden: (node: Node) => boolean): Node[][] {
     return runs;
 }
 
-function hasShownText(node: Node, isHidden: (node: Node) => boolean): boolean {
-    return NON_BLANK.test(shownText(node, isHidden));
+/**
+ * True when the page shows text in the node, or an image that stands for text. The walk stops at the first it finds, and
+ * does not go into a list or an item, which the list writes apart: each list's run is read once.
+ */
+function hasShownText(node: Node, shown: Shown): boolean {
+    const pending: Node[] = [node];
+
+    while (pending.length > 0) {
+        const current = pending.pop() as Node;
+
+        if (current.nodeType === 3 || current.nodeType === 4) {
+            if (NON_BLANK.test(current.nodeValue ?? "")) {
+                return true;
+            }
+        } else if (current.nodeType === 1 && !shown.isHidden(current) && !isListPart(current)) {
+            if (current.nodeName === "IMG" && shown.imageText(current as Element) !== "") {
+                return true;
+            }
+
+            for (let child = current.firstChild; child; child = child.nextSibling) {
+                pending.push(child);
+            }
+        }
+    }
+
+    return false;
+}
+
+function isListPart(node: Node): boolean {
+    return node.nodeName === "LI" || LISTS.has(node.nodeName);
 }
 
 /**
