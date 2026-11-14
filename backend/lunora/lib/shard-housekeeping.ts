@@ -241,7 +241,7 @@ export const settleRateLimitsPending = async (ctx: Pick<MutationCtx, "db">, shar
 
     let cleared = false;
 
-    await bestEffort("settleRateLimitsPending", async () => {
+    const settled = await bestEffort("settleRateLimitsPending", async () => {
         const row = await censusRow(ctx, shardKey);
 
         if (!row) {
@@ -256,6 +256,14 @@ export const settleRateLimitsPending = async (ctx: Pick<MutationCtx, "db">, shar
             await ctx.db.patch("shardActivity", row._id, { rateLimitsPending: true });
         }
     });
+
+    // A census write failed partway: the flag may now be off while a racing charge left a row. Put it back out of band,
+    // as a failed charge note does, so the dormant dispatch still finds this shard.
+    if (!settled && (await ctx.db.query("rateLimits").first()) !== null) {
+        await bestEffort("settleRateLimitsPending retry", async () => {
+            await enqueueJob(internal.lib.shard_housekeeping.markRateLimitsPending, { shardKey }, { delayMs: RATE_LIMITS_PENDING_RETRY_MS, shardKey });
+        });
+    }
 
     return cleared;
 };

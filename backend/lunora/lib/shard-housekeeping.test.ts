@@ -12,6 +12,7 @@ import {
     HOUSEKEEPING_IDLE_INTERVAL_MS,
     markRateLimitsPending,
     needsHousekeeping,
+    settleRateLimitsPending,
 } from "./shard-housekeeping";
 
 const enqueued = vi.hoisted(() => [] as { args: Record<string, unknown>; options: { delayMs?: number; shardKey?: string }; path: string }[]);
@@ -302,5 +303,64 @@ describe("the dormant-shard rate-limit sweep", () => {
         });
 
         expect(await pendingOf("dormant")).toBe(true);
+    });
+
+    it("retries putting the flag back when a charge raced the sweep and that write failed", async () => {
+        await census([{ lastActiveAt: DORMANT, rateLimitsPending: true, shardKey: "dormant" }]);
+
+        await runInShard("dormant", async () => {
+            await harness.run(async (ctx: any) => {
+                let reads = 0;
+                let patches = 0;
+                // Empty on the sweep's first two reads; a racing charge's row shows up on the re-check. The write that clears
+                // the flag lands; the one that puts it back fails.
+                const database = new Proxy(ctx.db, {
+                    get: (target, property) => {
+                        if (property === "query") {
+                            return (table: string) => {
+                                if (table !== "rateLimits") {
+                                    return target.query(table);
+                                }
+
+                                return {
+                                    first: async () => {
+                                        reads += 1;
+
+                                        return reads <= 1 ? null : { key: "raced" };
+                                    },
+                                };
+                            };
+                        }
+
+                        if (property === "patch") {
+                            return async (...args: unknown[]) => {
+                                patches += 1;
+
+                                if (patches > 1) {
+                                    throw new Error("D1 unavailable");
+                                }
+
+                                return await target.patch(...args);
+                            };
+                        }
+
+                        const value: unknown = Reflect.get(target, property, target);
+
+                        return typeof value === "function" ? value.bind(target) : value;
+                    },
+                });
+
+                expect(await settleRateLimitsPending({ db: database }, "dormant")).toBe(false);
+            });
+        });
+
+        expect(await pendingOf("dormant")).toBe(false);
+        expect(enqueued).toStrictEqual([
+            {
+                args: { shardKey: "dormant" },
+                options: { delayMs: expect.any(Number), shardKey: "dormant" },
+                path: "lib_shard_housekeeping:markRateLimitsPending",
+            },
+        ]);
     });
 });
