@@ -48,8 +48,8 @@ import { assertSafeMcpUrl, headersToRecord } from "./lib/mcp-tools";
 import type { ToolPermissionGrants } from "./lib/tool-permission-grants";
 import { activeGrants, grantExpiry, isGrantableKey, MAX_TOOL_GRANTS } from "./lib/tool-permission-grants";
 import type { ToolApprovalDecision } from "./lib/tool-approval-claim";
-import { claimToolApproval, findPendingApprovalOnLatestTurn } from "./lib/tool-approval-claim";
-import { purgeExpiredToolApprovalRunsForUser } from "./lib/tool-approval-cleanup";
+import { claimToolApproval, findPendingApprovalOnLatestTurn, SUB_AGENT_RUN_ENDED_BY } from "./lib/tool-approval-claim";
+import { denyToolApprovalRun, purgeExpiredToolApprovalRunsForUser } from "./lib/tool-approval-cleanup";
 import { listBuiltInTools } from "./lib/tool-builder";
 import type { ToolPermissionMode } from "./lib/tool-permissions";
 import { defaultToolPermission, toolPermissionKey } from "./lib/tool-permissions";
@@ -719,9 +719,9 @@ export const pruneExpiredToolPermissionGrants = internalMutation
  * same snapshot) before its stream closes.
  *
  * A sub-agent's pause (`config.subAgentRunId`) moves its run to `awaiting` here, after the rows and before the thread mark,
- * the reminder and the notification (`markRunAwaiting`, which also applies the one-waiting-child-per-source rule). A run
- * refused there ends with its requests denied and nothing sent, and a notified request can be answered at once: its run
- * already waits. Returns whether the pause stands (false only for a sub-agent's run that does not wait).
+ * the reminder and the notification (`markRunAwaiting`, which also applies the one-waiting-child-per-source rule). A pause
+ * refused there has the requests it recorded denied and sends nothing, and a notified request can be answered at once: its
+ * run already waits. Returns whether the pause stands (false only for a sub-agent's run that does not wait).
  */
 export const recordPendingToolApprovals = internalMutation
     .input({
@@ -761,9 +761,10 @@ export const recordPendingToolApprovals = internalMutation
             const secretIds = new Set(secretApprovalIds);
             // Every row of this pause carries the same id, so the reminder can tell this pause from another in the same millisecond.
             const [pauseId] = uniqueIds;
+            const recordedIds: Id<"toolApprovalRuns">[] = [];
 
             for (const approvalId of uniqueIds) {
-                await ctx.db.insert("toolApprovalRuns", {
+                const recordedId = await ctx.db.insert("toolApprovalRuns", {
                     approvalId,
                     config,
                     createdAt,
@@ -773,11 +774,23 @@ export const recordPendingToolApprovals = internalMutation
                     threadId,
                     userId: ownerId,
                 });
+
+                recordedIds.push(recordedId);
             }
 
             // A sub-agent's run waits before anyone is told: one refused (another child of its task waits, or it ended meanwhile)
             // has its requests closed and sends nothing, and an answer to the notification finds the run already waiting.
             if (config.subAgentRunId !== undefined && !(await markRunAwaiting(ctx, config.subAgentRunId, subAgentResumedWith))) {
+                // An end there closed them; a refusal that ended nothing (a run already settled, a newer resume, a worker, a
+                // run gone) did not. Nothing can answer them either way, so they close now instead of waiting out their expiry.
+                for (const recordedId of recordedIds) {
+                    const row = await ctx.db.get("toolApprovalRuns", recordedId);
+
+                    if (row?.status === "pending") {
+                        await denyToolApprovalRun(ctx, recordedId, { now: createdAt, resolvedBy: SUB_AGENT_RUN_ENDED_BY });
+                    }
+                }
+
                 return false;
             }
 

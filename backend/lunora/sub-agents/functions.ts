@@ -1590,7 +1590,13 @@ const liveContinuationOf = async (ctx: Pick<QueryCtx, "db">, run: Pick<RunDoc, "
  * A cancelled run (the owner stopped it) is not notified: the person who
  * ended it is the one who would read the notification.
  */
-export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, outcome: SubAgentOutcome): Promise<boolean> => {
+export const finishRun = async (
+    ctx: MutationCtx,
+    runId: Id<"subAgentRuns">,
+    outcome: SubAgentOutcome,
+    /** Ended from inside its own live continuation (a pause it was refused): that stream closes itself, it is not stopped. */
+    options: { fromOwnContinuation?: boolean } = {},
+): Promise<boolean> => {
     const run = await ctx.db.get("subAgentRuns", runId);
 
     if (!run || !isActiveSubAgentStatus(run.status)) {
@@ -1633,9 +1639,19 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
 
     // A resumed run (one that waited has a `reapAt`) ended from outside (a Stop, the reaper) streams its continuation on the
     // child thread, which `shouldRunStop` halts only at its next step: its stream is stopped now, so a tool in it gets the
-    // abort. Only that stream: a reply the owner started in the child meanwhile keeps going. A continuation that ends
-    // itself closes its stream before it settles (`continueAfterToolApproval`, every path), so nothing is found then.
-    if (wasRunning && !hostRun && run.mode !== "worker" && run.reapAt !== undefined && outcome.kind !== "succeeded" && run.childThreadId !== undefined) {
+    // abort. Only that stream: a reply the owner started in the child meanwhile keeps going. A continuation that ends the run
+    // after its stream closed (`continueAfterToolApproval`'s settle) finds nothing; one whose pause again is refused ends it
+    // while recording that pause (`recordPendingToolApprovals` → `markRunAwaiting`), before its stream's final chunk, and
+    // that stream is its own, which ends quietly instead of as stopped (`fromOwnContinuation`).
+    if (
+        !options.fromOwnContinuation &&
+        wasRunning &&
+        !hostRun &&
+        run.mode !== "worker" &&
+        run.reapAt !== undefined &&
+        outcome.kind !== "succeeded" &&
+        run.childThreadId !== undefined
+    ) {
         const continuation = await liveContinuationOf(ctx, run);
 
         if (continuation !== undefined) {
@@ -1877,7 +1893,9 @@ export const afterOwnerMessage = internalMutation
  * `running` → `awaiting`: the child stopped on an approval request recorded on its thread. The run keeps its fan-out
  * slot and posts nothing; its deadline becomes the request's own expiry. A no-op for a run that is not running (stopped
  * meanwhile), a worker's run, or one whose requests were already answered from the child's thread (that answer's
- * continuation ends the run). Returns whether it now waits.
+ * continuation ends the run). Returns whether it now waits. Called only from the run's own pause (its loop, its
+ * continuation, or their retried write), so an end it causes never stops the run's live stream. A caller that just
+ * recorded requests closes those left open when it returns false (`recordPendingToolApprovals`).
  */
 export const markRunAwaiting = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, resumedWith?: number): Promise<boolean> => {
     const run = await ctx.db.get("subAgentRuns", runId);
@@ -1918,8 +1936,8 @@ export const markRunAwaiting = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
     }
 
     if (pending.length === 0) {
-        // Its end closes the run's own requests (`finishRun`).
-        await finishRun(ctx, run._id, { kind: "cancelled" });
+        // Its end closes the run's own requests (`finishRun`). Called from the run's own pause, so its stream is not stopped.
+        await finishRun(ctx, run._id, { kind: "cancelled" }, { fromOwnContinuation: true });
 
         return false;
     }
@@ -1932,7 +1950,7 @@ export const markRunAwaiting = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
     const chainProblem = run.resumedBy === undefined ? chainPauseProblem(run.chainSource, await chainHasWaitingRun(ctx, run.chainSource)) : undefined;
 
     if (chainProblem) {
-        await finishRun(ctx, run._id, { error: chainProblem, kind: "failed" });
+        await finishRun(ctx, run._id, { error: chainProblem, kind: "failed" }, { fromOwnContinuation: true });
 
         return false;
     }

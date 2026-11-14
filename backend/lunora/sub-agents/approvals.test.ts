@@ -13,6 +13,7 @@ import { stopActiveForThread } from "../chat/streaming/persistent/library";
 import { _deletePageForThreadId } from "../agent/threads";
 import { clearAwaitingInput } from "../agent/table-writes";
 import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
+import { SUB_AGENT_RUN_ENDED_BY } from "../chat/lib/tool-approval-claim";
 import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
@@ -1095,6 +1096,61 @@ describe("a resumed run ended from outside", () => {
         await run(async (context) => await reapSubAgentRun(context, runId, reapAt));
         expect(await runStatus()).toBe("failed");
         expect(stopJobs().map((job) => job.args)).toStrictEqual([{ messageId: APPROVAL_ID, onlyNamed: true, threadId: childId }]);
+    });
+
+    describe("when its continuation pauses again and that pause is refused", () => {
+        const LATER = "approval-later";
+        /** The continuation records a request off the child's latest turn, bound to `resumedWith`. */
+        const recordLater = async (resumedWith: number): Promise<unknown> =>
+            await internalCall(recordPendingToolApprovals, {
+                approvalIds: [LATER],
+                awaitingInput: "approval",
+                config: { ...CONFIG(), subAgentRunId: runId },
+                subAgentResumedWith: resumedWith,
+                threadId: childId,
+                userId: OWNER,
+            });
+        const laterRow = async (): Promise<any> =>
+            await run(
+                async (context) =>
+                    await context.db
+                        .query("toolApprovalRuns")
+                        .withIndex("by_approvalId", (q: any) => q.eq("approvalId", LATER))
+                        .first(),
+            );
+        const asked = async (): Promise<any[]> => {
+            const rows = await run(async (context) => await context.db.query("notifications").collect());
+
+            return rows.filter((row: any) => row.dedupeKey === `tool_approval:${LATER}`);
+        };
+
+        it("ends the run without stopping the continuation's own stream, which closes itself", async () => {
+            const { reapAt } = await runRow();
+
+            // Nothing of the run is left on the child's latest turn: the first pause's other request was answered too.
+            await run(async (context) => {
+                const sibling = await context.db
+                    .query("toolApprovalRuns")
+                    .withIndex("by_approvalId", (q: any) => q.eq("approvalId", SIBLING_ID))
+                    .first();
+
+                await context.db.patch("toolApprovalRuns", sibling._id, { status: "denied" });
+            });
+
+            expect(await recordLater(reapAt)).toBe(false);
+            expect(await runStatus()).toBe("cancelled");
+            expect(stopJobs()).toStrictEqual([]);
+        });
+
+        it("closes the request it recorded and tells nobody, though the refusal ended nothing", async () => {
+            const { reapAt } = await runRow();
+
+            // Bound to an older resume: a newer answer is running the run, which goes on.
+            expect(await recordLater(reapAt - 1)).toBe(false);
+            expect(await runStatus()).toBe("running");
+            expect(await laterRow()).toMatchObject({ resolvedBy: SUB_AGENT_RUN_ENDED_BY, status: "denied" });
+            expect(await asked()).toStrictEqual([]);
+        });
     });
 
     it("stops nothing once the continuation is no longer live, not the owner's reply beside it", async () => {

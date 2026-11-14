@@ -975,9 +975,11 @@ export type SubAgentEnd = { error: string; kind: "failed" } | { kind: "paused" }
 const SETTLE_RETRY_DELAY_MS = 30_000;
 
 /**
- * A sub-agent child's continuation hands its end back to the run the snapshot names: paused again, the run waits on
- * the new request; ended, the run ends once, and its answer reaches the parent. Both writes are idempotent, so a failed
- * one is scheduled again: dropped, the run's reaper would fail a child that finished, or close a request that was just made. Returns whether a paused run now waits (a scheduled retry counts as waiting).
+ * A sub-agent child's continuation hands its end back to the run the snapshot names: ended, the run ends once, and its
+ * answer reaches the parent. A pause again is settled where its requests are recorded (`recordPendingToolApprovals`,
+ * before anyone is told), so the paused branch here is only a fallback for a pause that reported no wait. Both writes
+ * are idempotent, so a failed one is scheduled again: dropped, the run's reaper would fail a child that finished, or close
+ * a request that was just made. Returns whether a paused run now waits (a scheduled retry counts as waiting).
  */
 export const settleSubAgentRun = async (
     ctx: Pick<ActionCtx, "runMutation" | "scheduler">,
@@ -1031,8 +1033,9 @@ export const settleSubAgentRun = async (
  * Resume a run that paused on a tool-approval request, once
  * `respondToToolApproval` has claimed the snapshot and opened `streamId`.
  *
- * A sub-agent child's pause (`config.subAgentRunId`) puts its run back to `running` first and hands the run its end
- * ({@link settleSubAgentRun}), so the answer is posted to the parent once.
+ * A sub-agent child's pause (`config.subAgentRunId`) puts its run back to `running` first. A pause again waits where its
+ * requests are recorded, bound to this resume (`subAgentResumedWith`); any other end is handed to the run
+ * ({@link settleSubAgentRun}, also the fallback for a pause that reported no wait), so the answer is posted to the parent once.
  */
 export const continueAfterToolApproval = internalAction
     .input({

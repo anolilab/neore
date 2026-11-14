@@ -240,7 +240,7 @@ describe("a sub-agent child's continuation", () => {
         pausedAgainAt?: number;
         /** The owner was asked a question in the child thread while the continuation ran. */
         questionMeanwhile?: boolean;
-        resumed?: { awaitingInput?: "approval"; paused: boolean; stopped: boolean };
+        resumed?: { awaitingInput?: "approval"; paused: boolean; stopped: boolean; subAgentWaits?: boolean };
         status?: "cancelled";
         /** Records the run's status at the moment the continuation closes its stream (`failRun`). */
         watchClose?: boolean;
@@ -383,7 +383,19 @@ describe("a sub-agent child's continuation", () => {
         const pausedAgain = { pausedAgainAt: Date.now() + 60 * 60_000, resumed: { paused: true, stopped: false } };
 
         expect(await resumeChild(pausedAgain)).toMatchObject({ status: "awaiting" });
+        // The pause is recorded bound to that resume (`recordPendingToolApprovals` settles it there).
+        expect(vi.mocked(resumeApprovedRun).mock.calls.at(-1)?.[2]).toMatchObject({ subAgentResumedWith: pausedAgain.pausedAgainAt });
         expect(await resumeChild({ ...pausedAgain, newerResume: true })).toMatchObject({ status: "running" });
+    });
+
+    it("takes a pause again as settled where it was recorded, and does not wait when that refused it", async () => {
+        // The run could still wait here: only the recorded answer keeps the continuation from settling it a second time.
+        expect(
+            await resumeChild({
+                pausedAgainAt: Date.now() + 60 * 60_000,
+                resumed: { awaitingInput: "approval", paused: true, stopped: false, subAgentWaits: false },
+            }),
+        ).toMatchObject({ childAwaitingInput: undefined, status: "running" });
     });
 
     it("leaves a run that waits again waiting, with its request open, when a later step of the continuation fails", async () => {

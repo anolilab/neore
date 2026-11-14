@@ -62,7 +62,7 @@
   another waits does not wait: `markRunAwaiting` ends it failed in the same transaction (`chainPauseProblem`), denying its
   request. A child the owner already answered (`resumedBy`) is not checked again, so it and one newer sibling can wait at
   once. `recordPendingToolApprovals` runs `markRunAwaiting` after the rows and BEFORE the thread mark, the reminder and the
-  notification: a refused run sends nothing, and a notified request is answerable at once. The pause's snapshot and a worker's runs carry the source on. The pause's notification names the source; a
+  notification: a refused pause denies what it recorded and sends nothing, and a notified request is answerable at once. The pause's snapshot and a worker's runs carry the source on. The pause's notification names the source; a
   task round does not wait on it ([reference](../../../docs/agents/sub-agents.md)). The run waits and is answered as above; its first pause is bound
   to "never resumed" (`resumedWith: 0`), so a late write never re-opens an answered run. A nested result waits
   while its parent's one-shot run goes (running or awaiting), so it never lands after a request; that run's end, waited
