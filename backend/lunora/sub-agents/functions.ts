@@ -1380,12 +1380,15 @@ const waitsOnOpenRequest = async (ctx: Pick<QueryCtx, "db">, thread: Doc<"thread
 /** Nested runs of one thread read per status when its run ends; the held posts' own checks cover any beyond them. */
 const HELD_RESULTS_RELEASED = 20;
 
+/** How long past due a post check is still trusted to run: scheduler lag, far short of a dead-letter's retries. */
+const POST_CHECK_GRACE_MS = 60_000;
+
 /**
  * Schedules `run`'s next post check under a fresh token, recorded with its due time as the run's `postCheckId` and
  * `postCheckAt` in the same mutation. A check acts only while its token is current (`postResult`), and nothing is
  * cancelled: if this mutation rolls back, neither the new token nor its check exists, and the old check is still current.
- * With `coalesce` (a release), a check that would be due no sooner than the current one schedules nothing, so repeated
- * releases queue no extra jobs; only one that moves the check forward supersedes it.
+ * With `coalesce` (a release), a check that would be due no sooner than the current one, which is still ahead, schedules
+ * nothing, so repeated releases queue no extra jobs; one that moves the check forward, or finds it overdue, supersedes it.
  */
 const schedulePostCheck = async (
     ctx: MutationCtx,
@@ -1396,7 +1399,16 @@ const schedulePostCheck = async (
 ): Promise<void> => {
     const due = ctx.now + delayMs;
 
-    if (coalesce && run.postCheckId !== undefined && run.postCheckAt !== undefined && run.postCheckAt <= due) {
+    // Only a check not yet overdue is trusted: one more than `POST_CHECK_GRACE_MS` past due may have been deferred, or
+    // dead-lettered once its retries ran out, so a release then schedules a fresh check whose token supersedes it. The
+    // grace keeps a check due now (a release's own) trusted while the scheduler gets to it.
+    if (
+        coalesce &&
+        run.postCheckId !== undefined &&
+        run.postCheckAt !== undefined &&
+        run.postCheckAt + POST_CHECK_GRACE_MS > ctx.now &&
+        run.postCheckAt <= due
+    ) {
         return;
     }
 

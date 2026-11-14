@@ -1080,6 +1080,22 @@ describe("a result for a parent that waits on its own request", () => {
         expect(await parentReplies()).toHaveLength(0);
     });
 
+    it("schedules a fresh check on a release once the current one is overdue, which may never have run", async () => {
+        // A check now due (deferred, or dead-lettered once its retries ran out): it may never act, so it is not trusted.
+        await run(async (context) => await context.db.patch("subAgentRuns", runId, { postCheckAt: Date.now() - 10 * 60_000 }));
+
+        const row = await runRow();
+        const before = heldPosts().length;
+
+        await internalCall(afterOwnerMessage, { threadId: parentId });
+
+        const after = await runRow();
+
+        expect(heldPosts()).toHaveLength(before + 1);
+        expect(after.postCheckId).not.toBe(row.postCheckId);
+        expect(await currentChecks()).toStrictEqual([{ attempt: 0, runId }]);
+    });
+
     it("keeps its queued check through a release that rolls back, and that same job still posts", async () => {
         const row = await runRow();
         const [held] = heldPosts();
