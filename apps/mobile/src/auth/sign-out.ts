@@ -1,4 +1,3 @@
-import type { StoredGrant } from "./grant";
 import { StoredGrantNotClearedError } from "./stored-grant-error";
 
 /** How long sign-out waits for the server to drop this phone's push token before it carries on without it. */
@@ -56,8 +55,8 @@ const revokeStored = async (token: string | undefined, revokeSession: (token: st
     }
 };
 
-/** Whether `markedToken` is the token a sign-out recorded for `grant`: a grant left readable by a failed clear is refused. */
-export const wasSignedOut = (grant: StoredGrant, markedToken: string | null): boolean => markedToken === grant.token;
+/** Whether the digest a sign-out recorded is the digest of the grant: a grant left readable by a failed clear is refused. */
+export const wasSignedOut = (markedDigest: string | null, grantDigest: string): boolean => markedDigest === grantDigest;
 
 /**
  * Signing out takes the person's saved chats off the device FIRST, locally, before the server is asked anything: a

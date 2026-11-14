@@ -12,12 +12,10 @@ import {
 import { StoredGrantNotClearedError } from "./stored-grant-error";
 
 describe("wasSignedOut", () => {
-    it("refuses only the grant whose token a sign-out recorded", () => {
-        const grant = { token: "session-1", user: { email: "a@b.c", id: "u1", image: null, name: "A" } };
-
-        expect(wasSignedOut(grant, "session-1")).toBe(true);
-        expect(wasSignedOut(grant, "session-2")).toBe(false);
-        expect(wasSignedOut(grant, null)).toBe(false);
+    it("refuses only the grant whose digest a sign-out recorded", () => {
+        expect(wasSignedOut("digest-1", "digest-1")).toBe(true);
+        expect(wasSignedOut("digest-1", "digest-2")).toBe(false);
+        expect(wasSignedOut(null, "digest-1")).toBe(false);
     });
 });
 

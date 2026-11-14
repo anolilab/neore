@@ -1,15 +1,19 @@
+import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
 import { getItemAsync, setItemAsync } from "expo-secure-store";
 
 import type { StoredGrant } from "./grant";
 import { secureGrantStore } from "./secure-store";
 import { wasSignedOut } from "./sign-out";
 
-/** The token of the grant the last sign-out on this phone ended, kept where the headless push task can read it. */
+/** The digest of the token of the grant the last sign-out ended. The token itself is never kept: it is a credential. */
 const SIGNED_OUT_KEY = "neore.mobile.signed-out-grant";
+
+/** A one-way digest of a session token, so the record can be compared without holding the token. */
+const digestOf = async (token: string): Promise<string> => await digestStringAsync(CryptoDigestAlgorithm.SHA256, token);
 
 /** Records that the grant with `token` was signed out, so the push task refuses it even if its clear failed. */
 export const markGrantSignedOut = async (token: string): Promise<void> => {
-    await setItemAsync(SIGNED_OUT_KEY, token);
+    await setItemAsync(SIGNED_OUT_KEY, await digestOf(token));
 };
 
 /**
@@ -24,7 +28,7 @@ export const readSignedInGrant = async (): Promise<StoredGrant | undefined> => {
     }
 
     try {
-        return wasSignedOut(grant, await getItemAsync(SIGNED_OUT_KEY)) ? undefined : grant;
+        return wasSignedOut(await getItemAsync(SIGNED_OUT_KEY), await digestOf(grant.token)) ? undefined : grant;
     } catch {
         return undefined;
     }
