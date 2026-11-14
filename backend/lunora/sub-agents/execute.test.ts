@@ -191,11 +191,11 @@ describe("whether a child may pause for its owner", () => {
         expect(await oneShot({ depth: 2 })).toMatchObject({ withheldTools: ["delegateToSubAgent", "messageWorker"] });
     });
 
-    it("never pauses a child an unattended chain started, nor a worker", async () => {
-        for (const dispatchedBy of ["trigger", "messenger", "outside_agent"]) {
-            expect(await oneShot({ dispatchedBy })).not.toHaveProperty("pauseForApproval");
-        }
+    it.each(["trigger", "messenger", "outside_agent"])("pauses a one-shot child of a chain started by %s, which keeps its origin", async (dispatchedBy) => {
+        expect(await oneShot({ dispatchedBy })).toMatchObject({ origin: dispatchedBy, pauseForApproval: { subAgentRunId: expect.any(String) } });
+    });
 
+    it("never pauses a worker", async () => {
         const worker = await dispatch({ toolCallId: "call-w" });
 
         await execute(worker._id);

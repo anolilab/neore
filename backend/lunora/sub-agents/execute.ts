@@ -139,12 +139,12 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             },
             // A nested dispatch carries what reached this run, so an unattended chain is not read as the lead's own.
             origin: originOfRun(claim.dispatchedBy),
-            // A one-shot child of the owner's own turn keeps the tools its owner set to `ask` and pauses on them; the owner
-            // answers on the child's thread. A worker's are removed, as before, and so are those of a chain a trigger, a
-            // task, a messenger reply or an outside agent started: nobody of that chain is there to answer, as for its
-            // parent run. The depth cap limits delegation only: a child there keeps its other `ask` tools, but the dispatch
-            // tools are withheld rather than left to ask for a nesting that would be refused.
-            ...(claim.mode !== "worker" && originOfRun(claim.dispatchedBy) === "lead" && { pauseForApproval: { subAgentRunId: runId } }),
+            // Every one-shot child keeps the tools its owner set to `ask` and pauses on them, whatever started its chain (the
+            // owner's turn, a task, a trigger, a messenger reply, an outside agent): the pause notifies the owner
+            // (`recordPendingToolApprovals`), who answers on the child's thread. A worker's are removed, as before. The depth
+            // cap limits delegation only: a child there keeps its other `ask` tools, but the dispatch tools are withheld
+            // rather than left to ask for a nesting that would be refused.
+            ...(claim.mode !== "worker" && { pauseForApproval: { subAgentRunId: runId } }),
             ...(!canNest(claim.depth) && { withheldTools: [SUB_AGENT_TOOL_NAME, MESSAGE_WORKER_TOOL_NAME] }),
             personalization: "full",
             // A message the user typed into the worker's thread is the prompt as written.

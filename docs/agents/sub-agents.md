@@ -3,6 +3,24 @@
 The rules are summarized in `backend/lunora/sub-agents/AGENTS.md`, which agents load automatically; this file holds the
 detail. Paths are relative to `backend/lunora/`.
 
+## WHO A CHILD WAITS FOR
+
+- **Every one-shot child pauses for approval**, whatever started its chain (`sub-agents/execute.ts`, `pauseForApproval`
+  for every non-worker run). The unattended parent (a task round, a trigger run, a messenger reply) still drops its own
+  `ask` tools: only the child it delegated to can wait, because the parent's delegate call returned at admission.
+  - **The owner is told** by the pause itself: `recordPendingToolApprovals` writes a `tool_approval` (or `ask_user`,
+    `secret_request`) notification to the child thread's owner, linking to the child's thread, plus the phone push and the
+    four-hour reminder. No sub-agent-specific notice; the dedupe key is the approval id.
+  - **Where it shows**: the child's thread (answer there), the parent conversation's `listSubAgentApprovals` card (the task
+    run's or trigger run's thread), and the bell. The snapshot keeps `dispatchOrigin`, so an answered child still
+    dispatches as the trigger, not as the lead.
+  - **Tasks and triggers are not held.** The round ends on its own answer (`completeRound`), the recurrence sweep reads
+    only the task's own status, so the next slot runs as usual; the child's result posts back to the round's thread when it
+    ends (`postRunResult`). A waiting child keeps one of its parent thread's 3 fan-out slots, so a `continue_thread` task
+    with 3 children waiting gets its next delegation refused until one is answered or expires.
+  - **Timeout**: the request's own expiry (`PENDING_APPROVAL_TTL_MS`, 7 days) reaps the run with
+    `SUB_AGENT_APPROVAL_EXPIRED_MESSAGE`, posted back to the parent.
+
 ## LIFECYCLE
 
 - **A new message in a child ends its wait.** The send (`chat/http.ts`, `afterSave`) calls `afterOwnerMessage` after the
