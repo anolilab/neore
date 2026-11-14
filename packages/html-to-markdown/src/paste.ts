@@ -8,22 +8,26 @@
 import { gfm } from "./gfm";
 import { declaredStyle } from "./inline-style";
 import { codeRules } from "./paste-code";
-import { isWordMarker, listRules, unlessRemoved } from "./paste-lists";
+import { checkWork, wrapLooseListText } from "./paste-input";
+import { isWordMarker, LINE_BREAK_MARK, listRules, prefixLines, unlessRemoved } from "./paste-lists";
 import { guardMarks, isSetToNormal, styleRules } from "./paste-styles";
 import type TurndownService from "./turndown";
 import type { Options, Rule } from "./types";
+import { isBlock, trimNewlines } from "./utilities";
 
 /**
  * The options the preset is written for. A line break is a plain newline, with no trailing spaces a composer would
- * hide; lists use `- `; code is fenced; links whose destination is not safe are written as their text.
+ * hide (the preset takes out the mark it writes before it); lists use `- `; code is fenced, and inline code keeps the
+ * spaces it holds; links whose destination is not safe are written as their text.
  */
 export const PASTE_OPTIONS: Partial<Options> = {
-    br: "",
+    br: LINE_BREAK_MARK,
     bulletListMarker: "-",
     codeBlockStyle: "fenced",
     emDelimiter: "*",
     headingStyle: "atx",
     hr: "---",
+    preformattedCode: true,
     safeLinks: true,
 };
 
@@ -96,6 +100,12 @@ const VISIBILITY_VALUES = new Set(["collapse", "hidden", "visible", ...GLOBAL_VA
 const CONTENT_VISIBILITY_VALUES = new Set(["auto", "hidden", "visible", ...GLOBAL_VALUES]);
 // `collapse` hides an element as `hidden` does, except in a table, where it also takes the row's or column's space.
 const HIDING_VISIBILITY = new Set(["collapse", "hidden"]);
+// The characters Unicode has raised and lowered forms of, so `E=mc<sup>2</sup>` stays `E=mc²` in plain Markdown.
+const SCRIPT_FROM = [..."0123456789+-\u{2212}=()"];
+const SUPERSCRIPTS = new Map([...SCRIPT_FROM, "n", "i"].map((char, index) => [char, [..."⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁻⁼⁽⁾ⁿⁱ"][index] as string]));
+const SUBSCRIPTS = new Map(SCRIPT_FROM.map((char, index) => [char, [..."₀₁₂₃₄₅₆₇₈₉₊₋₋₌₍₎"][index] as string]));
+// A Markdown escape: a backslash before ASCII punctuation.
+const ESCAPED = /\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g;
 const OUTER_DISPLAY = new Set(["block", "inline", "run-in"]);
 const INNER_DISPLAY = new Set(["flex", "flow", "flow-root", "grid", "ruby", "table"]);
 
@@ -258,6 +268,14 @@ function inlineMath(source: string): string {
 }
 
 const pasteRules: Record<string, Rule> = {
+    // A quote with no trailing space on its blank lines, which a composer would hide.
+    blockquote: {
+        filter: unlessRemoved((node) => node.nodeName === "BLOCKQUOTE"),
+        replacement(content) {
+            return `\n\n${prefixLines(trimNewlines(content), "> ", ">")}\n\n`;
+        },
+    },
+
     // A closed details shows its summary alone. Its other elements are hidden; its loose text is left out here.
     closedDetails: {
         filter: unlessRemoved(isClosedDetails),
@@ -284,6 +302,17 @@ const pasteRules: Record<string, Rule> = {
         replacement: (_content, node) => imageText(node),
     },
 
+    // A div that holds only inline content is a line, as mail and editors write one per line: a run of them is not
+    // parted by blank lines. A `<br>` that ends it makes no line of its own, so a div that holds only one is a blank line.
+    lineDiv: {
+        filter: unlessRemoved((node) => node.nodeName === "DIV" && !hasBlockChild(node)),
+        replacement(content) {
+            const text = content.endsWith(`${LINE_BREAK_MARK}\n`) ? content.slice(0, -LINE_BREAK_MARK.length - 1) : content;
+
+            return text.trim() === "" ? "\n\n" : `\n${text}\n`;
+        },
+    },
+
     // A formula with a TeX source is written as inline math. Without one, its visible text stays (its other annotations
     // are skipped).
     math: {
@@ -296,7 +325,34 @@ const pasteRules: Record<string, Rule> = {
         filter: unlessRemoved((node) => (node.nodeName === "B" || node.nodeName === "STRONG") && isSetToNormal(node)),
         replacement: (content) => content,
     },
+
+    // Raised and lowered text: no Markdown writes it, so it keeps its meaning in Unicode where Unicode can.
+    script: {
+        filter: unlessRemoved((node) => node.nodeName === "SUP" || node.nodeName === "SUB"),
+        replacement: (content, node) => scriptText(content, node.nodeName === "SUP" ? SUPERSCRIPTS : SUBSCRIPTS),
+    },
 };
+
+/**
+ * Raised or lowered text in the Unicode forms of its characters, when each has one; otherwise as written: an ordinal
+ * (`12<sup>th</sup>`) or a footnote mark (`<sup>[1]</sup>`) reads the same on the line.
+ */
+function scriptText(content: string, forms: ReadonlyMap<string, string>): string {
+    const chars = [...content.replaceAll(ESCAPED, "$1")];
+
+    return chars.length > 0 && chars.every((char) => forms.has(char)) ? chars.map((char) => forms.get(char)).join("") : content;
+}
+
+/** True when one of the element's children is a block, which starts a line of its own. */
+function hasBlockChild(element: Element): boolean {
+    for (let child = element.firstElementChild; child; child = child.nextElementSibling) {
+        if (child.nodeName !== "BR" && isBlock(child)) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 /** A media type without its parameters, in lower case: `application/x-tex; charset=utf-8` is `application/x-tex`. */
 function mediaType(value: string): string {
@@ -353,5 +409,8 @@ export function paste(service: TurndownService): void {
         service.addRule(key, rule);
     }
 
-    guardMarks(service);
+    guardMarks(service, (root) => {
+        checkWork(root);
+        wrapLooseListText(root, isHiddenElement);
+    });
 }

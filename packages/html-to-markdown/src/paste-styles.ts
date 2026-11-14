@@ -8,6 +8,8 @@
  */
 import { escapeTildes } from "./gfm";
 import { declaredStyle } from "./inline-style";
+import { LINE_BREAK_MARK } from "./paste-lists";
+import { parseRoot } from "./root-node";
 import type TurndownService from "./turndown";
 import type { TurndownInput } from "./turndown";
 import type { Options, Rule, RuleLookup } from "./types";
@@ -27,8 +29,9 @@ interface Delimiter {
 const STRONG: Delimiter = { close: "\u{4}", open: "\u{3}" };
 const EMPHASIS: Delimiter = { close: "\u{6}", open: "\u{5}" };
 const STRIKE: Delimiter = { close: "\u{F}", open: "\u{E}" };
+
 // Every mark the preset writes, taken out of the input so only the preset writes them.
-const ALL_MARKS = [NORMAL_START, NORMAL_END, STRONG.open, STRONG.close, EMPHASIS.open, EMPHASIS.close, STRIKE.open, STRIKE.close];
+const ALL_MARKS = [NORMAL_START, NORMAL_END, STRONG.open, STRONG.close, EMPHASIS.open, EMPHASIS.close, STRIKE.open, STRIKE.close, LINE_BREAK_MARK];
 const BOLD_WEIGHTS = new Set(["600", "700", "800", "900", "bold", "bolder"]);
 
 // `lighter` is not here: it is relative, and under a heavy weight it is still bold.
@@ -898,17 +901,32 @@ function writeDelimiters(markdown: string, options: Options): string {
     return text;
 }
 
-/** The delimiter around the text, with the whitespace at its ends kept outside, where Markdown lets a delimiter be. */
-function wrapEdges(text: string, marker: Delimiter): string {
-    const core = text.trim();
+/** True for whitespace and a line break's mark, which stay outside a delimiter. */
+function isEdgeSpace(char: string): boolean {
+    return char === LINE_BREAK_MARK || char.trim() === "";
+}
 
-    if (core === "") {
+/**
+ * The delimiter around the text, with the whitespace and line breaks at its ends kept outside, where Markdown lets a
+ * delimiter be.
+ */
+function wrapEdges(text: string, marker: Delimiter): string {
+    let start = 0;
+    let end = text.length;
+
+    while (start < end && isEdgeSpace(text.charAt(start))) {
+        start += 1;
+    }
+
+    while (end > start && isEdgeSpace(text.charAt(end - 1))) {
+        end -= 1;
+    }
+
+    if (start === end) {
         return text;
     }
 
-    const start = text.length - text.trimStart().length;
-
-    return `${text.slice(0, start)}${marker.open}${core}${marker.close}${text.slice(start + core.length)}`;
+    return `${text.slice(0, start)}${marker.open}${text.slice(start, end)}${marker.close}${text.slice(end)}`;
 }
 
 /**
@@ -1174,29 +1192,6 @@ function attributesOf(element: Element): Attr[] {
     return Array.from({ length: attributes.length }, (_unused, index) => attributes[index] as Attr);
 }
 
-/** True when the node's text or an attribute in it holds a mark. */
-function hasMarks(root: Node): boolean {
-    const pending: Node[] = [root];
-
-    while (pending.length > 0) {
-        const node = pending.pop() as Node;
-
-        if (TEXT_TYPES.has(node.nodeType) && withoutAnyMarks(node.nodeValue ?? "") !== node.nodeValue) {
-            return true;
-        }
-
-        if (node.nodeType === 1 && attributesOf(node as Element).some(({ value }) => withoutAnyMarks(value) !== value)) {
-            return true;
-        }
-
-        for (let child = node.firstChild; child; child = child.nextSibling) {
-            pending.push(child);
-        }
-    }
-
-    return false;
-}
-
 /** A copy of the node with the marks taken out of its text and attributes. */
 function copyWithoutMarks(input: Node): Node {
     const copy = input.cloneNode(true);
@@ -1225,19 +1220,25 @@ function copyWithoutMarks(input: Node): Node {
 /**
  * Takes the marks out of what is converted, so only the preset writes them, and out of what it gives back. The output
  * also loses the blank text before its first content, such as the spaces between the elements of a pasted `<head>`.
+ * `prepare` sees the parsed input, or a copy of the node passed in, before it is converted.
  */
-export function guardMarks(service: TurndownService): void {
+export function guardMarks(service: TurndownService, prepare: (root: Node) => void): void {
     const convert = service.turndown.bind(service);
-    const finish = (markdown: string): string => withoutMarks(writeDelimiters(markdown, service.options)).replace(LEADING_SPACE, "");
+    const finish = (markdown: string): string =>
+        withoutMarks(writeDelimiters(markdown, service.options)).replaceAll(LINE_BREAK_MARK, "").replace(LEADING_SPACE, "");
 
     const turndown = (input: TurndownInput): string => {
-        if (typeof input === "string") {
-            return finish(convert(withoutAnyMarks(input)));
-        }
-
         const isNode = typeof input === "object" && input !== null && typeof (input as Partial<Node>).nodeType === "number";
 
-        return finish(convert(isNode && hasMarks(input) ? copyWithoutMarks(input) : input));
+        if (typeof input !== "string" && !isNode) {
+            return convert(input);
+        }
+
+        const root = typeof input === "string" ? parseRoot(withoutAnyMarks(input)) : copyWithoutMarks(input);
+
+        prepare(root);
+
+        return finish(convert(root));
     };
 
     Object.assign(service, { turndown });

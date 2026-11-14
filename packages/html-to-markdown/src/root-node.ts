@@ -8,22 +8,7 @@ import { isBlock, isVoid } from "./utilities";
  * or a deep clone of a DOM node. Whitespace is collapsed before any rule runs.
  */
 export default function rootNode(input: string | Node, options: Options): Node {
-    let root: Node;
-
-    if (typeof input === "string") {
-        // DOM parsers arrange elements in the <head> and <body>.
-        // Wrapping in a custom element ensures elements are reliably arranged in
-        // a single element. The wrapper is left open: the parser closes it at the
-        // end of the input. A closing tag would be read as text when the input ends
-        // inside a raw-text element such as <textarea>. The wrapper's name is random
-        // for each call, so input text cannot write a tag that would end it early.
-        const token = randomToken();
-        const htmlDocument = parseHTML(`<x-turndown-${token} id="turndown-root-${token}">${input}`);
-
-        root = htmlDocument.querySelector(`#turndown-root-${token}`) as Node;
-    } else {
-        root = input.cloneNode(true);
-    }
+    const root = typeof input === "string" ? parseRoot(input) : input.cloneNode(true);
 
     removeNonContent(root);
 
@@ -35,6 +20,20 @@ export default function rootNode(input: string | Node, options: Options): Node {
     });
 
     return root;
+}
+
+/** The element an HTML string is parsed into, in a document of its own. */
+export function parseRoot(input: string): Node {
+    // DOM parsers arrange elements in the <head> and <body>.
+    // Wrapping in a custom element ensures elements are reliably arranged in
+    // a single element. The wrapper is left open: the parser closes it at the
+    // end of the input. A closing tag would be read as text when the input ends
+    // inside a raw-text element such as <textarea>. The wrapper's name is random
+    // for each call, so input text cannot write a tag that would end it early.
+    const token = randomToken();
+    const htmlDocument = parseHTML(`<x-turndown-${token} id="turndown-root-${token}">${input}`);
+
+    return htmlDocument.querySelector(`#turndown-root-${token}`) as Node;
 }
 
 /**
