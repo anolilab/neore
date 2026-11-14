@@ -7598,8 +7598,8 @@ export interface RegisteredDataMigration {
  * shard DO's admin RPC and the CLI resolve migrations to run through this map.
  */
 export const LUNORA_MIGRATIONS: Record<string, RegisteredDataMigration> = {
+    "add-approval-chain-source": lunora_migrations_249.addApprovalChainSource as unknown as RegisteredDataMigration,
     "add-headless-approved": lunora_migrations_249.addHeadlessApproved as unknown as RegisteredDataMigration,
     "add-headless-resume-bounds": lunora_migrations_249.addHeadlessResumeBounds as unknown as RegisteredDataMigration,
-    "backfill-approval-chain-source": lunora_migrations_249.backfillApprovalChainSource as unknown as RegisteredDataMigration,
     "backfill-approval-organization": lunora_migrations_249.backfillApprovalOrganization as unknown as RegisteredDataMigration,
 };

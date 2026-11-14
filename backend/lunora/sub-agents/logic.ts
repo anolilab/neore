@@ -439,6 +439,21 @@ export const chainWaitProblem = (key: string | undefined, waiting: boolean): str
 };
 
 /**
+ * Why a child of this chain may not wait for approval, or `undefined` when it may: another child of the same task or trigger
+ * already waits. Admission ({@link chainWaitProblem}) cannot see children that were all running when they were admitted, so
+ * the pause checks again (`markRunAwaiting`); the child's request is refused and its run ends with this as its result.
+ */
+export const chainPauseProblem = (key: string | undefined, waiting: boolean): string | undefined => {
+    const kind = chainSourceKind(key);
+
+    if (kind === undefined || kind === "eval" || !waiting) {
+        return undefined;
+    }
+
+    return `Another sub-agent this ${kind} started is already waiting for the owner, so this sub-agent's request to use a tool was refused and it stopped. Its ${kind} waits for one answer at a time.`;
+};
+
+/**
  * Why a dispatch from `source` may not reach a lead whose policy is `policy`, or `undefined` when it may.
  * `outside_agent` is for cloud workers only: a host worker never takes it, whatever the policy lists.
  */

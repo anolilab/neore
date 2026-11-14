@@ -46,6 +46,7 @@ const NOT_FOUND = /not found/iu;
 const ONCE_OR_ALWAYS = /once or always/iu;
 const ALREADY_ENDED = /already ended/iu;
 const GONE = /gone/u;
+const ANOTHER_WAITS = /another sub-agent this task started is already waiting for the owner/iu;
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
@@ -302,6 +303,96 @@ describe("a child that stopped on a request", () => {
         expect(await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER))).toBe(1);
         expect(await runStatus()).toBe("cancelled");
         expect(await pendingRequests()).toHaveLength(0);
+    });
+});
+
+describe("two children of one task that both reach an ask tool", () => {
+    const TASK = "task:task-1";
+    const OTHER_TASK = "task:task-2";
+    const OTHER_APPROVAL = "approval-other";
+
+    /** A second child, running, that stopped on its own request: as a later round's child of `chainSource` would. */
+    const seedSibling = async (chainSource: string): Promise<{ siblingChild: string; siblingRun: Id<"subAgentRuns"> }> =>
+        await run(async (context) => {
+            const now = Date.now();
+            const siblingChild = await context.db.insert("threads", { status: "active", title: "Sub-agent: other", userId: OWNER });
+            const siblingRun = await context.db.insert("subAgentRuns", {
+                chainSource,
+                childThreadId: siblingChild,
+                createdAt: now,
+                depth: 1,
+                parentThreadId: parentId,
+                startedAt: now,
+                status: "running",
+                task: "Clean the inbox",
+                toolCallId: "call-parent-2",
+                updatedAt: now,
+                userId: OWNER,
+            });
+
+            await context.db.insert("messages", {
+                message: {
+                    content: [
+                        { input: { path: "/tmp/inbox" }, toolCallId: "call-9", toolName: TOOL, type: "tool-call" },
+                        { approvalId: OTHER_APPROVAL, toolCallId: "call-9", type: "tool-approval-request" },
+                    ],
+                    role: "assistant",
+                },
+                order: 0,
+                status: "success",
+                stepOrder: 0,
+                threadId: siblingChild,
+                tool: true,
+                userId: OWNER,
+            });
+            await context.db.insert("toolApprovalRuns", {
+                approvalId: OTHER_APPROVAL,
+                config: { ...CONFIG(), chainSource, subAgentRunId: siblingRun },
+                createdAt: now,
+                status: "pending",
+                threadId: siblingChild,
+                userId: OWNER,
+            });
+
+            return { siblingChild, siblingRun };
+        });
+    const approvalRow = async (approvalId: string): Promise<any> =>
+        await run(
+            async (context) =>
+                await context.db
+                    .query("toolApprovalRuns")
+                    .withIndex("by_approvalId", (q: any) => q.eq("approvalId", approvalId))
+                    .first(),
+        );
+
+    beforeEach(async () => {
+        await run(async (context) => await context.db.patch("subAgentRuns", runId, { chainSource: TASK }));
+    });
+
+    it("lets one wait and refuses the other's tool, ending it with the reason", async () => {
+        // Both were admitted while neither waited; both now stop on a request.
+        const { siblingRun } = await seedSibling(TASK);
+
+        expect(await run(async (context) => await markRunAwaiting(context, runId))).toBe(true);
+        expect(await run(async (context) => await markRunAwaiting(context, siblingRun))).toBe(false);
+
+        expect(await runStatus()).toBe("awaiting");
+
+        const sibling = await run(async (context) => await context.db.get("subAgentRuns", siblingRun));
+
+        expect(sibling).toMatchObject({ status: "failed" });
+        expect(sibling.error).toMatch(ANOTHER_WAITS);
+        // Its request is refused, so the owner is never asked twice for one task.
+        expect(await approvalRow(OTHER_APPROVAL)).toMatchObject({ status: "denied" });
+        expect(await approvalRow(APPROVAL_ID)).toMatchObject({ status: "pending" });
+    });
+
+    it("lets a child of a different task wait too", async () => {
+        const { siblingRun } = await seedSibling(OTHER_TASK);
+
+        expect(await run(async (context) => await markRunAwaiting(context, runId))).toBe(true);
+        expect(await run(async (context) => await markRunAwaiting(context, siblingRun))).toBe(true);
+        expect(await approvalRow(OTHER_APPROVAL)).toMatchObject({ status: "pending" });
     });
 });
 

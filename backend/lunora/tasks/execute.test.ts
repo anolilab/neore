@@ -233,4 +233,12 @@ describe("runTaskRound destination", () => {
 
         expect(state.runs[0]).toMatchObject({ reasoningEffort: 75 });
     });
+
+    it("names the task as its sub-agents' chain source, so the task has one waiting child at most", async () => {
+        state.claim = claimWith({});
+
+        await runRound();
+
+        expect(state.runs[0]).toMatchObject({ chainSource: "task:task-1" });
+    });
 });

@@ -19,8 +19,12 @@ detail. Paths are relative to `backend/lunora/`.
     fills across runs. The run names its source (`runHeadlessAgent({ chainSource })` → `ToolCtx.chainSource` →
     `subAgentRuns.chainSource`, `task:<taskId>` / `trigger:<triggerId>`), a nested child inherits it, and while a run of
     that source is `awaiting` (`by_chainSource_and_status`) its next delegation is refused with `chainWaitProblem`, which
-    the delegating run reads as the tool's error. Runs a single round admits before any of them waits can all wait (at most
-    3, the per-thread cap). The pause's snapshot keeps the source (`ToolRunConfig.chainSource`) and the continuation puts
+    the delegating run reads as the tool's error. Admission alone misses children that were all running when admitted (a
+    round's three, or round 1's child still running when round 2 delegates), so the pause checks again: `markRunAwaiting`
+    reads the same index in the transaction that writes `awaiting`, so two children of one source reaching `ask` at once
+    serialize. The first waits; the later one does not: its run ends `failed` with `chainPauseProblem` as its result
+    ("another sub-agent this task started is already waiting for the owner"), and that end denies its request, so the
+    tool is refused, as in an eval's chain. A source never has more than one child waiting. The pause's snapshot keeps the source (`ToolRunConfig.chainSource`) and the continuation puts
     it back on its tool context, so a resumed child's own sub-agents still count; an older snapshot without it falls back
     to the per-thread cap. A worker never waits, but its runs carry the source too (`createRun` and `messageWorker` store
     it, `claimRun` hands it to the run), so a one-shot child a worker delegates counts toward the limit, and in an eval's

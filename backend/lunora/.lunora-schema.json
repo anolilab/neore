@@ -1,9 +1,9 @@
 {
   "jurisdiction": "eu",
   "migrationIds": [
+    "add-approval-chain-source",
     "add-headless-approved",
     "add-headless-resume-bounds",
-    "backfill-approval-chain-source",
     "backfill-approval-organization"
   ],
   "tables": {
@@ -24173,7 +24173,8 @@
           "kind": "string",
           "nullable": false,
           "optional": true,
-          "unique": false
+          "unique": false,
+          "refined": true
         },
         "childThreadId": {
           "kind": "string",

@@ -83,6 +83,7 @@ import {
     resultContent,
     DISPATCH_SOURCES,
     type DispatchSource,
+    chainPauseProblem,
     chainWaitProblem,
     dispatchSourceProblem,
     distinctChildCount,
@@ -234,6 +235,23 @@ const admitCommon = async (
 };
 
 /**
+ * Whether a run of chain source `key` already waits for its owner's approval (`by_chainSource_and_status`): the admission
+ * and the pause both read it, so a task or trigger has one waiting child at most. `false` for a chat-started chain.
+ */
+const chainHasWaitingRun = async (ctx: Pick<QueryCtx, "db">, key: string | undefined): Promise<boolean> => {
+    if (key === undefined) {
+        return false;
+    }
+
+    const waiting = await ctx.db
+        .query("subAgentRuns")
+        .withIndex("by_chainSource_and_status", (q) => q.eq("chainSource", key).eq("status", "awaiting"))
+        .first();
+
+    return waiting !== null;
+};
+
+/**
  * Every admission check, charging the rate limit and quotas last; returns the
  * row to insert. A refusal is `{ error }` — for the model to read — rather than
  * a throw, so what a refused start consumed stays consumed, as in chat.
@@ -261,14 +279,7 @@ export const admitSubAgentRun = async (
         return { error: capProblem };
     }
 
-    const waiting =
-        args.chainSource === undefined
-            ? null
-            : await ctx.db
-                  .query("subAgentRuns")
-                  .withIndex("by_chainSource_and_status", (q) => q.eq("chainSource", args.chainSource!).eq("status", "awaiting"))
-                  .first();
-    const chainProblem = chainWaitProblem(args.chainSource, waiting !== null);
+    const chainProblem = chainWaitProblem(args.chainSource, await chainHasWaitingRun(ctx, args.chainSource));
 
     if (chainProblem) {
         return { error: chainProblem };
@@ -1143,7 +1154,7 @@ export const claimRun = internalMutation
     .output(
         v.union(
             v.object({
-                chainSource: v.optional(v.string()),
+                chainSource: v.optional(v.string().max(200)),
                 childThreadId: v.optional(v.string()),
                 clientId: v.optional(v.string()),
                 depth: v.number(),
@@ -1909,6 +1920,18 @@ export const markRunAwaiting = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
     if (pending.length === 0) {
         // Its end closes the run's own requests (`finishRun`).
         await finishRun(ctx, run._id, { kind: "cancelled" });
+
+        return false;
+    }
+
+    // One waiting child per task or trigger: children admitted while none waited can reach an `ask` tool together. This read
+    // and the write below share the transaction, so two pauses of one source serialize and only the first waits. The later
+    // one ends with its request refused (its end denies the run's open requests), as an eval's child refuses an `ask` tool,
+    // and its result says why.
+    const chainProblem = chainPauseProblem(run.chainSource, await chainHasWaitingRun(ctx, run.chainSource));
+
+    if (chainProblem) {
+        await finishRun(ctx, run._id, { error: chainProblem, kind: "failed" });
 
         return false;
     }

@@ -2683,7 +2683,7 @@ export const schema = defineSchema({
         beatAt: v.optional(v.number()),
         // The task, trigger or eval run whose chain this run belongs to (`sub-agents/logic.ts:chainSourceKey`); unset for a
         // chain the owner's chat started. One waiting child per source (`chainWaitProblem`); an eval's chain never waits.
-        chainSource: v.optional(v.string()),
+        chainSource: v.optional(v.string().max(200)),
         childThreadId: v.optional(v.string()),
         // Set on a run the user typed into a worker thread (`dispatchToWorker`); the dedupe key of that dispatch.
         clientId: v.optional(v.string()),

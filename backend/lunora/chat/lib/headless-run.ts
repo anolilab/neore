@@ -94,8 +94,9 @@ export interface HeadlessRunOptions {
     botId?: string;
     /**
      * The task, trigger or eval run whose sub-agent chain this is (`sub-agents/logic.ts:chainSourceKey`): a sub-agent this run
-     * starts carries it, so the source has one child waiting at most, and an eval's chain never waits. Not in the pause's
-     * snapshot: a resumed child's own sub-agents fall back to the per-thread cap.
+     * starts carries it, so the source has one child waiting at most, and an eval's chain never waits. The pause's snapshot
+     * keeps it (`ToolRunConfig.chainSource`), so a resumed child's own sub-agents still count; a snapshot that predates it falls
+     * back to the per-thread cap.
      */
     chainSource?: string;
     /**
