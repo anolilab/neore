@@ -309,3 +309,10 @@ describe("paste input: review cases, tenth round", () => {
         expect(convert("<ol><li>a</li><div>block</div>note</ol>")).toBe("1. a\nblock\nnote");
     });
 });
+
+describe("paste input: review cases, eleventh round", () => {
+    it("moves no loose text out of a list the page hides", () => {
+        expect(convert("<ul><li>a</li><ol hidden>secret<li>x</li></ol><li>b</li></ul>")).toBe("- a\n- b");
+        expect(convert(`<ul><li>a</li><div style="display:none"><ol>secret<li>x</li></ol></div><li>b</li></ul>`)).toBe("- a\n- b");
+    });
+});

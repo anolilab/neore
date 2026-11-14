@@ -281,8 +281,9 @@ export function wrapLooseListText(root: Node, shown: Shown): void {
             lists.push(node as Element);
         }
 
+        // What the page hides is left whole for the conversion to drop: no text is moved out of it.
         for (let child = node.firstChild; child; child = child.nextSibling) {
-            if (child.nodeType === 1) {
+            if (child.nodeType === 1 && !shown.isHidden(child)) {
                 pending.push(child);
             }
         }
