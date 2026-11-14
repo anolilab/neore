@@ -55,6 +55,14 @@ export interface RuleLookup {
     isRemoved: (node: Node) => boolean;
 
     /**
+     * The rule the node would get if `rule` did not match it: the next match in the search order, or the default rule.
+     * A rule that adds to what another rule writes, such as emphasis set by a style, passes its output on to that rule.
+     * A rule the service does not hold gets the default rule. Not cached: ask it from a replacement, which runs once per
+     * node.
+     */
+    ruleAfter: (rule: Rule, node: AnnotatedNode) => Rule;
+
+    /**
      * The first rule whose filter matches the node, or undefined when none matches. Asked once per node, so the answer
      * does not change. A blank node is still written by `blankReplacement`, whatever this returns.
      */

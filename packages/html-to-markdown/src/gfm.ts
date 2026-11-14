@@ -475,7 +475,7 @@ function backtickRuns(text: string): BacktickRun[] {
  * Literal tildes escaped, outside code spans: inside struck text a tilde run of two would end the strike, and a lone
  * tilde beside the strike's own tildes would make a run that opens a code fence. Each backtick run is read once.
  */
-function escapeTildes(markdown: string): string {
+export function escapeTildes(markdown: string): string {
     const runs = backtickRuns(markdown);
     let run = 0;
     let result = "";

@@ -95,8 +95,27 @@ new TurndownService(PASTE_OPTIONS).use(paste).turndown(html);
   other marker text (`a.`, `1.1.`, `(iv)`) is written after a bullet, and two Word lists side by side stay apart. A list placed straight in a list goes under the item
   before it.
 - `<b>` or `<strong>` set back to normal weight is not bold: Google Docs wraps a whole copy in one.
+- Bold, italics and strikethrough set by a style (`font-weight`, `font-style`, `text-decoration`) are written as
+  Markdown on a span, a paragraph, a list item or a table cell, not on a heading. Text set back to normal weight
+  inside bold stays out of the bold: `<b>a <span style="font-weight:normal">b</span> c</b>` is `**a** b **c**`. A
+  block holding a list, a table or a code block keeps no formatting of its own, which could not span them.
+- Formatting on part of a ZWJ emoji sequence (`<b>👩</b>‍👩`) is left off, so the joiner stays beside its emoji.
+- Every `<pre>` is fenced, with or without a `<code>` in it, its text read as the page shows it (a line per `<br>` and
+  per line element, hidden text left out). The language comes from a `language-`, `lang-` or `highlight-` class on
+  the code, the block, or the two elements around it, as GitHub writes it. The fence is longer than any backtick run
+  in the code.
+- The output starts at its first content: blank text before it, such as the spaces in a pasted `<head>`, is left out.
 
-The rest of the composer's paste behaviour (formatting set by style, code languages) follows in the next parts.
+The preset marks the normal-weight runs with the control characters U+0001 and U+0002 while it converts, so it takes
+them out of the input and the output.
+
+The rest of the composer's paste behaviour (sub- and superscripts, work budgets) follows in the next parts.
+
+## Rule lookup
+
+A rule's filter and replacement get a `RuleLookup`. Besides `ruleFor`, `hasRuleFor` and `isRemoved`, it has
+`ruleAfter(rule, node)`: the rule the node would get if `rule` did not match it. A rule that adds to what another rule
+writes, such as the paste preset's formatting set by style, formats the content and passes it on to that rule.
 
 ## Status
 
