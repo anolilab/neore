@@ -1,6 +1,7 @@
 import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
 import { getItemAsync, setItemAsync } from "expo-secure-store";
 
+import type { StoredGrant } from "./grant";
 import { secureGrantStore } from "./secure-store";
 import { signedInGrantOf } from "./sign-out";
 
@@ -16,4 +17,4 @@ export const markGrantSignedOut = async (token: string): Promise<void> => {
 };
 
 /** The sign-in on this phone, unless a sign-out ended it: what the headless push task is allowed to read. */
-export const readSignedInGrant = async () => await signedInGrantOf(() => secureGrantStore.get(), () => getItemAsync(SIGNED_OUT_KEY), digestOf);
+export const readSignedInGrant = async (): Promise<StoredGrant | undefined> => await signedInGrantOf(() => secureGrantStore.get(), () => getItemAsync(SIGNED_OUT_KEY), digestOf);
