@@ -81,3 +81,7 @@
   failed claim or completion until the call's deadline, whatever the error. A call's prompt is cleared from `input` and
   `envelope` on every terminal path (`ACP_CLEARED`). Any new way a call can end must go through `onAcpCallEnded`, or its
   turn stays "Sending". `acp_cancel` has its own open-call budget and a turn's end withdraws its waiting answers (`acp/lib/withdraw.ts`); when the backend ends a turn the desktop did not, the poster stops the agent itself. A refused command keeps a tombstone in the receipt log, so the same envelope is refused again, never run later. A request whose command or target was cut is declined, never allowed, from the web (Rust refuses it too). The numbers they are tuned by were not measured (`acp-s4-throttling.md`).
+  **An organization's cap**: an agent on a computer approves its own tools, so it runs for an organization only at the `auto` cap and
+  only while the owner is still a member. Every way one is started or sent a turn (a start, `/hosts/send`, a switch to a computer,
+  `/clear`, the pull-request guide, a worker) checks `acp/lib/organization-cap.ts` with the thread's own organization first, else
+  the caller's verified one. A start files the thread under the caller's organization, so switching spaces cannot lift the cap.
