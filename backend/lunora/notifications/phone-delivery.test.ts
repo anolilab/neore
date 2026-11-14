@@ -310,9 +310,9 @@ describe("deliverToPhones", () => {
 
         await deliverToPhones(ctx as never, USER, { notificationId: "n1", urgency: "normal" });
 
-        const [[, messages]] = vi.mocked(sendExpoMessages).mock.calls;
+        const messages = vi.mocked(sendExpoMessages).mock.calls[0]?.[1];
         expect(messages).toStrictEqual([expect.objectContaining({ data: { notificationId: "n1" }, to: SECOND_PHONE })]);
-        expect(messages[0]).not.toHaveProperty("title");
+        expect(messages?.[0]).not.toHaveProperty("title");
     });
 
     it("checks no receipt for a ticket that came back without an id", async () => {
