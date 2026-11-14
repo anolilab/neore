@@ -272,7 +272,10 @@ const pasteRules: Record<string, Rule> = {
     blockquote: {
         filter: unlessRemoved((node) => node.nodeName === "BLOCKQUOTE"),
         replacement(content) {
-            return `\n\n${prefixLines(trimBreaks(content), "> ", ">")}\n\n`;
+            const quoted = trimBreaks(content);
+
+            // A quote that holds only what the page hides writes no marker.
+            return quoted.trim() === "" ? "" : `\n\n${prefixLines(quoted, "> ", ">")}\n\n`;
         },
     },
 

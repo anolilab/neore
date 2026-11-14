@@ -224,3 +224,13 @@ describe("paste input: review cases, fourth round", () => {
         }
     });
 });
+
+describe("paste input: review cases, fifth round", () => {
+    it("writes no quote marker for a quote that holds only what the page hides", () => {
+        expect(convert(`<p>a</p><blockquote><span style="display:none">hidden</span></blockquote><p>b</p>`)).toBe("a\n\nb");
+    });
+
+    it("writes repeated or leading line breaks in a table cell as one space", () => {
+        expect(convert("<table><tr><th>A</th></tr><tr><td>a<br><br>b</td></tr><tr><td><br>c</td></tr></table>")).toBe("| A |\n| --- |\n| a b |\n| c |");
+    });
+});
