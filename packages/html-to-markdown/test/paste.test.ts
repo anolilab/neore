@@ -263,3 +263,15 @@ describe("paste: a heading broken by a line break", () => {
         expect(convert("<h2>First<br>Second</h2>")).toBe("## First Second");
     });
 });
+
+describe("paste: headings holding blocks", () => {
+    it("writes no empty heading line when a line break comes before the code block", () => {
+        expect(convert("<h2><br><pre>code</pre></h2>")).toBe("```\ncode\n```");
+    });
+
+    it("keeps the text of a paragraph or a div in a heading on the heading's line", () => {
+        expect(convert("<h2><p>Title</p></h2>")).toBe("## Title");
+        expect(convert("<h2><div>A</div><div>B</div></h2>")).toBe("## A B");
+        expect(convert("<h2><p>Setup</p><pre>npm i</pre></h2>")).toBe("## Setup\n\n```\nnpm i\n```");
+    });
+});

@@ -8,7 +8,7 @@
 import { gfm } from "./gfm";
 import { declaredStyle } from "./inline-style";
 import { codeRules } from "./paste-code";
-import { checkWork, shownText, wrapLooseListText } from "./paste-input";
+import { checkWork, shownText, unwrapHeadingParagraphs, wrapLooseListText } from "./paste-input";
 import { isWordMarker, LINE_BREAK_MARK, listRules, prefixLines, trimBreaks, unlessRemoved } from "./paste-lists";
 import { guardMarks, isSetToNormal, styleRules } from "./paste-styles";
 import type TurndownService from "./turndown";
@@ -268,8 +268,9 @@ function inlineMath(source: string): string {
     return `${fence}${pad}${tex}${pad}${fence}`;
 }
 
-// A heading line with no text: `#` to `######` and nothing after it.
-const EMPTY_HEADING_LINE = /^#{1,6} *(?:\n+|$)/;
+// A heading line with no text: `#` to `######` and nothing after it but spaces and a line break's mark.
+// eslint-disable-next-line no-control-regex, sonarjs/no-control-regex -- U+0010 is the preset's own line break mark.
+const EMPTY_HEADING_LINE = /^#{1,6}[ \u{10}]*(?:\n+|$)/u;
 
 /**
  * A heading whose only content is a block it cannot hold, such as a code block, writes no heading line of its own:
@@ -579,6 +580,7 @@ export function paste(service: TurndownService): void {
         const shown = { imageText, isHidden: isHiddenElement, mathText: texSource };
 
         wrapLooseListText(root, shown);
+        unwrapHeadingParagraphs(root, shown);
         // A Word marker is hidden only so its item's rule writes it: the work check counts its text.
         checkWork(root, { ...shown, isHidden: (node) => node.nodeType === 1 && isHiddenOnPage(node as Element) });
     });

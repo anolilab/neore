@@ -36,6 +36,9 @@ const FORMATTING = new Set(["B", "CODE", "DEL", "EM", "I", "S", "STRIKE", "STRON
 // Elements whose whitespace the preset keeps as written: code (`preformattedCode`) and code blocks.
 const KEEPS_WHITESPACE = new Set(["CODE", "PRE"]);
 const LISTS = new Set(["OL", "UL"]);
+const HEADINGS = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
+// The blocks in a heading that hold its text: their text goes on the heading's line.
+const HEADING_PARAGRAPHS = new Set(["DIV", "P"]);
 // The parts of a table between a table and its cells, which add no depth of their own: the cell is the next level.
 const TABLE_PARTS = new Set(["TBODY", "TFOOT", "THEAD", "TR"]);
 const NON_BLANK = /[^\t\n\f\r ]/;
@@ -292,6 +295,55 @@ function collapsedLength(text: string): number {
     }
 
     return length;
+}
+
+/**
+ * Takes the paragraphs and divs that are children of a heading out of their element, their text kept on the heading's
+ * line: a heading holds one line, and `<h2><p>Title</p></h2>` is the heading `Title`. Two of them side by side are
+ * parted by a space. Other blocks in a heading, such as a code block, stay blocks.
+ */
+export function unwrapHeadingParagraphs(root: Node, shown: Shown): void {
+    const pending: Node[] = [root];
+
+    while (pending.length > 0) {
+        const node = pending.pop() as Node;
+
+        if (HEADINGS.has(node.nodeName)) {
+            unwrapParagraphChildren(node as Element);
+        }
+
+        for (let child = node.firstChild; child; child = child.nextSibling) {
+            if (child.nodeType === 1 && !shown.isHidden(child)) {
+                pending.push(child);
+            }
+        }
+    }
+}
+
+function unwrapParagraphChildren(heading: Element): void {
+    let child = heading.firstChild;
+
+    while (child) {
+        if (!HEADING_PARAGRAPHS.has(child.nodeName)) {
+            child = child.nextSibling;
+            continue;
+        }
+
+        const paragraph = child;
+
+        // Its children take its place, with a space before them when text comes before.
+        if (paragraph.previousSibling) {
+            heading.insertBefore(heading.ownerDocument.createTextNode(" "), paragraph);
+        }
+
+        child = paragraph.firstChild ?? paragraph.nextSibling;
+
+        while (paragraph.firstChild) {
+            heading.insertBefore(paragraph.firstChild, paragraph);
+        }
+
+        paragraph.remove();
+    }
 }
 
 /**
