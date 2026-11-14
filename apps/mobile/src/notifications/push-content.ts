@@ -215,7 +215,7 @@ export const showDataOnlyPush = async (payload: unknown, steps: PushTaskSteps): 
     try {
         const afterPost = await steps.session();
 
-        // The alert is for the account read just before the post, so a change to any other account takes it back.
+        // The alert is for the sign-in read just before the post, so a change to any other sign-in takes it back.
         isUnchanged = isSameSignIn(afterPost, current);
     } catch {
         // A read that fails leaves the account unconfirmed, so the alert is taken back.
