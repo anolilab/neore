@@ -305,3 +305,13 @@ describe("paste: paragraphs nested deeper in a heading", () => {
         expect(convert("<h2>T<blockquote><p>q</p></blockquote></h2>")).toContain("> q");
     });
 });
+
+describe("paste: headings and code blocks, review cases", () => {
+    it("leaves a heading inside a code block as the code's lines", () => {
+        expect(convert("<pre><h2><div>one</div><div>two</div></h2></pre>")).toBe("```\none\ntwo\n```");
+    });
+
+    it("writes no empty heading line when text comes only after the heading's code block", () => {
+        expect(convert("<h2><pre>x</pre>Tail</h2>")).toBe("```\nx\n```\n\nTail");
+    });
+});

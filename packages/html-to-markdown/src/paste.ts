@@ -444,8 +444,8 @@ function withoutLastBreak(content: string): string {
 }
 
 /**
- * True when the heading shows text of its own, outside the blocks in it: text, or an image that stands for text. One
- * walk, which does not go into a block or a hidden element.
+ * True when the heading shows text on its line, before its first block: text, or an image that stands for text. One
+ * walk in order, which does not go into a hidden element and stops at the first block.
  */
 function hasLineText(heading: Element): boolean {
     const pending: Node[] = [];
@@ -459,8 +459,12 @@ function hasLineText(heading: Element): boolean {
             return true;
         }
 
-        // Into an inline element the page shows; a block holds no text of the heading's line.
-        if (node.nodeType === 1 && !isHiddenElement(node) && !isBlock(node)) {
+        if (node.nodeType === 1 && !isHiddenElement(node)) {
+            // The heading line ends at its first block: text after one does not fill the line.
+            if (isBlock(node)) {
+                return false;
+            }
+
             pushChildren(pending, node);
         }
     }

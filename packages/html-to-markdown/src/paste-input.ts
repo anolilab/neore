@@ -314,8 +314,9 @@ export function unwrapHeadingParagraphs(root: Node, shown: Shown): void {
             inlineParagraphChildren(node as Element, shown);
         }
 
+        // A code block is read as its text, a line per div: a heading in it is no heading, so it is left as it is.
         for (let child = node.firstChild; child; child = child.nextSibling) {
-            if (child.nodeType === 1 && !shown.isHidden(child)) {
+            if (child.nodeType === 1 && child.nodeName !== "PRE" && !shown.isHidden(child)) {
                 pending.push(child);
             }
         }
