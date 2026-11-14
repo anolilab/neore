@@ -10,6 +10,7 @@ import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { getExpoReceipts, sendExpoMessages } from "./expo-push";
 import { registerPushDevice } from "./native-push";
+import { isAndroidDataOnlyPushOn } from "./native-push-config";
 import { hasPhone } from "./notify";
 import {
     checkPushReceipts,
@@ -197,6 +198,14 @@ describe("the phones a send goes to", () => {
         const { ended } = await listOf(USER);
 
         expect(ended).toHaveLength(0);
+    });
+});
+
+describe("the Android data-only switch", () => {
+    it("is on unless ANDROID_DATA_ONLY_PUSH is off", () => {
+        expect(isAndroidDataOnlyPushOn({})).toBe(true);
+        expect(isAndroidDataOnlyPushOn({ ANDROID_DATA_ONLY_PUSH: "on" })).toBe(true);
+        expect(isAndroidDataOnlyPushOn({ ANDROID_DATA_ONLY_PUSH: "off" })).toBe(false);
     });
 });
 

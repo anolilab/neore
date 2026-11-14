@@ -15,7 +15,7 @@ import { internalAction, internalMutation, internalQuery } from "../_generated/s
 import type { ExpoMessage, ExpoOutcome } from "./expo-push";
 import { getExpoReceipts, isDeviceGone, sendExpoMessages } from "./expo-push";
 import type { PhonePlatform } from "./native-push-config";
-import { expoAccessToken } from "./native-push-config";
+import { expoAccessToken, isAndroidDataOnlyPushOn } from "./native-push-config";
 import { MAX_PUSH_DEVICES_PER_USER } from "./push-device-writes";
 import { threadIdOfLink } from "./locked-link";
 import { approvalToolFallback, PHONE_PLACEHOLDER_TITLE, phonePlaceholderBody, pushUrgency } from "./push-text";
@@ -221,11 +221,12 @@ export const deliverToPhones = async (ctx: ActionCtx, userId: string, message: P
 
     let outcomes: ExpoOutcome[];
     const sentAt = Date.now();
+    const dataOnly = isAndroidDataOnlyPushOn(process.env);
 
     try {
         outcomes = await sendExpoMessages(
             accessToken,
-            devices.map((device) => phoneMessage(device, message)),
+            devices.map((device) => phoneMessage({ ...device, buildsAlert: device.buildsAlert && dataOnly }, message)),
         );
     } catch (error) {
         console.warn("[notifications] Phone push send failed:", error);
