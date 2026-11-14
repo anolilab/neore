@@ -37,7 +37,10 @@ const NO_STORE = { "Cache-Control": "no-store" };
 
 const errorResponse = (error: unknown): Response => {
     if (error instanceof ExtensionGrantError) {
-        return Response.json({ error: error.code, message: error.message }, { headers: NO_STORE, status: error.status });
+        return Response.json(
+            { error: error.code, message: error.message, ...(error.reason !== undefined && { reason: error.reason }) },
+            { headers: NO_STORE, status: error.status },
+        );
     }
 
     authLogger.error("[extension-auth] unexpected failure", error);

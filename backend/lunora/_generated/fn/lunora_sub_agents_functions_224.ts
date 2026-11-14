@@ -12,19 +12,6 @@ if (typeof source["childThreadId"] !== "string") return DEFER;
 if (typeof source["runId"] !== "string") return DEFER;
 return { "childThreadId": source["childThreadId"], "runId": source["runId"] };
 });
-installCompiledValidatorMap(lunora_sub_agents_functions_224.awaitApproval.args, (source) => {
-if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
-if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-let __has1 = false;
-let __val1;
-if (source["resumedWith"] !== undefined) {
-if (typeof source["resumedWith"] !== "number" || !Number.isFinite(source["resumedWith"])) return DEFER;
-__val1 = source["resumedWith"];
-__has1 = true;
-}
-if (typeof source["runId"] !== "string") return DEFER;
-return { ...(__has1 ? { "resumedWith": __val1 } : {}), "runId": source["runId"] };
-});
 installCompiledValidatorMap(lunora_sub_agents_functions_224.beatRun.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;

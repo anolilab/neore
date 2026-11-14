@@ -288,10 +288,13 @@ export const sendPhonePush = internalAction
                 return null;
             }
 
-            // A sub-agent's approval is answerable only once its run waits on it. Its notification is written in the transaction
-            // that moves the run to `awaiting` (`recordPendingToolApprovals`), so a push no longer finds the run still working
-            // on its own request; the hold stays as a guard for a run seen running beside a pending request, which holds the
-            // actionable alert for a later attempt. After the last attempt the owner still gets the generic alert, which names nothing.
+            // A sub-agent's approval is answerable only while its run waits on it. A first push cannot find the run still working on
+            // its own request: the notification is written in the transaction that moves the run to `awaiting`
+            // (`recordPendingToolApprovals`). But once the owner answers one request of a pause, the run is `running` again
+            // while its siblings stay pending on the latest turn, and an answer to them is refused (`SUB_AGENT_STILL_WORKING`). A
+            // push read then (the four-hour reminder, `lib/approval-reminder.ts`, or a late first push) would name a sibling whose
+            // Approve fails, so its actionable alert is held for a later attempt: the run waits again (answerable) or ends (its
+            // requests close, no push). After the last attempt the owner still gets the generic alert, which names nothing.
             const working = await ctx.runQuery(internal.notifications.phone_content.subAgentStillWorking, {
                 approvalId: notification.approvalId,
             });

@@ -101,13 +101,22 @@ export interface ExtensionGrantStore {
 
 export type ExtensionGrantErrorCode = "access_denied" | "invalid_grant" | "invalid_request" | "invalid_token" | "unauthorized";
 
+/** `reason` of the refusal to sign an app in while an admin impersonates the user. */
+export const EXTENSION_GRANT_IMPERSONATING = "impersonating";
+
+export type ExtensionGrantRefusal = typeof EXTENSION_GRANT_IMPERSONATING;
+
 export class ExtensionGrantError extends Error {
     public readonly code: ExtensionGrantErrorCode;
 
-    public constructor(code: ExtensionGrantErrorCode, message: string) {
+    /** Which `access_denied` refusal this is, for a page that words it in the user's language; `code` stays OAuth's. */
+    public readonly reason: ExtensionGrantRefusal | undefined;
+
+    public constructor(code: ExtensionGrantErrorCode, message: string, reason?: ExtensionGrantRefusal) {
         super(message);
         this.code = code;
         this.name = "ExtensionGrantError";
+        this.reason = reason;
     }
 
     /** HTTP status for the error, OAuth-style: 401 for a bad credential, 403 for a refused user, else 400. */
@@ -222,7 +231,11 @@ export const authorizeExtension = async (
     // The grant's session is a fresh one with no impersonation mark, so an app an admin signed in while acting as
     // the user would pass every impersonation guard. As `refuseGuestApproval` for device codes.
     if (input.session.impersonating) {
-        throw new ExtensionGrantError("access_denied", "Apps can't be signed in while impersonating. Sign in as yourself to connect one.");
+        throw new ExtensionGrantError(
+            "access_denied",
+            "Apps can't be signed in while impersonating. Sign in as yourself to connect one.",
+            EXTENSION_GRANT_IMPERSONATING,
+        );
     }
 
     if (!input.trustedRedirectUris.includes(input.redirectUri)) {
