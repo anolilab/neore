@@ -977,7 +977,14 @@ function isFormattedAbove(element: Element, kind: Kind, lookup: RuleLookup): boo
 
     // A built-in rule writes `<b>`, `<i>` or `<s>` whatever it holds; the preset's rule writes one it took over only
     // when it can.
-    return above !== null && ((isNamed(above) && !carriersOf(above).has(above)) || canWrap(above, lookup));
+    if (above === null) {
+        return false;
+    }
+
+    // A `<b>` the preset took over because it parts an emoji sequence writes none.
+    const isBuiltIn = isNamed(above) && !carriersOf(above).has(above) && !isInEmojiSequence(above, lookup);
+
+    return isBuiltIn || canWrap(above, lookup);
 }
 
 /**

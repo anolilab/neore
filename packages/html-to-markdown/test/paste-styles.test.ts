@@ -350,3 +350,9 @@ describe("paste styles: review cases, eleventh round", () => {
         expect(convert(`<p><span style="font-weight:bold"><b style="font-weight:inherit">x</b> y</span></p>`)).toBe("**x y**");
     });
 });
+
+describe("paste styles: review cases, twelfth round", () => {
+    it("keeps the bold of a styled word inside a <b> that writes none, as it parts an emoji sequence", () => {
+        expect(convert(`<p><b><span style="font-weight:bold">a</span>👩</b>\u{200D}👩</p>`)).toBe("**a**👩\u{200D}👩");
+    });
+});
