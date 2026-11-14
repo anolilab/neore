@@ -157,6 +157,15 @@ vi.mock("./sortable-thread-item", () => {
     return { default: vi.fn(() => null) };
 });
 
+/** Set while a test acts as an admin impersonating the signed-in user. */
+const impersonation = vi.hoisted(() => {
+    return { active: false };
+});
+
+vi.mock("@/features/admin/hooks/use-is-impersonating", () => {
+    return { useImpersonating: () => impersonation.active };
+});
+
 /** The thread whose options menu the list has open, as the context-menu key sets it. */
 const uiState = vi.hoisted(() => {
     return { optionsMenuThreadId: null as string | null };
@@ -241,6 +250,26 @@ describe("ThreadNode", () => {
         render(<ThreadNode {...baseProps} />);
 
         expect(screen.getByRole("button", { name: `${action}: Quarterly plan` })).toBeTruthy();
+    });
+
+    it("hides archive, delete and the lock menu from an admin impersonating the owner, as the server refuses them", () => {
+        impersonation.active = true;
+        render(<ThreadNode {...baseProps} />);
+        impersonation.active = false;
+
+        for (const action of ["Archive thread", "Delete thread", "Chat lock"]) {
+            expect(screen.queryByRole("button", { name: `${action}: Quarterly plan` })).toBeNull();
+        }
+
+        expect(screen.getByRole("button", { name: "Download thread: Quarterly plan" })).toBeTruthy();
+    });
+
+    it("keeps the lock menu for an admin impersonating the owner of a locked chat, so they can still unlock it to read", () => {
+        impersonation.active = true;
+        render(<ThreadNode {...baseProps} node={{ ...baseProps.node, lockedAt: 1 }} />);
+        impersonation.active = false;
+
+        expect(screen.getByRole("button", { name: "Chat lock: locked: Locked chat" })).toBeTruthy();
     });
 
     it("offers a snooze on a root thread that has a reply, and none on a child", () => {

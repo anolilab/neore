@@ -42,6 +42,7 @@ import type { FC } from "react";
 import React, { useEffect, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 
+import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import useAllThreadsData from "@/features/chat/core/hooks/use-all-threads-data";
 import useCurrentModel from "@/features/chat/core/hooks/use-current-model";
@@ -183,6 +184,8 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
 
     const setLoadingStates = () => {};
     const { handleCreateBranch, handlePinThread, handleUnpinThread, updateThread } = useThreadHandlers(setLoadingStates);
+    // An admin acting as the owner may not archive or delete their chats: the server refuses both.
+    const isImpersonating = useImpersonating();
 
     const pinnedThreadIds = new Set(
         pinnedThreads
@@ -460,19 +463,24 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                     onClick: handlePinUnpinThread,
                     value: "action-pin-unpin-thread",
                 },
-                {
-                    icon: <Archive className="size-4" />,
-                    label: currentThread?.status === "archived" ? t`Unarchive thread` : t`Archive thread`,
-                    onClick: handleArchiveCurrentThread,
-                    value: "action-archive-thread",
-                },
-                {
-                    icon: <Trash2 className="size-4" />,
-                    label: t`Delete thread`,
-                    onClick: handleDeleteCurrentThread,
-                    value: "action-delete-thread",
-                },
             );
+
+            if (!isImpersonating) {
+                threadActions.push(
+                    {
+                        icon: <Archive className="size-4" />,
+                        label: currentThread?.status === "archived" ? t`Unarchive thread` : t`Archive thread`,
+                        onClick: handleArchiveCurrentThread,
+                        value: "action-archive-thread",
+                    },
+                    {
+                        icon: <Trash2 className="size-4" />,
+                        label: t`Delete thread`,
+                        onClick: handleDeleteCurrentThread,
+                        value: "action-delete-thread",
+                    },
+                );
+            }
         }
 
         groups.push({ items: threadActions, value: t`Thread Actions` });
@@ -620,7 +628,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                                                     )}
                                                     {item.shortcut && <CommandShortcut>{formatShortcutForDisplay(item.shortcut)}</CommandShortcut>}
                                                     {item.isCurrent && <CommandShortcut>{t`Current`}</CommandShortcut>}
-                                                    {item.threadId && (
+                                                    {item.threadId && !isImpersonating && (
                                                         <div className="ml-auto flex gap-1">
                                                             <button
                                                                 aria-label={item.status === "archived" ? t`Unarchive thread` : t`Archive thread`}

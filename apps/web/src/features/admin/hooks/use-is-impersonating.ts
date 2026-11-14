@@ -24,3 +24,6 @@ export const useIsImpersonating = () => {
 
     return useQuery({ ...options, queryFn: isAuthenticated && afterFirstPaint ? options.queryFn : skipToken });
 };
+
+/** Whether an admin is acting as this account: the controls the server refuses to an impersonated session hide on it. */
+export const useImpersonating = (): boolean => useIsImpersonating().data?.isImpersonating === true;

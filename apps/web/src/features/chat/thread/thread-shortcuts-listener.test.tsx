@@ -17,6 +17,7 @@ const state = vi.hoisted(() => {
         handleDeleteThread: vi.fn(),
         handlerThreadId: undefined as string | undefined,
         optimistic: new Map<string, string>(),
+        impersonating: false,
         threadId: "t1" as string | undefined,
         updateThread: vi.fn(),
     };
@@ -33,6 +34,10 @@ vi.mock("@lingui/react/macro", () => {
             };
         },
     };
+});
+
+vi.mock("@/features/admin/hooks/use-is-impersonating", () => {
+    return { useImpersonating: () => state.impersonating };
 });
 
 vi.mock("@tanstack/react-router", () => {
@@ -109,6 +114,7 @@ describe("thread shortcuts", () => {
         state.updateThread.mockReset();
         state.optimistic = new Map();
         state.threadId = "t1";
+        state.impersonating = false;
         state.handlerThreadId = undefined;
     });
 
@@ -176,6 +182,18 @@ describe("thread shortcuts", () => {
 
     it("does nothing for a thread the person does not own, as a shared thread's viewer", () => {
         render(listener({ isOwner: false, status: "active" }));
+
+        pressArchive();
+        pressDelete();
+
+        expect(state.updateThread).not.toHaveBeenCalled();
+        expect(screen.queryByRole("button", { name: "Confirm delete" })).toBeNull();
+    });
+
+    it("does nothing for an admin impersonating the owner, as the server refuses both", () => {
+        state.impersonating = true;
+
+        render(listener({ isOwner: true, status: "active" }));
 
         pressArchive();
         pressDelete();

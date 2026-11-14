@@ -178,11 +178,11 @@ for a schema table that is neither policed nor listed:
 | `agent_projects.listThreadsByProject` | query | query | projects | identity (self-resolved); row.userId == caller | ok |
 | `agent_streams.list` | query | query | threads | thread access (owner/grant) | **fixed** (medium) — `isPublic` no longer grants raw stream rows |
 | `agent_streams.listDeltas` | query | query | streamingMessages, threads | thread access (owner/grant) | **fixed** (medium) — `isPublic` no longer grants raw deltas |
-| `agent_thread_lock.changeThreadPasscode` | mutation | authMutation | threadPasscodes, threads | owner only (`requireOwnedThreadIgnoringLock`); identity (self-resolved); rate limit `threadLock/unlock`; current passcode verified, failures counted on the row | ok — a wrong passcode is a result, so the failure count commits |
-| `agent_thread_lock.enableThreadLock` | mutation | authMutation | threadPasscodes, threads, threadAccess | owner only; refuses a shared or public chat; rate limit `threadLock/unlock` | ok — the passcode is hashed (PBKDF2-SHA256, 600k, per-row salt) and never stored |
-| `agent_thread_lock.lockThread` | mutation | authMutation | threadPasscodes, threads | owner only; rotates the epoch so every outstanding proof stops working | ok |
-| `agent_thread_lock.removeThreadPasscode` | mutation | authMutation | threadPasscodes, threads | owner only; needs the passcode; rate limit `threadLock/unlock` | ok |
-| `agent_thread_lock.unlockThread` | mutation | authMutation | threadPasscodes, threads | owner only; rate limit `threadLock/unlock`; per-chat backoff from the 5th failure, capped at 1 h | ok — returns a 30-minute proof bound to the current epoch |
+| `agent_thread_lock.changeThreadPasscode` | mutation | authMutation | threadPasscodes, threads | refused while impersonating; owner only (`requireOwnedThreadIgnoringLock`); identity (self-resolved); rate limit `threadLock/unlock`; current passcode verified, failures counted on the row | ok — a wrong passcode is a result, so the failure count commits |
+| `agent_thread_lock.enableThreadLock` | mutation | authMutation | threadPasscodes, threads, threadAccess | refused while impersonating (a lock withdraws the guest link and held notes); owner only; refuses a shared or public chat; rate limit `threadLock/unlock` | ok — the passcode is hashed (PBKDF2-SHA256, 600k, per-row salt) and never stored |
+| `agent_thread_lock.lockThread` | mutation | authMutation | threadPasscodes, threads | refused while impersonating (a lock withdraws the guest link and held notes); owner only; rotates the epoch so every outstanding proof stops working | ok |
+| `agent_thread_lock.removeThreadPasscode` | mutation | authMutation | threadPasscodes, threads | refused while impersonating; owner only; needs the passcode; rate limit `threadLock/unlock` | ok |
+| `agent_thread_lock.unlockThread` | mutation | authMutation | threadPasscodes, threads | owner only, impersonating admin included (it changes nothing about the chat and only proves the passcode for reading); rate limit `threadLock/unlock`; per-chat backoff from the 5th failure, capped at 1 h | ok — returns a 30-minute proof bound to the current epoch |
 | `agent_threads.getChildThreads` | query | query | threadRelationships, threads | identity (self-resolved); row.userId == caller | ok |
 | `agent_threads.getTemporaryThread` | query | query | temporaryThreads, threads | identity (self-resolved); row.userId == caller | ok |
 | `agent_threads.getTemporaryThreads` | query | query | — | identity (self-resolved); row.userId == caller | ok |
@@ -295,8 +295,8 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.createExtensionPairing` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_functions.createThread` | mutation | authMutation + RL | projects, teamMember | org membership/role; row.userId == caller; botId must be a bot the caller owns | **fixed** (low) — organizationId must be the active org |
 | `chat_functions.createThreadRelationshipPublic` | mutation | authMutation + RL | threads | row.userId == caller (both ends) | **fixed** (critical) — both threads must be the caller's; a link to a stranger's thread was a read grant on it |
-| `chat_functions.deleteThread` | mutation | authMutation + RL | threads | row.userId == caller; the public API route (`DELETE /api/v1/threads/{id}`) refuses a host-run thread with 409 before calling it | ok |
-| `chat_functions.deleteThreads` | mutation | authMutation + RL | — | row.userId == caller | ok |
+| `chat_functions.deleteThread` | mutation | authMutation + RL | threads | refused while impersonating; row.userId == caller; the public API route (`DELETE /api/v1/threads/{id}`) refuses a host-run thread with 409 before calling it | ok |
+| `chat_functions.deleteThreads` | mutation | authMutation + RL | — | refused while impersonating (the whole call); row.userId == caller | ok |
 | `chat_functions.generateSummary` | action | authAction + RL | threads | thread access (owner/grant) | **fixed** (low) — write access (it overwrites the summary) |
 | `chat_functions.getAllThreadRelationships` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_functions.getAnonymousMessageLimit` | query | publicQuery | — | identity (self-resolved) | accepted — public by design; caller's own counter |
@@ -325,13 +325,13 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.revokeExtension` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_functions.searchMessages` | query | authQuery | — | thread access (owner/grant); row.userId == caller | ok |
 | `chat_functions.searchThreads` | query | liteAuthQuery | — | caller-scoped (ctx.user) | ok |
-| `chat_functions.softDeleteThread` | mutation | authMutation + RL | threads | row.userId == caller | ok |
+| `chat_functions.softDeleteThread` | mutation | authMutation + RL | threads | refused while impersonating (trashing withdraws the guest link and held notes); row.userId == caller | ok |
 | `chat_functions.terminateBrowserSession` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `chat_functions.testMCPServerConnection` | action | authAction + RL | — | caller-scoped (ctx.user) | **fixed** (medium) — SSRF guard (`assertSafeMcpUrl`) on the URL |
-| `chat_functions.undoDeleteThread` | mutation | authMutation + RL | threads | row.userId == caller | ok |
+| `chat_functions.undoDeleteThread` | mutation | authMutation + RL | threads | refused while impersonating; row.userId == caller | ok |
 | `chat_functions.unpinThread` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.updateBrowserSettings` | mutation | authMutation + RL | aiUserPreferences | caller-scoped (ctx.user) | ok |
-| `chat_functions.updateThread` | action | authAction + RL | threads | thread access (owner/grant) | accepted — admin grantees may edit by design |
+| `chat_functions.updateThread` | action | authAction + RL | threads | thread access (owner/grant); a `status` change (archive, which withdraws the guest link and held notes, or unarchive) is refused while impersonating | accepted — admin grantees may edit by design |
 | `chat_functions.regenerateThreadTitle` | action | authAction + RL | threads | admin access (owner), as the rename | overwrites the title and bills the requester, as the summary does; refuses a locked, a host-run and a deleted thread |
 | `chat_functions.updateThreadDictationLanguage` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.updateThreadLanguage` | mutation | authMutation + RL | threads | row.userId == caller | ok |

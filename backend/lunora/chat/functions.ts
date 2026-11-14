@@ -1469,6 +1469,17 @@ export const updateThreadModel = internalMutation
         },
     );
 
+/**
+ * The pattern of `setThreadPermissionMode` and the guest-link writes: an admin acting as the owner archives, restores, trashes
+ * or deletes no chat. Each of those also withdraws the chat's guest link and held notes. Undoing one is refused too: it is a write
+ * to the owner's chats all the same.
+ */
+const refuseImpersonation = (impersonatedBy: string | null | undefined, refused: string): void => {
+    if (impersonatedBy) {
+        throw new LunoraError("FORBIDDEN", `${refused} while impersonating`);
+    }
+};
+
 export const updateThread = authAction
     .use(rateLimit("chat/update"))
     .input({
@@ -1504,7 +1515,11 @@ export const updateThread = authAction
             },
             ctx: context,
         }) => {
-            const { userId } = context.user;
+            const { impersonatedBy, userId } = context.user;
+
+            if (status !== undefined) {
+                refuseImpersonation(impersonatedBy, status === "archived" ? "A chat cannot be archived" : "A chat cannot be unarchived");
+            }
 
             const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "admin", threadId, unlockProof, userId });
 
@@ -2811,6 +2826,8 @@ export const deleteThread = authMutation
     })
     .output(v.object({ isDone: v.boolean() }))
     .mutation(async ({ args: { threadId }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy, "A chat cannot be deleted");
+
         const { userId } = context.user;
 
         // Get thread data before deletion for audit history
@@ -2858,6 +2875,8 @@ export const deleteThreads = authMutation
     })
     .output(v.object({ deletedCount: v.number(), success: v.boolean() }))
     .mutation(async ({ args: { threadIds }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy, "Chats cannot be deleted");
+
         if (threadIds.length === 0) {
             return { deletedCount: 0, success: true };
         }
@@ -3902,6 +3921,8 @@ export const softDeleteThread = authMutation
         threadId: v.id("threads"),
     })
     .mutation(async ({ args: { threadId }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy, "A chat cannot be moved to the trash");
+
         const { userId } = context.user;
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, {
             threadId: threadId as Id<"threads">,
@@ -3971,6 +3992,8 @@ export const undoDeleteThread = authMutation
         threadId: v.id("threads"),
     })
     .mutation(async ({ args: { threadId }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy, "A chat cannot be restored from the trash");
+
         const { userId } = context.user;
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, {
             threadId: threadId as Id<"threads">,
