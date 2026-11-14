@@ -249,3 +249,11 @@ describe("paste: review cases, seventh round", () => {
         expect(convert(`<ol><li value="-1">a</li><li>b</li></ol>`)).toBe("- -1. a\n0. b");
     });
 });
+
+describe("paste: a heading that holds only a code block", () => {
+    it("writes the code block alone, with no empty heading line", () => {
+        expect(convert("<h3><pre>only code</pre></h3>")).toBe("```\nonly code\n```");
+        expect(convert("<h2>Setup<pre>npm i</pre></h2>")).toBe("## Setup\n\n```\nnpm i\n```");
+        expect(convert("<h2>Use <code>npm</code></h2>")).toBe("## Use `npm`");
+    });
+});

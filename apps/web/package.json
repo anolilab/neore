@@ -81,6 +81,7 @@
         "@neore/backend": "workspace:*",
         "@neore/chat-ui": "workspace:*",
         "@neore/client-runtime": "workspace:*",
+        "@neore/html-to-markdown": "workspace:*",
         "@neore/ui": "workspace:*",
         "@onboardjs/core": "catalog:onboarding",
         "@onboardjs/posthog-plugin": "catalog:onboarding",

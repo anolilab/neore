@@ -106,6 +106,7 @@ const SUPERSCRIPTS = new Map([...SCRIPT_FROM, "n", "i"].map((char, index) => [ch
 const SUBSCRIPTS = new Map(SCRIPT_FROM.map((char, index) => [char, [..."₀₁₂₃₄₅₆₇₈₉₊₋₋₌₍₎"][index] as string]));
 // Elements in raised or lowered text that are more than its characters, so it is written as it is.
 const SCRIPT_STRUCTURE = new Set(["A", "BR", "CODE", "IMG", "KBD", "MATH", "SAMP", "SUB", "SUP", "TT"]);
+const HEADINGS = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
 const OUTER_DISPLAY = new Set(["block", "inline", "run-in"]);
 const INNER_DISPLAY = new Set(["flex", "flow", "flow-root", "grid", "ruby", "table"]);
 
@@ -267,6 +268,24 @@ function inlineMath(source: string): string {
     return `${fence}${pad}${tex}${pad}${fence}`;
 }
 
+// A heading line with no text: `#` to `######` and nothing after it.
+const EMPTY_HEADING_LINE = /^#{1,6} *(?:\n+|$)/;
+
+/**
+ * A heading whose only content is a block it cannot hold, such as a code block, writes no heading line of its own:
+ * an empty `### ` would be a heading with no text. Any other heading is written by the rule after this one.
+ */
+const headingRule: Rule = {
+    filter: unlessRemoved((node) => HEADINGS.has(node.nodeName)),
+    replacement(content, node, options, lookup) {
+        const next = lookup.ruleAfter(headingRule, node);
+        const written = next.replacement.call(next, content, node, options, lookup);
+        const start = written.length - written.trimStart().length;
+
+        return written.slice(0, start) + written.slice(start).replace(EMPTY_HEADING_LINE, "");
+    },
+};
+
 const pasteRules: Record<string, Rule> = {
     // A quote with no trailing space on its blank lines, which a composer would hide.
     blockquote: {
@@ -298,6 +317,8 @@ const pasteRules: Record<string, Rule> = {
             return "";
         },
     },
+
+    heading: headingRule,
 
     // An image is an emoji's or a formula's text, or nothing: a pasted picture arrives as a file, if at all.
     image: {
