@@ -16,7 +16,69 @@ import { patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { MAX_LENGTH } from "../lib/validators";
-import { RECORD_RETRY } from "./activity-logic";
+import { addDays, exportedUsageRow, RECORD_RETRY } from "./activity-logic";
+
+/**
+ * Rollup rows one export page reads and persists: about 135 KB of exported JSON. Below 1,000 so one page's writes (a row per distinct
+ * project, the two pieces, and the run's row) stay under a mutation's write limit.
+ */
+export const USAGE_EXPORT_PAGE = 900;
+
+/** Rollup rows one recount reads. A count keeps nothing, so it reads more at a time. */
+export const USAGE_COUNT_PAGE = 2000;
+
+/**
+ * Projects one title read takes, four at a time. A project document holds at most 2 MiB (`projects/export-pages.ts`), so a
+ * read is at most 8 MiB of documents, well under the 32 MiB a single read may use.
+ */
+export const USAGE_TITLE_STEP = 4;
+
+/**
+ * The most exported usage JSON one export keeps. The usage action reads it back from its own budget, so usage gets a fixed
+ * share of the file; past the share the export fails, and says the usage history is too large.
+ */
+export const USAGE_EXPORT_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Passes over the rollup in one attempt. Each pass uses its own step names, so a pass redone after a change reads the rollup
+ * again instead of replaying a count the workflow already has.
+ */
+export const USAGE_EXPORT_PASSES = 6;
+
+/**
+ * Attempts at the export. An attempt whose passes all changed under it is followed by a durable pause (`step.sleep`), so a
+ * backfill that is still writing can finish, and then a new attempt with fresh step names. Past the last attempt the export
+ * fails with a clear error.
+ */
+export const USAGE_EXPORT_ATTEMPTS = 3;
+
+/**
+ * Project document bytes one title step reads, measured as their JSON. A step reads projects four at a time and stops once this
+ * is reached, so a step's reads stay bounded whatever the projects' sizes; the number of steps follows the total size, not the
+ * number of projects. A step reads at most this plus one batch, plus the rows pieces it lists the projects from.
+ */
+export const TITLE_STEP_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Serialized title bytes one title step writes into its piece. A title is at most 10,000 characters, so a step of up to a thousand projects
+ * could pass a stored document's 2 MB limit; the step stops adding projects once this is reached, and the next step starts there.
+ */
+export const TITLE_PIECE_BYTES = 1024 * 1024;
+
+/**
+ * What one id a title step asks for counts against its budget, whether or not its project is still there. A deleted project reads
+ * no document, so without this its ids would cost nothing, and one step would work through all of them.
+ */
+export const TITLE_ID_BYTES = 4 * 1024;
+
+/**
+ * The position step between two rows pages' projects: a title step's position is its rows page times this, plus its offset among that
+ * page's projects. A page holds at most `USAGE_EXPORT_PAGE` rows, so its offsets stay below it.
+ */
+export const PROJECT_POSITION = 1_000_000;
+
+/** Pieces one read of an export's pieces returns. */
+const PIECES_PER_READ = 20;
 
 /**
  * Pieces one erasure, clear or sweep step reads. A rows piece holds up to a thousand exported rows, so a step's read stays bounded
@@ -35,6 +97,16 @@ export const EXPORT_PIECE_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** Pages of a user's run rows one erasure call reads; the next call continues where this one stopped. */
 const RUN_PAGES_PER_ERASURE = 50;
+
+/** The totals of the rows dated before a cutoff: what a recount must match, and what a page reports for its own rows. */
+export interface ClosedTotals {
+    cost: number;
+    replies: number;
+    rows: number;
+    tokens: number;
+}
+
+const utf8Bytes = (value: string): number => new TextEncoder().encode(value).byteLength;
 
 /**
  * Schedules the purge of a run's usage object (`purgeUsageFile`). The purge runs on the user's shard and is retried by the scheduler,
@@ -392,3 +464,300 @@ export const pruneUsageDaysBefore = async (ctx: MutationCtx, cutoffDate: string,
 
     return days.length;
 };
+
+/**
+ * The run's row, created with its first piece. A run's row is what the sweep reads to find it, so a run has one from its first page.
+ */
+const ensureRun = async (ctx: MutationCtx, requestId: string, userId: string): Promise<void> => {
+    const run = await ctx.db.usageExportRuns.findFirst({ consistency: "primary", where: { requestId, userId } });
+
+    if (!run) {
+        const deleteAt = ctx.now + EXPORT_PIECE_TTL_MS;
+
+        await ctx.db.insert("usageExportRuns", { createdAt: ctx.now, deleteAt, requestId, userId });
+        await noteShardDue(ctx, deleteAt, userId);
+    }
+};
+
+const pageSummary = v.object({
+    backfill: v.string(),
+    bytes: v.number(),
+    closed: v.object({ cost: v.number(), replies: v.number(), rows: v.number(), tokens: v.number() }),
+    cutoff: v.string(),
+    nextCursor: v.union(v.string(), v.null()),
+    projectIds: v.array(v.string()),
+    rowCount: v.number(),
+});
+
+const cursorArgument = v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null()));
+
+/**
+ * The day the recount's closed region ends: two days before the latest usage date the user has, read from the rows and not the
+ * clock, so a replay of the first page computes the same day. A user west of UTC, whose live rows are dated a day behind the
+ * UTC date, and a late retry of a reply from two days back both fall on or after it. No rows give an empty cutoff, which
+ * closes nothing.
+ */
+const cutoffFromRows = async (ctx: MutationCtx, userId: string): Promise<string> => {
+    const { page } = await ctx.db.usageDaily.findMany({ consistency: "primary", limit: 1, orderBy: [{ date: "desc" }], where: { userId } });
+
+    return page[0] ? addDays(page[0].date, -2) : "";
+};
+
+/**
+ * Whether the account's deletion has begun, read from the primary: a replica that has not seen the deletion would let a write
+ * through after the erasure has passed over the rollup.
+ */
+export const deletionUnderwayOnPrimary = async (ctx: MutationCtx | QueryCtx, userId: string): Promise<boolean> => {
+    // A failed deletion blocks too: its erasure may already have passed the rollup, and its retry does not erase again. Only a
+    // cancelled one does not hold the export back.
+    const request = await ctx.db.gdprRequests.findFirst({
+        consistency: "primary",
+        where: { requestType: "deletion", status: { in: ["completed", "failed", "pending", "processing"] }, userId },
+    });
+
+    return Boolean(request);
+};
+
+/** The user's backfill row as the export compares it: a change to any of these during the export is history written meanwhile. */
+const backfillFingerprint = async (ctx: MutationCtx | QueryCtx, userId: string): Promise<string> => {
+    const row = await ctx.db.usageBackfill.findFirst({ consistency: "primary", where: { userId } });
+
+    return row ? JSON.stringify([row.finishedAt ?? null, row.replies, row.runId, row.startedAt, row.status]) : "";
+};
+
+/**
+ * One page of the user's rollup, exported and persisted as piece `seq` of `pass` for the export run `requestId`. The first page
+ * of a run sets the cutoff (from the rows, see {@link cutoffFromRows}) and the run keeps it. A retry of the step finds its piece
+ * and returns the same summary, so the page is never written twice. Nothing is written once the account's deletion has begun.
+ */
+export const persistUsageRowsPage = internalMutation
+    .input({
+        cursor: cursorArgument,
+        cutoff: v.optional(v.string().max(10)),
+        pass: v.number(),
+        requestId: v.string().max(MAX_LENGTH.id),
+        seq: v.number(),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(pageSummary)
+    .mutation(async ({ args: { cursor, cutoff, pass, requestId, seq, userId }, ctx }) => {
+        // From the primary: a retry whose first write is not yet on a replica must find it, or the page is written twice.
+        const kept = await ctx.db.usageExportPieces.findFirst({ consistency: "primary", where: { kind: "rows", pass, requestId, seq, userId } });
+
+        if (kept) {
+            if (kept.closed === undefined) {
+                // Every rows piece is written with its totals, so a piece without them is not one this code wrote.
+                throw new Error("An export piece has no totals; the export is restarted");
+            }
+
+            return {
+                backfill: kept.backfill ?? "",
+                bytes: kept.bytes,
+                closed: kept.closed,
+                cutoff: kept.cutoff ?? "",
+                nextCursor: kept.nextCursor ?? null,
+                projectIds: kept.projectIds,
+                rowCount: kept.rowCount,
+            };
+        }
+
+        // Stored under a deletion, the pieces would outlive the erasure pass that is already draining the rollup.
+        if (await deletionUnderwayOnPrimary(ctx, userId)) {
+            throw new Error("Account deletion is underway; the usage export stops");
+        }
+
+        await ensureRun(ctx, requestId, userId);
+
+        const day = cutoff ?? (await cutoffFromRows(ctx, userId));
+        const backfill = await backfillFingerprint(ctx, userId);
+        const result = await ctx.db.usageDaily.findMany({
+            consistency: "primary",
+            cursor: cursor ?? null,
+            limit: USAGE_EXPORT_PAGE,
+            orderBy: [{ date: "asc" }],
+            where: { userId },
+        });
+        const payload = JSON.stringify(result.page.map((row) => exportedUsageRow(row)));
+        const projectIds = [...new Set(result.page.flatMap((row) => (row.projectKey === undefined ? [] : [row.projectKey])))];
+        const closed = closedTotalsOf(result.page, day);
+        const nextCursor = result.isDone ? null : result.continueCursor;
+        const bytes = utf8Bytes(payload);
+
+        await ctx.db.insert("usageExportPieces", {
+            backfill,
+            bytes,
+            closed,
+            closedRows: closed.rows,
+            createdAt: ctx.now,
+            cutoff: day,
+            kind: "rows",
+            pass,
+            payload,
+            projectIds,
+            requestId,
+            rowCount: result.page.length,
+            seq,
+            userId,
+            ...(nextCursor !== null && { nextCursor }),
+        });
+
+        // The page's projects, as their own piece: a title step reads these ids and never the rows.
+        // A project an earlier page of this pass named is not named again: each project is read once per pass.
+        const fresh: string[] = [];
+
+        for (const projectId of projectIds) {
+            const seen = await ctx.db.usageExportProjects.findFirst({ consistency: "primary", where: { pass, projectId, requestId, userId } });
+
+            if (!seen) {
+                await ctx.db.insert("usageExportProjects", { pass, projectId, requestId, userId });
+                fresh.push(projectId);
+            }
+        }
+
+        const projectPayload = JSON.stringify(fresh);
+
+        await ctx.db.insert("usageExportPieces", {
+            bytes: utf8Bytes(projectPayload),
+            createdAt: ctx.now,
+            kind: "projects",
+            pass,
+            payload: projectPayload,
+            projectIds: [],
+            requestId,
+            rowCount: fresh.length,
+            seq,
+            userId,
+        });
+
+        return { backfill, bytes, closed, cutoff: day, nextCursor, projectIds, rowCount: result.page.length };
+    });
+
+/** The totals of the rows dated before `cutoff` (YYYY-MM-DD) among `rows`. */
+export const closedTotalsOf = (
+    rows: ReadonlyArray<{ costMicrodollars: number; date: string; replies: number; tokens: number }>,
+    cutoff: string,
+): ClosedTotals => {
+    const totals: ClosedTotals = { cost: 0, replies: 0, rows: 0, tokens: 0 };
+
+    for (const row of rows) {
+        if (row.date >= cutoff) {
+            continue;
+        }
+
+        totals.cost += row.costMicrodollars;
+        totals.replies += row.replies;
+        totals.rows += 1;
+        totals.tokens += row.tokens;
+    }
+
+    return totals;
+};
+
+/** One recount page: the totals of the rows dated before `cutoff` it holds, and the backfill row as it stands. Nothing is kept. */
+export const countUsageRowsPage = internalQuery
+    .input({ cursor: cursorArgument, cutoff: v.string().max(10), userId: v.string().max(MAX_LENGTH.id) })
+    .output(
+        v.object({
+            backfill: v.string(),
+            closed: v.object({ cost: v.number(), replies: v.number(), rows: v.number(), tokens: v.number() }),
+            cursor: v.union(v.string(), v.null()),
+        }),
+    )
+    .query(async ({ args: { cursor, cutoff, userId }, ctx }) => {
+        // From the primary: a replica that has not seen a backfill's row would pass the recount it should fail.
+        const result = await ctx.db.usageDaily.findMany({
+            consistency: "primary",
+            cursor: cursor ?? null,
+            limit: USAGE_COUNT_PAGE,
+            orderBy: [{ date: "asc" }],
+            where: { date: { lt: cutoff }, userId },
+        });
+
+        return {
+            backfill: await backfillFingerprint(ctx, userId),
+            closed: closedTotalsOf(result.page, cutoff),
+            cursor: result.isDone ? null : result.continueCursor,
+        };
+    });
+
+/**
+ * The projects of `ids` the user still owns, read from the primary, with the bytes of the documents read: the usage action's
+ * re-check, made just before the file is written.
+ */
+/** The payloads of one kind of a run's pieces for `pass`, in `seq` order, a few at a time, from the primary. */
+export const readUsageExportPieces = internalQuery
+    .input({
+        cursor: cursorArgument,
+        kind: v.union(v.literal("rows"), v.literal("titles"), v.literal("verified")),
+        pass: v.number(),
+        requestId: v.string().max(MAX_LENGTH.id),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.object({ cursor: v.union(v.string(), v.null()), payloads: v.array(v.string()) }))
+    .query(async ({ args: { cursor, kind, pass, requestId, userId }, ctx }) => {
+        const result = await ctx.db.usageExportPieces.findMany({
+            consistency: "primary",
+            cursor: cursor ?? null,
+            limit: PIECES_PER_READ,
+            orderBy: [{ seq: "asc" }],
+            where: { kind, pass, requestId, userId },
+        });
+
+        return { cursor: result.isDone ? null : result.continueCursor, payloads: result.page.map((piece) => piece.payload) };
+    });
+
+/**
+ * Records the key of the usage JSON object a run stores, before the object is written: the run's row names it, so a run that dies
+ * after this leaves a record the sweep can act on, and the object never outlives its run.
+ */
+export const recordUsageFile = internalMutation
+    .input({ key: v.string().max(MAX_LENGTH.id), requestId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args: { key, requestId, userId }, ctx }) => {
+        // Checked in the same write that names the object: a record written after erasure would outlive its purge.
+        if (await deletionUnderwayOnPrimary(ctx, userId)) {
+            throw new Error("Account deletion is underway; the usage export stops");
+        }
+
+        await ensureRun(ctx, requestId, userId);
+
+        const run = await ctx.db.usageExportRuns.findFirst({ consistency: "primary", where: { requestId, userId } });
+
+        if (run) {
+            await ctx.db.patch("usageExportRuns", run._id, { usageKey: key });
+        }
+
+        return null;
+    });
+
+/**
+ * Names a stored usage object again, in a run row of its own, after its record was released: the row is due at once, so the sweep purges
+ * the object if its removal does not finish here. Returns the row, which the caller releases once the object is gone.
+ */
+export const keepUsageFileRecord = internalMutation
+    .input({ key: v.string().max(MAX_LENGTH.id), requestId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.id("usageExportRuns"))
+    .mutation(async ({ args: { key, requestId, userId }, ctx }) => {
+        const runId = await ctx.db.insert("usageExportRuns", { createdAt: ctx.now, deleteAt: ctx.now, requestId, usageKey: key, userId });
+
+        await noteShardDue(ctx, ctx.now, userId);
+
+        return runId;
+    });
+
+/**
+ * Confirms, after the usage object was written, that its run still names it and that no deletion has begun. `false` means the
+ * object must be removed: its record was released with the erasure, or the account is being deleted.
+ */
+export const confirmUsageFile = internalQuery
+    .input({ key: v.string().max(MAX_LENGTH.id), requestId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .query(async ({ args: { key, requestId, userId }, ctx }) => {
+        if (await deletionUnderwayOnPrimary(ctx, userId)) {
+            return false;
+        }
+
+        const run = await ctx.db.usageExportRuns.findFirst({ consistency: "primary", where: { requestId, userId } });
+
+        return run?.usageKey === key;
+    });

@@ -82,25 +82,51 @@ const inBatches = <T>(ids: ReadonlyArray<T>): T[][] => {
 };
 
 /**
- * The titles of the projects in `projectIds` that `userId` can read, by id: the rule of {@link readableProject} for many
- * projects in a few reads, the rows and then the caller's memberships in their organizations, each in batches of
- * {@link IDS_PER_READ} ids. A project the caller cannot
- * read, or that no longer exists, is left out. For a view that only names projects: no row-level-security re-read, as
- * only titles leave here.
+ * The titles, and the grants, of the projects in `projectIds` that `userId` can read, by id: the rule of
+ * {@link readableProject} for many projects in a few reads, the rows and then the caller's memberships in their
+ * organizations, each in batches of {@link IDS_PER_READ} ids. A project the caller cannot read, or that no longer exists,
+ * is left out. For a view that only names projects: no row-level-security re-read, as only titles leave here.
  */
-export const readableProjectTitles = async (
+export const readableProjectGrants = async (
     context: QueryCtx | MutationCtx,
     projectIds: ReadonlyArray<Id<"projects">>,
     userId: string,
-): Promise<Map<string, string>> => {
+    options: { primary?: boolean } = {},
+): Promise<Map<string, ProjectTitleGrant>> => {
+    // A view that only names projects does not serialize the documents it reads to count them.
+    const measured = await readableProjectGrantsMeasured(context, projectIds, userId, { ...options, measure: false });
+
+    return measured.grants;
+};
+
+/**
+ * The grants of {@link readableProjectGrants}, with the bytes its project documents cost to read: their JSON size, a fair measure
+ * of what the read budget counts. A caller that budgets its reads uses this, so each document is counted when it is read.
+ */
+export const readableProjectGrantsMeasured = async (
+    context: QueryCtx | MutationCtx,
+    projectIds: ReadonlyArray<Id<"projects">>,
+    userId: string,
+    options: { measure?: boolean; primary?: boolean } = {},
+): Promise<{ grants: Map<string, ProjectTitleGrant>; readBytes: number }> => {
     if (projectIds.length === 0) {
-        return new Map();
+        return { grants: new Map(), readBytes: 0 };
     }
 
+    // The export's own reads come from the primary; a view that only names projects reads from a replica.
+    const consistency = options.primary === true ? { consistency: "primary" as const } : {};
+
     const rows = [];
+    let readBytes = 0;
 
     for (const ids of inBatches(projectIds)) {
-        const { page } = await systemDb(context).projects.findMany({ where: { _id: { in: ids } } });
+        const { page } = await systemDb(context).projects.findMany({ ...consistency, where: { _id: { in: ids } } });
+
+        if (options.measure !== false) {
+            for (const row of page) {
+                readBytes += new TextEncoder().encode(JSON.stringify(row)).byteLength;
+            }
+        }
 
         rows.push(...page);
     }
@@ -109,22 +135,40 @@ export const readableProjectTitles = async (
     const memberOf = new Set<string>();
 
     for (const ids of inBatches(organizations)) {
-        const { page } = await context.db.member.findMany({ where: { organizationId: { in: ids }, userId } });
+        const { page } = await context.db.member.findMany({ ...consistency, where: { organizationId: { in: ids }, userId } });
 
         for (const membership of page) {
             memberOf.add(membership.organizationId);
         }
     }
 
-    const titles = new Map<string, string>();
+    const grants = new Map<string, ProjectTitleGrant>();
 
     for (const row of rows) {
         if (await mayReadProject(row, userId, async (organizationId) => memberOf.has(organizationId))) {
-            titles.set(row._id, row.title);
+            // The organization the caller reads it through, unless the caller owns it: that is the membership a later check re-reads.
+            grants.set(row._id, { organizationId: row.userId === userId ? undefined : row.organizationId, title: row.title });
         }
     }
 
-    return titles;
+    return { grants, readBytes };
+};
+
+/** A project title and the organization whose membership lets the caller read it (none for a project they own). */
+export interface ProjectTitleGrant {
+    organizationId?: string;
+    title: string;
+}
+
+/** The titles of {@link readableProjectGrants}, by id: what a view that only names projects shows. */
+export const readableProjectTitles = async (
+    context: QueryCtx | MutationCtx,
+    projectIds: ReadonlyArray<Id<"projects">>,
+    userId: string,
+): Promise<Map<string, string>> => {
+    const grants = await readableProjectGrants(context, projectIds, userId);
+
+    return new Map([...grants].map(([projectId, grant]) => [projectId, grant.title] as const));
 };
 
 /**

@@ -747,14 +747,16 @@ export interface InternalApiTypes {
             pruneRetainedActivity: FunctionReference<"mutation", {}, { subAgentRuns: number; usageDaily: number }>;
         };
         steps: {
-            collectActivityForExport: FunctionReference<"query", { userId: string }, { knowledgeCollections: Array<unknown>; subAgentRuns: Array<unknown>; usageDaily: Array<unknown> }>;
+            collectActivityForExport: FunctionReference<"query", { userId: string }, { knowledgeCollections: Array<unknown>; subAgentRuns: Array<unknown> }>;
             collectConversations: FunctionReference<"action", { userId: string }, { contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string; }[]; guestLinks: { createdAt: number; expiresAt: number; }[]; guestNotes: { createdAt: number; status: string; text: string; }[]; messages: { _id: string; createdAt: number; model?: string; order?: number; parentMessageId?: string; role?: string; status?: string; stepOrder?: number; text?: string; tool?: boolean; }[]; thread: { _id: string; activeLeafMessageId?: string; category?: string; createdAt: number; model?: string; summary?: string; tags?: string[]; title?: string; updatedAt?: number; userTags: string[]; }; }[]>;
             collectFiles: FunctionReference<"query", { userId: string }, { files: Array<{ _id: Id<"files">; createdAt: number; name: string; size: number; tags?: Array<string>; type: string; updatedAt: number }>; folders: Array<{ _id: Id<"folders">; createdAt: number; name: string; updatedAt: number }> }>;
             collectProfile: FunctionReference<"query", { userId: string }, { createdAt: number; email: string; emailVerified: boolean; id: string; image: string; name: string } | null>;
             collectPrompts: FunctionReference<"query", { userId: string }, { promptHistory: { _id: Id<"promptHistory">; changeType: string; content: string; createdAt: number; promptId: Id<"prompts">; version: number; }[]; prompts: { _id: Id<"prompts">; content: string; createdAt: number; description: string | undefined; isFavorite: boolean | undefined; lastUsedAt: number | undefined; name: string; tags: string[] | undefined; updatedAt: number | undefined; usageCount: number | undefined; }[]; }>;
             collectSettings: FunctionReference<"query", { userId: string }, { aiUserPreferences?: unknown | null; userSettings?: unknown | null }>;
             collectThreadTags: FunctionReference<"query", { userId: string }, Array<{ _id: string; color: string; createdAt: number; name: string; order: number; updatedAt: number }>>;
-            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; pullRequestGuides?: unknown; pullRequestThreads?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; userEmail: string; userId: string; watchedRepositories?: unknown }, string>;
+            deleteUsageJson: FunctionReference<"action", { key: string }, null>;
+            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; pullRequestGuides?: unknown; pullRequestThreads?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; usageKey?: string; userEmail: string; userId: string; watchedRepositories?: unknown }, string>;
+            prepareUsageForExport: FunctionReference<"action", { pass: number; requestId: string; userId: string }, string | null>;
             sendExportReadyEmail: FunctionReference<"action", { requestId: Id<"gdprRequests">; userEmail: string }, null>;
             deletion_steps: {
                 deleteAuthRecords: FunctionReference<"mutation", { userId: string }, null>;
@@ -1304,7 +1306,10 @@ export interface InternalApiTypes {
     usage: {
         activity: {
             forwardReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; projectRetry?: boolean; replyKey: string; skillKey: string; skillName?: string; threadId: string; tokens: number; userId: string }, null>;
+            persistUsageTitles: FunctionReference<"mutation", { budgetBytes: number; from: number; pass: number; requestId: string; seq: number; userId: string }, { bytes: number; done: boolean; next: number; titles: number }>;
             recordReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; projectUnread?: boolean; replyKey: string; retry?: boolean; skillKey: string; skillName?: string; threadAttribution?: { projectKey?: string }; threadId?: string; tokens: number; userId: string }, null>;
+            stillMemberOf: FunctionReference<"query", { organizationIds: Array<string>; userId: string }, Array<string>>;
+            verifyUsageTitles: FunctionReference<"mutation", { budgetBytes: number; from: number; pass: number; requestId: string; seq: number; userId: string }, { bytes: number; done: boolean; next: number; titles: number }>;
         };
         backfill: {
             runUsageBackfillStep: FunctionReference<"mutation", { runId: string; userId: string }, null>;
@@ -1312,9 +1317,15 @@ export interface InternalApiTypes {
         };
         gdpr: {
             clearUsageExportPieces: FunctionReference<"mutation", { requestId: string; userId: string }, { hasMore: boolean }>;
+            confirmUsageFile: FunctionReference<"query", { key: string; requestId: string; userId: string }, boolean>;
+            countUsageRowsPage: FunctionReference<"query", { cursor?: string | null; cutoff: string; userId: string }, { backfill: string; closed: { cost: number; replies: number; rows: number; tokens: number }; cursor: string | null }>;
+            keepUsageFileRecord: FunctionReference<"mutation", { key: string; requestId: string; userId: string }, Id<"usageExportRuns">>;
             keyedUsageRuns: FunctionReference<"query", { cursor: string | null; userId: string }, { cursor: string | null; keyed: Array<{ key?: string; live: boolean; runId: Id<"usageExportRuns"> }> }>;
+            persistUsageRowsPage: FunctionReference<"mutation", { cursor?: string | null; cutoff?: string; pass: number; requestId: string; seq: number; userId: string }, { backfill: string; bytes: number; closed: { cost: number; replies: number; rows: number; tokens: number }; cutoff: string; nextCursor: string | null; projectIds: Array<string>; rowCount: number }>;
             purgeUsageFile: FunctionReference<"action", { key: string; runId: Id<"usageExportRuns"> }, null>;
+            readUsageExportPieces: FunctionReference<"query", { cursor?: string | null; kind: "rows" | "titles" | "verified"; pass: number; requestId: string; userId: string }, { cursor: string | null; payloads: Array<string> }>;
             rearmLiveUsageRun: FunctionReference<"mutation", { runId: Id<"usageExportRuns">; userId: string }, null>;
+            recordUsageFile: FunctionReference<"mutation", { key: string; requestId: string; userId: string }, null>;
             releaseUsageKey: FunctionReference<"mutation", { runId: Id<"usageExportRuns"> }, null>;
             sweepUsageExportPieces: FunctionReference<"mutation", {}, null>;
         };
@@ -2103,7 +2114,9 @@ export const internal: InternalApiTypes = {
             collectPrompts: { __lunoraRef: "gdpr_steps:collectPrompts" },
             collectSettings: { __lunoraRef: "gdpr_steps:collectSettings" },
             collectThreadTags: { __lunoraRef: "gdpr_steps:collectThreadTags" },
+            deleteUsageJson: { __lunoraRef: "gdpr_steps:deleteUsageJson" },
             generateExportFile: { __lunoraRef: "gdpr_steps:generateExportFile" },
+            prepareUsageForExport: { __lunoraRef: "gdpr_steps:prepareUsageForExport" },
             sendExportReadyEmail: { __lunoraRef: "gdpr_steps:sendExportReadyEmail" },
             deletion_steps: {
                 deleteAuthRecords: { __lunoraRef: "gdpr_steps_deletion_steps:deleteAuthRecords" },
@@ -2653,7 +2666,10 @@ export const internal: InternalApiTypes = {
     usage: {
         activity: {
             forwardReplyUsage: { __lunoraRef: "usage_activity:forwardReplyUsage" },
+            persistUsageTitles: { __lunoraRef: "usage_activity:persistUsageTitles" },
             recordReplyUsage: { __lunoraRef: "usage_activity:recordReplyUsage" },
+            stillMemberOf: { __lunoraRef: "usage_activity:stillMemberOf" },
+            verifyUsageTitles: { __lunoraRef: "usage_activity:verifyUsageTitles" },
         },
         backfill: {
             runUsageBackfillStep: { __lunoraRef: "usage_backfill:runUsageBackfillStep" },
@@ -2661,9 +2677,15 @@ export const internal: InternalApiTypes = {
         },
         gdpr: {
             clearUsageExportPieces: { __lunoraRef: "usage_gdpr:clearUsageExportPieces" },
+            confirmUsageFile: { __lunoraRef: "usage_gdpr:confirmUsageFile" },
+            countUsageRowsPage: { __lunoraRef: "usage_gdpr:countUsageRowsPage" },
+            keepUsageFileRecord: { __lunoraRef: "usage_gdpr:keepUsageFileRecord" },
             keyedUsageRuns: { __lunoraRef: "usage_gdpr:keyedUsageRuns" },
+            persistUsageRowsPage: { __lunoraRef: "usage_gdpr:persistUsageRowsPage" },
             purgeUsageFile: { __lunoraRef: "usage_gdpr:purgeUsageFile" },
+            readUsageExportPieces: { __lunoraRef: "usage_gdpr:readUsageExportPieces" },
             rearmLiveUsageRun: { __lunoraRef: "usage_gdpr:rearmLiveUsageRun" },
+            recordUsageFile: { __lunoraRef: "usage_gdpr:recordUsageFile" },
             releaseUsageKey: { __lunoraRef: "usage_gdpr:releaseUsageKey" },
             sweepUsageExportPieces: { __lunoraRef: "usage_gdpr:sweepUsageExportPieces" },
         },

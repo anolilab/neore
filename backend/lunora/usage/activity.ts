@@ -25,12 +25,13 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { internalMutation } from "../_generated/server";
-import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { authQuery } from "../lib/crpc";
 import { logger } from "../lib/logger";
 import { runAfterOnShard, runAfterWithRetry } from "../lib/shard-scheduler";
-import { readableProject, readableProjectTitles } from "../projects/functions";
+import { MAX_LENGTH } from "../lib/validators";
+import { readableProject, readableProjectGrantsMeasured, readableProjectTitles, type ProjectTitleGrant } from "../projects/functions";
+import { deletionUnderwayOnPrimary, PROJECT_POSITION, TITLE_ID_BYTES, TITLE_PIECE_BYTES, USAGE_TITLE_STEP } from "./gdpr";
 import { leadThreadOf } from "../sub-agents/worker-thread";
 import type { Attribution, AttributionIncrement, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
 import {
@@ -204,7 +205,7 @@ export const recordReplyUsage = internalMutation
         }
 
         // A row written behind the deletion workflow's step would survive the erasure.
-        if (await isAccountDeletionUnderway(ctx, args.userId)) {
+        if (await deletionUnderwayOnPrimary(ctx, args.userId)) {
             return null;
         }
 
@@ -609,4 +610,153 @@ export const getProjectUsage = authQuery
         });
 
         return { ...sumRows(page.slice(0, PROJECT_USAGE_ROW_LIMIT)), truncated: page.length > PROJECT_USAGE_ROW_LIMIT };
+    });
+
+const utf8Bytes = (value: string): number => new TextEncoder().encode(value).byteLength;
+
+/** The ids of one `projects` piece (a rows page's projects, stored with that page), or null when it is not stored. */
+const projectIdsAt = async (ctx: MutationCtx, requestId: string, pass: number, userId: string, seq: number): Promise<string[] | null> => {
+    const piece = await ctx.db.usageExportPieces.findFirst({ consistency: "primary", where: { kind: "projects", pass, requestId, seq, userId } });
+
+    return piece ? (JSON.parse(piece.payload) as string[]) : null;
+};
+
+const titleStepInput = {
+    budgetBytes: v.number(),
+    from: v.number(),
+    pass: v.number(),
+    requestId: v.string().max(MAX_LENGTH.id),
+    seq: v.number(),
+    userId: v.string().max(MAX_LENGTH.id),
+};
+
+const titleStepOutput = v.object({ bytes: v.number(), done: v.boolean(), next: v.number(), titles: v.number() });
+
+/**
+ * The titles and grants of a bounded run of a pass's projects, for one title step. `from` is a position: the rows page the step
+ * starts in, times `PROJECT_POSITION`, plus its offset among that page's projects. The step reads four projects at a time and stops
+ * once it has read `budgetBytes` of project documents. `done` when no page is left; otherwise `next` is where the following step
+ * starts. `kind` is the piece the step writes: `titles` for the first read, `verified` for the re-check before the usage action.
+ */
+const runTitleStep = async (
+    ctx: MutationCtx,
+    args: { budgetBytes: number; from: number; pass: number; requestId: string; seq: number; userId: string },
+    kind: "titles" | "verified",
+): Promise<{ bytes: number; done: boolean; next: number; titles: number }> => {
+    const { budgetBytes, from, pass, requestId, seq, userId } = args;
+    // A retried step reads afresh: the group is the export's last check, so it never reuses a read made under older access.
+    const kept = await ctx.db.usageExportPieces.findFirst({
+        consistency: "primary",
+        where: { kind, pass, requestId, seq, userId },
+    });
+
+    if (kept) {
+        await ctx.db.delete("usageExportPieces", kept._id);
+    }
+
+    if (await deletionUnderwayOnPrimary(ctx, userId)) {
+        throw new Error("Account deletion is underway; the usage export stops");
+    }
+
+    const grants = new Map<string, ProjectTitleGrant>();
+    let next = from;
+    let readBytes = 0;
+    let payloadBytes = 0;
+    // The page's projects the step is reading: one page is read once, not once per group.
+    let readPage = -1;
+    let pageIds: string[] | null = null;
+
+    while (readBytes < budgetBytes) {
+        const pageAt = Math.floor(next / PROJECT_POSITION);
+
+        if (pageAt !== readPage) {
+            readPage = pageAt;
+            pageIds = await projectIdsAt(ctx, requestId, pass, userId, pageAt);
+        }
+
+        if (pageIds === null) {
+            break;
+        }
+
+        const offset = next - pageAt * PROJECT_POSITION;
+
+        if (offset >= pageIds.length) {
+            next = (pageAt + 1) * PROJECT_POSITION;
+            continue;
+        }
+
+        const group = pageIds.slice(offset, offset + USAGE_TITLE_STEP);
+        const measured = await readableProjectGrantsMeasured(ctx, group as Id<"projects">[], userId, { primary: true });
+
+        readBytes += measured.readBytes + group.length * TITLE_ID_BYTES;
+
+        // The group's titles would take the piece past its cap: this step stops before it, and the next step reads it.
+        const groupBytes = [...measured.grants].reduce((sum, entry) => sum + utf8Bytes(JSON.stringify(entry)), 0);
+
+        if (grants.size > 0 && payloadBytes + groupBytes > TITLE_PIECE_BYTES) {
+            break;
+        }
+
+        payloadBytes += groupBytes;
+
+        for (const [projectId, grant] of measured.grants) {
+            grants.set(projectId, grant);
+        }
+
+        next += group.length;
+    }
+
+    // A page read through is passed over, so `next` is where the following step starts: the first page with projects left.
+    let endAt = Math.floor(next / PROJECT_POSITION);
+    let endIds = await projectIdsAt(ctx, requestId, pass, userId, endAt);
+
+    while (endIds !== null && next - endAt * PROJECT_POSITION >= endIds.length) {
+        endAt += 1;
+        next = endAt * PROJECT_POSITION;
+        endIds = await projectIdsAt(ctx, requestId, pass, userId, endAt);
+    }
+
+    const payload = JSON.stringify(Object.fromEntries(grants));
+    const bytes = utf8Bytes(payload);
+
+    await ctx.db.insert("usageExportPieces", {
+        bytes,
+        createdAt: ctx.now,
+        kind,
+        pass,
+        payload,
+        projectIds: [],
+        requestId,
+        rowCount: grants.size,
+        seq,
+        userId,
+    });
+
+    return { bytes, done: endIds === null, next, titles: grants.size };
+};
+
+/** The first read of a pass's projects, in bounded steps. */
+export const persistUsageTitles = internalMutation
+    .input(titleStepInput)
+    .output(titleStepOutput)
+    .mutation(async ({ args, ctx }) => await runTitleStep(ctx, args, "titles"));
+
+/** The re-check of a pass's projects just before the usage action builds the file, in bounded steps of its own. */
+export const verifyUsageTitles = internalMutation
+    .input(titleStepInput)
+    .output(titleStepOutput)
+    .mutation(async ({ args, ctx }) => await runTitleStep(ctx, args, "verified"));
+
+/**
+ * The organizations of `organizationIds` the user is still a member of, read from the primary. The usage action re-checks memberships
+ * with it just before the file is built: a membership reads one small row per organization, so the check's cost does not follow the
+ * size of the projects.
+ */
+export const stillMemberOf = internalQuery
+    .input({ organizationIds: v.array(v.string().max(MAX_LENGTH.id)), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.array(v.string()))
+    .query(async ({ args: { organizationIds, userId }, ctx }) => {
+        const { page } = await ctx.db.member.findMany({ consistency: "primary", where: { organizationId: { in: organizationIds }, userId } });
+
+        return page.map((membership) => membership.organizationId);
     });
