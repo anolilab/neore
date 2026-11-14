@@ -74,6 +74,7 @@ afterEach(() => {
     manager.killAll();
     scratch.dispose();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
 });
 
 describe("a session", () => {
@@ -373,6 +374,7 @@ describe("the environment", () => {
     it("is exactly the plan's: nothing is inherited from the app", async () => {
         vi.stubEnv("NEORE_LEAK", "from-the-app");
         vi.stubEnv("ELECTRON_RUN_AS_NODE", "1");
+        vi.stubEnv("SHLVL", "41");
 
         const target = make({ ONLY_FOR_THIS_AGENT: "yes" });
         const id = await start(target);
@@ -380,13 +382,13 @@ describe("the environment", () => {
         target.send(id, "env");
         await idle(id, target);
 
-        // macOS adds this one to every process it starts; it is not the app's.
-        const names = Object.keys(JSON.parse(snapshot(id, target).turns[0].text) as Record<string, string>).filter(
-            (name) => name !== "__CF_USER_TEXT_ENCODING",
-        );
+        const env = JSON.parse(snapshot(id, target).turns[0].text) as Record<string, string>;
+        // macOS adds __CF_USER_TEXT_ENCODING to every process it starts, and bash as the Linux launch `sh` (Arch, Fedora;
+        // not dash) exports its own SHLVL, re-set on `exec`; neither is the app's.
+        const names = Object.keys(env).filter((name) => name !== "__CF_USER_TEXT_ENCODING" && name !== "SHLVL");
 
         expect(new Set(names)).toEqual(new Set(["FAKE_AGENT_LOG", "ONLY_FOR_THIS_AGENT", "PATH"]));
-        vi.unstubAllEnvs();
+        expect(env.SHLVL).not.toBe("41");
         target.killAll();
     });
 });

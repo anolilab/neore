@@ -6,7 +6,7 @@
  * once and downloads nothing, and a failed download shows the folder, then loads again when the page is visible again.
  */
 // eslint-disable-next-line testing-library/no-manual-cleanup -- vitest runs without globals, so nothing else cleans up between tests
-import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { Rocket } from "lucide-react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -39,6 +39,17 @@ const setVisibility = (state: DocumentVisibilityState): void => {
     document.dispatchEvent(new Event("visibilitychange"));
 };
 
+/**
+ * Runs `step` in an async act, which keeps flushing until nothing is queued: the effect that starts the download, the
+ * download's `then`/`catch` update and the effects of that render (the retry listener) all run before it returns. With
+ * the update made outside act, that listener could still be pending when the test dispatches `visibilitychange`.
+ */
+const settle = async (step: () => void): Promise<void> => {
+    await act(async () => {
+        step();
+    });
+};
+
 beforeEach(() => {
     loader.calls = 0;
     loader.fail = false;
@@ -65,21 +76,21 @@ describe("ProjectIcon around the icon map's download", () => {
     it("shows the folder when the download fails, and loads again once the page is visible again", async () => {
         loader.fail = true;
 
-        const { container } = render(<ProjectIcon color="#ff0000" name="rocket" />);
+        let container: HTMLElement = document.body;
 
-        await waitFor(() => {
-            expect(container.querySelector("svg.lucide-folder")).not.toBeNull();
+        await settle(() => {
+            ({ container } = render(<ProjectIcon color="#ff0000" name="rocket" />));
         });
+
+        expect(container.querySelector("svg.lucide-folder")).not.toBeNull();
         expect(loader.calls).toBe(1);
 
         loader.fail = false;
-        act(() => {
+        await settle(() => {
             setVisibility("visible");
         });
 
-        await waitFor(() => {
-            expect(container.querySelector("svg.lucide-rocket")).not.toBeNull();
-        });
+        expect(container.querySelector("svg.lucide-rocket")).not.toBeNull();
         expect(loader.calls).toBe(2);
     });
 });
