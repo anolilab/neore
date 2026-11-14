@@ -54,6 +54,27 @@ const LINE_ELEMENTS = new Set([
 const INLINE_DISPLAYS = new Set(["contents", "inline", "inline-block", "inline-flex", "inline-grid", "inline-table", "ruby", "ruby-base", "ruby-text"]);
 const BLOCK_DISPLAYS = new Set(["block", "flex", "flow-root", "grid", "list-item", "table", "table-caption", "table-row", "table-row-group"]);
 const DISPLAY_SPACE = /[\t\n\f\r ]+/;
+// Every keyword a display value may hold, so a value a browser cannot read overrides no earlier one.
+const DISPLAY_KEYWORDS = new Set([
+    ...INLINE_DISPLAYS,
+    ...BLOCK_DISPLAYS,
+    "flow",
+    "inherit",
+    "initial",
+    "none",
+    "revert",
+    "revert-layer",
+    "ruby-base-container",
+    "ruby-text-container",
+    "run-in",
+    "table-cell",
+    "table-column",
+    "table-column-group",
+    "table-footer-group",
+    "table-header-group",
+    "unset",
+]);
+const MAX_DISPLAY_KEYWORDS = 3;
 const BACKTICK_RUN = /`+/g;
 const MIN_FENCE = 3;
 
@@ -198,7 +219,7 @@ function codeText(pre: Element, lookup: RuleLookup, imageAlt: (image: Element) =
  */
 function isLineElement(element: Element): boolean {
     const style = element.getAttribute("style") ?? "";
-    const display = style === "" ? "" : declaredStyle(style, "display");
+    const display = style === "" ? "" : declaredStyle(style, "display", isDisplayValue);
     const outer = display.split(DISPLAY_SPACE)[0] ?? "";
 
     if (INLINE_DISPLAYS.has(outer)) {
@@ -228,6 +249,13 @@ function leafText(node: Node, lookup: RuleLookup, imageAlt: (image: Element) => 
 
     // An image is the emoji or formula its alt text names, as code writes it: the text alone.
     return node.nodeName === "IMG" ? imageAlt(node as Element) : undefined;
+}
+
+/** True for a display value made of keywords a browser knows, at most three of them. */
+function isDisplayValue(value: string): boolean {
+    const keywords = value.split(DISPLAY_SPACE);
+
+    return keywords.length <= MAX_DISPLAY_KEYWORDS && keywords.every((keyword) => DISPLAY_KEYWORDS.has(keyword));
 }
 
 /** Pushes the node's children, last first, so the first comes off the stack first. */

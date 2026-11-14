@@ -24,11 +24,12 @@ const BOLD_WEIGHTS = new Set(["600", "700", "800", "900", "bold", "bolder"]);
 const NORMAL_WEIGHTS = new Set(["100", "200", "300", "400", "500", "normal"]);
 // The whitespace between the keywords of a CSS value.
 const CSS_SPACE = /[\t\n\f\r ]+/;
+// The box the gfm rules write for a checkbox at the start of a list item.
+const TASK_BOX = /^\[[ x]\] /;
 const GLOBAL_VALUES = new Set(["inherit", "initial", "revert", "revert-layer", "unset"]);
 const NUMBER = /^\d+(?:\.\d+)?$/;
 const MAX_WEIGHT = 1000;
-// Values that take the parent's weight, as no declaration does.
-// Values that take the parent's weight. `revert` goes back to the browser's own style, which for `<b>` is bolder.
+// `inherit` and `unset` take the parent's weight; `revert` goes back to the browser's own style, bolder for `<b>`.
 const INHERITING = new Set(["inherit", "unset"]);
 const REVERTING = new Set(["revert", "revert-layer"]);
 const DEFAULT_WEIGHT = 400;
@@ -712,7 +713,8 @@ function edgeText(node: Node | null, side: "first" | "last", lookup: RuleLookup)
             break;
         }
 
-        if (current.nodeType === 3) {
+        // Text, and CDATA, which a DOM passed in may hold.
+        if (current.nodeType === 3 || current.nodeType === 4) {
             text = current.nodeValue ?? "";
             break;
         }
@@ -726,6 +728,18 @@ function edgeText(node: Node | null, side: "first" | "last", lookup: RuleLookup)
     }
 
     return text;
+}
+
+/** The first sibling toward the edge that the page shows text in: hidden ones and empty elements are passed over. */
+function textSibling(node: Node, side: "first" | "last", lookup: RuleLookup): Node | null {
+    const step = (from: Node): Node | null => shownFrom(side === "first" ? from.nextSibling : from.previousSibling, side, lookup);
+    let sibling = step(node);
+
+    while (sibling?.nodeType === 1 && (sibling.textContent ?? "") === "") {
+        sibling = step(sibling);
+    }
+
+    return sibling;
 }
 
 /** The node, or the first after it toward the edge (the next one for "first", the one before for "last") the page shows. */
@@ -816,7 +830,7 @@ function neighbourText(node: Node, side: "first" | "last", lookup: RuleLookup): 
 
         chain.push(current);
 
-        const sibling = shownFrom(side === "first" ? current.nextSibling : current.previousSibling, side, lookup);
+        const sibling = textSibling(current, side, lookup);
 
         if (sibling) {
             text = edgeText(sibling, side, lookup);
@@ -1003,6 +1017,14 @@ function isNestedInStyled(element: Element, lookup: RuleLookup): boolean {
 
 /** The element's content with the bold, italics and strikethrough its name or style gives it, and its normal-weight marks. */
 function formatted(content: string, node: Element, options: Options, lookup: RuleLookup): string {
+    // A task list item's box stays right after its marker, outside the delimiters, so it is still a box.
+    const found = node.nodeName === "LI" ? TASK_BOX.exec(content) : null;
+    const box = found?.[0] ?? "";
+
+    return box + formattedText(content.slice(box.length), node, options, lookup);
+}
+
+function formattedText(content: string, node: Element, options: Options, lookup: RuleLookup): string {
     const emphasis = emphasisOf(node);
     const isWrapped = canWrap(node, lookup);
     let text = content;

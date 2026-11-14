@@ -356,3 +356,32 @@ describe("paste styles: review cases, twelfth round", () => {
         expect(convert(`<p><b><span style="font-weight:bold">a</span>👩</b>\u{200D}👩</p>`)).toBe("**a**👩\u{200D}👩");
     });
 });
+
+describe("paste styles: review cases, thirteenth round", () => {
+    it("reads past an empty element for the joiner beside formatting on an emoji", () => {
+        expect(convert("<p><b>👩</b><span></span>\u{200D}👩</p>")).toBe("👩\u{200D}👩");
+    });
+
+    it("reads an emoji in CDATA at the edge of formatting, so the sequence stays whole", () => {
+        const document = createDocument("<p><b>x</b>\u{200D}👩</p>");
+        const bold = document.querySelector("b") as Element;
+
+        bold.textContent = "a ";
+        appendCdataSection(bold, "👩");
+
+        // Domino's textContent skips CDATA, so the space before it is read as the bold's edge: only the delimiters count.
+        expect(convert(document.body)).not.toContain("**");
+    });
+
+    it("lets an invalid display value in a code block override no earlier one", () => {
+        expect(convert(`<pre>one<span style="display:block;display:bogus">two</span>three</pre>`)).toBe("```\none\ntwo\nthree\n```");
+    });
+
+    it("keeps a styled task list item's box right after its marker, outside the delimiters", () => {
+        expect(
+            convert(
+                `<ul><li style="text-decoration:line-through"><input type="checkbox" checked>Done</li><li style="font-weight:bold"><input type="checkbox">Task</li></ul>`,
+            ),
+        ).toBe("- [x] ~~Done~~\n- [ ] **Task**");
+    });
+});
