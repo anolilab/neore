@@ -4,11 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { backendPushServer } from "./phone-push";
 
 const mocks = vi.hoisted(() => ({
-    OS: "android" as "android" | "ios",
     pushTaskRegistration: vi.fn(async (): Promise<void> => undefined),
 }));
 
-vi.mock("react-native", () => ({ Platform: mocks }));
+vi.mock("react-native", () => ({ Platform: { OS: "android" } }));
 vi.mock("expo-constants", () => ({ default: { easConfig: undefined, expoConfig: undefined } }));
 vi.mock("expo-crypto", () => ({ CryptoDigestAlgorithm: { SHA256: "SHA-256" }, digestStringAsync: vi.fn() }));
 vi.mock("expo-notifications", () => ({
@@ -53,7 +52,6 @@ const registeredWith = async (platform: "android" | "ios", language?: string) =>
 };
 
 afterEach(() => {
-    mocks.OS = "android";
     vi.mocked(isTaskRegisteredAsync).mockReset();
     vi.mocked(isTaskRegisteredAsync).mockResolvedValue(true);
 });
@@ -93,8 +91,6 @@ describe("backendPushServer.register", () => {
     });
 
     it("sends no buildsAlert for an iOS phone, which has no background task", async () => {
-        mocks.OS = "ios";
-
         const args = await registeredWith("ios", "en");
 
         expect(args).toStrictEqual({ language: "en", platform: "ios", token: TOKEN });
