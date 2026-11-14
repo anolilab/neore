@@ -10,7 +10,7 @@ import { internal } from "../_generated/internal";
 import { AUTH_RATE_LIMIT_RETENTION_MS, AUTH_RATE_LIMIT_SWEEP_PAGE, sweepExpiredAuthRateLimits } from "../auth/rate-limit-sweep";
 import schema from "../schema";
 import { DAY, Ratelimit } from "./rate-limiter";
-import { RATE_LIMIT_DEBT_RETENTION_MS, RATE_LIMIT_RETENTION_MS, RATE_LIMIT_SWEEP_PAGE, retentionOf, sweepExpiredRateLimits } from "./rate-limit-sweep";
+import { RATE_LIMIT_RETENTION_MS, RATE_LIMIT_SWEEP_PAGE, debtSettledAt, retentionOf, SLOWEST_REFILL_PER_MS, sweepExpiredRateLimits } from "./rate-limit-sweep";
 
 const NOW = 1_800_000_000_000;
 
@@ -106,11 +106,13 @@ describe.each(TABLES)("$table sweep", ({ page, retention, row, sweep, table, tar
 });
 
 describe("rateLimits sweep and reserve debt", () => {
-    it("keeps an expired row that still carries debt, and deletes it once past the debt retention", async () => {
+    it("keeps a row while its debt could still be refilling, and deletes it once even the slowest limit has refilled it", async () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("rateLimits", { key: "debt", ts: NOW - RATE_LIMIT_RETENTION_MS - 1, value: -1800 });
             await ctx.db.insert("rateLimits", { key: "paid", ts: NOW - RATE_LIMIT_RETENTION_MS - 1, value: 0 });
-            await ctx.db.insert("rateLimits", { key: "settled", ts: NOW - RATE_LIMIT_DEBT_RETENTION_MS - 1, value: -1800 });
+            // 144,000 seconds: more than 30 days of the premium daily limit, which a burst of capped reserves can reach.
+            await ctx.db.insert("rateLimits", { key: "deep", ts: NOW - 40 * DAY, value: -144_000 });
+            await ctx.db.insert("rateLimits", { key: "settled", ts: NOW - RATE_LIMIT_RETENTION_MS - 1800 / SLOWEST_REFILL_PER_MS - 1, value: -1800 });
         });
 
         const keys = await harness.run(async (ctx: any) => {
@@ -121,7 +123,13 @@ describe("rateLimits sweep and reserve debt", () => {
             return rows.map((row) => row.key);
         });
 
-        expect(keys).toStrictEqual(["debt"]);
+        expect(keys.toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["debt", "deep"]);
+    });
+});
+
+describe("debtSettledAt", () => {
+    it("adds the debt's refill at the slowest configured rate to the retention", () => {
+        expect(debtSettledAt({ ts: 0, value: -10 })).toBe(RATE_LIMIT_RETENTION_MS + 10 / SLOWEST_REFILL_PER_MS);
     });
 });
 

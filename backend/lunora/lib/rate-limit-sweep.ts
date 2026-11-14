@@ -11,7 +11,7 @@
  *
  * A row with a negative `value` (debt a `reserve` left) is kept past that, as the
  * library's own sweep keeps it: concurrent reserves can stack debt past one capacity,
- * so its refill can outlast the retention. It goes after `RATE_LIMIT_DEBT_RETENTION_MS`.
+ * so its refill can outlast the retention. It goes once its debt has refilled (`debtSettledAt`).
  *
  * Rows live on the shard whose mutation charged them, so the sweep runs on `__root__`
  * from the cron tick and on each user shard from `lib/shard-housekeeping.ts`.
@@ -42,34 +42,32 @@ export const retentionOf = (config: RateLimitConfig): number => {
 export const RATE_LIMIT_RETENTION_MS = Math.max(...Object.values(RATE_LIMIT_CONFIGS as Record<string, RateLimitConfig>).map((config) => retentionOf(config)));
 
 /**
- * How long a row still in debt is kept. Only `voice/dailyTranscribeSeconds` reserves, and one
- * overrun is at most a clip's worth of seconds, so 30 days of refill (18,000 seconds on the free
- * daily limit) is far deeper than any debt concurrent clips can stack. Past this, deleting the row
- * forgives nothing, and the sweep stops reading it on every run.
+ * The slowest refill of any configured limit, in units per millisecond. A row's storage key does not say which limit
+ * it belongs to, so a row in debt is kept until even this rate would have paid its debt back.
  */
-export const RATE_LIMIT_DEBT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+export const SLOWEST_REFILL_PER_MS = Math.min(
+    ...Object.values(RATE_LIMIT_CONFIGS as Record<string, RateLimitConfig>).map((config) => config.rate / config.period),
+);
+
+/** When a row in debt reads as a full bucket under every limit: its retention plus the time its debt takes to refill. */
+export const debtSettledAt = (row: { ts: number; value: number }): number => row.ts + RATE_LIMIT_RETENTION_MS + -row.value / SLOWEST_REFILL_PER_MS;
 
 export const sweepExpiredRateLimits = internalMutation
     .input({})
     .output(v.number())
     .mutation(async ({ ctx }) => {
-        const [{ page: expired }, { page: settled }] = await Promise.all([
-            ctx.db.rateLimits.findMany({
-                limit: RATE_LIMIT_SWEEP_PAGE,
-                orderBy: [{ ts: "asc" }],
-                where: { ts: { lt: ctx.now - RATE_LIMIT_RETENTION_MS }, value: { gte: 0 } },
-            }),
-            ctx.db.rateLimits.findMany({
-                limit: RATE_LIMIT_SWEEP_PAGE,
-                orderBy: [{ ts: "asc" }],
-                where: { ts: { lt: ctx.now - RATE_LIMIT_DEBT_RETENTION_MS }, value: { lt: 0 } },
-            }),
+        const cutoff = ctx.now - RATE_LIMIT_RETENTION_MS;
+        const [{ page: expired }, { page: inDebt }] = await Promise.all([
+            ctx.db.rateLimits.findMany({ limit: RATE_LIMIT_SWEEP_PAGE, orderBy: [{ ts: "asc" }], where: { ts: { lt: cutoff }, value: { gte: 0 } } }),
+            ctx.db.rateLimits.findMany({ limit: RATE_LIMIT_SWEEP_PAGE, orderBy: [{ ts: "asc" }], where: { ts: { lt: cutoff }, value: { lt: 0 } } }),
         ]);
+        const settled = inDebt.filter((row) => debtSettledAt(row) < ctx.now);
         const rows = [...expired, ...settled];
 
         await Promise.all(rows.map(async (row) => await ctx.db.delete("rateLimits", row._id)));
 
-        if (expired.length === RATE_LIMIT_SWEEP_PAGE || settled.length === RATE_LIMIT_SWEEP_PAGE) {
+        // A full page of debt rows schedules more only when it deleted some, so rows still owed never loop the sweep.
+        if (expired.length === RATE_LIMIT_SWEEP_PAGE || (inDebt.length === RATE_LIMIT_SWEEP_PAGE && settled.length > 0)) {
             await ctx.scheduler.runAfter(0, internal.lib.rate_limit_sweep.sweepExpiredRateLimits, {});
         }
 
