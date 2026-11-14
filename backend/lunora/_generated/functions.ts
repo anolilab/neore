@@ -1378,7 +1378,6 @@ export const LUNORA_FUNCTION_MANIFEST: Readonly<Record<string, FunctionManifestE
     "sub_agents_execute:runSubAgent": {"argumentDescriptors":[{"kind":"id","name":"runId","optional":false,"table":"subAgentRuns"}],"exportName":"runSubAgent","kind":"action","moduleId":"lunora_sub_agents_execute_223","visibility":"internal"},
     "sub_agents_functions:afterOwnerMessage": {"argumentDescriptors":[{"kind":"string","name":"threadId","optional":false}],"exportName":"afterOwnerMessage","kind":"mutation","moduleId":"lunora_sub_agents_functions_224","visibility":"internal"},
     "sub_agents_functions:attachChildThread": {"argumentDescriptors":[{"kind":"string","name":"childThreadId","optional":false},{"kind":"id","name":"runId","optional":false,"table":"subAgentRuns"}],"exportName":"attachChildThread","kind":"mutation","moduleId":"lunora_sub_agents_functions_224","visibility":"internal"},
-    "sub_agents_functions:awaitApproval": {"argumentDescriptors":[{"kind":"number","name":"resumedWith","optional":true},{"kind":"id","name":"runId","optional":false,"table":"subAgentRuns"}],"exportName":"awaitApproval","kind":"mutation","moduleId":"lunora_sub_agents_functions_224","visibility":"internal"},
     "sub_agents_functions:beatRun": {"argumentDescriptors":[{"kind":"id","name":"runId","optional":false,"table":"subAgentRuns"}],"exportName":"beatRun","kind":"mutation","moduleId":"lunora_sub_agents_functions_224","visibility":"internal"},
     "sub_agents_functions:cancelDeletedThreadDelegated": {"argumentDescriptors":[{"kind":"string","name":"threadId","optional":false}],"exportName":"cancelDeletedThreadDelegated","kind":"mutation","moduleId":"lunora_sub_agents_functions_224","visibility":"internal"},
     "sub_agents_functions:cancelDeletedThreadQueue": {"argumentDescriptors":[{"kind":"string","name":"threadId","optional":false}],"exportName":"cancelDeletedThreadQueue","kind":"mutation","moduleId":"lunora_sub_agents_functions_224","visibility":"internal"},
@@ -3210,7 +3209,6 @@ export const LUNORA_FUNCTIONS: Record<string, RegisteredLunoraFunction> = {
     "sub_agents_execute:runSubAgent": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"id","name":"runId","optional":false,"table":"subAgentRuns"}],"kind":"action","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "sub_agents_functions:afterOwnerMessage": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"threadId","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "sub_agents_functions:attachChildThread": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"childThreadId","optional":false},{"kind":"id","name":"runId","optional":false,"table":"subAgentRuns"}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
-    "sub_agents_functions:awaitApproval": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"number","name":"resumedWith","optional":true},{"kind":"id","name":"runId","optional":false,"table":"subAgentRuns"}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "sub_agents_functions:beatRun": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"id","name":"runId","optional":false,"table":"subAgentRuns"}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "sub_agents_functions:cancelDeletedThreadDelegated": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"threadId","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
     "sub_agents_functions:cancelDeletedThreadQueue": { args: {}, handler: unloadedFunctionHandler, "argumentDescriptors":[{"kind":"string","name":"threadId","optional":false}],"kind":"mutation","visibility":"internal" } satisfies RegisteredLunoraFunction & Pick<FunctionManifestEntry, "argumentDescriptors" | "channel" | "expose">,
@@ -5266,7 +5264,6 @@ export interface Caller {
         functions: {
             afterOwnerMessage: (args: { threadId: string }) => Promise<number>;
             attachChildThread: (args: { childThreadId: string; runId: Id<"subAgentRuns"> }) => Promise<boolean>;
-            awaitApproval: (args: { resumedWith?: number; runId: Id<"subAgentRuns"> }) => Promise<boolean>;
             beatRun: (args: { runId: Id<"subAgentRuns"> }) => Promise<null>;
             cancelDeletedThreadDelegated: (args: { threadId: string }) => Promise<null>;
             cancelDeletedThreadQueue: (args: { threadId: string }) => Promise<null>;
@@ -7363,7 +7360,6 @@ export const createCaller = (context: CallerCtx): Caller => ({
         functions: {
             afterOwnerMessage: (args) => callRegistered(context, "sub_agents_functions:afterOwnerMessage", args),
             attachChildThread: (args) => callRegistered(context, "sub_agents_functions:attachChildThread", args),
-            awaitApproval: (args) => callRegistered(context, "sub_agents_functions:awaitApproval", args),
             beatRun: (args) => callRegistered(context, "sub_agents_functions:beatRun", args),
             cancelDeletedThreadDelegated: (args) => callRegistered(context, "sub_agents_functions:cancelDeletedThreadDelegated", args),
             cancelDeletedThreadQueue: (args) => callRegistered(context, "sub_agents_functions:cancelDeletedThreadQueue", args),

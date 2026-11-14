@@ -1225,7 +1225,6 @@ export interface InternalApiTypes {
         functions: {
             afterOwnerMessage: FunctionReference<"mutation", { threadId: string }, number>;
             attachChildThread: FunctionReference<"mutation", { childThreadId: string; runId: Id<"subAgentRuns"> }, boolean>;
-            awaitApproval: FunctionReference<"mutation", { resumedWith?: number; runId: Id<"subAgentRuns"> }, boolean>;
             beatRun: FunctionReference<"mutation", { runId: Id<"subAgentRuns"> }, null>;
             cancelDeletedThreadDelegated: FunctionReference<"mutation", { threadId: string }, null>;
             cancelDeletedThreadQueue: FunctionReference<"mutation", { threadId: string }, null>;
@@ -2580,7 +2579,6 @@ export const internal: InternalApiTypes = {
         functions: {
             afterOwnerMessage: { __lunoraRef: "sub_agents_functions:afterOwnerMessage" },
             attachChildThread: { __lunoraRef: "sub_agents_functions:attachChildThread" },
-            awaitApproval: { __lunoraRef: "sub_agents_functions:awaitApproval" },
             beatRun: { __lunoraRef: "sub_agents_functions:beatRun" },
             cancelDeletedThreadDelegated: { __lunoraRef: "sub_agents_functions:cancelDeletedThreadDelegated" },
             cancelDeletedThreadQueue: { __lunoraRef: "sub_agents_functions:cancelDeletedThreadQueue" },

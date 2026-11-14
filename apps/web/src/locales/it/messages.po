@@ -515,7 +515,7 @@ msgstr "{0} da {1} valutazioni"
 
 #. placeholder {0}: formatPricePerMillion(model.pricing.input_per_million)
 #. placeholder {1}: formatPricePerMillion(model.pricing.output_per_million)
-#: src/components/model-picker/model-picker.tsx:313
+#: src/components/model-picker/model-picker.tsx:368
 msgid "{0} input, {1} output per 1M tokens"
 msgstr "{0} in input, {1} in output per 1 M di token"
 
@@ -608,7 +608,7 @@ msgid "{0} of {1} tokens used ({2}%)"
 msgstr "{0} di {1} token usati ({2}%)"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1274
+#: src/components/model-picker/model-picker.tsx:1392
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} di {MAX_PARALLEL} selezionati"
 
@@ -1048,7 +1048,7 @@ msgstr "{itemCount, plural, one {{nodeName}: # elemento, oggetto} other {{nodeNa
 msgid "{itemCount, plural, one {# item} other {# items}}"
 msgstr "{itemCount, plural, one {# elemento} other {# elementi}}"
 
-#: src/components/model-picker/model-picker.tsx:976
+#: src/components/model-picker/model-picker.tsx:1093
 msgid "{label} added to starred"
 msgstr "{label} aggiunto ai preferiti"
 
@@ -1084,7 +1084,7 @@ msgid "{label} is not connected."
 msgstr "{label} non è connesso."
 
 #. placeholder {0}: ids.length
-#: src/components/model-picker/model-picker.tsx:916
+#: src/components/model-picker/model-picker.tsx:1033
 msgid "{label} moved to position {position} of {0} in starred"
 msgstr "{label} spostato in posizione {position} di {0} tra i contrassegnati"
 
@@ -1096,7 +1096,7 @@ msgstr "{label} ha rifiutato questa richiesta. Il tuo account potrebbe non avere
 msgid "{label} refused this. Your account may lack access."
 msgstr "{label} ha rifiutato la richiesta. Il tuo account potrebbe non avere accesso."
 
-#: src/components/model-picker/model-picker.tsx:976
+#: src/components/model-picker/model-picker.tsx:1093
 msgid "{label} removed from starred"
 msgstr "{label} rimosso dai preferiti"
 
@@ -1185,7 +1185,7 @@ msgstr "{name} — Modello AI di generazione di testo | Neore"
 msgid "{name} — AI Video Generation Model | Neore"
 msgstr "{name} — Modello AI di generazione video | Neore"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:542
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:618
 msgid "{name} added to starred"
 msgstr "{name} aggiunto ai preferiti"
 
@@ -1209,7 +1209,7 @@ msgstr "Connessione {name} attivata"
 msgid "{name} disconnected"
 msgstr "{name} disconnesso"
 
-#: src/components/model-picker/model-picker.tsx:736
+#: src/components/model-picker/model-picker.tsx:860
 msgid "{name} hidden from the model picker"
 msgstr "{name} nascosto dal selettore dei modelli"
 
@@ -1226,7 +1226,7 @@ msgstr "{name} sta rispondendo"
 msgid "{name} paused"
 msgstr "{name} in pausa"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:542
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:618
 msgid "{name} removed from starred"
 msgstr "{name} rimosso dai preferiti"
 
@@ -1351,7 +1351,7 @@ msgstr "{selectedCount, plural, one {# prompt selezionato} other {# prompt selez
 msgid "{selectedCount, plural, one {# thread selected} other {# threads selected}}"
 msgstr "{selectedCount, plural, one {# conversazione selezionata} other {# conversazioni selezionate}}"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:782
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:859
 msgid "{selectedCount} of {MAX_PARALLEL} selected"
 msgstr "{selectedCount} di {MAX_PARALLEL} selezionati"
 
@@ -1523,7 +1523,7 @@ msgstr "20 $/mese sostituiscono ChatGPT + Midjourney + Runway e altro ancora. In
 msgid "1 {from} in other currencies"
 msgstr "1 {from} in altre valute"
 
-#: src/features/chat/sharing/thread-share-button.tsx:333
+#: src/features/chat/sharing/thread-share-button.tsx:334
 msgid "1 Day"
 msgstr "1 giorno"
 
@@ -1688,7 +1688,7 @@ msgstr "Intervallo 52 settimane"
 msgid "7 days"
 msgstr "7 giorni"
 
-#: src/features/chat/sharing/thread-share-button.tsx:334
+#: src/features/chat/sharing/thread-share-button.tsx:335
 msgid "7 Days"
 msgstr "7 giorni"
 
@@ -2060,7 +2060,7 @@ msgstr "Accetta invito"
 msgid "Accept or reject invitations to join organizations"
 msgstr "Accetta o rifiuta gli inviti a unirti alle organizzazioni"
 
-#: src/features/chat/sharing/thread-share-button.tsx:263
+#: src/features/chat/sharing/thread-share-button.tsx:264
 #: src/features/pages/components/page-share-dialog.tsx:96
 msgid "Access"
 msgstr "Accesso"
@@ -2512,8 +2512,8 @@ msgstr "Aggiungi alla mia revisione"
 msgid "Add to review"
 msgstr "Aggiungi alla revisione"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:187
-#: src/components/model-picker/model-picker.tsx:363
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:238
+#: src/components/model-picker/model-picker.tsx:418
 msgid "Add to starred"
 msgstr "Aggiungi ai contrassegnati"
 
@@ -2622,7 +2622,7 @@ msgstr "Regola"
 #: src/features/auth/components/team/team-member-cell.tsx:163
 #: src/features/auth/components/team/team-switcher.tsx:152
 #: src/features/chat/sharing/thread-share-button.tsx:217
-#: src/features/chat/sharing/thread-share-button.tsx:322
+#: src/features/chat/sharing/thread-share-button.tsx:323
 #: src/features/layout/components/sidebar-shortcut.tsx:268
 #: src/features/layout/lib/dashboard-page-names.ts:12
 #: src/routes/admin/route.tsx:51
@@ -3111,10 +3111,10 @@ msgstr "Allinea verticalmente"
 msgid "Align vertically (V)"
 msgstr "Allinea verticalmente (V)"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:655
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:717
-#: src/components/model-picker/model-picker.tsx:1122
-#: src/components/model-picker/model-picker.tsx:1200
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:731
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:793
+#: src/components/model-picker/model-picker.tsx:1239
+#: src/components/model-picker/model-picker.tsx:1317
 #: src/features/chat/tags/thread-category-filter.tsx:16
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:422
@@ -3199,8 +3199,8 @@ msgstr "Tutti i programmi di installazione"
 msgid "All MCP servers active"
 msgstr "Tutti i server MCP attivi"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:601
-#: src/components/model-picker/model-picker.tsx:1070
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:677
+#: src/components/model-picker/model-picker.tsx:1187
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "Tutti i modelli"
@@ -3657,7 +3657,7 @@ msgstr "Chiunque abbia un link ospite può lasciarti un messaggio qui. Nulla di 
 msgid "Anyone with the link can read this page. Comments are never shown. Turning it off revokes the link."
 msgstr "Chiunque abbia il link può leggere questa pagina. I commenti non vengono mai mostrati. Disattivandolo, il link viene revocato."
 
-#: src/features/chat/sharing/thread-share-button.tsx:383
+#: src/features/chat/sharing/thread-share-button.tsx:384
 msgid "Anyone with the link can view this thread"
 msgstr "Chiunque abbia il link può visualizzare questa conversazione"
 
@@ -3859,6 +3859,10 @@ msgstr "Approvato automaticamente: rischio basso"
 msgid "Approving…"
 msgstr ""
 
+#: src/features/auth/lib/app-sign-in-refusal.ts:23
+msgid "Apps can't be signed in while impersonating. Sign in as yourself to connect one."
+msgstr "Non è possibile accedere alle app mentre impersoni un altro utente. Accedi con il tuo account per collegarne una."
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:246
 msgid "AppSecret from the same page"
 msgstr "AppSecret dalla stessa pagina"
@@ -3975,7 +3979,7 @@ msgstr "Vuoi davvero lasciare questa organizzazione?"
 msgid "Are you sure you want to make {userName} an admin? They will have full access to admin features."
 msgstr "Vuoi davvero rendere {userName} un admin? Avrà accesso completo alle funzioni di amministrazione."
 
-#: src/features/chat/sharing/thread-share-button.tsx:420
+#: src/features/chat/sharing/thread-share-button.tsx:421
 msgid "Are you sure you want to remove {userToRemoveName} from this thread?"
 msgstr "Vuoi davvero rimuovere {userToRemoveName} da questa conversazione?"
 
@@ -4217,8 +4221,8 @@ msgstr "Tentativi: {0}"
 msgid "Auckland"
 msgstr "Auckland"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:705
-#: src/components/model-picker/model-picker.tsx:1174
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:781
+#: src/components/model-picker/model-picker.tsx:1291
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:130
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -5412,7 +5416,7 @@ msgstr "Cache"
 msgid "Cache Hit Rate"
 msgstr "Tasso di hit della cache"
 
-#: src/components/model-picker/model-picker.tsx:212
+#: src/components/model-picker/model-picker.tsx:267
 #: src/features/chat/thread/message-cost-badge.tsx:56
 msgid "Cached input"
 msgstr "Input in cache"
@@ -5563,7 +5567,7 @@ msgstr "Canada"
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
-#: src/routes/auth/extension.tsx:145
+#: src/routes/auth/extension.tsx:147
 msgid "Cancel"
 msgstr "Annulla"
 
@@ -6430,7 +6434,7 @@ msgstr "Clic"
 msgid "Click \"{selector}\""
 msgstr "Clic su \"{selector}\""
 
-#: src/components/model-picker/model-picker.tsx:1233
+#: src/components/model-picker/model-picker.tsx:1350
 msgid "Click ★ on any model in All models to add it here."
 msgstr "Clicca ★ su un modello in Tutti i modelli per aggiungerlo qui."
 
@@ -6459,7 +6463,7 @@ msgstr "Clicca il pulsante qui sotto per registrare una nuova passkey con il tuo
 msgid "Click the pin icon on any message to save it here."
 msgstr "Clicca l'icona della puntina su un messaggio per salvarlo qui."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:744
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:820
 msgid "Click the star on any model in All models to add it here."
 msgstr "Fai clic sulla stella di un modello in Tutti i modelli per aggiungerlo qui."
 
@@ -7343,9 +7347,9 @@ msgstr "Configura le impostazioni dell'applicazione"
 msgid "Configured"
 msgstr "Configurato"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:805
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:882
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1296
+#: src/components/model-picker/model-picker.tsx:1414
 msgid "Confirm"
 msgstr "Conferma"
 
@@ -7381,7 +7385,7 @@ msgstr "Conferma la tua password"
 #: src/features/devices/components/devices-settings.tsx:235
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
 #: src/features/skills/components/skill-builder-setup.tsx:136
-#: src/routes/auth/extension.tsx:154
+#: src/routes/auth/extension.tsx:156
 msgid "Connect"
 msgstr "Connetti"
 
@@ -7442,7 +7446,7 @@ msgstr "Collega API, database e servizi personalizzati tramite le integrazioni. 
 msgid "Connect Discord"
 msgstr "Connetti Discord"
 
-#: src/routes/auth/extension.tsx:172
+#: src/routes/auth/extension.tsx:174
 msgid "Connect extension"
 msgstr "Collega estensione"
 
@@ -7479,7 +7483,7 @@ msgstr "Connetti Telegram"
 msgid "Connect Telegram, Slack, or Discord bots to chat with AI directly from your messaging apps."
 msgstr "Collega bot Telegram, Slack o Discord per chattare con l'IA direttamente dalle tue app di messaggistica."
 
-#: src/routes/auth/extension.tsx:132
+#: src/routes/auth/extension.tsx:134
 msgid "Connect the Anole browser extension"
 msgstr "Collega l'estensione del browser Anole"
 
@@ -7557,7 +7561,7 @@ msgstr "Account collegati"
 msgid "Connected to {0}"
 msgstr "Connesso a {0}"
 
-#: src/routes/auth/extension.tsx:89
+#: src/routes/auth/extension.tsx:91
 msgid "Connected. You can close this window."
 msgstr "Connesso. Puoi chiudere questa finestra."
 
@@ -7569,7 +7573,7 @@ msgstr "Connessione ai tuoi server MCP..."
 msgid "Connecting..."
 msgstr "Connessione..."
 
-#: src/routes/auth/extension.tsx:154
+#: src/routes/auth/extension.tsx:156
 msgid "Connecting…"
 msgstr "Connessione…"
 
@@ -7996,7 +8000,7 @@ msgstr "Copiato!"
 #: src/features/auth/components/settings/api-key/mcp-config-snippet.tsx:30
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/guest-links/guest-link-panel.tsx:365
-#: src/features/chat/sharing/thread-share-button.tsx:398
+#: src/features/chat/sharing/thread-share-button.tsx:399
 #: src/features/chat/thread/message-item.tsx:356
 #: src/features/chat/thread/text-selection-menu.tsx:525
 #: src/features/settings/components/chat/trigger-settings.tsx:782
@@ -8581,7 +8585,7 @@ msgstr "Impossibile salvare l'impostazione del Daily Brief."
 msgid "Could not save the email setting."
 msgstr "Impossibile salvare l'impostazione dell'email."
 
-#: src/components/model-picker/model-picker.tsx:919
+#: src/components/model-picker/model-picker.tsx:1036
 msgid "Could not save the new order for {label}"
 msgstr "Impossibile salvare il nuovo ordine per {label}"
 
@@ -8858,7 +8862,7 @@ msgstr "Crea immagini e video"
 msgid "Create images with FLUX, Imagen, and Stable Diffusion. Generate videos with Runway, Luma, and Kling. Compare outputs across providers — pick the best result, not the only result."
 msgstr "Crea immagini con FLUX, Imagen e Stable Diffusion. Genera video con Runway, Luma e Kling. Confronta gli output dei vari provider: scegli il risultato migliore, non l'unico."
 
-#: src/features/chat/sharing/thread-share-button.tsx:346
+#: src/features/chat/sharing/thread-share-button.tsx:347
 msgid "Create Invite"
 msgstr "Crea invito"
 
@@ -9171,7 +9175,7 @@ msgid "Currently restricted"
 msgstr "Attualmente limitati"
 
 #: src/features/canvas/components/design-preset-selector.tsx:87
-#: src/features/chat/sharing/thread-share-button.tsx:335
+#: src/features/chat/sharing/thread-share-button.tsx:336
 #: src/features/marketing/components/gateway-landing-page.tsx:792
 #: src/features/marketing/components/landing-page.tsx:1014
 #: src/features/prompts/components/prompt-form-dialog.tsx:444
@@ -9681,7 +9685,7 @@ msgstr "Modello predefinito aggiornato"
 msgid "Default Models"
 msgstr "Modelli predefiniti"
 
-#: src/components/model-picker/model-picker.tsx:1185
+#: src/components/model-picker/model-picker.tsx:1302
 msgid "Default order"
 msgstr "Ordine predefinito"
 
@@ -10233,7 +10237,7 @@ msgstr "Descrivi cosa vuoi. Il builder ti fa domande se qualcosa non è chiaro, 
 msgid "Describe your workflow... e.g., 'Generate an image from text, upscale it, then remove the background'"
 msgstr "Descrivi il tuo workflow... ad es. \"Genera un'immagine da un testo, aumentane la risoluzione, poi rimuovi lo sfondo\""
 
-#: src/components/model-picker/model-picker.tsx:167
+#: src/components/model-picker/model-picker.tsx:222
 #: src/features/develop/components/pull-request-edit-action.tsx:143
 #: src/features/develop/components/pull-request-view.tsx:74
 #: src/features/evals/components/dataset-form-dialog.tsx:102
@@ -10333,7 +10337,7 @@ msgstr "Deterministico, coerente"
 msgid "Develop"
 msgstr "Develop"
 
-#: src/components/model-picker/model-picker.tsx:234
+#: src/components/model-picker/model-picker.tsx:289
 #: src/features/marketing/components/tutorials-page.tsx:131
 msgid "Developer"
 msgstr "Sviluppatore"
@@ -11564,7 +11568,7 @@ msgid "Email"
 msgstr "Email"
 
 #: src/features/auth/components/settings/security/change-email-card.tsx:139
-#: src/features/chat/sharing/thread-share-button.tsx:310
+#: src/features/chat/sharing/thread-share-button.tsx:311
 msgid "Email Address"
 msgstr "Indirizzo email"
 
@@ -11911,7 +11915,7 @@ msgid "Enter default value..."
 msgstr "Inserisci il valore predefinito..."
 
 #: src/features/auth/components/organization/invite-member-dialog.tsx:118
-#: src/features/chat/sharing/thread-share-button.tsx:311
+#: src/features/chat/sharing/thread-share-button.tsx:312
 msgid "Enter email address"
 msgstr "Inserisci l'indirizzo email"
 
@@ -12601,7 +12605,7 @@ msgstr "sperimentale"
 msgid "Experimental reasoning with DeepSeek's latest thinking capabilities"
 msgstr "Ragionamento sperimentale con le ultime capacità di pensiero di DeepSeek"
 
-#: src/features/chat/sharing/thread-share-button.tsx:327
+#: src/features/chat/sharing/thread-share-button.tsx:328
 msgid "Expiration"
 msgstr "Scadenza"
 
@@ -12653,7 +12657,7 @@ msgstr "Scade tra {remainingTime}"
 msgid "Expires on {0}"
 msgstr "Scade il {0}"
 
-#: src/features/chat/sharing/thread-share-button.tsx:359
+#: src/features/chat/sharing/thread-share-button.tsx:360
 msgid "Expires:"
 msgstr "Scade:"
 
@@ -13522,8 +13526,8 @@ msgstr "Impossibile aggiornare il preferito"
 msgid "Failed to update favorite status"
 msgstr "Impossibile aggiornare lo stato di preferito"
 
-#: src/components/model-picker/model-picker.tsx:731
-#: src/components/model-picker/model-picker.tsx:740
+#: src/components/model-picker/model-picker.tsx:855
+#: src/components/model-picker/model-picker.tsx:864
 #: src/features/settings/components/chat/model-filter-settings.tsx:57
 #: src/features/settings/components/chat/model-filter-settings.tsx:68
 msgid "Failed to update filter rules"
@@ -13994,7 +13998,7 @@ msgstr "In evidenza"
 msgid "Featured image"
 msgstr "Immagine in evidenza"
 
-#: src/components/model-picker/model-picker.tsx:179
+#: src/components/model-picker/model-picker.tsx:234
 #: src/features/marketing/components/gateway-footer.tsx:33
 #: src/features/marketing/components/gateway-landing-page.tsx:511
 #: src/features/marketing/components/gateway-navbar.tsx:56
@@ -14178,11 +14182,11 @@ msgstr "Filmmaker che creano video cinematografici con una forte attenzione alla
 msgid "Filter by action"
 msgstr "Filtra per azione"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:642
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:718
 msgid "Filter by mode"
 msgstr "Filtra per modalità"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:713
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:789
 msgid "Filter by provider"
 msgstr "Filtra per provider"
 
@@ -15808,11 +15812,11 @@ msgstr "Account ospite"
 msgid "Guest accounts"
 msgstr "Account ospite"
 
-#: src/components/model-picker/model-picker.tsx:1024
+#: src/components/model-picker/model-picker.tsx:1141
 msgid "Guest accounts use free models only."
 msgstr "Gli account ospite usano solo modelli gratuiti."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:561
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:637
 msgid "Guest accounts use free models only. Sign up to unlock all models."
 msgstr "Gli account ospite usano solo modelli gratuiti. Registrati per sbloccare tutti i modelli."
 
@@ -15832,7 +15836,7 @@ msgstr "Messaggi degli ospiti"
 msgid "Guest messages from an earlier link are still waiting."
 msgstr "Ci sono ancora messaggi degli ospiti di un link precedente in attesa."
 
-#: src/features/chat/sharing/thread-share-button.tsx:266
+#: src/features/chat/sharing/thread-share-button.tsx:267
 msgid "Guests"
 msgstr "Ospiti"
 
@@ -15999,7 +16003,7 @@ msgstr "Nascosto nel selettore dei modelli"
 msgid "Hide {fieldLabel}"
 msgstr "Nascondi {fieldLabel}"
 
-#: src/components/model-picker/model-picker.tsx:1209
+#: src/components/model-picker/model-picker.tsx:1326
 msgid "Hide {name} from model picker"
 msgstr "Nascondi {name} dal selettore dei modelli"
 
@@ -16310,7 +16314,7 @@ msgstr "scorciatoia"
 msgid "Hour"
 msgstr "Ora"
 
-#: src/features/chat/sharing/thread-share-button.tsx:341
+#: src/features/chat/sharing/thread-share-button.tsx:342
 msgid "Hours"
 msgstr "Ore"
 
@@ -16503,13 +16507,13 @@ msgstr "illustrazione"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
 #: ../../packages/chat-ui/src/chat/message-content.tsx:430
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:679
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:755
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:343
-#: src/components/model-picker/model-picker.tsx:1148
+#: src/components/model-picker/model-picker.tsx:1265
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:128
 #: src/features/marketing/components/landing-footer.tsx:165
@@ -17061,7 +17065,7 @@ msgid "inpainting"
 msgstr "inpainting"
 
 #: ../../packages/ui/src/components/ai-elements/context.tsx:238
-#: src/components/model-picker/model-picker.tsx:202
+#: src/components/model-picker/model-picker.tsx:257
 #: src/features/devices/components/device-tool-call.tsx:168
 #: src/features/evals/components/case-fields.tsx:69
 #: src/features/evals/components/dataset-panel.tsx:144
@@ -17411,7 +17415,7 @@ msgstr "Invitato da {0}"
 msgid "Invited to join"
 msgstr "Invitato a unirti a"
 
-#: src/features/chat/sharing/thread-share-button.tsx:264
+#: src/features/chat/sharing/thread-share-button.tsx:265
 msgid "Invites"
 msgstr "Inviti"
 
@@ -18925,7 +18929,7 @@ msgstr "Caricamento..."
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:158
-#: src/routes/auth/extension.tsx:66
+#: src/routes/auth/extension.tsx:68
 msgid "Loading…"
 msgstr "Caricamento…"
 
@@ -18990,11 +18994,11 @@ msgid "Locked chat"
 msgstr "Chat bloccata"
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1279
+#: src/components/model-picker/model-picker.tsx:1397
 msgid "Locked to {0} models"
 msgstr "Limitato ai modelli {0}"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:787
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:864
 msgid "Locked to {anchorModeName} models"
 msgstr "Limitato ai modelli {anchorModeName}"
 
@@ -19300,7 +19304,7 @@ msgstr "Maltese (Malta)"
 msgid "Manage Consent Preferences"
 msgstr "Gestisci preferenze di consenso"
 
-#: src/components/model-picker/model-picker.tsx:743
+#: src/components/model-picker/model-picker.tsx:867
 msgid "Manage hidden labs"
 msgstr "Gestisci i lab nascosti"
 
@@ -19519,8 +19523,8 @@ msgstr "Dimensione max: {size}"
 msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "Dimensione max: {size} • Max {maxFiles} file"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:782
-#: src/components/model-picker/model-picker.tsx:1273
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:859
+#: src/components/model-picker/model-picker.tsx:1391
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "Raggiunto il massimo di {MAX_PARALLEL} modelli"
 
@@ -20256,7 +20260,7 @@ msgstr "Modello attivato"
 msgid "Model filter"
 msgstr "Filtro modelli"
 
-#: src/components/model-picker/model-picker.tsx:403
+#: src/components/model-picker/model-picker.tsx:458
 msgid "Model info"
 msgstr "Info sul modello"
 
@@ -20273,7 +20277,7 @@ msgstr "Restrizioni sui modelli"
 msgid "Model server"
 msgstr "Server dei modelli"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:570
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:646
 msgid "Model tabs"
 msgstr "Schede modelli"
 
@@ -20567,11 +20571,11 @@ msgstr "Sposta {0} giù"
 msgid "Move {0} up"
 msgstr "Sposta {0} su"
 
-#: src/components/model-picker/model-picker.tsx:389
+#: src/components/model-picker/model-picker.tsx:444
 msgid "Move {label} down in starred"
 msgstr "Sposta {label} giù tra i contrassegnati"
 
-#: src/components/model-picker/model-picker.tsx:377
+#: src/components/model-picker/model-picker.tsx:432
 msgid "Move {label} up in starred"
 msgstr "Sposta {label} su tra i contrassegnati"
 
@@ -20811,7 +20815,7 @@ msgstr "nome"
 msgid "Name"
 msgstr "Nome"
 
-#: src/components/model-picker/model-picker.tsx:1186
+#: src/components/model-picker/model-picker.tsx:1303
 msgid "Name (A to Z)"
 msgstr "Nome (dalla A alla Z)"
 
@@ -21163,8 +21167,8 @@ msgstr "Non scade mai"
 msgid "Never used"
 msgstr "Mai usata"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:143
-#: src/components/model-picker/model-picker.tsx:320
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:194
+#: src/components/model-picker/model-picker.tsx:375
 #: src/features/settings/components/chat/models-settings.tsx:43
 #: src/features/settings/components/chat/models-settings.tsx:568
 msgid "New"
@@ -21237,7 +21241,7 @@ msgstr "Nuovo dataset"
 msgid "New Export"
 msgstr "Nuova esportazione"
 
-#: src/components/model-picker/model-picker.tsx:1187
+#: src/components/model-picker/model-picker.tsx:1304
 msgid "New first"
 msgstr "Prima le nuove"
 
@@ -21494,7 +21498,7 @@ msgstr "Nessun accesso a questo repository."
 msgid "No active session found. Please sign in again."
 msgstr "Nessuna sessione attiva trovata. Accedi di nuovo."
 
-#: src/features/chat/sharing/thread-share-button.tsx:270
+#: src/features/chat/sharing/thread-share-button.tsx:271
 msgid "No additional users have access to this thread."
 msgstr "Nessun altro utente ha accesso a questa conversazione."
 
@@ -21784,8 +21788,8 @@ msgstr "Nessun modello disponibile"
 msgid "No models found matching your filters."
 msgstr "Nessun modello corrisponde ai tuoi filtri."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:749
-#: src/components/model-picker/model-picker.tsx:1238
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:825
+#: src/components/model-picker/model-picker.tsx:1355
 msgid "No models found."
 msgstr "Nessun modello trovato."
 
@@ -22009,8 +22013,8 @@ msgstr "Nessun ordinamento applicato"
 msgid "No speech detected. Hands-free mode stopped."
 msgstr "Nessuna voce rilevata. Modalità a mani libere interrotta."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:742
-#: src/components/model-picker/model-picker.tsx:1231
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:818
+#: src/components/model-picker/model-picker.tsx:1348
 msgid "No starred models"
 msgstr "Nessun modello contrassegnato"
 
@@ -22732,7 +22736,7 @@ msgid "Online"
 msgstr "Online"
 
 #. placeholder {0}: getModelModeName(anchorMode!)
-#: src/components/model-picker/model-picker.tsx:489
+#: src/components/model-picker/model-picker.tsx:532
 msgid "Only {0} models can be compared. Clear selection to switch types."
 msgstr "Si possono confrontare solo modelli {0}. Annulla la selezione per cambiare tipo."
 
@@ -22780,7 +22784,7 @@ msgstr "Pubblica solo quando c’è qualcosa da segnalare"
 msgid "Only run when every filter matches the JSON body. Use dotted paths such as pull_request.user.login or labels.0.name. A delivery that does not match is accepted, shown as Skipped in the history, and does not run or count against your quota."
 msgstr "Esegui solo quando ogni filtro corrisponde al corpo JSON. Usa percorsi con punti come pull_request.user.login o labels.0.name. Una consegna che non corrisponde viene accettata, appare come Saltata nella cronologia e non viene eseguita né conteggiata nella tua quota."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:258
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:295
 msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "Si possono confrontare solo modelli dello stesso tipo. Cancella la selezione per cambiare tipo."
 
@@ -23766,7 +23770,7 @@ msgstr "Outpaint"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:578
 #: ../../packages/ui/src/components/ai-elements/context.tsx:277
-#: src/components/model-picker/model-picker.tsx:206
+#: src/components/model-picker/model-picker.tsx:261
 #: src/features/devices/components/device-tool-call.tsx:174
 #: src/features/workflow/components/nodes/output-node.tsx:52
 #: src/features/workflow/types/index.ts:584
@@ -23986,8 +23990,8 @@ msgstr "Riquadro {0}"
 msgid "Paraguay"
 msgstr "Paraguay"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:633
-#: src/components/model-picker/model-picker.tsx:1100
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:709
+#: src/components/model-picker/model-picker.tsx:1217
 msgid "Parallel"
 msgstr "In parallelo"
 
@@ -24291,7 +24295,7 @@ msgstr "In attesa"
 msgid "Pending Invitations"
 msgstr "Inviti in sospeso"
 
-#: src/features/chat/sharing/thread-share-button.tsx:351
+#: src/features/chat/sharing/thread-share-button.tsx:352
 msgid "Pending Invites"
 msgstr "Inviti in sospeso"
 
@@ -24347,7 +24351,7 @@ msgstr "Elimina definitivamente questa organizzazione e tutti i suoi dati"
 msgid "Permanently delete your account and all associated data"
 msgstr "Elimina definitivamente il tuo account e tutti i dati associati"
 
-#: src/features/chat/sharing/thread-share-button.tsx:314
+#: src/features/chat/sharing/thread-share-button.tsx:315
 msgid "Permission Level"
 msgstr "Livello di permesso"
 
@@ -25163,15 +25167,15 @@ msgstr "Slide precedente"
 msgid "Previous version"
 msgstr "Versione precedente"
 
-#: src/components/model-picker/model-picker.tsx:198
+#: src/components/model-picker/model-picker.tsx:253
 msgid "Price per 1M tokens"
 msgstr "Prezzo per 1 M di token"
 
-#: src/components/model-picker/model-picker.tsx:1189
+#: src/components/model-picker/model-picker.tsx:1306
 msgid "Price: high to low"
 msgstr "Prezzo: dal più alto al più basso"
 
-#: src/components/model-picker/model-picker.tsx:1188
+#: src/components/model-picker/model-picker.tsx:1305
 msgid "Price: low to high"
 msgstr "Prezzo: dal più basso al più alto"
 
@@ -25250,8 +25254,8 @@ msgstr "Privata"
 msgid "Private by default"
 msgstr "Privato per impostazione predefinita"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:138
-#: src/components/model-picker/model-picker.tsx:307
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:189
+#: src/components/model-picker/model-picker.tsx:362
 #: src/features/billing/components/personal-plan-card.tsx:25
 #: src/features/marketing/components/gateway-landing-page.tsx:131
 #: src/features/marketing/components/landing-page.tsx:345
@@ -25633,7 +25637,7 @@ msgstr "Estetica cinematografica collaudata"
 msgid "Proven reliability from previous generation"
 msgstr "L’affidabilità collaudata della generazione precedente"
 
-#: src/components/model-picker/model-picker.tsx:228
+#: src/components/model-picker/model-picker.tsx:283
 #: src/features/settings/components/chat/native-providers-settings.tsx:471
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -25682,14 +25686,14 @@ msgstr "Provider"
 msgid "Pseudo numerical diffusion"
 msgstr "Diffusione pseudo-numerica"
 
-#: src/features/chat/sharing/thread-share-button.tsx:265
+#: src/features/chat/sharing/thread-share-button.tsx:266
 #: src/features/skills/components/skill-form-dialog.tsx:481
 #: src/features/skills/components/skill-item.tsx:124
 msgid "Public"
 msgstr "Pubblica"
 
-#: src/features/chat/sharing/thread-share-button.tsx:382
-#: src/features/chat/sharing/thread-share-button.tsx:386
+#: src/features/chat/sharing/thread-share-button.tsx:383
+#: src/features/chat/sharing/thread-share-button.tsx:387
 msgid "Public Access"
 msgstr "Accesso pubblico"
 
@@ -25702,7 +25706,7 @@ msgstr "Chiave pubblica dal Discord Developer Portal per la verifica della firma
 msgid "Public link"
 msgstr "Link pubblico"
 
-#: src/features/chat/sharing/thread-share-button.tsx:394
+#: src/features/chat/sharing/thread-share-button.tsx:395
 msgid "Public Link"
 msgstr "Link pubblico"
 
@@ -26066,7 +26070,7 @@ msgid "Read"
 msgstr "Lettura"
 
 #: src/features/chat/sharing/thread-share-button.tsx:223
-#: src/features/chat/sharing/thread-share-button.tsx:321
+#: src/features/chat/sharing/thread-share-button.tsx:322
 msgid "Read & Write"
 msgstr "Lettura e scrittura"
 
@@ -26087,7 +26091,7 @@ msgid "Read only"
 msgstr "Sola lettura"
 
 #: src/features/chat/sharing/thread-share-button.tsx:220
-#: src/features/chat/sharing/thread-share-button.tsx:320
+#: src/features/chat/sharing/thread-share-button.tsx:321
 msgid "Read Only"
 msgstr "Sola lettura"
 
@@ -26739,8 +26743,8 @@ msgstr "Ricordami"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:195
 #: ../../packages/ui/src/components/combobox.tsx:304
 #: src/features/chat/host/host-composer.tsx:917
-#: src/features/chat/sharing/thread-share-button.tsx:299
-#: src/features/chat/sharing/thread-share-button.tsx:371
+#: src/features/chat/sharing/thread-share-button.tsx:300
+#: src/features/chat/sharing/thread-share-button.tsx:372
 #: src/features/chat/thread/composer-input.tsx:342
 #: src/features/chat/thread/composer-input.tsx:354
 #: src/features/chat/thread/composer-input.tsx:408
@@ -26876,8 +26880,8 @@ msgstr "Rimuovi dai preferiti"
 msgid "Remove from project"
 msgstr "Rimuovi dal progetto"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:187
-#: src/components/model-picker/model-picker.tsx:363
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:238
+#: src/components/model-picker/model-picker.tsx:418
 msgid "Remove from starred"
 msgstr "Rimuovi dai contrassegnati"
 
@@ -26969,7 +26973,7 @@ msgstr "Rimuovi il webhook"
 msgid "Remove These Files"
 msgstr "Rimuovi questi file"
 
-#: src/features/chat/sharing/thread-share-button.tsx:436
+#: src/features/chat/sharing/thread-share-button.tsx:437
 msgid "Remove User"
 msgstr "Rimuovi utente"
 
@@ -28484,8 +28488,8 @@ msgstr "Modalità di ricerca: {0}."
 msgid "Search models by name, ID, or provider..."
 msgstr "Cerca modelli per nome, ID o provider..."
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:566
-#: src/components/model-picker/model-picker.tsx:1040
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:642
+#: src/components/model-picker/model-picker.tsx:1157
 msgid "Search models..."
 msgstr "Cerca modelli..."
 
@@ -28939,7 +28943,7 @@ msgstr "Azioni sulla selezione"
 msgid "Selection context"
 msgstr "Contesto della selezione"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:608
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:684
 msgid "Selection mode"
 msgstr "Modalità di selezione"
 
@@ -29327,6 +29331,7 @@ msgstr "Condividi pagina"
 
 #: src/features/chat/sharing/thread-share-button.tsx:207
 #: src/features/chat/sharing/thread-share-button.tsx:256
+#: src/features/chat/sharing/thread-share-button.tsx:261
 msgid "Share Thread"
 msgstr "Condividi conversazione"
 
@@ -29632,7 +29637,7 @@ msgstr "Barra laterale destra"
 #: src/features/layout/components/nav-user.tsx:240
 #: src/features/marketing/components/landing-page.tsx:1058
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
-#: src/routes/auth/extension.tsx:78
+#: src/routes/auth/extension.tsx:80
 msgid "Sign in"
 msgstr "Accedi"
 
@@ -29679,15 +29684,15 @@ msgstr "Accedi per vedere le tue chat."
 msgid "Sign in to the host again to keep this fresh."
 msgstr "Accedi di nuovo all’host per mantenere tutto aggiornato."
 
-#: src/routes/auth/extension.tsx:132
+#: src/routes/auth/extension.tsx:134
 msgid "Sign in to the Neore desktop app"
 msgstr "Accedi all'app desktop di Neore"
 
-#: src/components/model-picker/model-picker.tsx:486
+#: src/components/model-picker/model-picker.tsx:529
 msgid "Sign in to unlock all models"
 msgstr "Accedi per sbloccare tutti i modelli"
 
-#: src/components/model-picker/model-picker.tsx:1031
+#: src/components/model-picker/model-picker.tsx:1148
 msgid "Sign in to unlock all models."
 msgstr "Accedi per sbloccare tutti i modelli."
 
@@ -29753,8 +29758,8 @@ msgstr "Registrati e abbonati a 8 $/mese per sbloccare tutte le funzionalità."
 #~ msgid "Sign up successful"
 #~ msgstr "Registrazione completata"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:255
-#: src/components/model-picker/model-picker.tsx:486
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:292
+#: src/components/model-picker/model-picker.tsx:529
 msgid "Sign up to unlock all models"
 msgstr "Registrati per sbloccare tutti i modelli"
 
@@ -29787,7 +29792,7 @@ msgstr "Accesso effettuato"
 msgid "Signed in · {0}"
 msgstr "Accesso effettuato · {0}"
 
-#: src/routes/auth/extension.tsx:89
+#: src/routes/auth/extension.tsx:91
 msgid "Signed in. Return to the Neore app — you can close this tab."
 msgstr "Accesso effettuato. Torna all'app Neore: puoi chiudere questa scheda."
 
@@ -29831,8 +29836,8 @@ msgstr "poi sostituito"
 msgid "Singapore"
 msgstr "Singapore"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:620
-#: src/components/model-picker/model-picker.tsx:1088
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:696
+#: src/components/model-picker/model-picker.tsx:1205
 msgid "Single"
 msgstr "Singolo"
 
@@ -30243,7 +30248,7 @@ msgstr "Ordine decrescente"
 msgid "Sort direction"
 msgstr "Direzione di ordinamento"
 
-#: src/components/model-picker/model-picker.tsx:1179
+#: src/components/model-picker/model-picker.tsx:1296
 msgid "Sort models"
 msgstr "Ordina i modelli"
 
@@ -30622,8 +30627,8 @@ msgstr "Aggiungi un modello ai preferiti nel selettore dei modelli e comparirà 
 msgid "starred"
 msgstr "preferiti"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:585
-#: src/components/model-picker/model-picker.tsx:1057
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:661
+#: src/components/model-picker/model-picker.tsx:1174
 msgid "Starred"
 msgstr "Contrassegnati"
 
@@ -31469,7 +31474,7 @@ msgstr "Invia la revisione"
 msgid "Submitting…"
 msgstr "Invio in corso…"
 
-#: src/components/model-picker/model-picker.tsx:1027
+#: src/components/model-picker/model-picker.tsx:1144
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "Abbonati a 8 $/mese per sbloccare tutti i modelli."
 
@@ -32232,10 +32237,10 @@ msgstr "test"
 msgid "text"
 msgstr "testo"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:667
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:743
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:1135
+#: src/components/model-picker/model-picker.tsx:1252
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:127
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -32445,7 +32450,7 @@ msgstr "Questa combinazione di tasti non può essere usata come scorciatoia"
 msgid "That link could not be read."
 msgstr "Impossibile leggere quel link."
 
-#: src/features/chat/thread/message-list.tsx:312
+#: src/features/chat/thread/message-list.tsx:227
 msgid "That message could not be found in this conversation."
 msgstr "Impossibile trovare quel messaggio in questa conversazione."
 
@@ -32722,13 +32727,13 @@ msgstr "L'endpoint non ha elencato alcun modello: aggiungi gli ID dei modelli a 
 msgid "The export file was not generated. Please request a new export."
 msgstr "Il file di esportazione non è stato generato. Richiedi una nuova esportazione."
 
-#: src/routes/auth/extension.tsx:115
-#: src/routes/auth/extension.tsx:125
+#: src/features/auth/lib/app-sign-in-refusal.ts:26
+#: src/routes/auth/extension.tsx:127
 msgid "The extension could not be connected."
 msgstr "Impossibile collegare l'estensione."
 
 #. placeholder {0}: data.user.email
-#: src/routes/auth/extension.tsx:136
+#: src/routes/auth/extension.tsx:138
 msgid "The extension will be able to read and send chats as {0}. You can disconnect it at any time by signing out in the extension or ending its session in your account settings."
 msgstr "L'estensione potrà leggere e inviare chat come {0}. Puoi scollegarla in qualsiasi momento disconnettendoti dall'estensione o terminando la sua sessione nelle impostazioni dell'account."
 
@@ -33009,7 +33014,7 @@ msgid "The Neore app on that computer is out of date. Update it, then try again.
 msgstr "L’app Neore su quel computer non è aggiornata. Aggiornala e riprova."
 
 #. placeholder {0}: data.user.email
-#: src/routes/auth/extension.tsx:135
+#: src/routes/auth/extension.tsx:137
 msgid "The Neore app on this device will be signed in as {0}. Only continue if you started signing in from the app just now."
 msgstr "L'app Neore su questo dispositivo accederà come {0}. Continua solo se hai appena avviato l'accesso dall'app."
 
@@ -33878,7 +33883,7 @@ msgstr "Questa sessione è terminata. Avviane una nuova dall’app desktop."
 msgid "This sheet appears to be empty."
 msgstr "Questo foglio sembra vuoto."
 
-#: src/routes/auth/extension.tsx:58
+#: src/routes/auth/extension.tsx:60
 msgid "This sign-in link is incomplete. Start signing in from the extension again."
 msgstr "Questo link di accesso è incompleto. Riavvia l'accesso dall'estensione."
 
@@ -34932,8 +34937,8 @@ msgid "Two-factor authentication is currently enabled for your account. This add
 msgstr "L'autenticazione a due fattori è attualmente attiva per il tuo account. Aggiunge un ulteriore livello di sicurezza."
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:644
-#: src/components/model-picker/model-picker.tsx:1111
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:720
+#: src/components/model-picker/model-picker.tsx:1228
 #: src/features/devices/components/device-tool-call.tsx:119
 msgid "Type"
 msgstr "Tipo"
@@ -35126,7 +35131,7 @@ msgstr "Sottolineato"
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:604
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:290
 #: ../../packages/ui/src/components/tiptap-editor.tsx:183
-#: src/components/model-picker/model-picker.tsx:738
+#: src/components/model-picker/model-picker.tsx:862
 #: src/features/canvas/canvas-panel.tsx:244
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:128
@@ -35854,7 +35859,7 @@ msgstr "Ha usato {0}"
 msgid "Used for buttons, highlights and focus rings. Every option keeps text readable in light and dark mode."
 msgstr "Usato per pulsanti, evidenziazioni e anelli di focus. Ogni opzione mantiene il testo leggibile in modalità chiara e scura."
 
-#: src/features/chat/sharing/thread-share-button.tsx:292
+#: src/features/chat/sharing/thread-share-button.tsx:293
 msgid "user"
 msgstr "utente"
 
@@ -36277,8 +36282,8 @@ msgstr "Costo per generazione molto basso"
 msgid "video"
 msgstr "video"
 
-#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:691
-#: src/components/model-picker/model-picker.tsx:1161
+#: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
+#: src/components/model-picker/model-picker.tsx:1278
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:129
 #: src/features/marketing/components/landing-footer.tsx:166
@@ -37571,7 +37576,7 @@ msgstr "Stai aggiungendo documenti troppo velocemente. Attendi un momento e ripr
 msgid "You are browsing as a guest. Sign in with your account to approve this code."
 msgstr ""
 
-#: src/routes/auth/extension.tsx:76
+#: src/routes/auth/extension.tsx:78
 msgid "You are browsing as a guest. Sign in with your account to connect the extension."
 msgstr "Stai navigando come ospite. Accedi con il tuo account per collegare l'estensione."
 
@@ -38044,7 +38049,7 @@ msgstr "Impossibile caricare i tuoi server MCP salvati, quindi per ora non è po
 msgid "Your session has expired"
 msgstr "La tua sessione è scaduta"
 
-#: src/routes/auth/extension.tsx:102
+#: src/routes/auth/extension.tsx:104
 msgid "Your session has expired. Reload the page and sign in again."
 msgstr "La tua sessione è scaduta. Ricarica la pagina e accedi di nuovo."
 

@@ -11,6 +11,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registeredApi, registerModule } from "../../test/registered-api";
 
 import schema from "../schema";
+import { markRunAwaiting } from "../sub-agents/functions";
 import { internal } from "../_generated/internal";
 import { continueAfterToolApproval, settleSubAgentRun } from "./execute";
 import { noteGoalPaused } from "./goals/execute";
@@ -334,10 +335,7 @@ describe("a sub-agent child's continuation", () => {
                     if (resumed.paused && resumed.subAgentWaits === undefined) {
                         const subAgentWaits = await harness.run(
                             async (ctx: any) =>
-                                await ctx.runMutation(internal.sub_agents.functions.awaitApproval, {
-                                    resumedWith: (runOptions as { subAgentResumedWith?: number } | undefined)?.subAgentResumedWith,
-                                    runId,
-                                }),
+                                await markRunAwaiting(ctx, runId, (runOptions as { subAgentResumedWith?: number } | undefined)?.subAgentResumedWith),
                         );
 
                         return { lastMessageId: undefined, ...resumed, subAgentWaits };

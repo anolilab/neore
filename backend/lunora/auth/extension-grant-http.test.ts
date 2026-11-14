@@ -99,6 +99,7 @@ describe("POST /extension/auth/authorize", () => {
         expect(await response.json()).toStrictEqual({
             error: "access_denied",
             message: "Apps can't be signed in while impersonating. Sign in as yourself to connect one.",
+            reason: "impersonating",
         });
         expect(state.codes).toHaveLength(0);
         expect(state.sessions).toBe(0);
