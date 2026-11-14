@@ -55,18 +55,12 @@
   (its owner unlocks the child to answer). It admits the parent and every child, so it reads each child's latest turn
   through a reader keyed on that child (`admittedThreadMessages`): the guarded `ctx.db` would hand it the parent's rows. The card answers through `respondToToolApproval` on the child's thread, so the
   claim above decides, and it offers no allow for a period.
-- **A one-shot child pauses on an `ask` tool** (`pauseForApproval` → `headlessCanAsk`) whether the owner's turn or a task
-  started its chain; an eval's chain (`chainSource` `eval:`) and workers drop `ask` tools. Triggers, messenger replies and
-  outside agents have no `delegateToSubAgent`. A task or trigger names itself on its chain (`chainSource`): while one of
-  its children waits, its next delegation is refused (`chainWaitProblem`), and a child that reaches its FIRST `ask` while
-  another waits does not wait: `markRunAwaiting` ends it failed in the same transaction (`chainPauseProblem`), denying its
-  request. A child the owner already answered (`resumedBy`) is not checked again, so it and one newer sibling can wait at
-  once. `recordPendingToolApprovals` runs `markRunAwaiting` after the rows and BEFORE the thread mark, the reminder and the
-  notification: a refused pause denies what it recorded and sends nothing, and a notified request is answerable at once. The pause's snapshot and a worker's runs carry the source on. The pause's notification names the source; a
-  task round does not wait on it ([reference](../../../docs/agents/sub-agents.md)). The run waits and is answered as above; its first pause is bound
-  to "never resumed" (`resumedWith: 0`), so a late write never re-opens an answered run. A nested result waits
-  while its parent's one-shot run goes (running or awaiting), so it never lands after a request; that run's end, waited
-  or not, posts it (`releaseHeldResults`). A pause, first or continued, never overwrites a `"question"` the child thread
-  waits on.
+- **A one-shot child pauses on an `ask` tool** (`pauseForApproval`), whatever started its chain; an eval's chain and
+  workers drop `ask` tools. A task or trigger has at most one child waiting on its first request (`chainWaitProblem`,
+  `chainPauseProblem`). `recordPendingToolApprovals` moves the run to waiting (`markRunAwaiting`) BEFORE anything is
+  sent, so a refused pause sends nothing. A pause, first or continued, is bound to its resume, so a late write never
+  re-opens an answered run, and never overwrites a `"question"` the child thread waits on. A nested result waits while its
+  parent's one-shot run goes, and that run's end posts it (`releaseHeldResults`). The rules, sources and exceptions:
+  [reference](../../../docs/agents/sub-agents.md).
 - **Lifecycle** ([reference](../../../docs/agents/sub-agents.md)): a send in a child ends its moved-past waits
   (`afterOwnerMessage`); a hard delete sets `deletingAt` and ends the thread's runs (`endSubAgentRunsOfDeletedThread`).

@@ -969,17 +969,16 @@ export const runStreamingAgent = internalAction
         },
     );
 
-export type SubAgentEnd = { error: string; kind: "failed" } | { kind: "paused" } | { kind: "succeeded"; messageIds: string[] };
+export type SubAgentEnd = { error: string; kind: "failed" } | { kind: "succeeded"; messageIds: string[] };
 
 /** Delay of a settlement handed to the scheduler after its write in the action failed. */
 const SETTLE_RETRY_DELAY_MS = 30_000;
 
 /**
- * A sub-agent child's continuation hands its end back to the run the snapshot names: ended, the run ends once, and its
- * answer reaches the parent. A pause again is settled where its requests are recorded (`recordPendingToolApprovals`,
- * before anyone is told), so the paused branch here is only a fallback for a pause that reported no wait. Both writes
- * are idempotent, so a failed one is scheduled again: dropped, the run's reaper would fail a child that finished, or close
- * a request that was just made. Returns whether a paused run now waits (a scheduled retry counts as waiting).
+ * A sub-agent child's continuation hands its end back to the run the snapshot names: the run ends once, and its answer
+ * reaches the parent. A pause again is not settled here: `recordPendingToolApprovals` moves the run to waiting where its
+ * requests are recorded, before anyone is told. The write is idempotent, so a failed one is scheduled again: dropped, the
+ * run's reaper would fail a child that finished.
  */
 export const settleSubAgentRun = async (
     ctx: Pick<ActionCtx, "runMutation" | "scheduler">,
@@ -987,46 +986,33 @@ export const settleSubAgentRun = async (
     end: SubAgentEnd,
     /** The deadline the resume this continuation runs under set (`continuingRun`): every write is bound to it. */
     resumedWith?: number,
-): Promise<boolean> => {
+): Promise<void> => {
     if (runId === undefined) {
-        return false;
+        return;
     }
 
-    // Bound to the resume this continuation runs under, so neither a retried write nor a late one acts on a run that waited
-    // again or was answered since: a pause never re-opens it, an end never ends it.
+    // Bound to the resume this continuation runs under, so neither a retried write nor a late one ends a run that waited
+    // again or was answered since.
     const bound = { ...(resumedWith !== undefined && { resumedWith }), runId };
     const completion = {
         ...(end.kind === "succeeded" && end.messageIds.length > 0 && { messageIds: end.messageIds.slice(-COMPLETION_MESSAGE_IDS_MAX) }),
         outcome: end.kind === "failed" ? { error: end.error.slice(0, MAX_LENGTH.short), kind: "failed" as const } : { kind: "succeeded" as const },
         ...bound,
     };
-    const pauseArgs = bound;
 
     try {
-        if (end.kind === "paused") {
-            return await ctx.runMutation(internal.sub_agents.functions.awaitApproval, pauseArgs);
-        }
-
         await ctx.runMutation(internal.sub_agents.functions.completeResumedRun, completion);
 
-        return false;
+        return;
     } catch (error) {
         streamLogger.error(`[ToolApproval] Could not hand the continuation's end to sub-agent run ${runId}; scheduling it:`, error);
     }
 
     try {
-        if (end.kind === "paused") {
-            await ctx.scheduler.runAfter(SETTLE_RETRY_DELAY_MS, internal.sub_agents.functions.awaitApproval, pauseArgs);
-
-            return true;
-        }
-
         await ctx.scheduler.runAfter(SETTLE_RETRY_DELAY_MS, internal.sub_agents.functions.completeResumedRun, completion);
     } catch (error) {
         streamLogger.error(`[ToolApproval] Could not schedule the end of sub-agent run ${runId}:`, error);
     }
-
-    return false;
 };
 
 /**
@@ -1035,7 +1021,7 @@ export const settleSubAgentRun = async (
  *
  * A sub-agent child's pause (`config.subAgentRunId`) puts its run back to `running` first. A pause again waits where its
  * requests are recorded, bound to this resume (`subAgentResumedWith`); any other end is handed to the run
- * ({@link settleSubAgentRun}, also the fallback for a pause that reported no wait), so the answer is posted to the parent once.
+ * ({@link settleSubAgentRun}; a pause again was settled where its requests were recorded), so the answer is posted to the parent once.
  */
 export const continueAfterToolApproval = internalAction
     .input({
@@ -1143,20 +1129,20 @@ export const continueAfterToolApproval = internalAction
                 { admittedRun: true, steerable: true, ...(typeof subAgentResume === "number" && { subAgentResumedWith: subAgentResume }) },
             );
 
-            let subAgentEnd: SubAgentEnd = { kind: "succeeded", messageIds: resumed.messageIds ?? [] };
+            // A pause again was settled where its requests were recorded (`recordPendingToolApprovals`): the run waits, or was
+            // refused, before anyone is told. Only an end is handed back here.
+            let waiting = false;
 
             if (resumed.paused) {
-                subAgentEnd = { kind: "paused" };
-            } else if (resumed.stopped) {
-                subAgentEnd = { error: "This sub-agent was stopped.", kind: "failed" };
+                waiting = resumed.subAgentWaits ?? false;
+            } else {
+                await settleSubAgentRun(
+                    ctx,
+                    subAgentRunId,
+                    resumed.stopped ? { error: "This sub-agent was stopped.", kind: "failed" } : { kind: "succeeded", messageIds: resumed.messageIds ?? [] },
+                    subAgentResume ?? undefined,
+                );
             }
-
-            // A pause again was settled where its requests were recorded (`recordPendingToolApprovals`): the run waits, or was
-            // refused, before anyone is told.
-            const waiting =
-                subAgentEnd.kind === "paused" && resumed.subAgentWaits !== undefined
-                    ? resumed.subAgentWaits
-                    : await settleSubAgentRun(ctx, subAgentRunId, subAgentEnd, subAgentResume ?? undefined);
 
             settled = true;
             // A run that ended while this continuation paused again had its new requests closed: the child does not wait on them.

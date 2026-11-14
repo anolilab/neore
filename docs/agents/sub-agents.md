@@ -34,7 +34,7 @@ detail. Paths are relative to `backend/lunora/`.
     rule above, a run that ended or was resumed again meanwhile, a worker's or a missing run) leaves the requests it
     recorded denied and sends nothing; a notified request finds its run waiting, so an immediate answer is never refused
     as still working. The mutation returns whether the pause stands (`subAgentWaits` on a continuation, which then settles
-    nothing itself: `settleSubAgentRun` writes its end, and a pause only as a fallback when none was reported). A continuation whose
+    nothing itself: `settleSubAgentRun` writes only its end). A continuation whose
     pause again is refused ends its run inside its own stream, before that stream's final chunk, so that end does not stop
     the stream (`finishRun`'s `fromOwnContinuation`): it closes quietly instead of reading "stopped". The pause's snapshot keeps the source (`ToolRunConfig.chainSource`) and the continuation puts
     it back on its tool context, so a resumed child's own sub-agents still count; an older snapshot without it falls back
