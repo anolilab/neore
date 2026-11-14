@@ -13,7 +13,7 @@ const HOUR_MS = 60 * 60 * 1000;
 
 let harness: ReturnType<typeof lunoraTest>;
 
-const insertSession = async (fields: { activeOrganizationId?: string; expiresAt: number; userId?: string }): Promise<string> =>
+const insertSession = async (fields: { activeOrganizationId?: string; expiresAt: number; impersonatedBy?: string; userId?: string }): Promise<string> =>
     await harness.run(
         async (ctx: any) => await ctx.db.insert("session", { createdAt: 0, token: `token-${String(Math.random())}`, updatedAt: 0, userId: USER, ...fields }),
     );
@@ -40,6 +40,13 @@ describe("getSessionOrganizationForCap", () => {
         const sessionId = await insertSession({ activeOrganizationId: "org-a", expiresAt: Date.now() + HOUR_MS });
 
         expect(await read(sessionId)).toStrictEqual({ organizationId: "org-a" });
+    });
+
+    it("marks a session an admin opened to act as the user", async () => {
+        expect(await read(await insertSession({ expiresAt: Date.now() + HOUR_MS, impersonatedBy: "admin-1" }))).toStrictEqual({
+            impersonating: true,
+            organizationId: null,
+        });
     });
 
     it("places a session that still names an organization its user has left in the personal space", async () => {

@@ -54,18 +54,16 @@ const paste = async (
 describe("composer paste", () => {
     it("turns a Google Docs list with bold, italics and a link into Markdown", async () => {
         await expect(paste({ "text/html": googleDocs, "text/plain": "Release plan\nShip the beta on Monday\nRead the release notes\ntwice" })).resolves.toBe(
-            ["Release plan", "", "- **Ship** the beta on Monday", "- Read the [release notes](https://example.com/notes)", "    - *twice*"].join("\n"),
+            ["Release plan", "", "- **Ship** the beta on Monday", "- Read the [release notes](https://example.com/notes)", "  - *twice*"].join("\n"),
         );
     });
 
     it("numbers each depth of a flat Google Docs numbered list on its own and indents every line of a nested item", () => {
-        expect(htmlToMarkdown(googleDocsNumbered)).toBe(["1. Install", "    1. Download", "       the installer", "    2. Run it", "2. Sign in"].join("\n"));
+        expect(htmlToMarkdown(googleDocsNumbered)).toBe(["1. Install", "   1. Download", "      the installer", "   2. Run it", "2. Sign in"].join("\n"));
     });
 
     it("starts a list copied from a nested Google Docs item at the left edge, keeping its nesting", () => {
-        expect(htmlToMarkdown('<ul><li aria-level="2">a</li><li aria-level="3">b</li><li aria-level="2">c</li></ul>')).toBe(
-            ["- a", "    - b", "- c"].join("\n"),
-        );
+        expect(htmlToMarkdown('<ul><li aria-level="2">a</li><li aria-level="3">b</li><li aria-level="2">c</li></ul>')).toBe(["- a", "  - b", "- c"].join("\n"));
     });
 
     it("keeps a list or text placed straight in a list, nesting a list under the item before it", () => {
@@ -80,7 +78,7 @@ describe("composer paste", () => {
         const item = (level: number, text: string): string =>
             `<p class=MsoListParagraph style='mso-list:l0 level${level} lfo1'><span style='mso-list:Ignore'>o</span>${text}</p>`;
 
-        expect(htmlToMarkdown(item(2, "a") + item(3, "b") + item(2, "c"))).toBe(["- a", "    - b", "- c"].join("\n"));
+        expect(htmlToMarkdown(item(2, "a") + item(3, "b") + item(2, "c"))).toBe(["- a", "  - b", "- c"].join("\n"));
         // A level-one item in hidden text is not where the shown list starts.
         expect(htmlToMarkdown(`<p>Steps</p><div style="display:none">${item(1, "secret")}</div>${item(3, "a")}`)).toBe("Steps\n\n- a");
     });
@@ -94,19 +92,19 @@ describe("composer paste", () => {
             `<p style="mso-list:l0 level${level} lfo1"><span style="mso-list:Ignore">${marker}</span>${text}</p>`;
 
         expect(htmlToMarkdown(item(1, "1.", "First") + item(2, "a.", "Sub") + item(3, "i.", "Deep"))).toBe(
-            ["1. First", "    - a. Sub", "        - i. Deep"].join("\n"),
+            ["1. First", "   - a. Sub", "     - i. Deep"].join("\n"),
         );
         expect(htmlToMarkdown(item(1, "a)", "one") + item(1, "b)", "two"))).toBe("- a) one\n- b) two");
     });
 
-    it("counts a reversed list down, from its start or its number of items, with its numbers kept as text", () => {
-        expect(htmlToMarkdown("<ol reversed><li>b</li><li>a</li></ol>")).toBe("- 2. b\n- 1. a");
-        expect(htmlToMarkdown('<ol reversed start="10"><li>j</li><li value="4">d</li><li>c</li></ol>')).toBe("- 10. j\n- 4. d\n- 3. c");
-        expect(htmlToMarkdown('<ol reversed start="1"><li>a</li><li>z</li></ol>')).toBe("- 1. a\n- 0. z");
+    it("numbers a reversed list as an ordinary one, from its start, as Markdown numbers every list", () => {
+        expect(htmlToMarkdown("<ol reversed><li>b</li><li>a</li></ol>")).toBe("1. b\n2. a");
+        expect(htmlToMarkdown('<ol reversed start="10"><li>j</li><li value="4">d</li><li>c</li></ol>')).toBe("10. j\n4. d\n5. c");
+        expect(htmlToMarkdown('<ol reversed start="1"><li>a</li><li>z</li></ol>')).toBe("1. a\n2. z");
     });
 
-    it("marks formatted text broken by a line break on each of its lines", () => {
-        expect(htmlToMarkdown("<p><b>one<br>two</b> <i>three<br></i><s> four<br>five</s></p>")).toBe("**one**\n**two** *three*\n~~four~~\n~~five~~");
+    it("marks formatted text broken by a line break as one span across its lines", () => {
+        expect(htmlToMarkdown("<p><b>one<br>two</b> <i>three<br></i><s> four<br>five</s></p>")).toBe("**one\ntwo** *three*\n~~four\nfive~~");
     });
 
     it("converts a code block of many line elements in linear time", () => {
@@ -337,8 +335,8 @@ describe("composer paste", () => {
         expect(htmlToMarkdown("<p>a\u{A0}\u{A0}\u{A0}b <b>c</b></p>")).toBe("a\u{A0}\u{A0}\u{A0}b **c**");
     });
 
-    it("keeps a link whose label is broken by a line break", () => {
-        expect(htmlToMarkdown('<p><a href="https://example.com/">first<br>second</a></p>')).toBe("[first\nsecond](https://example.com/)");
+    it("keeps a link whose label is broken by a line break, its label on one line", () => {
+        expect(htmlToMarkdown('<p><a href="https://example.com/">first<br>second</a></p>')).toBe("[first second](https://example.com/)");
     });
 
     it("pastes deeply nested formatting around many lines as plain text instead of rebuilding them per element", async () => {
@@ -403,7 +401,7 @@ describe("composer paste", () => {
         [
             "a Word list paragraph keeps its later lines in the item",
             '<p style="mso-list:l0 level1 lfo1"><span style="mso-list:Ignore">1.</span>one<br>two</p><p style="mso-list:l0 level2 lfo1"><span style="mso-list:Ignore">o</span>three<br>four</p>',
-            "1. one\n   two\n    - three\n      four",
+            "1. one\n   two\n   - three\n     four",
         ],
         [
             "a cell spanning columns or rows keeps the cells after it under their headers",
@@ -436,7 +434,7 @@ describe("composer paste", () => {
         [
             "a backslash in a cell or a link label never escapes the Markdown around it",
             String.raw`<table><tr><th>A</th><th>B</th></tr><tr><td>a\|b</td><td>c</td></tr></table><p><a href="https://x.y/">C:\dir\</a> <a href="https://x.y/">a\]b</a></p>`,
-            ["| A | B |", "| --- | --- |", String.raw`| a\\\|b | c |`, "", String.raw`[C:\dir\\](https://x.y/) [a\\\]b](https://x.y/)`].join("\n"),
+            ["| A | B |", "| --- | --- |", String.raw`| a\\\|b | c |`, "", String.raw`[C:\\dir\\](https://x.y/) [a\\\]b](https://x.y/)`].join("\n"),
         ],
         [
             "code in a table cell keeps its backslashes, escapes its pipes for the row, and a backslash before it never escapes its backtick",
@@ -446,7 +444,7 @@ describe("composer paste", () => {
         [
             "code in a link label is kept as written, and a backslash before it never escapes its backtick",
             '<p><a href="https://x.y/"><code>arr[0]</code> and a[1]</a> <a href="https://x.y/">C:\\<code>x\\y</code></a> <a href="https://x.y/">a`b[</a></p>',
-            "[`arr[0]` and a\\[1\\]](https://x.y/) [C:\\\\`x\\y`](https://x.y/) [a`b\\[](https://x.y/)",
+            "[`arr[0]` and a\\[1\\]](https://x.y/) [C:\\\\`x\\y`](https://x.y/) [a\\`b\\[](https://x.y/)",
         ],
         ["a table keeps its caption", "<table><caption>Prices</caption><tr><th>A</th></tr><tr><td>1</td></tr></table>", "Prices\n\n| A |\n| --- |\n| 1 |"],
         [
@@ -477,7 +475,7 @@ describe("composer paste", () => {
         [
             "a link in a table cell keeps its label escaped once, a backslash before code in it and a pipe too",
             String.raw`<table><tr><th>A</th></tr><tr><td><a href="https://x.y/">a\<code>b|c</code>]</a> <a href="https://x.y/">d|]e</a> <a href="https://x.y/a|b">https://x.y/a|b</a></td></tr></table>`,
-            ["| A |", "| --- |", String.raw`| [a\\${"`"}b\|c${"`"}\]](https://x.y/) [d\|\]e](https://x.y/) https://x.y/a\|b |`].join("\n"),
+            ["| A |", "| --- |", String.raw`| [a\\${"`"}b\|c${"`"}\]](https://x.y/) [d\|\]e](https://x.y/) [https://x.y/a\|b](https://x.y/a\|b) |`].join("\n"),
         ],
         [
             "a MathML formula without TeX keeps its visible text, not its other annotations",
@@ -672,9 +670,9 @@ describe("a plain Word list", () => {
 });
 
 describe("a link whose tag quotes an angle bracket", () => {
-    it("still counts as formatting, so the link is kept", async () => {
+    it("still counts as formatting, so the link is kept, its title too", async () => {
         await expect(paste({ "text/html": '<a title="2 > 1" href="https://example.com/">docs</a>', "text/plain": "docs" })).resolves.toBe(
-            "[docs](https://example.com/)",
+            '[docs](https://example.com/ "2 > 1")',
         );
     });
 });
@@ -815,7 +813,7 @@ describe("superscripts and subscripts", () => {
         ["a chemical formula", "<p><b>H<sub>2</sub>O</b> and CO<sub>2</sub></p>", "**H₂O** and CO₂"],
         ["a signed exponent", "<p><i>x<sup>-(n+1)</sup></i></p>", "*x⁻⁽ⁿ⁺¹⁾*"],
         ["an ordinal, kept as text", "<p>12<sup>th</sup> <b>May</b></p>", "12th **May**"],
-        ["a footnote mark, kept as text", "<p>Fact<sup>[1]</sup> <b>here</b></p>", "Fact[1] **here**"],
+        ["a footnote mark, kept as text", "<p>Fact<sup>[1]</sup> <b>here</b></p>", String.raw`Fact\[1\] **here**`],
     ])("keeps the raised or lowered meaning where Unicode can: %s", (_: string, html: string, markdown: string) => {
         expect(htmlToMarkdown(html)).toBe(markdown);
     });
@@ -952,9 +950,9 @@ describe("display or visibility declared twice", () => {
 });
 
 describe("a code block inside a heading", () => {
-    it("keeps the heading's text and puts the block below it", () => {
+    it("keeps the heading's text, puts the block below it and the text after the block below that", () => {
         expect(htmlToMarkdown("<h2>Setup<pre>npm i</pre></h2>")).toBe("## Setup\n\n```\nnpm i\n```");
-        expect(htmlToMarkdown("<h2>A<pre>x</pre>B</h2>")).toBe("## A B\n\n```\nx\n```");
+        expect(htmlToMarkdown("<h2>A<pre>x</pre>B</h2>")).toBe("## A\n\n```\nx\n```\n\nB");
         expect(htmlToMarkdown("<h3><pre>only code</pre></h3>")).toBe("```\nonly code\n```");
         expect(htmlToMarkdown("<h2>Use <code>npm</code></h2>")).toBe("## Use `npm`");
     });
@@ -978,6 +976,12 @@ describe("block content in a pasted table cell", () => {
     });
 });
 
+describe("an HTML-only copy with control characters, pasted plain", () => {
+    it("leaves them out, as they show nothing", async () => {
+        await expect(paste({ "text/html": "<p>a\u{1}b\u{2}c\u{3}d\u{10}e</p>" }, { plainOnly: true, selectedText: "" })).resolves.toBe("abcde");
+    });
+});
+
 describe("an HTML-only copy with an emoji picture, pasted plain", () => {
     it("keeps the emoji from its alt text", async () => {
         await expect(paste({ "text/html": '<p>Done <img alt="🎉" src="x.png"></p>' }, { plainOnly: true, selectedText: "" })).resolves.toBe("Done 🎉");
@@ -985,7 +989,7 @@ describe("an HTML-only copy with an emoji picture, pasted plain", () => {
 });
 
 describe("non-breaking spaces at the edge of a block", () => {
-    it("stay, outside the formatting marks", () => {
-        expect(htmlToMarkdown("<p><strong>&nbsp;Warning&nbsp;</strong></p>")).toBe("\u{A0}**Warning**\u{A0}");
+    it("stay outside the formatting marks; one that ends the paste is trimmed with it", () => {
+        expect(htmlToMarkdown("<p><strong>&nbsp;Warning&nbsp;</strong></p>")).toBe("\u{A0}**Warning**");
     });
 });

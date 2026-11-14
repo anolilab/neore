@@ -17,10 +17,10 @@ const STEPS_PER_ITEM = 10;
 const steps = { count: 0 };
 
 /** A prototype on an element's chain; only its own sibling accessors are read. */
-type SiblingName = "nextElementSibling" | "nextSibling" | "previousElementSibling" | "previousSibling";
+type SiblingName = "nextElementSibling" | "nextSibling" | "parentElement" | "previousElementSibling" | "previousSibling";
 type SiblingPrototype = Partial<Pick<Element, SiblingName>>;
 
-const SIBLING_NAMES: ReadonlyArray<SiblingName> = ["nextElementSibling", "nextSibling", "previousElementSibling", "previousSibling"];
+const SIBLING_NAMES: ReadonlyArray<SiblingName> = ["nextElementSibling", "nextSibling", "parentElement", "previousElementSibling", "previousSibling"];
 
 function getter(element: Element, name: SiblingName): (this: Element) => Node | null {
     let owner: SiblingPrototype | null = Object.getPrototypeOf(element) as SiblingPrototype;
@@ -124,5 +124,17 @@ describe("paste: a closed details stays linear", () => {
 
         expect(markdown).toBe(summary === "" ? "" : "end");
         expect(steps.count).toBeLessThan(STEPS_PER_ITEM * count);
+    });
+});
+
+describe("paste: a code block's language stays linear", () => {
+    it("finds the shown code past many code elements under a deep hidden wrapper, stepping a linear number of times", () => {
+        const count = 2000;
+        const depth = 200;
+        const hidden = `<div hidden>${"<span>".repeat(depth)}${"<code>x</code>".repeat(count)}${"</span>".repeat(depth)}</div>`;
+        const markdown = convert(`<pre>${hidden}<code class="language-js">y</code></pre>`, "pre *");
+
+        expect(markdown).toBe("```js\ny\n```");
+        expect(steps.count).toBeLessThan(STEPS_PER_ITEM * (count + depth));
     });
 });

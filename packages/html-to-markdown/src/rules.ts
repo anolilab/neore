@@ -265,6 +265,36 @@ export default class Rules implements RuleLookup {
         return removalRule(this.removal, node, this.options, this) !== undefined;
     }
 
+    ruleAfter(rule: Rule, node: AnnotatedNode): Rule {
+        const search: ListSearch = (list, candidate, nodeName) => searchList(this.removal, list, candidate, nodeName, this.options, this);
+        const nodeName = node.nodeName.toLowerCase();
+        let isPast = false;
+
+        for (const list of this.searchOrder) {
+            let found: Rule | undefined;
+
+            // A rule added twice is passed over at each place, so it never gets itself back.
+            if (isPast) {
+                found = list === this.removeList ? search(list, node, nodeName) : findRule(list, node, nodeName, this.options, this, 0, rule);
+            } else {
+                const index = list.indexOf(rule);
+
+                if (index === -1) {
+                    continue;
+                }
+
+                isPast = true;
+                found = findRule(list, node, nodeName, this.options, this, index + 1, rule);
+            }
+
+            if (found) {
+                return found;
+            }
+        }
+
+        return this.defaultRule;
+    }
+
     forEach(visit: (rule: Rule, index: number) => void): void {
         [...this.customRules, ...this.builtInRules].forEach((rule, index) => {
             visit(rule, index);
@@ -379,15 +409,24 @@ function isFilterMatch(rule: Rule, node: AnnotatedNode, nodeName: string, option
     throw new TypeError("`filter` needs to be a string, array, or function");
 }
 
-function findRule(rules: ReadonlyArray<Rule>, node: AnnotatedNode, nodeName: string, options: Options, lookup: RuleLookup): Rule | undefined {
+/** The first rule from index `from` that matches the node, passing over `skip`. */
+function findRule(
+    rules: ReadonlyArray<Rule>,
+    node: AnnotatedNode,
+    nodeName: string,
+    options: Options,
+    lookup: RuleLookup,
+    from = 0,
+    skip?: Rule,
+): Rule | undefined {
     // A filter may add rules to this same list. Bounding the search by the length
     // at the start keeps it to the rules that existed, as Array.find did.
     const { length } = rules;
 
-    for (let index = 0; index < length; index += 1) {
+    for (let index = from; index < length; index += 1) {
         const rule = rules[index];
 
-        if (rule && isFilterMatch(rule, node, nodeName, options, lookup)) {
+        if (rule && rule !== skip && isFilterMatch(rule, node, nodeName, options, lookup)) {
             return rule;
         }
     }

@@ -707,7 +707,8 @@ const loadTurnContext = async (
         organizationId: args.organizationId,
         origin: args.origin,
         participants: args.config.participants,
-        permissionOrganizationId: thread.organizationId ?? args.organizationId ?? null,
+        // As `readRunPermissionCap` does: the thread's organization, then the one a temporary chat was started in, then the run's.
+        permissionOrganizationId: thread.organizationId ?? thread.capOrganizationId ?? args.organizationId ?? null,
         prefs: runContext.prefs,
         promptMessageId: args.promptMessageId,
         promptMessages: undefined,

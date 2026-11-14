@@ -85,7 +85,13 @@ new TurndownService(PASTE_OPTIONS).use(paste).turndown(html);
   as inline math). Any other image is dropped: a pasted picture arrives as a file, if at all.
 - A formula with a TeX annotation is written as inline math; without one, its visible text stays.
 - The forms are the ones people type: `- ` and `1. ` with one space, a plain newline for a line break, fenced code,
-  `#` headings, `*` emphasis and `---` rules. A nested item is indented to its parent's text.
+  `#` headings, `*` emphasis and `---` rules. A nested item is indented to its parent's text. Blank lines in a list
+  item or a quote end in no spaces (`>` alone in a quote), and a repeated `<br>` keeps its blank line.
+- A `<div>` that holds only inline content is a line: a run of them is not parted by blank lines, and one that holds
+  only a `<br>` is a blank line.
+- Inline code keeps the spaces it holds, at its ends too. Raised and lowered text (`<sup>`, `<sub>`) is written in
+  Unicode's raised and lowered characters when each of its characters has one (`E=mc²`, `H₂O`), and as written
+  otherwise (`12th`).
 - Items are numbered as HTML numbers them, from the list's `start` or an item's `value`. Markdown numbers only in
   digits and from 0 up, so a lettered or roman list (`type="a"`, `"i"`) and a number below 0 are written as text after
   a bullet: `- b. item`, `- -1. item`.
@@ -93,10 +99,32 @@ new TurndownService(PASTE_OPTIONS).use(paste).turndown(html);
   paragraphs with `mso-list` styles and hides the marker. Both are written as nested lists, each depth numbered on its
   own, and a copy that starts at a nested item starts at the left edge. Word's numbers (up to nine digits) are kept,
   other marker text (`a.`, `1.1.`, `(iv)`) is written after a bullet, and two Word lists side by side stay apart. A list placed straight in a list goes under the item
-  before it.
+  before it, and text placed straight in a list is an item of its own.
 - `<b>` or `<strong>` set back to normal weight is not bold: Google Docs wraps a whole copy in one.
+- Bold, italics and strikethrough set by a style (`font-weight`, `font-style`, `text-decoration`) are written as
+  Markdown on a span, a paragraph, a list item or a table cell, not on a heading. Text set back to normal weight
+  inside bold stays out of the bold: `<b>a <span style="font-weight:normal">b</span> c</b>` is `**a** b **c**`. A
+  block holding a list, a table or a code block keeps no formatting of its own, which could not span them.
+- Formatting on part of a ZWJ emoji sequence (`<b>👩</b>‍👩`) is left off, so the joiner stays beside its emoji.
+- Every `<pre>` is fenced, with or without a `<code>` in it, its text read as the page shows it (a line per `<br>` and
+  per line element, hidden text left out). The language comes from a `language-`, `lang-` or `highlight-` class on
+  the code, the block, or the two elements around it, as GitHub writes it. The fence is longer than any backtick run
+  in the code.
+- Pasted HTML nested more than 500 elements deep (a table and its cell are one level), or so deep around many lines
+  that re-indenting quotes and list items or rebuilding formatting line by line would take more than a budget of work,
+  throws a `RangeError`: paste the plain text instead.
+- The output starts at its first content: blank text before it, such as the spaces in a pasted `<head>`, is left out.
 
-The rest of the composer's paste behaviour (formatting set by style, code languages) follows in the next parts.
+The preset marks the normal-weight runs with the control characters U+0001 and U+0002 while it converts, so it takes
+them out of the input and the output.
+
+The rest of the composer's paste behaviour (sub- and superscripts, work budgets) follows in the next parts.
+
+## Rule lookup
+
+A rule's filter and replacement get a `RuleLookup`. Besides `ruleFor`, `hasRuleFor` and `isRemoved`, it has
+`ruleAfter(rule, node)`: the rule the node would get if `rule` did not match it. A rule that adds to what another rule
+writes, such as the paste preset's formatting set by style, formats the content and passes it on to that rule.
 
 ## Status
 

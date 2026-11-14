@@ -1218,6 +1218,7 @@ export const rateLimits = sqliteTable("rateLimits", {
     value: real("value").notNull(),
 }, (t) => ({
     by_key: index("by_key").on(t.key),
+    by_ts: index("by_ts").on(t.ts),
 }));
 
 export const requestedSecrets = sqliteTable("requestedSecrets", {
@@ -1380,6 +1381,7 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     organizationId: text("organizationId"),
     parentModel: text("parentModel"),
     parentThreadId: text("parentThreadId").notNull(),
+    postCheckAt: real("postCheckAt"),
     postCheckId: text("postCheckId"),
     postFailed: text("postFailed"),
     reapAt: real("reapAt"),
@@ -1657,6 +1659,7 @@ export const threads = sqliteTable("threads", {
     autoModel: integer("autoModel", { mode: "boolean" }),
     awaitingInput: text("awaitingInput", { mode: "json" }).$type<"approval" | "question">(),
     botId: text("botId").references((): AnySQLiteColumn => bots._id),
+    capOrganizationId: text("capOrganizationId"),
     category: text("category"),
     contextResetMessageId: text("contextResetMessageId"),
     createdAt: real("createdAt"),

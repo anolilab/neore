@@ -500,6 +500,7 @@ export const rateLimit = sqliteTable("rateLimit", {
     lastRequest: real("lastRequest").notNull(),
 }, (t) => ({
     key: index("key").on(t.key),
+    by_lastRequest: index("by_lastRequest").on(t.lastRequest),
 }));
 
 export const session = sqliteTable("session", {

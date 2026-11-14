@@ -2297,7 +2297,9 @@ export const schema = defineSchema({
     })
         .externallyManaged()
         .global()
-        .index("key", ["key"]),
+        .index("key", ["key"])
+        // `auth/rate-limit-sweep.ts` deletes rows past every limiter window.
+        .index("by_lastRequest", ["lastRequest"]),
 
     /**
      * Backing table for `@lunora/ratelimit`'s `createDbStore`.
@@ -2320,7 +2322,9 @@ export const schema = defineSchema({
         value: v.number(),
     })
         .externallyManaged()
-        .index("by_key", ["key"]),
+        .index("by_key", ["key"])
+        // `lib/rate-limit-sweep.ts` deletes rows past every limit's retention.
+        .index("by_ts", ["ts"]),
 
     /**
      * A value the agent asked the user for with `requestSecret` (an API key, a token),
@@ -2705,7 +2709,10 @@ export const schema = defineSchema({
         // The delegating run's model, inherited when still allowed.
         parentModel: v.optional(v.string()),
         parentThreadId: v.string(),
-        // The run's one pending post check (`postResult`), so a release replaces it instead of adding a second loop.
+        // When the run's current post check is due: a release that would not move it forward schedules nothing.
+        postCheckAt: v.optional(v.number()),
+        // The token of the run's current post check (`postResult`): a check acts only while its token is current, so a
+        // release supersedes the pending one instead of adding a second loop.
         postCheckId: v.optional(v.string()),
         // Why the result never reached the parent thread, once the retries ran out. Terminal: set
         // instead of `resultPostedAt`, never with it.
@@ -3166,6 +3173,12 @@ export const schema = defineSchema({
         // The bot this chat was started with. Set once at creation; its
         // instructions are read live on each run (`chat/lib/agent-run.ts`).
         botId: v.optional(v.id("bots")),
+        // The organization a temporary chat was started in, kept for its permission cap only
+        // (`chat/lib/run-permission-cap.ts`). A temporary chat is never filed under `organizationId`, so it stays off that
+        // organization's list, but a later turn sent from another space must not lift the cap it started under.
+        // Written by `agent/threads.ts#createTemporaryThread`. Saving or branching the chat files the lasting chat under this
+        // organization while its owner is a member, and keeps this field instead once they left (`placeLastingChat`).
+        capOrganizationId: v.optional(v.string()),
         category: v.optional(v.string()),
         // The newest context reset on the ACTIVE path, kept by `syncActiveAgent` and the clear writers so a reply reads it in
         // one lookup (`agent/context-reset.ts#resetForTip`). "" = none on the path; unset = not known (walk the path).

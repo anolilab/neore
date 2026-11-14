@@ -1657,6 +1657,7 @@ export interface Doc_subAgentRuns {
     organizationId?: string;
     parentModel?: string;
     parentThreadId: string;
+    postCheckAt?: number;
     postCheckId?: string;
     postFailed?: string;
     reapAt?: number;
@@ -1930,6 +1931,7 @@ export interface Doc_threads {
     autoModel?: boolean;
     awaitingInput?: "approval" | "question";
     botId?: Id<"bots">;
+    capOrganizationId?: string;
     category?: string;
     contextResetMessageId?: string;
     createdAt?: number;
@@ -2679,8 +2681,8 @@ export interface IndexNamesByTable {
     pullRequestGuides: "by_user_and_pull" | "by_threadId";
     pullRequestThreads: "by_user_and_repository_number" | "by_user_and_threadId";
     pushDevices: "by_token" | "by_userId";
-    rateLimit: "key";
-    rateLimits: "by_key";
+    rateLimit: "key" | "by_lastRequest";
+    rateLimits: "by_key" | "by_ts";
     requestedSecrets: "by_ref" | "by_expiresAt" | "by_threadId" | "by_userId";
     reviewDrafts: "by_user_and_pull";
     sandboxActions: "by_sessionId_timestamp";
@@ -4873,6 +4875,7 @@ export interface Insert_subAgentRuns {
     organizationId?: string;
     parentModel?: string;
     parentThreadId: string;
+    postCheckAt?: number;
     postCheckId?: string;
     postFailed?: string;
     reapAt?: number;
@@ -5146,6 +5149,7 @@ export interface Insert_threads {
     autoModel?: boolean;
     awaitingInput?: "approval" | "question";
     botId?: Id<"bots">;
+    capOrganizationId?: string;
     category?: string;
     contextResetMessageId?: string;
     createdAt?: number;

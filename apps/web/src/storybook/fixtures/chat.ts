@@ -193,5 +193,9 @@ export const chatFixtures = (options: ChatFixtureOptions = {}): LunoraFixture[] 
         lunora(api.chat.thread_state.markThreadViewed, { updated: true }),
         lunora(api.knowledge.functions.getThreadKnowledge, []),
         lunora(api.source_control.pr_threads.getForThread, null),
+        lunora(api.source_control.pr_thread_attach.listForThread, []),
+        lunora(api.source_control.pr_thread_attach.countsForThreads, []),
+        lunora(api.chat.thread_state.getEffectivePermissionMode, null),
+        lunora(api.chat.compaction.getCompactionStatus, { canCompact: true, contextTokens: 1200 }),
     ];
 };

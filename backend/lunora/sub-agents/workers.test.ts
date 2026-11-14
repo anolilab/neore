@@ -205,6 +205,31 @@ describe("dispatching to a worker", () => {
         expect(followUp).toMatchObject({ organizationId: "org-run" });
     });
 
+    it("takes the organization a temporary lead chat was started in, so a turn from another space cannot lift its cap", async () => {
+        await joinOrganization(userId, "org-temp");
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", leadId, { capOrganizationId: "org-temp", isTemporary: true }));
+
+        const { run } = await create({ toolCallId: "call-temp" });
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", run.childThreadId));
+
+        expect(run).toMatchObject({ organizationId: "org-temp" });
+        expect(thread).toMatchObject({ organizationId: "org-temp" });
+    });
+
+    it("refuses, uncharged, a worker from a temporary lead chat whose starting organization the owner left", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", leadId, { capOrganizationId: "org-left", isTemporary: true }));
+
+        const worker = await dispatch({ name: "Researcher", toolCallId: "call-temp-left" });
+        const subAgent = await harness.run(
+            async (ctx: any) => await admitSubAgentRun(ctx, { parentThreadId: leadId, task: "Research the topic", toolCallId: "call-temp-sub", userId }),
+        );
+
+        expect(worker).toMatchObject({ error: expect.stringMatching(LEFT_ORGANIZATION), kind: "forbidden" });
+        expect(subAgent).toMatchObject({ error: expect.stringMatching(LEFT_ORGANIZATION) });
+        expect(await runs()).toHaveLength(0);
+        expect(await rateLimitKeys()).toHaveLength(0);
+    });
+
     it("refuses a worker run whose owner left its organization, charging nothing", async () => {
         const result = await dispatch({ name: "Researcher", organizationId: "org-left", toolCallId: "call-left" });
 

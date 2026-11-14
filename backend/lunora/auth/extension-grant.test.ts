@@ -75,6 +75,7 @@ const authorize = async (store: ExtensionGrantStore, overrides: Partial<Paramete
     await authorizeExtension(store, {
         codeChallenge: await pkceChallenge(VERIFIER),
         redirectUri: REDIRECT_URI,
+        session: {},
         trustedRedirectUris: [REDIRECT_URI],
         userId: USER.id,
         ...overrides,
@@ -116,6 +117,27 @@ describe("authorizeExtension", () => {
         await expect(authorize(store, { userId: "guest" })).rejects.toMatchObject({ code: "access_denied", name: "ExtensionGrantError" });
         await expect(authorize(store, { userId: "banned" })).rejects.toMatchObject({ code: "access_denied", name: "ExtensionGrantError" });
         await expect(authorize(store, { codeChallenge: "plain-verifier" })).rejects.toMatchObject({ code: "invalid_request", name: "ExtensionGrantError" });
+    });
+});
+
+describe("authorizeExtension while an admin is impersonating the user", () => {
+    it("issues no code, so no app session can follow", async () => {
+        const { codes, sessions, store } = createStore();
+
+        await expect(authorize(store, { session: { impersonating: true } })).rejects.toMatchObject({
+            code: "access_denied",
+            message: expect.stringContaining("while impersonating"),
+            name: "ExtensionGrantError",
+        });
+        expect(codes.size).toBe(0);
+        expect(sessions.size).toBe(0);
+    });
+
+    it("refuses a sign-in whose session could not be read (an app's grant, or a session gone)", async () => {
+        const { codes, store } = createStore();
+
+        await expect(authorize(store, { session: null })).rejects.toMatchObject({ code: "unauthorized", name: "ExtensionGrantError" });
+        expect(codes.size).toBe(0);
     });
 });
 

@@ -16,6 +16,7 @@ import { deleteGoalsForThread, endActiveGoals, hasLiveStream } from "../chat/goa
  * Thread operations.
  * Migrated from `@neore/backend-agent` component.
  */
+import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { omit } from "../lib/collections";
 import { assert } from "../lib/error-helpers";
 import { patchById, patchRow, withoutUndefined } from "../lib/patch";
@@ -50,10 +51,10 @@ export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
 };
 
 /**
- * Unread, snooze and "needs you" belong to the thread's OWNER; the row is shared with grantees, who must not see
- * (or act on) them. Reads that can reach a grantee return the row through here.
+ * Unread, snooze and "needs you" belong to the thread's OWNER, as does the organization a temporary chat was started in; the
+ * row is shared with grantees, who must not see (or act on) them. Reads that can reach a grantee return the row through here.
  */
-const OWNER_STATE_KEYS = ["awaitingInput", "lastReplyAt", "lastViewedAt", "permissionMode", "snoozeChosenAt", "snoozedUntil"] as const;
+const OWNER_STATE_KEYS = ["awaitingInput", "capOrganizationId", "lastReplyAt", "lastViewedAt", "permissionMode", "snoozeChosenAt", "snoozedUntil"] as const;
 
 export const threadForViewer = (thread: Doc<"threads">, viewerId: string | undefined): ThreadDoc => {
     const isOwner = thread.userId !== undefined && thread.userId === viewerId;
@@ -1245,6 +1246,11 @@ export const searchThreadsByTitleAndSummary = query
 // Temporary threads functions
 export const createTemporaryThread = internalMutation
     .input({
+        /**
+         * The organization the chat was started in. A temporary chat is not filed under it (it stays off that organization's
+         * list), so it is kept on the thread for the permission cap alone (`threads.capOrganizationId`).
+         */
+        capOrganizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         expiresAt: v.number(),
         retentionHours: v.optional(v.number()),
         threadId: v.id("threads"),
@@ -1259,7 +1265,7 @@ export const createTemporaryThread = internalMutation
 /** A thread made temporary, in the caller's transaction (`createThreadWithInitialMessage` creates one as temporary). */
 export const insertTemporaryThread = async (
     ctx: MutationContext,
-    args: { expiresAt: number; retentionHours?: number; threadId: Id<"threads"> },
+    args: { capOrganizationId?: string; expiresAt: number; retentionHours?: number; threadId: Id<"threads"> },
 ): Promise<void> => {
     const thread = await ctx.db.get("threads", args.threadId);
 
@@ -1272,7 +1278,7 @@ export const insertTemporaryThread = async (
 
     // Denormalize isTemporary onto thread for efficient filtering
     if (thread) {
-        await ctx.db.patch("threads", args.threadId, { isTemporary: true });
+        await ctx.db.patch("threads", args.threadId, { isTemporary: true, ...(args.capOrganizationId && { capOrganizationId: args.capOrganizationId }) });
     }
 
     // A temporary chat takes no guest posts: a link already given out is withdrawn with its notes, as archiving does.
@@ -1434,6 +1440,39 @@ export const getTemporaryThreadsByThreadIds = query
         return Object.fromEntries(expiresAtMap);
     });
 
+/**
+ * Where a lasting chat made from `source` (a saved temporary chat, or a branch) goes. One started in an organization is filed
+ * under it while the owner is still a member, as a lasting chat started there is, so it keeps that organization's cap. Once the
+ * owner has left, filing it there would hide it from every list they can open: it stays in their personal list and keeps the
+ * cap through `capOrganizationId`. Membership is read from the primary, as the other left-member checks are.
+ */
+const placeLastingChat = async (
+    ctx: MutationContext | QueryContext,
+    source: Pick<Doc<"threads">, "capOrganizationId" | "organizationId" | "userId">,
+): Promise<{ capOrganizationId?: string; organizationId?: string }> => {
+    if (source.organizationId) {
+        return { organizationId: source.organizationId };
+    }
+
+    if (!source.capOrganizationId) {
+        return {};
+    }
+
+    const member = source.userId ? await getMemberByOrganizationAndUser(ctx, source.capOrganizationId, source.userId, "primary") : null;
+
+    return member ? { organizationId: source.capOrganizationId } : { capOrganizationId: source.capOrganizationId };
+};
+
+/** `placeLastingChat` for an action that makes a lasting chat from a thread (`chat/functions.ts#branchThread`). */
+export const lastingChatPlacement = internalQuery
+    .input({ threadId: v.id("threads") })
+    .output(v.object({ capOrganizationId: v.optional(v.string()), organizationId: v.optional(v.string()) }))
+    .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get("threads", args.threadId);
+
+        return thread ? await placeLastingChat(ctx, thread) : {};
+    });
+
 export const convertTemporaryToPermanent = internalMutation
     .input({ threadId: v.id("threads") })
     .output(v.null())
@@ -1447,9 +1486,11 @@ export const convertTemporaryToPermanent = internalMutation
             throw new LunoraError("NOT_FOUND", `Temporary thread ${args.threadId} not found`);
         }
 
+        const thread = await ctx.db.get("threads", args.threadId);
+        const placement = thread ? await placeLastingChat(ctx, thread) : {};
+
         await ctx.db.delete("temporaryThreads", temporaryThread._id);
-        // Clear denormalized flag
-        await patchById(ctx.db, "threads", args.threadId, { isTemporary: undefined });
+        await patchById(ctx.db, "threads", args.threadId, { capOrganizationId: undefined, isTemporary: undefined, ...placement });
 
         return null;
     });

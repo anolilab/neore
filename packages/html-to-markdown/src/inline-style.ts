@@ -10,7 +10,13 @@ const QUOTES = new Set(["'", `"`]);
  * The value an inline style gives a property, as CSS reads it: the last declaration wins, unless an earlier one is
  * `!important` and the later one is not. Lower case, without `!important`; empty when the style sets none.
  */
-export function declaredStyle(style: string, property: string, isValid: (value: string) => boolean = () => true): string {
+export function declaredStyle(
+    style: string,
+    property: string | ReadonlyArray<string>,
+    isValid: (value: string, property: string) => boolean = () => true,
+): string {
+    // Several properties when they set the same thing, such as a shorthand and its longhand: the last of any of them wins.
+    const properties: ReadonlyArray<string> = typeof property === "string" ? [property] : property;
     let value = "";
     let isImportant = false;
 
@@ -19,7 +25,9 @@ export function declaredStyle(style: string, property: string, isValid: (value: 
     for (const declaration of parts) {
         const colon = declaration.indexOf(":");
 
-        if (colon === -1 || declaration.slice(0, colon).trim().toLowerCase() !== property) {
+        const name = colon === -1 ? "" : declaration.slice(0, colon).trim().toLowerCase();
+
+        if (!properties.includes(name)) {
             continue;
         }
 
@@ -27,13 +35,28 @@ export function declaredStyle(style: string, property: string, isValid: (value: 
         const { isImportant: isThisImportant, value: candidate } = priority(raw);
 
         // A browser drops a declaration whose value it cannot read, so an invalid value overrides nothing.
-        if ((isThisImportant || !isImportant) && isValid(candidate)) {
+        if ((isThisImportant || !isImportant) && isValid(candidate, name)) {
             value = candidate;
             isImportant = isThisImportant;
         }
     }
 
     return value;
+}
+
+/** The property names an inline style declares, in lower case. */
+export function declaredProperties(style: string): Set<string> {
+    const names = new Set<string>();
+
+    for (const declaration of declarations(style)) {
+        const colon = declaration.indexOf(":");
+
+        if (colon !== -1) {
+            names.add(declaration.slice(0, colon).trim().toLowerCase());
+        }
+    }
+
+    return names;
 }
 
 /**

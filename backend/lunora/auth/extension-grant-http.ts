@@ -3,7 +3,8 @@
  * protocol and why it exists.
  *
  * - `POST /extension/auth/authorize` — the web app, as the signed-in user (the
- *   RPC bearer JWT), asks for a code. Identity comes from `resolveIdentity`.
+ *   RPC bearer JWT), asks for a code. Identity comes from `resolveIdentity`; a
+ *   session an admin is impersonating with is refused (`access_denied`).
  * - `POST /extension/auth/exchange` — the extension trades code + verifier for
  *   its session token. Unauthenticated by design: the code IS the credential.
  * - `POST /extension/auth/token` — session token → short-lived JWT.
@@ -15,6 +16,7 @@
 import type { HttpActionCtx } from "lunorash/server";
 import { v } from "lunorash/server";
 
+import { internal } from "../_generated/internal";
 import { getAuth } from "../auth";
 import { PUBLIC_ORIGIN, TRUSTED_EXTENSION_REDIRECT_URIS } from "../env";
 import { parseTrustedExtensionRedirectUris } from "../lib/extension-origins";
@@ -59,11 +61,15 @@ const tokenBody = v.object({ token: v.string() });
 export const authorizeExtensionHttpAction = async (context: HttpActionCtx, request: Request): Promise<Response> => {
     try {
         const body = await readBody(request, (value) => authorizeBody.parse(value));
-        const result = await authorizeExtension(createExtensionGrantStore(getAuth()), {
-            ...body,
-            trustedRedirectUris,
-            userId: context.auth.userId as null | string | undefined,
-        });
+        const userId = context.auth.userId as null | string | undefined;
+        // Only the web app's own session (`sid`) approves, read from its row for its impersonation mark. An app's grant
+        // (`gsid`) carries no mark, so it cannot show it is not an admin's, and approves nothing.
+        const { sessionId } = ((await context.auth.getIdentity()) ?? {}) as { sessionId?: unknown };
+        const session =
+            userId && typeof sessionId === "string"
+                ? await context.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId, userId })
+                : null;
+        const result = await authorizeExtension(createExtensionGrantStore(getAuth()), { ...body, session, trustedRedirectUris, userId });
 
         return Response.json(result, { headers: NO_STORE });
     } catch (error) {

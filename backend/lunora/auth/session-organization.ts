@@ -32,7 +32,7 @@ export const getActiveOrganizationIdForSession = internalQuery
 export const getSessionOrganizationForCap = internalQuery
     // The session id comes from the request's sign-in, so it is bounded like every other id a request carries.
     .input({ sessionId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.union(v.object({ organizationId: v.union(v.string(), v.null()) }), v.null()))
+    .output(v.union(v.object({ impersonating: v.optional(v.boolean()), organizationId: v.union(v.string(), v.null()) }), v.null()))
     .query(async ({ args: { sessionId, userId }, ctx }) => {
         // Both reads from the primary: a replica can still hold a session just signed out or a membership just revoked.
         const session = await ctx.db.session.findFirst({ consistency: "primary", where: { _id: sessionId as Id<"session"> } });
@@ -42,8 +42,12 @@ export const getSessionOrganizationForCap = internalQuery
             return null;
         }
 
+        // Set when an admin opened this session to act as the user, for the writes refused to them (a guest note's send,
+        // an app's sign-in: `extension-grant-http.ts`).
+        const impersonating = session.impersonatedBy ? { impersonating: true } : {};
+
         if (!session.activeOrganizationId) {
-            return { organizationId: null };
+            return { ...impersonating, organizationId: null };
         }
 
         // Membership is read directly, not through `resolveActiveMembership`: that helper checks expiry again with the
@@ -53,5 +57,5 @@ export const getSessionOrganizationForCap = internalQuery
         // spaces. A chat filed under that organization is still capped by it (the thread's own organization wins).
         const membership = await getMemberByOrganizationAndUser(ctx, session.activeOrganizationId, userId, "primary");
 
-        return { organizationId: membership ? session.activeOrganizationId : null };
+        return { ...impersonating, organizationId: membership ? session.activeOrganizationId : null };
     });

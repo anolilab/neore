@@ -646,6 +646,9 @@ export type MessageDoc = Infer<typeof vMessageDoc>; // Public
  */
 export const vThreadCreateFields = {
     autoModel: v.optional(v.boolean()),
+    // A temporary chat's organization, for its cap alone: written by `agent/threads.ts#createTemporaryThread`, and kept on a
+    // lasting chat made from it when the owner has left that organization (`agent/threads.ts#lastingChatPlacement`).
+    capOrganizationId: v.optional(v.string()),
     category: v.optional(v.string()), // Auto-categorized thread topic
     createdBy: v.optional(v.string()),
     customSystemPrompt: v.optional(v.string()),

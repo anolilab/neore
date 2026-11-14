@@ -26,7 +26,7 @@ function wordItem(level: number, marker: string, text: string): string {
 describe("paste lists: Google Docs", () => {
     it("writes a Google Docs list and leaves out the normal-weight bold it wraps a copy in", () => {
         expect(convert(fixture("google-docs-list.html"))).toBe(
-            "Release plan\n\n- Ship the beta on Monday\n- Read the [release notes](https://example.com/notes)\n  - twice",
+            "Release plan\n\n- **Ship** the beta on Monday\n- Read the [release notes](https://example.com/notes)\n  - *twice*",
         );
     });
 
@@ -142,8 +142,12 @@ describe("paste lists: review cases", () => {
         ).toBe("- a\n  - a2\n\n- b\n  - b2");
     });
 
-    it("keeps bold set to the relative weight lighter, which a heavy weight leaves bold", () => {
-        expect(convert(`<b style="font-weight:lighter">x</b> <strong style="font-weight:normal">y</strong>`)).toBe("**x** y");
+    it("reads the relative weight lighter from the weight around it: bold under a heavy one, normal under a normal one", () => {
+        expect(
+            convert(
+                `<span style="font-weight:900"><b style="font-weight:lighter">x</b></span> <b style="font-weight:lighter">y</b> <strong style="font-weight:normal">z</strong>`,
+            ),
+        ).toBe("**x** y z");
     });
 
     it("keeps the number of a Word numbered heading, which is no list item", () => {

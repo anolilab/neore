@@ -7,21 +7,27 @@
  */
 import { gfm } from "./gfm";
 import { declaredStyle } from "./inline-style";
-import { isWordMarker, listRules, unlessRemoved } from "./paste-lists";
+import { codeRules } from "./paste-code";
+import { checkWork, shownText, unwrapHeadingParagraphs, wrapLooseListText } from "./paste-input";
+import { isWordMarker, LINE_BREAK_MARK, listRules, prefixLines, trimBreaks, unlessRemoved } from "./paste-lists";
+import { guardMarks, isSetToNormal, styleRules } from "./paste-styles";
 import type TurndownService from "./turndown";
 import type { Options, Rule } from "./types";
+import { isBlock } from "./utilities";
 
 /**
  * The options the preset is written for. A line break is a plain newline, with no trailing spaces a composer would
- * hide; lists use `- `; code is fenced; links whose destination is not safe are written as their text.
+ * hide (the preset takes out the mark it writes before it); lists use `- `; code is fenced, and inline code keeps the
+ * spaces it holds; links whose destination is not safe are written as their text.
  */
 export const PASTE_OPTIONS: Partial<Options> = {
-    br: "",
+    br: LINE_BREAK_MARK,
     bulletListMarker: "-",
     codeBlockStyle: "fenced",
     emDelimiter: "*",
     headingStyle: "atx",
     hr: "---",
+    preformattedCode: true,
     safeLinks: true,
 };
 
@@ -94,9 +100,15 @@ const VISIBILITY_VALUES = new Set(["collapse", "hidden", "visible", ...GLOBAL_VA
 const CONTENT_VISIBILITY_VALUES = new Set(["auto", "hidden", "visible", ...GLOBAL_VALUES]);
 // `collapse` hides an element as `hidden` does, except in a table, where it also takes the row's or column's space.
 const HIDING_VISIBILITY = new Set(["collapse", "hidden"]);
+// The characters Unicode has raised and lowered forms of, so `E=mc<sup>2</sup>` stays `E=mc²` in plain Markdown.
+const SCRIPT_FROM = [..."0123456789+-\u{2212}=()"];
+const SUPERSCRIPTS = new Map([...SCRIPT_FROM, "n", "i"].map((char, index) => [char, [..."⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁻⁼⁽⁾ⁿⁱ"][index] as string]));
+const SUBSCRIPTS = new Map(SCRIPT_FROM.map((char, index) => [char, [..."₀₁₂₃₄₅₆₇₈₉₊₋₋₌₍₎"][index] as string]));
+// Elements in raised or lowered text that are more than its characters, so it is written as it is.
+const SCRIPT_STRUCTURE = new Set(["A", "BR", "CODE", "IMG", "KBD", "MATH", "SAMP", "SUB", "SUP", "TT"]);
+const HEADINGS = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
+const LIST_NAMES = new Set(["OL", "UL"]);
 const OUTER_DISPLAY = new Set(["block", "inline", "run-in"]);
-// `lighter` is not here: it is relative, and under a heavy weight it is still bold.
-const NORMAL_WEIGHT = new Set(["100", "200", "300", "400", "normal"]);
 const INNER_DISPLAY = new Set(["flex", "flow", "flow-root", "grid", "ruby", "table"]);
 
 /**
@@ -215,10 +227,17 @@ function isClosedDetails(node: Element): boolean {
 
 /** The text an image stands for: an emoji's alt text, or a formula's. Any other image is not text, so it has none. */
 function imageText(image: Element): string {
+    const alt = imageAlt(image);
+
+    return alt !== "" && isFormulaImage(image) ? inlineMath(alt) : alt;
+}
+
+/** The alt text of an image that draws an emoji or a formula, or "" for any other image. */
+function imageAlt(image: Element): string {
     const alt = image.getAttribute("alt")?.trim() ?? "";
 
     if (alt !== "" && isFormulaImage(image)) {
-        return inlineMath(alt);
+        return alt;
     }
 
     return EMOJI_NAME.test(alt) || (alt.length <= MAX_EMOJI_ALT && PICTOGRAPHIC.test(alt) && EMOJI_ONLY.test(alt)) ? alt : "";
@@ -250,7 +269,38 @@ function inlineMath(source: string): string {
     return `${fence}${pad}${tex}${pad}${fence}`;
 }
 
+// A heading line with no text: `#` to `######` and nothing after it but spaces and a line break's mark.
+// eslint-disable-next-line no-control-regex, sonarjs/no-control-regex -- U+0010 is the preset's own line break mark.
+const EMPTY_HEADING_LINE = /^#{1,6}[ \u{10}]*(?:\n+|$)/u;
+
+/**
+ * A heading whose only content is a block it cannot hold, such as a code block, writes no heading line of its own:
+ * an empty `### ` would be a heading with no text. Only such a heading is taken here; any other is the built-in
+ * rule's, which also folds a `<br>` into the heading's one line.
+ */
+const headingRule: Rule = {
+    filter: unlessRemoved((node) => HEADINGS.has(node.nodeName) && !hasLineText(node)),
+    replacement(content, node, options, lookup) {
+        const next = lookup.ruleAfter(headingRule, node);
+        const written = next.replacement.call(next, content, node, options, lookup);
+        const start = written.length - written.trimStart().length;
+
+        return written.slice(0, start) + written.slice(start).replace(EMPTY_HEADING_LINE, "");
+    },
+};
+
 const pasteRules: Record<string, Rule> = {
+    // A quote with no trailing space on its blank lines, which a composer would hide.
+    blockquote: {
+        filter: unlessRemoved((node) => node.nodeName === "BLOCKQUOTE"),
+        replacement(content) {
+            const quoted = trimBreaks(content);
+
+            // A quote that holds only what the page hides writes no marker.
+            return quoted.trim() === "" ? "" : `\n\n${prefixLines(quoted, "> ", ">")}\n\n`;
+        },
+    },
+
     // A closed details shows its summary alone. Its other elements are hidden; its loose text is left out here.
     closedDetails: {
         filter: unlessRemoved(isClosedDetails),
@@ -271,10 +321,32 @@ const pasteRules: Record<string, Rule> = {
         },
     },
 
+    heading: headingRule,
+
     // An image is an emoji's or a formula's text, or nothing: a pasted picture arrives as a file, if at all.
     image: {
         filter: unlessRemoved((node) => node.nodeName === "IMG"),
         replacement: (_content, node) => imageText(node),
+    },
+
+    // A div that holds only inline content is a line, as mail and editors write one per line: a run of them is not
+    // parted by blank lines. A `<br>` that ends it makes no line of its own, so a div that holds only one is a blank line;
+    // one that holds nothing the page shows writes nothing.
+    lineDiv: {
+        filter: unlessRemoved((node) => node.nodeName === "DIV" && !hasBlockChild(node)),
+        replacement(content, node) {
+            // Blank only for a line break: a div that holds what the page hides or drops shows nothing.
+            if (trimBreaks(content).trim() === "") {
+                return blankLines(content.split(LINE_BREAK_MARK).length - 1);
+            }
+
+            // The last `<br>` of a block ends its last line and makes no line of its own; any before it, and one that
+            // starts the div, each show a line. Placed straight in a list, it is parted by blank lines, as any block
+            // there is: on the next line it would read as more of the item before.
+            const edge = LIST_NAMES.has(node.parentNode?.nodeName ?? "") ? "\n\n" : "\n";
+
+            return `${edge}${withoutLastBreak(content)}${edge}`;
+        },
     },
 
     // A formula with a TeX source is written as inline math. Without one, its visible text stays (its other annotations
@@ -286,13 +358,175 @@ const pasteRules: Record<string, Rule> = {
 
     // Bold set back to normal weight is not bold: Google Docs wraps a whole copy in `<b style="font-weight:normal">`.
     normalWeightBold: {
-        filter: unlessRemoved(
-            (node) =>
-                (node.nodeName === "B" || node.nodeName === "STRONG") && NORMAL_WEIGHT.has(declaredStyle(node.getAttribute("style") ?? "", "font-weight")),
-        ),
+        filter: unlessRemoved((node) => (node.nodeName === "B" || node.nodeName === "STRONG") && isSetToNormal(node)),
         replacement: (content) => content,
     },
+
+    // Raised and lowered text: no Markdown writes it, so it keeps its meaning in Unicode where Unicode can.
+    script: {
+        filter: unlessRemoved((node) => node.nodeName === "SUP" || node.nodeName === "SUB"),
+        replacement: (content, node) => scriptText(content, node, node.nodeName === "SUP" ? SUPERSCRIPTS : SUBSCRIPTS),
+    },
 };
+
+/**
+ * Raised or lowered text in the Unicode forms of its characters, when the page shows only text in it and each character
+ * has a form; otherwise as written: an ordinal (`12<sup>th</sup>`), a footnote mark (`<sup>[1]</sup>`), or one that holds
+ * a line break, a link, code, an image or raised text of its own. The characters are mapped in the Markdown, so
+ * emphasis around them stays, and an escaped one is mapped without its backslash.
+ */
+function scriptText(content: string, node: Element, forms: ReadonlyMap<string, string>): string {
+    const chars = [...shownText(node, isHiddenElement).trim()];
+
+    if (chars.length === 0 || chars.some((char) => !forms.has(char)) || hasScriptStructure(node)) {
+        return content;
+    }
+
+    const written: string[] = [];
+    const contentChars = [...content];
+
+    for (let index = 0; index < contentChars.length; index += 1) {
+        const char = contentChars[index] as string;
+        const next = contentChars[index + 1];
+        const isEscape = char === "\\" && next !== undefined && forms.has(next);
+        const mapped = isEscape ? next : char;
+
+        written.push(forms.get(mapped) ?? mapped);
+        index += isEscape ? 1 : 0;
+    }
+
+    return written.join("");
+}
+
+/** True when the element holds an element it shows that is more than text: a line break, a link, code, an image. */
+function hasScriptStructure(node: Element): boolean {
+    const pending: Element[] = [];
+
+    for (let child = node.firstElementChild; child; child = child.nextElementSibling) {
+        pending.push(child);
+    }
+
+    while (pending.length > 0) {
+        const element = pending.pop() as Element;
+
+        if (isHiddenElement(element)) {
+            continue;
+        }
+
+        if (SCRIPT_STRUCTURE.has(element.nodeName) || isBlock(element)) {
+            return true;
+        }
+
+        for (let child = element.firstElementChild; child; child = child.nextElementSibling) {
+            pending.push(child);
+        }
+    }
+
+    return false;
+}
+
+/**
+ * The blank lines of a div that holds only line breaks: one per break, as the page shows them. Each is a mark line,
+ * which the end of the conversion takes out, so the blank lines of divs side by side are not joined into one.
+ */
+function blankLines(breaks: number): string {
+    return breaks === 0 ? "" : `\n${`${LINE_BREAK_MARK}\n`.repeat(breaks)}`;
+}
+
+// Each div's answer, found once: its rule's filter may be asked more than once.
+const blockHolders = new WeakMap<Element, boolean>();
+
+/** The content without the newlines at its end and the one line break mark before them, if any. */
+function withoutLastBreak(content: string): string {
+    let end = content.length;
+
+    while (end > 0 && content.charAt(end - 1) === "\n") {
+        end -= 1;
+    }
+
+    return content.slice(0, end - (content.charAt(end - 1) === LINE_BREAK_MARK ? 1 : 0));
+}
+
+/**
+ * True when the heading shows text on its line, before its first block: text, or an image that stands for text. One
+ * walk in order, which does not go into a hidden element and stops at the first block.
+ */
+function hasLineText(heading: Element): boolean {
+    const pending: Node[] = [];
+
+    pushChildren(pending, heading);
+
+    while (pending.length > 0) {
+        const node = pending.pop() as Node;
+
+        if (isShownText(node)) {
+            return true;
+        }
+
+        if (node.nodeType === 1 && !isHiddenElement(node)) {
+            // The heading line ends at its first block: text after one does not fill the line.
+            if (isBlock(node)) {
+                return false;
+            }
+
+            pushChildren(pending, node);
+        }
+    }
+
+    return false;
+}
+
+/** True for text that is not blank, and for an image that stands for text. */
+function isShownText(node: Node): boolean {
+    if (node.nodeType === 3 || node.nodeType === 4) {
+        return (node.nodeValue ?? "").trim() !== "";
+    }
+
+    return node.nodeName === "IMG" && !isHiddenElement(node) && imageText(node as Element) !== "";
+}
+
+/** Pushes the node's children, last first, so the first comes off the stack first. */
+function pushChildren(pending: Node[], node: Node): void {
+    for (let child = node.lastChild; child; child = child.previousSibling) {
+        pending.push(child);
+    }
+}
+
+/** True when the element holds a block the page shows, which starts a line of its own. */
+function hasBlockChild(element: Element): boolean {
+    const known = blockHolders.get(element);
+
+    if (known !== undefined) {
+        return known;
+    }
+
+    // A block the page shows, at any depth: one inside an inline wrapper starts a line of its own too. The walk stops
+    // at the first block, so a div of divs is read no deeper than its first.
+    const pending: Element[] = [];
+    let hasBlock = false;
+
+    for (let child = element.lastElementChild; child; child = child.previousElementSibling) {
+        pending.push(child);
+    }
+
+    while (!hasBlock && pending.length > 0) {
+        const current = pending.pop() as Element;
+
+        if (current.nodeName === "BR" || isHiddenElement(current)) {
+            continue;
+        }
+
+        hasBlock = isBlock(current);
+
+        for (let child = current.lastElementChild; !hasBlock && child; child = child.previousElementSibling) {
+            pending.push(child);
+        }
+    }
+
+    blockHolders.set(element, hasBlock);
+
+    return hasBlock;
+}
 
 /** A media type without its parameters, in lower case: `application/x-tex; charset=utf-8` is `application/x-tex`. */
 function mediaType(value: string): string {
@@ -334,12 +568,28 @@ function texSource(node: Element): string {
 export function paste(service: TurndownService): void {
     service.remove(isHiddenElement);
 
-    const rules = { ...pasteRules, ...listRules(isHiddenOnPage) };
+    const rules = { ...pasteRules, ...listRules(isHiddenOnPage), ...codeRules(imageAlt) };
 
     for (const [key, rule] of Object.entries(rules)) {
         service.addRule(key, rule);
     }
 
-    // Added last, so it comes first: inside a table cell its rules write a list as the cell's text.
+    // Added after the preset's rules, so it comes before them: inside a table cell its rules write a list or a code
+    // block as the cell's text.
     service.use(gfm);
+
+    // Added last, so it comes first: a styled list item or table cell is formatted, then passed on to its rule.
+    for (const [key, rule] of Object.entries(styleRules)) {
+        service.addRule(key, rule);
+    }
+
+    // The loose list text is put in items first, so the work is measured on the items the conversion writes.
+    guardMarks(service, (root) => {
+        const shown = { imageText, isHidden: isHiddenElement, mathText: texSource };
+
+        wrapLooseListText(root, shown);
+        unwrapHeadingParagraphs(root, shown);
+        // A Word marker is hidden only so its item's rule writes it: the work check counts its text.
+        checkWork(root, { ...shown, isHidden: (node) => node.nodeType === 1 && isHiddenOnPage(node as Element) });
+    });
 }

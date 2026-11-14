@@ -22240,6 +22240,12 @@
         }
       },
       "indexes": {
+        "by_lastRequest": {
+          "fields": [
+            "lastRequest"
+          ],
+          "unique": false
+        },
         "key": {
           "fields": [
             "key"
@@ -22283,6 +22289,12 @@
         "by_key": {
           "fields": [
             "key"
+          ],
+          "unique": false
+        },
+        "by_ts": {
+          "fields": [
+            "ts"
           ],
           "unique": false
         }
@@ -24297,6 +24309,12 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "postCheckAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "postCheckId": {
@@ -27142,6 +27160,12 @@
           "optional": true,
           "unique": false,
           "ref": "bots"
+        },
+        "capOrganizationId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         },
         "category": {
           "kind": "string",
