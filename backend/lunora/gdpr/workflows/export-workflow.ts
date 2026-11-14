@@ -23,6 +23,7 @@ import type { Id } from "../../_generated/dataModel";
 import { onUserShard } from "../../lib/workflow-shard";
 import { stepDedupId } from "./dedup-id";
 import { collectAllGuides, collectAllPullRequestThreads, collectAllReviewDrafts } from "../../source-control/export-pages";
+import { clearUsagePieces, collectUsageExport, UsageExportError, type UsageExportIo, type UsagePageSummary, usageObjectKey } from "../usage-export-steps";
 
 export interface ExportParams {
     requestId: Id<"gdprRequests">;
@@ -31,10 +32,19 @@ export interface ExportParams {
 }
 
 /** The user-facing reason a failed export shows; never the raw error. */
-export const exportFailureMessage = (error: unknown): string =>
-    error instanceof LunoraError && error.code === "PAYLOAD_TOO_LARGE"
+export const exportFailureMessage = (error: unknown): string => {
+    if (error instanceof UsageExportError && error.reason === "changed") {
+        return "Your usage kept changing while the export was written; request the export again";
+    }
+
+    if (error instanceof UsageExportError && error.reason === "too-large") {
+        return "Your usage history is too large to export in one file; contact support";
+    }
+
+    return error instanceof LunoraError && error.code === "PAYLOAD_TOO_LARGE"
         ? "Your export is larger than the 32 MB limit; contact support"
         : "Failed to generate export file";
+};
 
 export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
     handler: async (workflowContext): Promise<void> => {
@@ -44,16 +54,25 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
         // Scoped to this instance, so a fresh instance for the same request collects again.
         const scope = `${requestId}:${context.event.instanceId}`;
 
-        /** Progress writes are deliberately NOT checkpointed — idempotent and cheap. */
+        /**
+         * Progress writes are deliberately NOT checkpointed — idempotent and cheap. A write is refused once the request is cancelled or
+         * failed, so a cancelled export cannot be brought back; a completed request accepts its completion again, so a replay goes on to
+         * the notice and the audit. The result is `false` when it was refused.
+         */
         const progress = async (patch: {
             currentStep?: string;
             errorMessage?: string;
             progress?: number;
             status?: "cancelled" | "completed" | "failed" | "pending" | "processing";
             storageId?: Id<"_storage">;
-        }): Promise<void> => {
-            await context.run(internal.gdpr.functions.updateRequestProgress, { requestId, ...patch });
-        };
+        }): Promise<boolean> =>
+            // Keyed by its own content, not by its position: a replay that skips a cached step shifts later positional ids, which would
+            // hand a refused completion an earlier write's result.
+            (await context.run(
+                internal.gdpr.functions.updateRequestProgress,
+                { fromStatus: ["pending", "processing", "completed"], requestId, ...patch },
+                { dedupId: stepDedupId(scope, `progress:${JSON.stringify(patch)}`) },
+            )) as boolean;
 
         await progress({ currentStep: "collecting_profile", progress: 10, status: "processing" });
         const profile = await context.step.do(
@@ -185,14 +204,32 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             async () => await context.run(internal.gdpr.steps.collectActivityForExport, { userId }, { dedupId: stepDedupId(scope, "collect-activity") }),
         );
 
-        await progress({ currentStep: "generating_export", progress: 80 });
         // `context.run` is typed `Promise<unknown>` — the runner does not thread a
         // function's return type through — so `step.do` infers `unknown` and the
         // guard below narrows it to `{}`. Cast at the boundary, same as
         // `chat-import/workflows/import-workflow.ts` does. The value is the R2
         // object key `generateExportFile` returns.
+        // The run's usage object, found by the key the run derives. Deleted on every terminal path, by a step the runtime retries.
+        const deleteUsageObject = async (): Promise<void> => {
+            const key = usageObjectKey(scope);
+
+            await context.step.do(
+                "delete-usage-json",
+                async () => await context.run(internal.gdpr.steps.deleteUsageJson, { key }, { dedupId: stepDedupId(scope, "delete-usage-json") }),
+            );
+        };
+
         const failExport = async (message: string): Promise<void> => {
-            await progress({ errorMessage: message, progress: 80, status: "failed" });
+            const failed = await progress({ errorMessage: message, progress: 80, status: "failed" });
+
+            // Refused once the export was cancelled: nothing is announced, and the usage is cleared all the same.
+            if (failed === false) {
+                await deleteUsageObject();
+                await clearUsagePieces(usageIo);
+
+                return;
+            }
+
             await context.step.do(
                 "notify-export-failed",
                 async () =>
@@ -210,11 +247,85 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                         { dedupId: stepDedupId(scope, "notify-export-failed") },
                     ),
             );
+
+            // A failed export keeps nothing: its usage object and its pieces hold the user's usage, and no file was stored from them.
+            // The object goes first, so a failed clear cannot leave it behind.
+            await deleteUsageObject();
+            await clearUsagePieces(usageIo);
         };
 
         let storageId: Id<"_storage"> | undefined;
+        // The usage JSON the usage action stored for this run, deleted if the export fails.
+        let usageKey: string | undefined;
+
+        // The usage history, written a page at a time into this run's pieces (`gdpr/usage-export-steps.ts`). Each step is a
+        // durable checkpoint, so a retry resumes at the first step that did not finish. The pieces are keyed by the run, not
+        // the request, so two runs of one request never share them.
+        const usageIo: UsageExportIo = {
+            clear: async (name) =>
+                (await context.run(internal.usage.gdpr.clearUsageExportPieces, { requestId: scope, userId }, { dedupId: stepDedupId(scope, name) })) as {
+                    hasMore: boolean;
+                },
+            clearVerified: async (name, pass) =>
+                (await context.run(
+                    internal.usage.gdpr.clearVerifiedUsagePieces,
+                    { pass, requestId: scope, userId },
+                    { dedupId: stepDedupId(scope, name) },
+                )) as { hasMore: boolean },
+            countRows: async (name, page) =>
+                (await context.run(
+                    internal.usage.gdpr.countUsageRowsPage,
+                    { cursor: page.cursor, cutoff: page.cutoff, userId },
+                    { dedupId: stepDedupId(scope, name) },
+                )) as {
+                    backfill: string;
+                    closed: { cost: number; replies: number; rows: number; tokens: number };
+                    cursor: string | null;
+                },
+            pause: async (name) => await context.step.sleep(name, "1 minute"),
+            persistRows: async (name, page) =>
+                (await context.run(
+                    internal.usage.gdpr.persistUsageRowsPage,
+                    { ...page, requestId: scope, userId },
+                    { dedupId: stepDedupId(scope, name) },
+                )) as UsagePageSummary,
+            step: async (name, run) => await context.step.do(name, run),
+            verifyTitles: async (name, group) =>
+                (await context.run(
+                    internal.usage.activity.verifyUsageTitles,
+                    { ...group, requestId: scope, userId },
+                    { dedupId: stepDedupId(scope, name) },
+                )) as {
+                    bytes: number;
+                    done: boolean;
+                    next: number;
+                    titles: number;
+                },
+        };
 
         try {
+            await progress({ currentStep: "collecting_usage", progress: 70 });
+            const collected = await collectUsageExport(usageIo);
+
+            // The usage action reads the kept pass into its own JSON object; the pieces it read are then cleared.
+            const prepared = (await context.step.do(
+                "prepare-usage",
+                async () =>
+                    await context.run(
+                        internal.gdpr.steps.prepareUsageForExport,
+                        { pass: collected.pass, requestId: scope, userId },
+                        { dedupId: stepDedupId(scope, "prepare-usage") },
+                    ),
+            )) as string | null;
+
+            // The usage action reports an oversized usage as `null`; the reason is raised here, where it keeps its type.
+            if (prepared === null) {
+                throw new UsageExportError("too-large");
+            }
+
+            usageKey = prepared;
+
+            await progress({ currentStep: "generating_export", progress: 80 });
             storageId = (await context.step.do(
                 "generate-export-file",
                 async () =>
@@ -240,6 +351,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                             settings,
                             tasks,
                             threadTags,
+                            usageKey,
                             userEmail,
                             userId,
                             watchedRepositories,
@@ -260,8 +372,17 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
             return;
         }
 
-        await progress({ currentStep: "sending_notification", progress: 90 });
-        await progress({ progress: 100, status: "completed", storageId });
+        // The file's record comes first: once the file is stored, a failure in the cleanup below cannot leave it without its record. A
+        // refused write here is left to the completion, which a cancelled export refuses too: the refusal deletes the stored file.
+        await progress({ currentStep: "sending_notification", progress: 90, storageId });
+
+        // Refused once the export was cancelled: nothing is announced, and the usage is cleared as a failed export's is.
+        if ((await progress({ progress: 100, status: "completed", storageId })) === false) {
+            await deleteUsageObject();
+            await clearUsagePieces(usageIo);
+
+            return;
+        }
 
         await context.step.do(
             "notify-export-ready",
@@ -299,6 +420,11 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                     { dedupId: stepDedupId(scope, "log-audit") },
                 ),
         );
+
+        // The usage object it was read from, and the run's pieces, are no longer needed. They go after the audit: a cleanup that fails
+        // permanently leaves the sweep to remove them, and must not hide the export's record.
+        await deleteUsageObject();
+        await clearUsagePieces(usageIo);
     },
 };
 
