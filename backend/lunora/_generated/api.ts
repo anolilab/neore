@@ -570,7 +570,7 @@ export interface ApiTypes {
         };
         native_push: {
             getNativePushConfig: FunctionReference<"query", {}, { enabled: boolean }>;
-            registerPushDevice: FunctionReference<"mutation", { language?: string; platform: "android" | "ios"; token: string }, { registered: boolean }>;
+            registerPushDevice: FunctionReference<"mutation", { buildsAlert?: boolean; language?: string; platform: "android" | "ios"; token: string }, { registered: boolean }>;
             unregisterPushDevice: FunctionReference<"mutation", { token: string }, null>;
         };
         push: {

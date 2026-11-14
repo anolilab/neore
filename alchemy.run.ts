@@ -179,6 +179,7 @@ const customDomain = (origin: string, name: (typeof REQUIRED_DEPLOY_ENV)[number]
  */
 const PLAIN_ENV_KEYS = new Set([
     "AMADEUS_CLIENT_ID",
+    "ANDROID_DATA_ONLY_PUSH",
     "APP_NAME",
     "AUTH_GITHUB_CLIENT_ID",
     "BROWSERBASE_PROJECT_ID",

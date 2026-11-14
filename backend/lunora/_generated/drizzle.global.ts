@@ -479,6 +479,7 @@ export const prompts = sqliteTable("prompts", {
 export const pushDevices = sqliteTable("pushDevices", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    buildsAlert: integer("buildsAlert", { mode: "boolean" }),
     createdAt: real("createdAt").notNull(),
     language: text("language"),
     lastSeenAt: real("lastSeenAt").notNull(),

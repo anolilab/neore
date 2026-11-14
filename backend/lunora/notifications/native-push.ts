@@ -59,7 +59,7 @@ export const getNativePushConfig = authQuery
  */
 export const registerPushDevice = authMutation
     .use(rateLimit("notifications/pushRegister"))
-    .input({ language: v.optional(vLanguage), platform: vPlatform, token: vExpoPushToken })
+    .input({ buildsAlert: v.optional(v.boolean()), language: v.optional(vLanguage), platform: vPlatform, token: vExpoPushToken })
     .output(v.object({ registered: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         const refuse = (reason: "deleting" | "no_session" | "off" | "session_ended" | "superseded") => {
@@ -103,7 +103,7 @@ export const registerPushDevice = authMutation
         // owner's is read back or returned.
         // What this registration writes, whichever row it lands on. A phone that reports no language keeps none
         // (`undefined` removes the field in `patchRow`): the previous registration's may have been another person's.
-        const phone = { language: args.language, platform: args.platform, sessionId, userId };
+        const phone = { buildsAlert: args.buildsAlert, language: args.language, platform: args.platform, sessionId, userId };
         const existing = await database.pushDevices.findFirst({ consistency: "primary", where: { token: args.token } });
 
         // A registration that started before the row's last one (a request held up on its way) is older news: it must not
@@ -162,10 +162,17 @@ export const registerPushDevice = authMutation
                 const restorable = replaced !== undefined && (await isLive(replaced)) && !(replaced.userId === userId && isDeleting) ? replaced : undefined;
 
                 if (restorable) {
-                    const { language, lastSeenAt, platform, sessionId: replacedSession, userId: replacedOwner } = restorable;
+                    const { buildsAlert, language, lastSeenAt, platform, sessionId: replacedSession, userId: replacedOwner } = restorable;
 
-                    // Its language too (`undefined` removes the field): the refused call's must not stay behind.
-                    await patchRow(database, "pushDevices", written, { language, lastSeenAt, platform, sessionId: replacedSession, userId: replacedOwner });
+                    // Its language and build flag too (`undefined` removes the field): the refused call's must not stay behind.
+                    await patchRow(database, "pushDevices", written, {
+                        buildsAlert,
+                        language,
+                        lastSeenAt,
+                        platform,
+                        sessionId: replacedSession,
+                        userId: replacedOwner,
+                    });
                     // That account may have registered other phones meanwhile: keep it under the cap.
                     await trimPushDevices(database, replacedOwner);
                 } else {

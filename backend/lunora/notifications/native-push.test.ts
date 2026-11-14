@@ -106,8 +106,8 @@ describe("phone push tokens", () => {
         expect(row).not.toHaveProperty("language");
     });
 
-    it("puts the previous account's language back with its phone when a registration is refused after its write", async () => {
-        await call(registerPushDevice, OTHER, { language: "en-GB", platform: "ios", token: PHONE });
+    it("puts the previous account's language and build flag back with its phone when a registration is refused after its write", async () => {
+        await call(registerPushDevice, OTHER, { buildsAlert: true, language: "en-GB", platform: "android", token: PHONE });
 
         // USER's session ends while its registration is on its way: the first check passes, the second does not.
         const live = sessions[USER]!;
@@ -136,11 +136,11 @@ describe("phone push tokens", () => {
                         userId: USER,
                     },
                 },
-                { language: "de-AT", platform: "ios", token: PHONE },
+                { buildsAlert: false, language: "de-AT", platform: "android", token: PHONE },
             );
         });
 
-        expect(await devicesOf(OTHER)).toMatchObject([{ language: "en-GB", token: PHONE }]);
+        expect(await devicesOf(OTHER)).toMatchObject([{ buildsAlert: true, language: "en-GB", token: PHONE }]);
     });
 
     it("refuses a language that is not a language tag", async () => {

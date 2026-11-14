@@ -110,6 +110,9 @@ const toolApiEnvSchema = z.object({
 // signed-storage base and the scheduler's callback origin), so a second
 // required-ness check would only produce a different message for one cause.
 const optionalEnvSchema = z.object({
+    // Android kill switch for the data-only phone push (`notifications/native-push-config.ts`). `off` sends every Android phone
+    // the notification-style push again; unset keeps the data-only push on.
+    ANDROID_DATA_ONLY_PUSH: z.string().trim().optional(),
     APP_NAME: z.string().trim().optional(),
     AUTH_GITHUB_CLIENT_ID: z.string().trim().optional(),
     AUTH_GITHUB_CLIENT_SECRET: z.string().trim().optional(),

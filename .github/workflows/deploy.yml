@@ -541,6 +541,9 @@ jobs:
                   # Phone push — optional; off until set. An Expo access token
                   # with push security ("enhanced security") enabled on the project.
                   EXPO_ACCESS_TOKEN: "${{ secrets.EXPO_ACCESS_TOKEN }}"
+                  # Android kill switch for the data-only phone push. Set the repo variable to `off` before an
+                  # Android rollback, then deploy; unset keeps the data-only push on.
+                  ANDROID_DATA_ONLY_PUSH: "${{ vars.ANDROID_DATA_ONLY_PUSH }}"
                   # Display name sent in connector OAuth client registration;
                   # unset = "Neore".
                   APP_NAME: "${{ secrets.APP_NAME }}"

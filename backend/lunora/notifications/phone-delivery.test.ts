@@ -10,6 +10,7 @@ import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { getExpoReceipts, sendExpoMessages } from "./expo-push";
 import { registerPushDevice } from "./native-push";
+import { isAndroidDataOnlyPushOn } from "./native-push-config";
 import { hasPhone } from "./notify";
 import {
     checkPushReceipts,
@@ -200,6 +201,15 @@ describe("the phones a send goes to", () => {
     });
 });
 
+describe("the Android data-only switch", () => {
+    it("is on unless ANDROID_DATA_ONLY_PUSH is off", () => {
+        expect(isAndroidDataOnlyPushOn({})).toBe(true);
+        expect(isAndroidDataOnlyPushOn({ ANDROID_DATA_ONLY_PUSH: "on" })).toBe(true);
+        expect(isAndroidDataOnlyPushOn({ ANDROID_DATA_ONLY_PUSH: "off" })).toBe(false);
+        expect(isAndroidDataOnlyPushOn({ ANDROID_DATA_ONLY_PUSH: "OFF" })).toBe(false);
+    });
+});
+
 describe("phoneMessage", () => {
     it.each(["ios", "android"] as const)("gives a %s phone the generic alert, in the phone's language, with only ids as data", (platform) => {
         const message = phoneMessage({ language: "de-DE", platform, token: PHONE }, { notificationId: "n1", threadId: "t1", urgency: "high" });
@@ -223,6 +233,28 @@ describe("phoneMessage", () => {
         );
 
         expect(message).not.toHaveProperty("mutableContent");
+    });
+
+    it("gives an Android phone whose app builds the alert a data-only message: no text leaves us at all", () => {
+        const message = phoneMessage(
+            { buildsAlert: true, language: "de-DE", platform: "android", token: PHONE },
+            { notificationId: "n1", threadId: "t1", urgency: "high" },
+        );
+
+        expect(message).toStrictEqual({ data: { notificationId: "n1", threadId: "t1" }, priority: "high", to: PHONE, ttl: 86_400 });
+    });
+
+    it("keeps a tool approval notification-style on an Android phone that builds its own alerts", () => {
+        const message = phoneMessage(
+            { buildsAlert: true, platform: "android", token: PHONE },
+            { approval: { approvalId: "a1", teammate: "Mira", tool: "shell" }, notificationId: "n1", urgency: "high" },
+        );
+
+        expect(message).toMatchObject({ body: "Mira", title: "shell" });
+    });
+
+    it("keeps the generic alert for an Android phone whose build does not build it", () => {
+        expect(phoneMessage({ platform: "android", token: PHONE }, { notificationId: "n1", urgency: "normal" })).toHaveProperty("title", "Neore");
     });
 
     it("falls back to English for a language without a placeholder", () => {
@@ -258,6 +290,30 @@ describe("deliverToPhones", () => {
 
         await expect(deliverToPhones(ctx as never, USER, { notificationId: "n1", urgency: "normal" })).resolves.toBeUndefined();
         expect(ctx.log.event).toHaveBeenCalledWith("notifications.native_push", { delivered: 1, failed: 0, gone: 0 });
+    });
+
+    it("sends an Android phone that builds its own alert the generic alert while the switch is off", async () => {
+        vi.stubEnv("ANDROID_DATA_ONLY_PUSH", "off");
+        const ctx = actionCtx([{ buildsAlert: true, id: "d2", platform: "android", sessionId: "s1", token: SECOND_PHONE }]);
+
+        vi.mocked(sendExpoMessages).mockResolvedValueOnce([{ id: "r2", status: "ok" }]);
+
+        await deliverToPhones(ctx as never, USER, { notificationId: "n1", urgency: "normal" });
+
+        expect(sendExpoMessages).toHaveBeenCalledWith("expo-secret", [expect.objectContaining({ body: expect.any(String), title: "Neore", to: SECOND_PHONE })]);
+    });
+
+    it("sends that same phone only its ids while the switch is on", async () => {
+        const ctx = actionCtx([{ buildsAlert: true, id: "d2", platform: "android", sessionId: "s1", token: SECOND_PHONE }]);
+
+        vi.mocked(sendExpoMessages).mockResolvedValueOnce([{ id: "r2", status: "ok" }]);
+
+        await deliverToPhones(ctx as never, USER, { notificationId: "n1", urgency: "normal" });
+
+        const messages = vi.mocked(sendExpoMessages).mock.calls[0]?.[1];
+
+        expect(messages).toStrictEqual([expect.objectContaining({ data: { notificationId: "n1" }, to: SECOND_PHONE })]);
+        expect(messages?.[0]).not.toHaveProperty("title");
     });
 
     it("checks no receipt for a ticket that came back without an id", async () => {

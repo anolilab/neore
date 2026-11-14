@@ -2260,6 +2260,9 @@ export const schema = defineSchema({
     // one write instead of reaching into the first account's shard. Web Push subscriptions live in `@lunora/notify`'s
     // store.
     pushDevices: defineTable({
+        // Android only: the app's background task builds the alert, so the push carries no alert of its own. Set by the
+        // build that runs the task; a build without it (or an older one) gets the notification-style push.
+        buildsAlert: v.optional(v.boolean()),
         createdAt: v.number(),
         // The phone's language (a BCP 47 tag the app reports), for the placeholder alert's wording.
         language: v.optional(v.string()),
