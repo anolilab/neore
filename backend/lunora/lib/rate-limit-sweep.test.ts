@@ -127,6 +127,50 @@ describe("rateLimits sweep and reserve debt", () => {
     });
 });
 
+describe("rateLimits sweep past a page of rows still in debt", () => {
+    it("moves its cursor past them and reaches a settled row behind them", async () => {
+        // Settled: one unit of debt, older than the retention plus that unit's refill at the slowest rate.
+        const settledAt = NOW - RATE_LIMIT_RETENTION_MS - 2 / SLOWEST_REFILL_PER_MS;
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < RATE_LIMIT_SWEEP_PAGE; index += 1) {
+                // Older than the settled row, and owing far more than the slowest limit refills by now.
+                await ctx.db.insert("rateLimits", { key: `owed-${String(index)}`, ts: settledAt - RATE_LIMIT_SWEEP_PAGE + index, value: -1_000_000_000 });
+            }
+
+            await ctx.db.insert("rateLimits", { key: "settled", ts: settledAt, value: -1 });
+        });
+
+        const sweep = async (args: Record<string, string>): Promise<{ next: Record<string, string> | undefined }> =>
+            await harness.run(async (ctx: any) => {
+                let next: Record<string, string> | undefined;
+
+                ctx.scheduler.runAfter = async (_delay: number, _reference: unknown, nextArgs: Record<string, string>) => {
+                    next = nextArgs;
+                };
+
+                await ctx.runMutation(sweepExpiredRateLimits, args);
+
+                return { next };
+            });
+
+        const first = await sweep({});
+
+        expect(first.next?.debtCursor).toBeDefined();
+
+        await sweep(first.next ?? {});
+
+        const keys = await harness.run(async (ctx: any) => {
+            const rows: { key: string }[] = await ctx.db.query("rateLimits").collect();
+
+            return rows.map((row) => row.key);
+        });
+
+        expect(keys).toHaveLength(RATE_LIMIT_SWEEP_PAGE);
+        expect(keys).not.toContain("settled");
+    });
+});
+
 describe("debtSettledAt", () => {
     it("adds the debt's refill at the slowest configured rate to the retention", () => {
         expect(debtSettledAt({ ts: 0, value: -10 })).toBe(RATE_LIMIT_RETENTION_MS + 10 / SLOWEST_REFILL_PER_MS);

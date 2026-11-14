@@ -905,7 +905,7 @@ export interface InternalApiTypes {
             runJobOnce: FunctionReference<"action", { args?: unknown; jobId: string; onLapse?: { args?: string; target: string }; target: string; userId?: string }, null>;
         };
         rate_limit_sweep: {
-            sweepExpiredRateLimits: FunctionReference<"mutation", {}, number>;
+            sweepExpiredRateLimits: FunctionReference<"mutation", { debtCursor?: string }, number>;
         };
         rate_limiter_mutations: {
             applyRateLimit: FunctionReference<"mutation", { count?: number; identifier: string; key: string; reserve?: boolean }, { ok: boolean; retryAfter: number | undefined; }>;

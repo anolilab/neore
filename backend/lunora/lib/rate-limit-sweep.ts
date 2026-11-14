@@ -53,22 +53,33 @@ export const SLOWEST_REFILL_PER_MS = Math.min(
 export const debtSettledAt = (row: { ts: number; value: number }): number => row.ts + RATE_LIMIT_RETENTION_MS + -row.value / SLOWEST_REFILL_PER_MS;
 
 export const sweepExpiredRateLimits = internalMutation
-    .input({})
+    // Where the rows still in debt left off: each run moves past them, so rows still owed can't hide settled ones behind them.
+    .input({ debtCursor: v.optional(v.string().max(1024)) })
     .output(v.number())
-    .mutation(async ({ ctx }) => {
+    .mutation(async ({ args: { debtCursor }, ctx }) => {
         const cutoff = ctx.now - RATE_LIMIT_RETENTION_MS;
-        const [{ page: expired }, { page: inDebt }] = await Promise.all([
+        const [{ page: expired }, inDebt] = await Promise.all([
             ctx.db.rateLimits.findMany({ limit: RATE_LIMIT_SWEEP_PAGE, orderBy: [{ ts: "asc" }], where: { ts: { lt: cutoff }, value: { gte: 0 } } }),
-            ctx.db.rateLimits.findMany({ limit: RATE_LIMIT_SWEEP_PAGE, orderBy: [{ ts: "asc" }], where: { ts: { lt: cutoff }, value: { lt: 0 } } }),
+            ctx.db.rateLimits.findMany({
+                cursor: debtCursor,
+                limit: RATE_LIMIT_SWEEP_PAGE,
+                orderBy: [{ ts: "asc" }],
+                where: { ts: { lt: cutoff }, value: { lt: 0 } },
+            }),
         ]);
-        const settled = inDebt.filter((row) => debtSettledAt(row) < ctx.now);
+        const settled = inDebt.page.filter((row) => debtSettledAt(row) < ctx.now);
         const rows = [...expired, ...settled];
 
         await Promise.all(rows.map(async (row) => await ctx.db.delete("rateLimits", row._id)));
 
-        // A full page of debt rows schedules more only when it deleted some, so rows still owed never loop the sweep.
-        if (expired.length === RATE_LIMIT_SWEEP_PAGE || (inDebt.length === RATE_LIMIT_SWEEP_PAGE && settled.length > 0)) {
-            await ctx.scheduler.runAfter(0, internal.lib.rate_limit_sweep.sweepExpiredRateLimits, {});
+        const moreDebt = !inDebt.isDone && inDebt.continueCursor !== null && inDebt.continueCursor !== undefined;
+
+        if (expired.length === RATE_LIMIT_SWEEP_PAGE || moreDebt) {
+            await ctx.scheduler.runAfter(
+                0,
+                internal.lib.rate_limit_sweep.sweepExpiredRateLimits,
+                moreDebt ? { debtCursor: inDebt.continueCursor ?? undefined } : {},
+            );
         }
 
         return rows.length;
