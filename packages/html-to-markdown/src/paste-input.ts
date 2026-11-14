@@ -23,7 +23,10 @@ const MAX_FORMAT_WORK = 20_000_000;
 const INDENT_WIDTH = 2;
 const INDENTING = new Set(["BLOCKQUOTE", "LI"]);
 // Elements whose rule writes all they hold again: formatting, and inline code, which reads its text for backticks.
-const FORMATTING = new Set(["B", "CODE", "DEL", "EM", "I", "S", "STRIKE", "STRONG"]);
+// Raised and lowered text reads its text for the characters it maps, and writes it again.
+const FORMATTING = new Set(["B", "CODE", "DEL", "EM", "I", "S", "STRIKE", "STRONG", "SUB", "SUP"]);
+// Elements whose whitespace the preset keeps as written: code (`preformattedCode`) and code blocks.
+const KEEPS_WHITESPACE = new Set(["CODE", "PRE"]);
 const LISTS = new Set(["OL", "UL"]);
 // The parts of a table between a table and its cells, which add no depth of their own: the cell is the next level.
 const TABLE_PARTS = new Set(["TBODY", "TFOOT", "THEAD", "TR"]);
@@ -47,6 +50,8 @@ interface Step {
     depth: number;
     element: Element;
     isClosing: boolean;
+    // In code, where whitespace is kept as written.
+    isCode: boolean;
     level: number;
 }
 
@@ -89,7 +94,7 @@ export function checkWork(root: Node, isHidden: (node: Node) => boolean): void {
     const steps: Step[] = [];
     let work: Work = { format: 0, indent: 0, wrap: 0 };
 
-    pushElements(steps, root, 1, 1);
+    pushElements(steps, root, { depth: 1, isCode: false, level: 1 });
 
     while (steps.length > 0) {
         const step = steps.pop() as Step;
@@ -101,7 +106,11 @@ export function checkWork(root: Node, isHidden: (node: Node) => boolean): void {
             }
 
             steps.push({ ...step, isClosing: true });
-            pushElements(steps, element, TABLE_PARTS.has(element.nodeName) ? step.depth : step.depth + 1, step.level + 1);
+            pushElements(steps, element, {
+                depth: TABLE_PARTS.has(element.nodeName) ? step.depth : step.depth + 1,
+                isCode: step.isCode || KEEPS_WHITESPACE.has(element.nodeName),
+                level: step.level + 1,
+            });
             continue;
         }
 
@@ -112,7 +121,7 @@ export function checkWork(root: Node, isHidden: (node: Node) => boolean): void {
             continue;
         }
 
-        const measure = measureOf(element, measures);
+        const measure = measureOf(element, measures, step.isCode || KEEPS_WHITESPACE.has(element.nodeName));
 
         work = spend(work, element, measure);
         measures.set(element, measure);
@@ -141,19 +150,20 @@ function spend(work: Work, element: Element, measure: Measure): Work {
     return spent;
 }
 
-function pushElements(steps: Step[], parent: Node, depth: number, level: number): void {
+function pushElements(steps: Step[], parent: Node, place: Pick<Step, "depth" | "isCode" | "level">): void {
     for (let child = parent.lastChild; child; child = child.previousSibling) {
         if (child.nodeType === 1) {
-            steps.push({ depth, element: child as Element, isClosing: false, level });
+            steps.push({ ...place, element: child as Element, isClosing: false });
         }
     }
 }
 
 /**
  * The element's measure, from its text and its child elements' measures, which are taken out of the map once read. Text
- * is counted as the conversion sees it: a run of whitespace is one space.
+ * is counted as the conversion sees it: a run of whitespace is one space, except in code, which keeps it as written,
+ * each newline a line.
  */
-function measureOf(element: Element, measures: Map<Node, Measure>): Measure {
+function measureOf(element: Element, measures: Map<Node, Measure>, isCode: boolean): Measure {
     const measure: Measure = { lines: element.nodeName === "BR" || isBlock(element) ? 1 : 0, size: 1 };
 
     for (let child = element.firstChild; child; child = child.nextSibling) {
@@ -164,7 +174,10 @@ function measureOf(element: Element, measures: Map<Node, Measure>): Measure {
             measure.lines += inner.lines;
             measure.size += inner.size;
         } else if (child.nodeType === 3 || child.nodeType === 4) {
-            measure.size += collapsedLength(child.nodeValue ?? "");
+            const text = child.nodeValue ?? "";
+
+            measure.size += isCode ? text.length : collapsedLength(text);
+            measure.lines += isCode ? newlines(text) : 0;
         }
     }
 
@@ -181,6 +194,16 @@ function dropMeasures(element: Element, measures: Map<Node, Measure>): void {
     for (let child = element.firstElementChild; child; child = child.nextElementSibling) {
         measures.delete(child);
     }
+}
+
+function newlines(text: string): number {
+    let count = 0;
+
+    for (let index = text.indexOf("\n"); index !== -1; index = text.indexOf("\n", index + 1)) {
+        count += 1;
+    }
+
+    return count;
 }
 
 /** The length of the text with each run of whitespace counted as one character. */

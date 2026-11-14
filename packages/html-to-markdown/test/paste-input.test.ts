@@ -190,3 +190,15 @@ describe("paste input: review cases, second round", () => {
         expect(asked).toBeLessThan(200 * 10);
     });
 });
+
+describe("paste input: review cases, third round", () => {
+    it("counts raised text nested around a long text, which maps all of it again", () => {
+        expect(() => convert(`${"<sup>".repeat(450)}${"1".repeat(50_000)}`)).toThrow(RangeError);
+    });
+
+    it("counts the whitespace code keeps, and the lines of a code block, against the quotes around them", () => {
+        expect(() => convert(`${"<blockquote>".repeat(100)}<code>a${" ".repeat(300_000)}b</code>`)).toThrow(RangeError);
+        expect(() => convert(`${"<blockquote>".repeat(100)}<pre>${"a\n".repeat(150_000)}</pre>`)).toThrow(RangeError);
+        expect(convert(`<blockquote><code>a${" ".repeat(10)}b</code></blockquote>`)).toBe(`> \`a${" ".repeat(10)}b\``);
+    });
+});
