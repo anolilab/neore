@@ -13,6 +13,8 @@ interface SignOutSteps {
     dismissNotifications?: () => Promise<void>;
     /** Forgets the chat saved to reopen on launch. */
     forgetLastChat: () => Promise<void>;
+    /** Records the token of the grant being signed out, so a background task refuses it even if the stored session stays readable. */
+    markSignedOut?: (token: string) => Promise<void>;
     /** Tells the server this phone stops getting the account's pushes. Signs in with the in-memory JWT. */
     releasePush?: () => Promise<void>;
     /** Revokes the session server-side. May fail, or never answer, with no network. */
@@ -53,6 +55,31 @@ const revokeStored = async (token: string | undefined, revokeSession: (token: st
     }
 };
 
+/** Whether the digest a sign-out recorded is the digest of the grant: a grant left readable by a failed clear is refused. */
+export const wasSignedOut = (markedDigest: string | null, grantDigest: string): boolean => markedDigest === grantDigest;
+
+/**
+ * The sign-in on this phone, unless a sign-out ended it, read through the stores it is given. A marker that cannot be read
+ * counts as signed out, so a broken store shows nothing rather than an old account's text.
+ */
+export const signedInGrantOf = async <G extends { token: string }>(
+    readGrant: () => Promise<G | null | undefined>,
+    readMarker: () => Promise<string | null>,
+    digest: (token: string) => Promise<string>,
+): Promise<G | undefined> => {
+    const grant = await readGrant();
+
+    if (!grant) {
+        return undefined;
+    }
+
+    try {
+        return wasSignedOut(await readMarker(), await digest(grant.token)) ? undefined : grant;
+    } catch {
+        return undefined;
+    }
+};
+
 /**
  * Signing out takes the person's saved chats off the device FIRST, locally, before the server is asked anything: a
  * sign-out request that fails or hangs offline must not leave their chats behind for the next person to open.
@@ -65,6 +92,7 @@ export const signOutOnDevice = async ({
     clearCache,
     dismissNotifications,
     forgetLastChat,
+    markSignedOut,
     releasePush,
     revokeSession,
     takeCredential,
@@ -92,6 +120,14 @@ export const signOutOnDevice = async ({
         // warning gets only the keychain failure: the error itself carries the session token.
         token = error instanceof StoredGrantNotClearedError ? error.token : undefined;
         warn("Could not clear the stored sign-in.", error instanceof StoredGrantNotClearedError ? error.cause : error);
+    }
+
+    if (token !== undefined && markSignedOut) {
+        try {
+            await markSignedOut(token);
+        } catch (error) {
+            warn("Could not record the sign-out for the background task.", error);
+        }
     }
 
     await removeAlerts(dismissNotifications, warn);

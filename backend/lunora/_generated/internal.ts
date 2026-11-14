@@ -1027,7 +1027,7 @@ export interface InternalApiTypes {
         };
         phone_delivery: {
             checkPushReceipts: FunctionReference<"action", { attempt?: number; entries: Array<{ deviceId: Id<"pushDevices">; receiptId: string; sentAt: number; sessionId: string; userId: string }> }, null>;
-            listPushDevicesForUser: FunctionReference<"query", { userId: string }, { ended: Array<{ id: Id<"pushDevices">; lastSeenAt: number; sessionId: string }>; live: Array<{ id: Id<"pushDevices">; language?: string; platform: "android" | "ios"; sessionId: string; token: string }> }>;
+            listPushDevicesForUser: FunctionReference<"query", { userId: string }, { ended: Array<{ id: Id<"pushDevices">; lastSeenAt: number; sessionId: string }>; live: Array<{ buildsAlert?: boolean; id: Id<"pushDevices">; language?: string; platform: "android" | "ios"; sessionId: string; token: string }> }>;
             recordPushDeliveries: FunctionReference<"mutation", { gone: Array<{ id: Id<"pushDevices">; sentAt: number; sessionId: string; userId: string }> }, null>;
             sendPhonePush: FunctionReference<"action", { notificationId: Id<"notifications">; userId: string; waits?: number }, null>;
         };

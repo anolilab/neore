@@ -67,6 +67,12 @@
       (`sendPhonePush`) as separate jobs, so neither holds the other back. The
       phone job is retried only for a failure before its send; a failed send is
       logged, never retried, so no phone gets an alert twice.
+    - **Android data-only** (`buildsAlert` on the row, set by a build that runs the
+      background task): the message is ids only, and the app builds the alert. Roll
+      an Android build back only after `ANDROID_DATA_ONLY_PUSH=off` is set (the repo
+      variable of that name, deployed to the Worker; the switch is read in
+      `native-push-config.ts`), or a phone that still stores the flag gets pushes
+      with no alert.
 - **Phone push content** (`push-content-http.ts`, `phone-content.ts`) —
   `POST /notifications/push-content` gives a phone the text of one of its
   owner's notifications (`pushHeadline`, the same as Web Push). Another user's

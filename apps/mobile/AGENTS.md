@@ -64,4 +64,4 @@
   (`offerPhonePush`), once per sign-in, and only when the server has push on. The token is never logged. Sign-out
   closes the registration gate (`pushRegistrations`), lets registrations in flight settle, then releases the token
   (bounded to 5 s) before the grant is revoked, since the release needs the sign-in. The server also sends only while
-  the registering session lives, so a failed release still stops the pushes once the revoke lands. Pushes carry only a generic alert and ids.
+  the registering session lives, so a failed release still stops the pushes once the revoke lands. Pushes carry only a generic alert and ids, except for an Android phone whose registration says `buildsAlert` (set only while its background task, `PHONE_PUSH_TASK`, is registered): that phone gets a data-only push, and its task builds the alert (`src/notifications/background-task.ts`, `push-content.ts`). Tool approvals stay notification-style on every phone.

@@ -4,11 +4,11 @@
  * register and unregister procedures. A push carries only a generic alert and ids.
  */
 import type { LunoraClient } from "@lunora/client";
-import { api } from "@neore/backend/api";
 import Constants from "expo-constants";
 import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
 import {
     AndroidImportance,
+    cancelAllScheduledNotificationsAsync,
     dismissAllNotificationsAsync,
     getExpoPushTokenAsync,
     getPermissionsAsync,
@@ -17,51 +17,23 @@ import {
     setNotificationHandler,
 } from "expo-notifications";
 import { getItemAsync, setItemAsync } from "expo-secure-store";
+import { isTaskRegisteredAsync } from "expo-task-manager";
 import { Platform } from "react-native";
 
 import { sharedKeychainOps } from "../auth/secure-store";
 import { writeIfDifferent } from "../auth/shared-keychain";
 import { loadConfig } from "../lib/config";
 import { registerApprovalActions } from "./approval-actions";
+import { pushTaskRegistration } from "./background-task";
 import { clearTapRoute } from "./pending-tap";
+import { ANDROID_CHANNEL_ID, channelName, deviceLocale } from "./push-channel";
+import { isDataOnlyPush, PHONE_PUSH_TASK } from "./push-content";
 import type { PushPlatform, PushServer } from "./push-registration";
-import { createPendingWork, createSerialSteps, languageTag, noteAccountOnPhone, onceItWorks } from "./push-registration";
+import { createPendingWork, createSerialSteps, noteAccountOnPhone, onceItWorks } from "./push-registration";
+import { pushServerFor } from "./push-server";
 
 /** Registrations in flight; sign-out settles them before it releases the token. */
 export const pushRegistrations = createPendingWork();
-
-/** The Android channel phone pushes show on: Expo sends to `default` when a message names none. */
-const ANDROID_CHANNEL_ID = "default";
-
-const LOCALE_SEPARATOR = /[-_]/u;
-
-const CHANNEL_NAMES: Readonly<Record<string, string>> = {
-    de: "Benachrichtigungen",
-    en: "Notifications",
-    es: "Notificaciones",
-    fr: "Notifications",
-    it: "Notifiche",
-    ja: "通知",
-    pl: "Powiadomienia",
-    pt: "Notificações",
-    zh: "通知",
-};
-
-/** The phone's language (a BCP 47 tag), sent with the token so the server words the generic alert in it. */
-export const deviceLocale = (): string | undefined => {
-    try {
-        return languageTag(new Intl.DateTimeFormat().resolvedOptions().locale);
-    } catch {
-        return undefined;
-    }
-};
-
-/** The Android notification channel's name, as the system settings show it, in the phone's language. */
-export const channelName = (locale: string | undefined): string => {
-    const base = locale?.toLowerCase().split(LOCALE_SEPARATOR, 1)[0] ?? "en";
-
-    return Object.hasOwn(CHANNEL_NAMES, base) ? (CHANNEL_NAMES[base] as string) : (CHANNEL_NAMES.en as string);
-};
 
 /** The EAS project the Expo push token belongs to (`app.config.ts`, from `EAS_PROJECT_ID`). */
 const easProjectId = (): string | undefined => {
@@ -91,28 +63,21 @@ export const devicePushPlatform: PushPlatform = {
     },
 };
 
-/** `onlineOnly`: a registration made offline is refused, never replayed later for whoever is signed in by then. */
-export const backendPushServer = (client: LunoraClient): PushServer => {
-    return {
-        isEnabled: async () => {
-            const { enabled } = await client.query(api.notifications.native_push.getNativePushConfig, {});
+/** Whether this build's background task is registered: the phone builds its own Android alerts only while it is. */
+const isPhoneTaskRegistered = async (): Promise<boolean> => {
+    try {
+        // The first registration can run before the task has registered: wait for that attempt, or the phone
+        // reads as built without it.
+        await pushTaskRegistration();
 
-            return enabled;
-        },
-        register: async (platform, token, language) => {
-            const { registered } = await client.mutation(
-                api.notifications.native_push.registerPushDevice,
-                { platform, token, ...language !== undefined && { language } },
-                { onlineOnly: true },
-            );
-
-            return registered;
-        },
-        unregister: async (token) => {
-            await client.mutation(api.notifications.native_push.unregisterPushDevice, { token }, { onlineOnly: true });
-        },
-    };
+        return await isTaskRegisteredAsync(PHONE_PUSH_TASK);
+    } catch {
+        return false;
+    }
 };
+
+/** The backend's push procedures, with this device's background-task check for the Android alert flag. */
+export const backendPushServer = (client: LunoraClient): PushServer => pushServerFor(client, isPhoneTaskRegistered);
 
 /** The backend's address, for the notification extension: it reads it from the shared keychain group to fetch a push's text. */
 const EXTENSION_LUNORA_URL_KEY = "neore.mobile.lunora-url";
@@ -124,8 +89,11 @@ const EXTENSION_LUNORA_URL_KEY = "neore.mobile.lunora-url";
  */
 export const configurePhoneNotifications = onceItWorks(async () => {
     setNotificationHandler({
-        handleNotification: async () => {
-            return { shouldPlaySound: false, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true };
+        handleNotification: async ({ request }) => {
+            // A data-only push shows no banner of its own: the task posts its alert, and the system's would be blank.
+            const isSilent = isDataOnlyPush(request.trigger);
+
+            return { shouldPlaySound: false, shouldSetBadge: false, shouldShowBanner: !isSilent, shouldShowList: !isSilent };
         },
     });
 
@@ -194,7 +162,14 @@ export const syncApprovalActions = async (): Promise<void> => {
 /** Removes the alerts still on this phone. */
 export const dismissAccountNotifications = async (): Promise<void> => {
     clearTapRoute();
-    await dismissAllNotificationsAsync();
+
+    // Queued alerts too: the task's alerts for the account being removed must not appear after its sign-out. The dismiss runs
+    // even when the cancel fails, so an alert already shown does not stay up.
+    try {
+        await cancelAllScheduledNotificationsAsync();
+    } finally {
+        await dismissAllNotificationsAsync();
+    }
 };
 
 /** Records the account signed in on this phone; `onSwitch` removes the previous person's alerts first when it differs. */

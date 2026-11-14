@@ -15,7 +15,7 @@ import { internalAction, internalMutation, internalQuery } from "../_generated/s
 import type { ExpoMessage, ExpoOutcome } from "./expo-push";
 import { getExpoReceipts, isDeviceGone, sendExpoMessages } from "./expo-push";
 import type { PhonePlatform } from "./native-push-config";
-import { expoAccessToken } from "./native-push-config";
+import { expoAccessToken, isAndroidDataOnlyPushOn } from "./native-push-config";
 import { MAX_PUSH_DEVICES_PER_USER } from "./push-device-writes";
 import { threadIdOfLink } from "./locked-link";
 import { approvalToolFallback, PHONE_PLACEHOLDER_TITLE, phonePlaceholderBody, pushUrgency } from "./push-text";
@@ -50,7 +50,14 @@ export const listPushDevicesForUser = internalQuery
         v.object({
             ended: v.array(v.object({ id: v.id("pushDevices"), lastSeenAt: v.number(), sessionId: v.string() })),
             live: v.array(
-                v.object({ id: v.id("pushDevices"), language: v.optional(v.string()), platform: vPlatform, sessionId: v.string(), token: v.string() }),
+                v.object({
+                    buildsAlert: v.optional(v.boolean()),
+                    id: v.id("pushDevices"),
+                    language: v.optional(v.string()),
+                    platform: vPlatform,
+                    sessionId: v.string(),
+                    token: v.string(),
+                }),
             ),
         }),
     )
@@ -65,8 +72,14 @@ export const listPushDevicesForUser = internalQuery
 
         const now = Date.now();
         const ended: { id: (typeof page)[number]["_id"]; lastSeenAt: number; sessionId: string }[] = [];
-        const live: { id: (typeof page)[number]["_id"]; language?: string; platform: (typeof page)[number]["platform"]; sessionId: string; token: string }[] =
-            [];
+        const live: {
+            buildsAlert?: boolean;
+            id: (typeof page)[number]["_id"];
+            language?: string;
+            platform: (typeof page)[number]["platform"];
+            sessionId: string;
+            token: string;
+        }[] = [];
 
         for (const row of page) {
             const session = await ctx.db.session.findFirst({ consistency: "primary", where: { _id: row.sessionId as Id<"session"> } });
@@ -77,6 +90,7 @@ export const listPushDevicesForUser = internalQuery
                     platform: row.platform,
                     sessionId: row.sessionId,
                     token: row.token,
+                    ...(row.buildsAlert !== undefined && { buildsAlert: row.buildsAlert }),
                     ...(row.language !== undefined && { language: row.language }),
                 });
             } else {
@@ -128,11 +142,15 @@ export interface PhonePushMessage {
 }
 
 /**
- * The message for one phone: the same generic alert on both platforms, in the phone's language. Nothing about the
- * notification itself leaves us, only its ids in `data`. A tool approval is the one exception: its alert names the tool
- * and the teammate, and carries the approval's id for the phone's approve and deny actions.
+ * The message for one phone: the generic alert in the phone's language, except that an Android phone whose app builds its
+ * own alert (`buildsAlert`) gets ids only. Nothing about the notification itself leaves us, only its ids in `data`. A tool
+ * approval is the one exception: its alert names the tool and the teammate, and carries the approval's id for the phone's
+ * approve and deny actions.
  */
-export const phoneMessage = (device: { language?: string; platform: PhonePlatform; token: string }, message: PhonePushMessage): ExpoMessage => {
+export const phoneMessage = (
+    device: { buildsAlert?: boolean; language?: string; platform: PhonePlatform; token: string },
+    message: PhonePushMessage,
+): ExpoMessage => {
     const data = {
         notificationId: message.notificationId,
         ...(message.threadId !== undefined && { threadId: message.threadId }),
@@ -151,6 +169,12 @@ export const phoneMessage = (device: { language?: string; platform: PhonePlatfor
             to: device.token,
             ttl: PUSH_TTL_SECONDS,
         };
+    }
+
+    // Android's app builds the alert itself (its background task), so the message carries only ids: no title, body or sound.
+    // A notification-style one would show the placeholder on its own, and the task would show a second alert.
+    if (device.platform === "android" && device.buildsAlert) {
+        return { data, priority: message.urgency, to: device.token, ttl: PUSH_TTL_SECONDS };
     }
 
     return {
@@ -198,11 +222,12 @@ export const deliverToPhones = async (ctx: ActionCtx, userId: string, message: P
 
     let outcomes: ExpoOutcome[];
     const sentAt = Date.now();
+    const dataOnly = isAndroidDataOnlyPushOn(process.env);
 
     try {
         outcomes = await sendExpoMessages(
             accessToken,
-            devices.map((device) => phoneMessage(device, message)),
+            devices.map((device) => phoneMessage({ ...device, buildsAlert: device.buildsAlert && dataOnly }, message)),
         );
     } catch (error) {
         console.warn("[notifications] Phone push send failed:", error);

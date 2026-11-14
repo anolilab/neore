@@ -22135,6 +22135,12 @@
     "pushDevices": {
       "commitOrdered": false,
       "fields": {
+        "buildsAlert": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "createdAt": {
           "kind": "number",
           "nullable": false,

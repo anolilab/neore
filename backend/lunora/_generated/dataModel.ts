@@ -1399,6 +1399,7 @@ export interface Doc_pullRequestThreads {
 export interface Doc_pushDevices {
     _id: Id<"pushDevices">;
     _creationTime: number;
+    buildsAlert?: boolean;
     createdAt: number;
     language?: string;
     lastSeenAt: number;
@@ -4618,6 +4619,7 @@ export interface Insert_pullRequestThreads {
 export interface Insert_pushDevices {
     _id?: Id<"pushDevices">;
     _creationTime?: number;
+    buildsAlert?: boolean;
     createdAt: number;
     language?: string;
     lastSeenAt: number;

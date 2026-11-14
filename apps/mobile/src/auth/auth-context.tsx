@@ -22,6 +22,7 @@ import { secureGrantStore } from "./secure-store";
 import { createAuthEpoch, INITIAL_SESSION, reduceSession } from "./session-state";
 import { signInWithBrowser } from "./sign-in";
 import { emptyCacheWhileSignedOut, runSignOut, signOutOnDevice } from "./sign-out";
+import { markGrantSignedOut } from "./signed-out-grant";
 
 /** Re-mint the JWT this long before the client's own refresh point, if `exp` is unknown. */
 const FALLBACK_REFRESH_MS = 60_000;
@@ -186,6 +187,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     clearCache: () => getOfflineCache().clear(),
                     dismissNotifications: dismissAccountNotifications,
                     forgetLastChat: clearLastThread,
+                    markSignedOut: markGrantSignedOut,
                     releasePush: async () =>
                         await releaseOnSignOut({ platform: devicePushPlatform, registrations: pushRegistrations, server: backendPushServer(client) }),
                     revokeSession: async (token) => await revokeSessionToken({ fetch, lunoraUrl: config.lunoraUrl, token }),

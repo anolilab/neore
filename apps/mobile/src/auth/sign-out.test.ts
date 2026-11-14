@@ -1,8 +1,121 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createAuthEpoch } from "./session-state";
-import { ALERT_REMOVAL_TIMEOUT_MS, emptyCacheWhileSignedOut, RELEASE_PUSH_TIMEOUT_MS, runSignOut, signOutOnDevice } from "./sign-out";
+import {
+    ALERT_REMOVAL_TIMEOUT_MS,
+    emptyCacheWhileSignedOut,
+    RELEASE_PUSH_TIMEOUT_MS,
+    runSignOut,
+    signedInGrantOf,
+    signOutOnDevice,
+    wasSignedOut,
+} from "./sign-out";
 import { StoredGrantNotClearedError } from "./stored-grant-error";
+
+describe("wasSignedOut", () => {
+    it("refuses only the grant whose digest a sign-out recorded", () => {
+        expect(wasSignedOut("digest-1", "digest-1")).toBe(true);
+        expect(wasSignedOut("digest-1", "digest-2")).toBe(false);
+        expect(wasSignedOut(null, "digest-1")).toBe(false);
+    });
+});
+
+describe("signedInGrantOf", () => {
+    const grant = { token: "session-1", user: { email: "a@b.c", id: "u1", image: null, name: "A" } };
+    const digest = async (token: string) => `digest-of-${token}`;
+
+    it("reads no sign-in when the store holds none", async () => {
+        expect(await signedInGrantOf(async () => null, async () => null, digest)).toBeUndefined();
+    });
+
+    it("gives back a readable grant when no sign-out recorded it", async () => {
+        expect(await signedInGrantOf(async () => grant, async () => null, digest)).toBe(grant);
+    });
+
+    it("refuses a readable grant that a sign-out recorded, by its digest", async () => {
+        expect(await signedInGrantOf(async () => grant, async () => "digest-of-session-1", digest)).toBeUndefined();
+    });
+
+    it("gives back a grant when the record is for a different sign-in", async () => {
+        expect(await signedInGrantOf(async () => grant, async () => "digest-of-session-0", digest)).toBe(grant);
+    });
+
+    it("refuses the grant when the record cannot be read, so a broken store shows nothing", async () => {
+        const failing = async (): Promise<string | null> => {
+            throw new Error("keychain locked");
+        };
+
+        expect(await signedInGrantOf(async () => grant, failing, digest)).toBeUndefined();
+    });
+});
+
+describe("signOutOnDevice's marker", () => {
+    it("records the token when the stored sign-in is cleared", async () => {
+        const markSignedOut = vi.fn(async (_token: string) => undefined);
+
+        await signOutOnDevice({
+            clearCache: async () => undefined,
+            forgetLastChat: async () => undefined,
+            markSignedOut,
+            revokeSession: async () => undefined,
+            takeCredential: async () => "session-1",
+            warn: () => undefined,
+        });
+
+        expect(markSignedOut).toHaveBeenCalledWith("session-1");
+    });
+
+    it("records the token even when the clear fails, because the grant stays readable", async () => {
+        const markSignedOut = vi.fn(async (_token: string) => undefined);
+
+        await signOutOnDevice({
+            clearCache: async () => undefined,
+            forgetLastChat: async () => undefined,
+            markSignedOut,
+            revokeSession: async () => undefined,
+            takeCredential: async () => {
+                throw new StoredGrantNotClearedError("session-1", new Error("keychain locked"));
+            },
+            warn: () => undefined,
+        });
+
+        expect(markSignedOut).toHaveBeenCalledWith("session-1");
+    });
+
+    it("records nothing when there was no sign-in to end", async () => {
+        const markSignedOut = vi.fn(async (_token: string) => undefined);
+
+        await signOutOnDevice({
+            clearCache: async () => undefined,
+            forgetLastChat: async () => undefined,
+            markSignedOut,
+            revokeSession: async () => undefined,
+            takeCredential: async () => undefined,
+            warn: () => undefined,
+        });
+
+        expect(markSignedOut).not.toHaveBeenCalled();
+    });
+
+    it("goes on with the sign-out when the marker cannot be written", async () => {
+        const revokeSession = vi.fn(async (_token: string) => undefined);
+        const warn = vi.fn();
+
+        await signOutOnDevice({
+            clearCache: async () => undefined,
+            forgetLastChat: async () => undefined,
+            markSignedOut: async () => {
+                throw new Error("keychain unavailable");
+            },
+            revokeSession,
+            takeCredential: async () => "session-1",
+            warn,
+        });
+
+        expect(revokeSession).toHaveBeenCalledWith("session-1");
+        expect(warn).toHaveBeenCalledWith("Could not record the sign-out for the background task.", expect.any(Error));
+    });
+});
 
 describe("signOutOnDevice", () => {
     it("empties the cache before it asks the server, so a request that fails or hangs cannot leave chats behind", async () => {
