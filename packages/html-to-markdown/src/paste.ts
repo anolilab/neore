@@ -107,6 +107,7 @@ const SUBSCRIPTS = new Map(SCRIPT_FROM.map((char, index) => [char, [..."₀₁�
 // Elements in raised or lowered text that are more than its characters, so it is written as it is.
 const SCRIPT_STRUCTURE = new Set(["A", "BR", "CODE", "IMG", "KBD", "MATH", "SAMP", "SUB", "SUP", "TT"]);
 const HEADINGS = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
+const LIST_NAMES = new Set(["OL", "UL"]);
 const OUTER_DISPLAY = new Set(["block", "inline", "run-in"]);
 const INNER_DISPLAY = new Set(["flex", "flow", "flow-root", "grid", "ruby", "table"]);
 
@@ -333,15 +334,18 @@ const pasteRules: Record<string, Rule> = {
     // one that holds nothing the page shows writes nothing.
     lineDiv: {
         filter: unlessRemoved((node) => node.nodeName === "DIV" && !hasBlockChild(node)),
-        replacement(content) {
+        replacement(content, node) {
             // Blank only for a line break: a div that holds what the page hides or drops shows nothing.
             if (trimBreaks(content).trim() === "") {
                 return blankLines(content.split(LINE_BREAK_MARK).length - 1);
             }
 
             // The last `<br>` of a block ends its last line and makes no line of its own; any before it, and one that
-            // starts the div, each show a line.
-            return `\n${withoutLastBreak(content)}\n`;
+            // starts the div, each show a line. Placed straight in a list, it is parted by blank lines, as any block
+            // there is: on the next line it would read as more of the item before.
+            const edge = LIST_NAMES.has(node.parentNode?.nodeName ?? "") ? "\n\n" : "\n";
+
+            return `${edge}${withoutLastBreak(content)}${edge}`;
         },
     },
 

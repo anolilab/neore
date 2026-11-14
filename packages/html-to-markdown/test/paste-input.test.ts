@@ -307,7 +307,7 @@ describe("paste input: review cases, tenth round", () => {
     });
 
     it("keeps loose text after a block in a numbered list in its place", () => {
-        expect(convert("<ol><li>a</li><div>block</div>note</ol>")).toBe("1. a\nblock\nnote");
+        expect(convert("<ol><li>a</li><div>block</div>note</ol>")).toBe("1. a\n\nblock\n\nnote");
     });
 });
 
@@ -341,7 +341,7 @@ describe("paste input: review cases, thirteenth round", () => {
         const document = createDocument("<ol>note<li>a</li></ol>");
         const list = document.querySelector("ol") as Element;
 
-        expect(convert(list)).toBe("note\n1. a");
+        expect(convert(list)).toBe("note\n\n1. a");
         expect(list.outerHTML).toBe("<ol>note<li>a</li></ol>");
     });
 });
@@ -404,5 +404,17 @@ describe("paste input: review cases, seventeenth round", () => {
         const formula = `<math><semantics><annotation encoding="application/x-tex">x^2</annotation></semantics></math>`;
 
         expect(convert(`<ul><li>a</li>${formula}<li>b</li></ul>`)).toBe("- a\n- $x^2$\n- b");
+    });
+});
+
+describe("paste input: a block placed straight in a list", () => {
+    it("parts a one-line div from the items around it by blank lines, so it is no more of the item before", () => {
+        expect(convert("<ol><li>a</li><div>block</div><li>b</li></ol>")).toBe("1. a\n\nblock\n\n2. b");
+        expect(convert("<ul><li>a</li><div>block</div><li>b</li></ul>")).toBe("- a\n\nblock\n\n- b");
+        expect(convert("<ol><li>a</li><div>block</div>note</ol>")).toBe("1. a\n\nblock\n\nnote");
+    });
+
+    it("keeps a run of one-line divs outside a list on lines of their own", () => {
+        expect(convert("<div>one</div><div>two</div>")).toBe("one\ntwo");
     });
 });
