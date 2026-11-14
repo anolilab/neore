@@ -142,8 +142,8 @@ export interface PhonePushMessage {
 }
 
 /**
- * The message for one phone: the same generic alert on both platforms, in the phone's language. Nothing about the
- * notification itself leaves us, only its ids in `data`. A tool approval is the one exception: its alert names the tool
+ * The message for one phone: the generic alert in the phone's language, except that an Android phone whose app builds its own
+ * alert (`buildsAlert`) gets ids only. Nothing about the notification itself leaves us, only its ids in `data`. A tool approval is the one exception: its alert names the tool
  * and the teammate, and carries the approval's id for the phone's approve and deny actions.
  */
 export const phoneMessage = (

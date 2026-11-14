@@ -174,6 +174,7 @@ describe("showDataOnlyPush", () => {
             fetchContent: vi.fn(async () => { return { body: "Release run", title: "Approval" }; }),
             locale: "de-DE",
             prepare: () => Promise.reject(new Error("no channel")),
+            retract: vi.fn(async () => undefined),
             session: async () => grantOf("u1"),
             show,
         });
@@ -187,6 +188,7 @@ describe("showDataOnlyPush", () => {
             showDataOnlyPush(PUSH, {
                 fetchContent: vi.fn(async () => undefined),
                 locale: "de-DE",
+                retract: vi.fn(async () => undefined),
                 session: async () => grantOf("u1"),
                 show: () => Promise.reject(new Error("no alerts")),
             }),
@@ -201,6 +203,7 @@ describe("showDataOnlyPush", () => {
         const result = await showDataOnlyPush(payload, {
             fetchContent,
             locale: "de-DE",
+            retract: vi.fn(async () => undefined),
             session: async () => grantOf("u1"),
             show: vi.fn(async () => undefined),
         });

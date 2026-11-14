@@ -123,7 +123,7 @@ export interface PushTaskSteps {
     /** Work before showing (the Android channel). A failure is not fatal: the alert is still posted. */
     prepare?: () => Promise<void>;
     /** Takes back an alert just posted, once the account it was for has changed or signed out. */
-    retract?: (ids: PushIds) => Promise<void>;
+    retract: (ids: PushIds) => Promise<void>;
     /** The grant signed in on this phone right now, or `undefined`. A push for nobody shows nothing. */
     session: () => Promise<StoredGrant | undefined>;
     show: (text: PushText, ids: PushIds) => Promise<void>;
@@ -213,7 +213,7 @@ export const showDataOnlyPush = async (payload: unknown, steps: PushTaskSteps): 
     }
 
     if (!isUnchanged) {
-        await steps.retract?.(shownIds);
+        await steps.retract(shownIds);
     }
 
     return true;
