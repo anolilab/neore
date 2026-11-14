@@ -26,7 +26,7 @@ import { loadConfig } from "../lib/config";
 import { registerApprovalActions } from "./approval-actions";
 import { clearTapRoute } from "./pending-tap";
 import { ANDROID_CHANNEL_ID, channelName, deviceLocale } from "./push-channel";
-import { PHONE_PUSH_TASK } from "./push-content";
+import { isDataOnlyPush, PHONE_PUSH_TASK } from "./push-content";
 import type { PushPlatform, PushServer } from "./push-registration";
 import { createPendingWork, createSerialSteps, noteAccountOnPhone, onceItWorks } from "./push-registration";
 
@@ -105,8 +105,11 @@ const EXTENSION_LUNORA_URL_KEY = "neore.mobile.lunora-url";
  */
 export const configurePhoneNotifications = onceItWorks(async () => {
     setNotificationHandler({
-        handleNotification: async () => {
-            return { shouldPlaySound: false, shouldSetBadge: false, shouldShowBanner: true, shouldShowList: true };
+        handleNotification: async ({ request }) => {
+            // A data-only push shows no banner of its own: the task posts its alert, and the system's would be blank.
+            const isSilent = isDataOnlyPush(request.trigger);
+
+            return { shouldPlaySound: false, shouldSetBadge: false, shouldShowBanner: !isSilent, shouldShowList: !isSilent };
         },
     });
 

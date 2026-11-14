@@ -5,6 +5,8 @@
  * Android does this in its background task (`background-task.ts`); iOS in its Notification Service Extension
  * (`targets/notification-service`), which mirrors {@link fetchPushContent} in Swift. Either way, any failure shows the placeholder.
  */
+import type { NotificationTrigger } from "expo-notifications";
+
 import type { Fetch, GrantStore, StoredGrant } from "../auth/grant";
 import { fetchAccessToken } from "../auth/grant";
 import { languageBase } from "./push-channel";
@@ -134,6 +136,18 @@ export interface PushTaskSteps {
 const isNotificationStyle = (payload: unknown): boolean =>
     typeof payload === "object" && payload !== null && "notification" in payload && Boolean(payload.notification);
 
+/**
+ * A data-only Android push: its trigger carries a `remoteMessage` with no `notification`. The task posts its alert, so the
+ * system shows none for it. An iOS trigger carries a `payload` instead and is never data-only here.
+ */
+export const isDataOnlyPush = (trigger: NotificationTrigger | null | undefined): boolean => {
+    if (!trigger || !("remoteMessage" in trigger)) {
+        return false;
+    }
+
+    return trigger.remoteMessage !== undefined && !trigger.remoteMessage.notification;
+};
+
 /** The ids of a data-only push, or `undefined` for one the system alerts itself. */
 export const dataOnlyPushIds = (payload: unknown): PushIds | undefined => {
     if (isNotificationStyle(payload)) {
@@ -187,10 +201,19 @@ export const showDataOnlyPush = async (payload: unknown, steps: PushTaskSteps): 
 
     await steps.show(text, shownIds);
 
-    // A sign-out or account switch can land between the check above and the post: the alert is taken back, text or placeholder.
-    const after = await steps.session();
+    // A sign-out or account switch can land between the check above and the post. A read that fails counts as changed: the
+    // account cannot be confirmed, so the alert is taken back, text or placeholder.
+    let isUnchanged = false;
 
-    if (after?.user.id !== fetchedFor) {
+    try {
+        const afterPost = await steps.session();
+
+        isUnchanged = afterPost?.user.id === fetchedFor;
+    } catch {
+        // Not confirmed: the alert is taken back below.
+    }
+
+    if (!isUnchanged) {
         await steps.retract?.(shownIds);
     }
 

@@ -37,6 +37,8 @@ if (Platform.OS === "android") {
 
         const locale = deviceLocale();
 
+        let isPosted = false;
+
         // Keyed by the notification: a send that runs twice replaces the first alert instead of adding a second.
         const post = async (text: PushText, ids: PushIds) => {
             await scheduleNotificationAsync({
@@ -44,6 +46,7 @@ if (Platform.OS === "android") {
                 identifier: ids.notificationId,
                 trigger: { channelId: ANDROID_CHANNEL_ID },
             });
+            isPosted = true;
         };
 
         try {
@@ -66,11 +69,12 @@ if (Platform.OS === "android") {
             // eslint-disable-next-line no-console -- no logger in a background task; a lost push must not be silent
             console.warn("Could not show a push notification.", taskError);
 
-            // The push was read and nothing is shown for it: post the placeholder without its chat, keyed like the real alert,
-            // so the notification is not lost. It carries no text and no chat, so it is safe whoever is signed in.
+            // Nothing posted yet: post the placeholder without its chat, keyed like the real alert, so the notification is not
+            // lost. It carries no text and no chat, so it is safe whoever is signed in. Once an alert is up, showDataOnlyPush
+            // owns taking it back, so a failure after that must not put a placeholder back.
             const ids = dataOnlyPushIds(data);
 
-            if (ids) {
+            if (ids && !isPosted) {
                 try {
                     await post(pushPlaceholder(locale), { notificationId: ids.notificationId });
                 } catch (fallbackError) {

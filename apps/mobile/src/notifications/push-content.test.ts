@@ -1,9 +1,10 @@
+import type { NotificationTrigger } from "expo-notifications";
 import { describe, expect, it, vi } from "vitest";
 
 import type { StoredGrant } from "../auth/grant";
 import { channelName } from "./push-channel";
 import type { PushText } from "./push-content";
-import { fetchPushContent, NOT_THIS_ACCOUNT, pushPlaceholder, showDataOnlyPush, WITHHELD } from "./push-content";
+import { fetchPushContent, isDataOnlyPush, NOT_THIS_ACCOUNT, pushPlaceholder, showDataOnlyPush, WITHHELD } from "./push-content";
 
 const LUNORA = "https://api.test";
 const TOKEN_URL = `${LUNORA}/extension/auth/token`;
@@ -216,6 +217,50 @@ describe("showDataOnlyPush", () => {
 
         expect(result).toBe(true);
         expect(show).toHaveBeenCalledWith({ body: "Release run", title: "Approval" }, PUSH);
+    });
+});
+
+describe("showDataOnlyPush when the account cannot be read after posting", () => {
+    it("takes the alert back", async () => {
+        const reads = [grantOf("u1"), grantOf("u1")];
+        const retract = vi.fn(async () => undefined);
+        const show = vi.fn(async () => undefined);
+
+        await showDataOnlyPush(PUSH, {
+            fetchContent: vi.fn(async () => { return { body: "Release run", title: "Approval" }; }),
+            locale: "de-DE",
+            retract,
+            session: () => {
+                const next = reads.shift();
+
+                return next === undefined ? Promise.reject(new Error("keystore locked")) : Promise.resolve(next);
+            },
+            show,
+        });
+
+        expect(show).toHaveBeenCalledTimes(1);
+        expect(retract).toHaveBeenCalledWith(PUSH);
+    });
+});
+
+/** An Android push trigger carrying `remoteMessage`; only the fields the app reads are modelled. */
+const androidPushTrigger = (remoteMessage: { data?: { notificationId: string }; notification?: { title: string } }) => ({ remoteMessage, type: "push" } as unknown as NotificationTrigger);
+
+describe("isDataOnlyPush", () => {
+    it("is true for an Android push with no notification of its own", () => {
+        expect(isDataOnlyPush(androidPushTrigger({ data: { notificationId: "n1" } }))).toBe(true);
+    });
+
+    it("is false for a push that carries its own alert", () => {
+        expect(isDataOnlyPush(androidPushTrigger({ notification: { title: "Neore" } }))).toBe(false);
+    });
+
+    it("is false for an iOS push, which has no remote message", () => {
+        expect(isDataOnlyPush({ payload: { notificationId: "n1" }, type: "push" } as NotificationTrigger)).toBe(false);
+    });
+
+    it("is false for a notification the app scheduled itself", () => {
+        expect(isDataOnlyPush(undefined)).toBe(false);
     });
 });
 
