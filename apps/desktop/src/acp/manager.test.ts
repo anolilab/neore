@@ -388,7 +388,8 @@ describe("the environment", () => {
         const names = Object.keys(env).filter((name) => name !== "__CF_USER_TEXT_ENCODING" && name !== "SHLVL");
 
         expect(new Set(names)).toEqual(new Set(["FAKE_AGENT_LOG", "ONLY_FOR_THIS_AGENT", "PATH"]));
-        expect(env.SHLVL).not.toBe("41");
+        // The shell's own count starts from nothing (0, or 1 for a bash that counts itself); the app's 41 would read 41 or 42.
+        expect(["0", "1"]).toContain(env.SHLVL ?? "0");
         target.killAll();
     });
 });

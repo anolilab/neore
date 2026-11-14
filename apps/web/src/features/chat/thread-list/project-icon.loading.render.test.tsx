@@ -78,6 +78,8 @@ describe("ProjectIcon around the icon map's download", () => {
 
         let container: HTMLElement = document.body;
 
+        // render's own act is synchronous and returns before the failed download's update and its effects; the async
+        // act in `settle` waits for both, so the retry listener is attached before the next step.
         await settle(() => {
             ({ container } = render(<ProjectIcon color="#ff0000" name="rocket" />));
         });
