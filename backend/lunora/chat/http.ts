@@ -664,6 +664,14 @@ const runChatStartOnShard = async (
 
     const validThreadId = body.threadId && body.threadId !== "default" ? body.threadId : undefined;
     const isGuestSend = body.guestMessageId !== undefined;
+
+    // As `sendHeldGuestMessage`: an admin acting as the owner sends no guest note on, resend or not.
+    const guestSendPlaced = isGuestSend ? await placedPromise : undefined;
+
+    if (guestSendPlaced?.impersonating === true) {
+        return Response.json({ error: "GUEST_NOTE_IMPERSONATING", message: "A guest's message cannot be sent while impersonating." }, { status: 403 });
+    }
+
     // A held guest note goes only into its own chat, as text, and its stored text is saved, never the client's prompt.
     const guestLookup = isGuestSend
         ? await context.runQuery(internal.chat.guest_links.getGuestNoteForSend, {

@@ -3847,7 +3847,7 @@ export interface Caller {
         };
         session_organization: {
             getActiveOrganizationIdForSession: (args: { sessionId: string; userId: string }) => Promise<string | null>;
-            getSessionOrganizationForCap: (args: { sessionId: string; userId: string }) => Promise<{ organizationId: string | null } | null>;
+            getSessionOrganizationForCap: (args: { sessionId: string; userId: string }) => Promise<{ impersonating?: boolean; organizationId: string | null } | null>;
         };
         setup_steps: {
             setSetupStepSkipped: (args: { expectedUserId?: string; skipped: boolean; stepId: "pair" | "ssh" | "agent" }) => Promise<null>;

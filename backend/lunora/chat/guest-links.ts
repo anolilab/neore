@@ -138,13 +138,23 @@ const hasWaitingNotes = async (context: MutationCtx, threadId: Id<"threads">): P
 // The owner
 // ---------------------------------------------------------------------------
 
+/** The pattern of `setThreadPermissionMode` and `registerDevice`: an admin acting as the owner hands out, withdraws, sends or dismisses nothing on their guest link. */
+const refuseImpersonation = (impersonatedBy: string | null | undefined): void => {
+    if (impersonatedBy) {
+        throw new LunoraError("FORBIDDEN", "Guest links cannot be changed while impersonating");
+    }
+};
+
 /** Makes the thread's guest link (replacing any earlier one). The token comes back once; only its hash is kept. */
 export const createGuestLink = authMutation
     .use(rateLimit("sharing/create"))
     .input({ discardWaiting: v.optional(v.boolean()), threadId: v.id("threads") })
     .output(v.object({ expiresAt: v.number(), id: v.string(), linkToken: v.string() }))
     .mutation(async ({ args: { discardWaiting, threadId }, ctx: context }) => {
-        const { userId } = context.user;
+        const { impersonatedBy, userId } = context.user;
+
+        refuseImpersonation(impersonatedBy);
+
         // The owner alone, and never a locked chat: this takes no unlock proof, and a link into a locked chat would be a way around the lock.
         const thread = await requireOwnedThread(context, threadId, userId);
 
@@ -221,6 +231,7 @@ export const revokeGuestLink = authMutation
     })
     .output(v.null())
     .mutation(async ({ args: { confirmedNotes = [], linkId, threadId }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy);
         await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
 
         // Only compared with the owner's own thread's live link: an id from elsewhere never matches and grants nothing.
@@ -401,6 +412,8 @@ export const sendHeldGuestMessage = authMutation
     .input(vReviewArgs)
     .output(v.union(v.object({ status: v.literal("ready"), text: v.string(), threadId: v.string() }), v.object({ status: v.literal("sent") })))
     .mutation(async ({ args: { messageId, unlockProof }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy);
+
         const row = await reviewedAfterSettle(context, context.user.userId, messageId, unlockProof);
 
         if (row.status === "sent") {
@@ -418,6 +431,8 @@ export const dismissHeldGuestMessage = authMutation
     .input(vReviewArgs)
     .output(v.object({ status: v.union(v.literal("dismissed"), v.literal("sent")) }))
     .mutation(async ({ args: { messageId, unlockProof }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy);
+
         const row = await reviewedAfterSettle(context, context.user.userId, messageId, unlockProof);
 
         if (row.status === "sent") {

@@ -289,6 +289,21 @@ describe("/chat/start with a held guest note", () => {
         expect(saved.prompts).toHaveLength(1);
     });
 
+    it("refuses a note sent by an admin impersonating the owner, and keeps it waiting", async () => {
+        const impersonated = fakeContext({
+            "auth_session_organization:getSessionOrganizationForCap": async () => {
+                return { impersonating: true, organizationId: null };
+            },
+        });
+        const response = await runChatStart(impersonated, { guestMessageId: noteId, model: MODEL, prompt: "x", threadId } as never, "secret");
+
+        expect(response.status).toBe(403);
+        expect(await response.json()).toMatchObject({ error: "GUEST_NOTE_IMPERSONATING" });
+        expect(saved.prompts).toHaveLength(0);
+        expect(saved.charges).toBe(0);
+        expect(await noteStatus()).toBe("held");
+    });
+
     it("refuses a note sent into another chat than the one it was left in", async () => {
         const otherThread = await run(async (ctx) => await ctx.db.insert("threads", { model: MODEL, status: "active", title: "U", userId: OWNER }));
         const response = await runChatStart(fakeContext(), { guestMessageId: noteId, model: MODEL, prompt: "x", threadId: otherThread } as never, "secret");
