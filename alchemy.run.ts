@@ -178,8 +178,8 @@ const customDomain = (origin: string, name: (typeof REQUIRED_DEPLOY_ENV)[number]
  * exceptions — ids, hostnames and addresses that are not credentials.
  */
 const PLAIN_ENV_KEYS = new Set([
-    "ANDROID_DATA_ONLY_PUSH",
     "AMADEUS_CLIENT_ID",
+    "ANDROID_DATA_ONLY_PUSH",
     "APP_NAME",
     "AUTH_GITHUB_CLIENT_ID",
     "BROWSERBASE_PROJECT_ID",
