@@ -9,9 +9,9 @@
  * longest retention of any configured limit: past that point the library would
  * read the row as a full bucket, so deleting it changes no decision.
  *
- * A row with a negative `value` (debt a `reserve` left) is kept, as the library's own
- * sweep keeps it: concurrent reserves can stack debt past one capacity, so its refill
- * can outlast the retention, and deleting it would forgive the debt.
+ * A row with a negative `value` (debt a `reserve` left) is kept past that, as the
+ * library's own sweep keeps it: concurrent reserves can stack debt past one capacity,
+ * so its refill can outlast the retention. It goes after `RATE_LIMIT_DEBT_RETENTION_MS`.
  *
  * Rows live on the shard whose mutation charged them, so the sweep runs on `__root__`
  * from the cron tick and on each user shard from `lib/shard-housekeeping.ts`.
@@ -41,21 +41,37 @@ export const retentionOf = (config: RateLimitConfig): number => {
 /** The longest retention of any configured limit: a row older than this is outside every window. */
 export const RATE_LIMIT_RETENTION_MS = Math.max(...Object.values(RATE_LIMIT_CONFIGS as Record<string, RateLimitConfig>).map((config) => retentionOf(config)));
 
+/**
+ * How long a row still in debt is kept. Only `voice/dailyTranscribeSeconds` reserves, and one
+ * overrun is at most a clip's worth of seconds, so 30 days of refill (18,000 seconds on the free
+ * daily limit) is far deeper than any debt concurrent clips can stack. Past this, deleting the row
+ * forgives nothing, and the sweep stops reading it on every run.
+ */
+export const RATE_LIMIT_DEBT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
 export const sweepExpiredRateLimits = internalMutation
     .input({})
     .output(v.number())
     .mutation(async ({ ctx }) => {
-        const { page: expired } = await ctx.db.rateLimits.findMany({
-            limit: RATE_LIMIT_SWEEP_PAGE,
-            orderBy: [{ ts: "asc" }],
-            where: { ts: { lt: ctx.now - RATE_LIMIT_RETENTION_MS }, value: { gte: 0 } },
-        });
+        const [{ page: expired }, { page: settled }] = await Promise.all([
+            ctx.db.rateLimits.findMany({
+                limit: RATE_LIMIT_SWEEP_PAGE,
+                orderBy: [{ ts: "asc" }],
+                where: { ts: { lt: ctx.now - RATE_LIMIT_RETENTION_MS }, value: { gte: 0 } },
+            }),
+            ctx.db.rateLimits.findMany({
+                limit: RATE_LIMIT_SWEEP_PAGE,
+                orderBy: [{ ts: "asc" }],
+                where: { ts: { lt: ctx.now - RATE_LIMIT_DEBT_RETENTION_MS }, value: { lt: 0 } },
+            }),
+        ]);
+        const rows = [...expired, ...settled];
 
-        await Promise.all(expired.map(async (row) => await ctx.db.delete("rateLimits", row._id)));
+        await Promise.all(rows.map(async (row) => await ctx.db.delete("rateLimits", row._id)));
 
-        if (expired.length === RATE_LIMIT_SWEEP_PAGE) {
+        if (expired.length === RATE_LIMIT_SWEEP_PAGE || settled.length === RATE_LIMIT_SWEEP_PAGE) {
             await ctx.scheduler.runAfter(0, internal.lib.rate_limit_sweep.sweepExpiredRateLimits, {});
         }
 
-        return expired.length;
+        return rows.length;
     });

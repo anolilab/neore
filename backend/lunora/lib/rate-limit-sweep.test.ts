@@ -10,7 +10,7 @@ import { internal } from "../_generated/internal";
 import { AUTH_RATE_LIMIT_RETENTION_MS, AUTH_RATE_LIMIT_SWEEP_PAGE, sweepExpiredAuthRateLimits } from "../auth/rate-limit-sweep";
 import schema from "../schema";
 import { DAY, Ratelimit } from "./rate-limiter";
-import { RATE_LIMIT_RETENTION_MS, RATE_LIMIT_SWEEP_PAGE, retentionOf, sweepExpiredRateLimits } from "./rate-limit-sweep";
+import { RATE_LIMIT_DEBT_RETENTION_MS, RATE_LIMIT_RETENTION_MS, RATE_LIMIT_SWEEP_PAGE, retentionOf, sweepExpiredRateLimits } from "./rate-limit-sweep";
 
 const NOW = 1_800_000_000_000;
 
@@ -106,10 +106,11 @@ describe.each(TABLES)("$table sweep", ({ page, retention, row, sweep, table, tar
 });
 
 describe("rateLimits sweep and reserve debt", () => {
-    it("keeps an expired row that still carries debt, as the library's own sweep does", async () => {
+    it("keeps an expired row that still carries debt, and deletes it once past the debt retention", async () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("rateLimits", { key: "debt", ts: NOW - RATE_LIMIT_RETENTION_MS - 1, value: -1800 });
             await ctx.db.insert("rateLimits", { key: "paid", ts: NOW - RATE_LIMIT_RETENTION_MS - 1, value: 0 });
+            await ctx.db.insert("rateLimits", { key: "settled", ts: NOW - RATE_LIMIT_DEBT_RETENTION_MS - 1, value: -1800 });
         });
 
         const keys = await harness.run(async (ctx: any) => {
