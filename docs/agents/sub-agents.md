@@ -3,6 +3,57 @@
 The rules are summarized in `backend/lunora/sub-agents/AGENTS.md`, which agents load automatically; this file holds the
 detail. Paths are relative to `backend/lunora/`.
 
+## WHO A CHILD WAITS FOR
+
+- **A one-shot child pauses for approval** when the owner's chat or a task started its chain (`sub-agents/execute.ts`,
+  `pauseForApproval` for every non-worker run outside an eval's chain). The task round itself still drops its own `ask`
+  tools: only the child it delegated to can wait, because the parent's delegate call returned at admission. A task round
+  has `delegateToSubAgent` only when its owner set the tool to `auto` (a headless run drops `ask`).
+  - **Who cannot start a chain**: a trigger run gets no tools, or only the bot's shell and file tools
+    (`triggers/execute.ts`); a messenger reply's tool groups never include sub-agents (`messenger/lib/reply-tools.ts`);
+    an outside agent's run turns the sub-agent tools off (`chat/lib/tool-permissions.ts`). A trigger still names itself
+    on the chain, so the rule below holds if its tools ever widen.
+  - **An eval's chain never waits** (`chainSource` `eval:<resultId>`, `chainPausesForApproval`): an eval measures one
+    headless answer, so its child refuses an `ask` tool as any headless run does.
+  - **One waiting child per source.** Each task or trigger run starts a fresh thread, so the per-thread cap of 3 never
+    fills across runs. The run names its source (`runHeadlessAgent({ chainSource })` → `ToolCtx.chainSource` →
+    `subAgentRuns.chainSource`, `task:<taskId>` / `trigger:<triggerId>`), a nested child inherits it, and while a run of
+    that source is `awaiting` (`by_chainSource_and_status`) its next delegation is refused with `chainWaitProblem`, which
+    the delegating run reads as the tool's error. Admission alone misses children that were all running when admitted (a
+    round's three, or round 1's child still running when round 2 delegates), so the pause checks again: `markRunAwaiting`
+    reads the same index in the transaction that writes `awaiting`, so two children of one source reaching `ask` at once
+    serialize. The first waits; the later one does not: its run ends `failed` with `chainPauseProblem` as its result
+    ("another sub-agent this task started is already waiting for the owner"), and that end denies its request, so the
+    tool is refused, as in an eval's chain. The check runs on a run's first pause only (never resumed, no `resumedBy`):
+    a child the owner already answered keeps its right to wait, so its next `ask` waits even when a newer sibling of the
+    same source waits meanwhile. So a source has at most one child waiting on its first request, plus any it already
+    answered that paused again; the owner never gets a second unanswered first request from one source.
+  - **The wait comes before the notification.** `recordPendingToolApprovals` moves a sub-agent's run to `awaiting`
+    (`markRunAwaiting`, bound to the resume it runs under: `subAgentResumedWith`, 0 for a first pause) in the mutation
+    that records the rows, before the thread's `awaitingInput`, the reminder and the notification. A refused pause (the
+    rule above, a run that ended or was resumed again meanwhile, a worker's or a missing run) leaves the requests it
+    recorded denied and sends nothing; a notified request finds its run waiting, so an immediate answer is never refused
+    as still working. The mutation returns whether the pause stands (`subAgentWaits` on a continuation, which then settles
+    nothing itself: `settleSubAgentRun` writes only its end). A continuation whose
+    pause again is refused ends its run inside its own stream, before that stream's final chunk, so that end does not stop
+    the stream (`finishRun`'s `fromOwnContinuation`): it closes quietly instead of reading "stopped". The pause's snapshot keeps the source (`ToolRunConfig.chainSource`) and the continuation puts
+    it back on its tool context, so a resumed child's own sub-agents still count; an older snapshot without it falls back
+    to the per-thread cap. A worker never waits, but its runs carry the source too (`createRun` and `messageWorker` store
+    it, `claimRun` hands it to the run), so a one-shot child a worker delegates counts toward the limit, and in an eval's
+    chain it never pauses. A chat-started chain has only the per-thread cap.
+  - **The owner is told** by the pause itself: `recordPendingToolApprovals` writes a `tool_approval` (or `ask_user`,
+    `secret_request`) notification to the child thread's owner, linking to the child's thread, plus the phone push and the
+    four-hour reminder; the dedupe key is the approval id. A sub-agent's pause names who started its chain in the body
+    (`chainStarterLabel`: "a task", "a trigger", else the dispatch source); the owner's own chat adds none.
+  - **Where it shows**: the child's thread (answer there), the parent conversation's `listSubAgentApprovals` card (the task
+    run's thread), and the bell. The snapshot keeps `dispatchOrigin`, so an answered child still dispatches as the task's
+    unattended origin, not as the lead.
+  - **Tasks are not held.** The round ends on its own answer (`completeRound`), the recurrence sweep reads only the task's
+    own status, so the next slot runs as usual; the child's result posts back to the round's thread when it ends
+    (`postRunResult`).
+  - **Timeout**: the request's own expiry (`PENDING_APPROVAL_TTL_MS`, 7 days) reaps the run with
+    `SUB_AGENT_APPROVAL_EXPIRED_MESSAGE`, posted back to the parent.
+
 ## LIFECYCLE
 
 - **A new message in a child ends its wait.** The send (`chat/http.ts`, `afterSave`) calls `afterOwnerMessage` after the

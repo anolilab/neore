@@ -1367,6 +1367,7 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     beatAt: real("beatAt"),
+    chainSource: text("chainSource"),
     childThreadId: text("childThreadId"),
     clientId: text("clientId"),
     completedAt: real("completedAt"),
@@ -1405,6 +1406,7 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     by_user_and_status: index("by_user_and_status").on(t.userId, t.status),
     by_user_and_toolCallId: index("by_user_and_toolCallId").on(t.userId, t.toolCallId),
     by_user_and_createdAt: index("by_user_and_createdAt").on(t.userId, t.createdAt),
+    by_chainSource_and_status: index("by_chainSource_and_status").on(t.chainSource, t.status),
     by_createdAt: index("by_createdAt").on(t.createdAt),
 }));
 
@@ -1755,7 +1757,7 @@ export const toolApprovalRuns = sqliteTable("toolApprovalRuns", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     approvalId: text("approvalId").notNull(),
-    config: text("config", { mode: "json" }).$type<{ autoMediaEnrichment: boolean; contextFromOrder?: number; dispatchOrigin?: "outside_agent" | "trigger" | "messenger"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; headlessApproved?: Array<string>; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; organizationId?: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; stepsLeft?: number; subAgentRunId?: Id<"subAgentRuns">; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }>().notNull(),
+    config: text("config", { mode: "json" }).$type<{ autoMediaEnrichment: boolean; chainSource?: string; contextFromOrder?: number; dispatchOrigin?: "outside_agent" | "trigger" | "messenger"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; headlessApproved?: Array<string>; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; organizationId?: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; stepsLeft?: number; subAgentRunId?: Id<"subAgentRuns">; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }>().notNull(),
     createdAt: real("createdAt").notNull(),
     pauseId: text("pauseId"),
     reminderSentAt: real("reminderSentAt"),

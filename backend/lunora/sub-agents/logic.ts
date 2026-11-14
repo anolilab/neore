@@ -389,6 +389,70 @@ const SOURCE_LABELS: Record<DispatchSource, string> = {
 
 export const dispatchSourceLabel = (source: DispatchSource): string => SOURCE_LABELS[source];
 
+/** The unattended runs that can start a sub-agent chain, each named on the chain's runs (`subAgentRuns.chainSource`). */
+const CHAIN_SOURCE_KINDS = ["eval", "task", "trigger"] as const;
+
+export type ChainSourceKind = (typeof CHAIN_SOURCE_KINDS)[number];
+
+/** A chain's source as stored: the kind and the id of the task, trigger or eval run (`task:<taskId>`). */
+export const chainSourceKey = (kind: ChainSourceKind, id: string): string => `${kind}:${id}`;
+
+const chainSourceKind = (key: string | undefined): ChainSourceKind | undefined => {
+    const kind = key?.slice(0, key.indexOf(":"));
+
+    return CHAIN_SOURCE_KINDS.find((known) => known === kind);
+};
+
+/**
+ * Whether a one-shot child of this chain may pause for its owner's approval. An eval measures one headless answer, so its
+ * chain keeps the headless rule: an `ask` tool is refused, nothing waits.
+ */
+export const chainPausesForApproval = (key: string | undefined): boolean => chainSourceKind(key) !== "eval";
+
+const CHAIN_SOURCE_LABELS: Record<ChainSourceKind, string> = { eval: "an eval", task: "a task", trigger: "a trigger" };
+
+/** Who started the chain a waiting child belongs to, for its owner: its task or trigger, else what dispatched it. */
+export const chainStarterLabel = (run: { chainSource?: string; dispatchedBy?: DispatchSource }): string | undefined => {
+    const kind = chainSourceKind(run.chainSource);
+
+    if (kind !== undefined) {
+        return CHAIN_SOURCE_LABELS[kind];
+    }
+
+    const origin = originOfRun(run.dispatchedBy);
+
+    return origin === "lead" ? undefined : dispatchSourceLabel(origin);
+};
+
+/**
+ * Why a chain source that already has a child waiting for approval may not start another, or `undefined` when it may.
+ * A task or trigger starts a fresh thread every run, so the per-thread cap never fills: one waiting child per source.
+ */
+export const chainWaitProblem = (key: string | undefined, waiting: boolean): string | undefined => {
+    const kind = chainSourceKind(key);
+
+    if (kind === undefined || kind === "eval" || !waiting) {
+        return undefined;
+    }
+
+    return `A sub-agent this ${kind} started earlier is still waiting for the owner's approval, so this ${kind} starts no other until that one is answered or expires. Do this part of the work yourself.`;
+};
+
+/**
+ * Why a child of this chain may not wait for approval, or `undefined` when it may: another child of the same task or trigger
+ * already waits. Admission ({@link chainWaitProblem}) cannot see children that were all running when they were admitted, so
+ * the pause checks again (`markRunAwaiting`); the child's request is refused and its run ends with this as its result.
+ */
+export const chainPauseProblem = (key: string | undefined, waiting: boolean): string | undefined => {
+    const kind = chainSourceKind(key);
+
+    if (kind === undefined || kind === "eval" || !waiting) {
+        return undefined;
+    }
+
+    return `Another sub-agent this ${kind} started is already waiting for the owner, so this sub-agent's request to use a tool was refused and it stopped. Its ${kind} waits for one answer at a time.`;
+};
+
 /**
  * Why a dispatch from `source` may not reach a lead whose policy is `policy`, or `undefined` when it may.
  * `outside_agent` is for cloud workers only: a host worker never takes it, whatever the policy lists.

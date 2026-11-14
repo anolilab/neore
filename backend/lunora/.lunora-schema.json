@@ -1,6 +1,7 @@
 {
   "jurisdiction": "eu",
   "migrationIds": [
+    "add-approval-chain-source",
     "add-headless-approved",
     "add-headless-resume-bounds",
     "backfill-approval-organization"
@@ -24168,6 +24169,13 @@
           "optional": true,
           "unique": false
         },
+        "chainSource": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "refined": true
+        },
         "childThreadId": {
           "kind": "string",
           "nullable": false,
@@ -24492,6 +24500,13 @@
         }
       },
       "indexes": {
+        "by_chainSource_and_status": {
+          "fields": [
+            "chainSource",
+            "status"
+          ],
+          "unique": false
+        },
         "by_childThreadId": {
           "fields": [
             "childThreadId"
@@ -27825,6 +27840,13 @@
               "nullable": false,
               "optional": false,
               "unique": false
+            },
+            "chainSource": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "refined": true
             },
             "contextFromOrder": {
               "kind": "number",

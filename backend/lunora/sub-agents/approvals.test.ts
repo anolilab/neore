@@ -8,11 +8,12 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
-import { respondToToolApproval } from "../chat/tool-permissions";
+import { recordPendingToolApprovals, respondToToolApproval } from "../chat/tool-permissions";
 import { stopActiveForThread } from "../chat/streaming/persistent/library";
 import { _deletePageForThreadId } from "../agent/threads";
 import { clearAwaitingInput } from "../agent/table-writes";
 import { PENDING_APPROVAL_TTL_MS } from "../chat/lib/tool-approval-cleanup";
+import { SUB_AGENT_RUN_ENDED_BY } from "../chat/lib/tool-approval-claim";
 import { THREAD_LOCKED_CODE } from "../lib/thread-lock";
 import type { Id } from "../_generated/dataModel";
 import schema from "../schema";
@@ -46,6 +47,7 @@ const NOT_FOUND = /not found/iu;
 const ONCE_OR_ALWAYS = /once or always/iu;
 const ALREADY_ENDED = /already ended/iu;
 const GONE = /gone/u;
+const ANOTHER_WAITS = /another sub-agent this task started is already waiting for the owner/iu;
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
@@ -302,6 +304,161 @@ describe("a child that stopped on a request", () => {
         expect(await run(async (context) => await cancelSubAgentRunsForStop(context, parentId, OWNER))).toBe(1);
         expect(await runStatus()).toBe("cancelled");
         expect(await pendingRequests()).toHaveLength(0);
+    });
+});
+
+describe("two children of one task that both reach an ask tool", () => {
+    const TASK = "task:task-1";
+    const OTHER_TASK = "task:task-2";
+    const OTHER_APPROVAL = "approval-other";
+
+    /** A second child, running, that stopped on its own request: as a later round's child of `chainSource` would. */
+    const seedSibling = async (chainSource: string, { recorded = true } = {}): Promise<{ siblingChild: string; siblingRun: Id<"subAgentRuns"> }> =>
+        await run(async (context) => {
+            const now = Date.now();
+            const siblingChild = await context.db.insert("threads", { status: "active", title: "Sub-agent: other", userId: OWNER });
+            const siblingRun = await context.db.insert("subAgentRuns", {
+                chainSource,
+                childThreadId: siblingChild,
+                createdAt: now,
+                depth: 1,
+                parentThreadId: parentId,
+                startedAt: now,
+                status: "running",
+                task: "Clean the inbox",
+                toolCallId: "call-parent-2",
+                updatedAt: now,
+                userId: OWNER,
+            });
+
+            await context.db.insert("messages", {
+                message: {
+                    content: [
+                        { input: { path: "/tmp/inbox" }, toolCallId: "call-9", toolName: TOOL, type: "tool-call" },
+                        { approvalId: OTHER_APPROVAL, toolCallId: "call-9", type: "tool-approval-request" },
+                    ],
+                    role: "assistant",
+                },
+                order: 0,
+                status: "success",
+                stepOrder: 0,
+                threadId: siblingChild,
+                tool: true,
+                userId: OWNER,
+            });
+
+            if (recorded) {
+                await context.db.insert("toolApprovalRuns", {
+                    approvalId: OTHER_APPROVAL,
+                    config: { ...CONFIG(), chainSource, subAgentRunId: siblingRun },
+                    createdAt: now,
+                    status: "pending",
+                    threadId: siblingChild,
+                    userId: OWNER,
+                });
+            }
+
+            return { siblingChild, siblingRun };
+        });
+    const approvalRow = async (approvalId: string): Promise<any> =>
+        await run(
+            async (context) =>
+                await context.db
+                    .query("toolApprovalRuns")
+                    .withIndex("by_approvalId", (q: any) => q.eq("approvalId", approvalId))
+                    .first(),
+        );
+
+    beforeEach(async () => {
+        await run(async (context) => await context.db.patch("subAgentRuns", runId, { chainSource: TASK }));
+    });
+
+    it("lets one wait and refuses the other's tool, ending it with the reason", async () => {
+        // Both were admitted while neither waited; both now stop on a request.
+        const { siblingRun } = await seedSibling(TASK);
+
+        expect(await run(async (context) => await markRunAwaiting(context, runId))).toBe(true);
+        expect(await run(async (context) => await markRunAwaiting(context, siblingRun))).toBe(false);
+
+        expect(await runStatus()).toBe("awaiting");
+
+        const sibling = await run(async (context) => await context.db.get("subAgentRuns", siblingRun));
+
+        expect(sibling).toMatchObject({ status: "failed" });
+        expect(sibling.error).toMatch(ANOTHER_WAITS);
+        // Its request is refused, so the owner is never asked twice for one task.
+        expect(await approvalRow(OTHER_APPROVAL)).toMatchObject({ status: "denied" });
+        expect(await approvalRow(APPROVAL_ID)).toMatchObject({ status: "pending" });
+    });
+
+    it("lets a child the owner already answered wait again while a newer sibling waits", async () => {
+        const { siblingRun } = await seedSibling(TASK);
+
+        expect(await run(async (context) => await markRunAwaiting(context, siblingRun))).toBe(true);
+
+        // This child was answered once and resumed before the sibling waited; it now stops on a second `ask` tool.
+        await run(async (context) => await context.db.patch("subAgentRuns", runId, { resumedBy: "approval-earlier" }));
+
+        expect(await run(async (context) => await markRunAwaiting(context, runId))).toBe(true);
+        expect(await approvalRow(APPROVAL_ID)).toMatchObject({ status: "pending" });
+        expect(await approvalRow(OTHER_APPROVAL)).toMatchObject({ status: "pending" });
+    });
+
+    describe("recording the pause", () => {
+        const notifications = async (): Promise<any[]> => await run(async (context) => await context.db.query("notifications").collect());
+        const record = async (approvalIds: string[], subAgentRunId: Id<"subAgentRuns">, threadId: string): Promise<unknown> =>
+            await internalCall(recordPendingToolApprovals, {
+                approvalIds,
+                awaitingInput: "approval",
+                config: { ...CONFIG(), chainSource: TASK, subAgentRunId },
+                subAgentResumedWith: 0,
+                threadId,
+                userId: OWNER,
+            });
+
+        beforeEach(async () => {
+            // The pause records the requests itself here.
+            await run(async (context) => {
+                const rows = await context.db.query("toolApprovalRuns").collect();
+
+                for (const row of rows) {
+                    await context.db.delete("toolApprovalRuns", row._id);
+                }
+            });
+        });
+
+        it("tells the owner only of the child that waits", async () => {
+            expect(await record([APPROVAL_ID, SIBLING_ID], runId, childId)).toBe(true);
+
+            const { siblingChild, siblingRun } = await seedSibling(TASK, { recorded: false });
+
+            expect(await record([OTHER_APPROVAL], siblingRun, siblingChild)).toBe(false);
+
+            // The refused child's end notifies as any end does (`sub_agent`); only the waiting child asks for an answer.
+            const asked = await notifications();
+
+            expect(asked.filter((row) => row.type === "tool_approval").map((row) => row.dedupeKey)).toStrictEqual([`tool_approval:${APPROVAL_ID}`]);
+            expect(await runStatus()).toBe("awaiting");
+            expect(await run(async (context) => await context.db.get("subAgentRuns", siblingRun))).toMatchObject({ status: "failed" });
+            expect(await approvalRow(OTHER_APPROVAL)).toMatchObject({ status: "denied" });
+            // Nor does the refused child's thread show as waiting.
+            expect(await run(async (context) => await context.db.get("threads", siblingChild))).not.toHaveProperty("awaitingInput");
+        });
+
+        it("accepts an answer the moment the owner is told", async () => {
+            await record([APPROVAL_ID, SIBLING_ID], runId, childId);
+
+            expect(await answer(APPROVAL_ID, "approve")).toMatchObject({ alreadyResolved: false });
+            expect(continuations()).toHaveLength(1);
+        });
+    });
+
+    it("lets a child of a different task wait too", async () => {
+        const { siblingRun } = await seedSibling(OTHER_TASK);
+
+        expect(await run(async (context) => await markRunAwaiting(context, runId))).toBe(true);
+        expect(await run(async (context) => await markRunAwaiting(context, siblingRun))).toBe(true);
+        expect(await approvalRow(OTHER_APPROVAL)).toMatchObject({ status: "pending" });
     });
 });
 
@@ -939,6 +1096,61 @@ describe("a resumed run ended from outside", () => {
         await run(async (context) => await reapSubAgentRun(context, runId, reapAt));
         expect(await runStatus()).toBe("failed");
         expect(stopJobs().map((job) => job.args)).toStrictEqual([{ messageId: APPROVAL_ID, onlyNamed: true, threadId: childId }]);
+    });
+
+    describe("when its continuation pauses again and that pause is refused", () => {
+        const LATER = "approval-later";
+        /** The continuation records a request off the child's latest turn, bound to `resumedWith`. */
+        const recordLater = async (resumedWith: number): Promise<unknown> =>
+            await internalCall(recordPendingToolApprovals, {
+                approvalIds: [LATER],
+                awaitingInput: "approval",
+                config: { ...CONFIG(), subAgentRunId: runId },
+                subAgentResumedWith: resumedWith,
+                threadId: childId,
+                userId: OWNER,
+            });
+        const laterRow = async (): Promise<any> =>
+            await run(
+                async (context) =>
+                    await context.db
+                        .query("toolApprovalRuns")
+                        .withIndex("by_approvalId", (q: any) => q.eq("approvalId", LATER))
+                        .first(),
+            );
+        const asked = async (): Promise<any[]> => {
+            const rows = await run(async (context) => await context.db.query("notifications").collect());
+
+            return rows.filter((row: any) => row.dedupeKey === `tool_approval:${LATER}`);
+        };
+
+        it("ends the run without stopping the continuation's own stream, which closes itself", async () => {
+            const { reapAt } = await runRow();
+
+            // Nothing of the run is left on the child's latest turn: the first pause's other request was answered too.
+            await run(async (context) => {
+                const sibling = await context.db
+                    .query("toolApprovalRuns")
+                    .withIndex("by_approvalId", (q: any) => q.eq("approvalId", SIBLING_ID))
+                    .first();
+
+                await context.db.patch("toolApprovalRuns", sibling._id, { status: "denied" });
+            });
+
+            expect(await recordLater(reapAt)).toBe(false);
+            expect(await runStatus()).toBe("cancelled");
+            expect(stopJobs()).toStrictEqual([]);
+        });
+
+        it("closes the request it recorded and tells nobody, though the refusal ended nothing", async () => {
+            const { reapAt } = await runRow();
+
+            // Bound to an older resume: a newer answer is running the run, which goes on.
+            expect(await recordLater(reapAt - 1)).toBe(false);
+            expect(await runStatus()).toBe("running");
+            expect(await laterRow()).toMatchObject({ resolvedBy: SUB_AGENT_RUN_ENDED_BY, status: "denied" });
+            expect(await asked()).toStrictEqual([]);
+        });
     });
 
     it("stops nothing once the continuation is no longer live, not the owner's reply beside it", async () => {

@@ -800,16 +800,16 @@ describe("runHeadlessAgent pauseForApproval", () => {
         expect(patches.at(-1)).not.toHaveProperty("lastReplyAt");
     });
 
-    it("saves what started the run, so a trigger's child resumes dispatching as the trigger, not as the lead", async () => {
+    it("saves what started the run and its chain, so a task's child resumes dispatching as before, within the task's limit", async () => {
         seen.saved = [approvalRequest];
 
         const ctx = fakeCtx();
 
-        await run(ctx, { origin: "trigger", pauseForApproval: { subAgentRunId: RUN_ID } });
+        await run(ctx, { chainSource: "task:t1", origin: "trigger", pauseForApproval: { subAgentRunId: RUN_ID } });
 
         const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
 
-        expect(recorded!.config.dispatchOrigin).toBe("trigger");
+        expect(recorded!.config).toMatchObject({ chainSource: "task:t1", dispatchOrigin: "trigger" });
     });
 
     it("saves the run's organization, whose cap the continuation reads when the thread has none", async () => {
