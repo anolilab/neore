@@ -40,11 +40,21 @@ describe("createTemporaryThread", () => {
 
 describe("convertTemporaryToPermanent", () => {
     it("files a kept chat under the organization it was started in, so it keeps that organization's cap", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: "owner" }));
         await harness.run(async (ctx: any) => await ctx.runMutation(createTemporaryThread, { capOrganizationId: "org-a", expiresAt: 1, threadId }));
         await harness.run(async (ctx: any) => await ctx.runMutation(convertTemporaryToPermanent, { threadId }));
 
         expect(await thread()).toMatchObject({ organizationId: "org-a" });
         expect(await thread()).not.toHaveProperty("capOrganizationId");
+        expect(await thread()).not.toHaveProperty("isTemporary");
+    });
+
+    it("keeps a chat whose owner left its organization in their personal list, still capped by that organization", async () => {
+        await harness.run(async (ctx: any) => await ctx.runMutation(createTemporaryThread, { capOrganizationId: "org-a", expiresAt: 1, threadId }));
+        await harness.run(async (ctx: any) => await ctx.runMutation(convertTemporaryToPermanent, { threadId }));
+
+        expect(await thread()).toMatchObject({ capOrganizationId: "org-a" });
+        expect(await thread()).not.toHaveProperty("organizationId");
         expect(await thread()).not.toHaveProperty("isTemporary");
     });
 

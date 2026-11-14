@@ -16,6 +16,7 @@ import { deleteGoalsForThread, endActiveGoals, hasLiveStream } from "../chat/goa
  * Thread operations.
  * Migrated from `@neore/backend-agent` component.
  */
+import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { omit } from "../lib/collections";
 import { assert } from "../lib/error-helpers";
 import { patchById, patchRow, withoutUndefined } from "../lib/patch";
@@ -1439,6 +1440,39 @@ export const getTemporaryThreadsByThreadIds = query
         return Object.fromEntries(expiresAtMap);
     });
 
+/**
+ * Where a lasting chat made from `source` (a saved temporary chat, or a branch) goes. One started in an organization is filed
+ * under it while the owner is still a member, as a lasting chat started there is, so it keeps that organization's cap. Once the
+ * owner has left, filing it there would hide it from every list they can open: it stays in their personal list and keeps the
+ * cap through `capOrganizationId`. Membership is read from the primary, as the other left-member checks are.
+ */
+const placeLastingChat = async (
+    ctx: MutationContext | QueryContext,
+    source: Pick<Doc<"threads">, "capOrganizationId" | "organizationId" | "userId">,
+): Promise<{ capOrganizationId?: string; organizationId?: string }> => {
+    if (source.organizationId) {
+        return { organizationId: source.organizationId };
+    }
+
+    if (!source.capOrganizationId) {
+        return {};
+    }
+
+    const member = source.userId ? await getMemberByOrganizationAndUser(ctx, source.capOrganizationId, source.userId, "primary") : null;
+
+    return member ? { organizationId: source.capOrganizationId } : { capOrganizationId: source.capOrganizationId };
+};
+
+/** `placeLastingChat` for an action that makes a lasting chat from a thread (`chat/functions.ts#branchThread`). */
+export const lastingChatPlacement = internalQuery
+    .input({ threadId: v.id("threads") })
+    .output(v.object({ capOrganizationId: v.optional(v.string()), organizationId: v.optional(v.string()) }))
+    .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get("threads", args.threadId);
+
+        return thread ? await placeLastingChat(ctx, thread) : {};
+    });
+
 export const convertTemporaryToPermanent = internalMutation
     .input({ threadId: v.id("threads") })
     .output(v.null())
@@ -1453,15 +1487,10 @@ export const convertTemporaryToPermanent = internalMutation
         }
 
         const thread = await ctx.db.get("threads", args.threadId);
+        const placement = thread ? await placeLastingChat(ctx, thread) : {};
 
         await ctx.db.delete("temporaryThreads", temporaryThread._id);
-        // A kept chat started in an organization is filed under it, as a lasting chat started there is, so it keeps that
-        // organization's cap and switching spaces cannot lift it.
-        await patchById(ctx.db, "threads", args.threadId, {
-            capOrganizationId: undefined,
-            isTemporary: undefined,
-            ...(!thread?.organizationId && thread?.capOrganizationId && { organizationId: thread.capOrganizationId }),
-        });
+        await patchById(ctx.db, "threads", args.threadId, { capOrganizationId: undefined, isTemporary: undefined, ...placement });
 
         return null;
     });

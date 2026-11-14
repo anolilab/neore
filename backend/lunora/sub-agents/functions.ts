@@ -281,7 +281,7 @@ export const admitSubAgentRun = async (
             createdAt: now,
             depth,
             dispatchedBy: args.dispatchedBy ?? "lead",
-            organizationId: parent.organizationId ?? args.organizationId,
+            organizationId: parent.organizationId ?? parent.capOrganizationId ?? args.organizationId,
             parentModel: args.parentModel,
             parentThreadId: parent._id,
             skillSlug,
@@ -861,7 +861,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
             createdAt: now,
             // A host worker runs on its agent, not on a cloud model.
             model: host ? host.offer.agentKey : model,
-            organizationId: parent.organizationId ?? args.organizationId,
+            organizationId: parent.organizationId ?? parent.capOrganizationId ?? args.organizationId,
             ...(host && { runner: "host" as const }),
             status: "active",
             tags: ["sub-agent", "worker"],
@@ -906,7 +906,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
         dispatchedBy: args.dispatchedBy ?? "lead",
         mode: "worker",
         // An existing worker keeps the organization its thread was stamped with, so a follow-up is capped as the first run was.
-        organizationId: child?.organizationId ?? parent.organizationId ?? args.organizationId,
+        organizationId: child?.organizationId ?? parent.organizationId ?? parent.capOrganizationId ?? args.organizationId,
         parentModel: args.parentModel,
         parentThreadId: parent._id,
         runner: origin?.runner ?? (host ? { deviceId: host.device._id, kind: "host" } : { kind: "headless" }),

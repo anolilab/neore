@@ -16486,6 +16486,9 @@
                               "autoModel": {
                                 "type": "boolean"
                               },
+                              "capOrganizationId": {
+                                "type": "string"
+                              },
                               "category": {
                                 "type": "string"
                               },
@@ -16636,9 +16639,6 @@
                                 ]
                               },
                               "botId": {
-                                "type": "string"
-                              },
-                              "capOrganizationId": {
                                 "type": "string"
                               },
                               "contextResetMessageId": {
@@ -19251,6 +19251,9 @@
                       "autoModel": {
                         "type": "boolean"
                       },
+                      "capOrganizationId": {
+                        "type": "string"
+                      },
                       "category": {
                         "type": "string"
                       },
@@ -19401,9 +19404,6 @@
                         ]
                       },
                       "botId": {
-                        "type": "string"
-                      },
-                      "capOrganizationId": {
                         "type": "string"
                       },
                       "contextResetMessageId": {

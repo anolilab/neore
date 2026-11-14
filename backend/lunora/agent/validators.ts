@@ -646,6 +646,9 @@ export type MessageDoc = Infer<typeof vMessageDoc>; // Public
  */
 export const vThreadCreateFields = {
     autoModel: v.optional(v.boolean()),
+    // A temporary chat's organization, for its cap alone: written by `agent/threads.ts#createTemporaryThread`, and kept on a
+    // lasting chat made from it when the owner has left that organization (`agent/threads.ts#lastingChatPlacement`).
+    capOrganizationId: v.optional(v.string()),
     category: v.optional(v.string()), // Auto-categorized thread topic
     createdBy: v.optional(v.string()),
     customSystemPrompt: v.optional(v.string()),
@@ -693,8 +696,6 @@ export const vThreadDocFields = {
     awaitingInput: v.optional(v.union(v.literal("approval"), v.literal("question"))),
     // Written once by `chat/functions.ts#createThread`, which checks the bot belongs to the caller.
     botId: v.optional(v.string()),
-    // Written only by `agent/threads.ts#createTemporaryThread`: a temporary chat's organization, for its cap alone.
-    capOrganizationId: v.optional(v.string()),
     contextResetMessageId: v.optional(v.string()),
     createdAt: v.optional(v.number()),
     // Written only by a hard delete's first page (`agent/threads.ts`): the thread is going, so not a create or patch field.

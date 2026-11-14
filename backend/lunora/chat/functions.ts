@@ -3763,8 +3763,8 @@ export const branchThread = authAction
             throw new LunoraError("BAD_REQUEST", "Parent thread is missing model");
         }
 
-        // A branch is a lasting chat: one taken from a temporary chat started in an organization is filed under it, as saving it would be.
-        const organizationId = parentThread.organizationId ?? parentThread.capOrganizationId;
+        // A branch is a lasting chat: one taken from a temporary chat started in an organization is placed as saving it would be.
+        const placement = await context.runQuery(internal.agent.threads.lastingChatPlacement, { threadId: threadId as Id<"threads"> });
 
         // Resolved along the ACTIVE path: a branched thread also stores
         // off-path siblings, which a raw row index would count.
@@ -3782,8 +3782,8 @@ export const branchThread = authAction
         // Create the new thread
         const newThread = await context.runMutation(internal.agent.threads.createThread, {
             language,
+            ...placement,
             model,
-            organizationId,
             title: branchName || "",
             userId,
         });
