@@ -345,3 +345,18 @@ describe("paste input: review cases, thirteenth round", () => {
         expect(list.outerHTML).toBe("<ol>note<li>a</li></ol>");
     });
 });
+
+describe("paste input: review cases, fourteenth round", () => {
+    it("parts a div that holds a block inside an inline wrapper from the next line", () => {
+        expect(convert("<div><span><p>a</p></span></div><div>b</div>")).toBe("a\n\nb");
+    });
+
+    it("counts nothing for the destination of a link written as its text alone", () => {
+        expect(convert(`${"<b>".repeat(450)}<a href="javascript:${"a".repeat(50_000)}">label</a>`)).toContain("label");
+    });
+
+    it("keeps each blank line of break-only divs side by side", () => {
+        expect(convert("<div>a</div><div><br></div><div><br></div><div>b</div>")).toBe("a\n\n\nb");
+        expect(convert("<div>two</div><div><br></div><div>four</div>")).toBe("two\n\nfour");
+    });
+});

@@ -3,6 +3,7 @@
  * and formatting would rebuild the same lines over and over, is refused with a RangeError: the caller pastes its plain
  * text instead. Text placed straight in a list, outside any item, becomes an item of its own.
  */
+import { isUnsafeDestination } from "./commonmark-rules";
 import { isBlock } from "./utilities";
 
 /** Elements deep the conversion goes, well before the stack runs out. A table and its cell count as one level. */
@@ -195,7 +196,8 @@ function writtenLength(element: Element, shown: Shown): number {
         return shown.mathText(element).length;
     }
 
-    if (element.nodeName === "A") {
+    // A link to an unsafe destination is written as its text alone: its destination and title cost nothing.
+    if (element.nodeName === "A" && !isUnsafeDestination(element.getAttribute("href") ?? "")) {
         return (element.getAttribute("href")?.length ?? 0) + (element.getAttribute("title")?.length ?? 0);
     }
 

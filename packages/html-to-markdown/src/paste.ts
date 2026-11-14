@@ -400,22 +400,50 @@ function hasScriptStructure(node: Element): boolean {
 }
 
 /**
- * The blank lines of a div that holds only line breaks: one per break, as the page shows them. The first is the
- * break between blocks; the others are kept by marks, which the end of the conversion takes out.
+ * The blank lines of a div that holds only line breaks: one per break, as the page shows them. Each is a mark line,
+ * which the end of the conversion takes out, so the blank lines of divs side by side are not joined into one.
  */
 function blankLines(breaks: number): string {
-    return breaks === 0 ? "" : `\n${`${LINE_BREAK_MARK}\n`.repeat(breaks - 1)}\n`;
+    return breaks === 0 ? "" : `\n${`${LINE_BREAK_MARK}\n`.repeat(breaks)}`;
 }
 
-/** True when one of the element's children is a block, which starts a line of its own. */
+// Each div's answer, found once: its rule's filter may be asked more than once.
+const blockHolders = new WeakMap<Element, boolean>();
+
+/** True when the element holds a block the page shows, which starts a line of its own. */
 function hasBlockChild(element: Element): boolean {
-    for (let child = element.firstElementChild; child; child = child.nextElementSibling) {
-        if (child.nodeName !== "BR" && isBlock(child)) {
-            return true;
+    const known = blockHolders.get(element);
+
+    if (known !== undefined) {
+        return known;
+    }
+
+    // A block the page shows, at any depth: one inside an inline wrapper starts a line of its own too. The walk stops
+    // at the first block, so a div of divs is read no deeper than its first.
+    const pending: Element[] = [];
+    let hasBlock = false;
+
+    for (let child = element.lastElementChild; child; child = child.previousElementSibling) {
+        pending.push(child);
+    }
+
+    while (!hasBlock && pending.length > 0) {
+        const current = pending.pop() as Element;
+
+        if (current.nodeName === "BR" || isHiddenElement(current)) {
+            continue;
+        }
+
+        hasBlock = isBlock(current);
+
+        for (let child = current.lastElementChild; !hasBlock && child; child = child.previousElementSibling) {
+            pending.push(child);
         }
     }
 
-    return false;
+    blockHolders.set(element, hasBlock);
+
+    return hasBlock;
 }
 
 /** A media type without its parameters, in lower case: `application/x-tex; charset=utf-8` is `application/x-tex`. */
