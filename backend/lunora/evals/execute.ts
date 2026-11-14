@@ -33,6 +33,7 @@ import { gatewayFetch, type ServiceFetch } from "../lib/services";
 import { sumMessageCosts } from "../agent/message-cost";
 import { getMaxSteps } from "../chat/lib/auto-continue";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
+import { chainSourceKey } from "../sub-agents/logic";
 import { resolveTaskModel } from "../tasks/logic";
 import type { vCaseOutcome } from "./internal";
 import type { JudgeVerdict } from "./judge";
@@ -250,6 +251,8 @@ const evaluateCase = async (ctx: ActionCtx, claim: Claim, onThread: (threadId: s
                 throw new EvalCaseError("This account is being deleted.");
             }
         },
+        // An eval's sub-agents keep the headless rule: an `ask` tool is refused, nothing waits for the owner.
+        chainSource: chainSourceKey("eval", claim.resultId),
         maxSteps: getMaxSteps(false),
         memory: false,
         model,

@@ -5,19 +5,33 @@ detail. Paths are relative to `backend/lunora/`.
 
 ## WHO A CHILD WAITS FOR
 
-- **Every one-shot child pauses for approval**, whatever started its chain (`sub-agents/execute.ts`, `pauseForApproval`
-  for every non-worker run). The unattended parent (a task round, a trigger run, a messenger reply) still drops its own
-  `ask` tools: only the child it delegated to can wait, because the parent's delegate call returned at admission.
+- **A one-shot child pauses for approval** when the owner's chat or a task started its chain (`sub-agents/execute.ts`,
+  `pauseForApproval` for every non-worker run outside an eval's chain). The task round itself still drops its own `ask`
+  tools: only the child it delegated to can wait, because the parent's delegate call returned at admission. A task round
+  has `delegateToSubAgent` only when its owner set the tool to `auto` (a headless run drops `ask`).
+  - **Who cannot start a chain**: a trigger run gets no tools, or only the bot's shell and file tools
+    (`triggers/execute.ts`); a messenger reply's tool groups never include sub-agents (`messenger/lib/reply-tools.ts`);
+    an outside agent's run turns the sub-agent tools off (`chat/lib/tool-permissions.ts`). A trigger still names itself
+    on the chain, so the rule below holds if its tools ever widen.
+  - **An eval's chain never waits** (`chainSource` `eval:<resultId>`, `chainPausesForApproval`): an eval measures one
+    headless answer, so its child refuses an `ask` tool as any headless run does.
+  - **One waiting child per source.** Each task or trigger run starts a fresh thread, so the per-thread cap of 3 never
+    fills across runs. The run names its source (`runHeadlessAgent({ chainSource })` → `ToolCtx.chainSource` →
+    `subAgentRuns.chainSource`, `task:<taskId>` / `trigger:<triggerId>`), a nested child inherits it, and while a run of
+    that source is `awaiting` (`by_chainSource_and_status`) its next delegation is refused with `chainWaitProblem`, which
+    the delegating run reads as the tool's error. Runs a single round admits before any of them waits can all wait (at most
+    3, the per-thread cap). The pause's snapshot does not keep the source: a resumed child's own sub-agents fall back to
+    the per-thread cap. A chat-started chain has only the per-thread cap.
   - **The owner is told** by the pause itself: `recordPendingToolApprovals` writes a `tool_approval` (or `ask_user`,
     `secret_request`) notification to the child thread's owner, linking to the child's thread, plus the phone push and the
-    four-hour reminder. No sub-agent-specific notice; the dedupe key is the approval id.
+    four-hour reminder; the dedupe key is the approval id. A sub-agent's pause names who started its chain in the body
+    (`chainStarterLabel`: "a task", "a trigger", else the dispatch source); the owner's own chat adds none.
   - **Where it shows**: the child's thread (answer there), the parent conversation's `listSubAgentApprovals` card (the task
-    run's or trigger run's thread), and the bell. The snapshot keeps `dispatchOrigin`, so an answered child still
-    dispatches as the trigger, not as the lead.
-  - **Tasks and triggers are not held.** The round ends on its own answer (`completeRound`), the recurrence sweep reads
-    only the task's own status, so the next slot runs as usual; the child's result posts back to the round's thread when it
-    ends (`postRunResult`). A waiting child keeps one of its parent thread's 3 fan-out slots, so a `continue_thread` task
-    with 3 children waiting gets its next delegation refused until one is answered or expires.
+    run's thread), and the bell. The snapshot keeps `dispatchOrigin`, so an answered child still dispatches as the task's
+    unattended origin, not as the lead.
+  - **Tasks are not held.** The round ends on its own answer (`completeRound`), the recurrence sweep reads only the task's
+    own status, so the next slot runs as usual; the child's result posts back to the round's thread when it ends
+    (`postRunResult`).
   - **Timeout**: the request's own expiry (`PENDING_APPROVAL_TTL_MS`, 7 days) reaps the run with
     `SUB_AGENT_APPROVAL_EXPIRED_MESSAGE`, posted back to the parent.
 

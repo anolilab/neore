@@ -24168,6 +24168,12 @@
           "optional": true,
           "unique": false
         },
+        "chainSource": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "childThreadId": {
           "kind": "string",
           "nullable": false,
@@ -24492,6 +24498,13 @@
         }
       },
       "indexes": {
+        "by_chainSource_and_status": {
+          "fields": [
+            "chainSource",
+            "status"
+          ],
+          "unique": false
+        },
         "by_childThreadId": {
           "fields": [
             "childThreadId"

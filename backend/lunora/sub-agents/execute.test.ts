@@ -191,8 +191,19 @@ describe("whether a child may pause for its owner", () => {
         expect(await oneShot({ depth: 2 })).toMatchObject({ withheldTools: ["delegateToSubAgent", "messageWorker"] });
     });
 
-    it.each(["trigger", "messenger", "outside_agent"])("pauses a one-shot child of a chain started by %s, which keeps its origin", async (dispatchedBy) => {
-        expect(await oneShot({ dispatchedBy })).toMatchObject({ origin: dispatchedBy, pauseForApproval: { subAgentRunId: expect.any(String) } });
+    it("pauses a one-shot child of a task's chain, which keeps its origin and passes the task on to what it starts", async () => {
+        expect(await oneShot({ chainSource: "task:t1", dispatchedBy: "trigger" })).toMatchObject({
+            chainSource: "task:t1",
+            origin: "trigger",
+            pauseForApproval: { subAgentRunId: expect.any(String) },
+        });
+    });
+
+    it("never pauses a child of an eval's chain: its `ask` tools are refused as in any headless run", async () => {
+        const options = await oneShot({ chainSource: "eval:r1", dispatchedBy: "trigger" });
+
+        expect(options).toMatchObject({ chainSource: "eval:r1", origin: "trigger" });
+        expect(options).not.toHaveProperty("pauseForApproval");
     });
 
     it("never pauses a worker", async () => {

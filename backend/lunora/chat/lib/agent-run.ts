@@ -257,6 +257,11 @@ export const setResearchDepth = (ctx: object, researchDepth: ResearchDepth): voi
     (ctx as { researchDepth?: ResearchDepth }).researchDepth = researchDepth;
 };
 
+/** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `chainSource`; the action ctx has no such field. */
+export const setChainSource = (ctx: object, chainSource: string | undefined): void => {
+    (ctx as { chainSource?: string }).chainSource = chainSource;
+};
+
 /** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `dispatchOrigin`; the action ctx has no such field. */
 export const setDispatchOrigin = (ctx: object, origin: DispatchOrigin): void => {
     (ctx as { dispatchOrigin?: DispatchOrigin }).dispatchOrigin = origin;

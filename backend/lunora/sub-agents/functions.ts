@@ -83,6 +83,7 @@ import {
     resultContent,
     DISPATCH_SOURCES,
     type DispatchSource,
+    chainWaitProblem,
     dispatchSourceProblem,
     distinctChildCount,
     INTERRUPTED_RUN_MESSAGE,
@@ -124,6 +125,8 @@ import { vDispatchSource, vHostRunnerRequest, vSubAgentRunMode, vSubAgentRunStat
 type RunDoc = Doc<"subAgentRuns">;
 
 export interface CreateSubAgentRunArgs {
+    /** The task, trigger or eval run whose chain this is (`chainSourceKey`); unset for the owner's chat. */
+    chainSource?: string;
     /** Who sent the dispatch; a lead's own call when unset. */
     dispatchedBy?: DispatchSource;
     /** The organization that capped the dispatching run; used when the parent thread has no stored organization. */
@@ -258,6 +261,19 @@ export const admitSubAgentRun = async (
         return { error: capProblem };
     }
 
+    const waiting =
+        args.chainSource === undefined
+            ? null
+            : await ctx.db
+                  .query("subAgentRuns")
+                  .withIndex("by_chainSource_and_status", (q) => q.eq("chainSource", args.chainSource!).eq("status", "awaiting"))
+                  .first();
+    const chainProblem = chainWaitProblem(args.chainSource, waiting !== null);
+
+    if (chainProblem) {
+        return { error: chainProblem };
+    }
+
     // The organization the run is stamped with: the lead chat's, or the one a temporary lead chat was started in, else the caller's.
     const organizationId = parent.organizationId ?? parent.capOrganizationId ?? args.organizationId;
     const leftOrganization = await membershipRefusal(ctx, organizationId, args.userId);
@@ -280,6 +296,7 @@ export const admitSubAgentRun = async (
 
     return {
         row: {
+            ...(args.chainSource !== undefined && { chainSource: args.chainSource }),
             createdAt: now,
             depth,
             dispatchedBy: args.dispatchedBy ?? "lead",
@@ -952,6 +969,7 @@ export const dispatchWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): 
 
 export const createRun = internalMutation
     .input({
+        chainSource: v.optional(v.string().max(200)),
         dispatchedBy: vDispatchSource,
         // Set by a headless run's tool call: nobody there can approve a message to a computer.
         headless: v.optional(v.boolean()),
@@ -973,14 +991,15 @@ export const createRun = internalMutation
         userId: v.string(),
     })
     .output(v.union(v.object({ runId: v.id("subAgentRuns"), workerId: v.optional(v.string()) }), v.object({ error: v.string() })))
-    .mutation(async ({ args: { host, persistent, ...args }, ctx }) => {
+    .mutation(async ({ args: { chainSource, host, persistent, ...args }, ctx }) => {
+        // A worker never waits for approval, so it carries no chain source.
         if (persistent) {
             const dispatched = await dispatchWorkerRun(ctx, { ...args, ...(host && { runner: { ...host, kind: "host" as const } }) });
 
             return "error" in dispatched ? { error: dispatched.error } : { runId: dispatched.runId, workerId: dispatched.workerId };
         }
 
-        const admitted = await admitSubAgentRun(ctx, args);
+        const admitted = await admitSubAgentRun(ctx, { ...args, ...(chainSource !== undefined && { chainSource }) });
 
         if ("error" in admitted) {
             return admitted;
@@ -1115,6 +1134,7 @@ export const claimRun = internalMutation
     .output(
         v.union(
             v.object({
+                chainSource: v.optional(v.string()),
                 childThreadId: v.optional(v.string()),
                 clientId: v.optional(v.string()),
                 depth: v.number(),
@@ -1152,6 +1172,7 @@ export const claimRun = internalMutation
         const worker = run.mode === "worker" && run.childThreadId ? await ctx.db.get("threads", run.childThreadId as Id<"threads">) : null;
 
         return {
+            ...(run.chainSource !== undefined && { chainSource: run.chainSource }),
             ...(run.childThreadId !== undefined && { childThreadId: run.childThreadId }),
             ...(run.clientId !== undefined && { clientId: run.clientId }),
             depth: run.depth,

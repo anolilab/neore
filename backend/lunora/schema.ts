@@ -2681,6 +2681,9 @@ export const schema = defineSchema({
         // The last heartbeat of a cloud run's loop (`sub-agents/execute.ts`): a running run whose beat goes stale died
         // with its worker, and `watchRunBeat` ends it. Unset until the first beat; `startedAt` stands in for it.
         beatAt: v.optional(v.number()),
+        // The task, trigger or eval run whose chain this run belongs to (`sub-agents/logic.ts:chainSourceKey`); unset for a
+        // chain the owner's chat started. One waiting child per source (`chainWaitProblem`); an eval's chain never waits.
+        chainSource: v.optional(v.string()),
         childThreadId: v.optional(v.string()),
         // Set on a run the user typed into a worker thread (`dispatchToWorker`); the dedupe key of that dispatch.
         clientId: v.optional(v.string()),
@@ -2743,6 +2746,8 @@ export const schema = defineSchema({
         .index("by_user_and_status", ["userId", "status"])
         .index("by_user_and_toolCallId", ["userId", "toolCallId"])
         .index("by_user_and_createdAt", ["userId", "createdAt"])
+        // A chain source's waiting child, which refuses that source's next delegation (`admitSubAgentRun`).
+        .index("by_chainSource_and_status", ["chainSource", "status"])
         // The retention sweep (`gdpr/retention.ts`), which serves a whole shard.
         .index("by_createdAt", ["createdAt"]),
 

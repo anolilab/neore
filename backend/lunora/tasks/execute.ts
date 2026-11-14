@@ -24,6 +24,7 @@ import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { wrapUntrusted } from "../coding-agents/agent-output";
+import { chainSourceKey } from "../sub-agents/logic";
 import type { VerifierVerdict } from "./logic";
 import { buildTaskPrompt, buildVerifierPrompt, isPassingFallback, parseVerifierOutput, resolveTaskModel, VERIFIER_SYSTEM_PROMPT } from "./logic";
 import { stopsRecurrence, TaskRunError, taskErrorMessage } from "./run-error";
@@ -160,6 +161,7 @@ const runAgent = async (
 
     const { text, threadId } = await runHeadlessAgent(ctx, {
         beforeThread: ensureAccountLive,
+        chainSource: chainSourceKey("task", round.taskId),
         ...(claim.freshContext && "threadId" in thread && { freshContext: true }),
         memory: false,
         model,

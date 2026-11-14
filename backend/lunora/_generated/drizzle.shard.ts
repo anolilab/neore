@@ -1367,6 +1367,7 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     beatAt: real("beatAt"),
+    chainSource: text("chainSource"),
     childThreadId: text("childThreadId"),
     clientId: text("clientId"),
     completedAt: real("completedAt"),
@@ -1405,6 +1406,7 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     by_user_and_status: index("by_user_and_status").on(t.userId, t.status),
     by_user_and_toolCallId: index("by_user_and_toolCallId").on(t.userId, t.toolCallId),
     by_user_and_createdAt: index("by_user_and_createdAt").on(t.userId, t.createdAt),
+    by_chainSource_and_status: index("by_chainSource_and_status").on(t.chainSource, t.status),
     by_createdAt: index("by_createdAt").on(t.createdAt),
 }));
 

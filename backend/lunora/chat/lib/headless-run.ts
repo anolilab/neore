@@ -46,6 +46,7 @@ import {
     resolveBackupModelId,
     resolveRunModel,
     retrieveMemoryContext,
+    setChainSource,
     setDispatchOrigin,
     setHeadlessRun,
     setRunOrganizationId,
@@ -91,6 +92,12 @@ export interface HeadlessRunOptions {
     beforeThread?: () => Promise<void>;
     /** The bot the run is for: its memories are read and written in that bot's scope. Unset = the user's own. */
     botId?: string;
+    /**
+     * The task, trigger or eval run whose sub-agent chain this is (`sub-agents/logic.ts:chainSourceKey`): a sub-agent this run
+     * starts carries it, so the source has one child waiting at most, and an eval's chain never waits. Not in the pause's
+     * snapshot: a resumed child's own sub-agents fall back to the per-thread cap.
+     */
+    chainSource?: string;
     /**
      * Send the model none of the thread's earlier turns, only this run's prompt: a scheduled task that
      * reuses one thread with a fresh context per run (`tasks/AGENTS.md`). The history stays in the thread.
@@ -286,6 +293,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
     try {
         setResearchDepth(ctx, "balanced");
         setDispatchOrigin(ctx, options.origin);
+        setChainSource(ctx, options.chainSource);
         setHeadlessRun(ctx);
         setRunOrganizationId(ctx, options.organizationId);
 

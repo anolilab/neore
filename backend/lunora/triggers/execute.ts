@@ -21,6 +21,7 @@ import { isLeftOrganizationRefusal, isModelUnavailableRefusal, PERMANENT_RUN_ERR
 import { releaseRetryDelayMs } from "../lib/claim-once";
 import { filterTextOf } from "./filters";
 import { eventInputMessage } from "./event-sources";
+import { chainSourceKey } from "../sub-agents/logic";
 import { canBeQuiet, isQuietRunSkipped, TRIGGER_THREAD_TAG } from "./quiet";
 import { MAX_PAYLOAD_LENGTH, randomFrameId, renderWebhookPrompt, sliceUnits } from "./webhook-template";
 
@@ -356,6 +357,7 @@ export const executeTrigger = internalAction
 
             const { text: responseText, threadId } = await runHeadlessAgent(ctx, {
                 botId: bot ? trigger.botId : undefined,
+                chainSource: chainSourceKey("trigger", triggerId),
                 memory: true,
                 model,
                 onGenerationStart: () => {

@@ -79,6 +79,7 @@ This tool returns as soon as the sub-agent has started. Its result is posted to 
 
         const parentModel = parentModelOf(context);
         const created = await context.runMutation(internal.sub_agents.functions.createRun, {
+            ...(context.chainSource !== undefined && { chainSource: context.chainSource }),
             dispatchedBy: context.dispatchOrigin,
             // A headless run cannot be asked to approve: a worker on a computer is out of its reach (checked at admission).
             ...(context.headless && { headless: true }),

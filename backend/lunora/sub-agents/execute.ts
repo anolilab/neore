@@ -34,6 +34,7 @@ import { isTaskModelAllowed } from "../tasks/logic";
 import {
     buildSubAgentPrompt,
     canNest,
+    chainPausesForApproval,
     MESSAGE_WORKER_TOOL_NAME,
     originOfRun,
     resolveSubAgentModel,
@@ -121,6 +122,7 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             // grant is withheld, and the tools with it (`withheldTools` below).
             ...(canNest(claim.depth) && { approvedTools: [SUB_AGENT_TOOL_NAME, MESSAGE_WORKER_TOOL_NAME] }),
             beforeThread: assertCanRun,
+            ...(claim.chainSource !== undefined && { chainSource: claim.chainSource }),
             keepThreadStatus: worker !== undefined,
             memory: false,
             model,
@@ -139,12 +141,13 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             },
             // A nested dispatch carries what reached this run, so an unattended chain is not read as the lead's own.
             origin: originOfRun(claim.dispatchedBy),
-            // Every one-shot child keeps the tools its owner set to `ask` and pauses on them, whatever started its chain (the
-            // owner's turn, a task, a trigger, a messenger reply, an outside agent): the pause notifies the owner
-            // (`recordPendingToolApprovals`), who answers on the child's thread. A worker's are removed, as before. The depth
+            // A one-shot child keeps the tools its owner set to `ask` and pauses on them, whether the owner's turn, a task or a
+            // trigger started its chain: the pause notifies the owner (`recordPendingToolApprovals`), who answers on the child's
+            // thread. A worker's are removed, as before, and so are those of an eval's chain, which measures a headless answer
+            // (`chainPausesForApproval`). The depth
             // cap limits delegation only: a child there keeps its other `ask` tools, but the dispatch tools are withheld
             // rather than left to ask for a nesting that would be refused.
-            ...(claim.mode !== "worker" && { pauseForApproval: { subAgentRunId: runId } }),
+            ...(claim.mode !== "worker" && chainPausesForApproval(claim.chainSource) && { pauseForApproval: { subAgentRunId: runId } }),
             ...(!canNest(claim.depth) && { withheldTools: [SUB_AGENT_TOOL_NAME, MESSAGE_WORKER_TOOL_NAME] }),
             personalization: "full",
             // A message the user typed into the worker's thread is the prompt as written.

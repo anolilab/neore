@@ -63,6 +63,7 @@ import { REQUEST_SECRET_TOOL_NAME } from "./tools/request-secret-constants";
 import { assertRunHeld, vRunHold } from "./lib/run-epoch";
 import { APPROVAL_REMINDER_SCHEDULE_DELAY_MS } from "./lib/approval-reminder";
 import { runAfterOnShard } from "../lib/shard-scheduler";
+import { chainStarterLabel } from "../sub-agents/logic";
 
 const vToolPermissionMode = v.union(v.literal("auto"), v.literal("ask"), v.literal("off"));
 const vToolPermissions = v.record(v.string(), vToolPermissionMode);
@@ -800,8 +801,12 @@ export const recordPendingToolApprovals = internalMutation
             }
 
             const key = secret ?? question ?? first;
+            // A sub-agent's pause says who started its chain, so the owner knows a task or a trigger is asking.
+            const subAgentRun = config.subAgentRunId ? await ctx.db.get("subAgentRuns", config.subAgentRunId) : null;
+            const starter = subAgentRun ? chainStarterLabel(subAgentRun) : undefined;
 
             await notifyQuietly(ctx, {
+                ...(starter !== undefined && { body: `A sub-agent started by ${starter} is waiting for you.` }),
                 dedupeKey: `${type}:${key}`,
                 link: `/chat/${threadId}`,
                 title: thread?.title ?? "Chat",
