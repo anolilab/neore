@@ -66,7 +66,8 @@ export const devicePushPlatform: PushPlatform = {
 /** Whether this build's background task is registered: the phone builds its own Android alerts only while it is. */
 const isPhoneTaskRegistered = async (): Promise<boolean> => {
     try {
-        // The first registration can run before the task has registered: wait for that attempt, or the phone reads as built without it.
+        // The first registration can run before the task has registered: wait for that attempt, or the phone
+        // reads as built without it.
         await pushTaskRegistration();
 
         return await isTaskRegisteredAsync(PHONE_PUSH_TASK);
