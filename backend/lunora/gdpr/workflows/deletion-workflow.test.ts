@@ -534,6 +534,11 @@ describe("account deletion workflow: usage exports", () => {
         expect(purges.map((entry) => entry.args["force"])).toStrictEqual([false, false, false]);
         expect(sleeps).toStrictEqual(["1 minute", "1 minute"]);
         expect(completionIndex()).toBeGreaterThan(-1);
+        // Completion is recorded only after the final purge, so the request is never complete while a purge is still pending.
+        const lastPurgeAt = trace.findLastIndex((entry) => entry.kind === "run" && isPurge(entry.ref));
+
+        expect(lastPurgeAt).toBeGreaterThan(-1);
+        expect(completionIndex()).toBeGreaterThan(lastPurgeAt);
     });
 
     it("follows the purge's cursor from call to call, so every page of keyed runs is purged before erasure completes", async () => {

@@ -430,3 +430,42 @@ export const remainderOf = (total: UsageTotals, projects: ReadonlyArray<UsageTot
         tokens: Math.max(0, total.tokens - filed.tokens),
     };
 };
+
+/** One rollup row as the account export shows it: a skill's day, or a project's day, which names its project instead. */
+export interface ExportedUsageRow {
+    costMicrodollars: number;
+    date: string;
+    project?: string;
+    /** The project's title, only where the user can open the project. */
+    projectTitle?: string;
+    replies: number;
+    skill?: string;
+    tokens: number;
+}
+
+export const exportedUsageRow = (row: {
+    costMicrodollars: number;
+    date: string;
+    projectKey?: string;
+    replies: number;
+    skillKey: string;
+    skillName?: string;
+    tokens: number;
+}): ExportedUsageRow => {
+    const { costMicrodollars, date, replies, tokens } = row;
+
+    return row.projectKey === undefined
+        ? { costMicrodollars, date, replies, skill: row.skillName ?? row.skillKey, tokens }
+        : { costMicrodollars, date, project: row.projectKey, replies, tokens };
+};
+
+/**
+ * The export's rows with each project's title, where the title was read (`titles` holds only projects the user can open).
+ * A row whose project has no title is kept as it is, by its id.
+ */
+export const nameExportedRows = (rows: ReadonlyArray<ExportedUsageRow>, titles: ReadonlyMap<string, string>): ExportedUsageRow[] =>
+    rows.map((row) => {
+        const title = row.project === undefined ? undefined : titles.get(row.project);
+
+        return title === undefined ? row : { ...row, projectTitle: title };
+    });

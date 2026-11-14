@@ -1,6 +1,8 @@
 import { LunoraError, v } from "lunorash/server";
 
-import { PROJECT_SKILL_KEY } from "../usage/activity-logic";
+import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-steps";
+import { readStoredText } from "../lib/storage-read";
+import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { collectAllRepositories } from "../projects/export-pages";
@@ -420,24 +422,15 @@ const MAX_EXPORT_BYTES = 32 * 1024 * 1024;
 const TRIGGER_EXPORT_BYTES = 8 * 1024 * 1024;
 
 /**
- * Usage history, sub-agent delegations (their task text and results) and
- * knowledge collections — user data the export used to leave out.
+ * Sub-agent delegations (their task text and results) and knowledge
+ * collections — user data the export used to leave out. The usage rollup is
+ * read a page at a time by `generateExportFile`, not here.
  */
 export const collectActivityForExport = internalQuery
     .input({ userId: v.string() })
-    .output(v.object({ knowledgeCollections: v.array(v.any()), subAgentRuns: v.array(v.any()), usageDaily: v.array(v.any()) }))
+    .output(v.object({ knowledgeCollections: v.array(v.any()), subAgentRuns: v.array(v.any()) }))
     .query(async ({ args: { userId }, ctx: context }) => {
-        // Project rows are read on their own, under their own cap, so they never crowd the day and skill rows out of it.
-        const [{ page: dayAndSkillRows }, projectRows, subAgentRuns, { page: collections }] = await Promise.all([
-            context.db.usageDaily.findMany({
-                limit: EXPORT_ACTIVITY_CAP,
-                orderBy: [{ date: "asc" }],
-                where: { skillKey: { ne: PROJECT_SKILL_KEY }, userId },
-            }),
-            context.db
-                .query("usageDaily")
-                .withIndex("by_user_skill_date", (q) => q.eq("userId", userId).eq("skillKey", PROJECT_SKILL_KEY))
-                .take(EXPORT_ACTIVITY_CAP),
+        const [subAgentRuns, { page: collections }] = await Promise.all([
             context.db
                 .query("subAgentRuns")
                 .withIndex("by_user_and_createdAt", (q) => q.eq("userId", userId))
@@ -470,15 +463,6 @@ export const collectActivityForExport = internalQuery
                     task: run.task,
                 };
             }),
-            // In date order, project rows among the day and skill rows of their day.
-            usageDaily: [...dayAndSkillRows, ...projectRows]
-                .toSorted((a, b) => a.date.localeCompare(b.date))
-                .map((row) => {
-                    // A project row is the day's usage in one project, not one more skill: it names the project instead.
-                    const breakdown = row.projectKey === undefined ? { skill: row.skillName ?? row.skillKey } : { project: row.projectKey };
-
-                    return { costMicrodollars: row.costMicrodollars, date: row.date, replies: row.replies, tokens: row.tokens, ...breakdown };
-                }),
         };
     });
 
@@ -533,9 +517,8 @@ export const generateExportFile = internalAction
         // Coding-agent sessions on paired devices (`acp/gdpr.ts`). Read here, a page at a
         // time, unless a workflow already in flight passes them.
         acpSessions: v.optional(v.any()),
-        // Usage history, sub-agent runs and knowledge collections
-        // (`collectActivityForExport`). Optional for the same in-flight-replay
-        // reason as `threadTags`.
+        // Sub-agent runs and knowledge collections (`collectActivityForExport`).
+        // Optional for the same in-flight-replay reason as `threadTags`.
         activity: v.optional(v.any()),
         // Bots, their persona and computer settings (`bots/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
@@ -581,6 +564,9 @@ export const generateExportFile = internalAction
         // Optional so an export workflow already in flight when this shipped
         // still replays against the new signature.
         threadTags: v.optional(v.any()),
+        // The usage JSON `prepareUsageForExport` stored (its object key). Absent for an export that started before the usage
+        // pieces existed, whose usage came in `activity`.
+        usageKey: v.optional(v.string()),
         userEmail: v.string(),
         userId: v.string(),
         // The user's watched repositories (`source-control/gdpr.ts`). Optional for the same in-flight-replay reason.
@@ -588,6 +574,9 @@ export const generateExportFile = internalAction
     })
     .action(async ({ args, ctx: context }) => {
         const activity = args.activity as { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[] } | undefined;
+        // The usage JSON, already read and checked by `prepareUsageForExport` in its own action. It is spliced into the file as
+        // text, so this action does not read it against its own budget.
+        const usageJson = args.usageKey === undefined ? undefined : await readStoredText(context.storage, args.usageKey, { maxBytes: USAGE_EXPORT_BYTES });
         // Read here, a page per query, so no workflow step result or action argument carries the history.
         const acpSessions =
             args.acpSessions ??
@@ -600,7 +589,7 @@ export const generateExportFile = internalAction
         // the ACP sessions); their projects' details past the budget are marked as left out. The trigger history, which
         // is cut oldest first, reads only from what is left after both.
         const readBytes = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
-        const acpReadBytes = readBytes(acpSessions);
+        const earlierReadBytes = readBytes(acpSessions);
         // The user's repository rows with their projects' details (`projects/gdpr.ts`), read here a page per query.
         const repositories = await collectAllRepositories(
             async (cursor) => await context.runQuery(internal.projects.gdpr.collectProjectRepositoriesForExport, { cursor, userId: args.userId }),
@@ -609,13 +598,13 @@ export const generateExportFile = internalAction
                     projectIds: projectIds as Id<"projects">[],
                     userId: args.userId,
                 }),
-            repositoriesReadBudget(acpReadBytes),
+            repositoriesReadBudget(earlierReadBytes),
             // The rows have a floor, the details none: past what the ACP sessions left they are marked as left out.
-            projectDetailsReadBudget(acpReadBytes),
+            projectDetailsReadBudget(earlierReadBytes),
         );
         const projectRepositories = { projectRepositories: repositories.projectRepositories };
         // The projects read for their details count too: a row is read whole, however little of it is exported.
-        const triggerReadBytes = triggerReadBudget(acpReadBytes + repositories.readBytes);
+        const triggerReadBytes = triggerReadBudget(earlierReadBytes + repositories.readBytes);
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
@@ -656,11 +645,14 @@ export const generateExportFile = internalAction
                 TRIGGER_EXPORT_BYTES,
                 triggerReadBytes,
             ),
-            usageDaily: activity?.usageDaily ?? [],
+            // An export from before the usage pieces existed carries its rows in `activity`; otherwise the usage JSON is spliced in below.
+            ...(usageJson === undefined && { usageDaily: activity?.usageDaily ?? [] }),
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };
 
-        const jsonString = JSON.stringify(exportData, null, 2);
+        const head = JSON.stringify(exportData, null, 2);
+        // The usage JSON is an array already, so it is written as the file's last key rather than parsed and serialized again.
+        const jsonString = usageJson === undefined ? head : spliceUsageJson(head, usageJson);
         const blob = new Blob([jsonString], { type: "application/json" });
 
         // Lunora's `store(key, body, options?)` takes the key; a store that mints
@@ -680,6 +672,77 @@ export const generateExportFile = internalAction
         );
 
         return key;
+    });
+
+/**
+ * The user's usage history for the export, read from the run's pieces and stored as a JSON array (`usage-export-steps.ts`).
+ * It has its own action so that its reads use their own read budget, apart from the coding-agent sessions' read. A membership
+ * revoked since a title was read is checked here, from the primary, before the title is named.
+ */
+export const prepareUsageForExport = internalAction
+    .input({ pass: v.number(), requestId: v.string(), userId: v.string() })
+    // `null` when the usage is larger than its share of the file. The size check runs here, where the error is raised, and
+    // the result crosses the action boundary as a value, not as a thrown error that loses its class.
+    .output(v.union(v.string(), v.null()))
+    .action(async ({ args: { pass, requestId, userId }, ctx: context }) => {
+        const text = await buildUsageJson(
+            async (kind, cursor) =>
+                (await context.runQuery(internal.usage.gdpr.readUsageExportPieces, { cursor, kind, pass, requestId, userId })) as {
+                    cursor: string | null;
+                    payloads: string[];
+                },
+            async (organizationIds) => (await context.runQuery(internal.usage.activity.stillMemberOf, { organizationIds, userId })) as string[],
+        );
+
+        if (text === null) {
+            return null;
+        }
+
+        const key = usageObjectKey(requestId);
+        const blob = new Blob([text], { type: "application/json" });
+
+        // Recorded before the object is written, so a run that dies after this is found by the sweep (`usage/gdpr.ts`).
+        await context.runMutation(internal.usage.gdpr.recordUsageFile, { key, requestId, userId });
+
+        await withDependency("file storage", () =>
+            context.storage.store(key, blob, {
+                allowedContentTypes: ["application/json"],
+                contentType: "application/json",
+                maxSize: MAX_EXPORT_BYTES,
+            }),
+        );
+
+        // Confirmed after the write: if the record was purged, or a deletion has begun, the object is removed here, so nothing
+        // the erasure has already passed over is left behind.
+        const kept = await context.runQuery(internal.usage.gdpr.confirmUsageFile, { key, requestId, userId });
+
+        if (!kept) {
+            // The record was released, or a deletion began, after the object was written. The record names the object again until
+            // its removal is confirmed, so a failed delete leaves the sweep something to find (`usage/gdpr.ts`).
+            const runId = await context.runMutation(internal.usage.gdpr.keepUsageFileRecord, { key, requestId, userId });
+
+            await context.storage.delete(key);
+            await context.runMutation(internal.usage.gdpr.releaseUsageKey, { runId });
+            throw new Error("Account deletion is underway; the usage export stops");
+        }
+
+        return key;
+    });
+
+/**
+ * Removes a run's usage JSON object. A missing object is not an error, so the export can call this on every terminal path,
+ * including one whose usage step never wrote the object. A failed delete throws: the workflow's step is then retried, and
+ * the record that names the object stays until it is gone.
+ */
+export const deleteUsageJson = internalAction
+    .input({ key: v.string() })
+    .output(v.null())
+    .action(async ({ args: { key }, ctx: context }) => {
+        if (await context.storage.getMetadata(key)) {
+            await context.storage.delete(key);
+        }
+
+        return null;
     });
 
 export const sendExportReadyEmail = internalAction

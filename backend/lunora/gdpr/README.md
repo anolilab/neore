@@ -351,9 +351,25 @@ sweep (`lib/shard-housekeeping.ts`), a bounded batch per table per run:
 | `usageDaily`   | 400 days                                           | The usage page's per-day rollup; a year plus a month of history is enough.    |
 | `subAgentRuns` | 90 days, finished runs only (`succeeded`/`failed`) | The answer was already posted into the parent thread; the row is bookkeeping. |
 
-Both are also in the export (`collectActivityForExport`, with
-`knowledgeCollections`) and deleted with the account in their own batched steps
-(`deleteUserUsageDaily`, `deleteUserSubAgentRuns`).
+Both are also in the export and deleted with the account in their own batched
+steps (`deleteUserUsageDaily`, `deleteUserSubAgentRuns`). A failed delete fails
+its step, so the retry removes what is left. `subAgentRuns` is read with
+`collectActivityForExport`, with `knowledgeCollections`.
+
+`usageDaily` is exported in durable steps (`gdpr/usage-export-steps.ts`): a page
+of 900 rows (`USAGE_EXPORT_PAGE`, below a mutation's write limit), then a recount of the closed days (two days before the user's latest
+row, so a replay gets the same day) and of the backfill row, then the titles of four
+projects at a time until 4 MiB are read, as the last check before the usage action. Each step persists its piece (`usageExportPieces`, keyed by run),
+so a retry resumes at the step that did not finish. A recount whose totals differ
+from the pages (a backfill wrote or changed an older row) redoes the pass, up to
+six passes per attempt, three attempts with a one-minute pause between them. A separate usage action (`prepareUsageForExport`) reads the kept pass,
+reads the verified titles and stores the usage JSON; the verification steps before it re-check each project's ownership and organization membership; the usage action then re-checks the organization memberships of the named titles from the primary, just before it writes the file, so a membership revoked since the verify steps is left out. Ownership is checked only by the verify steps, each project in its own bounded step: a project transferred after its step is still named. Its only size limit is the usage share of the file. A project is named once per pass (`usageExportProjects`), however many rows pages it is on; the file
+action splices it in. The usage object is deleted on every terminal path, before
+the pieces are cleared. The shard housekeeping sweep (`sweepUsageExportPieces`)
+removes a run's pieces and object once they are older than 24 hours and the run's
+request is no longer pending or processing: age alone never proves a run dead, and a
+slow export keeps its pieces.
+Erasure removes the pieces, and deletes each run's usage object inline in the deletion workflow (`purge-user-usage-files`). A failed delete fails that step, so erasure cannot finish while an object remains. A run whose export is still live keeps its record until that export ends: the workflow pauses a minute and purges again; after 120 rounds the purge is forced, removing the object and record while the export is still live.
 
 The rollup's bookkeeping — `usageReplies` (the id of each reply it counted, so
 none counts twice) and `usageBackfill` (the one-shot backfill's position) — is

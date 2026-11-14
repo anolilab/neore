@@ -459,13 +459,15 @@ export const updateRequestProgress = internalMutation
     .output(v.boolean())
     .mutation(async ({ args, ctx: context }) => {
         const { fromStatus, requestId, ...updates } = args;
+        const current = await context.db.get("gdprRequests", requestId);
 
-        if (fromStatus !== undefined) {
-            const current = await context.db.get("gdprRequests", requestId);
+        // A completed export is final: a replayed progress write must not move it back, or its download is refused while it reads processing.
+        if (current?.requestType === "export" && current.status === "completed" && updates.status !== "completed") {
+            return false;
+        }
 
-            if (current === null || !fromStatus.includes(current.status)) {
-                return false;
-            }
+        if (fromStatus !== undefined && (current === null || !fromStatus.includes(current.status))) {
+            return false;
         }
 
         const patch: Partial<Doc<"gdprRequests">> = {};
