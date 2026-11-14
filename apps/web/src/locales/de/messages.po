@@ -815,7 +815,7 @@ msgstr "{count, plural, one {# von {maxReferenceImages} Referenz angehängt} oth
 msgid "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 msgstr "{count, plural, one {# Steuerhinweis – die Antwort liest ihn bei ihrem nächsten Schritt} other {# Steuerhinweise – die Antwort liest sie bei ihrem nächsten Schritt}}"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:307
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:323
 msgid "{count, plural, one {# thread deleted.} other {# threads deleted.}}"
 msgstr "{count, plural, one {# Thread gelöscht.} other {# Threads gelöscht.}}"
 
@@ -2193,7 +2193,7 @@ msgstr "Aktive Tage"
 msgid "Active Sessions ({0})"
 msgstr "Aktive Sitzungen ({0})"
 
-#: src/components/command-palette.tsx:508
+#: src/components/command-palette.tsx:526
 msgid "Active Threads"
 msgstr "Aktive Threads"
 
@@ -2402,7 +2402,7 @@ msgstr "Ausgabe-Node hinzufügen"
 msgid "Add page"
 msgstr "Seite hinzufügen"
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:87
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:93
 msgid "Add Passkey"
 msgstr "Passkey hinzufügen"
 
@@ -3692,7 +3692,7 @@ msgstr "API-Schlüssel (optional)"
 msgid "API Key Created"
 msgstr "API-Schlüssel erstellt"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:78
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:80
 #: src/features/layout/lib/dashboard-page-names.ts:15
 #: src/features/settings/components/chat/api-keys-settings.tsx:554
 #: src/features/settings/lib/settings-navigation.ts:96
@@ -3701,9 +3701,9 @@ msgstr "API-Schlüssel erstellt"
 msgid "API Keys"
 msgstr "API-Schlüssel"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:79
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:81
 msgid "API keys can't be created while impersonating."
-msgstr ""
+msgstr "API-Schlüssel können beim Imitieren eines Kontos nicht erstellt werden."
 
 #: src/features/marketing/components/gateway-footer.tsx:24
 #: src/features/marketing/components/gateway-landing-page.tsx:658
@@ -3900,7 +3900,7 @@ msgstr "Arcees großes Reasoning-LLM über OpenRouter"
 msgid "Arcee's small reasoning LLM"
 msgstr "Arcees kleines Reasoning-LLM"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:258
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:272
 msgid "archive"
 msgstr "archivieren"
 
@@ -3923,8 +3923,8 @@ msgid "Archive the open thread, or restore it when it is archived ({0})"
 msgstr "Den geöffneten Thread archivieren, oder aus dem Archiv holen, wenn er archiviert ist ({0})"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
-#: src/components/command-palette.tsx:475
-#: src/components/command-palette.tsx:637
+#: src/components/command-palette.tsx:493
+#: src/components/command-palette.tsx:655
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Archive thread"
 msgstr "Thread archivieren"
@@ -3936,7 +3936,7 @@ msgstr "Thread archivieren"
 msgid "Archived"
 msgstr "Archiviert"
 
-#: src/components/command-palette.tsx:525
+#: src/components/command-palette.tsx:543
 msgid "Archived Threads"
 msgstr "Archivierte Threads"
 
@@ -5054,8 +5054,8 @@ msgstr "Brainstorming"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:149
 #: ../../packages/chat-ui/src/chat/message-item.tsx:203
-#: src/features/chat/core/hooks/use-thread-manager.ts:138
-#: src/features/chat/core/hooks/use-thread-manager.ts:151
+#: src/features/chat/core/hooks/use-thread-manager.ts:148
+#: src/features/chat/core/hooks/use-thread-manager.ts:161
 #: src/features/tasks/components/task-form-dialog.tsx:336
 #: src/features/workflow/types/index.ts:425
 #: src/features/workflow/types/index.ts:429
@@ -5799,7 +5799,7 @@ msgstr "Farben ändern"
 msgid "Change passcode"
 msgstr "Passcode ändern"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:250
+#: src/features/auth/components/settings/security/change-password-card.tsx:255
 msgid "Change Password"
 msgstr "Passwort ändern"
 
@@ -5807,7 +5807,7 @@ msgstr "Passwort ändern"
 msgid "Change tone"
 msgstr "Ton ändern"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:247
+#: src/features/auth/components/settings/security/change-password-card.tsx:251
 msgid "Change your account password"
 msgstr "Kontopasswort ändern"
 
@@ -6459,7 +6459,7 @@ msgstr "Auf das Logo klicken, um ein neues Bild hochzuladen"
 msgid "Click the avatar to upload a new image or delete the current one"
 msgstr "Auf den Avatar klicken, um ein neues Bild hochzuladen oder das aktuelle zu löschen"
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:91
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:98
 msgid "Click the button below to register a new passkey with your device."
 msgstr "Klicke auf die Schaltfläche unten, um einen neuen Passkey mit deinem Gerät zu registrieren."
 
@@ -6517,7 +6517,7 @@ msgstr "Uhr"
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
 #: ../../packages/ui/src/components/sheet.tsx:75
-#: src/components/command-palette.tsx:708
+#: src/components/command-palette.tsx:726
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:818
 #: src/features/canvas/pdf-preview-panel.tsx:105
@@ -7362,7 +7362,7 @@ msgid "Confirm cleanup"
 msgstr "Bereinigung bestätigen"
 
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:207
-#: src/features/auth/components/settings/security/change-password-card.tsx:335
+#: src/features/auth/components/settings/security/change-password-card.tsx:340
 msgid "Confirm new password"
 msgstr "Neues Passwort bestätigen"
 
@@ -7372,13 +7372,13 @@ msgstr "Passwort bestätigen"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:222
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:580
-#: src/features/auth/components/settings/security/change-password-card.tsx:324
+#: src/features/auth/components/settings/security/change-password-card.tsx:329
 msgid "Confirm Password"
 msgstr "Passwort bestätigen"
 
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:40
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:134
-#: src/features/auth/components/settings/security/change-password-card.tsx:56
+#: src/features/auth/components/settings/security/change-password-card.tsx:58
 msgid "Confirm password is required"
 msgstr "Passwortbestätigung ist erforderlich"
 
@@ -7556,7 +7556,7 @@ msgstr "Verbunden – {0} Tools gefunden ({1} ms)"
 msgid "Connected ({0}ms)"
 msgstr "Verbunden ({0} ms)"
 
-#: src/features/auth/components/settings/providers/providers-card.tsx:39
+#: src/features/auth/components/settings/providers/providers-card.tsx:42
 msgid "Connected Accounts"
 msgstr "Verbundene Konten"
 
@@ -8393,7 +8393,7 @@ msgstr "Der Workflow konnte nicht importiert werden"
 msgid "Could not link. Try again."
 msgstr "Verknüpfen nicht möglich. Versuche es erneut."
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:48
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:50
 msgid "Could not load API keys. Try again later."
 msgstr "API-Schlüssel konnten nicht geladen werden. Versuche es später erneut."
 
@@ -8814,11 +8814,11 @@ msgstr "Erstelle im Azure-Portal eine Azure-Bot-Ressource und notiere dir ihre M
 msgid "Create an outline for a blog post about sustainable living"
 msgstr "Eine Gliederung für einen Blog-Beitrag über nachhaltiges Leben erstellen"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:76
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:78
 msgid "Create and manage API keys for programmatic access to your account."
 msgstr "API-Schlüssel für programmatischen Zugriff auf dein Konto erstellen und verwalten."
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:73
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:75
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:97
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:180
 msgid "Create API Key"
@@ -8828,7 +8828,7 @@ msgstr "API-Schlüssel erstellen"
 msgid "Create bot"
 msgstr "Bot erstellen"
 
-#: src/components/command-palette.tsx:459
+#: src/components/command-palette.tsx:477
 #: src/features/chat/thread-list/thread-node.tsx:743
 #: src/features/chat/thread-list/thread-node.tsx:766
 msgid "Create branch"
@@ -9132,7 +9132,7 @@ msgstr "Kuba"
 msgid "Currency Conversion"
 msgstr "Währungsumrechnung"
 
-#: src/components/command-palette.tsx:633
+#: src/components/command-palette.tsx:651
 #: src/features/auth/components/settings/security/session-cell.tsx:80
 #: src/features/projects/components/move-to-project-dialog.tsx:84
 #: src/features/prompts/components/prompt-history-dialog.tsx:136
@@ -9149,11 +9149,11 @@ msgid "Current passcode"
 msgstr "Aktueller Passcode"
 
 #: src/components/settings/session-freshness-dialog.tsx:90
-#: src/features/auth/components/settings/security/change-password-card.tsx:276
+#: src/features/auth/components/settings/security/change-password-card.tsx:281
 msgid "Current Password"
 msgstr "Aktuelles Passwort"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:82
+#: src/features/auth/components/settings/security/change-password-card.tsx:84
 msgid "Current password is required"
 msgstr "Aktuelles Passwort ist erforderlich"
 
@@ -9994,8 +9994,8 @@ msgid "Delete this case?"
 msgstr "Diesen Testfall löschen?"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
-#: src/components/command-palette.tsx:481
-#: src/components/command-palette.tsx:661
+#: src/components/command-palette.tsx:499
+#: src/components/command-palette.tsx:679
 #: src/features/chat/thread-list/thread-node.tsx:1082
 #: src/features/chat/thread-list/thread-node.tsx:1100
 #: src/features/pages/components/page-comments-panel.tsx:188
@@ -11571,7 +11571,7 @@ msgstr "E-Mail"
 msgid "Email"
 msgstr "E-Mail"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:139
+#: src/features/auth/components/settings/security/change-email-card.tsx:142
 #: src/features/chat/sharing/thread-share-button.tsx:311
 msgid "Email Address"
 msgstr "E-Mail-Adresse"
@@ -11593,7 +11593,7 @@ msgstr "E-Mail-Header"
 msgid "Email Hero"
 msgstr "E-Mail-Hero"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:41
+#: src/features/auth/components/settings/security/change-email-card.tsx:43
 msgid "Email is the same"
 msgstr "E-Mail ist identisch"
 
@@ -11605,7 +11605,7 @@ msgstr "E-Mail oder Benutzername"
 msgid "Email sent successfully"
 msgstr "E-Mail erfolgreich gesendet"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:63
+#: src/features/auth/components/settings/security/change-email-card.tsx:65
 msgid "Email updated successfully"
 msgstr "E-Mail erfolgreich aktualisiert"
 
@@ -11910,7 +11910,7 @@ msgstr "Abrechnungs-E-Mail eingeben"
 msgid "Enter branch title (optional)"
 msgstr "Branch-Titel eingeben (optional)"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:286
+#: src/features/auth/components/settings/security/change-password-card.tsx:291
 msgid "Enter current password"
 msgstr "Aktuelles Passwort eingeben"
 
@@ -11932,7 +11932,7 @@ msgid "Enter model ID (e.g., \"llama-4-scout\")..."
 msgstr "Modell-ID eingeben (z. B. \"llama-4-scout\")..."
 
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:182
-#: src/features/auth/components/settings/security/change-password-card.tsx:310
+#: src/features/auth/components/settings/security/change-password-card.tsx:315
 msgid "Enter new password"
 msgstr "Neues Passwort eingeben"
 
@@ -12004,7 +12004,7 @@ msgstr "Gib deine Zugangsdaten ein, um fortzufahren"
 msgid "Enter your current password"
 msgstr "Aktuelles Passwort eingeben"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:248
+#: src/features/auth/components/settings/security/change-password-card.tsx:253
 msgid "Enter your current password and choose a new one"
 msgstr "Gib dein aktuelles Passwort ein und wähle ein neues"
 
@@ -12025,7 +12025,7 @@ msgid "Enter your email"
 msgstr "E-Mail eingeben"
 
 #: src/features/auth/components/auth/forms/email-otp-form.tsx:243
-#: src/features/auth/components/settings/security/change-email-card.tsx:158
+#: src/features/auth/components/settings/security/change-email-card.tsx:161
 msgid "Enter your email address"
 msgstr "E-Mail-Adresse eingeben"
 
@@ -12066,7 +12066,7 @@ msgstr "Standort eingeben"
 msgid "Enter your name"
 msgstr "Namen eingeben"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:137
+#: src/features/auth/components/settings/security/change-email-card.tsx:140
 msgid "Enter your new email address below"
 msgstr "Gib unten deine neue E-Mail-Adresse ein"
 
@@ -12900,7 +12900,7 @@ msgstr "{device}: fehlgeschlagen"
 msgid "Failed to accept invite"
 msgstr "Einladung konnte nicht angenommen werden"
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:47
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:49
 msgid "Failed to add passkey"
 msgstr "Passkey konnte nicht hinzugefügt werden"
 
@@ -12917,7 +12917,7 @@ msgstr "System-Prompt konnte nicht angewendet werden"
 msgid "Failed to archive the worker"
 msgstr "Der Worker konnte nicht archiviert werden"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:261
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:275
 msgid "Failed to archive thread"
 msgstr "Thread konnte nicht archiviert werden"
 
@@ -13085,8 +13085,21 @@ msgstr "Der Testfall konnte nicht gelöscht werden"
 msgid "Failed to delete the dataset"
 msgstr "Der Datensatz konnte nicht gelöscht werden"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:135
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:313
+#. placeholder {0}: deletedIds.length
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:138
+msgid "Failed to delete the thread. {0, plural, one {# branch was deleted.} other {# branches were deleted.}}"
+msgstr "Der Thread konnte nicht gelöscht werden. {0, plural, one {# Branch wurde gelöscht.} other {# Branches wurden gelöscht.}}"
+
+#: src/components/command-palette.tsx:333
+#: src/components/command-palette.tsx:341
+#: src/components/command-palette.tsx:384
+#: src/components/command-palette.tsx:391
+msgid "Failed to delete thread"
+msgstr "Thread konnte nicht gelöscht werden"
+
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:143
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:149
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:329
 msgid "Failed to delete threads"
 msgstr "Threads konnten nicht gelöscht werden"
 
@@ -13199,7 +13212,7 @@ msgstr "Bildeditor konnte nicht initialisiert werden"
 msgid "Failed to install skill"
 msgstr "Skill konnte nicht installiert werden"
 
-#: src/features/auth/components/settings/providers/provider-cell.tsx:65
+#: src/features/auth/components/settings/providers/provider-cell.tsx:67
 msgid "Failed to link account"
 msgstr "Konto konnte nicht verknüpft werden"
 
@@ -13263,8 +13276,8 @@ msgstr "PPTX konnte nicht verarbeitet werden"
 msgid "Failed to paste. Please try again."
 msgstr "Einfügen fehlgeschlagen. Bitte versuch es erneut."
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:153
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:196
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:167
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:210
 msgid "Failed to pin thread"
 msgstr "Thread konnte nicht angeheftet werden"
 
@@ -13439,7 +13452,7 @@ msgstr "Variablen konnten nicht gespeichert werden"
 msgid "Failed to send verification code"
 msgstr "Verifizierungscode konnte nicht gesendet werden"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:110
+#: src/features/auth/components/settings/security/change-email-card.tsx:112
 msgid "Failed to send verification email"
 msgstr "Verifizierungs-E-Mail konnte nicht gesendet werden"
 
@@ -13476,8 +13489,8 @@ msgstr "Identitätswechsel konnte nicht beendet werden"
 msgid "Failed to submit the review"
 msgstr "Die Prüfung konnte nicht übermittelt werden"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:173
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:261
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:187
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:275
 msgid "Failed to unarchive thread"
 msgstr "Thread konnte nicht dearchiviert werden"
 
@@ -13485,11 +13498,11 @@ msgstr "Thread konnte nicht dearchiviert werden"
 msgid "Failed to unban user"
 msgstr "Sperre des Benutzers konnte nicht aufgehoben werden"
 
-#: src/features/auth/components/settings/providers/provider-cell.tsx:88
+#: src/features/auth/components/settings/providers/provider-cell.tsx:90
 msgid "Failed to unlink account"
 msgstr "Kontoverknüpfung konnte nicht aufgehoben werden"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:224
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:238
 msgid "Failed to unpin thread"
 msgstr "Anheften des Threads konnte nicht aufgehoben werden"
 
@@ -13513,7 +13526,7 @@ msgstr "Verbindung konnte nicht aktualisiert werden"
 msgid "Failed to update default model"
 msgstr "Standardmodell konnte nicht aktualisiert werden"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:69
+#: src/features/auth/components/settings/security/change-email-card.tsx:71
 msgid "Failed to update email address"
 msgstr "E-Mail-Adresse konnte nicht aktualisiert werden"
 
@@ -15324,7 +15337,7 @@ msgstr "Von der Idee zum fertigen Ergebnis ohne Toolwechsel. Text, Bilder, Video
 msgid "Go to chat"
 msgstr "Zum Chat"
 
-#: src/components/command-palette.tsx:407
+#: src/components/command-palette.tsx:425
 #: src/routes/(public)/invite/$inviteToken.tsx:70
 msgid "Go to Chat"
 msgstr "Zum Chat"
@@ -15366,7 +15379,7 @@ msgstr ""
 msgid "Go to previous page"
 msgstr "Zur vorherigen Seite"
 
-#: src/components/command-palette.tsx:413
+#: src/components/command-palette.tsx:431
 msgid "Go to Prompts"
 msgstr "Zu den Prompts"
 
@@ -15378,7 +15391,7 @@ msgstr "Zur Antwort"
 msgid "Go to servers"
 msgstr ""
 
-#: src/components/command-palette.tsx:425
+#: src/components/command-palette.tsx:443
 msgid "Go to Settings"
 msgstr "Zu den Einstellungen"
 
@@ -15403,7 +15416,7 @@ msgstr "Zu Folie {slideNumber}"
 msgid "Go to step {0}"
 msgstr "Zu Schritt {0}"
 
-#: src/components/command-palette.tsx:419
+#: src/components/command-palette.tsx:437
 msgid "Go to Vault"
 msgstr "Zum Tresor"
 
@@ -17302,9 +17315,9 @@ msgstr "Ungültiger OAuth-Callback"
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:150
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:122
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:151
-#: src/features/auth/components/settings/security/change-password-card.tsx:73
-#: src/features/auth/components/settings/security/change-password-card.tsx:99
-#: src/features/auth/components/settings/security/change-password-card.tsx:124
+#: src/features/auth/components/settings/security/change-password-card.tsx:75
+#: src/features/auth/components/settings/security/change-password-card.tsx:101
+#: src/features/auth/components/settings/security/change-password-card.tsx:126
 msgid "Invalid password"
 msgstr "Ungültiges Passwort"
 
@@ -18482,7 +18495,7 @@ msgid "Lines that are not valid JSON"
 msgstr "Zeilen, die kein gültiges JSON sind"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
-#: src/features/auth/components/settings/providers/provider-cell.tsx:111
+#: src/features/auth/components/settings/providers/provider-cell.tsx:113
 #: src/features/develop/components/thread-pull-requests.tsx:260
 msgid "Link"
 msgstr "Verknüpfen"
@@ -18669,7 +18682,7 @@ msgstr "{0} von {1, plural, one {# Datei} other {# Dateien}} geladen…"
 msgid "Loading"
 msgstr "Wird geladen"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:43
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:45
 msgid "Loading API keys…"
 msgstr "API-Schlüssel werden geladen…"
 
@@ -19376,7 +19389,7 @@ msgstr "Verwalte deine Automatisierungs-Skills. Erstelle benutzerdefinierte Work
 msgid "Manage your connected accounts"
 msgstr "Deine verbundenen Konten verwalten"
 
-#: src/features/auth/components/settings/providers/providers-card.tsx:37
+#: src/features/auth/components/settings/providers/providers-card.tsx:40
 msgid "Manage your connected social accounts and third-party providers"
 msgstr "Deine verbundenen Social-Media-Konten und Drittanbieter verwalten"
 
@@ -19889,7 +19902,7 @@ msgstr "Nachrichtenversionen"
 msgid "Message..."
 msgstr "Nachricht..."
 
-#: src/components/command-palette.tsx:544
+#: src/components/command-palette.tsx:562
 #: src/features/chat/sharing/shared-thread-page.tsx:151
 #: src/features/chat/thread-list/search-bar.tsx:57
 msgid "Messages"
@@ -20941,7 +20954,7 @@ msgid "navigate"
 msgstr "navigieren"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:110
-#: src/components/command-palette.tsx:694
+#: src/components/command-palette.tsx:712
 msgid "Navigate"
 msgstr "Navigieren"
 
@@ -20970,7 +20983,7 @@ msgid "Navigating to {target}..."
 msgstr "Navigiere zu {target}..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:132
-#: src/components/command-palette.tsx:432
+#: src/components/command-palette.tsx:450
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:66
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:59
 msgid "Navigation"
@@ -21285,12 +21298,12 @@ msgstr "Neuer Passcode"
 msgid "New password"
 msgstr "Neues Passwort"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:299
+#: src/features/auth/components/settings/security/change-password-card.tsx:304
 msgid "New Password"
 msgstr "Neues Passwort"
 
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:66
-#: src/features/auth/components/settings/security/change-password-card.tsx:107
+#: src/features/auth/components/settings/security/change-password-card.tsx:109
 msgid "New password is required"
 msgstr "Neues Passwort ist erforderlich"
 
@@ -21325,7 +21338,7 @@ msgstr "Neuer temporärer Chat"
 msgid "New Temporary Chat"
 msgstr "Neuer temporärer Chat"
 
-#: src/components/command-palette.tsx:448
+#: src/components/command-palette.tsx:466
 msgid "New temporary thread"
 msgstr "Neuer temporärer Thread"
 
@@ -21333,7 +21346,7 @@ msgstr "Neuer temporärer Thread"
 msgid "New this week"
 msgstr "Neu diese Woche"
 
-#: src/components/command-palette.tsx:441
+#: src/components/command-palette.tsx:459
 msgid "New thread"
 msgstr "Neuer Thread"
 
@@ -21510,7 +21523,7 @@ msgstr "Keine weiteren Nutzer haben Zugriff auf diesen Thread."
 msgid "No aperture selected"
 msgstr "Keine Blende ausgewählt"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:60
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:62
 msgid "No API keys found. Create one to get started."
 msgstr "Keine API-Schlüssel gefunden. Erstelle einen, um zu beginnen."
 
@@ -21960,7 +21973,7 @@ msgstr "Keine Ergebnisse gefunden"
 msgid "No results found for “{searchTerm}”"
 msgstr "Keine Ergebnisse für „{searchTerm}“ gefunden"
 
-#: src/components/command-palette.tsx:616
+#: src/components/command-palette.tsx:634
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "Keine Ergebnisse gefunden."
@@ -22793,7 +22806,7 @@ msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "Nur Modelle desselben Typs können verglichen werden. Leere die Auswahl, um den Typ zu wechseln."
 
 #. placeholder {0}: allThreadsData.lunora.length
-#: src/components/command-palette.tsx:613
+#: src/components/command-palette.tsx:631
 msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
 msgstr "Nur die {0} hier geladenen Threads werden nach Status gefiltert; ältere sind nicht enthalten."
 
@@ -22879,7 +22892,7 @@ msgid "Opacity"
 msgstr "Deckkraft"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:723
-#: src/components/command-palette.tsx:700
+#: src/components/command-palette.tsx:718
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
 #: src/features/develop/components/pull-request-view.tsx:75
@@ -24088,11 +24101,11 @@ msgstr "Bestanden"
 msgid "Passed check"
 msgstr ""
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:93
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:100
 msgid "Passkeys"
 msgstr "Passkeys"
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:90
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:96
 msgid "Passkeys allow you to sign in securely using your device's biometric authentication or security key."
 msgstr "Passkeys ermöglichen es dir, dich sicher mit der biometrischen Authentifizierung deines Geräts oder einem Sicherheitsschlüssel anzumelden."
 
@@ -24104,7 +24117,7 @@ msgstr "Passkeys ermöglichen es dir, dich sicher mit der biometrischen Authenti
 msgid "Password"
 msgstr "Passwort"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:152
+#: src/features/auth/components/settings/security/change-password-card.tsx:154
 msgid "Password changed successfully"
 msgstr "Passwort erfolgreich geändert"
 
@@ -24121,9 +24134,9 @@ msgstr "Passwort ist erforderlich"
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:144
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:116
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:145
-#: src/features/auth/components/settings/security/change-password-card.tsx:67
-#: src/features/auth/components/settings/security/change-password-card.tsx:93
-#: src/features/auth/components/settings/security/change-password-card.tsx:118
+#: src/features/auth/components/settings/security/change-password-card.tsx:69
+#: src/features/auth/components/settings/security/change-password-card.tsx:95
+#: src/features/auth/components/settings/security/change-password-card.tsx:120
 msgid "Password is too long"
 msgstr "Passwort ist zu lang"
 
@@ -24133,13 +24146,13 @@ msgstr "Passwort ist zu lang"
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:138
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:110
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:139
-#: src/features/auth/components/settings/security/change-password-card.tsx:61
-#: src/features/auth/components/settings/security/change-password-card.tsx:87
-#: src/features/auth/components/settings/security/change-password-card.tsx:112
+#: src/features/auth/components/settings/security/change-password-card.tsx:63
+#: src/features/auth/components/settings/security/change-password-card.tsx:89
+#: src/features/auth/components/settings/security/change-password-card.tsx:114
 msgid "Password is too short"
 msgstr "Passwort ist zu kurz"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:189
+#: src/features/auth/components/settings/security/change-password-card.tsx:191
 msgid "Password reset email sent"
 msgstr "E-Mail zum Zurücksetzen des Passworts gesendet"
 
@@ -24150,7 +24163,7 @@ msgstr "Passwort erfolgreich zurückgesetzt"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:84
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:91
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:237
-#: src/features/auth/components/settings/security/change-password-card.tsx:132
+#: src/features/auth/components/settings/security/change-password-card.tsx:134
 msgid "Passwords do not match"
 msgstr "Passwörter stimmen nicht überein"
 
@@ -24549,7 +24562,7 @@ msgid "Pin message"
 msgstr "Nachricht anheften"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:465
+#: src/components/command-palette.tsx:483
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Pin thread"
 msgstr "Thread anheften"
@@ -24645,7 +24658,7 @@ msgstr "Kurzen Ton abspielen, wenn eine Antwort fertig ist. Gilt nur für diesen
 msgid "Please authenticate to continue"
 msgstr "Bitte authentifiziere dich, um fortzufahren"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:187
+#: src/features/auth/components/settings/security/change-email-card.tsx:190
 msgid "Please check your email and click the verification link"
 msgstr "Bitte prüfe deine E-Mail und klicke auf den Verifizierungslink"
 
@@ -24709,7 +24722,7 @@ msgstr "Bitte melde dich an, um Skills zu erstellen"
 msgid "Please type <0>{0}</0> to confirm"
 msgstr "Gib <0>{0}</0> zur Bestätigung ein"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:57
+#: src/features/auth/components/settings/security/change-email-card.tsx:59
 msgid "Please verify your new email address"
 msgstr "Bitte bestätige deine neue E-Mail-Adresse"
 
@@ -27267,7 +27280,7 @@ msgstr "Forschende und Early Adopters, die Googles fortschrittlichste KI der nä
 msgid "Resend code"
 msgstr "Code erneut senden"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:184
+#: src/features/auth/components/settings/security/change-email-card.tsx:187
 msgid "Resend Verification Email"
 msgstr "Verifizierungs-E-Mail erneut senden"
 
@@ -28095,8 +28108,8 @@ msgstr "Saudi-Arabien"
 #: src/features/auth/components/organization/organization-slug-card.tsx:104
 #: src/features/auth/components/organization/organization-slug-card.tsx:155
 #: src/features/auth/components/settings/account/update-field-card.tsx:156
-#: src/features/auth/components/settings/security/change-email-card.tsx:133
-#: src/features/auth/components/settings/security/change-password-card.tsx:244
+#: src/features/auth/components/settings/security/change-email-card.tsx:135
+#: src/features/auth/components/settings/security/change-password-card.tsx:248
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
 #: src/features/chat/host/host-composer.tsx:845
 #: src/features/chat/pins/pin-item.tsx:284
@@ -28599,7 +28612,7 @@ msgstr "Threads suchen"
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "Threads durchsuchen ({focusSearchShortcut})"
 
-#: src/components/command-palette.tsx:608
+#: src/components/command-palette.tsx:626
 msgid "Search threads, navigate, or perform actions..."
 msgstr "Threads suchen, navigieren oder Aktionen ausführen..."
 
@@ -29222,7 +29235,7 @@ msgstr "Sitzungen für {userName}"
 msgid "Sessions Revoked"
 msgstr "Sitzungen widerrufen"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:224
+#: src/features/auth/components/settings/security/change-password-card.tsx:226
 msgid "Set a password for your account"
 msgstr "Passwort für dein Konto festlegen"
 
@@ -29242,8 +29255,8 @@ msgstr "Als {header}-Header auf deinem MCP-Server {serverName} gesetzt ({address
 msgid "Set color to {color}"
 msgstr "Farbe auf {color} setzen"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:221
-#: src/features/auth/components/settings/security/change-password-card.tsx:226
+#: src/features/auth/components/settings/security/change-password-card.tsx:223
+#: src/features/auth/components/settings/security/change-password-card.tsx:230
 msgid "Set Password"
 msgstr "Passwort festlegen"
 
@@ -29659,6 +29672,10 @@ msgstr "Erneut anmelden"
 #: src/features/chat/host/host-send-errors.ts:14
 msgid "Sign in again to send."
 msgstr "Melde dich erneut an, um zu senden."
+
+#: src/features/auth/hooks/use-credential-change-block.ts:22
+msgid "Sign in as yourself to change this. It can't be changed while impersonating."
+msgstr "Melde dich mit deinem eigenen Konto an, um dies zu ändern. Beim Imitieren eines Kontos ist das nicht möglich."
 
 #: src/features/settings/components/chat/mcp-settings.tsx:486
 msgid "Sign in on another site?"
@@ -34029,15 +34046,15 @@ msgstr "Thread"
 msgid "Thread"
 msgstr "Thread"
 
-#: src/components/command-palette.tsx:489
+#: src/components/command-palette.tsx:507
 msgid "Thread Actions"
 msgstr "Thread-Aktionen"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:246
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:260
 msgid "Thread archived"
 msgstr "Thread archiviert"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:128
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:131
 msgid "Thread deleted."
 msgstr "Thread gelöscht."
 
@@ -34083,11 +34100,11 @@ msgstr "Thread-Optionen"
 msgid "Thread options: {label}"
 msgstr "Thread-Optionen: {label}"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:188
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:202
 msgid "Thread pinned"
 msgstr "Thread angeheftet"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:249
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:263
 msgid "Thread restored"
 msgstr "Thread wiederhergestellt"
 
@@ -34109,7 +34126,7 @@ msgstr "Thread-Titel"
 msgid "Thread Titles"
 msgstr "Thread-Titel"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:214
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:228
 msgid "Thread unpinned"
 msgstr "Thread nicht mehr angeheftet"
 
@@ -35081,12 +35098,12 @@ msgstr "Ultraflach, extremes Bokeh"
 msgid "Ultra-wide, architectural"
 msgstr "Ultraweitwinkel, architektonisch"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:258
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:272
 msgid "unarchive"
 msgstr "Archivierung aufheben"
 
-#: src/components/command-palette.tsx:475
-#: src/components/command-palette.tsx:637
+#: src/components/command-palette.tsx:493
+#: src/components/command-palette.tsx:655
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Unarchive thread"
 msgstr "Thread aus dem Archiv holen"
@@ -35138,9 +35155,9 @@ msgstr "Unterstrichen"
 #: src/components/model-picker/model-picker.tsx:862
 #: src/features/canvas/canvas-panel.tsx:244
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:128
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:214
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:246
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:126
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:228
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:260
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
@@ -35230,7 +35247,7 @@ msgstr "Unbekannter Nutzer"
 msgid "Unlimited requests"
 msgstr "Unbegrenzte Anfragen"
 
-#: src/features/auth/components/settings/providers/provider-cell.tsx:111
+#: src/features/auth/components/settings/providers/provider-cell.tsx:113
 msgid "Unlink"
 msgstr "Verknüpfung aufheben"
 
@@ -35289,7 +35306,7 @@ msgid "Unpin memory"
 msgstr "Erinnerung nicht mehr anheften"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:465
+#: src/components/command-palette.tsx:483
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Unpin thread"
 msgstr "Thread nicht mehr anheften"
@@ -35352,10 +35369,10 @@ msgstr "Unbenannt"
 msgid "Untitled chat"
 msgstr "Unbenannter Chat"
 
-#: src/components/command-palette.tsx:264
-#: src/components/command-palette.tsx:277
-#: src/components/command-palette.tsx:536
-#: src/features/chat/core/hooks/use-thread-manager.ts:241
+#: src/components/command-palette.tsx:265
+#: src/components/command-palette.tsx:278
+#: src/components/command-palette.tsx:554
+#: src/features/chat/core/hooks/use-thread-manager.ts:254
 msgid "Untitled Thread"
 msgstr "Unbenannter Thread"
 
@@ -35421,7 +35438,7 @@ msgstr "Aktualisiere die Anweisungen und Einstellungen dieses Skills."
 msgid "Update the role for this member"
 msgstr "Die Rolle für dieses Mitglied aktualisieren"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:136
+#: src/features/auth/components/settings/security/change-email-card.tsx:138
 msgid "Update your account email address"
 msgstr "Deine Konto-E-Mail-Adresse aktualisieren"
 
@@ -36129,7 +36146,7 @@ msgid "Verification could not run, so nobody has checked this result. Review the
 msgstr "Die Prüfung konnte nicht laufen, daher hat niemand dieses Ergebnis kontrolliert. Prüfe die Antwort selbst: Genehmige sie so, wie sie ist, lehne sie ab oder schick sie mit einer Notiz zurück."
 
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:301
-#: src/features/auth/components/settings/security/change-email-card.tsx:105
+#: src/features/auth/components/settings/security/change-email-card.tsx:107
 msgid "Verification email sent"
 msgstr "Verifizierungs-E-Mail gesendet"
 
@@ -36157,7 +36174,7 @@ msgstr "Code verifizieren"
 msgid "Verify the claim: \"The Great Wall of China is visible from space\""
 msgstr "Überprüfe die Behauptung: \"Die Chinesische Mauer ist vom Weltraum aus sichtbar\""
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:189
+#: src/features/auth/components/settings/security/change-email-card.tsx:192
 msgid "Verify Your Email"
 msgstr "Deine E-Mail verifizieren"
 

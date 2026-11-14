@@ -21,8 +21,10 @@ const CREDENTIAL_PATHS: ReadonlySet<string> = new Set([
     "/api-key/create",
     "/change-email",
     "/change-password",
+    // emailOTP's change-email routes: not enabled today, listed so turning them on cannot open a gap.
+    "/email-otp/change-email",
+    "/email-otp/request-email-change",
     "/link-social",
-    "/oauth2/link",
     "/passkey/generate-register-options",
     "/passkey/verify-registration",
 ]);

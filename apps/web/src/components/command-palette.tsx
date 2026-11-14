@@ -58,6 +58,7 @@ import convertShortcutToHotkeysHook from "@/features/keyboard/lib/shortcut-conve
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import useDebouncedValue from "@/hooks/use-debounced-value";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
+import { showError } from "@/lib/toast";
 
 import { useCommandDialogActions, useCommandDialogState, useCommandDialogStore } from "./command-dialog-store";
 
@@ -326,10 +327,18 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         }
 
         try {
-            await deleteBranch(threadId);
+            const { threadDeleted } = await deleteBranch(threadId);
+
+            if (!threadDeleted) {
+                showError(t`Failed to delete thread`);
+
+                return;
+            }
+
             close();
         } catch (error) {
             console.error("Failed to delete thread:", error);
+            showError(t`Failed to delete thread`);
         }
     };
 
@@ -369,9 +378,18 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         }
 
         // The row reappears if the server refuses; nothing is reported deleted before it confirms.
-        deleteBranch(currentThreadId).catch((error: unknown) => {
-            console.error("Failed to delete thread:", error);
-        });
+        deleteBranch(currentThreadId)
+            .then(({ threadDeleted }) => {
+                if (!threadDeleted) {
+                    showError(t`Failed to delete thread`);
+                }
+
+                return undefined;
+            })
+            .catch((error: unknown) => {
+                console.error("Failed to delete thread:", error);
+                showError(t`Failed to delete thread`);
+            });
         close();
     };
 

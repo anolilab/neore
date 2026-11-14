@@ -122,12 +122,26 @@ const useThreadHandlers = (setLoadingStates: React.Dispatch<React.SetStateAction
     const handleDeleteThread = useCallback(
         (threadId: string) => {
             deleteBranch(threadId)
-                .then((deletedIds) => {
-                    showSuccess(
-                        <>
-                            {t`Thread deleted.`} <button onClick={() => handleUndoDeleteThread(deletedIds)} type="button">{t`Undo`}</button>
-                        </>,
-                    );
+                .then(({ deletedIds, threadDeleted }) => {
+                    const undo = <button onClick={() => handleUndoDeleteThread(deletedIds)} type="button">{t`Undo`}</button>;
+
+                    if (threadDeleted) {
+                        showSuccess(
+                            <>
+                                {t`Thread deleted.`} {undo}
+                            </>,
+                        );
+                    } else if (deletedIds.length > 0) {
+                        // The thread was refused but some of its branches were deleted: those can still be brought back.
+                        showError(
+                            <>
+                                {t`Failed to delete the thread. ${plural(deletedIds.length, { one: "# branch was deleted.", other: "# branches were deleted." })}`}{" "}
+                                {undo}
+                            </>,
+                        );
+                    } else {
+                        showError(t`Failed to delete threads`);
+                    }
 
                     return undefined;
                 })

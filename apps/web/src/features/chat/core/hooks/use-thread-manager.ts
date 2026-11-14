@@ -30,6 +30,16 @@ type ThreadDocument = ThreadDoc & {
     parentThreadIds?: string[];
 };
 
+/**
+ * What a delete settled to. The thread and its branches settle one by one, so the thread can be refused while
+ * branches were deleted: `deletedIds` lists every row the server deleted (the thread first when it was), which is
+ * what an undo restores.
+ */
+export interface DeleteBranchResult {
+    deletedIds: string[];
+    threadDeleted: boolean;
+}
+
 export interface BranchNode {
     children: BranchNode[];
     depth: number;
@@ -163,7 +173,7 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
         return branchId;
     };
 
-    const deleteBranch = async (threadId: string): Promise<string[]> => {
+    const deleteBranch = async (threadId: string): Promise<DeleteBranchResult> => {
         if (threadId === "default") {
             throw new Error("Cannot delete the default thread");
         }
@@ -195,13 +205,13 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
             deletedIds.push(id);
         });
 
-        if (!deletedIds.includes(threadId)) {
-            throw new Error("The thread was not deleted");
+        const threadDeleted = deletedIds.includes(threadId);
+
+        if (threadDeleted) {
+            trackEvent("thread_deleted", {});
         }
 
-        trackEvent("thread_deleted", {});
-
-        if (currentThreadId === threadId) {
+        if (currentThreadId !== undefined && deletedIds.includes(currentThreadId)) {
             // The survivor is read, then the route moves only if it still shows a deleted chat.
             // With the split view on, the other open panes stay: the route moves to one of them instead of `/chat`.
             void (async () => {
@@ -220,7 +230,10 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
         }
 
         // The thread first, then the branches deleted with it: what an undo restores.
-        return [threadId, ...deletedIds.filter((id) => id !== threadId)];
+        return {
+            deletedIds: threadDeleted ? [threadId, ...deletedIds.filter((id) => id !== threadId)] : deletedIds,
+            threadDeleted,
+        };
     };
 
     const getBranchTree = (rootThreadId?: string): BranchNode[] => {

@@ -815,7 +815,7 @@ msgstr "{count, plural, other {参照画像 # / {maxReferenceImages} 枚を添�
 msgid "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 msgstr "{count, plural, other {# 件のステアリング: 返信は次のステップで読み取ります}}"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:307
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:323
 msgid "{count, plural, one {# thread deleted.} other {# threads deleted.}}"
 msgstr "{count, plural, other {# 件のスレッドを削除しました。}}"
 
@@ -2193,7 +2193,7 @@ msgstr "アクティブ日数"
 msgid "Active Sessions ({0})"
 msgstr "アクティブなセッション（{0}）"
 
-#: src/components/command-palette.tsx:508
+#: src/components/command-palette.tsx:526
 msgid "Active Threads"
 msgstr "アクティブなスレッド"
 
@@ -2402,7 +2402,7 @@ msgstr "出力ノードを追加"
 msgid "Add page"
 msgstr "ページを追加"
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:87
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:93
 msgid "Add Passkey"
 msgstr "パスキーを追加"
 
@@ -3692,7 +3692,7 @@ msgstr "API キー（任意）"
 msgid "API Key Created"
 msgstr "API キーを作成しました"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:78
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:80
 #: src/features/layout/lib/dashboard-page-names.ts:15
 #: src/features/settings/components/chat/api-keys-settings.tsx:554
 #: src/features/settings/lib/settings-navigation.ts:96
@@ -3701,9 +3701,9 @@ msgstr "API キーを作成しました"
 msgid "API Keys"
 msgstr "API キー"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:79
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:81
 msgid "API keys can't be created while impersonating."
-msgstr ""
+msgstr "なりすまし中は API キーを作成できません。"
 
 #: src/features/marketing/components/gateway-footer.tsx:24
 #: src/features/marketing/components/gateway-landing-page.tsx:658
@@ -3900,7 +3900,7 @@ msgstr "OpenRouter 経由の Arcee の大型推論 LLM"
 msgid "Arcee's small reasoning LLM"
 msgstr "Arcee の小型推論 LLM"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:258
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:272
 msgid "archive"
 msgstr "アーカイブ"
 
@@ -3923,8 +3923,8 @@ msgid "Archive the open thread, or restore it when it is archived ({0})"
 msgstr "開いているスレッドをアーカイブします。アーカイブ済みなら解除します（{0}）"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
-#: src/components/command-palette.tsx:475
-#: src/components/command-palette.tsx:637
+#: src/components/command-palette.tsx:493
+#: src/components/command-palette.tsx:655
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Archive thread"
 msgstr "スレッドをアーカイブ"
@@ -3936,7 +3936,7 @@ msgstr "スレッドをアーカイブ"
 msgid "Archived"
 msgstr "アーカイブ済み"
 
-#: src/components/command-palette.tsx:525
+#: src/components/command-palette.tsx:543
 msgid "Archived Threads"
 msgstr "アーカイブ済みのスレッド"
 
@@ -5054,8 +5054,8 @@ msgstr "ブレインストーミング"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:149
 #: ../../packages/chat-ui/src/chat/message-item.tsx:203
-#: src/features/chat/core/hooks/use-thread-manager.ts:138
-#: src/features/chat/core/hooks/use-thread-manager.ts:151
+#: src/features/chat/core/hooks/use-thread-manager.ts:148
+#: src/features/chat/core/hooks/use-thread-manager.ts:161
 #: src/features/tasks/components/task-form-dialog.tsx:336
 #: src/features/workflow/types/index.ts:425
 #: src/features/workflow/types/index.ts:429
@@ -5799,7 +5799,7 @@ msgstr "色を変更"
 msgid "Change passcode"
 msgstr "パスコードを変更"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:250
+#: src/features/auth/components/settings/security/change-password-card.tsx:255
 msgid "Change Password"
 msgstr "パスワードを変更"
 
@@ -5807,7 +5807,7 @@ msgstr "パスワードを変更"
 msgid "Change tone"
 msgstr "トーンを変更"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:247
+#: src/features/auth/components/settings/security/change-password-card.tsx:251
 msgid "Change your account password"
 msgstr "アカウントのパスワードを変更します"
 
@@ -6459,7 +6459,7 @@ msgstr "ロゴをクリックして新しい画像をアップロード"
 msgid "Click the avatar to upload a new image or delete the current one"
 msgstr "アバターをクリックして新しい画像をアップロードするか、現在の画像を削除します"
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:91
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:98
 msgid "Click the button below to register a new passkey with your device."
 msgstr "下のボタンをクリックして、お使いのデバイスで新しいパスキーを登録してください。"
 
@@ -6517,7 +6517,7 @@ msgstr "時計"
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
 #: ../../packages/ui/src/components/sheet.tsx:75
-#: src/components/command-palette.tsx:708
+#: src/components/command-palette.tsx:726
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:818
 #: src/features/canvas/pdf-preview-panel.tsx:105
@@ -7362,7 +7362,7 @@ msgid "Confirm cleanup"
 msgstr "クリーンアップを確認"
 
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:207
-#: src/features/auth/components/settings/security/change-password-card.tsx:335
+#: src/features/auth/components/settings/security/change-password-card.tsx:340
 msgid "Confirm new password"
 msgstr "新しいパスワード（確認）"
 
@@ -7372,13 +7372,13 @@ msgstr "パスワード（確認）"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:222
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:580
-#: src/features/auth/components/settings/security/change-password-card.tsx:324
+#: src/features/auth/components/settings/security/change-password-card.tsx:329
 msgid "Confirm Password"
 msgstr "パスワード（確認）"
 
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:40
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:134
-#: src/features/auth/components/settings/security/change-password-card.tsx:56
+#: src/features/auth/components/settings/security/change-password-card.tsx:58
 msgid "Confirm password is required"
 msgstr "確認用パスワードは必須です"
 
@@ -7556,7 +7556,7 @@ msgstr "接続しました — {0} 個のツールを検出（{1}ms）"
 msgid "Connected ({0}ms)"
 msgstr "接続済み（{0} ms）"
 
-#: src/features/auth/components/settings/providers/providers-card.tsx:39
+#: src/features/auth/components/settings/providers/providers-card.tsx:42
 msgid "Connected Accounts"
 msgstr "接続済みのアカウント"
 
@@ -8393,7 +8393,7 @@ msgstr "ワークフローをインポートできませんでした"
 msgid "Could not link. Try again."
 msgstr "リンクできませんでした。もう一度お試しください。"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:48
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:50
 msgid "Could not load API keys. Try again later."
 msgstr "API キーを読み込めませんでした。後でもう一度お試しください。"
 
@@ -8814,11 +8814,11 @@ msgstr "Azure ポータルで Azure Bot リソースを作成し、Microsoft App
 msgid "Create an outline for a blog post about sustainable living"
 msgstr "サステナブルな暮らしに関するブログ記事の構成案を作成する"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:76
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:78
 msgid "Create and manage API keys for programmatic access to your account."
 msgstr "アカウントへのプログラムによるアクセス用の API キーを作成・管理します。"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:73
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:75
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:97
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:180
 msgid "Create API Key"
@@ -8828,7 +8828,7 @@ msgstr "API キーを作成"
 msgid "Create bot"
 msgstr "ボットを作成"
 
-#: src/components/command-palette.tsx:459
+#: src/components/command-palette.tsx:477
 #: src/features/chat/thread-list/thread-node.tsx:743
 #: src/features/chat/thread-list/thread-node.tsx:766
 msgid "Create branch"
@@ -9132,7 +9132,7 @@ msgstr "キューバ"
 msgid "Currency Conversion"
 msgstr "通貨換算"
 
-#: src/components/command-palette.tsx:633
+#: src/components/command-palette.tsx:651
 #: src/features/auth/components/settings/security/session-cell.tsx:80
 #: src/features/projects/components/move-to-project-dialog.tsx:84
 #: src/features/prompts/components/prompt-history-dialog.tsx:136
@@ -9149,11 +9149,11 @@ msgid "Current passcode"
 msgstr "現在のパスコード"
 
 #: src/components/settings/session-freshness-dialog.tsx:90
-#: src/features/auth/components/settings/security/change-password-card.tsx:276
+#: src/features/auth/components/settings/security/change-password-card.tsx:281
 msgid "Current Password"
 msgstr "現在のパスワード"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:82
+#: src/features/auth/components/settings/security/change-password-card.tsx:84
 msgid "Current password is required"
 msgstr "現在のパスワードは必須です"
 
@@ -9994,8 +9994,8 @@ msgid "Delete this case?"
 msgstr "このケースを削除しますか？"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
-#: src/components/command-palette.tsx:481
-#: src/components/command-palette.tsx:661
+#: src/components/command-palette.tsx:499
+#: src/components/command-palette.tsx:679
 #: src/features/chat/thread-list/thread-node.tsx:1082
 #: src/features/chat/thread-list/thread-node.tsx:1100
 #: src/features/pages/components/page-comments-panel.tsx:188
@@ -11571,7 +11571,7 @@ msgstr "メール"
 msgid "Email"
 msgstr "メール"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:139
+#: src/features/auth/components/settings/security/change-email-card.tsx:142
 #: src/features/chat/sharing/thread-share-button.tsx:311
 msgid "Email Address"
 msgstr "メールアドレス"
@@ -11593,7 +11593,7 @@ msgstr "メールヘッダー"
 msgid "Email Hero"
 msgstr "メールヒーロー"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:41
+#: src/features/auth/components/settings/security/change-email-card.tsx:43
 msgid "Email is the same"
 msgstr "メールアドレスが同じです"
 
@@ -11605,7 +11605,7 @@ msgstr "メールアドレスまたはユーザー名"
 msgid "Email sent successfully"
 msgstr "メールを送信しました"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:63
+#: src/features/auth/components/settings/security/change-email-card.tsx:65
 msgid "Email updated successfully"
 msgstr "メールアドレスを更新しました"
 
@@ -11910,7 +11910,7 @@ msgstr "請求先メールアドレスを入力"
 msgid "Enter branch title (optional)"
 msgstr "ブランチのタイトルを入力（任意）"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:286
+#: src/features/auth/components/settings/security/change-password-card.tsx:291
 msgid "Enter current password"
 msgstr "現在のパスワードを入力"
 
@@ -11932,7 +11932,7 @@ msgid "Enter model ID (e.g., \"llama-4-scout\")..."
 msgstr "モデル ID を入力（例：\"llama-4-scout\"）..."
 
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:182
-#: src/features/auth/components/settings/security/change-password-card.tsx:310
+#: src/features/auth/components/settings/security/change-password-card.tsx:315
 msgid "Enter new password"
 msgstr "新しいパスワードを入力"
 
@@ -12004,7 +12004,7 @@ msgstr "続行するには認証情報を入力してください"
 msgid "Enter your current password"
 msgstr "現在のパスワードを入力してください"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:248
+#: src/features/auth/components/settings/security/change-password-card.tsx:253
 msgid "Enter your current password and choose a new one"
 msgstr "現在のパスワードを入力し、新しいパスワードを設定してください"
 
@@ -12025,7 +12025,7 @@ msgid "Enter your email"
 msgstr "メールアドレスを入力"
 
 #: src/features/auth/components/auth/forms/email-otp-form.tsx:243
-#: src/features/auth/components/settings/security/change-email-card.tsx:158
+#: src/features/auth/components/settings/security/change-email-card.tsx:161
 msgid "Enter your email address"
 msgstr "メールアドレスを入力してください"
 
@@ -12066,7 +12066,7 @@ msgstr "所在地を入力"
 msgid "Enter your name"
 msgstr "名前を入力"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:137
+#: src/features/auth/components/settings/security/change-email-card.tsx:140
 msgid "Enter your new email address below"
 msgstr "新しいメールアドレスを下に入力してください"
 
@@ -12900,7 +12900,7 @@ msgstr "{device} で失敗しました"
 msgid "Failed to accept invite"
 msgstr "招待を承諾できませんでした"
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:47
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:49
 msgid "Failed to add passkey"
 msgstr "パスキーを追加できませんでした"
 
@@ -12917,7 +12917,7 @@ msgstr "システムプロンプトを適用できませんでした"
 msgid "Failed to archive the worker"
 msgstr "ワーカーをアーカイブできませんでした"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:261
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:275
 msgid "Failed to archive thread"
 msgstr "スレッドをアーカイブできませんでした"
 
@@ -13085,8 +13085,21 @@ msgstr "ケースを削除できませんでした"
 msgid "Failed to delete the dataset"
 msgstr "データセットを削除できませんでした"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:135
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:313
+#. placeholder {0}: deletedIds.length
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:138
+msgid "Failed to delete the thread. {0, plural, one {# branch was deleted.} other {# branches were deleted.}}"
+msgstr "スレッドを削除できませんでした。{0, plural, other {# 件のブランチが削除されました。}}"
+
+#: src/components/command-palette.tsx:333
+#: src/components/command-palette.tsx:341
+#: src/components/command-palette.tsx:384
+#: src/components/command-palette.tsx:391
+msgid "Failed to delete thread"
+msgstr "スレッドを削除できませんでした"
+
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:143
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:149
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:329
 msgid "Failed to delete threads"
 msgstr "スレッドを削除できませんでした"
 
@@ -13199,7 +13212,7 @@ msgstr "画像エディターを初期化できませんでした"
 msgid "Failed to install skill"
 msgstr "スキルをインストールできませんでした"
 
-#: src/features/auth/components/settings/providers/provider-cell.tsx:65
+#: src/features/auth/components/settings/providers/provider-cell.tsx:67
 msgid "Failed to link account"
 msgstr "アカウントをリンクできませんでした"
 
@@ -13263,8 +13276,8 @@ msgstr "PPTX を解析できませんでした"
 msgid "Failed to paste. Please try again."
 msgstr "貼り付けできませんでした。もう一度お試しください。"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:153
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:196
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:167
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:210
 msgid "Failed to pin thread"
 msgstr "スレッドをピン留めできませんでした"
 
@@ -13439,7 +13452,7 @@ msgstr "変数を保存できませんでした"
 msgid "Failed to send verification code"
 msgstr "確認コードを送信できませんでした"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:110
+#: src/features/auth/components/settings/security/change-email-card.tsx:112
 msgid "Failed to send verification email"
 msgstr "確認メールを送信できませんでした"
 
@@ -13476,8 +13489,8 @@ msgstr "なりすましを終了できませんでした"
 msgid "Failed to submit the review"
 msgstr "レビューを送信できませんでした"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:173
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:261
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:187
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:275
 msgid "Failed to unarchive thread"
 msgstr "スレッドのアーカイブを解除できませんでした"
 
@@ -13485,11 +13498,11 @@ msgstr "スレッドのアーカイブを解除できませんでした"
 msgid "Failed to unban user"
 msgstr "ユーザーの利用停止を解除できませんでした"
 
-#: src/features/auth/components/settings/providers/provider-cell.tsx:88
+#: src/features/auth/components/settings/providers/provider-cell.tsx:90
 msgid "Failed to unlink account"
 msgstr "アカウントのリンクを解除できませんでした"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:224
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:238
 msgid "Failed to unpin thread"
 msgstr "スレッドのピン留めを解除できませんでした"
 
@@ -13513,7 +13526,7 @@ msgstr "接続を更新できませんでした"
 msgid "Failed to update default model"
 msgstr "既定のモデルを更新できませんでした"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:69
+#: src/features/auth/components/settings/security/change-email-card.tsx:71
 msgid "Failed to update email address"
 msgstr "メールアドレスを更新できませんでした"
 
@@ -15324,7 +15337,7 @@ msgstr "ツールを切り替えずに、アイデアから完成品まで。テ
 msgid "Go to chat"
 msgstr "チャットへ移動"
 
-#: src/components/command-palette.tsx:407
+#: src/components/command-palette.tsx:425
 #: src/routes/(public)/invite/$inviteToken.tsx:70
 msgid "Go to Chat"
 msgstr "チャットへ移動"
@@ -15366,7 +15379,7 @@ msgstr ""
 msgid "Go to previous page"
 msgstr "前のページへ"
 
-#: src/components/command-palette.tsx:413
+#: src/components/command-palette.tsx:431
 msgid "Go to Prompts"
 msgstr "プロンプトへ移動"
 
@@ -15378,7 +15391,7 @@ msgstr "返信に移動"
 msgid "Go to servers"
 msgstr ""
 
-#: src/components/command-palette.tsx:425
+#: src/components/command-palette.tsx:443
 msgid "Go to Settings"
 msgstr "設定へ移動"
 
@@ -15403,7 +15416,7 @@ msgstr "スライド {slideNumber} へ移動"
 msgid "Go to step {0}"
 msgstr "ステップ {0} へ移動"
 
-#: src/components/command-palette.tsx:419
+#: src/components/command-palette.tsx:437
 msgid "Go to Vault"
 msgstr "ボールトへ移動"
 
@@ -17302,9 +17315,9 @@ msgstr "無効な OAuth コールバックです"
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:150
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:122
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:151
-#: src/features/auth/components/settings/security/change-password-card.tsx:73
-#: src/features/auth/components/settings/security/change-password-card.tsx:99
-#: src/features/auth/components/settings/security/change-password-card.tsx:124
+#: src/features/auth/components/settings/security/change-password-card.tsx:75
+#: src/features/auth/components/settings/security/change-password-card.tsx:101
+#: src/features/auth/components/settings/security/change-password-card.tsx:126
 msgid "Invalid password"
 msgstr "パスワードが無効です"
 
@@ -18482,7 +18495,7 @@ msgid "Lines that are not valid JSON"
 msgstr "有効な JSON ではない行"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
-#: src/features/auth/components/settings/providers/provider-cell.tsx:111
+#: src/features/auth/components/settings/providers/provider-cell.tsx:113
 #: src/features/develop/components/thread-pull-requests.tsx:260
 msgid "Link"
 msgstr "リンク"
@@ -18669,7 +18682,7 @@ msgstr "{1, plural, other {# 個のファイル}}のうち {0} 個を読み込�
 msgid "Loading"
 msgstr "読み込み中"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:43
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:45
 msgid "Loading API keys…"
 msgstr "API キーを読み込み中…"
 
@@ -19376,7 +19389,7 @@ msgstr "自動化スキルを管理します。カスタムワークフローを
 msgid "Manage your connected accounts"
 msgstr "接続済みのアカウントを管理します"
 
-#: src/features/auth/components/settings/providers/providers-card.tsx:37
+#: src/features/auth/components/settings/providers/providers-card.tsx:40
 msgid "Manage your connected social accounts and third-party providers"
 msgstr "接続済みのソーシャルアカウントとサードパーティプロバイダーを管理します"
 
@@ -19889,7 +19902,7 @@ msgstr "メッセージのバージョン"
 msgid "Message..."
 msgstr "メッセージ..."
 
-#: src/components/command-palette.tsx:544
+#: src/components/command-palette.tsx:562
 #: src/features/chat/sharing/shared-thread-page.tsx:151
 #: src/features/chat/thread-list/search-bar.tsx:57
 msgid "Messages"
@@ -20941,7 +20954,7 @@ msgid "navigate"
 msgstr "移動"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:110
-#: src/components/command-palette.tsx:694
+#: src/components/command-palette.tsx:712
 msgid "Navigate"
 msgstr "移動"
 
@@ -20970,7 +20983,7 @@ msgid "Navigating to {target}..."
 msgstr "{target} に移動しています..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:132
-#: src/components/command-palette.tsx:432
+#: src/components/command-palette.tsx:450
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:66
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:59
 msgid "Navigation"
@@ -21285,12 +21298,12 @@ msgstr "新しいパスコード"
 msgid "New password"
 msgstr "新しいパスワード"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:299
+#: src/features/auth/components/settings/security/change-password-card.tsx:304
 msgid "New Password"
 msgstr "新しいパスワード"
 
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:66
-#: src/features/auth/components/settings/security/change-password-card.tsx:107
+#: src/features/auth/components/settings/security/change-password-card.tsx:109
 msgid "New password is required"
 msgstr "新しいパスワードは必須です"
 
@@ -21325,7 +21338,7 @@ msgstr "新しい一時チャット"
 msgid "New Temporary Chat"
 msgstr "新しい一時チャット"
 
-#: src/components/command-palette.tsx:448
+#: src/components/command-palette.tsx:466
 msgid "New temporary thread"
 msgstr "新しい一時スレッド"
 
@@ -21333,7 +21346,7 @@ msgstr "新しい一時スレッド"
 msgid "New this week"
 msgstr "今週の新着"
 
-#: src/components/command-palette.tsx:441
+#: src/components/command-palette.tsx:459
 msgid "New thread"
 msgstr "新しいスレッド"
 
@@ -21510,7 +21523,7 @@ msgstr "このスレッドにアクセスできる他のユーザーはいませ
 msgid "No aperture selected"
 msgstr "絞りが選択されていません"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:60
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:62
 msgid "No API keys found. Create one to get started."
 msgstr "API キーがありません。作成して始めましょう。"
 
@@ -21960,7 +21973,7 @@ msgstr "結果が見つかりません"
 msgid "No results found for “{searchTerm}”"
 msgstr "“{searchTerm}” の結果が見つかりません"
 
-#: src/components/command-palette.tsx:616
+#: src/components/command-palette.tsx:634
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "結果が見つかりません。"
@@ -22793,7 +22806,7 @@ msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "比較できるのは同じ種類のモデルだけです。種類を切り替えるには選択をクリアしてください。"
 
 #. placeholder {0}: allThreadsData.lunora.length
-#: src/components/command-palette.tsx:613
+#: src/components/command-palette.tsx:631
 msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
 msgstr "状態で絞り込まれるのは、ここに読み込まれた {0} 件のスレッドのみです。それより古いスレッドは含まれません。"
 
@@ -22879,7 +22892,7 @@ msgid "Opacity"
 msgstr "不透明度"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:723
-#: src/components/command-palette.tsx:700
+#: src/components/command-palette.tsx:718
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
 #: src/features/develop/components/pull-request-view.tsx:75
@@ -24088,11 +24101,11 @@ msgstr "合格"
 msgid "Passed check"
 msgstr ""
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:93
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:100
 msgid "Passkeys"
 msgstr "パスキー"
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:90
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:96
 msgid "Passkeys allow you to sign in securely using your device's biometric authentication or security key."
 msgstr "パスキーを使うと、デバイスの生体認証やセキュリティキーで安全にサインインできます。"
 
@@ -24104,7 +24117,7 @@ msgstr "パスキーを使うと、デバイスの生体認証やセキュリテ
 msgid "Password"
 msgstr "パスワード"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:152
+#: src/features/auth/components/settings/security/change-password-card.tsx:154
 msgid "Password changed successfully"
 msgstr "パスワードを変更しました"
 
@@ -24121,9 +24134,9 @@ msgstr "パスワードは必須です"
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:144
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:116
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:145
-#: src/features/auth/components/settings/security/change-password-card.tsx:67
-#: src/features/auth/components/settings/security/change-password-card.tsx:93
-#: src/features/auth/components/settings/security/change-password-card.tsx:118
+#: src/features/auth/components/settings/security/change-password-card.tsx:69
+#: src/features/auth/components/settings/security/change-password-card.tsx:95
+#: src/features/auth/components/settings/security/change-password-card.tsx:120
 msgid "Password is too long"
 msgstr "パスワードが長すぎます"
 
@@ -24133,13 +24146,13 @@ msgstr "パスワードが長すぎます"
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:138
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:110
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:139
-#: src/features/auth/components/settings/security/change-password-card.tsx:61
-#: src/features/auth/components/settings/security/change-password-card.tsx:87
-#: src/features/auth/components/settings/security/change-password-card.tsx:112
+#: src/features/auth/components/settings/security/change-password-card.tsx:63
+#: src/features/auth/components/settings/security/change-password-card.tsx:89
+#: src/features/auth/components/settings/security/change-password-card.tsx:114
 msgid "Password is too short"
 msgstr "パスワードが短すぎます"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:189
+#: src/features/auth/components/settings/security/change-password-card.tsx:191
 msgid "Password reset email sent"
 msgstr "パスワードリセットのメールを送信しました"
 
@@ -24150,7 +24163,7 @@ msgstr "パスワードをリセットしました"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:84
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:91
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:237
-#: src/features/auth/components/settings/security/change-password-card.tsx:132
+#: src/features/auth/components/settings/security/change-password-card.tsx:134
 msgid "Passwords do not match"
 msgstr "パスワードが一致しません"
 
@@ -24549,7 +24562,7 @@ msgid "Pin message"
 msgstr "メッセージをピン留め"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:465
+#: src/components/command-palette.tsx:483
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Pin thread"
 msgstr "スレッドをピン留め"
@@ -24645,7 +24658,7 @@ msgstr "返信が完了したら短い音を鳴らします。このブラウザ
 msgid "Please authenticate to continue"
 msgstr "続行するには認証してください"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:187
+#: src/features/auth/components/settings/security/change-email-card.tsx:190
 msgid "Please check your email and click the verification link"
 msgstr "メールを確認し、認証リンクをクリックしてください"
 
@@ -24709,7 +24722,7 @@ msgstr "スキルを作成するにはサインインしてください"
 msgid "Please type <0>{0}</0> to confirm"
 msgstr "確認のため <0>{0}</0> と入力してください"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:57
+#: src/features/auth/components/settings/security/change-email-card.tsx:59
 msgid "Please verify your new email address"
 msgstr "新しいメールアドレスを認証してください"
 
@@ -27267,7 +27280,7 @@ msgstr "Google の最先端の次世代 AI を探求する研究者やアーリ�
 msgid "Resend code"
 msgstr "コードを再送信"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:184
+#: src/features/auth/components/settings/security/change-email-card.tsx:187
 msgid "Resend Verification Email"
 msgstr "確認メールを再送信"
 
@@ -28095,8 +28108,8 @@ msgstr "サウジアラビア"
 #: src/features/auth/components/organization/organization-slug-card.tsx:104
 #: src/features/auth/components/organization/organization-slug-card.tsx:155
 #: src/features/auth/components/settings/account/update-field-card.tsx:156
-#: src/features/auth/components/settings/security/change-email-card.tsx:133
-#: src/features/auth/components/settings/security/change-password-card.tsx:244
+#: src/features/auth/components/settings/security/change-email-card.tsx:135
+#: src/features/auth/components/settings/security/change-password-card.tsx:248
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
 #: src/features/chat/host/host-composer.tsx:845
 #: src/features/chat/pins/pin-item.tsx:284
@@ -28599,7 +28612,7 @@ msgstr "スレッドを検索"
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "スレッドを検索（{focusSearchShortcut}）"
 
-#: src/components/command-palette.tsx:608
+#: src/components/command-palette.tsx:626
 msgid "Search threads, navigate, or perform actions..."
 msgstr "スレッドの検索、移動、操作の実行..."
 
@@ -29222,7 +29235,7 @@ msgstr "{userName} のセッション"
 msgid "Sessions Revoked"
 msgstr "セッションを取り消しました"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:224
+#: src/features/auth/components/settings/security/change-password-card.tsx:226
 msgid "Set a password for your account"
 msgstr "アカウントのパスワードを設定します"
 
@@ -29242,8 +29255,8 @@ msgstr "{serverName} MCP サーバー（{address}）の {header} ヘッダーと
 msgid "Set color to {color}"
 msgstr "色を {color} に設定"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:221
-#: src/features/auth/components/settings/security/change-password-card.tsx:226
+#: src/features/auth/components/settings/security/change-password-card.tsx:223
+#: src/features/auth/components/settings/security/change-password-card.tsx:230
 msgid "Set Password"
 msgstr "パスワードを設定"
 
@@ -29659,6 +29672,10 @@ msgstr "再度サインイン"
 #: src/features/chat/host/host-send-errors.ts:14
 msgid "Sign in again to send."
 msgstr "送信するには、もう一度サインインしてください。"
+
+#: src/features/auth/hooks/use-credential-change-block.ts:22
+msgid "Sign in as yourself to change this. It can't be changed while impersonating."
+msgstr "変更するにはご自身のアカウントでサインインしてください。なりすまし中は変更できません。"
 
 #: src/features/settings/components/chat/mcp-settings.tsx:486
 msgid "Sign in on another site?"
@@ -34029,15 +34046,15 @@ msgstr "スレッド"
 msgid "Thread"
 msgstr "スレッド"
 
-#: src/components/command-palette.tsx:489
+#: src/components/command-palette.tsx:507
 msgid "Thread Actions"
 msgstr "スレッドの操作"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:246
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:260
 msgid "Thread archived"
 msgstr "スレッドをアーカイブしました"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:128
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:131
 msgid "Thread deleted."
 msgstr "スレッドを削除しました。"
 
@@ -34083,11 +34100,11 @@ msgstr "スレッドのオプション"
 msgid "Thread options: {label}"
 msgstr "スレッドのオプション: {label}"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:188
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:202
 msgid "Thread pinned"
 msgstr "スレッドをピン留めしました"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:249
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:263
 msgid "Thread restored"
 msgstr "スレッドを復元しました"
 
@@ -34109,7 +34126,7 @@ msgstr "スレッドのタイトル"
 msgid "Thread Titles"
 msgstr "スレッドのタイトル"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:214
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:228
 msgid "Thread unpinned"
 msgstr "スレッドのピン留めを解除しました"
 
@@ -35081,12 +35098,12 @@ msgstr "超浅い被写界深度、極端なボケ"
 msgid "Ultra-wide, architectural"
 msgstr "超広角、建築的"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:258
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:272
 msgid "unarchive"
 msgstr "アーカイブ解除"
 
-#: src/components/command-palette.tsx:475
-#: src/components/command-palette.tsx:637
+#: src/components/command-palette.tsx:493
+#: src/components/command-palette.tsx:655
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Unarchive thread"
 msgstr "スレッドのアーカイブを解除"
@@ -35138,9 +35155,9 @@ msgstr "下線"
 #: src/components/model-picker/model-picker.tsx:862
 #: src/features/canvas/canvas-panel.tsx:244
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:128
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:214
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:246
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:126
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:228
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:260
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
@@ -35230,7 +35247,7 @@ msgstr "不明なユーザー"
 msgid "Unlimited requests"
 msgstr "無制限のリクエスト"
 
-#: src/features/auth/components/settings/providers/provider-cell.tsx:111
+#: src/features/auth/components/settings/providers/provider-cell.tsx:113
 msgid "Unlink"
 msgstr "リンク解除"
 
@@ -35289,7 +35306,7 @@ msgid "Unpin memory"
 msgstr "メモリのピン留めを解除"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:465
+#: src/components/command-palette.tsx:483
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Unpin thread"
 msgstr "スレッドのピン留めを解除"
@@ -35352,10 +35369,10 @@ msgstr "無題"
 msgid "Untitled chat"
 msgstr "無題のチャット"
 
-#: src/components/command-palette.tsx:264
-#: src/components/command-palette.tsx:277
-#: src/components/command-palette.tsx:536
-#: src/features/chat/core/hooks/use-thread-manager.ts:241
+#: src/components/command-palette.tsx:265
+#: src/components/command-palette.tsx:278
+#: src/components/command-palette.tsx:554
+#: src/features/chat/core/hooks/use-thread-manager.ts:254
 msgid "Untitled Thread"
 msgstr "無題のスレッド"
 
@@ -35421,7 +35438,7 @@ msgstr "このスキルの指示と設定を更新します。"
 msgid "Update the role for this member"
 msgstr "このメンバーのロールを更新します"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:136
+#: src/features/auth/components/settings/security/change-email-card.tsx:138
 msgid "Update your account email address"
 msgstr "アカウントのメールアドレスを更新します"
 
@@ -36129,7 +36146,7 @@ msgid "Verification could not run, so nobody has checked this result. Review the
 msgstr "検証を実行できなかったため、この結果は誰もチェックしていません。回答をご自身で確認し、そのまま承認するか、却下するか、メモを付けて差し戻してください。"
 
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:301
-#: src/features/auth/components/settings/security/change-email-card.tsx:105
+#: src/features/auth/components/settings/security/change-email-card.tsx:107
 msgid "Verification email sent"
 msgstr "確認メールを送信しました"
 
@@ -36157,7 +36174,7 @@ msgstr "コードを確認"
 msgid "Verify the claim: \"The Great Wall of China is visible from space\""
 msgstr "次の主張を検証して：「万里の長城は宇宙から見える」"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:189
+#: src/features/auth/components/settings/security/change-email-card.tsx:192
 msgid "Verify Your Email"
 msgstr "メールアドレスを認証"
 

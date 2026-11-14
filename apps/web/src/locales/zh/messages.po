@@ -815,7 +815,7 @@ msgstr "{count, plural, other {已附加 #/{maxReferenceImages} 张参考图}}"
 msgid "{count, plural, one {# steering — the reply reads it at its next step} other {# steering — the reply reads them at its next step}}"
 msgstr "{count, plural, other {# 条引导——回复会在下一步读取}}"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:307
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:323
 msgid "{count, plural, one {# thread deleted.} other {# threads deleted.}}"
 msgstr "{count, plural, other {已删除 # 个对话。}}"
 
@@ -2193,7 +2193,7 @@ msgstr "活跃天数"
 msgid "Active Sessions ({0})"
 msgstr "活跃会话（{0}）"
 
-#: src/components/command-palette.tsx:508
+#: src/components/command-palette.tsx:526
 msgid "Active Threads"
 msgstr "活跃对话"
 
@@ -2402,7 +2402,7 @@ msgstr "添加输出节点"
 msgid "Add page"
 msgstr "添加网页"
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:87
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:93
 msgid "Add Passkey"
 msgstr "添加通行密钥"
 
@@ -3692,7 +3692,7 @@ msgstr "API 密钥（可选）"
 msgid "API Key Created"
 msgstr "API 密钥已创建"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:78
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:80
 #: src/features/layout/lib/dashboard-page-names.ts:15
 #: src/features/settings/components/chat/api-keys-settings.tsx:554
 #: src/features/settings/lib/settings-navigation.ts:96
@@ -3701,9 +3701,9 @@ msgstr "API 密钥已创建"
 msgid "API Keys"
 msgstr "API 密钥"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:79
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:81
 msgid "API keys can't be created while impersonating."
-msgstr ""
+msgstr "模拟用户期间无法创建 API 密钥。"
 
 #: src/features/marketing/components/gateway-footer.tsx:24
 #: src/features/marketing/components/gateway-landing-page.tsx:658
@@ -3900,7 +3900,7 @@ msgstr "通过 OpenRouter 提供的 Arcee 大型推理 LLM"
 msgid "Arcee's small reasoning LLM"
 msgstr "Arcee 的小型推理 LLM"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:258
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:272
 msgid "archive"
 msgstr "归档"
 
@@ -3923,8 +3923,8 @@ msgid "Archive the open thread, or restore it when it is archived ({0})"
 msgstr "归档当前对话；若已归档则取消归档（{0}）"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
-#: src/components/command-palette.tsx:475
-#: src/components/command-palette.tsx:637
+#: src/components/command-palette.tsx:493
+#: src/components/command-palette.tsx:655
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Archive thread"
 msgstr "归档对话"
@@ -3936,7 +3936,7 @@ msgstr "归档对话"
 msgid "Archived"
 msgstr "已归档"
 
-#: src/components/command-palette.tsx:525
+#: src/components/command-palette.tsx:543
 msgid "Archived Threads"
 msgstr "已归档的对话"
 
@@ -5054,8 +5054,8 @@ msgstr "头脑风暴"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:149
 #: ../../packages/chat-ui/src/chat/message-item.tsx:203
-#: src/features/chat/core/hooks/use-thread-manager.ts:138
-#: src/features/chat/core/hooks/use-thread-manager.ts:151
+#: src/features/chat/core/hooks/use-thread-manager.ts:148
+#: src/features/chat/core/hooks/use-thread-manager.ts:161
 #: src/features/tasks/components/task-form-dialog.tsx:336
 #: src/features/workflow/types/index.ts:425
 #: src/features/workflow/types/index.ts:429
@@ -5799,7 +5799,7 @@ msgstr "更改颜色"
 msgid "Change passcode"
 msgstr "更改口令"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:250
+#: src/features/auth/components/settings/security/change-password-card.tsx:255
 msgid "Change Password"
 msgstr "修改密码"
 
@@ -5807,7 +5807,7 @@ msgstr "修改密码"
 msgid "Change tone"
 msgstr "更改语气"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:247
+#: src/features/auth/components/settings/security/change-password-card.tsx:251
 msgid "Change your account password"
 msgstr "修改你的账号密码"
 
@@ -6459,7 +6459,7 @@ msgstr "点击徽标上传新图片"
 msgid "Click the avatar to upload a new image or delete the current one"
 msgstr "点击头像上传新图片或删除当前图片"
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:91
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:98
 msgid "Click the button below to register a new passkey with your device."
 msgstr "点击下方按钮，在你的设备上注册新的通行密钥。"
 
@@ -6517,7 +6517,7 @@ msgstr "时钟"
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
 #: ../../packages/ui/src/components/sheet.tsx:75
-#: src/components/command-palette.tsx:708
+#: src/components/command-palette.tsx:726
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:818
 #: src/features/canvas/pdf-preview-panel.tsx:105
@@ -7362,7 +7362,7 @@ msgid "Confirm cleanup"
 msgstr "确认清理"
 
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:207
-#: src/features/auth/components/settings/security/change-password-card.tsx:335
+#: src/features/auth/components/settings/security/change-password-card.tsx:340
 msgid "Confirm new password"
 msgstr "确认新密码"
 
@@ -7372,13 +7372,13 @@ msgstr "确认密码"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:222
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:580
-#: src/features/auth/components/settings/security/change-password-card.tsx:324
+#: src/features/auth/components/settings/security/change-password-card.tsx:329
 msgid "Confirm Password"
 msgstr "确认密码"
 
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:40
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:134
-#: src/features/auth/components/settings/security/change-password-card.tsx:56
+#: src/features/auth/components/settings/security/change-password-card.tsx:58
 msgid "Confirm password is required"
 msgstr "请确认密码"
 
@@ -7556,7 +7556,7 @@ msgstr "已连接——找到 {0} 个工具（{1}ms）"
 msgid "Connected ({0}ms)"
 msgstr "已连接（{0} 毫秒）"
 
-#: src/features/auth/components/settings/providers/providers-card.tsx:39
+#: src/features/auth/components/settings/providers/providers-card.tsx:42
 msgid "Connected Accounts"
 msgstr "已关联账号"
 
@@ -8393,7 +8393,7 @@ msgstr "无法导入工作流"
 msgid "Could not link. Try again."
 msgstr "无法关联。请重试。"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:48
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:50
 msgid "Could not load API keys. Try again later."
 msgstr "无法加载 API 密钥。请稍后重试。"
 
@@ -8814,11 +8814,11 @@ msgstr "在 Azure 门户中创建 Azure Bot 资源，并记下其 Microsoft App 
 msgid "Create an outline for a blog post about sustainable living"
 msgstr "为一篇关于可持续生活的博客文章列提纲"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:76
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:78
 msgid "Create and manage API keys for programmatic access to your account."
 msgstr "创建和管理 API 密钥，以编程方式访问你的账号。"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:73
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:75
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:97
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:180
 msgid "Create API Key"
@@ -8828,7 +8828,7 @@ msgstr "创建 API 密钥"
 msgid "Create bot"
 msgstr "创建机器人"
 
-#: src/components/command-palette.tsx:459
+#: src/components/command-palette.tsx:477
 #: src/features/chat/thread-list/thread-node.tsx:743
 #: src/features/chat/thread-list/thread-node.tsx:766
 msgid "Create branch"
@@ -9132,7 +9132,7 @@ msgstr "古巴"
 msgid "Currency Conversion"
 msgstr "货币换算"
 
-#: src/components/command-palette.tsx:633
+#: src/components/command-palette.tsx:651
 #: src/features/auth/components/settings/security/session-cell.tsx:80
 #: src/features/projects/components/move-to-project-dialog.tsx:84
 #: src/features/prompts/components/prompt-history-dialog.tsx:136
@@ -9149,11 +9149,11 @@ msgid "Current passcode"
 msgstr "当前口令"
 
 #: src/components/settings/session-freshness-dialog.tsx:90
-#: src/features/auth/components/settings/security/change-password-card.tsx:276
+#: src/features/auth/components/settings/security/change-password-card.tsx:281
 msgid "Current Password"
 msgstr "当前密码"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:82
+#: src/features/auth/components/settings/security/change-password-card.tsx:84
 msgid "Current password is required"
 msgstr "请输入当前密码"
 
@@ -9994,8 +9994,8 @@ msgid "Delete this case?"
 msgstr "删除此用例？"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
-#: src/components/command-palette.tsx:481
-#: src/components/command-palette.tsx:661
+#: src/components/command-palette.tsx:499
+#: src/components/command-palette.tsx:679
 #: src/features/chat/thread-list/thread-node.tsx:1082
 #: src/features/chat/thread-list/thread-node.tsx:1100
 #: src/features/pages/components/page-comments-panel.tsx:188
@@ -11571,7 +11571,7 @@ msgstr "电子邮件"
 msgid "Email"
 msgstr "邮箱"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:139
+#: src/features/auth/components/settings/security/change-email-card.tsx:142
 #: src/features/chat/sharing/thread-share-button.tsx:311
 msgid "Email Address"
 msgstr "邮箱地址"
@@ -11593,7 +11593,7 @@ msgstr "邮件页眉"
 msgid "Email Hero"
 msgstr "邮件主视觉"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:41
+#: src/features/auth/components/settings/security/change-email-card.tsx:43
 msgid "Email is the same"
 msgstr "邮箱未改变"
 
@@ -11605,7 +11605,7 @@ msgstr "邮箱或用户名"
 msgid "Email sent successfully"
 msgstr "邮件已发送"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:63
+#: src/features/auth/components/settings/security/change-email-card.tsx:65
 msgid "Email updated successfully"
 msgstr "邮箱已更新"
 
@@ -11910,7 +11910,7 @@ msgstr "输入账单邮箱"
 msgid "Enter branch title (optional)"
 msgstr "输入分支标题（可选）"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:286
+#: src/features/auth/components/settings/security/change-password-card.tsx:291
 msgid "Enter current password"
 msgstr "输入当前密码"
 
@@ -11932,7 +11932,7 @@ msgid "Enter model ID (e.g., \"llama-4-scout\")..."
 msgstr "输入模型 ID（例如“llama-4-scout”）..."
 
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:182
-#: src/features/auth/components/settings/security/change-password-card.tsx:310
+#: src/features/auth/components/settings/security/change-password-card.tsx:315
 msgid "Enter new password"
 msgstr "输入新密码"
 
@@ -12004,7 +12004,7 @@ msgstr "输入你的凭据以继续"
 msgid "Enter your current password"
 msgstr "输入你的当前密码"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:248
+#: src/features/auth/components/settings/security/change-password-card.tsx:253
 msgid "Enter your current password and choose a new one"
 msgstr "输入当前密码并设置新密码"
 
@@ -12025,7 +12025,7 @@ msgid "Enter your email"
 msgstr "输入你的邮箱"
 
 #: src/features/auth/components/auth/forms/email-otp-form.tsx:243
-#: src/features/auth/components/settings/security/change-email-card.tsx:158
+#: src/features/auth/components/settings/security/change-email-card.tsx:161
 msgid "Enter your email address"
 msgstr "输入你的邮箱地址"
 
@@ -12066,7 +12066,7 @@ msgstr "输入你的位置"
 msgid "Enter your name"
 msgstr "输入你的名字"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:137
+#: src/features/auth/components/settings/security/change-email-card.tsx:140
 msgid "Enter your new email address below"
 msgstr "在下方输入你的新邮箱地址"
 
@@ -12900,7 +12900,7 @@ msgstr "在 {device} 上失败"
 msgid "Failed to accept invite"
 msgstr "接受邀请失败"
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:47
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:49
 msgid "Failed to add passkey"
 msgstr "添加通行密钥失败"
 
@@ -12917,7 +12917,7 @@ msgstr "应用系统提示词失败"
 msgid "Failed to archive the worker"
 msgstr "归档工作进程失败"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:261
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:275
 msgid "Failed to archive thread"
 msgstr "归档对话失败"
 
@@ -13085,8 +13085,21 @@ msgstr "删除用例失败"
 msgid "Failed to delete the dataset"
 msgstr "删除数据集失败"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:135
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:313
+#. placeholder {0}: deletedIds.length
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:138
+msgid "Failed to delete the thread. {0, plural, one {# branch was deleted.} other {# branches were deleted.}}"
+msgstr "无法删除对话。{0, plural, other {已删除 # 个分支。}}"
+
+#: src/components/command-palette.tsx:333
+#: src/components/command-palette.tsx:341
+#: src/components/command-palette.tsx:384
+#: src/components/command-palette.tsx:391
+msgid "Failed to delete thread"
+msgstr "无法删除对话"
+
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:143
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:149
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:329
 msgid "Failed to delete threads"
 msgstr "删除对话失败"
 
@@ -13199,7 +13212,7 @@ msgstr "初始化图像编辑器失败"
 msgid "Failed to install skill"
 msgstr "安装技能失败"
 
-#: src/features/auth/components/settings/providers/provider-cell.tsx:65
+#: src/features/auth/components/settings/providers/provider-cell.tsx:67
 msgid "Failed to link account"
 msgstr "关联账号失败"
 
@@ -13263,8 +13276,8 @@ msgstr "解析 PPTX 失败"
 msgid "Failed to paste. Please try again."
 msgstr "粘贴失败，请重试。"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:153
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:196
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:167
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:210
 msgid "Failed to pin thread"
 msgstr "置顶对话失败"
 
@@ -13439,7 +13452,7 @@ msgstr "保存变量失败"
 msgid "Failed to send verification code"
 msgstr "发送验证码失败"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:110
+#: src/features/auth/components/settings/security/change-email-card.tsx:112
 msgid "Failed to send verification email"
 msgstr "发送验证邮件失败"
 
@@ -13476,8 +13489,8 @@ msgstr "停止模拟登录失败"
 msgid "Failed to submit the review"
 msgstr "提交审核失败"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:173
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:261
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:187
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:275
 msgid "Failed to unarchive thread"
 msgstr "取消归档对话失败"
 
@@ -13485,11 +13498,11 @@ msgstr "取消归档对话失败"
 msgid "Failed to unban user"
 msgstr "解封用户失败"
 
-#: src/features/auth/components/settings/providers/provider-cell.tsx:88
+#: src/features/auth/components/settings/providers/provider-cell.tsx:90
 msgid "Failed to unlink account"
 msgstr "取消关联账号失败"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:224
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:238
 msgid "Failed to unpin thread"
 msgstr "取消置顶对话失败"
 
@@ -13513,7 +13526,7 @@ msgstr "更新连接失败"
 msgid "Failed to update default model"
 msgstr "更新默认模型失败"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:69
+#: src/features/auth/components/settings/security/change-email-card.tsx:71
 msgid "Failed to update email address"
 msgstr "更新邮箱地址失败"
 
@@ -15324,7 +15337,7 @@ msgstr "从创意到成品，无需切换工具。文本、图像、视频和文
 msgid "Go to chat"
 msgstr "前往聊天"
 
-#: src/components/command-palette.tsx:407
+#: src/components/command-palette.tsx:425
 #: src/routes/(public)/invite/$inviteToken.tsx:70
 msgid "Go to Chat"
 msgstr "前往聊天"
@@ -15366,7 +15379,7 @@ msgstr ""
 msgid "Go to previous page"
 msgstr "上一页"
 
-#: src/components/command-palette.tsx:413
+#: src/components/command-palette.tsx:431
 msgid "Go to Prompts"
 msgstr "前往提示词"
 
@@ -15378,7 +15391,7 @@ msgstr "转到回复"
 msgid "Go to servers"
 msgstr ""
 
-#: src/components/command-palette.tsx:425
+#: src/components/command-palette.tsx:443
 msgid "Go to Settings"
 msgstr "前往设置"
 
@@ -15403,7 +15416,7 @@ msgstr "转到第 {slideNumber} 张幻灯片"
 msgid "Go to step {0}"
 msgstr "前往第 {0} 步"
 
-#: src/components/command-palette.tsx:419
+#: src/components/command-palette.tsx:437
 msgid "Go to Vault"
 msgstr "前往文件库"
 
@@ -17302,9 +17315,9 @@ msgstr "OAuth 回调无效"
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:150
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:122
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:151
-#: src/features/auth/components/settings/security/change-password-card.tsx:73
-#: src/features/auth/components/settings/security/change-password-card.tsx:99
-#: src/features/auth/components/settings/security/change-password-card.tsx:124
+#: src/features/auth/components/settings/security/change-password-card.tsx:75
+#: src/features/auth/components/settings/security/change-password-card.tsx:101
+#: src/features/auth/components/settings/security/change-password-card.tsx:126
 msgid "Invalid password"
 msgstr "密码无效"
 
@@ -18482,7 +18495,7 @@ msgid "Lines that are not valid JSON"
 msgstr "不是有效 JSON 的行"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
-#: src/features/auth/components/settings/providers/provider-cell.tsx:111
+#: src/features/auth/components/settings/providers/provider-cell.tsx:113
 #: src/features/develop/components/thread-pull-requests.tsx:260
 msgid "Link"
 msgstr "关联"
@@ -18669,7 +18682,7 @@ msgstr "已加载 {0}/{1, plural, other {# 个文件}}…"
 msgid "Loading"
 msgstr "加载中"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:43
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:45
 msgid "Loading API keys…"
 msgstr "正在加载 API 密钥…"
 
@@ -19376,7 +19389,7 @@ msgstr "管理你的自动化技能。创建自定义工作流、从 GitHub 导�
 msgid "Manage your connected accounts"
 msgstr "管理你的已关联账号"
 
-#: src/features/auth/components/settings/providers/providers-card.tsx:37
+#: src/features/auth/components/settings/providers/providers-card.tsx:40
 msgid "Manage your connected social accounts and third-party providers"
 msgstr "管理你已关联的社交账号和第三方提供商"
 
@@ -19889,7 +19902,7 @@ msgstr "消息版本"
 msgid "Message..."
 msgstr "输入消息..."
 
-#: src/components/command-palette.tsx:544
+#: src/components/command-palette.tsx:562
 #: src/features/chat/sharing/shared-thread-page.tsx:151
 #: src/features/chat/thread-list/search-bar.tsx:57
 msgid "Messages"
@@ -20941,7 +20954,7 @@ msgid "navigate"
 msgstr "导航"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:110
-#: src/components/command-palette.tsx:694
+#: src/components/command-palette.tsx:712
 msgid "Navigate"
 msgstr "导航"
 
@@ -20970,7 +20983,7 @@ msgid "Navigating to {target}..."
 msgstr "正在导航到 {target}..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:132
-#: src/components/command-palette.tsx:432
+#: src/components/command-palette.tsx:450
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:66
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:59
 msgid "Navigation"
@@ -21285,12 +21298,12 @@ msgstr "新口令"
 msgid "New password"
 msgstr "新密码"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:299
+#: src/features/auth/components/settings/security/change-password-card.tsx:304
 msgid "New Password"
 msgstr "新密码"
 
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:66
-#: src/features/auth/components/settings/security/change-password-card.tsx:107
+#: src/features/auth/components/settings/security/change-password-card.tsx:109
 msgid "New password is required"
 msgstr "请输入新密码"
 
@@ -21325,7 +21338,7 @@ msgstr "新建临时聊天"
 msgid "New Temporary Chat"
 msgstr "新建临时聊天"
 
-#: src/components/command-palette.tsx:448
+#: src/components/command-palette.tsx:466
 msgid "New temporary thread"
 msgstr "新建临时对话"
 
@@ -21333,7 +21346,7 @@ msgstr "新建临时对话"
 msgid "New this week"
 msgstr "本周新增"
 
-#: src/components/command-palette.tsx:441
+#: src/components/command-palette.tsx:459
 msgid "New thread"
 msgstr "新建对话"
 
@@ -21510,7 +21523,7 @@ msgstr "没有其他用户可以访问此对话。"
 msgid "No aperture selected"
 msgstr "未选择光圈"
 
-#: src/features/auth/components/settings/api-key/api-keys-card.tsx:60
+#: src/features/auth/components/settings/api-key/api-keys-card.tsx:62
 msgid "No API keys found. Create one to get started."
 msgstr "没有 API 密钥。创建一个开始使用吧。"
 
@@ -21960,7 +21973,7 @@ msgstr "未找到结果"
 msgid "No results found for “{searchTerm}”"
 msgstr "未找到“{searchTerm}”的结果"
 
-#: src/components/command-palette.tsx:616
+#: src/components/command-palette.tsx:634
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "未找到结果。"
@@ -22793,7 +22806,7 @@ msgid "Only same-type models can be compared. Clear selection to switch types."
 msgstr "只能对比同类型的模型。清除选择以切换类型。"
 
 #. placeholder {0}: allThreadsData.lunora.length
-#: src/components/command-palette.tsx:613
+#: src/components/command-palette.tsx:631
 msgid "Only the {0} threads loaded here are filtered by state; older ones are not included."
 msgstr "仅按状态筛选此处已加载的 {0} 个对话；更早的对话不包括在内。"
 
@@ -22879,7 +22892,7 @@ msgid "Opacity"
 msgstr "不透明度"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:723
-#: src/components/command-palette.tsx:700
+#: src/components/command-palette.tsx:718
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
 #: src/features/develop/components/pull-request-view.tsx:75
@@ -24088,11 +24101,11 @@ msgstr "已通过"
 msgid "Passed check"
 msgstr ""
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:93
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:100
 msgid "Passkeys"
 msgstr "通行密钥"
 
-#: src/features/auth/components/settings/passkey/passkeys-card.tsx:90
+#: src/features/auth/components/settings/passkey/passkeys-card.tsx:96
 msgid "Passkeys allow you to sign in securely using your device's biometric authentication or security key."
 msgstr "通行密钥让你可以使用设备的生物识别或安全密钥安全登录。"
 
@@ -24104,7 +24117,7 @@ msgstr "通行密钥让你可以使用设备的生物识别或安全密钥安全
 msgid "Password"
 msgstr "密码"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:152
+#: src/features/auth/components/settings/security/change-password-card.tsx:154
 msgid "Password changed successfully"
 msgstr "密码已修改"
 
@@ -24121,9 +24134,9 @@ msgstr "请输入密码"
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:144
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:116
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:145
-#: src/features/auth/components/settings/security/change-password-card.tsx:67
-#: src/features/auth/components/settings/security/change-password-card.tsx:93
-#: src/features/auth/components/settings/security/change-password-card.tsx:118
+#: src/features/auth/components/settings/security/change-password-card.tsx:69
+#: src/features/auth/components/settings/security/change-password-card.tsx:95
+#: src/features/auth/components/settings/security/change-password-card.tsx:120
 msgid "Password is too long"
 msgstr "密码过长"
 
@@ -24133,13 +24146,13 @@ msgstr "密码过长"
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:138
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:110
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:139
-#: src/features/auth/components/settings/security/change-password-card.tsx:61
-#: src/features/auth/components/settings/security/change-password-card.tsx:87
-#: src/features/auth/components/settings/security/change-password-card.tsx:112
+#: src/features/auth/components/settings/security/change-password-card.tsx:63
+#: src/features/auth/components/settings/security/change-password-card.tsx:89
+#: src/features/auth/components/settings/security/change-password-card.tsx:114
 msgid "Password is too short"
 msgstr "密码过短"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:189
+#: src/features/auth/components/settings/security/change-password-card.tsx:191
 msgid "Password reset email sent"
 msgstr "重置密码邮件已发送"
 
@@ -24150,7 +24163,7 @@ msgstr "密码重置成功"
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:84
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:91
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:237
-#: src/features/auth/components/settings/security/change-password-card.tsx:132
+#: src/features/auth/components/settings/security/change-password-card.tsx:134
 msgid "Passwords do not match"
 msgstr "两次输入的密码不一致"
 
@@ -24549,7 +24562,7 @@ msgid "Pin message"
 msgstr "置顶消息"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:465
+#: src/components/command-palette.tsx:483
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Pin thread"
 msgstr "置顶对话"
@@ -24645,7 +24658,7 @@ msgstr "回复完成时播放短提示音。仅适用于此浏览器。"
 msgid "Please authenticate to continue"
 msgstr "请进行身份验证以继续"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:187
+#: src/features/auth/components/settings/security/change-email-card.tsx:190
 msgid "Please check your email and click the verification link"
 msgstr "请查收邮件并点击验证链接"
 
@@ -24709,7 +24722,7 @@ msgstr "请登录以创建技能"
 msgid "Please type <0>{0}</0> to confirm"
 msgstr "请输入 <0>{0}</0> 以确认"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:57
+#: src/features/auth/components/settings/security/change-email-card.tsx:59
 msgid "Please verify your new email address"
 msgstr "请验证你的新邮箱地址"
 
@@ -27267,7 +27280,7 @@ msgstr "适合探索 Google 最先进新一代 AI 的研究人员和早期使用
 msgid "Resend code"
 msgstr "重新发送验证码"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:184
+#: src/features/auth/components/settings/security/change-email-card.tsx:187
 msgid "Resend Verification Email"
 msgstr "重新发送验证邮件"
 
@@ -28095,8 +28108,8 @@ msgstr "沙特阿拉伯"
 #: src/features/auth/components/organization/organization-slug-card.tsx:104
 #: src/features/auth/components/organization/organization-slug-card.tsx:155
 #: src/features/auth/components/settings/account/update-field-card.tsx:156
-#: src/features/auth/components/settings/security/change-email-card.tsx:133
-#: src/features/auth/components/settings/security/change-password-card.tsx:244
+#: src/features/auth/components/settings/security/change-email-card.tsx:135
+#: src/features/auth/components/settings/security/change-password-card.tsx:248
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
 #: src/features/chat/host/host-composer.tsx:845
 #: src/features/chat/pins/pin-item.tsx:284
@@ -28599,7 +28612,7 @@ msgstr "搜索对话"
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "搜索对话（{focusSearchShortcut}）"
 
-#: src/components/command-palette.tsx:608
+#: src/components/command-palette.tsx:626
 msgid "Search threads, navigate, or perform actions..."
 msgstr "搜索对话、导航或执行操作..."
 
@@ -29222,7 +29235,7 @@ msgstr "{userName} 的会话"
 msgid "Sessions Revoked"
 msgstr "会话已吊销"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:224
+#: src/features/auth/components/settings/security/change-password-card.tsx:226
 msgid "Set a password for your account"
 msgstr "为你的账号设置密码"
 
@@ -29242,8 +29255,8 @@ msgstr "设为你的 {serverName} MCP 服务器上的 {header} 请求头（{addr
 msgid "Set color to {color}"
 msgstr "将颜色设为 {color}"
 
-#: src/features/auth/components/settings/security/change-password-card.tsx:221
-#: src/features/auth/components/settings/security/change-password-card.tsx:226
+#: src/features/auth/components/settings/security/change-password-card.tsx:223
+#: src/features/auth/components/settings/security/change-password-card.tsx:230
 msgid "Set Password"
 msgstr "设置密码"
 
@@ -29659,6 +29672,10 @@ msgstr "重新登录"
 #: src/features/chat/host/host-send-errors.ts:14
 msgid "Sign in again to send."
 msgstr "请重新登录后再发送。"
+
+#: src/features/auth/hooks/use-credential-change-block.ts:22
+msgid "Sign in as yourself to change this. It can't be changed while impersonating."
+msgstr "请使用你自己的账号登录后再更改。模拟用户期间无法更改。"
 
 #: src/features/settings/components/chat/mcp-settings.tsx:486
 msgid "Sign in on another site?"
@@ -34029,15 +34046,15 @@ msgstr "对话"
 msgid "Thread"
 msgstr "对话"
 
-#: src/components/command-palette.tsx:489
+#: src/components/command-palette.tsx:507
 msgid "Thread Actions"
 msgstr "对话操作"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:246
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:260
 msgid "Thread archived"
 msgstr "对话已归档"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:128
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:131
 msgid "Thread deleted."
 msgstr "对话已删除。"
 
@@ -34083,11 +34100,11 @@ msgstr "对话选项"
 msgid "Thread options: {label}"
 msgstr "对话选项：{label}"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:188
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:202
 msgid "Thread pinned"
 msgstr "对话已置顶"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:249
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:263
 msgid "Thread restored"
 msgstr "对话已恢复"
 
@@ -34109,7 +34126,7 @@ msgstr "对话标题"
 msgid "Thread Titles"
 msgstr "对话标题"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:214
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:228
 msgid "Thread unpinned"
 msgstr "对话已取消置顶"
 
@@ -35081,12 +35098,12 @@ msgstr "超浅景深，极致焦外"
 msgid "Ultra-wide, architectural"
 msgstr "超广角，建筑感"
 
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:258
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:272
 msgid "unarchive"
 msgstr "取消归档"
 
-#: src/components/command-palette.tsx:475
-#: src/components/command-palette.tsx:637
+#: src/components/command-palette.tsx:493
+#: src/components/command-palette.tsx:655
 #: src/features/chat/thread-list/thread-node.tsx:125
 msgid "Unarchive thread"
 msgstr "取消归档对话"
@@ -35138,9 +35155,9 @@ msgstr "下划线"
 #: src/components/model-picker/model-picker.tsx:862
 #: src/features/canvas/canvas-panel.tsx:244
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:128
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:214
-#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:246
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:126
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:228
+#: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:260
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
@@ -35230,7 +35247,7 @@ msgstr "未知用户"
 msgid "Unlimited requests"
 msgstr "无限请求"
 
-#: src/features/auth/components/settings/providers/provider-cell.tsx:111
+#: src/features/auth/components/settings/providers/provider-cell.tsx:113
 msgid "Unlink"
 msgstr "取消关联"
 
@@ -35289,7 +35306,7 @@ msgid "Unpin memory"
 msgstr "取消置顶记忆"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:465
+#: src/components/command-palette.tsx:483
 #: src/features/chat/thread-list/thread-node.tsx:117
 msgid "Unpin thread"
 msgstr "取消置顶对话"
@@ -35352,10 +35369,10 @@ msgstr "无标题"
 msgid "Untitled chat"
 msgstr "未命名对话"
 
-#: src/components/command-palette.tsx:264
-#: src/components/command-palette.tsx:277
-#: src/components/command-palette.tsx:536
-#: src/features/chat/core/hooks/use-thread-manager.ts:241
+#: src/components/command-palette.tsx:265
+#: src/components/command-palette.tsx:278
+#: src/components/command-palette.tsx:554
+#: src/features/chat/core/hooks/use-thread-manager.ts:254
 msgid "Untitled Thread"
 msgstr "无标题对话"
 
@@ -35421,7 +35438,7 @@ msgstr "更新此技能的指令和设置。"
 msgid "Update the role for this member"
 msgstr "更新此成员的角色"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:136
+#: src/features/auth/components/settings/security/change-email-card.tsx:138
 msgid "Update your account email address"
 msgstr "更新你的账号邮箱地址"
 
@@ -36129,7 +36146,7 @@ msgid "Verification could not run, so nobody has checked this result. Review the
 msgstr "验证未能运行，因此没有人检查过此结果。请自行审阅答案：原样批准、拒绝，或附上备注退回。"
 
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:301
-#: src/features/auth/components/settings/security/change-email-card.tsx:105
+#: src/features/auth/components/settings/security/change-email-card.tsx:107
 msgid "Verification email sent"
 msgstr "验证邮件已发送"
 
@@ -36157,7 +36174,7 @@ msgstr "验证代码"
 msgid "Verify the claim: \"The Great Wall of China is visible from space\""
 msgstr "核实这一说法：“在太空中可以看到中国的长城”"
 
-#: src/features/auth/components/settings/security/change-email-card.tsx:189
+#: src/features/auth/components/settings/security/change-email-card.tsx:192
 msgid "Verify Your Email"
 msgstr "验证你的邮箱"
 
