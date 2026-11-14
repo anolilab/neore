@@ -7,13 +7,18 @@ const TOKEN = "ExponentPushToken[a]";
 /** A task check that answers `isRegistered`. */
 const answers = (isRegistered: boolean) => async (): Promise<boolean> => isRegistered;
 
-/** The arguments `register` sent to the server's `registerPushDevice`. */
+/** The arguments `register` sent to the server's `registerPushDevice`, after `isEnabled` as the registration flow calls it. */
 const registeredWith = async (platform: "android" | "ios", isRegistered: () => Promise<boolean>, language?: string) => {
+    const query = vi.fn(async (_procedure: unknown, _args: unknown) => {
+        return { enabled: true };
+    });
     const mutation = vi.fn(async (_procedure: unknown, _args: unknown, _options: unknown) => {
         return { registered: true };
     });
+    const server = pushServerFor({ mutation, query } as never, isRegistered);
 
-    await pushServerFor({ mutation } as never, isRegistered).register(platform, TOKEN, language);
+    await server.isEnabled();
+    await server.register(platform, TOKEN, language);
 
     return mutation.mock.calls[0]?.[1];
 };
@@ -33,12 +38,33 @@ describe("pushServerFor's register", () => {
     });
 
     it("sends no buildsAlert for an iOS phone, which has no background task", async () => {
-        const isRegistered = vi.fn(async (): Promise<boolean> => true);
-
-        const args = await registeredWith("ios", isRegistered, "en");
+        const args = await registeredWith("ios", answers(true), "en");
 
         expect(args).toStrictEqual({ language: "en", platform: "ios", token: TOKEN });
         expect(args).not.toHaveProperty("buildsAlert");
-        expect(isRegistered).not.toHaveBeenCalled();
+    });
+
+    it("reads the task check before register, so no await sits between the sign-out checks and the send", async () => {
+        const order: string[] = [];
+        const query = vi.fn(async (_procedure: unknown, _args: unknown) => {
+            return { enabled: true };
+        });
+        const mutation = vi.fn(async (_procedure: unknown, _args: unknown, _options: unknown) => {
+            order.push("sent");
+
+            return { registered: true };
+        });
+        const isRegistered = vi.fn(async (): Promise<boolean> => {
+            order.push("checked");
+
+            return true;
+        });
+        const server = pushServerFor({ mutation, query } as never, isRegistered);
+
+        await server.isEnabled();
+        order.push("signed-in check");
+        await server.register("android", TOKEN, undefined);
+
+        expect(order).toStrictEqual(["checked", "signed-in check", "sent"]);
     });
 });

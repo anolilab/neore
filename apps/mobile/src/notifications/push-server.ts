@@ -10,15 +10,21 @@ import type { PushServer } from "./push-registration";
 
 /** `onlineOnly`: a registration made offline is refused, never replayed later for whoever is signed in by then. */
 export const pushServerFor = (client: LunoraClient, isTaskRegistered: () => Promise<boolean>): PushServer => {
+    // Read by `isEnabled`, which runs before the sign-out checks that come before `register`: an await inside `register` would
+    // let a sign-out start between the last check and the send.
+    let isAlertBuilt = false;
+
     return {
         isEnabled: async () => {
             const { enabled } = await client.query(api.notifications.native_push.getNativePushConfig, {});
+
+            isAlertBuilt = await isTaskRegistered();
 
             return enabled;
         },
         register: async (platform, token, language) => {
             // Android's alert is built by the background task: the server sends this phone a data-only push only while it runs.
-            const buildsAlert = platform === "android" ? await isTaskRegistered() : undefined;
+            const buildsAlert = platform === "android" ? isAlertBuilt : undefined;
             const { registered } = await client.mutation(
                 api.notifications.native_push.registerPushDevice,
                 { platform, token, ...language !== undefined && { language }, ...buildsAlert !== undefined && { buildsAlert } },
