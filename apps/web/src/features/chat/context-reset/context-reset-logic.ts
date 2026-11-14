@@ -1,4 +1,4 @@
-import { CONTEXT_CLEAR_CONFLICT } from "@neore/backend/agent/context-reset-shape";
+import { CONTEXT_CLEAR_CONFLICT, CONTEXT_CLEAR_ORGANIZATION } from "@neore/backend/agent/context-reset-shape";
 
 /** Whether a sent text is the `/clear` command rather than a message for the model. */
 export const isClearCommand = (text: string): boolean => text.trim().toLowerCase() === "/clear";
@@ -18,7 +18,17 @@ export const clearsDraftAfterReset = (state: {
  * Why the server refused a `/clear` (`chat/context-reset.ts`, `acp/switch.ts`): a conflict's own `data.code` first, else the
  * error's code; `failed` for anything else. `already_made` is this click's clear, made by an earlier delivery.
  */
-export type ClearRefusal = "agent_starting" | "already_made" | "busy" | "failed" | "not_owner" | "rate_limited" | "summarising" | "unavailable";
+export type ClearRefusal =
+    | "agent_starting"
+    | "already_made"
+    | "busy"
+    | "failed"
+    | "left_organization"
+    | "not_allowed"
+    | "not_owner"
+    | "rate_limited"
+    | "summarising"
+    | "unavailable";
 
 export const clearRefusalOf = (error: unknown): ClearRefusal => {
     const { code, data } = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; data?: { code?: unknown } };
@@ -35,6 +45,12 @@ export const clearRefusalOf = (error: unknown): ClearRefusal => {
         }
         case CONTEXT_CLEAR_CONFLICT.summarising: {
             return "summarising";
+        }
+        case CONTEXT_CLEAR_ORGANIZATION.left_organization: {
+            return "left_organization";
+        }
+        case CONTEXT_CLEAR_ORGANIZATION.not_allowed: {
+            return "not_allowed";
         }
         default: {
             break;

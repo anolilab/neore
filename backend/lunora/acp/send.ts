@@ -20,6 +20,7 @@ import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { isUnlockProofValid } from "../agent/thread-passcode";
 import { getCurrentUserInternal } from "../auth/lib/helper";
+import { requestSignIn } from "../auth/lib/request-sign-in";
 import { createStreamToken } from "../chat/streaming/persistent/stream-token";
 import type { DeviceTaintSource } from "../devices/lib/taint";
 import { claimedAtOf, claimOnce } from "../lib/claim-once";
@@ -30,6 +31,7 @@ import { isWorkerThread } from "../sub-agents/worker-thread";
 import { readCappedBody } from "./http";
 import { liveHostStream } from "./remote";
 import { isHostRunThread } from "./lib/host-thread";
+import { hostOrganizationOf, hostOrganizationRefusalCode } from "./lib/organization-cap";
 import { awaitingReattach, pendingHandoffOf } from "./lib/pending-handoff";
 import { queueHostTurn } from "./lib/send-turn";
 import { sessionOfThread } from "./lib/sessions";
@@ -48,7 +50,9 @@ const vSendResult = v.union(
     v.object({
         outcome: v.union(
             v.literal("busy"),
+            v.literal("left_organization"),
             v.literal("locked"),
+            v.literal("not_allowed"),
             v.literal("not_found"),
             v.literal("offline"),
             v.literal("outdated"),
@@ -63,6 +67,8 @@ const vSendResult = v.union(
 );
 
 export interface SendToHostInput {
+    /** The caller's verified active organization, unset in the personal space. A thread filed under one is capped by that one. */
+    organizationId?: string;
     plan: "free" | "premium";
     requestId: string;
     /** Untrusted content the text carries; signed into the call so the computer never offers "Always allow" for the turn. */
@@ -116,6 +122,13 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
         return { outcome: "locked" as const };
     }
 
+    // Read at every turn: the owner may have left the organization, or it may have tightened its cap, since the agent started.
+    const refused = await hostOrganizationRefusalCode(ctx, hostOrganizationOf(thread, args.organizationId), userId);
+
+    if (refused) {
+        return { outcome: refused };
+    }
+
     const session = await sessionOfThread(ctx, threadId);
 
     if (!session || session.status === "ended") {
@@ -159,6 +172,8 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
 
 export const sendToHost = internalMutation
     .input({
+        // The caller's verified active organization (`getSessionOrganizationForCap`).
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         // The caller's tier, as `/chat/start` takes it: the limit a paying account has is its own.
         plan: v.union(v.literal("free"), v.literal("premium")),
         requestId: v.string().max(MAX_LENGTH.id),
@@ -175,7 +190,9 @@ const json = (body: unknown, status: number): Response => Response.json(body, { 
 
 const STATUS: Record<string, number> = {
     busy: 429,
+    left_organization: 403,
     locked: 403,
+    not_allowed: 403,
     not_found: 404,
     offline: 409,
     outdated: 409,
@@ -241,9 +258,19 @@ export const hostSendHttpAction = async (context: HttpActionCtx, request: Reques
         return json({ error: "not_authenticated" }, 401);
     }
 
-    const plan = getUserTier({ plan: user?.plan ?? null }) === "premium" ? "premium" : "free";
+    // The caller's space, as `/chat/start` reads it: a sign-in whose session cannot be validated is refused, not read as personal.
+    const signIn = requestSignIn(await context.auth.getIdentity());
+    const placed =
+        signIn === undefined ? null : await context.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId: signIn, userId });
 
-    const result = await context.runMutation(internal.acp.send.sendToHost, { plan, requestId, text, threadId, unlockProof, userId });
+    if (!placed) {
+        return json({ error: "not_authenticated" }, 401);
+    }
+
+    const plan = getUserTier({ plan: user?.plan ?? null }) === "premium" ? "premium" : "free";
+    const organizationId = placed.organizationId ?? undefined;
+
+    const result = await context.runMutation(internal.acp.send.sendToHost, { organizationId, plan, requestId, text, threadId, unlockProof, userId });
 
     if (result.outcome === "sent") {
         const streamToken = await createStreamToken(result.streamId, userId, threadId, signingSecret);

@@ -12,7 +12,9 @@ import env from "@/lib/env";
 /** The backend's refusals, by the `error` field of the answer. */
 export type HostSendError =
     | "busy"
+    | "left_organization"
     | "locked"
+    | "not_allowed"
     | "not_authenticated"
     | "not_found"
     | "offline"
@@ -33,7 +35,9 @@ export type HostSendResult = { duplicate?: boolean; ok: true; streamId?: string 
 
 const KNOWN: ReadonlySet<string> = new Set([
     "busy",
+    "left_organization",
     "locked",
+    "not_allowed",
     "not_authenticated",
     "not_found",
     "offline",

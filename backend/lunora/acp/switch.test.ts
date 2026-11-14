@@ -76,6 +76,7 @@ const CODEX = { agentKey: "codex", agentLabel: "Codex", folderId: "f1", folderLa
 const CLAUDE_OTHER_FOLDER = { ...CLAUDE, folderId: "f2", folderLabel: "docs" };
 const MODEL = "openai/gpt-4.1-mini";
 const OTHER_MODEL = "google/gemini-2.0-flash-001";
+const NOT_ALLOWED = /does not allow agents on your computer/u;
 const NOT_APPROVED = /not approved/u;
 const NOT_ONLINE = /not online/u;
 const ALREADY_MADE = /already made/u;
@@ -859,9 +860,11 @@ describe("what a takeover carries into a command on the computer", () => {
 });
 
 describe("the organisation of a switched thread", () => {
+    // The owner is a member: a switch to a computer is refused for an organization they left (`acp/lib/organization-cap.ts`).
     const inOrganisation = async (threadId: string) =>
         await run(async (ctx) => {
             await ctx.db.patch("threads", threadId as never, { organizationId: "org-1", teamId: "team-1" } as never);
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: ownerId });
         });
 
     it("is carried to the continuation that opens on a computer", async () => {
@@ -886,6 +889,87 @@ describe("the organisation of a switched thread", () => {
         const [fork] = await rows("threads", { _id: result.forkedThreadId });
 
         expect(fork).toMatchObject({ organizationId: "org-1", teamId: "team-1" });
+    });
+});
+
+describe("an organization's cap on a computer", () => {
+    const capped = async (permissionCap = "ask", member = true) =>
+        await run(async (ctx) => {
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap, schemaVersion: 1 }),
+                organizationId: "org-1",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+
+            if (member) {
+                await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: ownerId });
+            }
+        });
+
+    const fileUnder = async (threadId: string) => await run(async (ctx) => await ctx.db.patch("threads", threadId as never, { organizationId: "org-1" }));
+
+    it("refuses a switch to a computer for a chat whose organization holds agents below auto, making nothing", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await fileUnder(source);
+        await capped();
+
+        await expect(switchTo(source, hostTarget(device))).rejects.toThrow(NOT_ALLOWED);
+        expect(await rows("threads")).toHaveLength(1);
+        expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
+    });
+
+    it("holds a personal chat to the cap of the organization the switch is made from", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await capped();
+
+        await expect(
+            runAgentSwitch(
+                runner,
+                { clientId: nextClick(), target: hostTarget(device) as never, threadId: source as never, userId: ownerId },
+                summary,
+                "org-1",
+            ),
+        ).rejects.toThrow(NOT_ALLOWED);
+        expect(await rows("acpSessions")).toHaveLength(0);
+    });
+
+    it("refuses a switch to another agent on the computer too, and lets the chat leave the computer for a cloud model", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await hostThread(device);
+
+        await fileUnder(source);
+        await capped();
+
+        await expect(switchTo(source, hostTarget(device, CODEX))).rejects.toThrow(NOT_ALLOWED);
+        expect(await rows("acpSessions", { threadId: source })).toHaveLength(1);
+
+        const result = await switchTo(source, { kind: "model", model: OTHER_MODEL });
+
+        expect(result.switched).toBe(true);
+    });
+
+    it("refuses /clear, which opens a new session, with a code the app names: the cap, or an owner who left", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await hostThread(device, 1);
+
+        await fileUnder(threadId);
+        await capped("ask", false);
+
+        const clear = async (clientId: string) =>
+            await run(async (ctx) => await switchModule.clearHostSessionHandler(ctx, { clientId, threadId: threadId as never, userId: ownerId }));
+
+        await expect(clear("clear-left")).rejects.toMatchObject({ data: { code: "CONTEXT_CLEAR_LEFT_ORGANIZATION" } });
+
+        await run(async (ctx) => await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: ownerId }));
+
+        await expect(clear("clear-capped")).rejects.toMatchObject({ data: { code: "CONTEXT_CLEAR_NOT_ALLOWED" } });
+        expect(await rows("acpSessions", { threadId })).toHaveLength(1);
     });
 });
 
