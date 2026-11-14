@@ -439,7 +439,7 @@ function hasShownText(node: Node, shown: Shown): boolean {
                 return true;
             }
         } else if (current.nodeType === 1 && !shown.isHidden(current) && !isListPart(current)) {
-            if (current.nodeName === "IMG" && shown.imageText(current as Element) !== "") {
+            if (isTextElement(current as Element, shown)) {
                 return true;
             }
 
@@ -450,6 +450,15 @@ function hasShownText(node: Node, shown: Shown): boolean {
     }
 
     return false;
+}
+
+/** True for an image or a formula written as text: an emoji, or a formula's TeX source. */
+function isTextElement(element: Element, shown: Shown): boolean {
+    if (element.nodeName === "IMG") {
+        return shown.imageText(element) !== "";
+    }
+
+    return element.nodeName.toUpperCase() === "MATH" && shown.mathText(element) !== "";
 }
 
 function isListPart(node: Node): boolean {

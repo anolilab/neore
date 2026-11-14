@@ -516,6 +516,7 @@ export function paste(service: TurndownService): void {
         const shown = { imageText, isHidden: isHiddenElement, mathText: texSource };
 
         wrapLooseListText(root, shown);
-        checkWork(root, shown);
+        // A Word marker is hidden only so its item's rule writes it: the work check counts its text.
+        checkWork(root, { ...shown, isHidden: (node) => node.nodeType === 1 && isHiddenOnPage(node as Element) });
     });
 }

@@ -352,7 +352,10 @@ describe("paste input: review cases, fourteenth round", () => {
     });
 
     it("counts nothing for the destination of a link written as its text alone", () => {
-        expect(convert(`${"<b>".repeat(450)}<a href="javascript:${"a".repeat(50_000)}">label</a>`)).toContain("label");
+        const markdown = convert(`${"<b>".repeat(450)}<a href="javascript:${"a".repeat(50_000)}">label</a>`);
+
+        expect(markdown).toBe("**label**");
+        expect(markdown).not.toContain("javascript");
     });
 
     it("keeps each blank line of break-only divs side by side", () => {
@@ -387,5 +390,19 @@ describe("paste input: review cases, sixteenth round", () => {
         const document = createDocument("<p>text</p>");
 
         expect(() => convert((document.querySelector("p") as Element).firstChild as Node)).toThrow(TypeError);
+    });
+});
+
+describe("paste input: review cases, seventeenth round", () => {
+    it("counts the text of a Word marker, which its item writes", () => {
+        const marker = `<span style="mso-list:Ignore">${"9".repeat(50_000)}.</span>`;
+
+        expect(() => convert(`${"<b>".repeat(450)}<p style="mso-list:l0 level1 lfo1">${marker}item</p>`)).toThrow(RangeError);
+    });
+
+    it("makes an item of a formula placed straight in a list, though its only text is its hidden TeX source", () => {
+        const formula = `<math><semantics><annotation encoding="application/x-tex">x^2</annotation></semantics></math>`;
+
+        expect(convert(`<ul><li>a</li>${formula}<li>b</li></ul>`)).toBe("- a\n- $x^2$\n- b");
     });
 });
