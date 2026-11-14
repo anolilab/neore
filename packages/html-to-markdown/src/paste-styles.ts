@@ -370,7 +370,9 @@ function isFontStyleValue(value: string): boolean {
 
 /** True for a `text-decoration-line` a browser reads: line keywords, or a global value. */
 function isDecorationLineValue(value: string): boolean {
-    return GLOBAL_VALUES.has(value) || value.split(CSS_SPACE).every((keyword) => LINE_KEYWORDS.has(keyword));
+    const keywords = value.split(CSS_SPACE);
+
+    return GLOBAL_VALUES.has(value) || (keywords.every((keyword) => LINE_KEYWORDS.has(keyword)) && isLineList(keywords));
 }
 
 // A value a browser cannot read is dropped, so it overrides no earlier declaration.
@@ -416,16 +418,45 @@ function isDecorationValue(value: string): boolean {
         return true;
     }
 
-    return cssTokens(value).every((keyword) => isDecorationKeyword(keyword));
+    const parts = cssTokens(value).map((keyword) => decorationPart(keyword));
+    const lines = cssTokens(value).filter((_keyword, index) => parts[index] === "line");
+
+    // One style, one thickness and one color at most; a `var()` may stand for any of them.
+    const isOnceEach = (["style", "thickness", "color"] as const).every((part) => parts.filter((found) => found === part).length <= 1);
+
+    return parts.every((part) => part !== undefined) && isOnceEach && (lines.length === 0 || isLineList(lines));
 }
 
-/** True for a keyword of the shorthand: a line, a line style, a thickness, or a color. */
-function isDecorationKeyword(keyword: string): boolean {
-    if (LINE_KEYWORDS.has(keyword) || DECORATION_STYLES.has(keyword) || NAMED_COLORS.has(keyword)) {
-        return true;
+/** True for decoration line keywords CSS allows together: `none` alone, or each line once. */
+function isLineList(keywords: ReadonlyArray<string>): boolean {
+    if (keywords.includes("none")) {
+        return keywords.length === 1;
     }
 
-    return isFunctionToken(keyword) || THICKNESS.test(keyword) || HEX_COLOR.test(keyword);
+    return new Set(keywords).size === keywords.length;
+}
+
+type DecorationPart = "color" | "line" | "style" | "thickness" | "variable";
+
+/** What a keyword of the shorthand sets: a line, a line style, a thickness or a color; undefined for none of them. */
+function decorationPart(keyword: string): DecorationPart | undefined {
+    if (LINE_KEYWORDS.has(keyword)) {
+        return "line";
+    }
+
+    if (DECORATION_STYLES.has(keyword)) {
+        return "style";
+    }
+
+    if (THICKNESS.test(keyword) || keyword.startsWith("calc(")) {
+        return isFunctionToken(keyword) || !keyword.includes("(") ? "thickness" : undefined;
+    }
+
+    if (keyword.startsWith("var(")) {
+        return isFunctionToken(keyword) ? "variable" : undefined;
+    }
+
+    return NAMED_COLORS.has(keyword) || HEX_COLOR.test(keyword) || isFunctionToken(keyword) ? "color" : undefined;
 }
 
 /** True for a value the shorthand or the longhand that sets the decoration line takes. */

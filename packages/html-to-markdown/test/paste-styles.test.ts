@@ -327,3 +327,15 @@ describe("paste styles: review cases, ninth round", () => {
         ).toBe("```\nx\n```\n\n```\ny\n```\n\n```shell\nz\n```\n\n```py\nw\n```");
     });
 });
+
+describe("paste styles: review cases, tenth round", () => {
+    it("lets a shorthand with a part more than once override no earlier one, as CSS allows each once", () => {
+        const struck = (later: string): string => `<span style="text-decoration:line-through; ${later}">x</span>`;
+
+        expect(
+            convert(
+                `<p>${[struck("text-decoration:red blue"), struck("text-decoration:none underline"), struck("text-decoration-line:underline underline"), `<span style="text-decoration:line-through wavy red 2px">y</span>`].join(" ")}</p>`,
+            ),
+        ).toBe("~~x~~ ~~x~~ ~~x~~ ~~y~~");
+    });
+});
