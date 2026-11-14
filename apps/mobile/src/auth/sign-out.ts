@@ -59,6 +59,28 @@ const revokeStored = async (token: string | undefined, revokeSession: (token: st
 export const wasSignedOut = (markedDigest: string | null, grantDigest: string): boolean => markedDigest === grantDigest;
 
 /**
+ * The sign-in on this phone, unless a sign-out ended it, read through the stores it is given. A marker that cannot be read
+ * counts as signed out, so a broken store shows nothing rather than an old account's text.
+ */
+export const signedInGrantOf = async <G extends { token: string }>(
+    readGrant: () => Promise<G | null | undefined>,
+    readMarker: () => Promise<string | null>,
+    digest: (token: string) => Promise<string>,
+): Promise<G | undefined> => {
+    const grant = await readGrant();
+
+    if (!grant) {
+        return undefined;
+    }
+
+    try {
+        return wasSignedOut(await readMarker(), await digest(grant.token)) ? undefined : grant;
+    } catch {
+        return undefined;
+    }
+};
+
+/**
  * Signing out takes the person's saved chats off the device FIRST, locally, before the server is asked anything: a
  * sign-out request that fails or hangs offline must not leave their chats behind for the next person to open.
  *

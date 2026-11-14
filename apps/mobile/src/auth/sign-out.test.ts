@@ -6,6 +6,7 @@ import {
     emptyCacheWhileSignedOut,
     RELEASE_PUSH_TIMEOUT_MS,
     runSignOut,
+    signedInGrantOf,
     signOutOnDevice,
     wasSignedOut,
 } from "./sign-out";
@@ -16,6 +17,35 @@ describe("wasSignedOut", () => {
         expect(wasSignedOut("digest-1", "digest-1")).toBe(true);
         expect(wasSignedOut("digest-1", "digest-2")).toBe(false);
         expect(wasSignedOut(null, "digest-1")).toBe(false);
+    });
+});
+
+describe("signedInGrantOf", () => {
+    const grant = { token: "session-1", user: { email: "a@b.c", id: "u1", image: null, name: "A" } };
+    const digest = async (token: string) => `digest-of-${token}`;
+
+    it("reads no sign-in when the store holds none", async () => {
+        expect(await signedInGrantOf(async () => null, async () => null, digest)).toBeUndefined();
+    });
+
+    it("gives back a readable grant when no sign-out recorded it", async () => {
+        expect(await signedInGrantOf(async () => grant, async () => null, digest)).toBe(grant);
+    });
+
+    it("refuses a readable grant that a sign-out recorded, by its digest", async () => {
+        expect(await signedInGrantOf(async () => grant, async () => "digest-of-session-1", digest)).toBeUndefined();
+    });
+
+    it("gives back a grant when the record is for a different sign-in", async () => {
+        expect(await signedInGrantOf(async () => grant, async () => "digest-of-session-0", digest)).toBe(grant);
+    });
+
+    it("refuses the grant when the record cannot be read, so a broken store shows nothing", async () => {
+        const failing = async (): Promise<string | null> => {
+            throw new Error("keychain locked");
+        };
+
+        expect(await signedInGrantOf(async () => grant, failing, digest)).toBeUndefined();
     });
 });
 

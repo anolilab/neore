@@ -1,9 +1,8 @@
 import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
 import { getItemAsync, setItemAsync } from "expo-secure-store";
 
-import type { StoredGrant } from "./grant";
 import { secureGrantStore } from "./secure-store";
-import { wasSignedOut } from "./sign-out";
+import { signedInGrantOf } from "./sign-out";
 
 /** The digest of the token of the grant the last sign-out ended. The token itself is never kept: it is a credential. */
 const SIGNED_OUT_KEY = "neore.mobile.signed-out-grant";
@@ -16,20 +15,5 @@ export const markGrantSignedOut = async (token: string): Promise<void> => {
     await setItemAsync(SIGNED_OUT_KEY, await digestOf(token));
 };
 
-/**
- * The sign-in on this phone, unless a sign-out ended it: a failed clear leaves that grant readable. A marker that cannot be
- * read counts as signed out, so a broken store shows nothing rather than an old account's text.
- */
-export const readSignedInGrant = async (): Promise<StoredGrant | undefined> => {
-    const grant = await secureGrantStore.get();
-
-    if (!grant) {
-        return undefined;
-    }
-
-    try {
-        return wasSignedOut(await getItemAsync(SIGNED_OUT_KEY), await digestOf(grant.token)) ? undefined : grant;
-    } catch {
-        return undefined;
-    }
-};
+/** The sign-in on this phone, unless a sign-out ended it: what the headless push task is allowed to read. */
+export const readSignedInGrant = async () => await signedInGrantOf(() => secureGrantStore.get(), () => getItemAsync(SIGNED_OUT_KEY), digestOf);
