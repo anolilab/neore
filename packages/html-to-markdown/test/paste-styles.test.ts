@@ -385,3 +385,19 @@ describe("paste styles: review cases, thirteenth round", () => {
         ).toBe("- [x] ~~Done~~\n- [ ] **Task**");
     });
 });
+
+describe("paste styles: review cases, fourteenth round", () => {
+    it("joins the formatting of styled spans side by side into one run, as Google Docs splits a bold word by color", () => {
+        expect(convert(`<p><span style="font-weight:700">Hel</span><span style="font-weight:700;color:red">lo</span> world</p>`)).toBe("**Hello** world");
+        expect(convert(`<p><span style="font-weight:700">Hel</span><b>lo</b> <i>x</i><span style="font-style:italic">y</span></p>`)).toBe("**Hello** *xy*");
+        expect(convert(`<p><span style="font-weight:700">a</span> <span style="font-weight:700">b</span></p>`)).toBe("**a** **b**");
+    });
+
+    it("reads a decoration thickness written without a digit before its point", () => {
+        expect(convert(`<p><span style="text-decoration:line-through .5px">x</span></p>`)).toBe("~~x~~");
+    });
+
+    it("reads the delimiter marks a page's own text holds as no marks", () => {
+        expect(convert("<p>a\u{3}b\u{4}c <b>d\u{5}</b></p>")).toBe("abc **d**");
+    });
+});

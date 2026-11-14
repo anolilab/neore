@@ -17,6 +17,18 @@ import { isBlock } from "./utilities";
 const TEXT_TYPES = new Set([3, 4, 8]);
 const NORMAL_START = "\u{1}";
 const NORMAL_END = "\u{2}";
+
+/** The marks a style rule writes for its delimiters, put in at the end: a closer right before an opener of its kind goes. */
+interface Delimiter {
+    close: string;
+    open: string;
+}
+
+const STRONG: Delimiter = { close: "\u{4}", open: "\u{3}" };
+const EMPHASIS: Delimiter = { close: "\u{6}", open: "\u{5}" };
+const STRIKE: Delimiter = { close: "\u{F}", open: "\u{E}" };
+// Every mark the preset writes, taken out of the input so only the preset writes them.
+const ALL_MARKS = [NORMAL_START, NORMAL_END, STRONG.open, STRONG.close, EMPHASIS.open, EMPHASIS.close, STRIKE.open, STRIKE.close];
 const BOLD_WEIGHTS = new Set(["600", "700", "800", "900", "bold", "bolder"]);
 
 // `lighter` is not here: it is relative, and under a heavy weight it is still bold.
@@ -41,7 +53,9 @@ const VALUE_FUNCTIONS = new Set(["calc", "color", "color-mix", "hsl", "hsla", "h
 const LINE_KEYWORDS = new Set(["blink", "line-through", "none", "overline", "underline"]);
 // What else the `text-decoration` shorthand takes: a line style, a thickness and a color.
 const DECORATION_STYLES = new Set(["dashed", "dotted", "double", "solid", "wavy"]);
-const THICKNESS = /^(?:auto|from-font|\d+(?:\.\d+)?(?:%|[a-z]{1,4})?)$/;
+const THICKNESS_KEYWORDS = new Set(["auto", "from-font"]);
+// A length or a percentage: `2px`, `.5em`, `10%`.
+const LENGTH = /^(?:\d+(?:\.\d+)?|\.\d+)(?:%|[a-z]{1,4})?$/;
 const HEX_COLOR = /^#(?:[\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/;
 // The named colors of CSS Color 4, and the two keywords a color may also be.
 const NAMED_COLORS = new Set([
@@ -452,7 +466,7 @@ function decorationPart(keyword: string): DecorationPart | undefined {
         return "style";
     }
 
-    if (THICKNESS.test(keyword) || keyword.startsWith("calc(")) {
+    if (THICKNESS_KEYWORDS.has(keyword) || LENGTH.test(keyword) || keyword.startsWith("calc(")) {
         return isFunctionToken(keyword) || !keyword.includes("(") ? "thickness" : undefined;
     }
 
@@ -853,8 +867,39 @@ export function withoutMarks(text: string): string {
     return text.includes(NORMAL_START) || text.includes(NORMAL_END) ? text.replaceAll(NORMAL_START, "").replaceAll(NORMAL_END, "") : text;
 }
 
-/** `marker` around the text, with the whitespace at its ends kept outside, where Markdown lets a delimiter be. */
-function wrapEdges(text: string, marker: string): string {
+/** Every mark taken out: what a page's own text holds of them is no mark. */
+function withoutAnyMarks(text: string): string {
+    let rest = text;
+
+    for (const mark of ALL_MARKS) {
+        rest = rest.replaceAll(mark, "");
+    }
+
+    return rest;
+}
+
+/** The delimiters in place of their marks. Two runs of one kind side by side are one: the closer and opener between go. */
+function writeDelimiters(markdown: string, options: Options): string {
+    const written: ReadonlyArray<readonly [Delimiter, string]> = [
+        [STRONG, options.strongDelimiter],
+        [EMPHASIS, options.emDelimiter],
+        [STRIKE, "~~"],
+    ];
+
+    let text = markdown;
+
+    for (const [delimiter, value] of written) {
+        text = text
+            .replaceAll(delimiter.close + delimiter.open, "")
+            .replaceAll(delimiter.open, () => value)
+            .replaceAll(delimiter.close, () => value);
+    }
+
+    return text;
+}
+
+/** The delimiter around the text, with the whitespace at its ends kept outside, where Markdown lets a delimiter be. */
+function wrapEdges(text: string, marker: Delimiter): string {
     const core = text.trim();
 
     if (core === "") {
@@ -863,14 +908,14 @@ function wrapEdges(text: string, marker: string): string {
 
     const start = text.length - text.trimStart().length;
 
-    return `${text.slice(0, start)}${marker}${core}${marker}${text.slice(start + core.length)}`;
+    return `${text.slice(0, start)}${marker.open}${core}${marker.close}${text.slice(start + core.length)}`;
 }
 
 /**
  * `marker` around each run of the content between normal-weight marks, paragraph by paragraph: emphasis cannot span a
  * blank line. A normal-weight run that goes on past one is closed before it and opened again after it.
  */
-function wrapRuns(content: string, marker: string, isBold: boolean): string {
+function wrapRuns(content: string, marker: Delimiter, isBold: boolean): string {
     if (!content.includes("\n\n")) {
         return wrapParagraph(content, marker, isBold);
     }
@@ -893,7 +938,7 @@ function wrapRuns(content: string, marker: string, isBold: boolean): string {
  * `marker` around each run of one paragraph between normal-weight marks. Bold leaves a marked run as it is and drops its
  * marks; italics and strikethrough go inside the marks as well, so the bold around them never splits a delimiter.
  */
-function wrapParagraph(content: string, marker: string, isBold: boolean): string {
+function wrapParagraph(content: string, marker: Delimiter, isBold: boolean): string {
     const parts: string[] = [];
     let from = 0;
 
@@ -1002,6 +1047,24 @@ function isFormattedAbove(element: Element, kind: Kind, lookup: RuleLookup): boo
 }
 
 /**
+ * True for `<b>`, `<i>` or `<s>` right beside a styled element with the same formatting: the preset writes both, so
+ * their delimiters join into one run: a bold span `Hel` and a `<b>lo</b>` beside it are `**Hello**`.
+ */
+function hasStyledNeighbour(element: Element): boolean {
+    const emphasis = emphasisOf(element);
+
+    return [element.previousSibling, element.nextSibling].some((sibling) => {
+        if (sibling?.nodeType !== 1 || isNamed(sibling as Element) || !STYLED.has(sibling.nodeName)) {
+            return false;
+        }
+
+        const beside = emphasisOf(sibling as Element);
+
+        return KINDS.some((kind) => hasKind(emphasis, kind) && hasKind(beside, kind));
+    });
+}
+
+/**
  * True for `<b>`, `<i>` or `<s>` inside a styled element with the same formatting: the styled element writes the one
  * pair of delimiters, so the preset writes this one, without any.
  */
@@ -1016,15 +1079,15 @@ function isNestedInStyled(element: Element, lookup: RuleLookup): boolean {
 }
 
 /** The element's content with the bold, italics and strikethrough its name or style gives it, and its normal-weight marks. */
-function formatted(content: string, node: Element, options: Options, lookup: RuleLookup): string {
+function formatted(content: string, node: Element, lookup: RuleLookup): string {
     // A task list item's box stays right after its marker, outside the delimiters, so it is still a box.
     const found = node.nodeName === "LI" ? TASK_BOX.exec(content) : null;
     const box = found?.[0] ?? "";
 
-    return box + formattedText(content.slice(box.length), node, options, lookup);
+    return box + formattedText(content.slice(box.length), node, lookup);
 }
 
-function formattedText(content: string, node: Element, options: Options, lookup: RuleLookup): string {
+function formattedText(content: string, node: Element, lookup: RuleLookup): string {
     const emphasis = emphasisOf(node);
     const isWrapped = canWrap(node, lookup);
     let text = content;
@@ -1033,7 +1096,7 @@ function formattedText(content: string, node: Element, options: Options, lookup:
         // Bold inside bold writes no second pair; the marks wait for the bold around it. A link holding a normal-weight
         // run writes its label's bold runs, and the link as a whole is then marked normal.
         if (linkRuns.has(node) || !isFormattedAbove(node, "isBold", lookup)) {
-            text = isWrapped ? wrapRuns(text, options.strongDelimiter, true) : withoutMarks(text);
+            text = isWrapped ? wrapRuns(text, STRONG, true) : withoutMarks(text);
         }
     } else if (isUnbold(node) && isNamed(node) && text.trim() !== "") {
         // All of it is normal weight, so marks inside it are not needed.
@@ -1041,11 +1104,11 @@ function formattedText(content: string, node: Element, options: Options, lookup:
     }
 
     if (isWrapped && emphasis.isItalic && !isFormattedAbove(node, "isItalic", lookup)) {
-        text = wrapRuns(text, options.emDelimiter, false);
+        text = wrapRuns(text, EMPHASIS, false);
     }
 
     if (isWrapped && emphasis.isStrike && !isFormattedAbove(node, "isStrike", lookup)) {
-        text = wrapRuns(escapeTildes(text), "~~", false);
+        text = wrapRuns(escapeTildes(text), STRIKE, false);
     }
 
     return text;
@@ -1060,7 +1123,9 @@ const styledText: Rule = {
         }
 
         if (isNamed(node)) {
-            return isUnbold(node) || carriersOf(node).has(node) || isInEmojiSequence(node, lookup) || isNestedInStyled(node, lookup);
+            return (
+                isUnbold(node) || carriersOf(node).has(node) || isInEmojiSequence(node, lookup) || isNestedInStyled(node, lookup) || hasStyledNeighbour(node)
+            );
         }
 
         const emphasis = emphasisOf(node);
@@ -1072,7 +1137,7 @@ const styledText: Rule = {
         return STYLED.has(node.nodeName) && (emphasis.isBold || emphasis.isItalic || emphasis.isStrike || isUnbold(node));
     },
     replacement(content, node, options, lookup) {
-        const text = formatted(content, node, options, lookup);
+        const text = formatted(content, node, lookup);
 
         if (isNamed(node)) {
             return text;
@@ -1116,11 +1181,11 @@ function hasMarks(root: Node): boolean {
     while (pending.length > 0) {
         const node = pending.pop() as Node;
 
-        if (TEXT_TYPES.has(node.nodeType) && withoutMarks(node.nodeValue ?? "") !== node.nodeValue) {
+        if (TEXT_TYPES.has(node.nodeType) && withoutAnyMarks(node.nodeValue ?? "") !== node.nodeValue) {
             return true;
         }
 
-        if (node.nodeType === 1 && attributesOf(node as Element).some(({ value }) => withoutMarks(value) !== value)) {
+        if (node.nodeType === 1 && attributesOf(node as Element).some(({ value }) => withoutAnyMarks(value) !== value)) {
             return true;
         }
 
@@ -1142,10 +1207,10 @@ function copyWithoutMarks(input: Node): Node {
 
         // Text, CDATA and comments.
         if (TEXT_TYPES.has(node.nodeType)) {
-            node.nodeValue = withoutMarks(node.nodeValue ?? "");
+            node.nodeValue = withoutAnyMarks(node.nodeValue ?? "");
         } else if (node.nodeType === 1) {
             for (const attribute of attributesOf(node as Element)) {
-                attribute.value = withoutMarks(attribute.value);
+                attribute.value = withoutAnyMarks(attribute.value);
             }
         }
 
@@ -1163,11 +1228,11 @@ function copyWithoutMarks(input: Node): Node {
  */
 export function guardMarks(service: TurndownService): void {
     const convert = service.turndown.bind(service);
-    const finish = (markdown: string): string => withoutMarks(markdown).replace(LEADING_SPACE, "");
+    const finish = (markdown: string): string => withoutMarks(writeDelimiters(markdown, service.options)).replace(LEADING_SPACE, "");
 
     const turndown = (input: TurndownInput): string => {
         if (typeof input === "string") {
-            return finish(convert(withoutMarks(input)));
+            return finish(convert(withoutAnyMarks(input)));
         }
 
         const isNode = typeof input === "object" && input !== null && typeof (input as Partial<Node>).nodeType === "number";
