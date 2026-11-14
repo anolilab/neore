@@ -275,3 +275,22 @@ describe("paste: headings holding blocks", () => {
         expect(convert("<h2><p>Setup</p><pre>npm i</pre></h2>")).toBe("## Setup\n\n```\nnpm i\n```");
     });
 });
+
+describe("paste: paragraphs in a heading, review cases", () => {
+    it("keeps text the page hides in a heading's paragraph or div hidden", () => {
+        expect(convert(`<h2><p>Title</p><div style="display:none">x</div></h2>`)).toBe("## Title");
+        expect(convert("<h2>Title<p hidden>x</p></h2>")).toBe("## Title");
+    });
+
+    it("keeps the words of a heading's paragraph apart from the text after it", () => {
+        expect(convert("<h2><p>First</p>Second</h2>")).toBe("## First Second");
+    });
+
+    it("keeps the formatting a heading's paragraph sets", () => {
+        expect(convert(`<h2><p style="font-style:italic">Title</p></h2>`)).toBe("## *Title*");
+    });
+
+    it("keeps the language a div around a heading's code block names", () => {
+        expect(convert(`<h3><div class="language-js"><pre>let x=1</pre></div></h3>`)).toBe("```js\nlet x=1\n```");
+    });
+});

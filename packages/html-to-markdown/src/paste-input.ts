@@ -298,9 +298,11 @@ function collapsedLength(text: string): number {
 }
 
 /**
- * Takes the paragraphs and divs that are children of a heading out of their element, their text kept on the heading's
- * line: a heading holds one line, and `<h2><p>Title</p></h2>` is the heading `Title`. Two of them side by side are
- * parted by a space. Other blocks in a heading, such as a code block, stay blocks.
+ * Writes the paragraphs and divs that are children of a heading as spans, their text kept on the heading's line: a
+ * heading holds one line, and `<h2><p>Title</p></h2>` is the heading `Title`. The span keeps every attribute, so what
+ * hides the text, its style and its class (a code block's language) still apply. A space on each side keeps its words
+ * apart from those around it; HTML whitespace collapses any extra. Other blocks in a heading, such as a code block,
+ * stay blocks.
  */
 export function unwrapHeadingParagraphs(root: Node, shown: Shown): void {
     const pending: Node[] = [root];
@@ -309,7 +311,7 @@ export function unwrapHeadingParagraphs(root: Node, shown: Shown): void {
         const node = pending.pop() as Node;
 
         if (HEADINGS.has(node.nodeName)) {
-            unwrapParagraphChildren(node as Element);
+            inlineParagraphChildren(node as Element);
         }
 
         for (let child = node.firstChild; child; child = child.nextSibling) {
@@ -320,28 +322,34 @@ export function unwrapHeadingParagraphs(root: Node, shown: Shown): void {
     }
 }
 
-function unwrapParagraphChildren(heading: Element): void {
-    let child = heading.firstChild;
+function inlineParagraphChildren(heading: Element): void {
+    const document = heading.ownerDocument;
+    const paragraphs: Element[] = [];
 
-    while (child) {
-        if (!HEADING_PARAGRAPHS.has(child.nodeName)) {
-            child = child.nextSibling;
-            continue;
+    for (let child = heading.firstElementChild; child; child = child.nextElementSibling) {
+        if (HEADING_PARAGRAPHS.has(child.nodeName)) {
+            paragraphs.push(child);
         }
+    }
 
-        const paragraph = child;
+    for (const paragraph of paragraphs) {
+        const span = document.createElement("span");
 
-        // Its children take its place, with a space before them when text comes before.
-        if (paragraph.previousSibling) {
-            heading.insertBefore(heading.ownerDocument.createTextNode(" "), paragraph);
+        for (let index = 0; index < paragraph.attributes.length; index += 1) {
+            const attribute = paragraph.attributes[index] as Attr;
+
+            span.setAttribute(attribute.name, attribute.value);
         }
-
-        child = paragraph.firstChild ?? paragraph.nextSibling;
 
         while (paragraph.firstChild) {
-            heading.insertBefore(paragraph.firstChild, paragraph);
+            // eslint-disable-next-line unicorn/prefer-dom-node-append -- domino, the parser on servers, has no append.
+            span.appendChild(paragraph.firstChild);
         }
 
+        heading.insertBefore(document.createTextNode(" "), paragraph);
+        // eslint-disable-next-line unicorn/prefer-modern-dom-apis -- domino, the parser on servers, has no before.
+        heading.insertBefore(span, paragraph);
+        heading.insertBefore(document.createTextNode(" "), paragraph);
         paragraph.remove();
     }
 }
