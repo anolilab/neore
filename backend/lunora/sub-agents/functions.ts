@@ -42,6 +42,7 @@ import { resolveLeafRow } from "../agent/branch-rows";
 import { addMessagesHandler, getMaxMessage } from "../agent/messages";
 import { isThreadStreaming } from "../agent/thread-streaming";
 import { clearAwaitingInput, insertThread, insertThreadRelationship, patchThread } from "../agent/table-writes";
+import { hostOrganizationRefusal } from "../acp/lib/organization-cap";
 import { sessionOfThread } from "../acp/lib/sessions";
 import { startFailureMessage } from "../acp/lib/start";
 import { openHostSession } from "../acp/lib/start-session";
@@ -65,7 +66,6 @@ import { isTaskModelAllowed } from "../tasks/logic";
 import { threadGateOutcome, throwUnlessGranted } from "../chat/lib/thread-gate";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { LEFT_ORGANIZATION_MESSAGE } from "../auth/lib/organization-policy";
-import { readOrganizationPermissionCap } from "../auth/lib/permission-cap-read";
 import type { PendingToolRequest } from "../chat/lib/tool-approval-claim";
 import { findPendingRequestOnLatestTurn, latestTurnRows, openRequestsOfLatestTurn, SUB_AGENT_RUN_ENDED_BY } from "../chat/lib/tool-approval-claim";
 import { denyToolApprovalRun, isToolApprovalRunExpired, PENDING_APPROVAL_TTL_MS, pendingApprovalCutoff } from "../chat/lib/tool-approval-cleanup";
@@ -435,25 +435,6 @@ const membershipRefusal = async (ctx: MutationCtx, organizationId: string | null
     organizationId && !(await getMemberByOrganizationAndUser(ctx, organizationId, userId, "primary")) ? LEFT_ORGANIZATION_MESSAGE : null;
 
 /**
- * Why a computer worker cannot run for this organization, or `null`. The owner must still be a member, and the cap must be
- * `auto`: a computer agent's tools are approved there, out of the backend's reach. Checked at admission, before any session
- * is opened, and again when a queued turn is sent.
- */
-const hostOrganizationRefusal = async (ctx: MutationCtx, organizationId: string | null | undefined, userId: string): Promise<string | null> => {
-    if (!organizationId) {
-        return null;
-    }
-
-    const leftOrganization = await membershipRefusal(ctx, organizationId, userId);
-
-    if (leftOrganization) {
-        return leftOrganization;
-    }
-
-    return (await readOrganizationPermissionCap(ctx, organizationId)) === "auto" ? null : HOST_NOT_UNDER_AUTO;
-};
-
-/**
  * Starts a host run in the caller's transaction: claims it (no charge: the agent bills its own account) and sends its
  * message as the `acp_send` call. A host that cannot be reached fails the run at once, through {@link finishRun}, so the
  * lead hears a failure like any other and the queue moves on. A computer that is only busy (its open-call budget is spent,
@@ -590,8 +571,6 @@ const findDispatchedRun = async (ctx: Pick<MutationCtx, "db">, args: WorkerRunAr
 };
 
 const HOST_NEEDS_A_PERSON = "Messaging a worker on a computer needs a person in the conversation to approve it, so a background run cannot do it.";
-
-const HOST_NOT_UNDER_AUTO = "Your organization does not allow agents on your computer.";
 
 const HOST_NEEDS_OWN_CONVERSATION =
     "A worker on a computer can only be used from a conversation that is yours alone: not shared, public, a group chat or a messenger conversation.";

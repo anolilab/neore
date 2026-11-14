@@ -95,6 +95,7 @@ const GuideTab = ({
                 host_error: t`${hostLabel} could not be reached. Try again in a moment.`,
                 needs_reconnect: t`Your ${hostLabel} sign-in has expired. Connect it again.`,
                 not_connected: t`${hostLabel} is not connected.`,
+                not_allowed: t`Your organization does not allow agents on your computer.`,
                 not_found: t`It does not exist, or your ${hostLabel} account cannot see it.`,
                 quota: t`Your daily limit for AI requests is used up.`,
                 rate_limited: rateLimited,

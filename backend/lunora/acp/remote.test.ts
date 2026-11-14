@@ -12,10 +12,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { hashPasscode, mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
 
-const { sessionFrom } = vi.hoisted(() => {
+const { activeOrganization, sessionFrom } = vi.hoisted(() => {
+    /** The caller's verified active organization, as `getSessionUser` resolves it; `null` is the personal space. */
+    const active = { current: null as null | { id: string; name: string; role: string; slug: null } };
+
     return {
+        activeOrganization: active,
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
-            context.auth.userId ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, userId: context.auth.userId } : null,
+            context.auth.userId ? { activeOrganization: active.current, id: context.auth.userId, isAdmin: false, userId: context.auth.userId } : null,
     };
 });
 
@@ -89,6 +93,7 @@ const insertUser = async () =>
 let manifestAt = 0;
 
 const OUT_OF_DATE = /out of date/;
+const NOT_ALLOWED = /does not allow agents on your computer/u;
 
 const manifest = async (deviceId: string, secret: string, extra: Record<string, unknown>) => {
     manifestAt += 1;
@@ -244,6 +249,7 @@ const addRequests = async (streamId: string, ids: string[]) => {
 beforeEach(async () => {
     harness = lunoraTest(schema as never);
     ownerId = await insertUser();
+    activeOrganization.current = null;
 });
 
 afterEach(() => {
@@ -816,6 +822,98 @@ describe("a continue from the web", () => {
         expect(await sessionStatus()).toBe("idle");
         // And the thread takes the next message.
         expect(await outcomeOfSend(threadId, "thanks")).toBe("sent");
+    });
+});
+
+describe("an organization's cap on coding agents", () => {
+    const start = async (deviceId: string, clientId = "tap-org") =>
+        await as(ownerId).mutation(remote.startHostSession as never, { agentKey: "claude", clientId, deviceId, folderId: "f1" } as never);
+
+    const joinOrganization = async (organizationId = "org-a") =>
+        await run(async (ctx) => await ctx.db.insert("member", { createdAt: 0, organizationId, role: "member", userId: ownerId }));
+
+    const capOrganization = async (permissionCap: string, organizationId = "org-a") =>
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("organizationPolicies", {
+                    document: JSON.stringify({ permissionCap, schemaVersion: 1 }),
+                    organizationId,
+                    revision: 1,
+                    schemaVersion: 1,
+                    updatedAt: Date.now(),
+                }),
+        );
+
+    const sendAs = async (threadId: string, organizationId?: string): Promise<unknown> => {
+        const result = await run(
+            async (ctx) =>
+                await ctx.runMutation(send.sendToHost, {
+                    organizationId,
+                    plan: "free",
+                    requestId: crypto.randomUUID(),
+                    text: "fix the bug",
+                    threadId,
+                    userId: ownerId,
+                }),
+        );
+
+        return result.outcome;
+    };
+
+    it("files a start under the caller's organization when it allows agents, so its cap holds the chat in every space", async () => {
+        const device = await pairedDevice(ownerId);
+
+        await joinOrganization();
+        activeOrganization.current = { id: "org-a", name: "A", role: "member", slug: null };
+
+        const result = (await start(device.deviceId)) as { started: boolean; threadId: string };
+
+        expect(result.started).toBe(true);
+        expect(await row(result.threadId)).toMatchObject({ organizationId: "org-a", runner: "host" });
+    });
+
+    it("refuses a start when the caller's organization holds agents below auto, opening nothing", async () => {
+        const device = await pairedDevice(ownerId);
+
+        await joinOrganization();
+        await capOrganization("ask");
+        activeOrganization.current = { id: "org-a", name: "A", role: "member", slug: null };
+
+        await expect(start(device.deviceId)).rejects.toThrow(NOT_ALLOWED);
+        expect(await rows("acpSessions")).toHaveLength(0);
+        expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
+        expect(await rows("threads", { runner: "host" })).toHaveLength(0);
+    });
+
+    it("refuses a send into a chat filed under an organization that has since tightened its cap, or that its owner left", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await openSession(device);
+
+        await run(async (ctx) => await ctx.db.patch("threads", threadId as never, { organizationId: "org-a" }));
+        await joinOrganization();
+        await capOrganization("ask");
+
+        // From the personal space too: the chat's own organization decides.
+        expect(await sendAs(threadId)).toBe("not_allowed");
+
+        const [member] = await rows("member", { userId: ownerId });
+
+        await run(async (ctx) => await ctx.db.delete("member", member?._id));
+
+        expect(await sendAs(threadId)).toBe("left_organization");
+        expect(await rows("persistentStreams", { threadId })).toHaveLength(0);
+        expect(await rows("deviceCalls", { toolName: "acp_send" })).toHaveLength(0);
+    });
+
+    it("caps a send into a personal host chat by the caller's organization", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await openSession(device);
+
+        await joinOrganization();
+        await capOrganization("ask");
+
+        expect(await sendAs(threadId, "org-a")).toBe("not_allowed");
+        expect(await sendAs(threadId)).toBe("sent");
     });
 });
 

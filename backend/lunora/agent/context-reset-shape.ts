@@ -60,3 +60,11 @@ export const CONTEXT_CLEAR_CONFLICT = {
     /** A paid summary or compaction of the thread is under way; its result would be made for a context the clear ends. */
     summarising: "CONTEXT_CLEAR_SUMMARISING",
 } as const;
+
+/** Why the organization refused a `/clear` on a coding agent's chat, in the error's `data.code`: a clear starts a new session. */
+export const CONTEXT_CLEAR_ORGANIZATION = {
+    /** The owner is no longer a member of the organization the chat is filed under. */
+    left_organization: "CONTEXT_CLEAR_LEFT_ORGANIZATION",
+    /** The organization's cap is not `auto`, so it does not allow agents on a computer. */
+    not_allowed: "CONTEXT_CLEAR_NOT_ALLOWED",
+} as const;
