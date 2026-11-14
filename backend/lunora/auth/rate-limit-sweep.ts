@@ -3,9 +3,9 @@
  * row per client address and path, updated in place and never deleted.
  *
  * better-auth resets a row's count once `lastRequest` is older than the path's window, so a
- * row past the longest window reads exactly like a missing one. The longest window here is a
- * minute (`AUTH_RATE_LIMIT_CUSTOM_RULES` and better-auth's defaults); a day leaves room for
- * any plugin rule. Runs on `__root__` only: the table is in D1, the same from every shard.
+ * row past the longest window reads exactly like a missing one. Every window here, the
+ * custom rules, better-auth's defaults and plugin rules such as the 30-minute one in
+ * `auth.ts`, is well under a day. Runs on `__root__` only: the table is in D1, the same from every shard.
  */
 import { v } from "lunorash/server";
 

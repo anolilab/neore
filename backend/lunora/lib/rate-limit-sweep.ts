@@ -9,6 +9,10 @@
  * longest retention of any configured limit: past that point the library would
  * read the row as a full bucket, so deleting it changes no decision.
  *
+ * A row with a negative `value` (debt a `reserve` left) is kept, as the library's own
+ * sweep keeps it: concurrent reserves can stack debt past one capacity, so its refill
+ * can outlast the retention, and deleting it would forgive the debt.
+ *
  * Rows live on the shard whose mutation charged them, so the sweep runs on `__root__`
  * from the cron tick and on each user shard from `lib/shard-housekeeping.ts`.
  */
@@ -25,8 +29,8 @@ export const RATE_LIMIT_SWEEP_PAGE = 200;
 /**
  * How long `@lunora/ratelimit` keeps a row before its own sweep may evict it: the
  * period times (2 + capacity / rate). That covers the window itself and the refill
- * of the deepest debt a `reserve` can leave (at most one capacity), so a row this
- * old, negative or not, reads as a full bucket.
+ * of one capacity of debt, so a row this old with a non-negative value reads as a
+ * full bucket.
  */
 export const retentionOf = (config: RateLimitConfig): number => {
     const capacity = config.kind === "sliding window" ? config.rate : (config.capacity ?? config.rate);
@@ -41,10 +45,11 @@ export const sweepExpiredRateLimits = internalMutation
     .input({})
     .output(v.number())
     .mutation(async ({ ctx }) => {
-        const expired = await ctx.db
-            .query("rateLimits")
-            .withIndex("by_ts", (q) => q.lt("ts", ctx.now - RATE_LIMIT_RETENTION_MS))
-            .take(RATE_LIMIT_SWEEP_PAGE);
+        const { page: expired } = await ctx.db.rateLimits.findMany({
+            limit: RATE_LIMIT_SWEEP_PAGE,
+            orderBy: [{ ts: "asc" }],
+            where: { ts: { lt: ctx.now - RATE_LIMIT_RETENTION_MS }, value: { gte: 0 } },
+        });
 
         await Promise.all(expired.map(async (row) => await ctx.db.delete("rateLimits", row._id)));
 

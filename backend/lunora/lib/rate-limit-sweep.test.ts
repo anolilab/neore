@@ -105,7 +105,30 @@ describe.each(TABLES)("$table sweep", ({ page, retention, row, sweep, table, tar
     });
 });
 
+describe("rateLimits sweep and reserve debt", () => {
+    it("keeps an expired row that still carries debt, as the library's own sweep does", async () => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("rateLimits", { key: "debt", ts: NOW - RATE_LIMIT_RETENTION_MS - 1, value: -1800 });
+            await ctx.db.insert("rateLimits", { key: "paid", ts: NOW - RATE_LIMIT_RETENTION_MS - 1, value: 0 });
+        });
+
+        const keys = await harness.run(async (ctx: any) => {
+            await ctx.runMutation(sweepExpiredRateLimits, {});
+
+            const rows: { key: string }[] = await ctx.db.query("rateLimits").collect();
+
+            return rows.map((row) => row.key);
+        });
+
+        expect(keys).toStrictEqual(["debt"]);
+    });
+});
+
 describe("retentionOf", () => {
+    it("is three days for the longest configured limit", () => {
+        expect(RATE_LIMIT_RETENTION_MS).toBe(3 * DAY);
+    });
+
     it("covers the window and the refill of a full reserve debt", () => {
         expect(retentionOf(Ratelimit.fixedWindow(5, DAY))).toBe(3 * DAY);
         expect(retentionOf(Ratelimit.tokenBucket(10, 1000, 20))).toBe(4000);
