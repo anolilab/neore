@@ -52,6 +52,8 @@ interface Step {
     isClosing: boolean;
     // In code, where whitespace is kept as written.
     isCode: boolean;
+    // Hidden by the page, or inside an element it hides: converted to nothing, so it costs no work.
+    isHidden: boolean;
     level: number;
 }
 
@@ -94,7 +96,7 @@ export function checkWork(root: Node, shown: Shown): void {
     const steps: Step[] = [];
     let work: Work = { format: 0, indent: 0, wrap: 0 };
 
-    pushElements(steps, root, { depth: 1, isCode: false, level: 1 });
+    pushElements(steps, root, { depth: 1, isCode: false, isHidden: false, level: 1 });
 
     while (steps.length > 0) {
         const step = steps.pop() as Step;
@@ -105,17 +107,21 @@ export function checkWork(root: Node, shown: Shown): void {
                 throw new RangeError("Nested too deep to convert");
             }
 
-            steps.push({ ...step, isClosing: true });
+            const isHidden = step.isHidden || shown.isHidden(element);
+
+            steps.push({ ...step, isClosing: true, isHidden });
             pushElements(steps, element, {
                 depth: TABLE_PARTS.has(element.nodeName) ? step.depth : step.depth + 1,
                 isCode: step.isCode || KEEPS_WHITESPACE.has(element.nodeName),
+                isHidden,
                 level: step.level + 1,
             });
             continue;
         }
 
-        // What the page hides is not converted: it costs no work, and holds none for the elements around it.
-        if (shown.isHidden(element)) {
+        // What the page hides is not converted: it costs no work, and holds none for the elements around it. The depth
+        // checks still go through it, above.
+        if (step.isHidden) {
             dropMeasures(element, measures);
             measures.set(element, { lines: 0, size: 0 });
             continue;
@@ -135,13 +141,23 @@ function isIndenting(element: Element): boolean {
     return INDENTING.has(element.nodeName) || (LISTS.has(element.nodeName) && LISTS.has(element.parentNode?.nodeName ?? ""));
 }
 
+/**
+ * True for a style that may set formatting: a weight, a font style or a text decoration, alone or in the `font`
+ * shorthand. A color or a size formats nothing, so it costs no work.
+ */
+function isFormattingStyle(style: string): boolean {
+    const lower = style.toLowerCase();
+
+    return lower.includes("font") || lower.includes("text-decoration");
+}
+
 /** The work left after the element's rule does its work on what it holds. Throws once a budget is spent. */
 function spend(work: Work, element: Element, measure: Measure): Work {
     let spent = work;
 
     if (isIndenting(element)) {
         spent = { ...work, indent: work.indent + measure.size };
-    } else if (FORMATTING.has(element.nodeName) || element.hasAttribute("style")) {
+    } else if (FORMATTING.has(element.nodeName) || isFormattingStyle(element.getAttribute("style") ?? "")) {
         spent = { ...work, format: work.format + measure.size, wrap: work.wrap + (measure.lines > 0 ? measure.size : 0) };
     }
 
@@ -168,7 +184,7 @@ function writtenLength(element: Element, shown: Shown): number {
     return 0;
 }
 
-function pushElements(steps: Step[], parent: Node, place: Pick<Step, "depth" | "isCode" | "level">): void {
+function pushElements(steps: Step[], parent: Node, place: Pick<Step, "depth" | "isCode" | "isHidden" | "level">): void {
     for (let child = parent.lastChild; child; child = child.previousSibling) {
         if (child.nodeType === 1) {
             steps.push({ ...place, element: child as Element, isClosing: false });
@@ -261,9 +277,10 @@ export function wrapLooseListText(root: Node, shown: Shown): void {
         }
     }
 
-    for (const list of lists) {
+    // Nested lists first: one may hand loose text that leads it to the list around it, which then reads it as its own.
+    for (const list of lists.toReversed()) {
         for (const run of looseRuns(list, shown)) {
-            placeRun(list, run);
+            placeRun(list, run, shown);
         }
     }
 }
@@ -273,13 +290,13 @@ export function wrapLooseListText(root: Node, shown: Shown): void {
  * takes no number and renumbers no item: it goes on a line of its own in the item before it, or before the list when
  * no item comes first.
  */
-function placeRun(list: Element, run: Node[]): void {
+function placeRun(list: Element, run: Node[], shown: Shown): void {
     const document = list.ownerDocument;
     const first = run[0] as Node;
     let target: Node;
 
     if (list.nodeName === "OL") {
-        const item = previousItem(first);
+        const item = previousItem(first, shown);
 
         if (item === null) {
             for (const node of run) {
@@ -304,10 +321,10 @@ function placeRun(list: Element, run: Node[]): void {
     }
 }
 
-/** The nearest item before the node among its siblings, or null. */
-function previousItem(node: Node): Element | null {
+/** The nearest item the page shows before the node among its siblings, or null: a hidden one is dropped with all it holds. */
+function previousItem(node: Node, shown: Shown): Element | null {
     for (let sibling = node.previousSibling; sibling; sibling = sibling.previousSibling) {
-        if (sibling.nodeName === "LI") {
+        if (sibling.nodeName === "LI" && !shown.isHidden(sibling)) {
             return sibling as Element;
         }
     }

@@ -311,7 +311,8 @@ const pasteRules: Record<string, Rule> = {
     lineDiv: {
         filter: unlessRemoved((node) => node.nodeName === "DIV" && !hasBlockChild(node)),
         replacement(content) {
-            const text = content.endsWith(`${LINE_BREAK_MARK}\n`) ? content.slice(0, -LINE_BREAK_MARK.length - 1) : content;
+            // A `<br>` at either edge makes no line of its own.
+            const text = trimBreaks(content);
 
             // Blank only for a line break: a div that holds what the page hides or drops shows nothing.
             if (text.trim() === "") {

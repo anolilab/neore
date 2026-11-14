@@ -135,7 +135,7 @@ describe("paste input: review cases", () => {
     });
 
     it("counts formatting nested around one long line", () => {
-        expect(() => convert(`${`<span style="color:red">`.repeat(450)}${"word ".repeat(20_000)}`)).toThrow(RangeError);
+        expect(() => convert(`${`<span style="font-weight:bold">`.repeat(450)}${"word ".repeat(20_000)}`)).toThrow(RangeError);
     });
 
     it("counts a run of whitespace once and the text of a script as none, as the conversion sees them", () => {
@@ -270,5 +270,27 @@ describe("paste input: review cases, eighth round", () => {
     it("marks each paragraph of formatting that a repeated <br> parts", () => {
         expect(convert(`<span style="font-weight:bold">a<br><br>b</span>`)).toBe("**a**\n\n**b**");
         expect(convert(`<p style="font-style:italic">a<br><br>b</p>`)).toBe("*a*\n\n*b*");
+    });
+});
+
+describe("paste input: review cases, ninth round", () => {
+    it("counts no work inside an element the page hides, though its depth is still checked", () => {
+        expect(convert(`<p>a</p><div style="display:none">${"<sup>".repeat(450)}${"1".repeat(50_000)}</div>`)).toBe("a");
+    });
+
+    it("counts no formatting work for a style that sets no formatting, such as a color", () => {
+        expect(convert(`${`<span style="color:red">`.repeat(450)}${"word ".repeat(20_000)}`)).toContain("word word");
+    });
+
+    it("writes no blank line for a <br> that starts a div", () => {
+        expect(convert("<div>a</div><div><br>b</div>")).toBe("a\nb");
+    });
+
+    it("keeps loose text in a numbered list out of an item the page hides", () => {
+        expect(convert("<ol><li hidden>x</li><div>block</div>note<li>b</li></ol>")).toContain("note");
+    });
+
+    it("makes an item of loose text a nested numbered list hands to the list around it", () => {
+        expect(convert("<ul><li>a</li><ol>note<li>b</li></ol></ul>")).toBe("- a\n- note\n  1. b");
     });
 });
