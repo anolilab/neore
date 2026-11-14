@@ -257,3 +257,9 @@ describe("paste: a heading that holds only a code block", () => {
         expect(convert("<h2>Use <code>npm</code></h2>")).toBe("## Use `npm`");
     });
 });
+
+describe("paste: a heading broken by a line break", () => {
+    it("keeps the text on both sides of the break in the heading", () => {
+        expect(convert("<h2>First<br>Second</h2>")).toBe("## First Second");
+    });
+});

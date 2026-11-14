@@ -273,10 +273,11 @@ const EMPTY_HEADING_LINE = /^#{1,6} *(?:\n+|$)/;
 
 /**
  * A heading whose only content is a block it cannot hold, such as a code block, writes no heading line of its own:
- * an empty `### ` would be a heading with no text. Any other heading is written by the rule after this one.
+ * an empty `### ` would be a heading with no text. Only such a heading is taken here; any other is the built-in
+ * rule's, which also folds a `<br>` into the heading's one line.
  */
 const headingRule: Rule = {
-    filter: unlessRemoved((node) => HEADINGS.has(node.nodeName)),
+    filter: unlessRemoved((node) => HEADINGS.has(node.nodeName) && !hasLineText(node)),
     replacement(content, node, options, lookup) {
         const next = lookup.ruleAfter(headingRule, node);
         const written = next.replacement.call(next, content, node, options, lookup);
@@ -439,6 +440,47 @@ function withoutLastBreak(content: string): string {
     }
 
     return content.slice(0, end - (content.charAt(end - 1) === LINE_BREAK_MARK ? 1 : 0));
+}
+
+/**
+ * True when the heading shows text of its own, outside the blocks in it: text, or an image that stands for text. One
+ * walk, which does not go into a block or a hidden element.
+ */
+function hasLineText(heading: Element): boolean {
+    const pending: Node[] = [];
+
+    pushChildren(pending, heading);
+
+    while (pending.length > 0) {
+        const node = pending.pop() as Node;
+
+        if (isShownText(node)) {
+            return true;
+        }
+
+        // Into an inline element the page shows; a block holds no text of the heading's line.
+        if (node.nodeType === 1 && !isHiddenElement(node) && !isBlock(node)) {
+            pushChildren(pending, node);
+        }
+    }
+
+    return false;
+}
+
+/** True for text that is not blank, and for an image that stands for text. */
+function isShownText(node: Node): boolean {
+    if (node.nodeType === 3 || node.nodeType === 4) {
+        return (node.nodeValue ?? "").trim() !== "";
+    }
+
+    return node.nodeName === "IMG" && !isHiddenElement(node) && imageText(node as Element) !== "";
+}
+
+/** Pushes the node's children, last first, so the first comes off the stack first. */
+function pushChildren(pending: Node[], node: Node): void {
+    for (let child = node.lastChild; child; child = child.previousSibling) {
+        pending.push(child);
+    }
 }
 
 /** True when the element holds a block the page shows, which starts a line of its own. */
