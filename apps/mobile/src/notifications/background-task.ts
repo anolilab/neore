@@ -10,21 +10,12 @@ import { AndroidImportance, dismissNotificationAsync, registerTaskAsync, schedul
 import { defineTask } from "expo-task-manager";
 import { Platform } from "react-native";
 
-import type { GrantStore } from "../auth/grant";
 import { secureGrantStore } from "../auth/secure-store";
 import { loadConfig } from "../lib/config";
 import { ANDROID_CHANNEL_ID, channelName, deviceLocale } from "./push-channel";
-import { fetchPushContent, PHONE_PUSH_TASK, showDataOnlyPush } from "./push-content";
-
-/**
- * The task only reads the session: a refused token mint leaves the grant where it is, for the app to clear on its own
- * next start, so a background run can never clear a grant a sign-in just stored.
- */
-const readOnlyGrant: GrantStore = {
-    clear: async () => undefined,
-    get: () => secureGrantStore.get(),
-    set: async () => undefined,
-};
+import type { PushText } from "./push-content";
+import { dataOnlyPushIds, fetchPushContent, PHONE_PUSH_TASK, pushPlaceholder, showDataOnlyPush } from "./push-content";
+import type { PushIds } from "./push-registration";
 
 const registerPushTask = async (): Promise<void> => {
     try {
@@ -44,36 +35,49 @@ if (Platform.OS === "android") {
             return;
         }
 
+        const locale = deviceLocale();
+
+        // Keyed by the notification: a send that runs twice replaces the first alert instead of adding a second.
+        const post = async (text: PushText, ids: PushIds) => {
+            await scheduleNotificationAsync({
+                content: { ...text, data: { ...ids } },
+                identifier: ids.notificationId,
+                trigger: { channelId: ANDROID_CHANNEL_ID },
+            });
+        };
+
         try {
             const { lunoraUrl } = loadConfig();
 
             await showDataOnlyPush(data, {
-                fetchContent: async (notificationId) => await fetchPushContent({ fetch, lunoraUrl, notificationId, store: readOnlyGrant }),
-                locale: deviceLocale(),
+                fetchContent: async (grant, notificationId) => await fetchPushContent({ fetch, grant, lunoraUrl, notificationId }),
+                locale,
                 // The task can run with no screen up: the channel may not exist yet in this process.
                 prepare: async () => {
-                    await setNotificationChannelAsync(ANDROID_CHANNEL_ID, { importance: AndroidImportance.HIGH, name: channelName(deviceLocale()) });
+                    await setNotificationChannelAsync(ANDROID_CHANNEL_ID, { importance: AndroidImportance.HIGH, name: channelName(locale) });
                 },
                 retract: async (ids) => {
                     await dismissNotificationAsync(ids.notificationId);
                 },
-                sessionUserId: async () => {
-                    const grant = await secureGrantStore.get();
-
-                    return grant?.user.id;
-                },
-                show: async (text, ids) => {
-                    // Keyed by the notification: a send that runs twice replaces the first alert instead of adding a second.
-                    await scheduleNotificationAsync({
-                        content: { ...text, data: { ...ids } },
-                        identifier: ids.notificationId,
-                        trigger: { channelId: ANDROID_CHANNEL_ID },
-                    });
-                },
+                session: async () => await secureGrantStore.get() ?? undefined,
+                show: post,
             });
         } catch (taskError) {
             // eslint-disable-next-line no-console -- no logger in a background task; a lost push must not be silent
             console.warn("Could not show a push notification.", taskError);
+
+            // The push was read and nothing is shown for it: post the placeholder without its chat, keyed like the real alert,
+            // so the notification is not lost. It carries no text and no chat, so it is safe whoever is signed in.
+            const ids = dataOnlyPushIds(data);
+
+            if (ids) {
+                try {
+                    await post(pushPlaceholder(locale), { notificationId: ids.notificationId });
+                } catch (fallbackError) {
+                    // eslint-disable-next-line no-console -- no logger in a background task; a lost push must not be silent
+                    console.warn("Could not show the placeholder for a push notification.", fallbackError);
+                }
+            }
         }
     });
 

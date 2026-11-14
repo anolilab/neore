@@ -5,7 +5,7 @@
  * Android does this in its background task (`background-task.ts`); iOS in its Notification Service Extension
  * (`targets/notification-service`), which mirrors {@link fetchPushContent} in Swift. Either way, any failure shows the placeholder.
  */
-import type { Fetch, GrantStore } from "../auth/grant";
+import type { Fetch, GrantStore, StoredGrant } from "../auth/grant";
 import { fetchAccessToken } from "../auth/grant";
 import { languageBase } from "./push-channel";
 import type { PushIds } from "./push-registration";
@@ -28,16 +28,25 @@ export const NOT_THIS_ACCOUNT = "not-this-account";
 /** The server withholds the text (`{ generic: true }`): the chat is locked, unshared or deleted, or its check failed. */
 export const WITHHELD = "withheld";
 
+/** A store that reads only `grant`, so the token is minted from the grant the caller read and nothing here writes or clears it. */
+const readOnly = (grant: StoredGrant): GrantStore => {
+    return {
+        clear: async () => undefined,
+        get: async () => grant,
+        set: async () => undefined,
+    };
+};
+
 /**
- * The headline and body for one notification; {@link NOT_THIS_ACCOUNT} when it is not the signed-in account's (nothing
- * should show); {@link WITHHELD} when the server will not name its chat; or `undefined` when the phone should keep the
- * placeholder: signed out, offline, too slow, or a failure on our side.
+ * The headline and body for one notification, minted from `grant`: {@link NOT_THIS_ACCOUNT} when it is not that account's
+ * (nothing should show); {@link WITHHELD} when the server will not name its chat; or `undefined` when the phone should keep
+ * the placeholder: a refused session, offline, too slow, or a failure on our side.
  */
 export const fetchPushContent = async (input: {
     fetch: Fetch;
+    grant: StoredGrant;
     lunoraUrl: string;
     notificationId: string;
-    store: GrantStore;
 }): Promise<PushText | typeof NOT_THIS_ACCOUNT | typeof WITHHELD | undefined> => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PUSH_CONTENT_TIMEOUT_MS);
@@ -47,7 +56,7 @@ export const fetchPushContent = async (input: {
         const jwt = await fetchAccessToken({
             fetch: async (url, init) => await input.fetch(url, { ...init, signal: controller.signal }),
             lunoraUrl: input.lunoraUrl,
-            store: input.store,
+            store: readOnly(input.grant),
         });
 
         if (jwt === null) {
@@ -106,14 +115,15 @@ export const pushPlaceholder = (locale: string | undefined): PushText => {
 };
 
 export interface PushTaskSteps {
-    fetchContent: (notificationId: string) => Promise<PushText | typeof NOT_THIS_ACCOUNT | typeof WITHHELD | undefined>;
+    /** The text for one notification, minted from the grant it is asked with. */
+    fetchContent: (grant: StoredGrant, notificationId: string) => Promise<PushText | typeof NOT_THIS_ACCOUNT | typeof WITHHELD | undefined>;
     locale: string | undefined;
-    /** Work before showing (the Android channel), done before the last session check so nothing waits between them. */
+    /** Work before showing (the Android channel). A failure is not fatal: the alert is still posted. */
     prepare?: () => Promise<void>;
-    /** Takes back an alert just shown (a sign-out landed between the last check and the post). */
+    /** Takes back an alert just posted, once the account it was for has changed or signed out. */
     retract?: (ids: PushIds) => Promise<void>;
-    /** The account signed in on this phone right now, or `undefined`. A push for nobody shows nothing. */
-    sessionUserId: () => Promise<string | undefined>;
+    /** The grant signed in on this phone right now, or `undefined`. A push for nobody shows nothing. */
+    session: () => Promise<StoredGrant | undefined>;
     show: (text: PushText, ids: PushIds) => Promise<void>;
 }
 
@@ -124,45 +134,63 @@ export interface PushTaskSteps {
 const isNotificationStyle = (payload: unknown): boolean =>
     typeof payload === "object" && payload !== null && "notification" in payload && Boolean(payload.notification);
 
+/** The ids of a data-only push, or `undefined` for one the system alerts itself. */
+export const dataOnlyPushIds = (payload: unknown): PushIds | undefined => {
+    if (isNotificationStyle(payload)) {
+        return undefined;
+    }
+
+    return pushIdsIn(payload);
+};
+
 /**
- * Android's data-only push, in the background task: read the ids, fetch the text, and show the notification on the
- * device, the placeholder when the fetch fails. The text shows only if the account that fetched it is still the one
- * signed in when it is about to show: a sign-out or account switch while it was on its way gets the placeholder. A
- * notification the server says is not the signed-in account's shows nothing at all. A withheld chat, or one whose account
- * changed meanwhile, keeps the placeholder but loses its thread, so a tap opens the chat list. Resolves whether a
+ * Android's data-only push, in the background task: read the ids, fetch the text with the grant read here, and show the
+ * notification on the device, the placeholder when the fetch fails. The text shows only if the account that fetched it is
+ * still the one signed in when it is about to show. An account that changed or signed out while the alert was posted has
+ * it taken back. A notification the server says is not the signed-in account's shows nothing at all. A withheld chat, or one
+ * whose account changed meanwhile, keeps the placeholder but loses its thread, so a tap opens the chat list. A phone signed
+ * out shows nothing; an error thrown while showing is answered by the caller (`background-task.ts`). Resolves whether a
  * notification was shown.
  */
 export const showDataOnlyPush = async (payload: unknown, steps: PushTaskSteps): Promise<boolean> => {
-    const ids = isNotificationStyle(payload) ? undefined : pushIdsIn(payload);
+    const ids = dataOnlyPushIds(payload);
 
     if (!ids) {
         return false;
     }
 
-    const fetchedFor = await steps.sessionUserId();
+    const grant = await steps.session();
 
-    if (fetchedFor === undefined) {
+    if (grant === undefined) {
         return false;
     }
 
-    const fetched = await steps.fetchContent(ids.notificationId);
+    const fetchedFor = grant.user.id;
+    const fetched = await steps.fetchContent(grant, ids.notificationId);
 
     // Another account's notification: post nothing, so its ids never land under the account signed in now.
     if (fetched === NOT_THIS_ACCOUNT) {
         return false;
     }
 
-    await steps.prepare?.();
+    try {
+        await steps.prepare?.();
+    } catch {
+        // The channel normally exists already (the app creates it at start); a failed set-up must not stop the alert.
+    }
 
-    const isSameSession = await steps.sessionUserId() === fetchedFor;
+    const current = await steps.session();
+    const isSameSession = current?.user.id === fetchedFor;
     const realText = isSameSession && typeof fetched === "object" ? fetched : undefined;
     const text = realText ?? pushPlaceholder(steps.locale);
     const shownIds = fetched === WITHHELD || !isSameSession ? { notificationId: ids.notificationId } : ids;
 
     await steps.show(text, shownIds);
 
-    // A sign-out can still land between that check and the post: look once more, and take the real text back if so.
-    if (realText !== undefined && await steps.sessionUserId() !== fetchedFor) {
+    // A sign-out or account switch can land between the check above and the post: the alert is taken back, text or placeholder.
+    const after = await steps.session();
+
+    if (after?.user.id !== fetchedFor) {
         await steps.retract?.(shownIds);
     }
 

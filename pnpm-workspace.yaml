@@ -947,5 +947,3 @@ patchedDependencies:
   # trims leading whitespace. Drop it once @expo/plist passes a MIME type and Expo's template no longer leads
   # with whitespace; `expo prebuild --platform ios` shows whether it is still needed.
   "@expo/plist@0.10.1": patches/@expo__plist@0.10.1.patch
-catalog:
-  expo-task-manager: ~58.0.14
