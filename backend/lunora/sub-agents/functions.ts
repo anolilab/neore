@@ -83,6 +83,8 @@ import {
     resultContent,
     DISPATCH_SOURCES,
     type DispatchSource,
+    chainPauseProblem,
+    chainWaitProblem,
     dispatchSourceProblem,
     distinctChildCount,
     INTERRUPTED_RUN_MESSAGE,
@@ -124,6 +126,8 @@ import { vDispatchSource, vHostRunnerRequest, vSubAgentRunMode, vSubAgentRunStat
 type RunDoc = Doc<"subAgentRuns">;
 
 export interface CreateSubAgentRunArgs {
+    /** The task, trigger or eval run whose chain this is (`chainSourceKey`); unset for the owner's chat. */
+    chainSource?: string;
     /** Who sent the dispatch; a lead's own call when unset. */
     dispatchedBy?: DispatchSource;
     /** The organization that capped the dispatching run; used when the parent thread has no stored organization. */
@@ -231,6 +235,23 @@ const admitCommon = async (
 };
 
 /**
+ * Whether a run of chain source `key` already waits for its owner's approval (`by_chainSource_and_status`): the admission
+ * and the pause both read it, so a task or trigger has one waiting child at most. `false` for a chat-started chain.
+ */
+const chainHasWaitingRun = async (ctx: Pick<QueryCtx, "db">, key: string | undefined): Promise<boolean> => {
+    if (key === undefined) {
+        return false;
+    }
+
+    const waiting = await ctx.db
+        .query("subAgentRuns")
+        .withIndex("by_chainSource_and_status", (q) => q.eq("chainSource", key).eq("status", "awaiting"))
+        .first();
+
+    return waiting !== null;
+};
+
+/**
  * Every admission check, charging the rate limit and quotas last; returns the
  * row to insert. A refusal is `{ error }` — for the model to read — rather than
  * a throw, so what a refused start consumed stays consumed, as in chat.
@@ -258,6 +279,12 @@ export const admitSubAgentRun = async (
         return { error: capProblem };
     }
 
+    const chainProblem = chainWaitProblem(args.chainSource, await chainHasWaitingRun(ctx, args.chainSource));
+
+    if (chainProblem) {
+        return { error: chainProblem };
+    }
+
     // The organization the run is stamped with: the lead chat's, or the one a temporary lead chat was started in, else the caller's.
     const organizationId = parent.organizationId ?? parent.capOrganizationId ?? args.organizationId;
     const leftOrganization = await membershipRefusal(ctx, organizationId, args.userId);
@@ -280,6 +307,7 @@ export const admitSubAgentRun = async (
 
     return {
         row: {
+            ...(args.chainSource !== undefined && { chainSource: args.chainSource }),
             createdAt: now,
             depth,
             dispatchedBy: args.dispatchedBy ?? "lead",
@@ -902,6 +930,7 @@ export const admitWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): Pro
     }
 
     const row: Omit<RunDoc, "_creationTime" | "_id"> = {
+        ...(args.chainSource !== undefined && { chainSource: args.chainSource }),
         childThreadId,
         clientId: args.toolCallId === undefined ? args.clientId : undefined,
         createdAt: Math.max(now, newestRunAt + 1),
@@ -952,6 +981,7 @@ export const dispatchWorkerRun = async (ctx: MutationCtx, args: WorkerRunArgs): 
 
 export const createRun = internalMutation
     .input({
+        chainSource: v.optional(v.string().max(200)),
         dispatchedBy: vDispatchSource,
         // Set by a headless run's tool call: nobody there can approve a message to a computer.
         headless: v.optional(v.boolean()),
@@ -973,14 +1003,20 @@ export const createRun = internalMutation
         userId: v.string(),
     })
     .output(v.union(v.object({ runId: v.id("subAgentRuns"), workerId: v.optional(v.string()) }), v.object({ error: v.string() })))
-    .mutation(async ({ args: { host, persistent, ...args }, ctx }) => {
+    .mutation(async ({ args: { chainSource, host, persistent, ...args }, ctx }) => {
+        // A worker never waits for approval, but it carries the chain source on, so the one-shot children it delegates
+        // count toward their task's or trigger's limit, and an eval's still never pause.
         if (persistent) {
-            const dispatched = await dispatchWorkerRun(ctx, { ...args, ...(host && { runner: { ...host, kind: "host" as const } }) });
+            const dispatched = await dispatchWorkerRun(ctx, {
+                ...args,
+                ...(chainSource !== undefined && { chainSource }),
+                ...(host && { runner: { ...host, kind: "host" as const } }),
+            });
 
             return "error" in dispatched ? { error: dispatched.error } : { runId: dispatched.runId, workerId: dispatched.workerId };
         }
 
-        const admitted = await admitSubAgentRun(ctx, args);
+        const admitted = await admitSubAgentRun(ctx, { ...args, ...(chainSource !== undefined && { chainSource }) });
 
         if ("error" in admitted) {
             return admitted;
@@ -1000,6 +1036,8 @@ export const createRun = internalMutation
  */
 export const messageWorker = internalMutation
     .input({
+        // The lead run's chain (`chainSourceKey`), carried on to what the worker delegates during this message.
+        chainSource: v.optional(v.string().max(200)),
         dispatchedBy: vDispatchSource,
         headless: v.optional(v.boolean()),
         message: v.string().max(SUB_AGENT_TASK_MAX),
@@ -1012,6 +1050,7 @@ export const messageWorker = internalMutation
     .output(v.union(v.object({ runId: v.id("subAgentRuns"), state: vSubAgentRunStatus, workerId: v.string() }), v.object({ error: v.string() })))
     .mutation(async ({ args, ctx }) => {
         const dispatched = await dispatchWorkerRun(ctx, {
+            ...(args.chainSource !== undefined && { chainSource: args.chainSource }),
             childThreadId: args.workerId,
             dispatchedBy: args.dispatchedBy,
             ...(args.headless !== undefined && { headless: args.headless }),
@@ -1115,6 +1154,7 @@ export const claimRun = internalMutation
     .output(
         v.union(
             v.object({
+                chainSource: v.optional(v.string().max(200)),
                 childThreadId: v.optional(v.string()),
                 clientId: v.optional(v.string()),
                 depth: v.number(),
@@ -1152,6 +1192,7 @@ export const claimRun = internalMutation
         const worker = run.mode === "worker" && run.childThreadId ? await ctx.db.get("threads", run.childThreadId as Id<"threads">) : null;
 
         return {
+            ...(run.chainSource !== undefined && { chainSource: run.chainSource }),
             ...(run.childThreadId !== undefined && { childThreadId: run.childThreadId }),
             ...(run.clientId !== undefined && { clientId: run.clientId }),
             depth: run.depth,
@@ -1549,7 +1590,13 @@ const liveContinuationOf = async (ctx: Pick<QueryCtx, "db">, run: Pick<RunDoc, "
  * A cancelled run (the owner stopped it) is not notified: the person who
  * ended it is the one who would read the notification.
  */
-export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, outcome: SubAgentOutcome): Promise<boolean> => {
+export const finishRun = async (
+    ctx: MutationCtx,
+    runId: Id<"subAgentRuns">,
+    outcome: SubAgentOutcome,
+    /** Ended from inside its own live continuation (a pause it was refused): that stream closes itself, it is not stopped. */
+    options: { fromOwnContinuation?: boolean } = {},
+): Promise<boolean> => {
     const run = await ctx.db.get("subAgentRuns", runId);
 
     if (!run || !isActiveSubAgentStatus(run.status)) {
@@ -1592,9 +1639,19 @@ export const finishRun = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, out
 
     // A resumed run (one that waited has a `reapAt`) ended from outside (a Stop, the reaper) streams its continuation on the
     // child thread, which `shouldRunStop` halts only at its next step: its stream is stopped now, so a tool in it gets the
-    // abort. Only that stream: a reply the owner started in the child meanwhile keeps going. A continuation that ends
-    // itself closes its stream before it settles (`continueAfterToolApproval`, every path), so nothing is found then.
-    if (wasRunning && !hostRun && run.mode !== "worker" && run.reapAt !== undefined && outcome.kind !== "succeeded" && run.childThreadId !== undefined) {
+    // abort. Only that stream: a reply the owner started in the child meanwhile keeps going. A continuation that ends the run
+    // after its stream closed (`continueAfterToolApproval`'s settle) finds nothing; one whose pause again is refused ends it
+    // while recording that pause (`recordPendingToolApprovals` → `markRunAwaiting`), before its stream's final chunk, and
+    // that stream is its own, which ends quietly instead of as stopped (`fromOwnContinuation`).
+    if (
+        !options.fromOwnContinuation &&
+        wasRunning &&
+        !hostRun &&
+        run.mode !== "worker" &&
+        run.reapAt !== undefined &&
+        outcome.kind !== "succeeded" &&
+        run.childThreadId !== undefined
+    ) {
         const continuation = await liveContinuationOf(ctx, run);
 
         if (continuation !== undefined) {
@@ -1836,7 +1893,9 @@ export const afterOwnerMessage = internalMutation
  * `running` → `awaiting`: the child stopped on an approval request recorded on its thread. The run keeps its fan-out
  * slot and posts nothing; its deadline becomes the request's own expiry. A no-op for a run that is not running (stopped
  * meanwhile), a worker's run, or one whose requests were already answered from the child's thread (that answer's
- * continuation ends the run). Returns whether it now waits.
+ * continuation ends the run). Returns whether it now waits. Called only from the run's own pause (its loop, its
+ * continuation, or their retried write), so an end it causes never stops the run's live stream. A caller that just
+ * recorded requests closes those left open when it returns false (`recordPendingToolApprovals`).
  */
 export const markRunAwaiting = async (ctx: MutationCtx, runId: Id<"subAgentRuns">, resumedWith?: number): Promise<boolean> => {
     const run = await ctx.db.get("subAgentRuns", runId);
@@ -1877,8 +1936,21 @@ export const markRunAwaiting = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
     }
 
     if (pending.length === 0) {
-        // Its end closes the run's own requests (`finishRun`).
-        await finishRun(ctx, run._id, { kind: "cancelled" });
+        // Its end closes the run's own requests (`finishRun`). Called from the run's own pause, so its stream is not stopped.
+        await finishRun(ctx, run._id, { kind: "cancelled" }, { fromOwnContinuation: true });
+
+        return false;
+    }
+
+    // One waiting child per task or trigger: children admitted while none waited can reach an `ask` tool together. This read
+    // and the write below share the transaction, so two pauses of one source serialize and only the first waits. The later
+    // one ends with its request refused (its end denies the run's open requests), as an eval's child refuses an `ask` tool,
+    // and its result says why. Only a first pause is checked: a run the owner already answered (`resumedBy`) keeps its right
+    // to wait, so it and one newer sibling can wait at once.
+    const chainProblem = run.resumedBy === undefined ? chainPauseProblem(run.chainSource, await chainHasWaitingRun(ctx, run.chainSource)) : undefined;
+
+    if (chainProblem) {
+        await finishRun(ctx, run._id, { error: chainProblem, kind: "failed" }, { fromOwnContinuation: true });
 
         return false;
     }

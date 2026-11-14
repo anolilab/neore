@@ -227,6 +227,12 @@ describe("a quiet routine's run", () => {
         expect(state.runs[0]?.organizationId).toBe("org-a");
     });
 
+    it("names the routine as its sub-agents' chain source, so the routine has one waiting child at most", async () => {
+        await run();
+
+        expect(state.runs[0]?.chainSource).toBe("trigger:trigger-1");
+    });
+
     it("posts the run when the check itself fails", async () => {
         state.trigger = { ...state.trigger, quietWhenEmpty: true };
         state.snapshotError = true;

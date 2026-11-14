@@ -257,6 +257,11 @@ export const setResearchDepth = (ctx: object, researchDepth: ResearchDepth): voi
     (ctx as { researchDepth?: ResearchDepth }).researchDepth = researchDepth;
 };
 
+/** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `chainSource`; the action ctx has no such field. */
+export const setChainSource = (ctx: object, chainSource: string | undefined): void => {
+    (ctx as { chainSource?: string }).chainSource = chainSource;
+};
+
 /** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `dispatchOrigin`; the action ctx has no such field. */
 export const setDispatchOrigin = (ctx: object, origin: DispatchOrigin): void => {
     (ctx as { dispatchOrigin?: DispatchOrigin }).dispatchOrigin = origin;
@@ -967,12 +972,14 @@ export const finishRun = async (
         savedMessages: ReadonlyArray<{ _id: string; message?: { content?: unknown; role?: string } }> | undefined;
         snapshot: ToolRunConfig;
         streamId: string;
+        /** A sub-agent continuation's resume (`continuingRun`): a further pause moves the run to `awaiting` bound to it. */
+        subAgentResumedWith?: number;
         threadId: string;
         /** Text written since the run's last finished step: with `pending`, what a stop leaves owed to the reply. */
         unsaved?: StreamText;
         userId: string;
     },
-): Promise<{ awaitingInput: AwaitingInput | undefined; paused: boolean }> => {
+): Promise<{ awaitingInput: AwaitingInput | undefined; paused: boolean; subAgentWaits?: boolean }> => {
     const {
         autoApprovals = {},
         keepOpenUnlessPaused,
@@ -983,6 +990,7 @@ export const finishRun = async (
         savedMessages,
         snapshot,
         streamId,
+        subAgentResumedWith,
         threadId,
         unsaved = { reasoning: "", text: "" },
         userId,
@@ -996,19 +1004,26 @@ export const finishRun = async (
     // With no step left to answer it, a request is not a pause: nothing could resume the run past it.
     const approvalIds = noStepLeft ? [] : collectApprovalRequestIds(savedMessages);
     const askUserApprovalIds = noStepLeft ? [] : collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME);
+    // A sub-agent's further pause: whether its run waits again, decided where the requests are recorded, before any notification.
+    let subAgentWaits: boolean | undefined;
 
     if (approvalIds.length > 0) {
         const secretApprovalIds = collectAskUserApprovalIds(savedMessages, REQUEST_SECRET_TOOL_NAME);
 
-        await ctx.runMutation(internal.chat.tool_permissions.recordPendingToolApprovals, {
+        const recorded = await ctx.runMutation(internal.chat.tool_permissions.recordPendingToolApprovals, {
             approvalIds,
             ...(askUserApprovalIds.length > 0 && { askUserApprovalIds }),
             config: snapshot,
             ...(run && { run }),
             ...(secretApprovalIds.length > 0 && { secretApprovalIds }),
+            ...(subAgentResumedWith !== undefined && { subAgentResumedWith }),
             threadId,
             userId,
         });
+
+        if (snapshot.subAgentRunId !== undefined) {
+            subAgentWaits = recorded;
+        }
     }
 
     const paused = approvalIds.length > 0;
@@ -1042,7 +1057,7 @@ export const finishRun = async (
         awaitingInput = askUserApprovalIds.length + secretPending === approvalIds.length ? "question" : "approval";
     }
 
-    return { awaitingInput, paused };
+    return { awaitingInput, paused, ...(subAgentWaits !== undefined && { subAgentWaits }) };
 };
 
 /**
@@ -1164,6 +1179,8 @@ export const resumeApprovedRun = async (
         contextHandler?: ContextHandler;
         keepOpenUnlessPaused?: boolean;
         steerable?: boolean;
+        /** A sub-agent child's resume (`continuingRun`): a further pause waits bound to it ({@link finishRun}). */
+        subAgentResumedWith?: number;
     } = {},
 ): Promise<{
     awaitingInput?: AwaitingInput;
@@ -1173,6 +1190,8 @@ export const resumeApprovedRun = async (
     messageIds?: string[];
     paused: boolean;
     stopped: boolean;
+    /** A sub-agent child that paused again: whether its run now waits (false: it was refused or ended, its requests closed). */
+    subAgentWaits?: boolean;
 }> => {
     const { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
@@ -1340,6 +1359,8 @@ export const resumeApprovedRun = async (
         setResearchDepth(ctx, config.researchDepth);
         // The snapshot keeps what started the run: a person answering an approval does not make it the lead's.
         setDispatchOrigin(ctx, config.dispatchOrigin ?? "lead");
+        // And the chain it belongs to, so what it delegates next still counts toward its task's or trigger's limit.
+        setChainSource(ctx, config.chainSource);
 
         if (subAgentChild) {
             setHeadlessRun(ctx);
@@ -1501,12 +1522,13 @@ export const resumeApprovedRun = async (
 
         let paused: boolean;
         let awaitingInput: AwaitingInput | undefined;
+        let subAgentWaits: boolean | undefined;
 
         try {
             const usedSteps = childStepsLeft === undefined ? undefined : await result.steps;
             const stepsLeft = usedSteps && Math.max(0, maxSteps - usedSteps.length);
 
-            ({ awaitingInput, paused } = await finishRun(ctx, {
+            ({ awaitingInput, paused, subAgentWaits } = await finishRun(ctx, {
                 autoApprovals: toolResult.autoApprovals,
                 keepOpenUnlessPaused: options.keepOpenUnlessPaused,
                 mcpLabels: toolResult.mcpLabels,
@@ -1523,6 +1545,7 @@ export const resumeApprovedRun = async (
                     toolPermissionKeys: toolResult.permissionKeys,
                 },
                 streamId,
+                ...(options.subAgentResumedWith !== undefined && { subAgentResumedWith: options.subAgentResumedWith }),
                 threadId,
                 unsaved: piped.unsaved,
                 userId,
@@ -1544,7 +1567,15 @@ export const resumeApprovedRun = async (
             streamLogger.error(`[AgentRun] Could not record the continuation of ${threadId}:`, recordError);
         }
 
-        return { awaitingInput, lastMessageId: messageIds.at(-1), looped, messageIds, paused, stopped: false };
+        return {
+            awaitingInput,
+            lastMessageId: messageIds.at(-1),
+            looped,
+            messageIds,
+            paused,
+            stopped: false,
+            ...(subAgentWaits !== undefined && { subAgentWaits }),
+        };
     } catch (error) {
         if (started) {
             await stampSavedToolCallsQuietly(ctx, {

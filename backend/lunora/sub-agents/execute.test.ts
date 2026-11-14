@@ -8,7 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
-import { admitWorkerRun } from "./functions";
+import { admitSubAgentRun, admitWorkerRun } from "./functions";
 import { WORKER_SYSTEM } from "./logic";
 
 const { contexts, probe, registry, runs } = vi.hoisted(() => {
@@ -62,6 +62,8 @@ vi.mock("../chat/lib/headless-run", () => {
 });
 
 const { runSubAgent } = await import("./execute");
+
+const CHAIN_WAITS = /this task started earlier is still waiting/u;
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -191,15 +193,69 @@ describe("whether a child may pause for its owner", () => {
         expect(await oneShot({ depth: 2 })).toMatchObject({ withheldTools: ["delegateToSubAgent", "messageWorker"] });
     });
 
-    it("never pauses a child an unattended chain started, nor a worker", async () => {
-        for (const dispatchedBy of ["trigger", "messenger", "outside_agent"]) {
-            expect(await oneShot({ dispatchedBy })).not.toHaveProperty("pauseForApproval");
-        }
+    it("pauses a one-shot child of a task's chain, which keeps its origin and passes the task on to what it starts", async () => {
+        expect(await oneShot({ chainSource: "task:t1", dispatchedBy: "trigger" })).toMatchObject({
+            chainSource: "task:t1",
+            origin: "trigger",
+            pauseForApproval: { subAgentRunId: expect.any(String) },
+        });
+    });
 
+    it("never pauses a child of an eval's chain: its `ask` tools are refused as in any headless run", async () => {
+        const options = await oneShot({ chainSource: "eval:r1", dispatchedBy: "trigger" });
+
+        expect(options).toMatchObject({ chainSource: "eval:r1", origin: "trigger" });
+        expect(options).not.toHaveProperty("pauseForApproval");
+    });
+
+    it("never pauses a worker", async () => {
         const worker = await dispatch({ toolCallId: "call-w" });
 
         await execute(worker._id);
         expect(runs.at(-1)).not.toHaveProperty("pauseForApproval");
+    });
+
+    // The worker's run names its chain on its tool context (`runHeadlessAgent`), which its `delegateToSubAgent` admits under.
+    it("never pauses a worker of an eval's chain, nor the one-shot child it delegates", async () => {
+        const worker = await dispatch({ chainSource: "eval:r1", toolCallId: "call-w" });
+
+        await execute(worker._id);
+
+        const workerRun = runs.at(-1)!;
+
+        expect(workerRun).toMatchObject({ chainSource: "eval:r1" });
+        expect(workerRun).not.toHaveProperty("pauseForApproval");
+        expect(await oneShot({ chainSource: workerRun.chainSource, parentThreadId: worker.childThreadId })).not.toHaveProperty("pauseForApproval");
+    });
+
+    it("counts a task worker's one-shot child toward the task's limit of one waiting child", async () => {
+        const earlierRound = (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "Earlier", userId }))) as string;
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("subAgentRuns", {
+                    chainSource: "task:t1",
+                    createdAt: 0,
+                    depth: 1,
+                    parentThreadId: earlierRound,
+                    status: "awaiting",
+                    task: "Earlier",
+                    updatedAt: 0,
+                    userId,
+                }),
+        );
+
+        const worker = await dispatch({ chainSource: "task:t1", toolCallId: "call-w" });
+
+        await execute(worker._id);
+
+        const { chainSource } = runs.at(-1)!;
+        const nested = await harness.run(
+            async (ctx: any) =>
+                await admitSubAgentRun(ctx, { chainSource, parentThreadId: worker.childThreadId, task: "Nested", toolCallId: "nested", userId }),
+        );
+
+        expect(nested).toStrictEqual({ error: expect.stringMatching(CHAIN_WAITS) });
     });
 });
 

@@ -74,3 +74,16 @@ export const backfillApprovalOrganization = defineMigration({
         return { ...document, config: { ...config, organizationId } };
     },
 });
+
+/**
+ * The stored config gained an optional `chainSource` (`chat/lib/tool-run-config.ts`). Nothing to fill: no run had a chain
+ * source before it, so no stored row could carry one, and a row without it falls back to the per-thread cap. This no-op
+ * exists only because `lunora prepare` blocks any change to `toolApprovalRuns.config`'s shape that no migration covers
+ * ("field toolApprovalRuns.config changed shape … add a data migration to convert them"), even an added optional key.
+ */
+export const addApprovalChainSource = defineMigration({
+    id: "add-approval-chain-source",
+    table: "toolApprovalRuns",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});

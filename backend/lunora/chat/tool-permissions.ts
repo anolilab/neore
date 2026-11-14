@@ -48,8 +48,8 @@ import { assertSafeMcpUrl, headersToRecord } from "./lib/mcp-tools";
 import type { ToolPermissionGrants } from "./lib/tool-permission-grants";
 import { activeGrants, grantExpiry, isGrantableKey, MAX_TOOL_GRANTS } from "./lib/tool-permission-grants";
 import type { ToolApprovalDecision } from "./lib/tool-approval-claim";
-import { claimToolApproval, findPendingApprovalOnLatestTurn } from "./lib/tool-approval-claim";
-import { purgeExpiredToolApprovalRunsForUser } from "./lib/tool-approval-cleanup";
+import { claimToolApproval, findPendingApprovalOnLatestTurn, SUB_AGENT_RUN_ENDED_BY } from "./lib/tool-approval-claim";
+import { denyToolApprovalRun, purgeExpiredToolApprovalRunsForUser } from "./lib/tool-approval-cleanup";
 import { listBuiltInTools } from "./lib/tool-builder";
 import type { ToolPermissionMode } from "./lib/tool-permissions";
 import { defaultToolPermission, toolPermissionKey } from "./lib/tool-permissions";
@@ -63,6 +63,8 @@ import { REQUEST_SECRET_TOOL_NAME } from "./tools/request-secret-constants";
 import { assertRunHeld, vRunHold } from "./lib/run-epoch";
 import { APPROVAL_REMINDER_SCHEDULE_DELAY_MS } from "./lib/approval-reminder";
 import { runAfterOnShard } from "../lib/shard-scheduler";
+import { chainStarterLabel } from "../sub-agents/logic";
+import { markRunAwaiting } from "../sub-agents/functions";
 
 const vToolPermissionMode = v.union(v.literal("auto"), v.literal("ask"), v.literal("off"));
 const vToolPermissions = v.record(v.string(), vToolPermissionMode);
@@ -715,6 +717,11 @@ export const pruneExpiredToolPermissionGrants = internalMutation
  * Snapshot a run that paused on approval requests, one row per request. Written
  * by the run itself (and by a continuation that pauses again, inheriting the
  * same snapshot) before its stream closes.
+ *
+ * A sub-agent's pause (`config.subAgentRunId`) moves its run to `awaiting` here, after the rows and before the thread mark,
+ * the reminder and the notification (`markRunAwaiting`, which also applies the one-waiting-child-per-source rule). A pause
+ * refused there has the requests it recorded denied and sends nothing, and a notified request can be answered at once: its
+ * run already waits. Returns whether the pause stands (false only for a sub-agent's run that does not wait).
  */
 export const recordPendingToolApprovals = internalMutation
     .input({
@@ -729,91 +736,118 @@ export const recordPendingToolApprovals = internalMutation
         run: v.optional(vRunHold),
         // The subset that are `requestSecret` cards: answered with a value, not approved, so they notify as their own thing.
         secretApprovalIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
+        // A sub-agent's pause: the resume it runs under (`continuingRun`), 0 for the run's first pause. Its wait is bound to it.
+        subAgentResumedWith: v.optional(v.number()),
         threadId: v.string(),
         userId: v.string(),
     })
-    .output(v.null())
-    .mutation(async ({ args: { approvalIds, askUserApprovalIds, awaitingInput, config, run, secretApprovalIds, threadId, userId }, ctx }) => {
-        await assertRunHeld(ctx, run);
+    .output(v.boolean())
+    .mutation(
+        async ({ args: { approvalIds, askUserApprovalIds, awaitingInput, config, run, secretApprovalIds, subAgentResumedWith, threadId, userId }, ctx }) => {
+            await assertRunHeld(ctx, run);
 
-        const createdAt = ctx.now;
-        const thread = await ctx.db.get("threads", threadId as Id<"threads">);
-        // The row belongs to the thread OWNER, whoever's turn paused: only the
-        // owner can answer (`claimToolApproval` requires `run.userId` to be the
-        // owner), and their home's "Needs you" lists rows by `userId`. Stored
-        // under a collaborator's id, it was on neither dashboard and could not
-        // be answered at all.
-        const ownerId = thread?.userId ?? userId;
+            const createdAt = ctx.now;
+            const thread = await ctx.db.get("threads", threadId as Id<"threads">);
+            // The row belongs to the thread OWNER, whoever's turn paused: only the
+            // owner can answer (`claimToolApproval` requires `run.userId` to be the
+            // owner), and their home's "Needs you" lists rows by `userId`. Stored
+            // under a collaborator's id, it was on neither dashboard and could not
+            // be answered at all.
+            const ownerId = thread?.userId ?? userId;
 
-        await purgeExpiredToolApprovalRunsForUser(ctx, ownerId, createdAt);
+            await purgeExpiredToolApprovalRunsForUser(ctx, ownerId, createdAt);
 
-        // A question the owner was asked in this thread stays the thing it waits on: an approval does not overwrite it.
-        if (awaitingInput && thread && thread.awaitingInput !== "question") {
-            await patchThread(ctx.db, thread._id, { awaitingInput });
-        }
+            const uniqueIds = new Set(approvalIds);
+            const secretIds = new Set(secretApprovalIds);
+            // Every row of this pause carries the same id, so the reminder can tell this pause from another in the same millisecond.
+            const [pauseId] = uniqueIds;
+            const recordedIds: Id<"toolApprovalRuns">[] = [];
 
-        const uniqueIds = new Set(approvalIds);
-        const secretIds = new Set(secretApprovalIds);
-        // Every row of this pause carries the same id, so the reminder can tell this pause from another in the same millisecond.
-        const [pauseId] = uniqueIds;
+            for (const approvalId of uniqueIds) {
+                const recordedId = await ctx.db.insert("toolApprovalRuns", {
+                    approvalId,
+                    config,
+                    createdAt,
+                    ...(pauseId !== undefined && { pauseId }),
+                    secretRequest: secretIds.has(approvalId),
+                    status: "pending",
+                    threadId,
+                    userId: ownerId,
+                });
 
-        for (const approvalId of uniqueIds) {
-            await ctx.db.insert("toolApprovalRuns", {
-                approvalId,
-                config,
-                createdAt,
-                ...(pauseId !== undefined && { pauseId }),
-                secretRequest: secretIds.has(approvalId),
-                status: "pending",
-                threadId,
-                userId: ownerId,
-            });
-        }
-
-        // The four-hour reminder is due on the owner's shard when this pause comes due. Scheduled here, not left to the idle
-        // housekeeping sweep, which can wait a day and so miss the reminder's one-hour window (`lib/approval-reminder.ts`).
-        if (uniqueIds.size > 0) {
-            await runAfterOnShard(
-                ctx.scheduler,
-                APPROVAL_REMINDER_SCHEDULE_DELAY_MS,
-                internal.chat.approval_reminder_sweep.sweepApprovalReminders,
-                { userId: ownerId },
-                ownerId,
-            );
-        }
-
-        // One notification per pause, to the thread OWNER — only they can answer
-        // (`respondToToolApproval`). A secret request and a question take precedence over approvals: they are
-        // answered with something, and nothing offers to "approve" them.
-        const askUserIds = new Set(askUserApprovalIds);
-        const [first] = uniqueIds;
-        const secret = [...uniqueIds].find((id) => secretIds.has(id));
-        const question = [...uniqueIds].find((id) => askUserIds.has(id));
-
-        if (first !== undefined) {
-            let type: "ask_user" | "secret_request" | "tool_approval" = "tool_approval";
-
-            if (secret !== undefined) {
-                type = "secret_request";
-            } else if (question !== undefined) {
-                type = "ask_user";
+                recordedIds.push(recordedId);
             }
 
-            const key = secret ?? question ?? first;
+            // A sub-agent's run waits before anyone is told: one refused (another child of its task waits, or it ended meanwhile)
+            // has its requests closed and sends nothing, and an answer to the notification finds the run already waiting.
+            if (config.subAgentRunId !== undefined && !(await markRunAwaiting(ctx, config.subAgentRunId, subAgentResumedWith))) {
+                // An end there closed them; a refusal that ended nothing (a run already settled, a newer resume, a worker, a
+                // run gone) did not. Nothing can answer them either way, so they close now instead of waiting out their expiry.
+                for (const recordedId of recordedIds) {
+                    const row = await ctx.db.get("toolApprovalRuns", recordedId);
 
-            await notifyQuietly(ctx, {
-                dedupeKey: `${type}:${key}`,
-                link: `/chat/${threadId}`,
-                title: thread?.title ?? "Chat",
-                type,
-                userId: ownerId,
-                // The phone's approve and deny act on this approval (`notifications/phone-delivery.ts`).
-                ...(type === "tool_approval" && { approvalId: first }),
-            });
-        }
+                    if (row?.status === "pending") {
+                        await denyToolApprovalRun(ctx, recordedId, { now: createdAt, resolvedBy: SUB_AGENT_RUN_ENDED_BY });
+                    }
+                }
 
-        return null;
-    });
+                return false;
+            }
+
+            // A question the owner was asked in this thread stays the thing it waits on: an approval does not overwrite it.
+            if (awaitingInput && thread && thread.awaitingInput !== "question") {
+                await patchThread(ctx.db, thread._id, { awaitingInput });
+            }
+
+            // The four-hour reminder is due on the owner's shard when this pause comes due. Scheduled here, not left to the idle
+            // housekeeping sweep, which can wait a day and so miss the reminder's one-hour window (`lib/approval-reminder.ts`).
+            if (uniqueIds.size > 0) {
+                await runAfterOnShard(
+                    ctx.scheduler,
+                    APPROVAL_REMINDER_SCHEDULE_DELAY_MS,
+                    internal.chat.approval_reminder_sweep.sweepApprovalReminders,
+                    { userId: ownerId },
+                    ownerId,
+                );
+            }
+
+            // One notification per pause, to the thread OWNER — only they can answer
+            // (`respondToToolApproval`). A secret request and a question take precedence over approvals: they are
+            // answered with something, and nothing offers to "approve" them.
+            const askUserIds = new Set(askUserApprovalIds);
+            const [first] = uniqueIds;
+            const secret = [...uniqueIds].find((id) => secretIds.has(id));
+            const question = [...uniqueIds].find((id) => askUserIds.has(id));
+
+            if (first !== undefined) {
+                let type: "ask_user" | "secret_request" | "tool_approval" = "tool_approval";
+
+                if (secret !== undefined) {
+                    type = "secret_request";
+                } else if (question !== undefined) {
+                    type = "ask_user";
+                }
+
+                const key = secret ?? question ?? first;
+                // A sub-agent's pause says who started its chain, so the owner knows a task or a trigger is asking.
+                const subAgentRun = config.subAgentRunId ? await ctx.db.get("subAgentRuns", config.subAgentRunId) : null;
+                const starter = subAgentRun ? chainStarterLabel(subAgentRun) : undefined;
+
+                await notifyQuietly(ctx, {
+                    ...(starter !== undefined && { body: `A sub-agent started by ${starter} is waiting for you.` }),
+                    dedupeKey: `${type}:${key}`,
+                    link: `/chat/${threadId}`,
+                    title: thread?.title ?? "Chat",
+                    type,
+                    userId: ownerId,
+                    // The phone's approve and deny act on this approval (`notifications/phone-delivery.ts`).
+                    ...(type === "tool_approval" && { approvalId: first }),
+                });
+            }
+
+            return true;
+        },
+    );
 
 /**
  * What an answer leaves behind for next time: `always` stores `auto` for the tool, `hour` / `today` a time-boxed

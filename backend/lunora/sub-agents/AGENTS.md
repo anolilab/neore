@@ -55,12 +55,12 @@
   (its owner unlocks the child to answer). It admits the parent and every child, so it reads each child's latest turn
   through a reader keyed on that child (`admittedThreadMessages`): the guarded `ctx.db` would hand it the parent's rows. The card answers through `respondToToolApproval` on the child's thread, so the
   claim above decides, and it offers no allow for a period.
-- **A one-shot child of the owner's own turn pauses on an `ask` tool** (`pauseForApproval` → `headlessCanAsk`, only
-  when `originOfRun(dispatchedBy) === "lead"`): a chain a trigger, task, messenger reply or outside agent started drops
-  `ask` tools as its parent run does, and so do workers. The run waits and is answered as above; its first pause is bound
-  to "never resumed" (`resumedWith: 0`), so a late write never re-opens an answered run. A nested result waits
-  while its parent's one-shot run goes (running or awaiting), so it never lands after a request; that run's end, waited
-  or not, posts it (`releaseHeldResults`). A pause, first or continued, never overwrites a `"question"` the child thread
-  waits on.
+- **A one-shot child pauses on an `ask` tool** (`pauseForApproval`), whatever started its chain; an eval's chain and
+  workers drop `ask` tools. A task or trigger has at most one child waiting on its first request (`chainWaitProblem`,
+  `chainPauseProblem`). `recordPendingToolApprovals` moves the run to waiting (`markRunAwaiting`) BEFORE anything is
+  sent, so a refused pause sends nothing. A pause, first or continued, is bound to its resume, so a late write never
+  re-opens an answered run, and never overwrites a `"question"` the child thread waits on. A nested result waits while its
+  parent's one-shot run goes, and that run's end posts it (`releaseHeldResults`). The rules, sources and exceptions:
+  [reference](../../../docs/agents/sub-agents.md).
 - **Lifecycle** ([reference](../../../docs/agents/sub-agents.md)): a send in a child ends its moved-past waits
   (`afterOwnerMessage`); a hard delete sets `deletingAt` and ends the thread's runs (`endSubAgentRunsOfDeletedThread`).

@@ -154,7 +154,8 @@ const answerableOfPause = async (
 
 /**
  * Whether the approval belongs to a sub-agent run that has not yet started waiting on it. Its answer is refused until it does
- * (`claimToolApproval`), so its push is held back and sent once the run waits.
+ * (`claimToolApproval`), so its push is held back and sent once the run waits. A guard only: the pause's notification is
+ * written in the transaction that moves the run to `awaiting` (`recordPendingToolApprovals`).
  */
 export const subAgentStillWorking = internalQuery
     .input({ approvalId: v.string() })

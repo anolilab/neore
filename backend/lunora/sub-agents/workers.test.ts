@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import type { WorkerRunArgs } from "./functions";
-import { admitSubAgentRun, admitWorkerRun, cancelSubAgentRunsForStop, claimQueuedRun, finishRun, isWorkerThread, messageWorker } from "./functions";
+import { admitSubAgentRun, admitWorkerRun, cancelSubAgentRunsForStop, claimQueuedRun, createRun, finishRun, isWorkerThread, messageWorker } from "./functions";
 import { intersectWithLeadTools, SUB_AGENT_MAX_CONCURRENT, SUB_AGENT_MAX_TOOLS } from "./logic";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -203,6 +203,44 @@ describe("dispatching to a worker", () => {
         const followUp = allRuns.find((run) => run._id === sent.runId);
 
         expect(followUp).toMatchObject({ organizationId: "org-run" });
+    });
+
+    // A worker never pauses, but what it delegates belongs to its lead's chain (`runSubAgent` hands the run's source on).
+    it("stores the lead's chain on a new worker and on a follow-up the lead sends it", async () => {
+        const created = await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(createRun, {
+                    chainSource: "task:t1",
+                    dispatchedBy: "lead",
+                    name: "Researcher",
+                    parentThreadId: leadId,
+                    persistent: true,
+                    task: "First",
+                    toolCallId: "call-chain-1",
+                    userId,
+                }),
+        );
+
+        await claim(created.runId);
+        await finish(created.runId);
+
+        const sent = await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(messageWorker, {
+                    chainSource: "task:t2",
+                    dispatchedBy: "lead",
+                    message: "Next",
+                    parentThreadId: leadId,
+                    toolCallId: "call-chain-2",
+                    userId,
+                    workerId: created.workerId,
+                }),
+        );
+        const allRuns = await runs();
+        const byId = new Map(allRuns.map((run) => [run._id, run]));
+
+        expect(byId.get(created.runId)).toMatchObject({ chainSource: "task:t1", mode: "worker" });
+        expect(byId.get(sent.runId)).toMatchObject({ chainSource: "task:t2", mode: "worker" });
     });
 
     it("takes the organization a temporary lead chat was started in, so a turn from another space cannot lift its cap", async () => {

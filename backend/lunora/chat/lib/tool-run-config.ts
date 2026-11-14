@@ -16,6 +16,12 @@ import { vGroupRunSnapshot } from "../group/validators";
 export const vToolRunConfig = v.object({
     autoMediaEnrichment: v.boolean(),
     /**
+     * The task, trigger or eval whose sub-agent chain the paused child belongs to (`sub-agents/logic.ts:chainSourceKey`): the
+     * continuation names it on what the child delegates, so the per-source limit holds after an answer. Absent on a snapshot
+     * that predates it, or for a chat-started chain.
+     */
+    chainSource: v.optional(v.string().max(200)),
+    /**
      * A fresh-context headless run's own prompt order (`headless-run.ts`): its continuation reads the thread from there,
      * never the turns before it. Absent = the usual window.
      */

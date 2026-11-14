@@ -46,6 +46,7 @@ import {
     resolveBackupModelId,
     resolveRunModel,
     retrieveMemoryContext,
+    setChainSource,
     setDispatchOrigin,
     setHeadlessRun,
     setRunOrganizationId,
@@ -91,6 +92,13 @@ export interface HeadlessRunOptions {
     beforeThread?: () => Promise<void>;
     /** The bot the run is for: its memories are read and written in that bot's scope. Unset = the user's own. */
     botId?: string;
+    /**
+     * The task, trigger or eval run whose sub-agent chain this is (`sub-agents/logic.ts:chainSourceKey`): a sub-agent this run
+     * starts carries it, so the source has one child waiting at most, and an eval's chain never waits. The pause's snapshot
+     * keeps it (`ToolRunConfig.chainSource`), so a resumed child's own sub-agents still count; a snapshot that predates it falls
+     * back to the per-thread cap.
+     */
+    chainSource?: string;
     /**
      * Send the model none of the thread's earlier turns, only this run's prompt: a scheduled task that
      * reuses one thread with a fresh context per run (`tasks/AGENTS.md`). The history stays in the thread.
@@ -286,6 +294,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
     try {
         setResearchDepth(ctx, "balanced");
         setDispatchOrigin(ctx, options.origin);
+        setChainSource(ctx, options.chainSource);
         setHeadlessRun(ctx);
         setRunOrganizationId(ctx, options.organizationId);
 
@@ -430,6 +439,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // or a messenger reply's child still dispatches as that source, not as the lead.
             const snapshot: ToolRunConfig = {
                 autoMediaEnrichment: false,
+                // The continuation's own children stay on the chain, so its source's one-waiting-child limit still holds.
+                ...(options.chainSource !== undefined && { chainSource: options.chainSource }),
                 ...(options.origin !== "lead" && { dispatchOrigin: options.origin }),
                 instructions: system ?? agent.options.instructions,
                 mcpServerNames: toolResult.mcpServerNames,
@@ -467,10 +478,12 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // write here or below throws: no snapshot is recorded, and a request without one can never be answered
             // (`claimToolApproval`), so the caller ends the run as failed.
             await stampSavedToolCalls(ctx, { mcpLabels: toolResult.mcpLabels, savedMessages, userId });
+            // The run's first pause (0: never resumed) moves it to `awaiting` before the owner is told, or ends it refused.
             await ctx.runMutation(internal.chat.tool_permissions.recordPendingToolApprovals, {
                 approvalIds,
                 awaitingInput: "approval",
                 config: snapshot,
+                subAgentResumedWith: 0,
                 threadId,
                 userId,
             });

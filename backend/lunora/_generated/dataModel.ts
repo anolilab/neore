@@ -1643,6 +1643,7 @@ export interface Doc_subAgentRuns {
     _id: Id<"subAgentRuns">;
     _creationTime: number;
     beatAt?: number;
+    chainSource?: string;
     childThreadId?: string;
     clientId?: string;
     completedAt?: number;
@@ -2008,7 +2009,7 @@ export interface Doc_toolApprovalRuns {
     _id: Id<"toolApprovalRuns">;
     _creationTime: number;
     approvalId: string;
-    config: { autoMediaEnrichment: boolean; contextFromOrder?: number; dispatchOrigin?: "outside_agent" | "trigger" | "messenger"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; headlessApproved?: Array<string>; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; organizationId?: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; stepsLeft?: number; subAgentRunId?: Id<"subAgentRuns">; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean };
+    config: { autoMediaEnrichment: boolean; chainSource?: string; contextFromOrder?: number; dispatchOrigin?: "outside_agent" | "trigger" | "messenger"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; headlessApproved?: Array<string>; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; organizationId?: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; stepsLeft?: number; subAgentRunId?: Id<"subAgentRuns">; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean };
     createdAt: number;
     pauseId?: string;
     reminderSentAt?: number;
@@ -2699,7 +2700,7 @@ export interface IndexNamesByTable {
     skillStats: "by_skillId" | "by_usage";
     streamDeltas: "streamId_start_end";
     streamingMessages: "threadId_state_order_stepOrder" | "by_userId";
-    subAgentRuns: "by_parentThreadId_and_status" | "by_childThreadId" | "by_childThreadId_and_status" | "by_status_and_reapAt" | "by_user_and_status" | "by_user_and_toolCallId" | "by_user_and_createdAt" | "by_createdAt";
+    subAgentRuns: "by_parentThreadId_and_status" | "by_childThreadId" | "by_childThreadId_and_status" | "by_status_and_reapAt" | "by_user_and_status" | "by_user_and_toolCallId" | "by_user_and_createdAt" | "by_chainSource_and_status" | "by_createdAt";
     systemPromptPresets: "by_userId_modelId";
     taskRuns: "by_task_and_startedAt" | "by_cycle_and_round" | "by_user";
     tasks: "by_user_and_status" | "by_user_and_goal" | "by_recurring_and_nextRunAt" | "by_status_and_updatedAt" | "by_status_and_stuckCheckAt";
@@ -4861,6 +4862,7 @@ export interface Insert_subAgentRuns {
     _id?: Id<"subAgentRuns">;
     _creationTime?: number;
     beatAt?: number;
+    chainSource?: string;
     childThreadId?: string;
     clientId?: string;
     completedAt?: number;
@@ -5226,7 +5228,7 @@ export interface Insert_toolApprovalRuns {
     _id?: Id<"toolApprovalRuns">;
     _creationTime?: number;
     approvalId: string;
-    config: { autoMediaEnrichment: boolean; contextFromOrder?: number; dispatchOrigin?: "outside_agent" | "trigger" | "messenger"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; headlessApproved?: Array<string>; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; organizationId?: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; stepsLeft?: number; subAgentRunId?: Id<"subAgentRuns">; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean };
+    config: { autoMediaEnrichment: boolean; chainSource?: string; contextFromOrder?: number; dispatchOrigin?: "outside_agent" | "trigger" | "messenger"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; headlessApproved?: Array<string>; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; organizationId?: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; stepsLeft?: number; subAgentRunId?: Id<"subAgentRuns">; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean };
     createdAt: number;
     pauseId?: string;
     reminderSentAt?: number;
