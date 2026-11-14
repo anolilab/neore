@@ -229,6 +229,9 @@ const EMOJI_EDGE = /^[\p{Extended_Pictographic}\p{Emoji_Modifier}\u{FE0F}]$/u;
 // What a paste starts with that is no content: blank lines and the spaces before the first text. A non-breaking space
 // the page shows is kept.
 const LEADING_SPACE = /^[\t\n\r ]+/;
+// A blank line, which may hold a line break's mark, kept as the separator when content is split on it.
+// eslint-disable-next-line no-control-regex, sonarjs/no-control-regex -- U+0010 is the preset's own line break mark.
+const BLANK_LINE = /(\n\u{10}?\n)/u;
 const STRUCTURE = new Set(["BLOCKQUOTE", "H1", "H2", "H3", "H4", "H5", "H6", "HR", "OL", "PRE", "TABLE", "UL"]);
 
 /** The formatting an element gives its text, by its name or its style. */
@@ -935,22 +938,29 @@ function wrapEdges(text: string, marker: Delimiter): string {
  * blank line. A normal-weight run that goes on past one is closed before it and opened again after it.
  */
 function wrapRuns(content: string, marker: Delimiter, isBold: boolean): string {
-    if (!content.includes("\n\n")) {
+    // A blank line parts paragraphs; it may hold the mark of the line break that made it.
+    const pieces = content.split(BLANK_LINE);
+
+    if (pieces.length === 1) {
         return wrapParagraph(content, marker, isBold);
     }
 
     let isOpen = false;
 
-    return content
-        .split("\n\n")
-        .map((piece) => {
+    // The pieces alternate: a paragraph, then the blank line after it, kept as it is.
+    return pieces
+        .map((piece, index) => {
+            if (index % 2 === 1) {
+                return piece;
+            }
+
             const opened = isOpen ? `${NORMAL_START}${piece}` : piece;
 
             isOpen = opened.lastIndexOf(NORMAL_START) > opened.lastIndexOf(NORMAL_END);
 
             return wrapParagraph(isOpen ? `${opened}${NORMAL_END}` : opened, marker, isBold);
         })
-        .join("\n\n");
+        .join("");
 }
 
 /**

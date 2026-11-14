@@ -123,10 +123,7 @@ export function checkWork(root: Node, shown: Shown): void {
 
         const measure = measureOf(element, measures, step.isCode || KEEPS_WHITESPACE.has(element.nodeName));
 
-        // An image is written as the text it stands for: an emoji's, or a formula's, which may be long.
-        if (element.nodeName === "IMG") {
-            measure.size += shown.imageText(element).length;
-        }
+        measure.size += writtenLength(element, shown);
 
         work = spend(work, element, measure);
         measures.set(element, measure);
@@ -153,6 +150,22 @@ function spend(work: Work, element: Element, measure: Measure): Work {
     }
 
     return spent;
+}
+
+/**
+ * What the element's rule writes besides what it holds: an image's emoji or formula text, which may be long, and a
+ * link's destination and title.
+ */
+function writtenLength(element: Element, shown: Shown): number {
+    if (element.nodeName === "IMG") {
+        return shown.imageText(element).length;
+    }
+
+    if (element.nodeName === "A") {
+        return (element.getAttribute("href")?.length ?? 0) + (element.getAttribute("title")?.length ?? 0);
+    }
+
+    return 0;
 }
 
 function pushElements(steps: Step[], parent: Node, place: Pick<Step, "depth" | "isCode" | "level">): void {

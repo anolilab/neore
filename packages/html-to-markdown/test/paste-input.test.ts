@@ -261,3 +261,14 @@ describe("paste input: review cases, seventh round", () => {
         expect(convert("<ol>note<li>a</li></ol>")).toBe("note\n\n1. a");
     });
 });
+
+describe("paste input: review cases, eighth round", () => {
+    it("counts a link's destination, which the link writes again for each formatting element around it", () => {
+        expect(() => convert(`${"<b>".repeat(450)}<a href="https://x.y/${"a".repeat(50_000)}">l</a>`)).toThrow(RangeError);
+    });
+
+    it("marks each paragraph of formatting that a repeated <br> parts", () => {
+        expect(convert(`<span style="font-weight:bold">a<br><br>b</span>`)).toBe("**a**\n\n**b**");
+        expect(convert(`<p style="font-style:italic">a<br><br>b</p>`)).toBe("*a*\n\n*b*");
+    });
+});
