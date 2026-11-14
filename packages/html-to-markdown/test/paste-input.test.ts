@@ -1,6 +1,6 @@
 /* eslint-disable no-secrets/no-secrets, unicorn/prefer-dom-node-append -- HTML samples, not secrets; domino, the test parser, has no append. */
 import { createDocument } from "@mixmark-io/domino";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { setHTMLParser } from "../src/html-parser";
 import TurndownService, { paste, PASTE_OPTIONS } from "../src/index";
@@ -79,7 +79,7 @@ describe("paste: line breaks", () => {
 describe("paste: text placed straight in a list", () => {
     it("is an item of its own, as the page shows it on a line of its own", () => {
         expect(convert("<ul><li>a</li><ul><li>b</li></ul><li>c</li>d</ul>")).toBe("- a\n  - b\n- c\n- d");
-        expect(convert("<ol><li>a</li>b <i>c</i><li>d</li></ol>")).toBe("1. a\n2. b *c*\n3. d");
+        expect(convert("<ol><li>a</li>b <i>c</i><li>d</li></ol>")).toBe("1. a\n   b *c*\n2. d");
     });
 
     it("adds no item for blank text, a comment or an element the page hides", () => {
@@ -119,7 +119,11 @@ describe("paste input: review cases", () => {
 
         parent.appendChild(document.createTextNode("x"));
 
-        expect(() => convert(document.body)).toThrow(RangeError);
+        // Refused by the depth check, before anything copies the node: not by a stack that ran out.
+        const copied = vi.spyOn(document.body, "cloneNode");
+
+        expect(() => convert(document.body)).toThrow(new RangeError("Nested too deep to convert"));
+        expect(copied).not.toHaveBeenCalled();
     });
 
     it("measures the items it makes of loose list text, so lists nested through them count against the budget", () => {
@@ -244,5 +248,16 @@ describe("paste input: review cases, sixth round", () => {
 
     it("takes out marks a character reference decodes into, so only the preset writes them", () => {
         expect(convert("<p>a&#3;b&#4;c&#16;d&#1;e</p>")).toBe("abcde");
+    });
+});
+
+describe("paste input: review cases, seventh round", () => {
+    it("writes no blank line for a div that holds only what the page hides or drops", () => {
+        expect(convert(`<div>a</div><div><span style="display:none">x</span></div><div><img src="p.png"></div><div>b</div>`)).toBe("a\nb");
+    });
+
+    it("numbers a numbered list's items as the page does, with loose text on a line of its own", () => {
+        expect(convert("<ol><li>a</li>note<li>b</li></ol>")).toBe("1. a\n   note\n2. b");
+        expect(convert("<ol>note<li>a</li></ol>")).toBe("note\n\n1. a");
     });
 });

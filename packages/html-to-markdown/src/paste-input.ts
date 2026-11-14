@@ -250,16 +250,56 @@ export function wrapLooseListText(root: Node, shown: Shown): void {
 
     for (const list of lists) {
         for (const run of looseRuns(list, shown)) {
-            const item = list.ownerDocument.createElement("li");
-
-            list.insertBefore(item, run[0] as Node);
-
-            for (const node of run) {
-                // eslint-disable-next-line unicorn/prefer-dom-node-append -- domino, the parser on servers, has no append.
-                item.appendChild(node);
-            }
+            placeRun(list, run);
         }
     }
+}
+
+/**
+ * Puts a run of loose text where the page shows it. In a bulleted list it is an item of its own. In a numbered list it
+ * takes no number and renumbers no item: it goes on a line of its own in the item before it, or before the list when
+ * no item comes first.
+ */
+function placeRun(list: Element, run: Node[]): void {
+    const document = list.ownerDocument;
+    const first = run[0] as Node;
+    let target: Node;
+
+    if (list.nodeName === "OL") {
+        const item = previousItem(first);
+
+        if (item === null) {
+            for (const node of run) {
+                list.parentNode?.insertBefore(node, list);
+            }
+
+            return;
+        }
+
+        target = item;
+        // eslint-disable-next-line unicorn/prefer-dom-node-append -- domino, the parser on servers, has no append.
+        item.appendChild(document.createElement("br"));
+    } else {
+        target = document.createElement("li");
+        // eslint-disable-next-line unicorn/prefer-modern-dom-apis -- domino, the parser on servers, has no before.
+        list.insertBefore(target, first);
+    }
+
+    for (const node of run) {
+        // eslint-disable-next-line unicorn/prefer-dom-node-append -- domino, the parser on servers, has no append.
+        target.appendChild(node);
+    }
+}
+
+/** The nearest item before the node among its siblings, or null. */
+function previousItem(node: Node): Element | null {
+    for (let sibling = node.previousSibling; sibling; sibling = sibling.previousSibling) {
+        if (sibling.nodeName === "LI") {
+            return sibling as Element;
+        }
+    }
+
+    return null;
 }
 
 /** The list's runs of children outside its items that hold text the page shows. */

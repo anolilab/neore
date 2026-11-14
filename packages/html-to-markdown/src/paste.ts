@@ -306,13 +306,19 @@ const pasteRules: Record<string, Rule> = {
     },
 
     // A div that holds only inline content is a line, as mail and editors write one per line: a run of them is not
-    // parted by blank lines. A `<br>` that ends it makes no line of its own, so a div that holds only one is a blank line.
+    // parted by blank lines. A `<br>` that ends it makes no line of its own, so a div that holds only one is a blank line;
+    // one that holds nothing the page shows writes nothing.
     lineDiv: {
         filter: unlessRemoved((node) => node.nodeName === "DIV" && !hasBlockChild(node)),
         replacement(content) {
             const text = content.endsWith(`${LINE_BREAK_MARK}\n`) ? content.slice(0, -LINE_BREAK_MARK.length - 1) : content;
 
-            return text.trim() === "" ? "\n\n" : `\n${text}\n`;
+            // Blank only for a line break: a div that holds what the page hides or drops shows nothing.
+            if (text.trim() === "") {
+                return content.includes(LINE_BREAK_MARK) ? "\n\n" : "";
+            }
+
+            return `\n${text}\n`;
         },
     },
 
