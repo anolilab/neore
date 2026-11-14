@@ -283,6 +283,7 @@ describe("what a pause notifies as", () => {
             await harness.run(
                 async (ctx: any) =>
                     await ctx.db.insert("subAgentRuns", {
+                        childThreadId: threadId,
                         createdAt: 0,
                         depth: 1,
                         parentThreadId: "lead",
@@ -295,6 +296,9 @@ describe("what a pause notifies as", () => {
             );
         const fromTask = await subAgentRun({ chainSource: "task:t1", dispatchedBy: "trigger" });
         const fromChat = await subAgentRun({ dispatchedBy: "lead" });
+
+        // Each run's request is on the child's latest turn, so the run waits and its owner is told.
+        await insertMessage(2, { content: [...assistantWithRequest("task-1").content, ...assistantWithRequest("chat-1").content], role: "assistant" }, true);
 
         for (const [approvalId, subAgentRunId] of [
             ["task-1", fromTask],

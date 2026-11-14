@@ -1927,8 +1927,9 @@ export const markRunAwaiting = async (ctx: MutationCtx, runId: Id<"subAgentRuns"
     // One waiting child per task or trigger: children admitted while none waited can reach an `ask` tool together. This read
     // and the write below share the transaction, so two pauses of one source serialize and only the first waits. The later
     // one ends with its request refused (its end denies the run's open requests), as an eval's child refuses an `ask` tool,
-    // and its result says why.
-    const chainProblem = chainPauseProblem(run.chainSource, await chainHasWaitingRun(ctx, run.chainSource));
+    // and its result says why. Only a first pause is checked: a run the owner already answered (`resumedBy`) keeps its right
+    // to wait, so it and one newer sibling can wait at once.
+    const chainProblem = run.resumedBy === undefined ? chainPauseProblem(run.chainSource, await chainHasWaitingRun(ctx, run.chainSource)) : undefined;
 
     if (chainProblem) {
         await finishRun(ctx, run._id, { error: chainProblem, kind: "failed" });

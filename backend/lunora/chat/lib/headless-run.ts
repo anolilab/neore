@@ -196,6 +196,8 @@ export interface HeadlessRunResult {
     threadId: string;
     /** Tokens across every step, when the provider reported usage. */
     totalTokens?: number;
+    /** With `paused`: the sub-agent's run now waits for the owner. False when the pause was refused and the run ended. */
+    waits?: boolean;
 }
 
 /** A skill's tool config merged with the caller's extra built-ins; `undefined` when neither says anything. */
@@ -433,6 +435,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         const stepsLeft = Math.max(0, (options.maxSteps ?? getMaxSteps(true)) - (result.steps?.length ?? 0));
         const paused = approvalIds.length > 0 && stepsLeft > 0;
 
+        let waits = false;
+
         if (paused && options.pauseForApproval) {
             // What the continuation rebuilds the run from (`resumeApprovedRun`): the same model, servers, tools after the
             // allowlist, the final system prompt and what started it, so an answer never widens what the child had: a trigger's
@@ -478,10 +482,12 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // write here or below throws: no snapshot is recorded, and a request without one can never be answered
             // (`claimToolApproval`), so the caller ends the run as failed.
             await stampSavedToolCalls(ctx, { mcpLabels: toolResult.mcpLabels, savedMessages, userId });
-            await ctx.runMutation(internal.chat.tool_permissions.recordPendingToolApprovals, {
+            // The run's first pause (0: never resumed) moves it to `awaiting` before the owner is told, or ends it refused.
+            waits = await ctx.runMutation(internal.chat.tool_permissions.recordPendingToolApprovals, {
                 approvalIds,
                 awaitingInput: "approval",
                 config: snapshot,
+                subAgentResumedWith: 0,
                 threadId,
                 userId,
             });
@@ -517,7 +523,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         if (paused) {
             extract(text);
 
-            return { costMicrodollars: first.priced, paused: true, text, threadId, totalTokens: result.totalUsage?.totalTokens };
+            return { costMicrodollars: first.priced, paused: true, text, threadId, totalTokens: result.totalUsage?.totalTokens, waits };
         }
 
         if (!options.goal) {

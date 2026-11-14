@@ -24,7 +24,16 @@ detail. Paths are relative to `backend/lunora/`.
     reads the same index in the transaction that writes `awaiting`, so two children of one source reaching `ask` at once
     serialize. The first waits; the later one does not: its run ends `failed` with `chainPauseProblem` as its result
     ("another sub-agent this task started is already waiting for the owner"), and that end denies its request, so the
-    tool is refused, as in an eval's chain. A source never has more than one child waiting. The pause's snapshot keeps the source (`ToolRunConfig.chainSource`) and the continuation puts
+    tool is refused, as in an eval's chain. The check runs on a run's first pause only (never resumed, no `resumedBy`):
+    a child the owner already answered keeps its right to wait, so its next `ask` waits even when a newer sibling of the
+    same source waits meanwhile. So a source has at most one child waiting on its first request, plus any it already
+    answered that paused again; the owner never gets a second unanswered first request from one source.
+  - **The wait comes before the notification.** `recordPendingToolApprovals` moves a sub-agent's run to `awaiting`
+    (`markRunAwaiting`, bound to the resume it runs under: `subAgentResumedWith`, 0 for a first pause) in the mutation
+    that records the rows, before the thread's `awaitingInput`, the reminder and the notification. A refused run (the rule
+    above, or a run that ended meanwhile) leaves its requests denied and sends nothing; a notified request finds its run
+    waiting, so an immediate answer is never refused as still working. The mutation returns whether the pause stands
+    (`HeadlessRunResult.waits`, `subAgentWaits` on a continuation). The pause's snapshot keeps the source (`ToolRunConfig.chainSource`) and the continuation puts
     it back on its tool context, so a resumed child's own sub-agents still count; an older snapshot without it falls back
     to the per-thread cap. A worker never waits, but its runs carry the source too (`createRun` and `messageWorker` store
     it, `claimRun` hands it to the run), so a one-shot child a worker delegates counts toward the limit, and in an eval's

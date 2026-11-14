@@ -1137,7 +1137,7 @@ export const continueAfterToolApproval = internalAction
             const resumed = await resumeApprovedRun(
                 ctx,
                 { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId },
-                { admittedRun: true, steerable: true },
+                { admittedRun: true, steerable: true, ...(typeof subAgentResume === "number" && { subAgentResumedWith: subAgentResume }) },
             );
 
             let subAgentEnd: SubAgentEnd = { kind: "succeeded", messageIds: resumed.messageIds ?? [] };
@@ -1148,7 +1148,12 @@ export const continueAfterToolApproval = internalAction
                 subAgentEnd = { error: "This sub-agent was stopped.", kind: "failed" };
             }
 
-            const waiting = await settleSubAgentRun(ctx, subAgentRunId, subAgentEnd, subAgentResume ?? undefined);
+            // A pause again was settled where its requests were recorded (`recordPendingToolApprovals`): the run waits, or was
+            // refused, before anyone is told.
+            const waiting =
+                subAgentEnd.kind === "paused" && resumed.subAgentWaits !== undefined
+                    ? resumed.subAgentWaits
+                    : await settleSubAgentRun(ctx, subAgentRunId, subAgentEnd, subAgentResume ?? undefined);
 
             settled = true;
             // A run that ended while this continuation paused again had its new requests closed: the child does not wait on them.
