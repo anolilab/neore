@@ -2,6 +2,7 @@
 import { createDocument } from "@mixmark-io/domino";
 import { describe, expect, it } from "vitest";
 
+import { setHTMLParser } from "../src/html-parser";
 import TurndownService, { paste, PASTE_OPTIONS } from "../src/index";
 import { wrapLooseListText } from "../src/paste-input";
 
@@ -200,5 +201,26 @@ describe("paste input: review cases, third round", () => {
         expect(() => convert(`${"<blockquote>".repeat(100)}<code>a${" ".repeat(300_000)}b</code>`)).toThrow(RangeError);
         expect(() => convert(`${"<blockquote>".repeat(100)}<pre>${"a\n".repeat(150_000)}</pre>`)).toThrow(RangeError);
         expect(convert(`<blockquote><code>a${" ".repeat(10)}b</code></blockquote>`)).toBe(`> \`a${" ".repeat(10)}b\``);
+    });
+});
+
+describe("paste input: review cases, fourth round", () => {
+    it("writes no blank line or trailing space for a <br> that starts or ends a list item or a quote", () => {
+        expect(convert("<ul><li><br>a</li><li>b<br><br></li><li>c</li></ul>")).toBe("- a\n- b\n- c");
+        expect(convert("<blockquote>q<br><br></blockquote><p>after</p>")).toBe("> q\n\nafter");
+    });
+
+    it("ends the paste at its last text, past trailing line breaks", () => {
+        expect(convert("<p>foo<br><br></p>")).toBe("foo");
+    });
+
+    it("gives an empty string back without parsing it, so it needs no HTML parser", () => {
+        setHTMLParser(undefined);
+
+        try {
+            expect(convert("")).toBe("");
+        } finally {
+            setHTMLParser(createDocument);
+        }
     });
 });

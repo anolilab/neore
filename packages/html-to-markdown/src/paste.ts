@@ -9,11 +9,11 @@ import { gfm } from "./gfm";
 import { declaredStyle } from "./inline-style";
 import { codeRules } from "./paste-code";
 import { checkWork, shownText, wrapLooseListText } from "./paste-input";
-import { isWordMarker, LINE_BREAK_MARK, listRules, prefixLines, unlessRemoved } from "./paste-lists";
+import { isWordMarker, LINE_BREAK_MARK, listRules, prefixLines, trimBreaks, unlessRemoved } from "./paste-lists";
 import { guardMarks, isSetToNormal, styleRules } from "./paste-styles";
 import type TurndownService from "./turndown";
 import type { Options, Rule } from "./types";
-import { isBlock, trimNewlines } from "./utilities";
+import { isBlock } from "./utilities";
 
 /**
  * The options the preset is written for. A line break is a plain newline, with no trailing spaces a composer would
@@ -272,7 +272,7 @@ const pasteRules: Record<string, Rule> = {
     blockquote: {
         filter: unlessRemoved((node) => node.nodeName === "BLOCKQUOTE"),
         replacement(content) {
-            return `\n\n${prefixLines(trimNewlines(content), "> ", ">")}\n\n`;
+            return `\n\n${prefixLines(trimBreaks(content), "> ", ">")}\n\n`;
         },
     },
 

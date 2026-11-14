@@ -389,6 +389,29 @@ function bulletMarker(options: Options): Marker {
 export const LINE_BREAK_MARK = "\u{10}";
 
 /**
+ * The text without the newlines and line breaks at its ends: a page shows no blank line for a `<br>` that starts or
+ * ends a block.
+ */
+export function trimBreaks(text: string): string {
+    let start = 0;
+    let end = text.length;
+
+    while (start < end && isBreakChar(text.charAt(start))) {
+        start += 1;
+    }
+
+    while (end > start && isBreakChar(text.charAt(end - 1))) {
+        end -= 1;
+    }
+
+    return text.slice(start, end);
+}
+
+function isBreakChar(char: string): boolean {
+    return char === "\n" || char === LINE_BREAK_MARK;
+}
+
+/**
  * `prefix` before each line of the text from line `from` on, and `blank` before a blank one, so no line ends in spaces
  * a composer would hide. A line that holds only a line break's mark is blank.
  */
@@ -447,7 +470,7 @@ export function listRules(isHiddenOnPage: (element: Element) => boolean): Record
         listItem: {
             filter: unlessRemoved((node) => node.nodeName === "LI"),
             replacement(content, node, options, lookup) {
-                return `${writeItem(itemPlace(node, options, lookup), trimNewlines(content))}${node.nextSibling ? "\n" : ""}`;
+                return `${writeItem(itemPlace(node, options, lookup), trimBreaks(content))}${node.nextSibling ? "\n" : ""}`;
             },
         },
 
@@ -458,7 +481,7 @@ export function listRules(isHiddenOnPage: (element: Element) => boolean): Record
             replacement(content, node, _options, lookup) {
                 const place = wordPlace(node, lookup, isHiddenOnPage);
 
-                return `${place.isListStart ? "\n\n" : "\n"}${writeItem(place, content.trim())}\n`;
+                return `${place.isListStart ? "\n\n" : "\n"}${writeItem(place, trimBreaks(content.trim()).trim())}\n`;
             },
         },
     };

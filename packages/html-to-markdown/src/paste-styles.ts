@@ -1226,12 +1226,14 @@ function copyWithoutMarks(input: Node): Node {
 export function guardMarks(service: TurndownService, prepare: (root: Node) => void): void {
     const convert = service.turndown.bind(service);
     const finish = (markdown: string): string =>
-        withoutMarks(writeDelimiters(markdown, service.options)).replaceAll(LINE_BREAK_MARK, "").replace(LEADING_SPACE, "");
+        // The end is trimmed again once the line break marks are out: the conversion's own trim stops at a mark.
+        withoutMarks(writeDelimiters(markdown, service.options)).replaceAll(LINE_BREAK_MARK, "").replace(LEADING_SPACE, "").trimEnd();
 
     const turndown = (input: TurndownInput): string => {
         const isNode = typeof input === "object" && input !== null && typeof (input as Partial<Node>).nodeType === "number";
 
-        if (typeof input !== "string" && !isNode) {
+        // Nothing to parse in an empty string: the conversion gives "" without a parser.
+        if (input === "" || (typeof input !== "string" && !isNode)) {
             return convert(input);
         }
 
