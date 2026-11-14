@@ -9,6 +9,7 @@ import Constants from "expo-constants";
 import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
 import {
     AndroidImportance,
+    cancelAllScheduledNotificationsAsync,
     dismissAllNotificationsAsync,
     getExpoPushTokenAsync,
     getPermissionsAsync,
@@ -178,6 +179,8 @@ export const syncApprovalActions = async (): Promise<void> => {
 /** Removes the alerts still on this phone. */
 export const dismissAccountNotifications = async (): Promise<void> => {
     clearTapRoute();
+    // Queued alerts too: the task's alerts for the account being removed must not appear after its sign-out.
+    await cancelAllScheduledNotificationsAsync();
     await dismissAllNotificationsAsync();
 };
 

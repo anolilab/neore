@@ -6,7 +6,14 @@
  * Loaded first, from the app entry (`index.ts`): a background task must be defined at module scope before the app
  * starts, or a push that launches the app finds no task.
  */
-import { AndroidImportance, dismissNotificationAsync, registerTaskAsync, scheduleNotificationAsync, setNotificationChannelAsync } from "expo-notifications";
+import {
+    AndroidImportance,
+    cancelScheduledNotificationAsync,
+    dismissNotificationAsync,
+    registerTaskAsync,
+    scheduleNotificationAsync,
+    setNotificationChannelAsync,
+} from "expo-notifications";
 import { defineTask } from "expo-task-manager";
 import { Platform } from "react-native";
 
@@ -60,6 +67,8 @@ if (Platform.OS === "android") {
                     await setNotificationChannelAsync(ANDROID_CHANNEL_ID, { importance: AndroidImportance.HIGH, name: channelName(locale) });
                 },
                 retract: async (ids) => {
+                    // Queued but not yet shown is still a live alert: cancel it as well as dismissing it.
+                    await cancelScheduledNotificationAsync(ids.notificationId);
                     await dismissNotificationAsync(ids.notificationId);
                 },
                 session: async () => await secureGrantStore.get() ?? undefined,
