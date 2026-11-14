@@ -8,7 +8,7 @@ import { Route as ThreadRoute } from "@/routes/(chat)/chat/$threadId";
 import { Route as ChatLayoutRoute } from "@/routes/(chat)/route";
 import { chatFixtures, THREAD_IDS } from "@/storybook/fixtures/chat";
 import { chunksOf, gatewayStreamHandler } from "@/storybook/fixtures/gateway";
-import { GUEST_NOTES, guestLinksFixtures } from "@/storybook/fixtures/guest-links";
+import { GUEST_NOTES, guestLinksFixtures, saveGuestNote } from "@/storybook/fixtures/guest-links";
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
 import { shellFixtures } from "@/storybook/fixtures/shell";
 import { userFixtures } from "@/storybook/fixtures/user";
@@ -28,8 +28,16 @@ const DISMISS_HELD = /^Dismiss note: Could you check the deploy tonight/u;
 /** The bodies the gateway's `/v1/chat` received in this story: a guest note goes out with its id. */
 const sends: string[] = [];
 
+/** The gateway's chat start: it saves the message, and with it marks the guest note sent, as the backend does. */
 const gatewaySend = http.post(`${env.VITE_LLM_GATEWAY_URL}/v1/chat`, async ({ request }) => {
-    sends.push(await request.text());
+    const body = await request.text();
+    const { guestMessageId } = JSON.parse(body) as { guestMessageId?: string };
+
+    sends.push(body);
+
+    if (guestMessageId !== undefined) {
+        saveGuestNote(guestMessageId);
+    }
 
     return HttpResponse.json({
         contentType: "text",
@@ -42,11 +50,39 @@ const gatewaySend = http.post(`${env.VITE_LLM_GATEWAY_URL}/v1/chat`, async ({ re
     });
 });
 
+/** The held note's row in the list: its text and its state badge. */
+const heldNote = (notes: HTMLElement): HTMLElement => {
+    const row = within(notes).getByText(HELD).closest("li");
+
+    if (!row) {
+        throw new Error("The held note has no row.");
+    }
+
+    return row;
+};
+
 /** The owner opens the chat's share menu on the Guests tab, once the thread and its access have loaded. */
 const openGuestsTab = async (canvas: { findByRole: typeof screen.findByRole }): Promise<HTMLElement> => {
     await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT);
     await lunoraAnswered(api.chat.sharing.getThreadAccess);
-    await userEvent.click(await canvas.findByRole("button", { name: "Share Thread" }, PAGE_WAIT));
+    await canvas.findByRole("button", { name: "Share Thread" }, PAGE_WAIT);
+
+    // The last story's open share panel can hold `pointer-events: none` on the page for a moment after it unmounted; the
+    // header can render the button anew meanwhile, so it is looked up again for the click.
+    const share = await waitFor(async () => {
+        const button = screen.getByRole("button", { name: "Share Thread" });
+
+        await expect(getComputedStyle(button).pointerEvents).not.toBe("none");
+
+        return button;
+    }, PAGE_WAIT);
+
+    await userEvent.click(share);
+
+    // A popover on desktop, a drawer on a phone: either way a named dialog, and its tabs fit the screen.
+    const panel = await screen.findByRole("dialog", { name: "Share Thread" }, PAGE_WAIT);
+
+    await expect(within(panel).getByRole("tablist").getBoundingClientRect().right).toBeLessThanOrEqual(globalThis.innerWidth);
     await userEvent.click(await screen.findByRole("tab", { name: "Guests" }, PAGE_WAIT));
 
     return await screen.findByRole("list", { name: "Guest messages" }, PAGE_WAIT);
@@ -98,7 +134,7 @@ export const NotesWaiting: Story = {
     },
 };
 
-/** Send hands the note to the chat's own send, with its id: it goes out alone, and the list reads it as sent. */
+/** Send hands the note to the chat's own send, with its id: it goes out alone, and once the start saved it the list reads it as sent. */
 export const SendANote: Story = {
     play: async ({ canvas }) => {
         const notes = await openGuestsTab(canvas);
@@ -112,6 +148,34 @@ export const SendANote: Story = {
         await waitFor(async () => {
             await expect(within(notes).queryByRole("button", { name: SEND_HELD })).toBeNull();
         }, STATE_WAIT);
+        await expect(within(heldNote(notes)).getByText("Sent")).toBeVisible();
+    },
+};
+
+/** The chat start fails: nothing saved the note, so it stays waiting with its Send, to be sent again. */
+export const SendFails: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                send: http.post(`${env.VITE_LLM_GATEWAY_URL}/v1/chat`, async ({ request }) => {
+                    sends.push(await request.text());
+
+                    return HttpResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });
+                }),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        const notes = await openGuestsTab(canvas);
+
+        await userEvent.click(within(notes).getByRole("button", { name: SEND_HELD }));
+        await waitFor(async () => {
+            await expect(sends).toHaveLength(1);
+        }, STATE_WAIT);
+        await waitFor(async () => {
+            await expect(within(notes).getByRole("button", { name: SEND_HELD })).toBeEnabled();
+        }, STATE_WAIT);
+        await expect(within(heldNote(notes)).getByText("Waiting")).toBeVisible();
     },
 };
 

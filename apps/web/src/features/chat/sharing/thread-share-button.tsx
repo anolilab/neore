@@ -257,8 +257,8 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
                     </Button>
                 }
             />
-            {/* A popover, not a menu: it holds tabs and a form, which a `role="menu"` may not contain. */}
-            <PopoverContent align="end" aria-label={t`Share Thread`} className="w-[420px] p-0">
+            {/* A popover, not a menu: it holds tabs and a form, which a `role="menu"` may not contain. Full width in the phone drawer. */}
+            <PopoverContent align="end" aria-label={t`Share Thread`} className="w-full p-0 md:w-[420px]">
                 <Tabs className="w-full" onValueChange={handleTabChange} value={shownTab}>
                     <TabsList className={cn("grid w-full", showGuests ? "grid-cols-4" : "grid-cols-3")}>
                         <TabsTrigger value="access">{t`Access`}</TabsTrigger>

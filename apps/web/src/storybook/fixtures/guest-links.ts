@@ -13,9 +13,21 @@ export const GUEST_NOTES = [
 /** A thread's live link's id: one per thread, so a link made in one chat never matches another's. */
 const linkIdOf = (threadId: string): string => `guest-link-${threadId}`;
 
+/** The notes `/chat/start` saved in this story: the backend marks a note sent there, not in the review that hands out its text. */
+const savedByChatStart = new Set<string>();
+
+onStoryReset(() => {
+    savedByChatStart.clear();
+});
+
+/** The story's mocked `/chat/start` saved the guest note `messageId`: from now on the owner's read shows it sent. A failed start never calls this. */
+export const saveGuestNote = (messageId: string): void => {
+    savedByChatStart.add(messageId);
+};
+
 /**
  * The owner's guest-link procedures (`chat/guest-links.ts`). `link: false` is a thread with no live link. Create makes the link live, a revoke ends it and its notes, and both start over before
- * each story and each visit to one. A waiting note's Send hands out its text and reads as sent from then on (the backend marks it once `/chat/start` saved it); Dismiss deletes it.
+ * each story and each visit to one. A waiting note's Send hands out its text and leaves it waiting; it reads as sent once the story's `/chat/start` calls `saveGuestNote`. Dismiss deletes it.
  */
 export const guestLinksFixtures = ({
     link = true,
@@ -34,9 +46,11 @@ export const guestLinksFixtures = ({
     reset();
     onStoryReset(reset);
 
+    const current = () => notes.map((row) => (savedByChatStart.has(row.id) ? { ...row, status: "sent" as const } : row));
+
     return [
         lunora(api.chat.guest_links.getGuestLink, ({ threadId }) => {
-            return live ? { link: { bound: true, expiresAt: NOW + DAY, id: linkIdOf(threadId) }, messages: notes } : { link: null, messages: [] };
+            return live ? { link: { bound: true, expiresAt: NOW + DAY, id: linkIdOf(threadId) }, messages: current() } : { link: null, messages: [] };
         }),
         lunora(api.chat.guest_links.createGuestLink, ({ threadId }) => {
             live = true;
@@ -46,13 +60,11 @@ export const guestLinksFixtures = ({
             return { expiresAt: NOW + DAY, id: linkIdOf(threadId), linkToken: "ab".repeat(32) };
         }),
         lunora(api.chat.guest_links.sendHeldGuestMessage, ({ messageId }) => {
-            const note = notes.find(({ id }) => id === messageId);
+            const note = current().find(({ id }) => id === messageId);
 
             if (!note || note.status === "sent") {
                 return { status: "sent" as const };
             }
-
-            notes = notes.map((row) => (row.id === messageId ? { ...row, status: "sent" as const } : row));
 
             return { status: "ready" as const, text: note.text, threadId: "thread" };
         }),
