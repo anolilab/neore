@@ -271,3 +271,25 @@ describe("paste styles: review cases, sixth round", () => {
         expect(service.turndown(`<p>plain</p><p style="font-weight:bold">styled</p>`)).toBe("[P plain]\n\n[P **styled**]");
     });
 });
+
+describe("paste styles: review cases, seventh round", () => {
+    it("reads a weight as CSS computes it: a number from 600 up is bold, initial and lighter can reset it", () => {
+        expect(convert(`<p><span style="font-weight:650">a</span> <span style="font-weight:550">b</span></p>`)).toBe("**a** b");
+        expect(convert(`<b>a<span style="font-weight:initial">b</span>c</b>`)).toBe("**a**b**c**");
+        expect(convert(`<b>a<span style="font-weight:lighter">b</span>c</b>`)).toBe("**a**b**c**");
+    });
+
+    it("keeps a normal-weight run inside a bold link inside bold out of the bold, its syntax whole", () => {
+        expect(convert(`<b>a <a href="https://x.y" style="font-weight:bold"><span style="font-weight:normal">x</span> y</a> b</b>`)).toBe(
+            "**a** [x **y**](https://x.y) **b**",
+        );
+    });
+
+    it("lets a shorthand with a function in it override no earlier one when its keywords are invalid", () => {
+        expect(
+            convert(
+                `<p><span style="text-decoration:line-through; text-decoration:bogus rgb(1 2 3)">x</span> <span style="text-decoration:line-through rgb(1 2 3) 2px">y</span></p>`,
+            ),
+        ).toBe("~~x~~ ~~y~~");
+    });
+});

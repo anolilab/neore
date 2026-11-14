@@ -21,12 +21,20 @@ const BOLD_WEIGHTS = new Set(["600", "700", "800", "900", "bold", "bolder"]);
 
 // `lighter` is not here: it is relative, and under a heavy weight it is still bold.
 // Up to 500, medium, which is not bold either.
-export const NORMAL_WEIGHTS = new Set(["100", "200", "300", "400", "500", "normal"]);
+const NORMAL_WEIGHTS = new Set(["100", "200", "300", "400", "500", "normal"]);
 // The whitespace between the keywords of a CSS value.
 const CSS_SPACE = /[\t\n\f\r ]+/;
 const GLOBAL_VALUES = new Set(["inherit", "initial", "revert", "revert-layer", "unset"]);
 const NUMBER = /^\d+(?:\.\d+)?$/;
 const MAX_WEIGHT = 1000;
+// Values that take the parent's weight, as no declaration does.
+const INHERITING = new Set(["inherit", "revert", "revert-layer", "unset"]);
+const DEFAULT_WEIGHT = 400;
+const BOLD_WEIGHT = 700;
+// A weight from 600 up shows as bold.
+const MIN_BOLD = 600;
+// The functions a decoration's color or thickness may be written with.
+const VALUE_FUNCTIONS = new Set(["calc", "color", "color-mix", "hsl", "hsla", "hwb", "lab", "lch", "light-dark", "oklab", "oklch", "rgb", "rgba", "var"]);
 const LINE_KEYWORDS = new Set(["blink", "line-through", "none", "overline", "underline"]);
 // What else the `text-decoration` shorthand takes: a line style, a thickness and a color.
 const DECORATION_STYLES = new Set(["dashed", "dotted", "double", "solid", "wavy"]);
@@ -223,10 +231,12 @@ function emphasisOf(element: Element): Emphasis {
     const name = element.nodeName;
     const style = element.getAttribute("style") ?? "";
     const isStyled = STYLED.has(name);
-    const weight = style === "" ? "" : declaredStyle(style, "font-weight", isWeightValue);
-    const isNormal = (isStyled || isNamed(element)) && NORMAL_WEIGHTS.has(weight);
+    // The element sets the weight when it declares one, or is `<b>`/`<strong>`, which a browser makes bolder.
+    const isSet = declaredWeight(element) !== "" || BOLD_NAMES.has(name);
+    const isHeavy = computedWeight(element) >= MIN_BOLD;
+    const isNormal = (isStyled || isNamed(element)) && isSet && !isHeavy;
     const emphasis: Emphasis = {
-        isBold: !isNormal && (BOLD_NAMES.has(name) || (isStyled && BOLD_WEIGHTS.has(weight))),
+        isBold: (BOLD_NAMES.has(name) || isStyled) && isSet && isHeavy,
         isItalic: ITALIC_NAMES.has(name) || (isStyled && style !== "" && isItalicStyle(style)),
         isNormal,
         isStrike: STRIKE_NAMES.has(name) || (isStyled && style !== "" && isStruckStyle(style)),
@@ -235,6 +245,107 @@ function emphasisOf(element: Element): Emphasis {
     emphases.set(element, emphasis);
 
     return emphasis;
+}
+
+/** The weight the element declares, when its style sets its text's weight; "" when it takes its parent's. */
+function declaredWeight(element: Element): string {
+    const style = element.getAttribute("style") ?? "";
+
+    if (style === "" || !(STYLED.has(element.nodeName) || isNamed(element))) {
+        return "";
+    }
+
+    const value = declaredStyle(style, "font-weight", isWeightValue);
+
+    return INHERITING.has(value) ? "" : value;
+}
+
+const weights = new WeakMap<Element, number>();
+
+/** The weight the element's text shows with, as CSS computes it from the elements around it. Each is asked once. */
+function computedWeight(element: Element): number {
+    const chain: Element[] = [];
+    let current: Element | null = element;
+    let weight = DEFAULT_WEIGHT;
+
+    while (current) {
+        const known = weights.get(current);
+
+        if (known !== undefined) {
+            weight = known;
+            break;
+        }
+
+        chain.push(current);
+        current = current.parentElement;
+    }
+
+    for (let index = chain.length - 1; index >= 0; index -= 1) {
+        const member = chain[index] as Element;
+        const declared = declaredWeight(member);
+
+        if (declared !== "") {
+            weight = resolvedWeight(declared, weight);
+        } else if (BOLD_NAMES.has(member.nodeName)) {
+            weight = bolder(weight);
+        }
+
+        weights.set(member, weight);
+    }
+
+    return weight;
+}
+
+/** A declared weight as a number, a relative one from the parent's. */
+function resolvedWeight(value: string, parent: number): number {
+    switch (value) {
+        case "bold": {
+            return BOLD_WEIGHT;
+        }
+        case "bolder": {
+            return bolder(parent);
+        }
+        case "initial":
+        case "normal": {
+            return DEFAULT_WEIGHT;
+        }
+        case "lighter": {
+            return lighter(parent);
+        }
+        default: {
+            return Number(value);
+        }
+    }
+}
+
+// The steps CSS takes for `bolder` and `lighter`.
+function bolder(weight: number): number {
+    if (weight < 350) {
+        return 400;
+    }
+
+    if (weight < 550) {
+        return 700;
+    }
+
+    return Math.max(weight, 900);
+}
+
+function lighter(weight: number): number {
+    if (weight < 100) {
+        return weight;
+    }
+
+    if (weight < 550) {
+        return 100;
+    }
+
+    return weight < 750 ? 400 : 700;
+}
+
+/** True for `<b>` or `<strong>` set back to normal weight, which is no bold. */
+export function isSetToNormal(element: Element): boolean {
+    return emphasisOf(element).isNormal;
 }
 
 /** True for a `font-weight` a browser reads: a keyword, a global value, or a number from 1 to 1000. */
@@ -269,21 +380,52 @@ function isItalicStyle(style: string): boolean {
     return value === "italic" || value.startsWith("oblique");
 }
 
-/**
- * True for a `text-decoration` shorthand a browser reads: each keyword a line, a line style, a thickness or a color.
- * A value with a function in it (`rgb(…)`, `var(…)`) is taken as read: its keywords are not split on its spaces.
- */
+/** The keywords of a CSS value, split at whitespace outside parentheses, so `rgb(1 2 3)` is one. */
+function cssTokens(value: string): string[] {
+    const tokens: string[] = [];
+    let current = "";
+    let depth = 0;
+
+    for (const char of value) {
+        depth = Math.max(0, depth + (char === "(" ? 1 : 0) - (char === ")" ? 1 : 0));
+
+        if (depth === 0 && CSS_SPACE.test(char)) {
+            if (current !== "") {
+                tokens.push(current);
+            }
+
+            current = "";
+        } else {
+            current += char;
+        }
+    }
+
+    return current === "" ? tokens : [...tokens, current];
+}
+
+/** True for a function a color or thickness is written with, such as `rgb(…)` or `calc(…)`, closed. */
+function isFunctionToken(token: string): boolean {
+    const open = token.indexOf("(");
+
+    return open > 0 && token.endsWith(")") && VALUE_FUNCTIONS.has(token.slice(0, open));
+}
+
+/** True for a `text-decoration` shorthand a browser reads: each keyword a line, a line style, a thickness or a color. */
 function isDecorationValue(value: string): boolean {
-    if (GLOBAL_VALUES.has(value) || value.includes("(")) {
+    if (GLOBAL_VALUES.has(value)) {
         return true;
     }
 
-    return value
-        .split(CSS_SPACE)
-        .every(
-            (keyword) =>
-                LINE_KEYWORDS.has(keyword) || DECORATION_STYLES.has(keyword) || THICKNESS.test(keyword) || HEX_COLOR.test(keyword) || NAMED_COLORS.has(keyword),
-        );
+    return cssTokens(value).every((keyword) => isDecorationKeyword(keyword));
+}
+
+/** True for a keyword of the shorthand: a line, a line style, a thickness, or a color. */
+function isDecorationKeyword(keyword: string): boolean {
+    if (LINE_KEYWORDS.has(keyword) || DECORATION_STYLES.has(keyword) || NAMED_COLORS.has(keyword)) {
+        return true;
+    }
+
+    return isFunctionToken(keyword) || THICKNESS.test(keyword) || HEX_COLOR.test(keyword);
 }
 
 /** True for a value the shorthand or the longhand that sets the decoration line takes. */
@@ -414,7 +556,10 @@ function addCarriers(run: Element, carriers: Set<Element>): void {
             linkRuns.add(above as Element);
         }
 
-        if (emphasisOf(above as Element).isBold) {
+        // A bold link is marked normal as a whole for the bold around it, if any, so the way goes on up to that one.
+        const isBoldLink = above.nodeName === "A" && formattingFrom(above.parentNode, "isBold") !== null;
+
+        if (!isBoldLink && emphasisOf(above as Element).isBold) {
             return;
         }
     }
@@ -748,7 +893,7 @@ function formatted(content: string, node: Element, options: Options, lookup: Rul
     if (emphasis.isBold || linkRuns.has(node)) {
         // Bold inside bold writes no second pair; the marks wait for the bold around it. A link holding a normal-weight
         // run writes its label's bold runs, and the link as a whole is then marked normal.
-        if (!emphasis.isBold || !isFormattedAbove(node, "isBold", lookup)) {
+        if (linkRuns.has(node) || !isFormattedAbove(node, "isBold", lookup)) {
             text = isWrapped ? wrapRuns(text, options.strongDelimiter, true) : withoutMarks(text);
         }
     } else if (isUnbold(node) && isNamed(node) && text.trim() !== "") {

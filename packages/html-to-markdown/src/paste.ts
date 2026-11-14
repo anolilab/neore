@@ -9,7 +9,7 @@ import { gfm } from "./gfm";
 import { declaredStyle } from "./inline-style";
 import { codeRules } from "./paste-code";
 import { isWordMarker, listRules, unlessRemoved } from "./paste-lists";
-import { guardMarks, NORMAL_WEIGHTS, styleRules } from "./paste-styles";
+import { guardMarks, isSetToNormal, styleRules } from "./paste-styles";
 import type TurndownService from "./turndown";
 import type { Options, Rule } from "./types";
 
@@ -286,10 +286,7 @@ const pasteRules: Record<string, Rule> = {
 
     // Bold set back to normal weight is not bold: Google Docs wraps a whole copy in `<b style="font-weight:normal">`.
     normalWeightBold: {
-        filter: unlessRemoved(
-            (node) =>
-                (node.nodeName === "B" || node.nodeName === "STRONG") && NORMAL_WEIGHTS.has(declaredStyle(node.getAttribute("style") ?? "", "font-weight")),
-        ),
+        filter: unlessRemoved((node) => (node.nodeName === "B" || node.nodeName === "STRONG") && isSetToNormal(node)),
         replacement: (content) => content,
     },
 };
