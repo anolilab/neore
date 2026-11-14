@@ -4,7 +4,6 @@
  * register and unregister procedures. A push carries only a generic alert and ids.
  */
 import type { LunoraClient } from "@lunora/client";
-import { api } from "@neore/backend/api";
 import Constants from "expo-constants";
 import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
 import {
@@ -31,6 +30,7 @@ import { ANDROID_CHANNEL_ID, channelName, deviceLocale } from "./push-channel";
 import { isDataOnlyPush, PHONE_PUSH_TASK } from "./push-content";
 import type { PushPlatform, PushServer } from "./push-registration";
 import { createPendingWork, createSerialSteps, noteAccountOnPhone, onceItWorks } from "./push-registration";
+import { pushServerFor } from "./push-server";
 
 /** Registrations in flight; sign-out settles them before it releases the token. */
 export const pushRegistrations = createPendingWork();
@@ -76,30 +76,8 @@ const isPhoneTaskRegistered = async (): Promise<boolean> => {
     }
 };
 
-/** `onlineOnly`: a registration made offline is refused, never replayed later for whoever is signed in by then. */
-export const backendPushServer = (client: LunoraClient): PushServer => {
-    return {
-        isEnabled: async () => {
-            const { enabled } = await client.query(api.notifications.native_push.getNativePushConfig, {});
-
-            return enabled;
-        },
-        register: async (platform, token, language) => {
-            // Android's alert is built by the background task: the server sends this phone a data-only push only while it runs.
-            const buildsAlert = platform === "android" ? await isPhoneTaskRegistered() : undefined;
-            const { registered } = await client.mutation(
-                api.notifications.native_push.registerPushDevice,
-                { platform, token, ...language !== undefined && { language }, ...buildsAlert !== undefined && { buildsAlert } },
-                { onlineOnly: true },
-            );
-
-            return registered;
-        },
-        unregister: async (token) => {
-            await client.mutation(api.notifications.native_push.unregisterPushDevice, { token }, { onlineOnly: true });
-        },
-    };
-};
+/** The backend's push procedures, with this device's background-task check for the Android alert flag. */
+export const backendPushServer = (client: LunoraClient): PushServer => pushServerFor(client, isPhoneTaskRegistered);
 
 /** The backend's address, for the notification extension: it reads it from the shared keychain group to fetch a push's text. */
 const EXTENSION_LUNORA_URL_KEY = "neore.mobile.lunora-url";
@@ -184,6 +162,7 @@ export const syncApprovalActions = async (): Promise<void> => {
 /** Removes the alerts still on this phone. */
 export const dismissAccountNotifications = async (): Promise<void> => {
     clearTapRoute();
+
     // Queued alerts too: the task's alerts for the account being removed must not appear after its sign-out. The dismiss runs
     // even when the cancel fails, so an alert already shown does not stay up.
     try {

@@ -232,7 +232,9 @@ describe("showDataOnlyPush", () => {
         const retract = vi.fn(async () => undefined);
 
         await showDataOnlyPush(PUSH, {
-            fetchContent: vi.fn(async () => ({ body: "Release run", title: "Approval" })),
+            fetchContent: vi.fn(async () => {
+                return { body: "Release run", title: "Approval" };
+            }),
             locale: "de-DE",
             retract,
             session: async () => reads.shift(),
