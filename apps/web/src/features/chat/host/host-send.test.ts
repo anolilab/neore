@@ -66,6 +66,14 @@ describe("sendHostMessage", () => {
             error: "session_starting",
             ok: false,
         });
+        await expect(sendHostMessage(INPUT, { fetch: answering(403, { error: "not_allowed" }) as never })).resolves.toEqual({
+            error: "not_allowed",
+            ok: false,
+        });
+        await expect(sendHostMessage(INPUT, { fetch: answering(403, { error: "left_organization" }) as never })).resolves.toEqual({
+            error: "left_organization",
+            ok: false,
+        });
         await expect(sendHostMessage(INPUT, { fetch: answering(500, { error: "something new" }) as never })).resolves.toEqual({
             error: "unreachable",
             ok: false,

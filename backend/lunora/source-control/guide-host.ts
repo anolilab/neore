@@ -18,6 +18,7 @@ import { internalAction, internalMutation, internalQuery } from "../_generated/s
 import { readHostTranscript } from "../acp/lib/finish";
 import { OUTDATED_NOTICE } from "../acp/lib/start";
 import { startHostSessionFor } from "../acp/remote";
+import { hostOrganizationRefusal } from "../acp/lib/organization-cap";
 import { sendToHostFor } from "../acp/send";
 import { authAction, rateLimit } from "../lib/crpc";
 import { resolveGithubToken } from "../connectors/lib/github-token";
@@ -66,6 +67,8 @@ export const beginHostGuide = internalMutation
         headSha: v.string().max(MAX_LENGTH.short),
         instructions: v.string().max(MAX_LENGTH.long),
         number: v.number(),
+        // The caller's verified active organization: the agent is started under its cap, and the thread is filed there.
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         plan: v.union(v.literal("free"), v.literal("premium")),
         repository: v.string().max(MAX_LENGTH.short),
         text: v.string().max(MAX_LENGTH.document),
@@ -74,7 +77,7 @@ export const beginHostGuide = internalMutation
     .output(
         v.union(
             v.object({ status: v.literal("started"), threadId: v.string() }),
-            v.object({ status: v.union(v.literal("folder_mismatch"), v.literal("running")) }),
+            v.object({ status: v.union(v.literal("folder_mismatch"), v.literal("not_allowed"), v.literal("running")) }),
             vUnavailable,
         ),
     )
@@ -90,6 +93,12 @@ export const beginHostGuide = internalMutation
 
         if (!isDeviceOnline(device, ctx.now)) {
             return { reason: "offline" as const, status: "unavailable" as const };
+        }
+
+        // Before the guide is reserved: the session start below would refuse it too, but its refusal reads as "busy" here.
+        // The organization is the caller's verified one, so the owner is a member of it: only the cap can refuse.
+        if (await hostOrganizationRefusal(ctx, args.organizationId, userId)) {
+            return { status: "not_allowed" as const };
         }
 
         const reserved = await reserveGuide(ctx, {
@@ -111,6 +120,7 @@ export const beginHostGuide = internalMutation
             clientId: ctx.newId(),
             deviceId: args.deviceId,
             folderId: args.folderId,
+            organizationId: args.organizationId,
         }).catch((error: unknown) => {
             // A computer too old to start an agent says so, rather than passing for busy.
             throw new LunoraError("BAD_REQUEST", `${HOST_ROLLBACK}${error instanceof Error && error.message === OUTDATED_NOTICE ? "outdated" : "busy"}`);
@@ -122,6 +132,7 @@ export const beginHostGuide = internalMutation
 
         // The prompt carries a pull request's title, body and paths: third-party text, so the turn is signed as tainted.
         const sent = await sendToHostFor(ctx, {
+            organizationId: args.organizationId,
             plan: args.plan,
             requestId: ctx.newId(),
             taintedBy: GUIDE_TAINT,
@@ -186,7 +197,9 @@ export const startHostGuide = authAction
     .output(
         v.union(
             v.object({ status: v.literal("started"), threadId: v.string() }),
-            v.object({ status: v.union(v.literal("folder_mismatch"), v.literal("guest"), v.literal("running"), v.literal("too_large")) }),
+            v.object({
+                status: v.union(v.literal("folder_mismatch"), v.literal("guest"), v.literal("not_allowed"), v.literal("running"), v.literal("too_large")),
+            }),
             vUnavailable,
             vFailed,
         ),
@@ -232,6 +245,7 @@ export const startHostGuide = authAction
                 headSha: read.headSha,
                 instructions,
                 number: args.number,
+                organizationId: ctx.user.activeOrganization?.id,
                 plan: getUserTier({ plan: plan ?? null }) === "premium" ? "premium" : "free",
                 repository: args.repository,
                 text,

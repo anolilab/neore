@@ -147,6 +147,7 @@ export const clearContext = authAction
         const result = hostSession
             ? await ctx.runMutation(internal.acp.switch.clearHostSession, {
                   clientId: args.clientId,
+                  organizationId: ctx.user.activeOrganization?.id,
                   threadId: args.threadId,
                   unlockProof: args.unlockProof,
                   userId,

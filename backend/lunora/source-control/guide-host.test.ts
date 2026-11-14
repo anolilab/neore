@@ -185,6 +185,32 @@ describe("beginHostGuide", () => {
         await nothingLeftBehind();
     });
 
+    it("is refused, writing nothing, when the caller's organization holds agents below auto; one that allows them gets the guide's chat", async () => {
+        const deviceId = await pairedDevice(ownerId);
+
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "ask", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+
+        await expect(begin(deviceId, { organizationId: "org-a" })).resolves.toEqual({ status: "not_allowed" });
+        await nothingLeftBehind();
+
+        await run(async (ctx) => await ctx.db.insert("member", { createdAt: 0, organizationId: "org-b", role: "member", userId: ownerId }));
+
+        const started = await begin(deviceId, { organizationId: "org-b" });
+        const [thread] = await rows("threads");
+
+        expect(started).toMatchObject({ status: "started" });
+        expect(thread).toMatchObject({ _id: started.threadId, organizationId: "org-b" });
+    });
+
     it("runs one guide at a time for a pull request", async () => {
         const deviceId = await pairedDevice(ownerId);
 

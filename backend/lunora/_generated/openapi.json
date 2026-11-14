@@ -51871,6 +51871,10 @@
                               "type": "string"
                             },
                             {
+                              "const": "not_allowed",
+                              "type": "string"
+                            },
+                            {
                               "const": "running",
                               "type": "string"
                             },
