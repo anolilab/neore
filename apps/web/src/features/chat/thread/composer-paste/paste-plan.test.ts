@@ -107,13 +107,12 @@ describe("composer paste", () => {
         expect(htmlToMarkdown("<p><b>one<br>two</b> <i>three<br></i><s> four<br>five</s></p>")).toBe("**one\ntwo** *three*\n~~four\nfive~~");
     });
 
-    it("converts a code block of many line elements in linear time", () => {
-        // 15,000 lines: about 0.4 s here, so the coverage run on a loaded CI runner stays inside the test timeout. No
-        // wall-clock gate (docs/agents/testing.md): the timeout stops a run that grows far worse than that.
-        const html = `<pre>${"<div>let a = 1;</div>".repeat(15_000)}</pre>`;
+    it("keeps every line of a code block of many line elements", () => {
+        // That the conversion is linear in the lines is tested in @neore/html-to-markdown (paste-code-scale.test.ts).
+        const html = `<pre>${"<div>let a = 1;</div>".repeat(1000)}</pre>`;
         const markdown = htmlToMarkdown(html);
 
-        expect(markdown.split("\n").filter((line) => line === "let a = 1;")).toHaveLength(15_000);
+        expect(markdown.split("\n").filter((line) => line === "let a = 1;")).toHaveLength(1000);
     });
 
     it("takes a Word item's number only from a marker it shows", () => {
