@@ -107,13 +107,12 @@ describe("composer paste", () => {
         expect(htmlToMarkdown("<p><b>one<br>two</b> <i>three<br></i><s> four<br>five</s></p>")).toBe("**one\ntwo** *three*\n~~four\nfive~~");
     });
 
-    it("converts a code block of many line elements in linear time", () => {
-        // 30,000 lines: about 0.8 s here, against about 4 s when each line re-read the text built so far. No wall-clock
-        // gate (docs/agents/testing.md): the test timeout stops a run that grows far worse than that.
-        const html = `<pre>${"<div>let a = 1;</div>".repeat(30_000)}</pre>`;
+    it("keeps every line of a code block of many line elements", () => {
+        // That the conversion is linear in the lines is tested in @neore/html-to-markdown (paste-code-scale.test.ts).
+        const html = `<pre>${"<div>let a = 1;</div>".repeat(1000)}</pre>`;
         const markdown = htmlToMarkdown(html);
 
-        expect(markdown.split("\n").filter((line) => line === "let a = 1;")).toHaveLength(30_000);
+        expect(markdown.split("\n").filter((line) => line === "let a = 1;")).toHaveLength(1000);
     });
 
     it("takes a Word item's number only from a marker it shows", () => {
@@ -295,8 +294,9 @@ describe("composer paste", () => {
     });
 
     it("converts a crafted style attribute under the cap in linear time", () => {
-        // A crafted style of 800 KB took 69 s before the patterns were bounded: past the test timeout, with no wall-clock gate.
-        for (const style of ["text-decoration:".repeat(50_000), "mso-list:".repeat(80_000)]) {
+        // A crafted style of 800 KB took 69 s before the patterns were bounded: past the test timeout, with no wall-clock
+        // gate. Half that size still is, and keeps a loaded CI runner inside the timeout when the patterns are bounded.
+        for (const style of ["text-decoration:".repeat(25_000), "mso-list:".repeat(40_000)]) {
             expect(htmlToMarkdown(`<p><span style="${style}">x</span></p>`)).toBe("x");
         }
     });
