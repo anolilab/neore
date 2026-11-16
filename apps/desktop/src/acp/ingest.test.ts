@@ -1655,6 +1655,52 @@ describe("what the agent reports about itself", () => {
         expect(statePosts()[0]?.post.events).toEqual([{ at: observed, configOptions: [option("deep")], kind: "session_state", modes, seq: 3, usage: usage(1) }]);
     });
 
+    it("retries the newer observation when the clock moved back while a failed send was in flight", async () => {
+        const host = poster();
+
+        await open(host);
+
+        // The first report's post is held in flight for ten seconds, then answered with a failure.
+        let held = false;
+        let refused = false;
+
+        backend.gate = (post) => {
+            if (!held && (post.events[0] as { kind?: string } | undefined)?.kind === "session_state") {
+                held = true;
+
+                return new Promise<void>((resolve) => {
+                    setTimeout(resolve, 10_000);
+                });
+            }
+
+            return undefined;
+        };
+        backend.respond = (post) => {
+            if (!refused && (post.events[0] as { kind?: string } | undefined)?.kind === "session_state") {
+                refused = true;
+
+                return Response.json({ error: "x" }, { status: 500 });
+            }
+
+            return undefined;
+        };
+
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(1);
+
+        // The newer observation is made after the clock moved back: its time is earlier than the failed report's.
+        clock -= 60_000;
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(2000);
+
+        // The held post is answered with the failure, then the retry goes out.
+        await settleInSteps(40_000);
+
+        // The retry carries the newer observation (the later sequence number), not the failed older one.
+        expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ seq: 2, usage: usage(11) });
+    });
+
     it("drops a report the backend refuses, and the session keeps going", async () => {
         const host = poster();
 
@@ -1712,6 +1758,14 @@ describe("what the agent reports about itself", () => {
 });
 
 describe("a retry that finds a newer report waiting", () => {
+    it("orders the two by their sequence numbers when the clock moved back, so the later observation's usage wins", () => {
+        // The failed report was observed first (seq 1) but stamped later: the clock moved back before the waiting one.
+        const failed = { at: 2000, seq: 1, usage: { size: 10, used: 1 } };
+        const waiting = { at: 1000, seq: 2, usage: { size: 10, used: 2 } };
+
+        expect(newerPending(failed, waiting)).toEqual({ at: 1000, seq: 2, usage: { size: 10, used: 2 } });
+    });
+
     it("keeps the cost of a failed send when the newer report carries only counts", () => {
         const cost = { amount: 0.4, currency: "USD" };
         const failed = { at: 1000, seq: 1, usage: { cost, size: 10, used: 1 } };

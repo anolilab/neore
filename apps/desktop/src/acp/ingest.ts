@@ -65,14 +65,15 @@ interface PendingState extends SessionStatePatch {
 
 /**
  * The report to keep after a send failed: a field observed later wins, whichever send it went out with. Two sends can be in
- * flight at once, so the one that failed may be the older value; it must not replace the newer one.
+ * flight at once, so the one that failed may be the older value; it must not replace the newer one. "Later" is the
+ * sequence number, not the clock: the clock can move back, and a report observed later can carry an earlier time.
  */
 export const newerPending = (failed: PendingState, waiting: PendingState | undefined): PendingState => {
     if (waiting === undefined) {
         return failed;
     }
 
-    const [older, newer] = waiting.at < failed.at ? [waiting, failed] : [failed, waiting];
+    const [older, newer] = waiting.seq < failed.seq ? [waiting, failed] : [failed, waiting];
     const usage = mergeUsage(older.usage, newer.usage);
 
     return { ...older, ...newer, ...usage !== undefined && { usage }, at: newer.at, seq: Math.max(older.seq, newer.seq) };
