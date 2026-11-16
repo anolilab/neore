@@ -63,6 +63,20 @@ describe("configOptionsOf", () => {
         expect(configOptionsOf(entries, plain)).toBeUndefined();
     });
 
+    it("does not let an option with no list of choices hide the agent's legacy modes", () => {
+        // A malformed option (no `options` array) is left out, so the legacy mode list is what the session offers.
+        const raw = optionsOf(
+            {
+                configOptions: [{ category: "mode", currentValue: "ask", id: "mode", name: "Mode", type: "select" }],
+                modes: { availableModes: [{ id: "ask", name: "Ask" }], currentModeId: "ask" },
+            },
+            plain,
+        );
+
+        expect(resolveOptions(raw)).toMatchObject({ modes: { current: "ask" } });
+        expect(resolveOptions(raw)).not.toHaveProperty("configOptions");
+    });
+
     it("reads no more of a long choice list than it keeps: the first 100 choices, and the current one when it comes later", () => {
         const reads = { names: 0 };
         const choices = Array.from({ length: 300 }, (_unused, index) => {

@@ -165,9 +165,12 @@ const choicesOf = (options: unknown, scrub: Scrub, current: string): AgentOption
     return withCurrentLast(choices, later, (choice) => choice.value === current);
 };
 
-/** One option, if it is a list the person can choose from. A boolean option, or one with no usable id or current value, is left out; an empty current value is kept. */
+/**
+ * One option, if it is a list the person can choose from. A boolean option, one with no usable id or current value, and one
+ * with no list of choices, is left out; an empty current value is kept. An entry left out does not hide the legacy mode list.
+ */
 const optionOf = (entry: unknown, scrub: Scrub): AgentOption | undefined => {
-    if (!isRecord(entry) || (entry.type !== undefined && entry.type !== "select")) {
+    if (!isRecord(entry) || (entry.type !== undefined && entry.type !== "select") || !Array.isArray(entry.options)) {
         return undefined;
     }
 
