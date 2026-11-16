@@ -38,6 +38,11 @@
   day (`RETRY_COUNTS_WITHIN_MS`; keys are pruned after two); past that it notes
   its project on the key (`awaitingTotal`) for a first record still to come.
   Replies outside a project write none: "No project" is total − projects.
+- **Erasure and export** — the export's steps, budgets and retries are documented
+  once, in `gdpr/README.md` (account deletion and the usage export). Keep the rules
+  here to what a change to `usage/` must keep: deletion checks on every write
+  (`deletionUnderwayOnPrimary`), primary reads for the pieces, the backfill
+  fingerprint and the file record, and erasure of a run's pieces and usage object.
 - **Project usage starts at deploy** — only replies recorded live are filed
   under a project. Older usage, and any reply the totals backfill counted,
   shows under "No project" until the project-history backfill ships (a later

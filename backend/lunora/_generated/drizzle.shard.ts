@@ -672,6 +672,7 @@ export const gdprRequests = sqliteTable("gdprRequests", {
     workflowId: text("workflowId"),
 }, (t) => ({
     by_user_and_type: index("by_user_and_type").on(t.userId, t.requestType),
+    by_user_type_and_status: index("by_user_type_and_status").on(t.userId, t.requestType, t.status),
     by_expires: index("by_expires").on(t.expiresAt),
     by_status_and_requestedAt: index("by_status_and_requestedAt").on(t.status, t.requestedAt),
     by_status_and_expires: index("by_status_and_expires").on(t.status, t.expiresAt),

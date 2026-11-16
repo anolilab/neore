@@ -9265,6 +9265,14 @@
             "requestType"
           ],
           "unique": false
+        },
+        "by_user_type_and_status": {
+          "fields": [
+            "userId",
+            "requestType",
+            "status"
+          ],
+          "unique": false
         }
       },
       "memory": false,

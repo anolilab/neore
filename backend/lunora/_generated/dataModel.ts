@@ -2641,7 +2641,7 @@ export interface IndexNamesByTable {
     gatewayUsageDeductions: "by_requestId" | "by_userId";
     gdprAuditLog: "by_user" | "by_action" | "by_timestamp";
     gdprConsent: "by_user_and_purpose";
-    gdprRequests: "by_user_and_type" | "by_expires" | "by_status_and_requestedAt" | "by_status_and_expires";
+    gdprRequests: "by_user_and_type" | "by_user_type_and_status" | "by_expires" | "by_status_and_requestedAt" | "by_status_and_expires";
     goals: "by_user_and_status";
     idempotencyClaims: "by_scope_key" | "by_expiresAt" | "by_leaseExpiresAt" | "by_userId";
     invitation: "email_organizationId_status" | "organizationId_status" | "status";
