@@ -2,6 +2,7 @@ import { LunoraError } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { patchRow } from "../lib/patch";
 
 /** The longest folder path a project may record, in UTF-8 bytes. */
 export const MAX_PROJECT_PATH_BYTES = 1024;
@@ -60,4 +61,21 @@ export const resolveProjectLocation = async (
     }
 
     return { machineId, path };
+};
+
+/** Projects one scheduled run clears; a run that clears a full batch schedules the next (`clearDeviceProjects`). */
+export const MACHINE_CLEAR_BATCH = 100;
+
+/**
+ * Removes the machine and folder from up to one batch of the user's projects that live on `machineId`; the projects stay.
+ * Resolves to `true` when the batch was full, so projects may remain. Idempotent: a repeated run finds fewer rows or none.
+ */
+export const clearMachineFromProjects = async (ctx: Pick<MutationCtx, "db">, userId: string, machineId: Id<"devices">): Promise<boolean> => {
+    const { page } = await ctx.db.projects.findMany({ limit: MACHINE_CLEAR_BATCH, where: { machineId, userId } });
+
+    for (const project of page) {
+        await patchRow(ctx.db, "projects", project, { machineId: undefined, path: undefined });
+    }
+
+    return page.length === MACHINE_CLEAR_BATCH;
 };

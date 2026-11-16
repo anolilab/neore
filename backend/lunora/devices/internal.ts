@@ -5,7 +5,7 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { ACP_CLEARED } from "../acp/lib/constants";
@@ -29,7 +29,7 @@ import { isDeviceInScope, resolveThreadProject } from "./lib/scope";
 import { signDevicePayload, utf8Length } from "./lib/signing";
 import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { mergeTaint } from "./lib/taint";
-import { CLEAR_PROJECTS_RETRY, clearProjectsBatch } from "./lib/clear-projects";
+import { clearMachineFromProjects } from "../projects/machine-location";
 import { runAfterWithRetry } from "../lib/shard-scheduler";
 import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
 import { vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource } from "./validators";
@@ -357,6 +357,14 @@ const assertAccountMayPair = async (ctx: QueryCtx, userId: string): Promise<void
     }
 };
 
+/** Cleanup retries until it succeeds: a dead-lettered run would leave its projects pointing at a deleted device, with nothing left to queue it again. */
+const CLEAR_PROJECTS_RETRY = { forever: true } as const;
+
+/** Queues a `clearDeviceProjects` run for the machine, retried forever. Shared by the revoke and by a run that cleared a full batch. */
+export const scheduleClearDeviceProjects = async (scheduler: unknown, args: { machineId: Id<"devices">; userId: string }): Promise<void> => {
+    await runAfterWithRetry(scheduler, 0, internal.devices.internal.clearDeviceProjects, args, CLEAR_PROJECTS_RETRY);
+};
+
 /**
  * Clears a revoked device's machine and folder from the owner's projects (scheduled by `revokeDevice`): one batch per
  * run, and a run that cleared a full batch schedules the next. Needs no device row, which the revoke has already
@@ -366,8 +374,8 @@ export const clearDeviceProjects = internalMutation
     .input({ machineId: v.id("devices"), userId: v.string() })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        if (await clearProjectsBatch(ctx, args.userId, args.machineId)) {
-            await runAfterWithRetry(ctx.scheduler, 0, internal.devices.internal.clearDeviceProjects, args, CLEAR_PROJECTS_RETRY);
+        if (await clearMachineFromProjects(ctx, args.userId, args.machineId)) {
+            await scheduleClearDeviceProjects(ctx.scheduler, args);
         }
 
         return null;

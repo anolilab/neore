@@ -179,6 +179,15 @@ export const shardScopedSchedulerNamespace = <N extends object>(namespace: N, re
     });
 };
 
+/** A per-job retry policy for the scheduler; `forever` keeps retrying with no attempt cap. */
+export type RetryPolicy = {
+    backoff?: "exponential" | "linear";
+    baseMs?: number;
+    forever?: boolean;
+    maxAttempts?: number;
+    maxMs?: number;
+};
+
 /**
  * `ctx.scheduler.runAfter` with a per-job retry policy. `@lunora/server`'s `Scheduler` type declares three arguments,
  * but the runtime forwards the fourth (`RunOptions`) to the SchedulerDO, so the one cast lives here.
@@ -188,7 +197,7 @@ export const runAfterWithRetry = async <A extends Record<string, unknown>>(
     delayMs: number,
     target: { __lunoraRef: string },
     args: A,
-    retry: { backoff?: "exponential" | "linear"; baseMs?: number; forever?: boolean; maxAttempts?: number; maxMs?: number },
+    retry: RetryPolicy,
 ): Promise<string> =>
     await (scheduler as { runAfter: (delay: number, target: unknown, args: A, options: { retry: typeof retry }) => Promise<string> }).runAfter(
         delayMs,
@@ -209,7 +218,7 @@ export const runAfterOnShard = async <A extends Record<string, unknown>>(
     target: { __lunoraRef: string },
     args: A,
     shardKey: string,
-    retry?: { backoff?: "exponential" | "linear"; baseMs?: number; maxAttempts?: number; maxMs?: number },
+    retry?: RetryPolicy,
 ): Promise<string> =>
     await (
         scheduler as {

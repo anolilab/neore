@@ -34,8 +34,7 @@ import {
     MAX_MANIFEST_BYTES,
 } from "./lib/constants";
 import { isAppVersion } from "./lib/app-version";
-import { CLEAR_PROJECTS_RETRY } from "./lib/clear-projects";
-import { runAfterWithRetry } from "../lib/shard-scheduler";
+import { scheduleClearDeviceProjects } from "./internal";
 import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
 import { filterOwnProjectIds } from "./lib/scope";
@@ -281,7 +280,7 @@ export const revokeDevice = authMutation
             // The projects live in D1, outside this mutation's transaction, so the revoke writes none of them: a failed
             // device delete would leave them cleared. A scheduled run clears them instead, and the scheduler call commits
             // with the revoke, so a revoke that fails queues nothing and can be retried.
-            await runAfterWithRetry(ctx.scheduler, 0, internal.devices.internal.clearDeviceProjects, { machineId: revoked._id, userId }, CLEAR_PROJECTS_RETRY);
+            await scheduleClearDeviceProjects(ctx.scheduler, { machineId: revoked._id, userId });
             await ctx.db.delete("devices", revoked._id);
         }
 
