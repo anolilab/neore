@@ -268,6 +268,7 @@ export const revokeDevice = authMutation
         for (const revoked of [device, ...hosts]) {
             // An option change still waiting gets its answer first, as the session it belongs to is about to end.
             await recordRemovedDeviceOptions(ctx, revoked._id, ctx.now);
+
             // A machine that paired itself by code may still hold the code (a lost reply puts it back,
             // `auth/cli-device-auth.ts`). Remembered here, on this shard and in this mutation, so the code cannot
             // register a device again: `registerHeadlessDevice` runs on the same shard and refuses it.
