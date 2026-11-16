@@ -1206,6 +1206,9 @@ export const schema = defineSchema({
     })
         .shardBy("userId")
         .index("by_user_and_type", ["userId", "requestType"])
+        // The deletion check (`usage/gdpr.ts` `deletionUnderwayOnPrimary`) reads one user's requests by type and status, so it finds
+        // the blocking ones without reading the rest of the user's request history.
+        .index("by_user_type_and_status", ["userId", "requestType", "status"])
         .index("by_expires", ["expiresAt"])
         .index("by_status_and_requestedAt", ["status", "requestedAt"])
         .index("by_status_and_expires", ["status", "expiresAt"]),
@@ -3561,6 +3564,7 @@ export const schema = defineSchema({
         createdAt: v.optional(v.number()),
         // The day the export's recount is taken before (YYYY-MM-DD): rows dated before it are counted, later ones are not.
         cutoff: v.optional(v.string()),
+        // `titles` is no longer written; it stays in the union so stored rows still fit the blessed schema baseline.
         kind: v.union(v.literal("projects"), v.literal("rows"), v.literal("titles"), v.literal("verified")),
         // The rows page's cursor for the next page (unset on the last page).
         nextCursor: v.optional(v.string()),
