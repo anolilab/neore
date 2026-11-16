@@ -586,10 +586,6 @@ export class HostPoster implements SessionObserver {
         return next;
     }
 
-    /**
-     * Forgets a session's post bookkeeping once the session has ended and nothing of it is pending or in flight. Without this,
-     * the per-session maps keep every session that ever posted a report for the life of the process.
-     */
     /** Whether every field the report carries is already posted as it is for this session. */
     private repeatsSent(sessionId: string, report: PendingState): boolean {
         const sent = this.sentValues.get(sessionId);
@@ -616,6 +612,10 @@ export class HostPoster implements SessionObserver {
         this.sentValues.set(sessionId, sent);
     }
 
+    /**
+     * Forgets a session's post bookkeeping once the session has ended and nothing of it is pending or in flight. Without this,
+     * the per-session maps keep every session that ever posted a report for the life of the process.
+     */
     private forgetStateOf(sessionId: string): void {
         if (this.pendingState.has(sessionId) || this.stateInFlight.has(sessionId) || this.sessions.get(sessionId)?.isClosed !== true) {
             return;
