@@ -180,6 +180,61 @@ describe("the export of coding-agent sessions and events", () => {
         expect(exported).toEqual(expect.arrayContaining(threads.slice(1)));
     });
 
+    it("resumes after the session a page ends on when that session is deleted, and skips none of the rest", async () => {
+        const device = await insertDevice(A);
+        // Twenty options with long names and values: a row is about 10 KB, so a page is cut by bytes before its row limit.
+        const configOptions = Array.from({ length: 20 }, (_unused, index) => {
+            return {
+                category: "model",
+                choices: [{ name: "n", value: "v" }],
+                currentValue: "v".repeat(120),
+                id: `opt${String(index)}`.padEnd(120, "i"),
+                name: "n".repeat(200),
+            };
+        });
+        const threads: string[] = [];
+
+        for (let index = 0; index < 100; index += 1) {
+            const threadId = await insertSession(A, device, index);
+
+            threads.push(threadId);
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+                await ctx.db.patch("acpSessions", row._id, { agentState: { configOptions } });
+            });
+        }
+
+        const first = await collectPage(A);
+        const sessions = [...first.sessions];
+
+        // The page was cut by bytes, so the next page resumes inside it: after its last session.
+        expect(first.sessions.length).toBeLessThan(50);
+        expect(first.next).toBeDefined();
+
+        const anchor = first.sessions.at(-1)?.threadId as string;
+
+        // The session the next page resumes after goes away while the export is still paging.
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId: anchor } });
+
+            await ctx.db.delete("acpSessions", row._id);
+        });
+
+        for (let cursor = first.next; cursor !== undefined;) {
+            const page: Page = await collectPage(A, cursor);
+
+            sessions.push(...page.sessions);
+            cursor = page.next;
+        }
+
+        // Every session is exported once: the deleted one was exported already, and none that is left is skipped.
+        const exported = sessions.map((session) => session.threadId);
+
+        expect(exported).toHaveLength(100);
+        expect(new Set(exported)).toEqual(new Set(threads));
+    });
+
     it("exports the agent's usage and each option's current value, without the choices it offered", async () => {
         const device = await insertDevice(A);
         const threadId = await insertSession(A, device, 0);

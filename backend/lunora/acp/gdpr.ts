@@ -103,19 +103,26 @@ const withoutModelList = (report: Infer<typeof vCapabilityReport>): Infer<typeof
     return { ...report, groups: { ...report.groups, identity: { ...report.groups.identity, models: undefined } } };
 };
 
-/** Where the next page starts: in the sessions (`page` is the table cursor), or in the host streams' events (`page` is the stream cursor, `seq` the last chunk already read). */
+/** Where the next page starts: in the sessions (`after` and `afterAt` are the last session exported, by its key), or in the host streams' events (`page` is the stream cursor, `seq` the last chunk already read). */
 const vExportCursor = v.object({
-    // The last session of this page already exported, by id: the next page starts after it, wherever it now sits.
+    // The last session exported, by id and creation time: the next page starts after that key, so a session deleted meanwhile
+    // cannot shift the rest.
     after: v.optional(v.string()),
+    afterAt: v.optional(v.number()),
     page: v.optional(v.string()),
     phase: v.union(v.literal("sessions"), v.literal("events")),
     seq: v.optional(v.number()),
-    // Rows of this page already exported (a page can be cut short by bytes; see `SESSION_PAGE_BYTES`). Used only when the
-    // `after` row is gone, since a count alone moves when rows before it are deleted or inserted while the export runs.
-    skip: v.optional(v.number()),
 });
 
 type ExportCursor = Infer<typeof vExportCursor>;
+
+/** Sessions are paged in creation order, the id breaking a tie in the creation time, so the key of a session is total. */
+const compareSessionKeys = (a: { _creationTime: number; _id: string }, b: { _creationTime: number; _id: string }): number =>
+    a._creationTime - b._creationTime || (a._id < b._id ? -1 : a._id > b._id ? 1 : 0);
+
+/** Whether a session comes after the key (creation time, then id) of the last one exported. */
+const isAfterKey = (row: { _creationTime: number; _id: string }, at: number, id: string): boolean =>
+    row._creationTime > at || (row._creationTime === at && row._id > id);
 
 /** The export's share of an agent state (`vExportAgentState`): usage and each option's current value, without its choices. */
 const exportedAgentState = (state: AgentState): Infer<typeof vExportAgentState> => {
@@ -147,61 +154,65 @@ export const collectAcpSessionsForExport = internalQuery
     )
     .query(async ({ args: { cursor, userId }, ctx }) => {
         if (cursor === undefined || cursor.phase === "sessions") {
-            const { continueCursor, isDone, page } = await ctx.db.acpSessions.findMany({ cursor: cursor?.page, limit: SESSION_PAGE, where: { userId } });
-            const anchor = cursor?.after === undefined ? -1 : page.findIndex((row) => row._id === cursor.after);
-            const start = anchor === -1 ? (cursor?.skip ?? 0) : anchor + 1;
+            // Keyset paging: the page starts after the last session exported, by its creation time and id. A position counted
+            // from the start would move when a session before it is deleted, and skip one.
+            const after = cursor?.after;
+            const afterAt = cursor?.afterAt;
+            const fetched = await ctx.db.acpSessions.findMany({
+                limit: SESSION_PAGE,
+                orderBy: [{ _creationTime: "asc" }],
+                where: { userId, ...(afterAt !== undefined && { _creationTime: { gte: afterAt } }) },
+            });
+            const pending = (
+                after === undefined || afterAt === undefined ? fetched.page : fetched.page.filter((row) => isAfterKey(row, afterAt, after))
+            ).toSorted(compareSessionKeys);
 
             // Labels and times only: no device id, no path ever reaches the backend.
-            const rows = page
-                .slice(start)
-                .map(
-                    ({
+            const rows = pending.map(
+                ({
+                    agentKey,
+                    agentLabel,
+                    agentState,
+                    agentStateAt,
+                    capabilities,
+                    createdAt,
+                    folderLabel,
+                    importedTurns,
+                    importState,
+                    lastEventAt,
+                    nativeSessionId,
+                    optionResult,
+                    status,
+                    threadId,
+                }) => {
+                    return {
                         agentKey,
                         agentLabel,
-                        agentState,
-                        agentStateAt,
-                        capabilities,
                         createdAt,
                         folderLabel,
-                        importedTurns,
-                        importState,
-                        lastEventAt,
-                        nativeSessionId,
-                        optionResult,
                         status,
-                        threadId,
-                    }) => {
-                        return {
-                            agentKey,
-                            agentLabel,
-                            createdAt,
-                            folderLabel,
-                            status,
-                            threadId: threadId as string,
-                            ...(agentState !== undefined && { agentState: exportedAgentState(agentState) }),
-                            ...(agentStateAt !== undefined && { agentStateAt }),
-                            ...(capabilities !== undefined && { capabilities: withoutModelList(capabilities) }),
-                            ...(importedTurns !== undefined && { importedTurns }),
-                            ...(importState !== undefined && { importState }),
-                            ...(lastEventAt !== undefined && { lastEventAt }),
-                            ...(nativeSessionId !== undefined && { nativeSessionId }),
-                            ...(optionResult !== undefined && { optionResult }),
-                        };
-                    },
-                );
+                        threadId: threadId as string,
+                        ...(agentState !== undefined && { agentState: exportedAgentState(agentState) }),
+                        ...(agentStateAt !== undefined && { agentStateAt }),
+                        ...(capabilities !== undefined && { capabilities: withoutModelList(capabilities) }),
+                        ...(importedTurns !== undefined && { importedTurns }),
+                        ...(importState !== undefined && { importState }),
+                        ...(lastEventAt !== undefined && { lastEventAt }),
+                        ...(nativeSessionId !== undefined && { nativeSessionId }),
+                        ...(optionResult !== undefined && { optionResult }),
+                    };
+                },
+            );
 
-            // A row can hold up to 128 KiB of agent state, so a page is also cut by bytes. The rest of this query's rows come
-            // next, from the same cursor, after the last one taken.
+            // A row can hold up to 128 KiB of agent state, so a page is also cut by bytes: the rest of the rows come next, after
+            // the last one taken. A full page may have rows after it too.
             const sessions = rowsWithinBudget(rows, SESSION_PAGE_BYTES);
-            const end = start + sessions.length;
-            const more = end < page.length;
-            const lastTaken = page[end - 1];
-
-            const afterPage = isDone ? { phase: "events" as const } : { page: continueCursor ?? undefined, phase: "sessions" as const };
+            const lastTaken = pending[sessions.length - 1];
+            const more = lastTaken !== undefined && (sessions.length < pending.length || fetched.page.length === SESSION_PAGE);
 
             return {
                 events: [],
-                next: more && lastTaken !== undefined ? { after: lastTaken._id, page: cursor?.page, phase: "sessions" as const, skip: end } : afterPage,
+                next: more ? { after: lastTaken._id, afterAt: lastTaken._creationTime, phase: "sessions" as const } : { phase: "events" as const },
                 sessions,
             };
         }
