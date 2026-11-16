@@ -207,6 +207,19 @@ describe("setHostOption", () => {
         expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(0);
     });
 
+    it("is not held up by an unanswered change to the agent session the thread used before", async () => {
+        const { threadId } = await readySession({ configOptions: [MODEL] });
+
+        await expect(setOption(threadId, { optionId: "model", valueId: "deep" })).resolves.toMatchObject({ sent: true });
+
+        // The thread now runs another agent session on the same computer, while the change above is still unanswered.
+        const [session] = await rows("acpSessions", { threadId });
+
+        await run(async (ctx) => await ctx.db.patch("acpSessions", session?._id as never, { hostSessionId: "host-s2" } as never));
+
+        await expect(setOption(threadId, { optionId: "model", valueId: "fast" })).resolves.toMatchObject({ sent: true });
+    });
+
     it("refuses an option or a value the agent did not list, and queues nothing", async () => {
         const { threadId } = await readySession({ configOptions: [MODEL] });
 

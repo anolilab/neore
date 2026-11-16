@@ -262,6 +262,29 @@ describe("setOption", () => {
         expect(offered.find((option) => option.id === "model")?.currentValue).toBe("deep");
     });
 
+    it("keeps the choices an update withdrew while a change was in flight, when the change's answer still lists them", async () => {
+        const { player, session, states, steps } = await start("options-choices-during-change");
+        const change = session.setOption("model", "deep");
+
+        await player.play(steps);
+        await expect(change).resolves.toBeUndefined();
+
+        const effort = states.at(-1)?.configOptions?.find((option) => option.id === "effort");
+
+        expect(effort?.choices.map((choice) => choice.value)).toEqual(["low"]);
+    });
+
+    it("keeps the mode the agent changed while a model change was in flight, when the change's answer still lists the earlier mode", async () => {
+        const { player, session, states, steps } = await start("options-mode-stale-answer");
+        const change = session.setOption("model", "deep");
+
+        await player.play(steps);
+        await expect(change).resolves.toBeUndefined();
+
+        expect(states.at(-1)?.configOptions?.find((option) => option.id === "model")?.currentValue).toBe("deep");
+        expect(states.at(-1)?.configOptions?.find((option) => option.id === "mode")?.currentValue).toBe("code");
+    });
+
     it("sends nothing for a value the agent did not offer", async () => {
         const { agent, session } = await start("options-and-change");
         const before = agent.written.length;

@@ -606,10 +606,13 @@ export class AgentSession {
         this.changedAt.set(key, this.observed);
     }
 
-    /** Counts a change for each option whose value differs between two lists, an option added or removed included. */
+    /**
+     * Counts a change for each option whose entry differs between two lists (its value, choices, name or category), an option added
+     * or removed included.
+     */
     private markConfigChanges(previous: AgentOption[] | undefined, next: AgentOption[] | undefined): void {
-        const before = new Map((previous ?? []).map((option) => [option.id, option.currentValue]));
-        const after = new Map((next ?? []).map((option) => [option.id, option.currentValue]));
+        const before = new Map((previous ?? []).map((option) => [option.id, JSON.stringify(option)]));
+        const after = new Map((next ?? []).map((option) => [option.id, JSON.stringify(option)]));
 
         const ids = new Set([...before.keys(), ...after.keys()]);
 
@@ -1254,6 +1257,8 @@ export class AgentSession {
 
                 // A mode id the agent did not name validly changes nothing, so it does not supersede a change in flight.
                 if (offered !== this.offered) {
+                    // A mode option among the agent's options moved too, so an answer that lists it earlier must not put it back.
+                    this.markConfigChanges(this.offered.configOptions, offered.configOptions);
                     this.offered = offered;
                     this.markChanged("mode");
                     this.reportOptions();

@@ -32,6 +32,17 @@ const START_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 
 type Pending = Infer<typeof vPendingPermission>;
 
+/** The host session a queued call's input names, or undefined when the input names none. */
+const inputSessionOf = (input: string): string | undefined => {
+    try {
+        const parsed: unknown = JSON.parse(input);
+
+        return typeof parsed === "object" && parsed !== null && "sessionId" in parsed && typeof parsed.sessionId === "string" ? parsed.sessionId : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
 /** The owner's host thread, or null: a stranger's thread, a cloud thread and a missing one read the same. */
 const ownHostThread = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">, userId: string): Promise<Doc<"threads"> | null> => {
     const thread = await ctx.db.threads.findFirst({ where: { _id: threadId, userId } });
@@ -402,12 +413,14 @@ export const setHostOption = authMutation
         }
 
         // One change at a time: a double tap, or the phone and the web at once, finds the first still on its way.
+        // Only a change to this session counts: an unanswered change to the agent the thread used before does not hold back this one.
         const queued = await countOpenCalls(
             ctx,
             session.deviceId,
             (open) =>
                 open.toolName === "acp_set_config" &&
                 open.threadId === args.threadId &&
+                inputSessionOf(open.input) === session.hostSessionId &&
                 !(open.status === "pending" && open.claimedAt === undefined && ctx.now - open.createdAt > ACP_CLAIM_WINDOW_MS),
             1,
         );
