@@ -249,6 +249,19 @@ describe("setOption", () => {
         expect(states.at(-1)?.configOptions?.find((option) => option.id === "effort")?.currentValue).toBe("high");
     });
 
+    it("keeps an option the agent added during a change, and drops one it removed, when the answer's older list omits and lists them", async () => {
+        const { player, session, states, steps } = await start("options-membership-during-change");
+        const change = session.setOption("model", "deep");
+
+        await player.play(steps);
+        await expect(change).resolves.toBeUndefined();
+
+        const offered = states.at(-1)?.configOptions ?? [];
+
+        expect(offered.map((option) => option.id)).toEqual(["model", "tone"]);
+        expect(offered.find((option) => option.id === "model")?.currentValue).toBe("deep");
+    });
+
     it("sends nothing for a value the agent did not offer", async () => {
         const { agent, session } = await start("options-and-change");
         const before = agent.written.length;
@@ -343,5 +356,31 @@ describe("the usage an agent reports while a saved session loads", () => {
         await Promise.all([session.start(), transcriptPlayer(agent).play(readTranscript("usage-during-load"))]);
 
         expect(states.at(-1)?.usage).toEqual({ cost: { amount: 0.5, currency: "USD" }, size: 100, used: 12 });
+    });
+
+    it("does not give a fresh session the cost of a saved session whose load then failed", async () => {
+        const agent = memoryAgent();
+        const states: SessionStatePatch[] = [];
+        const observer = {
+            sessionState: (_id: string, patch: SessionStatePatch) => {
+                states.push(patch);
+            },
+        } as SessionObserver;
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer,
+            onChange: () => {},
+            process: agent.process,
+            resumeSessionId: "sess_1",
+        });
+
+        await Promise.all([session.start(), transcriptPlayer(agent).play(readTranscript("usage-after-failed-load"))]);
+
+        expect(states.at(-1)?.usage).toEqual({ size: 100, used: 12 });
     });
 });

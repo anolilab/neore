@@ -641,23 +641,46 @@ export class AgentSession {
             return false;
         }
 
-        const previous = this.offered.configOptions;
-        // The requested option takes the answer. Another option that changed after the request was asked for keeps its newer value.
-        const fresher = (option: AgentOption): AgentOption => {
-            const current = previous?.find((entry) => entry.id === option.id);
-
-            if (current === undefined || option.id === optionId || !this.changedSince(`option:${option.id}`, since)) {
-                return option;
-            }
-
-            return current;
-        };
-        const next = listed === undefined ? withOptionValue(this.offered, optionId, valueId).configOptions : listed.map((option) => fresher(option));
+        const previous = this.offered.configOptions ?? [];
+        const next = listed === undefined ? withOptionValue(this.offered, optionId, valueId).configOptions : this.merged(listed, previous, optionId, since);
 
         this.markConfigChanges(previous, next);
         this.offered = { ...this.offered, ...next !== undefined && { configOptions: next } };
 
         return listed === undefined || listed.find((option) => option.id === optionId)?.currentValue === valueId;
+    }
+
+    /**
+     * The answer's full list, corrected by what the agent observed after `since`: the requested option takes the answer, and an
+     * option another observation changed keeps that newer entry, or is dropped when that observation removed it. An option that
+     * observation added, which the answer does not list, is kept.
+     */
+    private merged(listed: AgentOption[], previous: AgentOption[], optionId: string, since: number): AgentOption[] {
+        const newer = (id: string): boolean => this.changedSince(`option:${id}`, since);
+        const kept: AgentOption[] = [];
+        const listedIds = new Set<string>();
+
+        for (const option of listed) {
+            listedIds.add(option.id);
+
+            if (option.id === optionId || !newer(option.id)) {
+                kept.push(option);
+            } else {
+                const current = previous.find((entry) => entry.id === option.id);
+
+                if (current !== undefined) {
+                    kept.push(current);
+                }
+            }
+        }
+
+        for (const option of previous) {
+            if (!listedIds.has(option.id) && newer(option.id)) {
+                kept.push(option);
+            }
+        }
+
+        return kept;
     }
 
     /** Whether what the session offers now shows the value asked for. */
@@ -696,6 +719,8 @@ export class AgentSession {
                 // The agent's own error can quote its environment: the backend is told that it failed (a code), not its text.
                 this.reattach = { loaded: false, reason: "load_failed" };
                 this.offered = {};
+                // What the failed load read is not the fresh session's: its buffered usage is dropped, not carried into it.
+                this.startupUsage = undefined;
             }
         } else {
             this.reattach = { loaded: false, reason: "load_unsupported" };
@@ -763,7 +788,9 @@ export class AgentSession {
             this.offered = withCurrentMode(this.offered, read.modeId, this.options.process.scrub);
         } else {
             // The cost is cumulative: a report that leaves it out keeps the cost the buffered report carried, as `retainStartupRead` does.
-            const cost: unknown = read.usage.cost ?? this.startupUsage?.update.cost;
+            // Only a buffered report of this same session counts: a failed load's cost is not the fresh session's.
+            const buffered = this.startupUsage?.sessionId === sessionId ? this.startupUsage.update.cost : undefined;
+            const cost: unknown = read.usage.cost ?? buffered;
 
             this.startupUsage = { sessionId, update: { sessionUpdate: "usage_update", ...read.usage, ...(cost !== undefined && { cost }) } };
         }

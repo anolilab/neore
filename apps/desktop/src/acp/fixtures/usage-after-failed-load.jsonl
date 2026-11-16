@@ -1,0 +1,9 @@
+# An agent reports a saved session's cost while it loads, then fails the load. The fresh session it opens reports usage without a cost, which must not take the failed load's cost. Hand-written from the ACP v1 spec, not recorded from a real agent.
+{"out":{"id":"$1","method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false},"clientInfo":{"name":"neore-desktop","title":"Neore","version":"9.9.9"}}}}
+{"in":{"id":"$1","result":{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"promptCapabilities":{"image":false,"audio":false,"embeddedContext":false}},"agentInfo":{"name":"example-agent","version":"0.4.1"},"authMethods":[]}}}
+{"out":{"id":"$2","method":"session/load","params":{"cwd":"/work","mcpServers":[],"sessionId":"sess_1"}}}
+{"in":{"method":"session/update","params":{"sessionId":"sess_1","update":{"sessionUpdate":"usage_update","used":10,"size":100,"cost":{"amount":0.5,"currency":"USD"}}}}}
+{"in":{"id":"$2","error":{"code":-32000,"message":"the saved session is gone"}}}
+{"out":{"id":"$3","method":"session/new","params":{"cwd":"/work","mcpServers":[]}}}
+{"in":{"method":"session/update","params":{"sessionId":"sess_2","update":{"sessionUpdate":"usage_update","used":12,"size":100}}}}
+{"in":{"id":"$3","result":{"sessionId":"sess_2"}}}
