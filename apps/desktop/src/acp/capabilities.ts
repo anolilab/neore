@@ -17,6 +17,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 const NATIVE = { degradation: "none", supported: true } as const;
 const NOT_OFFERED = { reason: "not_offered", supported: false } as const;
 
+/** The most models a report keeps: the backend's own limit (`lunora/lib/capability-report.ts`). */
+const MAX_MODELS = 200;
+
 /**
  * `loadSession` is a boolean; `sessionCapabilities.list` and `.fork` are "present means supported" (ACP: omitted or `null` is no
  * support, `{}` is support). The agent answered the handshake, so what it left out is not offered, not unknown.
@@ -48,14 +51,15 @@ const optionIn = (options: SessionStatePatch, category: string) => options.confi
  * so they are not reported as `permissions.modes`. Read from the option's category, never from the agent's or a model's name.
  */
 export const withOptionCapabilities = (report: CapabilityReport, options: SessionStatePatch): CapabilityReport => {
-    // Every model option's choices, each model once: an agent may file more than one option under `model`.
+    // Every model option's choices, each model once: an agent may file more than one option under `model`. The backend takes at
+    // most MAX_MODELS (`lunora/lib/capability-report.ts`), and a longer list would replace the whole report, so this stops there.
     const choices = new Map<string, string>();
     const configOptions = options.configOptions ?? [];
 
     for (const option of configOptions) {
         if (option.category?.toLowerCase() === "model") {
             for (const choice of option.choices) {
-                if (!choices.has(choice.value)) {
+                if (!choices.has(choice.value) && choices.size < MAX_MODELS) {
                     choices.set(choice.value, choice.name);
                 }
             }

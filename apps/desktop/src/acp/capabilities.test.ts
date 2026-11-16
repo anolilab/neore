@@ -94,6 +94,24 @@ describe("withOptionCapabilities", () => {
         ]);
     });
 
+    it("keeps at most 200 models, the backend's limit, however many options offer them", () => {
+        const offering = (option: number) => {
+            return {
+                category: "model",
+                choices: Array.from({ length: 100 }, (_unused, index) => {
+                    return { name: `Model ${String(option)}.${String(index)}`, value: `m${String(option)}-${String(index)}` };
+                }),
+                currentValue: "m0-0",
+                id: `model${String(option)}`,
+                name: `Model ${String(option)}`,
+            };
+        };
+        const models = groups({ configOptions: [offering(0), offering(1), offering(2)] }).identity?.models ?? [];
+
+        expect(models).toHaveLength(200);
+        expect(models[0]).toEqual({ id: "m0-0", name: "Model 0.0" });
+    });
+
     it("does not report a mode option as a permission mode: the session's modes are not the runner's", () => {
         expect(groups({ configOptions: [mode] }).permissions?.modes ?? []).toEqual([]);
     });
