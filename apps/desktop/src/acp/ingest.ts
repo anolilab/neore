@@ -135,6 +135,19 @@ export interface RunningTurn {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** The field texts of a report, for the fields it carries: a report whose texts a session already has is not posted again. */
+const valuesOf = (report: PendingState): Map<string, string> => {
+    const values = new Map<string, string>();
+
+    for (const key of ["configOptions", "models", "modes", "usage"] as const) {
+        if (report[key] !== undefined) {
+            values.set(key, JSON.stringify(report[key]));
+        }
+    }
+
+    return values;
+};
+
 export class HostPoster implements SessionObserver {
     private readonly channelHost: ChannelHost;
 
@@ -176,6 +189,9 @@ export class HostPoster implements SessionObserver {
 
     /** When a session last posted its report: its next one waits out `STATE_DEBOUNCE_MS` from it, whichever pass runs. */
     private readonly stateSentAt = new Map<string, number>();
+
+    /** The values last posted for a session, one JSON text per field: a report whose values are these again is not posted. */
+    private readonly sentValues = new Map<string, Map<string, string>>();
 
     /** The option fields of a report that was dropped: the session's next report carries them, since they are sent only on change. */
     private readonly heldOptions = new Map<string, SessionStatePatch>();
@@ -574,11 +590,31 @@ export class HostPoster implements SessionObserver {
      * Forgets a session's post bookkeeping once the session has ended and nothing of it is pending or in flight. Without this,
      * the per-session maps keep every session that ever posted a report for the life of the process.
      */
+    /** Whether every field the report carries is already posted as it is for this session. */
+    private repeatsSent(sessionId: string, report: PendingState): boolean {
+        const sent = this.sentValues.get(sessionId);
+        const values = valuesOf(report);
+
+        return sent !== undefined && values.size > 0 && [...values].every(([key, value]) => sent.get(key) === value);
+    }
+
+    /** Records the values a post carried as the ones the backend now holds for this session. */
+    private rememberSent(sessionId: string, report: PendingState): void {
+        const sent = this.sentValues.get(sessionId) ?? new Map<string, string>();
+
+        for (const [key, value] of valuesOf(report)) {
+            sent.set(key, value);
+        }
+
+        this.sentValues.set(sessionId, sent);
+    }
+
     private forgetStateOf(sessionId: string): void {
         if (this.pendingState.has(sessionId) || this.stateInFlight.has(sessionId) || this.sessions.get(sessionId)?.isClosed !== true) {
             return;
         }
 
+        this.sentValues.delete(sessionId);
         this.stateSentAt.delete(sessionId);
         this.stateAttempts.delete(sessionId);
         this.stateRetryAt.delete(sessionId);
@@ -713,7 +749,16 @@ export class HostPoster implements SessionObserver {
             }
 
             this.pendingState.delete(sessionId);
+
             // Sessions are independent: one slow post does not hold up another session's report. Each is signed when it is sent.
+            // A report repeating the values already posted is not sent: the backend would only rewrite the row to record the same.
+            if (this.repeatsSent(sessionId, pending)) {
+                this.pendingState.delete(sessionId);
+                this.forgetStateOf(sessionId);
+
+                continue;
+            }
+
             sends.push(this.sendState(sessionId, pending, deviceId));
         }
 
@@ -771,6 +816,7 @@ export class HostPoster implements SessionObserver {
             } else {
                 this.stateRetryAt.delete(sessionId);
                 this.stateAttempts.delete(sessionId);
+                this.rememberSent(sessionId, pending);
 
                 this.settleOptionsOf(sessionId, result, pending);
             }

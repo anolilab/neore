@@ -87,6 +87,3 @@ export const confirmedOf = (result: StoredOptionResult): StoredOptionResult => {
         valueId: result.valueId,
     };
 };
-
-/** A repeat of the stored values moves the ordering watermark only once the stored one is this old. */
-export const WATERMARK_STALE_MS = 60_000;

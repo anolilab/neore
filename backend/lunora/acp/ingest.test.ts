@@ -2480,26 +2480,18 @@ describe("what the agent reports about itself", () => {
         expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(11) }, agentStateSeq: 2 });
     });
 
-    it("does not rewrite the stored row for a report that repeats its values within the minute", async () => {
+    it("keeps the newest sequence when a report repeats the stored values, so a delayed older report cannot overwrite them", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);
         const at = Date.now() - 2000;
 
         await report(device, at, { seq: 1, usage: usage(10) });
-        await report(device, at + 500, { seq: 2, usage: usage(10) });
+        await report(device, at + 500, { seq: 3, usage: usage(10) });
 
-        // The repeat is not written: the watermark stays at the report that changed the value.
-        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(10) }, agentStateSeq: 1 });
-    });
+        // An older report arrives after the repeat: it is older than the newest observation, so it is dropped.
+        await report(device, at + 100, { seq: 2, usage: usage(11) });
 
-    it("moves the watermark on a repeat once the stored one is a minute old", async () => {
-        const device = await pair(ownerId);
-        const threadId = await openSession(device);
-
-        await report(device, Date.now() - 120_000, { seq: 1, usage: usage(10) });
-        await report(device, Date.now() - 1000, { seq: 2, usage: usage(10) });
-
-        expect(await rowOf(threadId)).toMatchObject({ agentStateSeq: 2 });
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(10) }, agentStateSeq: 3 });
     });
 
     it("confirms a refused option change once the agent reports the value it asked for, and not a refusal it gave", async () => {

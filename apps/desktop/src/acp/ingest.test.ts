@@ -1721,6 +1721,24 @@ describe("what the agent reports about itself", () => {
         expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ usage: usage(11) });
     });
 
+    it("does not post a report whose values the backend already holds, and posts a changed value", async () => {
+        const host = poster();
+
+        await open(host);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(1);
+
+        // The same usage again is not written: the backend would only rewrite its row to record the same values.
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(1);
+
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(2);
+    });
+
     it("drops a report the backend refuses, and the session keeps going", async () => {
         const host = poster();
 

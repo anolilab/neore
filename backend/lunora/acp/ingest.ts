@@ -36,7 +36,7 @@ import { patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
-import { confirmedOf, mergeAgentState, sameOptionFields, settledBy, WATERMARK_STALE_MS } from "./lib/agent-state";
+import { confirmedOf, mergeAgentState, sameOptionFields, settledBy } from "./lib/agent-state";
 import { MAX_EVENTS_PER_POST } from "./lib/constants";
 import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
@@ -238,23 +238,15 @@ const applySessionState = async (
     const stored = session.optionResult;
     const settled = stored !== undefined && settledBy(stored, event);
 
-    // The ordering watermark moves when the stored values change, when this report settles an option, or, for a report that
-    // repeats the stored values, once the stored watermark is a minute old. A repeat writes nothing else: a usage report repeats
-    // its values on every tick, and the row is read by every open client. A report without a sequence number (an older desktop)
-    // moves the watermark whenever it is newer, as before.
-    const watermarkDue =
-        event.seq === undefined
-            ? session.agentStateAt === undefined || at > session.agentStateAt
-            : session.agentStateAt === undefined || at - session.agentStateAt >= WATERMARK_STALE_MS;
-
-    if (changed || settled || watermarkDue) {
-        await ctx.db.patch("acpSessions", session._id, {
-            ...(changed && { agentState: mergeAgentState(session.agentState, { ...event, ...(usage !== undefined && { usage }) }) }),
-            agentStateAt: at,
-            ...ordering,
-            ...(settled && stored !== undefined && { optionResult: confirmedOf(stored) }),
-        });
-    }
+    // The watermark is stored with every accepted report, changed or not: a report that repeats the stored values still records
+    // its sequence, so a delayed older report that arrives later is dropped instead of overwriting the newest observation. The
+    // desktop does not post a report whose values the backend already holds, so the row is written for each change.
+    await ctx.db.patch("acpSessions", session._id, {
+        ...(changed && { agentState: mergeAgentState(session.agentState, { ...event, ...(usage !== undefined && { usage }) }) }),
+        agentStateAt: at,
+        ...ordering,
+        ...(settled && stored !== undefined && { optionResult: confirmedOf(stored) }),
+    });
 
     return { ended: false, next: 0, outcome: "applied" };
 };
