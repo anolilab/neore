@@ -29,7 +29,7 @@ const observer: SessionObserver = {
     turnStarted: () => {},
 };
 
-const startWith = async (env: Record<string, string>, nativeSessionId?: string): Promise<void> => {
+const startWith = async (env: Record<string, string>, nativeSessionId?: string, forkSessionId?: string): Promise<void> => {
     manager = new AcpManager({
         appVersion: "9.9.9",
         hostInfo: () => {
@@ -45,7 +45,8 @@ const startWith = async (env: Record<string, string>, nativeSessionId?: string):
     await manager.startSession("fake", "Fake Agent", scratch.work, {
         sessionId: "web-1",
         threadId: "t1",
-        ...nativeSessionId !== undefined && { nativeSessionId },
+        ...(nativeSessionId !== undefined && { nativeSessionId }),
+        ...(forkSessionId !== undefined && { forkSessionId }),
     });
 };
 
@@ -95,5 +96,41 @@ describe("a start with a saved session id", () => {
 
         expect(methods()).not.toContain("session/load");
         expect(opened[0]?.reattach).toBeUndefined();
+    });
+});
+
+describe("a start that forks a session", () => {
+    it("forks it when the agent advertised forking, and opens the fork under its new id", async () => {
+        await startWith({ FAKE_AGENT_SESSIONS: "load,fork" }, undefined, "s-new");
+
+        expect(methods()).toContain("session/fork");
+        expect(methods()).not.toContain("session/new");
+        expect(methods()).not.toContain("session/load");
+        expect(opened[0]).toMatchObject({ fork: { forked: true }, nativeSessionId: "s-new-fork" });
+        expect(opened[0]?.reattach).toBeUndefined();
+    });
+
+    it("sends no fork frame to an agent that did not advertise it, and opens a new session saying why", async () => {
+        await startWith({ FAKE_AGENT_SESSIONS: "load" }, undefined, "s-new");
+
+        expect(methods()).not.toContain("session/fork");
+        expect(methods()).toContain("session/new");
+        expect(opened[0]).toMatchObject({ fork: { forked: false, reason: "fork_unsupported" }, nativeSessionId: "fake-session-1" });
+    });
+
+    it("opens a new session and says the fork failed when the agent refuses it", async () => {
+        await startWith({ FAKE_AGENT_SESSIONS: "fork" }, undefined, "s-gone");
+
+        expect(methods()).toContain("session/fork");
+        expect(methods()).toContain("session/new");
+        expect(opened[0]).toMatchObject({ fork: { forked: false, reason: "fork_failed" }, nativeSessionId: "fake-session-1" });
+    });
+
+    it("opens a new session when the agent answers with the source's own id, so nothing is sent into the source", async () => {
+        await startWith({ FAKE_AGENT_FORK_SAME: "1", FAKE_AGENT_SESSIONS: "fork" }, undefined, "s-new");
+
+        expect(methods()).toContain("session/fork");
+        expect(methods()).toContain("session/new");
+        expect(opened[0]).toMatchObject({ fork: { forked: false, reason: "fork_failed" }, nativeSessionId: "fake-session-1" });
     });
 });

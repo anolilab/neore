@@ -12,7 +12,7 @@ import { createScheduler } from "@lunora/scheduler";
 import type { R2BucketLike, R2S3Credentials, Storage } from "@lunora/storage";
 import { createBucketStorage, createStorage } from "@lunora/storage";
 import { createWorkflowsRestClient } from "@lunora/workflow";
-import type { ExecutionContextLike, GlobalIntrospector, HttpRouterLike, LunoraWorker, Route, ScheduledControllerLike, ShardingInfo, ShardNamespaceLike, ShardRegistryRpc, TriggerTrace, WorkerOptions } from "lunorash/runtime";
+import type { ExecutionContextLike, GlobalIntrospector, HttpRouterLike, LunoraWorker, Route, ScheduledControllerLike, SecurityOptions, ShardingInfo, ShardNamespaceLike, ShardRegistryRpc, TriggerTrace, WorkerOptions } from "lunorash/runtime";
 import { createCrossShardRelationCapabilities, createDynamicShardRegistry, createQueryCoordinator, createWorker, declareAppJurisdiction, resolveLogArchiveFromEnv, memoizeIdentity } from "lunorash/runtime";
 
 import schema from "../schema.js";
@@ -670,6 +670,8 @@ class AppBuilder<Env extends object> {
             ["cronRuns", { mode: { kind: "root" } }],
             ["dailyBriefState", { mode: { field: "userId", kind: "shardBy" } }],
             ["deviceCalls", { mode: { field: "userId", kind: "shardBy" } }],
+            ["deviceCode", { mode: { kind: "global" } }],
+            ["devicePairingRevocations", { mode: { field: "userId", kind: "shardBy" } }],
             ["devices", { mode: { field: "userId", kind: "shardBy" } }],
             ["documentHistory", { mode: { kind: "global" } }],
             ["documents", { mode: { field: "userId", kind: "shardBy" } }],
@@ -729,11 +731,13 @@ class AppBuilder<Env extends object> {
             ["presentations", { mode: { field: "userId", kind: "shardBy" } }],
             ["presentationSlides", { mode: { kind: "root" } }],
             ["projectKnowledge", { mode: { kind: "root" } }],
+            ["projectRepositories", { mode: { kind: "global" } }],
             ["projects", { mode: { kind: "global" } }],
             ["promptHistory", { mode: { kind: "global" } }],
             ["prompts", { mode: { kind: "global" } }],
             ["pullRequestGuides", { mode: { field: "userId", kind: "shardBy" } }],
             ["pullRequestThreads", { mode: { field: "userId", kind: "shardBy" } }],
+            ["pushDevices", { mode: { kind: "global" } }],
             ["rateLimit", { mode: { kind: "global" } }],
             ["rateLimits", { mode: { kind: "root" } }],
             ["requestedSecrets", { mode: { field: "userId", kind: "shardBy" } }],
@@ -757,12 +761,15 @@ class AppBuilder<Env extends object> {
             ["taskRuns", { mode: { field: "userId", kind: "shardBy" } }],
             ["tasks", { mode: { field: "userId", kind: "shardBy" } }],
             ["team", { mode: { kind: "global" } }],
+            ["teammateConnectorAccess", { mode: { field: "userId", kind: "shardBy" } }],
             ["teamMember", { mode: { kind: "global" } }],
             ["teamSettings", { mode: { kind: "global" } }],
             ["temporaryThreads", { mode: { field: "userId", kind: "shardBy" } }],
             ["threadAccess", { mode: { kind: "global" } }],
             ["threadContextSummaries", { mode: { field: "userId", kind: "shardBy" } }],
             ["threadGoals", { mode: { field: "userId", kind: "shardBy" } }],
+            ["threadGuestLinks", { mode: { field: "userId", kind: "shardBy" } }],
+            ["threadGuestMessages", { mode: { field: "userId", kind: "shardBy" } }],
             ["threadInvites", { mode: { kind: "global" } }],
             ["threadKnowledge", { mode: { kind: "root" } }],
             ["threadPasscodes", { mode: { field: "userId", kind: "shardBy" } }],
@@ -777,6 +784,9 @@ class AppBuilder<Env extends object> {
             ["twoFactor", { mode: { kind: "global" } }],
             ["usageBackfill", { mode: { field: "userId", kind: "shardBy" } }],
             ["usageDaily", { mode: { field: "userId", kind: "shardBy" } }],
+            ["usageExportPieces", { mode: { field: "userId", kind: "shardBy" } }],
+            ["usageExportProjects", { mode: { field: "userId", kind: "shardBy" } }],
+            ["usageExportRuns", { mode: { field: "userId", kind: "shardBy" } }],
             ["usageReplies", { mode: { field: "userId", kind: "shardBy" } }],
             ["user", { mode: { kind: "global" } }],
             ["userConnectors", { mode: { field: "userId", kind: "shardBy" } }],
@@ -790,6 +800,7 @@ class AppBuilder<Env extends object> {
             ["workflowVersions", { mode: { field: "userId", kind: "shardBy" } }],
             ["payment_customers", { mode: { kind: "root" } }],
             ["payment_events", { mode: { kind: "root" } }],
+            ["payment_referenceRevisions", { mode: { kind: "root" } }],
             ["payment_sessions", { mode: { kind: "root" } }],
             ["payment_subscriptions", { mode: { kind: "root" } }],
             ["payment_usageEvents", { mode: { kind: "root" } }],
@@ -1344,6 +1355,8 @@ interface LunoraConfig<Env extends object = object> {
     remote?: boolean;
     /** Sibling Workers the app calls through service bindings — key → its folder and, for RPC, the exported `WorkerEntrypoint` class (`rpc: false` binds that class but calls it with plain `fetch`, without importing the service's sources). Becomes `ctx.services.<key>` in actions, a wrangler `services[]` entry, one `lunora dev` session and a services-first `lunora deploy`. Literals, for the same reason as `target`. */
     services?: Record<string, { dir: string; entrypoint?: string; rpc?: false }>;
+    /** Baseline security headers for the Worker AND the static assets' generated `_headers` (`crossOriginOpenerPolicy`, `frameAncestors`, `csp`, …; `false` omits a header, `headers: false` all of them). A `security.headers` set in code wins. Literals, for the same reason as `target`. */
+    security?: { headers?: SecurityOptions["headers"] };
     /** Studio settings. `companion: true` emits the companion Worker that serves the advisor procedure list to a hosted Studio, bound to the app as `ADVISOR_COMPANION`. A literal, for the same reason as `target`. */
     studio?: { companion?: boolean };
     /** Deploy target id — `lunora deploy`/`verify` read it when no `--target` is passed. Must be a literal: `runCodegen` resolves it synchronously by PARSING this file, so a computed value is not seen — `lunora verify` reports `platform_unreadable_target` rather than defaulting in silence. */

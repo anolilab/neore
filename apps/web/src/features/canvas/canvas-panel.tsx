@@ -237,7 +237,7 @@ const usePhotonEditorMessages = () => {
             ready: t`Ready`,
             redo: t`Redo`,
             reset: t`Reset`,
-            saveAriaLabel: t`Save as new version`,
+            saveAriaLabel: t`Save version as new`,
             saveFailed: t`Save failed`,
             saveVersion: t`Save version`,
             saving: t`Saving…`,

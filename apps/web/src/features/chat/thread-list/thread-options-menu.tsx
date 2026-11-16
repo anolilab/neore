@@ -14,17 +14,22 @@ import { showError, showSuccess } from "@/lib/toast";
 interface ThreadOptionsMenuProps {
     /** Where this copy of the menu shows: `className` for the wrapper, which is `display: contents` while it shows. */
     className?: string;
-    /** A host-run chat's title is not generated in the cloud, so the server refuses a regenerate; the item is not offered. */
+    /** A host-run chat's title is not generated in the cloud, so it gets no Regenerate; Rename still works. */
     isHostRun: boolean;
-    /** A locked chat keeps its title, so the server refuses a regenerate; the item is not offered. */
+    /** A locked chat keeps its title (the server refuses a rename or regenerate), so it gets no menu. */
     isLocked: boolean;
     /** The row's accessible name, from the thread title. */
     label: string;
+    onOpenChange: (open: boolean) => void;
+    /** Opens the chat as a pane of the split view. Given only while the split view preference is on; absent hides the item. */
+    onOpenInSplitView?: () => void;
+    onRename: () => void;
+    open: boolean;
     threadId: string;
 }
 
 /** The row's options menu. Holds the thread-level actions that have no row control of their own. */
-const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, threadId }: ThreadOptionsMenuProps) => {
+const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange, onOpenInSplitView, onRename, open, threadId }: ThreadOptionsMenuProps) => {
     const { t } = useLingui();
     // The action client: a regenerate must fail now when offline, not replay later from a queue, and is one request, not retried.
     const { isPending, mutate: regenerateTitle } = useMutation({
@@ -33,15 +38,15 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, threadId }: 
         retry: 0,
     });
 
-    // A host-run chat has no regenerate here and a locked one has none: with neither, the row has no menu to offer.
-    if (isLocked || isHostRun) {
+    // A locked row keeps only the split-view item: the server refuses its rename and its regenerate.
+    if (isLocked && !onOpenInSplitView) {
         return null;
     }
 
     // The menu's items are portaled; a click in them bubbles through React to the row, which must not open.
     return (
         <span className={cn("contents", className)} onClick={(event) => event.stopPropagation()} role="presentation">
-            <DropdownMenu>
+            <DropdownMenu onOpenChange={onOpenChange} open={open}>
                 <Tooltip>
                     <TooltipTrigger
                         render={
@@ -64,24 +69,28 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, threadId }: 
                     <TooltipContent>{t`Thread options`}</TooltipContent>
                 </Tooltip>
                 <DropdownMenuContent>
-                    <DropdownMenuItem
-                        onClick={() =>
-                            regenerateTitle(
-                                { threadId: threadId as Id<"threads"> },
-                                {
-                                    onError: (error: Error) => {
-                                        console.error("Failed to regenerate the thread title:", error);
-                                        showError(error);
+                    {!isLocked && <DropdownMenuItem onClick={onRename}>{t`Rename`}</DropdownMenuItem>}
+                    {onOpenInSplitView && <DropdownMenuItem onClick={onOpenInSplitView}>{t`Open in split view`}</DropdownMenuItem>}
+                    {!isHostRun && !isLocked && (
+                        <DropdownMenuItem
+                            onClick={() =>
+                                regenerateTitle(
+                                    { threadId: threadId as Id<"threads"> },
+                                    {
+                                        onError: (error: Error) => {
+                                            console.error("Failed to regenerate the thread title:", error);
+                                            showError(error);
+                                        },
+                                        onSuccess: () => {
+                                            showSuccess(t`Regenerating the title`);
+                                        },
                                     },
-                                    onSuccess: () => {
-                                        showSuccess(t`Regenerating the title`);
-                                    },
-                                },
-                            )
-                        }
-                    >
-                        {t`Regenerate title`}
-                    </DropdownMenuItem>
+                                )
+                            }
+                        >
+                            {t`Regenerate title`}
+                        </DropdownMenuItem>
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
             {isPending && (

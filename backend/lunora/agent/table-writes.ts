@@ -23,6 +23,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { agentSwitchRowContent } from "./agent-switch-logic";
+import { contextResetRowContent } from "./context-reset-shape";
 import type { AgentSwitchPart } from "./agent-switch-validators";
 import { findVectorTable, type VectorTableName } from "./vector/tables";
 
@@ -37,11 +38,15 @@ export type ThreadPatch = Partial<
         | "activeLeafMessageId"
         | "autoModel"
         | "awaitingInput"
+        | "category"
         | "groupChat"
+        | "contextResetMessageId"
+        | "hasContextReset"
         | "hasHandoff"
         | "lastCompressionStartedAt"
         | "lastReplyAt"
         | "model"
+        | "permissionMode"
         | "status"
         | "tagIds"
         | "updatedAt"
@@ -71,25 +76,58 @@ export const patchesWithoutAwaitingInput = (
     fields: Pick<ThreadPatch, "awaitingInput" | "lastReplyAt" | "status">,
 ): boolean => (fields.status === "running" || fields.lastReplyAt !== undefined) && fields.awaitingInput === undefined && row?.awaitingInput !== undefined;
 
-export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch): Promise<void> => {
-    if (fields.status === "running" || fields.lastReplyAt !== undefined) {
-        const row = await db.get("threads", threadId);
+/**
+ * The wake rule: a write that pauses for the owner (an approval or a question), or that records a failure. The owner should not
+ * have to find the thread in Snoozed to answer it, or to learn that it broke. A finished reply or any other write keeps the snooze.
+ */
+const fieldsWake = (fields: Pick<ThreadPatch, "awaitingInput" | "status">, failed: boolean): boolean =>
+    fields.awaitingInput !== undefined || fields.status === "error" || failed;
 
-        if (row && patchesWithoutAwaitingInput(row, fields)) {
-            await patchRow(db, "threads", row, { ...withoutUndefined(fields), awaitingInput: undefined });
+/**
+ * The one writer of a thread's run state; `agent/threads.ts#updateThread` delegates here. A write that ends a pause or records a
+ * reply removes `awaitingInput` (`patchesWithoutAwaitingInput`); a write that pauses for the owner or fails (`failed`: the run
+ * failed in place, whatever status the thread goes back to) removes `snoozedUntil`. Each removal is in the same write as its cause.
+ * A wake also stamps `snoozeChosenAt`, snoozed or not, so a snooze chosen before it and delivered after it changes nothing. The stamp
+ * is the server's now, or just past the stored one when a client clock put that ahead, so a redelivered choice cannot re-hide the thread.
+ */
+export const patchThread = async (db: Database, threadId: Id<"threads">, fields: ThreadPatch, { failed = false }: { failed?: boolean } = {}): Promise<void> => {
+    const endsPause = fields.status === "running" || fields.lastReplyAt !== undefined;
+    const wakes = fieldsWake(fields, failed);
+
+    if (endsPause || wakes) {
+        const row = await db.get("threads", threadId);
+        const clearsAwaiting = endsPause && patchesWithoutAwaitingInput(row, fields);
+        const clearsSnooze = wakes && row?.snoozedUntil !== undefined;
+
+        if (row && (clearsAwaiting || wakes)) {
+            await patchRow(db, "threads", row, {
+                ...withoutUndefined(fields),
+                ...(clearsAwaiting && { awaitingInput: undefined }),
+                ...(clearsSnooze && { snoozedUntil: undefined }),
+                ...(wakes && { snoozeChosenAt: Math.max(Date.now(), (row.snoozeChosenAt ?? 0) + 1) }),
+            });
 
             return;
         }
     }
 
-    await db.patch("threads", threadId, withoutUndefined(fields));
+    const patch = withoutUndefined(fields);
+
+    // A wake always writes above (it stamps `snoozeChosenAt`), so this is a write that does not wake, or a thread that is gone.
+    // Nothing to change writes nothing: the thread list is a live query.
+    if (Object.keys(patch).length > 0) {
+        await db.patch("threads", threadId, patch);
+    }
 };
 
-/** Removes `awaitingInput` from a thread whose pause can no longer be answered (its approval snapshot expired). */
-export const clearAwaitingInput = async (db: Database, threadId: Id<"threads">): Promise<void> => {
+/**
+ * Removes `awaitingInput` from a thread whose pause can no longer be answered (its approval snapshot expired). With `kind`,
+ * only a pause of that kind is cleared: another kind belongs to someone else's turn on the thread.
+ */
+export const clearAwaitingInput = async (db: Database, threadId: Id<"threads">, kind?: "approval" | "question"): Promise<void> => {
     const row = await db.get("threads", threadId);
 
-    if (row?.awaitingInput !== undefined) {
+    if (row?.awaitingInput !== undefined && (kind === undefined || row.awaitingInput === kind)) {
         await patchRow(db, "threads", row, { awaitingInput: undefined });
     }
 };
@@ -108,17 +146,19 @@ export const markThreadViewedAt = async (db: Database, thread: Doc<"threads">, n
     return true;
 };
 
-/** Snoozes the thread until `until`; `undefined` removes the column. Leaves `updatedAt` alone. */
-export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, until: number | undefined): Promise<void> => {
-    if (until === undefined) {
-        if (thread.snoozedUntil !== undefined) {
-            await patchRow(db, "threads", thread, { snoozedUntil: undefined });
-        }
-
-        return;
+/**
+ * Snoozes the thread until `until`, or `undefined` to bring it back, as the owner chose it at `chosenAt`. Leaves `updatedAt` alone.
+ * A choice older than the thread's `snoozeChosenAt` (a newer choice, or a wake) is stale: it writes nothing and returns false.
+ * An equal stamp applies, so the later of two same-stamp writes wins; one device never sends two (`nextSnoozeChoiceAt` on the web).
+ */
+export const setThreadSnooze = async (db: Database, thread: Doc<"threads">, until: number | undefined, chosenAt: number): Promise<boolean> => {
+    if (thread.snoozeChosenAt !== undefined && chosenAt < thread.snoozeChosenAt) {
+        return false;
     }
 
-    await db.patch("threads", thread._id, { snoozedUntil: until });
+    await patchRow(db, "threads", thread, { snoozeChosenAt: chosenAt, snoozedUntil: until });
+
+    return true;
 };
 
 /**
@@ -150,6 +190,26 @@ export const insertAgentSwitchRow = async (
         providerMetadata,
         status: "success",
         stepOrder: row.stepOrder ?? 0,
+        threadId: row.threadId,
+        tool: false,
+        userId: row.userId,
+    });
+};
+
+/** The row `/clear` writes: where the model\'s context starts again (`agent/context-reset.ts`). */
+export const insertContextResetRow = async (
+    db: Database,
+    row: { order: number; parentMessageId?: string; threadId: Id<"threads">; userId: string },
+): Promise<Id<"messages">> => {
+    const { message, providerMetadata } = contextResetRowContent();
+
+    return await insertMessageRow(db, {
+        message,
+        order: row.order,
+        parentMessageId: row.parentMessageId,
+        providerMetadata,
+        status: "success",
+        stepOrder: 0,
         threadId: row.threadId,
         tool: false,
         userId: row.userId,

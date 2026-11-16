@@ -30,6 +30,7 @@ const setup = async () => {
         await authorizeExtension(store, {
             codeChallenge: await pkceChallenge(VERIFIER),
             redirectUri,
+            session: {},
             trustedRedirectUris: [SHIPPED_FIREFOX_REDIRECT_URI, NATIVE_REDIRECT_URI],
             userId: user.id,
         });

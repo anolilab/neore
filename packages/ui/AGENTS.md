@@ -85,6 +85,11 @@ const { downloadAsXlsx, xlsxFileToCSV } = await import("@neore/ui/components/spr
 - `SpreadsheetThumbnail` uses IntersectionObserver for lazy parsing.
 - Package exports pattern is `"./components/*": "./src/components/*.tsx"` — new files must use `.tsx` extension even if they contain no JSX.
 
+## MARKDOWN BLOCK CACHE
+
+- `components/cached-markdown-block.tsx` re-runs Streamdown's block pipeline (`utils/markdown-block-cache.ts`) to keep
+  finished replies' parsed trees across mounts. Bumping `streamdown`: diff its `Markdown` renderer against that pipeline.
+
 ## ANTI-PATTERNS
 
 - Don't create components without proper TypeScript types

@@ -59,6 +59,17 @@ describe("useKeyboardShortcutHandler", () => {
         expect(useThreadListUIStore.getState().showKeyboardHelp).toBe(false);
     });
 
+    it("hands the jump action to the open thread's listener", () => {
+        const { result } = renderHook(() => useKeyboardShortcutHandler());
+        const onJump = vi.fn();
+
+        globalThis.addEventListener("jumpToLastMessage", onJump);
+        result.current("jumpToLastMessage", new KeyboardEvent("keydown", { key: "j" }));
+        globalThis.removeEventListener("jumpToLastMessage", onJump);
+
+        expect(onJump).toHaveBeenCalledTimes(1);
+    });
+
     it("should handle escape action with active input element", () => {
         const mockActiveElement = { blur: mockBlur, tagName: "INPUT" };
 

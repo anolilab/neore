@@ -81,10 +81,12 @@ export const WebPreviewNavigationButton = ({ children, disabled, onClick, toolti
     <TooltipProvider>
         <Tooltip>
             <TooltipTrigger
-                render={<Button className="hover:text-foreground h-8 w-8 p-0" disabled={disabled} onClick={onClick} size="sm" variant="ghost" {...props} />}
-            >
-                {children}
-            </TooltipTrigger>
+                render={
+                    <Button className="hover:text-foreground h-8 w-8 p-0" disabled={disabled} onClick={onClick} size="sm" variant="ghost" {...props}>
+                        {children}
+                    </Button>
+                }
+            />
             <TooltipContent>
                 <p>{tooltip}</p>
             </TooltipContent>
@@ -143,7 +145,7 @@ const isHttpUrl = (url: string): boolean => {
     }
 };
 
-export type WebPreviewBodyProps = ComponentProps<"iframe"> & {
+export type WebPreviewBodyProps = Omit<ComponentProps<"iframe">, "loading"> & {
     loading?: ReactNode;
 };
 
@@ -183,11 +185,13 @@ export const WebPreviewConsole = ({ children, className, logs = EMPTY_LOGS, ...p
     return (
         <Collapsible className={cn("bg-muted/50 border-t font-mono text-sm", className)} onOpenChange={setConsoleOpen} open={consoleOpen} {...props}>
             <CollapsibleTrigger
-                render={<Button className="hover:bg-muted/50 flex w-full items-center justify-between p-4 text-left font-medium" variant="ghost" />}
-            >
-                {t`Console`}
-                <ChevronDownIcon aria-hidden="true" className={cn("h-4 w-4 transition-transform duration-200", consoleOpen && "rotate-180")} />
-            </CollapsibleTrigger>
+                render={
+                    <Button className="hover:bg-muted/50 flex w-full items-center justify-between p-4 text-left font-medium" variant="ghost">
+                        {t`Console`}
+                        <ChevronDownIcon aria-hidden="true" className={cn("h-4 w-4 transition-transform duration-200", consoleOpen && "rotate-180")} />
+                    </Button>
+                }
+            />
             <CollapsibleContent
                 className={cn(
                     "px-4 pb-4",
@@ -203,7 +207,7 @@ export const WebPreviewConsole = ({ children, className, logs = EMPTY_LOGS, ...p
                                 className={cn(
                                     "text-xs",
                                     log.level === "error" && "text-destructive",
-                                    log.level === "warn" && "text-yellow-600",
+                                    log.level === "warn" && "text-yellow-700 dark:text-yellow-500",
                                     log.level === "log" && "text-foreground",
                                 )}
                                 key={`${log.timestamp.getTime()}-${index}`}

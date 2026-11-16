@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { toast } from "sonner";
 
 /**
@@ -11,7 +11,8 @@ export const usePasteGuard = (threadId: string | undefined) => {
     const mountedRef = useRef(false);
     const toastIdsRef = useRef(new Set<number | string>());
 
-    useEffect(() => {
+    // In the commit, not after it: a paste resuming between a chat switch's commit and its passive effects must see the new chat.
+    useLayoutEffect(() => {
         threadIdRef.current = threadId;
     }, [threadId]);
 

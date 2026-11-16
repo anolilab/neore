@@ -125,6 +125,7 @@ export const ContextContent = ({ className, ...props }: ContextContentProps) => 
 export type ContextContentHeaderProps = ComponentProps<"div">;
 
 export const ContextContentHeader = ({ children, className, ...props }: ContextContentHeaderProps) => {
+    const { t } = useLingui();
     const { locale, maxTokens, usedTokens } = useContextValue();
     const usedPercent = usedTokens / maxTokens;
     const displayPct = new Intl.NumberFormat(locale, {
@@ -149,7 +150,7 @@ export const ContextContentHeader = ({ children, className, ...props }: ContextC
                         </p>
                     </div>
                     <div className="space-y-2">
-                        <Progress max={PERCENT_MAX} value={usedPercent * PERCENT_MAX} />
+                        <Progress aria-label={t`Model context usage`} max={PERCENT_MAX} value={usedPercent * PERCENT_MAX} />
                     </div>
                 </>
             )}

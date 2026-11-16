@@ -19,7 +19,8 @@
  *    `/auth/extension` page with `code_challenge = BASE64URL(SHA-256(verifier))`
  *    and `redirect_uri = identity.getRedirectURL()`.
  * 2. The user signs in there however they like (password, Google, passkey…) and
- *    approves. The page calls `authorizeExtension` below as that user, which
+ *    approves. The page calls `authorizeExtension` below as that user (never
+ *    a session an admin is impersonating with), which
  *    stores a single-use code bound to the user, the challenge and the redirect
  *    URI for `CODE_TTL_MS`, and navigates to `redirect_uri?code=…`. The browser
  *    intercepts that navigation and hands the URL to the extension unloaded.
@@ -91,7 +92,7 @@ export interface ExtensionGrantStore {
     createSession: (userId: string, meta: { ipAddress?: string; userAgent?: string }) => Promise<{ expiresAt: Date; token: string }>;
     deleteSession: (token: string) => Promise<void>;
     extendSession: (token: string, expiresAt: Date) => Promise<void>;
-    findSession: (token: string) => Promise<null | { session: { expiresAt: Date }; user: ExtensionGrantUser }>;
+    findSession: (token: string) => Promise<null | { session: { expiresAt: Date; id: string }; user: ExtensionGrantUser }>;
     findUser: (userId: string) => Promise<ExtensionGrantUser | null>;
     saveCode: (identifier: string, value: string, expiresAt: Date) => Promise<void>;
     /** Sign a JWT with better-auth's JWKS; `iss`/`aud` are already in the payload. */
@@ -100,13 +101,22 @@ export interface ExtensionGrantStore {
 
 export type ExtensionGrantErrorCode = "access_denied" | "invalid_grant" | "invalid_request" | "invalid_token" | "unauthorized";
 
+/** `reason` of the refusal to sign an app in while an admin impersonates the user. */
+export const EXTENSION_GRANT_IMPERSONATING = "impersonating";
+
+export type ExtensionGrantRefusal = typeof EXTENSION_GRANT_IMPERSONATING;
+
 export class ExtensionGrantError extends Error {
     public readonly code: ExtensionGrantErrorCode;
 
-    public constructor(code: ExtensionGrantErrorCode, message: string) {
+    /** Which `access_denied` refusal this is, for a page that words it in the user's language; `code` stays OAuth's. */
+    public readonly reason: ExtensionGrantRefusal | undefined;
+
+    public constructor(code: ExtensionGrantErrorCode, message: string, reason?: ExtensionGrantRefusal) {
         super(message);
         this.code = code;
         this.name = "ExtensionGrantError";
+        this.reason = reason;
     }
 
     /** HTTP status for the error, OAuth-style: 401 for a bad credential, 403 for a refused user, else 400. */
@@ -204,10 +214,28 @@ const assertEligible = (user: ExtensionGrantUser | null): ExtensionGrantUser => 
  */
 export const authorizeExtension = async (
     store: ExtensionGrantStore,
-    input: { codeChallenge: string; now?: number; redirectUri: string; trustedRedirectUris: ReadonlyArray<string>; userId: null | string | undefined },
+    input: {
+        codeChallenge: string;
+        now?: number;
+        redirectUri: string;
+        /** The web sign-in approving, as read from its session row; `null` when it is not one, or is gone. */
+        session: null | { impersonating?: boolean };
+        trustedRedirectUris: ReadonlyArray<string>;
+        userId: null | string | undefined;
+    },
 ): Promise<{ code: string; expiresAt: number }> => {
-    if (!input.userId) {
+    if (!input.userId || !input.session) {
         throw new ExtensionGrantError("unauthorized", "Not signed in.");
+    }
+
+    // The grant's session is a fresh one with no impersonation mark, so an app an admin signed in while acting as
+    // the user would pass every impersonation guard. As `refuseGuestApproval` for device codes.
+    if (input.session.impersonating) {
+        throw new ExtensionGrantError(
+            "access_denied",
+            "Apps can't be signed in while impersonating. Sign in as yourself to connect one.",
+            EXTENSION_GRANT_IMPERSONATING,
+        );
     }
 
     if (!input.trustedRedirectUris.includes(input.redirectUri)) {
@@ -300,6 +328,10 @@ export const mintExtensionAccessToken = async (
         iat: Math.floor(now / 1000),
         ...user,
         aud: input.origin,
+        // The sign-in this token stands for, as `gsid`, NEVER `sid`: it reaches procedures as `grantSessionId`, not
+        // `sessionId`. This session is the exchange's fresh one, with no impersonation mark, so as `sessionId` it would
+        // pass account deletion's freshness and impersonation checks (`src/bearer-identity.ts`).
+        gsid: found.session.id,
         iss: input.origin,
         sub: user.id,
     });
@@ -330,7 +362,7 @@ interface BetterAuthLike {
             createSession: (userId: string, dontRememberMe?: boolean, override?: Record<string, unknown>) => Promise<{ expiresAt: Date; token: string }>;
             createVerificationValue: (data: { expiresAt: Date; identifier: string; value: string }) => Promise<unknown>;
             deleteSession: (token: string) => Promise<void>;
-            findSession: (token: string) => Promise<null | { session: { expiresAt: Date }; user: ExtensionGrantUser }>;
+            findSession: (token: string) => Promise<null | { session: { expiresAt: Date; id: string }; user: ExtensionGrantUser }>;
             findUserById: (userId: string) => Promise<ExtensionGrantUser | null>;
             updateSession: (token: string, session: { expiresAt: Date }) => Promise<unknown>;
         };

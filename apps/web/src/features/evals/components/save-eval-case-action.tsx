@@ -85,7 +85,7 @@ const SaveEvalCaseBody = ({ message, onClose }: { message: UIMessage; onClose: (
                     <DialogPanel>
                         <p className="text-sm">
                             {t`You have no eval datasets yet.`}{" "}
-                            <Link className="text-primary underline-offset-4 hover:underline" to="/evals">
+                            <Link className="text-primary-text underline-offset-4 hover:underline" to="/evals">
                                 {t`Create one on the Evals page.`}
                             </Link>
                         </p>

@@ -28,7 +28,8 @@ export const DEFAULT_STREAMDOWN_APPEARANCE: StreamdownAppearance = {
     capLongCodeBlocks: true,
     codeLineNumbers: false,
     mermaidTheme: "default",
-    shikiTheme: ["poimandres", "min-light"],
+    // `[light, dark]`: the light palette for light mode. The reverse put a dark palette on a light page (and the light one on dark).
+    shikiTheme: ["min-light", "poimandres"],
 };
 
 // Held on an object so the setter mutates a property rather than rebinding a module-level `let`.

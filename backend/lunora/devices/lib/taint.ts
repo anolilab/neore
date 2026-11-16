@@ -14,6 +14,7 @@ import type { Infer } from "lunorash/server";
 
 import { parseGoalReviewNote } from "../../chat/goals/shared";
 import { readCompressedHistory } from "../../chat/lib/compressed-history";
+import { isGuestTextPart } from "../../lib/guest-text";
 import type { vDeviceTaintSource } from "../validators";
 
 export type DeviceTaintSource = Infer<typeof vDeviceTaintSource>;
@@ -132,6 +133,11 @@ export const computeTaint = (messages: ReadonlyArray<MessageLike> | undefined): 
         const parts = message.content as ReadonlyArray<{ providerMetadata?: unknown; providerOptions?: unknown; toolName?: unknown; type?: unknown }>;
 
         for (const part of parts) {
+            // A guest's note the owner sent on is the guest's words, not the owner's: a call prompted by it is not trusted.
+            if (message.role === "user" && isGuestTextPart(part)) {
+                found.add("files");
+            }
+
             if (message.role === "assistant" && part.type === "text" && isHostText(part)) {
                 // A coding agent's own text, posted from a paired computer: it read files and command output there.
                 found.add("device");

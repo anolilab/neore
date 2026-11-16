@@ -1,0 +1,331 @@
+import { setupI18n } from "@lingui/core";
+import { Editor, Extension } from "@tiptap/core";
+import { StarterKit } from "@tiptap/starter-kit";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { formatQuote } from "@/features/chat/core/utils/quote-selection";
+import { scrollToMessageChannel } from "@/features/chat/core/utils/scroll-to-message";
+
+import { plainTextToHtml } from "../plain-text";
+import QuoteChip, { insertQuoteChip, quoteRestoreDraft, refreshQuoteChipLabels } from "./quote-chip";
+
+const labels = () => {
+    return { goToReply: "Go to reply" };
+};
+const quoted = { messageId: "msg-4", text: "The first line\nthe second line" };
+
+/** The chip's draft text is the quote as a blockquote, ending its last line; the comment paragraph's separator adds the blank line. */
+const quotedDraft = "> The first line\n> the second line\n";
+
+describe("insertQuoteChip", () => {
+    let editor: Editor | undefined;
+
+    afterEach(() => {
+        editor?.destroy();
+        editor = undefined;
+    });
+
+    const createEditor = (content = ""): Editor => {
+        editor = new Editor({ content, extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })] });
+
+        return editor;
+    };
+
+    it("puts the chip in an empty draft, with a line after it for the comment", () => {
+        const instance = createEditor();
+
+        insertQuoteChip(instance, quoted);
+
+        expect(instance.getJSON().content?.map((node) => node.type)).toEqual(["quoteChip", "paragraph"]);
+        // The chip's quote, then the comment paragraph's separator: no text before the chip, an empty line after it.
+        expect(instance.getText({ blockSeparator: "\n" })).toBe(`${quotedDraft}\n`);
+    });
+
+    it("takes the place of a trailing empty line, so no blank line comes before the quote", () => {
+        const instance = createEditor(plainTextToHtml("Before the quote\n"));
+
+        insertQuoteChip(instance, quoted);
+
+        expect(instance.getText({ blockSeparator: "\n" })).toBe(`Before the quote\n${quotedDraft}\n`);
+    });
+
+    it("drops hidden characters from the quote, as the draft store drops them", () => {
+        const instance = createEditor("");
+
+        insertQuoteChip(instance, { messageId: "msg-4", text: "The first\u{200B} line\nthe second line" });
+
+        expect(instance.getText({ blockSeparator: "\n" })).toBe(`${quotedDraft}\n`);
+    });
+
+    it("appends the chip after typed text, and the editor's text keeps the quote", () => {
+        const instance = createEditor("Before the quote");
+
+        insertQuoteChip(instance, quoted);
+
+        expect(instance.getJSON().content?.map((node) => node.type)).toEqual(["paragraph", "quoteChip", "paragraph"]);
+        expect(instance.getText({ blockSeparator: "\n" })).toBe(`Before the quote\n${quotedDraft}\n`);
+        // Cursor and paste offsets come from `textBetween`, so it has to count the chip's text the same way.
+        expect(instance.state.doc.textBetween(0, instance.state.doc.content.size, "\n")).toBe(instance.getText({ blockSeparator: "\n" }));
+    });
+});
+
+describe("the quote chip's clipboard", () => {
+    let editor: Editor | undefined;
+
+    afterEach(() => {
+        editor?.destroy();
+        editor = undefined;
+    });
+
+    const chipEditor = (): Editor => {
+        editor = new Editor({
+            content: { content: [{ attrs: { messageId: quoted.messageId, text: quoted.text }, type: "quoteChip" }], type: "doc" },
+            extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })],
+        });
+
+        return editor;
+    };
+
+    it("copies the quoted lines into the HTML clipboard format, so a rich-text paste shows them", () => {
+        const instance = chipEditor();
+        const { dom } = instance.view.serializeForClipboard(instance.state.doc.slice(0, instance.state.doc.content.size));
+
+        expect(new XMLSerializer().serializeToString(dom)).toContain("<blockquote><p>The first line</p><p>the second line</p></blockquote>");
+    });
+
+    it("copies the quote into the plain-text clipboard format too", () => {
+        const instance = chipEditor();
+        const { text } = instance.view.serializeForClipboard(instance.state.doc.slice(0, instance.state.doc.content.size));
+
+        expect(text).toContain("> The first line\n> the second line");
+    });
+
+    it("pastes the copied HTML back as a chip with the same reply and text", () => {
+        const instance = chipEditor();
+        const { dom } = instance.view.serializeForClipboard(instance.state.doc.slice(0, instance.state.doc.content.size));
+
+        const pasted = new Editor({
+            content: new XMLSerializer().serializeToString(dom),
+            extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })],
+        });
+
+        try {
+            expect(pasted.getJSON().content?.[0]).toMatchObject({ attrs: { messageId: quoted.messageId, text: quoted.text }, type: "quoteChip" });
+        } finally {
+            pasted.destroy();
+        }
+    });
+
+    it.each([
+        [
+            "takes the quote from the visible lines, not a hidden attribute",
+            `<div data-quote-chip data-message-id="m" data-quote-text="${"hidden ".repeat(200)}"><blockquote><p>Seen</p></blockquote></div>`,
+            "quoteChip",
+            "> Seen\n",
+        ],
+        [
+            "keeps a line break inside a quoted line",
+            `<div data-quote-chip data-message-id="m"><blockquote><p>one<br>two</p></blockquote></div>`,
+            "quoteChip",
+            "> one\n> two\n",
+        ],
+        [
+            "leaves out text the pasting page hid inside a quoted line",
+            `<div data-quote-chip data-message-id="m"><blockquote><p>Seen<span style="display: none">hidden ask</span></p><p hidden>hidden line</p></blockquote><blockquote hidden><p>hidden block</p></blockquote></div>`,
+            "quoteChip",
+            "> Seen\n",
+        ],
+        [
+            "keeps a line whose style names display and none in different declarations",
+            `<div data-quote-chip data-message-id="m"><blockquote><p style="display: block; background: none">Seen</p><p style="visibility: hidden">hidden line</p></blockquote></div>`,
+            "quoteChip",
+            "> Seen\n",
+        ],
+        [
+            "leaves out a line hidden through a CSS variable or content-visibility",
+            `<div data-quote-chip data-message-id="m"><blockquote><p>Seen<span style="content-visibility: hidden">hidden ask</span></p><p style="--x: none; display: var(--x)">hidden line</p></blockquote></div>`,
+            "quoteChip",
+            "> Seen\n",
+        ],
+        [
+            "makes no chip from a chip the pasting page hid as a whole",
+            `<div data-quote-chip hidden data-message-id="m"><blockquote><p>hidden ask</p></blockquote></div><div data-quote-chip style="display: none" data-message-id="m"><blockquote><p>hidden ask</p></blockquote></div>`,
+            "paragraph",
+            "\n",
+        ],
+        [
+            "pastes a quote past the long-paste limit as quoted lines, not a chip",
+            `<div data-quote-chip data-message-id="m"><blockquote><p>${"long ".repeat(120)}</p></blockquote></div>`,
+            "paragraph",
+            `> ${"long ".repeat(120).trim()}`,
+        ],
+    ])("%s", (_label, html, type, text) => {
+        const pasted = new Editor({ content: html, extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })] });
+
+        try {
+            expect(pasted.getJSON().content?.[0]?.type).toBe(type);
+            // All of the quote, and only the visible quote, with its markers.
+            expect(pasted.getText({ blockSeparator: "\n" })).toBe(text);
+        } finally {
+            pasted.destroy();
+        }
+    });
+});
+
+describe("quoteRestoreDraft", () => {
+    let editor: Editor | undefined;
+
+    afterEach(() => {
+        editor?.destroy();
+        editor = undefined;
+    });
+
+    it("keeps the quote in the draft as plain quoted lines while the editor is not mounted", () => {
+        expect(quoteRestoreDraft(null, quoted, "Before")).toBe(`Before\n${formatQuote(quoted.text)}`);
+    });
+
+    it("gives the same draft, one blank line between the quote and the comment, with and without the editor", () => {
+        editor = new Editor({ content: "", extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })] });
+
+        const withEditor = quoteRestoreDraft(editor, quoted, "Before");
+
+        expect(withEditor).toBe(quoteRestoreDraft(null, quoted, "Before"));
+
+        editor.commands.insertContentAt(editor.state.doc.content.size - 1, "comment");
+
+        expect(editor.getText({ blockSeparator: "\n" })).toBe("Before\n> The first line\n> the second line\n\ncomment");
+    });
+});
+
+describe("the link back to the quoted reply", () => {
+    let editor: Editor | undefined;
+
+    afterEach(() => {
+        editor?.destroy();
+        editor = undefined;
+        document.body.replaceChildren();
+    });
+
+    it("keeps Enter on the focused link from reaching the editor, so it does not send the draft", () => {
+        const submit = vi.fn(() => true);
+        const SubmitOnEnter = Extension.create({
+            addKeyboardShortcuts() {
+                return { Enter: submit };
+            },
+        });
+
+        editor = new Editor({
+            content: { content: [{ attrs: { messageId: "msg-7", text: "A line" }, type: "quoteChip" }], type: "doc" },
+            extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels }), SubmitOnEnter],
+        });
+
+        const link = editor.view.dom.querySelector<HTMLButtonElement>(":scope [data-quote-chip] button");
+
+        expect(link).not.toBeNull();
+        link!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }));
+
+        expect(submit).not.toHaveBeenCalled();
+    });
+
+    it("asks the message list to jump to the reply, which it can mount when the reply is windowed out", () => {
+        const jumps: string[] = [];
+        const unsubscribe = scrollToMessageChannel.consume(({ messageId }) => {
+            jumps.push(messageId);
+        });
+
+        editor = new Editor({
+            content: { content: [{ attrs: { messageId: "msg-7", text: "A line" }, type: "quoteChip" }], type: "doc" },
+            extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })],
+        });
+        editor.view.dom.querySelector<HTMLButtonElement>(":scope [data-quote-chip] button")?.click();
+        unsubscribe();
+
+        expect(jumps).toEqual(["msg-7"]);
+    });
+});
+
+describe("quoteRestoreDraft when the draft changed before the editor synced", () => {
+    let editor: Editor | undefined;
+
+    afterEach(() => {
+        editor?.destroy();
+        editor = undefined;
+    });
+
+    it("adds the quote to the newer draft, not to the editor's stale text", () => {
+        editor = new Editor({
+            content: plainTextToHtml("Stale editor text"),
+            extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })],
+        });
+
+        // Dictation wrote this to the draft store; the editor's sync has not run yet.
+        const draft = "Dictated words the editor has not seen";
+        const result = quoteRestoreDraft(editor, quoted, draft);
+
+        expect(result.startsWith(`${draft}\n`)).toBe(true);
+        expect(result).not.toContain("Stale editor text");
+        expect(result).toContain(formatQuote(quoted.text).trimEnd());
+        expect(editor.getJSON().content?.map((node) => node.type)).toEqual(["paragraph", "quoteChip", "paragraph"]);
+    });
+
+    it("leaves an editor that already matches the draft, chips included, as it is", () => {
+        editor = new Editor({
+            content: { content: [{ attrs: { messageId: "msg-1", text: "Earlier" }, type: "quoteChip" }, { type: "paragraph" }], type: "doc" },
+            extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels })],
+        });
+        const draft = editor.getText({ blockSeparator: "\n" });
+
+        quoteRestoreDraft(editor, quoted, draft);
+
+        expect(editor.getJSON().content?.map((node) => node.type)).toEqual(["quoteChip", "paragraph", "quoteChip", "paragraph"]);
+    });
+});
+
+describe("the quote chip's labels after an in-place locale switch", () => {
+    let editor: Editor | undefined;
+    const i18n = setupI18n({ locale: "en", messages: {} });
+    // Through an alias, so the catalog extractor does not take these test-only ids into the app's catalogs.
+    const translate = (id: string, message: string): string => i18n.t({ id, message });
+    const translated = () => {
+        return {
+            goToReply: translate("quote.goToReply", "Go to reply"),
+        };
+    };
+    const german = {
+        "quote.goToReply": "Zur Antwort",
+    };
+
+    afterEach(() => {
+        editor?.destroy();
+        editor = undefined;
+        document.body.replaceChildren();
+    });
+
+    const linkLabels = (instance: Editor): string[] =>
+        [...instance.view.dom.querySelectorAll<HTMLButtonElement>(":scope [data-quote-chip] button")].map((button) => button.textContent ?? "");
+
+    it("shows the new language on a chip added after the switch, without recreating the editor", () => {
+        i18n.loadAndActivate({ locale: "en", messages: {} });
+        editor = new Editor({ content: "", extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels: translated })] });
+
+        insertQuoteChip(editor, quoted);
+        i18n.loadAndActivate({ locale: "de", messages: german });
+        insertQuoteChip(editor, { messageId: "msg-9", text: "A later selection" });
+
+        expect(linkLabels(editor)).toEqual(["Go to reply", "Zur Antwort"]);
+    });
+
+    it("repaints a chip drawn before the switch when the composer refreshes its labels", () => {
+        i18n.loadAndActivate({ locale: "en", messages: {} });
+        editor = new Editor({ content: "", extensions: [StarterKit.configure({ blockquote: false }), QuoteChip.configure({ labels: translated })] });
+        insertQuoteChip(editor, quoted);
+
+        i18n.loadAndActivate({ locale: "de", messages: german });
+
+        expect(linkLabels(editor)).toEqual(["Go to reply"]);
+
+        refreshQuoteChipLabels(editor.view.dom);
+
+        expect(linkLabels(editor)).toEqual(["Zur Antwort"]);
+    });
+});

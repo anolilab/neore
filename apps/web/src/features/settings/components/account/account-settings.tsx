@@ -45,9 +45,11 @@ const AccountSettings: FC = () => {
         setSendBehavior,
         setShowTimestamps,
         setSoundEffects,
+        setSplitViewEnabled,
         setTemporaryChatRetentionHours,
         showTimestamps,
         soundEffects,
+        splitViewEnabled,
     } = useUserPreferences();
     const userSettingsQuery = useUserSettings();
     const userSettings = userSettingsQuery.data;
@@ -657,6 +659,26 @@ const AccountSettings: FC = () => {
                             onCheckedChange={(checked) => {
                                 setSoundEffects(checked);
                                 toast.success(checked ? t`Sound effects enabled` : t`Sound effects disabled`);
+                            }}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-base font-medium" htmlFor="split-view">
+                                {t`Split View`}
+                            </Label>
+                            <p
+                                className="text-muted-foreground text-sm"
+                                id="split-view-description"
+                            >{t`Open up to three chats side by side. Applies to this browser only.`}</p>
+                        </div>
+                        <Switch
+                            aria-describedby="split-view-description"
+                            checked={splitViewEnabled}
+                            id="split-view"
+                            onCheckedChange={(checked) => {
+                                setSplitViewEnabled(checked);
+                                toast.success(checked ? t`Split view enabled` : t`Split view disabled`);
                             }}
                         />
                     </div>

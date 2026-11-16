@@ -68,13 +68,27 @@ describe("code highlighter plugin", () => {
         expect(run("x", language)).not.toBeNull();
     });
 
-    it.each(["r", "scala", "haskell", "elixir", "powershell", "graphql", "latex", "hcl", "zig", "julia", "objective-c", ""])(
-        "leaves %s to Streamdown's plain rendering",
-        (language) => {
-            expect(code.supportsLanguage(language)).toBe(false);
-            expect(run("x", language)).toBeNull();
-        },
-    );
+    it.each(["hcl", "zig", ""])("leaves %s to Streamdown's plain rendering", (language) => {
+        expect(code.supportsLanguage(language)).toBe(false);
+        expect(run("x", language)).toBeNull();
+    });
+
+    it.each([
+        ["r", "f <- function(x) x", "function"],
+        ["scala", "def f = 1", "def"],
+        ["haskell", "module Main where", "module"],
+        ["elixir", "def f, do: 1", "def"],
+        ["powershell", "function Get-X { }", "function"],
+        ["graphql", "query Q { a }", "query"],
+        ["latex", String.raw`\section{A}`, String.raw`\section`],
+        ["julia", "function f() end", "function"],
+        ["objective-c", "@interface A @end", "@interface"],
+    ])("highlights %s with its own grammar", (language, source, keyword) => {
+        const token = run(source, language)?.tokens[0]?.find((candidate) => candidate.content === keyword);
+
+        expect(code.supportsLanguage(language)).toBe(true);
+        expect(token?.color).toBe("#cf222e");
+    });
 
     it("highlights C with the C++ grammar", () => {
         const keyword = run("int main(void) { return 0; }", "c")?.tokens[0]?.find((token) => token.content === "return");

@@ -14,8 +14,9 @@ import { Textarea } from "@neore/ui/components/textarea";
 import { useMutation } from "@tanstack/react-query";
 import { SendIcon } from "lucide-react";
 import type { FC, KeyboardEvent } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { peekWorkerDraft, saveWorkerDraft } from "@/features/chat/split/composer-drafts";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
@@ -31,9 +32,18 @@ interface WorkerComposerProps {
 const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, followUp, workerId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
-    const [text, setText] = useState("");
+    // The text is kept per worker: its composer unmounts when focus moves to another pane, and comes back with the text.
+    const [text, setText] = useState(() => peekWorkerDraft(workerId) ?? "");
+    const draft = useRef(text);
     const clientId = useRef<string | undefined>(undefined);
     const send = useMutation(crpc.sub_agents.functions.dispatchToWorker.mutationOptions());
+
+    useEffect(
+        () => () => {
+            saveWorkerDraft(workerId, draft.current);
+        },
+        [workerId],
+    );
 
     let notice: string | undefined;
 
@@ -59,6 +69,7 @@ const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, fo
                 onError: (error: unknown) => showError(error instanceof Error ? error : t`Could not send the message.`),
                 onSuccess: () => {
                     clientId.current = undefined;
+                    draft.current = "";
                     setText("");
                 },
             },
@@ -91,10 +102,13 @@ const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, fo
                 <Textarea
                     aria-label={t`Message the worker`}
                     className="min-h-[44px] flex-1"
+                    // The box is the composer's focus area for F6, as the cloud composer's editor is (`composer-tiptap/editor-attributes.ts`).
+                    data-focus-area="composer"
                     disabled={archived}
                     onChange={(event) => {
                         // A changed draft is a new message: it must not reuse the last one's id.
                         clientId.current = undefined;
+                        draft.current = event.target.value;
                         setText(event.target.value);
                     }}
                     onKeyDown={onKeyDown}

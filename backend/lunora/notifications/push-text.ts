@@ -15,6 +15,7 @@ const HEADLINES: Record<string, { failure?: string; success: string }> = {
     secret_request: { success: "The assistant is asking for a secret" },
     sub_agent: { failure: "Sub-agent failed", success: "Sub-agent finished" },
     task: { failure: "Task failed", success: "Task finished" },
+    task_stuck: { success: "A task is stuck" },
     tool_approval: { success: "A tool call needs your approval" },
     trigger: { failure: "Trigger run failed", success: "Trigger run finished" },
     usage_alert: { success: "A usage alert was triggered" },
@@ -35,6 +36,72 @@ export const pushTitle = (type: string, outcome: "failure" | "success" | undefin
  * pushed `high`, so a dozing phone wakes for it; everything else waits for the
  * device's next convenient moment.
  */
+/** Push body cap, well inside the 4 KiB a push service accepts after encryption. */
+const PUSH_BODY_MAX = 300;
+
+/**
+ * The headline and text of a push, the same for a browser (Web Push) and for the text a phone fetches
+ * (`phone-content.ts`): the type's headline, then the subject and its body, capped.
+ */
+export const pushHeadline = (notification: {
+    body?: string;
+    outcome?: "failure" | "success";
+    title: string;
+    type: string;
+}): { body: string; title: string } => {
+    return {
+        body: (notification.body ? `${notification.title}\n${notification.body}` : notification.title).slice(0, PUSH_BODY_MAX),
+        title: pushTitle(notification.type, notification.outcome),
+    };
+};
+
 const WAITING_ON_A_PERSON: ReadonlySet<string> = new Set(["ask_user", "secret_request", "tool_approval"]);
 
 export const pushUrgency = (type: string): "high" | "normal" => (WAITING_ON_A_PERSON.has(type) ? "high" : "normal");
+
+/**
+ * The only text a phone push carries through Expo, Apple and Google: a generic
+ * alert, the same for every notification. Worded in the phone's language, with
+ * the same locales as the web app; English while the phone's language is not
+ * known (`userSettings.language` is the language for AI replies, not this).
+ */
+const PHONE_PLACEHOLDER_BODIES: Readonly<Record<string, string>> = {
+    de: "Du hast eine neue Benachrichtigung",
+    en: "You have a new notification",
+    es: "Tienes una notificación nueva",
+    fr: "Vous avez une nouvelle notification",
+    it: "Hai una nuova notifica",
+    ja: "新しい通知があります",
+    pl: "Masz nowe powiadomienie",
+    pt: "Você tem uma nova notificação",
+    zh: "你有一条新通知",
+};
+
+export const PHONE_PLACEHOLDER_TITLE = "Neore";
+
+const LANGUAGE_SEPARATOR = /[-_]/u;
+
+/** The title an approval alert shows for a call whose tool name cannot be read back, worded like the rest of the phone's alerts. */
+const APPROVAL_TOOL_FALLBACKS: Readonly<Record<string, string>> = {
+    de: "Ein Werkzeug",
+    en: "A tool",
+    es: "Una herramienta",
+    fr: "Un outil",
+    it: "Uno strumento",
+    ja: "ツール",
+    pl: "Narzędzie",
+    pt: "Uma ferramenta",
+    zh: "一个工具",
+};
+
+/** The table entry for the phone's language, English when it is not known or has no entry. */
+const localized = (table: Readonly<Record<string, string>>, language: string | undefined): string => {
+    const base = language?.toLowerCase().split(LANGUAGE_SEPARATOR, 1)[0] ?? "en";
+
+    // Own keys only: a language such as `constructor` must not read an inherited property.
+    return Object.hasOwn(table, base) ? (table[base] as string) : (table.en as string);
+};
+
+export const phonePlaceholderBody = (language: string | undefined): string => localized(PHONE_PLACEHOLDER_BODIES, language);
+
+export const approvalToolFallback = (language: string | undefined): string => localized(APPROVAL_TOOL_FALLBACKS, language);

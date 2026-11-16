@@ -6,7 +6,7 @@
 import type { ToolSet } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
-import { createAuthRetrySession, isUnauthorizedError, renewBearer, retryOnUnauthorized, withBearer } from "./mcp-auth-retry";
+import { createAuthRetrySession, isUnauthorizedError, RELISTED_TOOL_CHANGED, renewBearer, retryOnUnauthorized, withBearer } from "./mcp-auth-retry";
 import type { MCPServerConfig, MCPServerOAuth } from "./mcp-tools";
 
 const HINT = "Reconnect Notion in Settings → Connectors";
@@ -179,6 +179,59 @@ describe("createAuthRetrySession", () => {
         expect(oauth.refresh).toHaveBeenCalledTimes(1);
         expect(reconnect).toHaveBeenCalledTimes(1);
         expect(oauth.markExpired).not.toHaveBeenCalled();
+    });
+
+    it("does not retry on a tool the reconnect lists with another definition: the input was written for the first", async () => {
+        const oauth = hooks("new");
+        const retried = vi.fn(async () => "ran");
+        const original = failing();
+        const sameTool = vi.fn(async () => false);
+        const wrapped = createAuthRetrySession(
+            server(oauth),
+            { search: original },
+            async () => {
+                return { tools: { search: tool(retried) } };
+            },
+            sameTool,
+        ).wrap("search", original);
+
+        await expect(call(wrapped, { q: 1 })).rejects.toThrow(RELISTED_TOOL_CHANGED);
+        expect(sameTool).toHaveBeenCalledWith("search", original, expect.anything());
+        expect(retried).not.toHaveBeenCalled();
+    });
+
+    it("refuses the retry when the check itself fails: nothing shows the tool is unchanged", async () => {
+        const oauth = hooks("new");
+        const retried = vi.fn(async () => "ran");
+        const original = failing();
+        const wrapped = createAuthRetrySession(
+            server(oauth),
+            { search: original },
+            async () => {
+                return { tools: { search: tool(retried) } };
+            },
+            async () => {
+                throw new Error("unhashable");
+            },
+        ).wrap("search", original);
+
+        await expect(call(wrapped)).rejects.toThrow(RELISTED_TOOL_CHANGED);
+        expect(retried).not.toHaveBeenCalled();
+    });
+
+    it("retries on a tool the reconnect lists unchanged", async () => {
+        const oauth = hooks("new");
+        const original = failing();
+        const wrapped = createAuthRetrySession(
+            server(oauth),
+            { search: original },
+            async () => {
+                return { tools: { search: tool(async () => "ran") } };
+            },
+            async () => true,
+        ).wrap("search", original);
+
+        await expect(call(wrapped)).resolves.toBe("ran");
     });
 
     it("shares one refresh and one reconnect among every tool of the server", async () => {

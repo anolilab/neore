@@ -25,6 +25,10 @@ const MODEL = { modelId: "test-model", provider: "test", specificationVersion: "
 
 const start = async (summary: string | null, system: string | undefined) => {
     const runQuery = vi.fn(async (ref: unknown) => {
+        if (ref === internal.agent.context_reset_read.getContextReset) {
+            return null;
+        }
+
         if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
             return summary === null ? null : { summary };
         }

@@ -2,15 +2,15 @@ import { useLingui } from "@lingui/react/macro";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
 import type { FC } from "react";
-import { useState } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill } from "../../hooks/use-usage-backfill";
-import { formatUsd, localDayKey, periodStart } from "../../lib/usage-activity";
+import { keepAcrossDayTurn, useUsageToday } from "../../hooks/use-usage-today";
+import { formatUsd, periodStart } from "../../lib/usage-activity";
 
 /** The `skillKey` the backend files plain-assistant replies under; mirrors DEFAULT_SKILL_KEY in the backend's activity logic. */
 const DEFAULT_SKILL_KEY = "__assistant__";
@@ -31,15 +31,22 @@ const formatTokens = (count: number, locale: string): string => new Intl.NumberF
 const UsageSkillBreakdown: FC<UsageSkillBreakdownProps> = ({ backfilling, days }) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
-    const [today] = useState(() => localDayKey(new Date()));
+    const { failed: zoneFailed, today, zone } = useUsageToday();
     const locale = i18n.locale || "en";
 
-    const { data, isError, isPending, refetch } = useQuery({
-        ...crpc.usage.activity.getSkillBreakdown.queryOptions({ fromDate: periodStart(today, days) }, { live: false }),
+    const skillsQuery = crpc.usage.activity.getSkillBreakdown.queryOptions(today === undefined ? skipToken : { fromDate: periodStart(today, days) }, {
+        live: false,
+    });
+    const query = useQuery({
+        ...keepAcrossDayTurn(skillsQuery, `skills:${zone}:${String(days)}`),
         refetchInterval: backfilling ? BACKFILL_REFETCH_MS : false,
     });
 
-    useRefetchAfterBackfill(backfilling, refetch);
+    useRefetchAfterBackfill(backfilling, query.refetch, today !== undefined);
+
+    const { data } = query;
+    const isError = query.isError || zoneFailed;
+    const isPending = query.isPending && !zoneFailed;
 
     const skillLabel = (skill: { skillKey: string; skillName?: string }): string => {
         if (skill.skillKey === DEFAULT_SKILL_KEY) {

@@ -140,6 +140,7 @@ describe("writing a generated title", () => {
     it.each([
         ["a locked thread, whose title is its content", { lockedAt: 1000 }],
         ["a deleted thread", { deletedAt: 1000 }],
+        ["a thread marked deleted without a deletion time", { deleted: true }],
         ["a host-run thread", { runner: "host" }],
     ])("refuses %s", async (_name, fields) => {
         const threadId = await threadWith(fields);

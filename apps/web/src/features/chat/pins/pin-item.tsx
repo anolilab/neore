@@ -214,6 +214,7 @@ const PinItem: FC<PinItemProps> = ({ pin }) => {
                         onChange={handleNoteChange}
                         placeholder={t`Add a note…`}
                         rows={1}
+                        spellCheck
                         value={noteValue}
                     />
 

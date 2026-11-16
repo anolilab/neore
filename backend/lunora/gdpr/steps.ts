@@ -1,6 +1,10 @@
 import { LunoraError, v } from "lunorash/server";
 
+import { PROJECT_SKILL_KEY } from "../usage/activity-logic";
 import { collectAcpSessionPages } from "../acp/gdpr";
+import { collectAllTriggers } from "../triggers/export-pages";
+import { collectAllRepositories } from "../projects/export-pages";
+import { projectDetailsReadBudget, repositoriesReadBudget, triggerReadBudget } from "./read-budget";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
@@ -126,7 +130,18 @@ const projectMessage = (
 const projectThread = (
     thread: Pick<
         Doc<"threads">,
-        "_creationTime" | "activeLeafMessageId" | "category" | "lastViewedAt" | "model" | "snoozedUntil" | "summary" | "tagIds" | "tags" | "title" | "updatedAt"
+        | "_creationTime"
+        | "activeLeafMessageId"
+        | "category"
+        | "lastViewedAt"
+        | "model"
+        | "snoozeChosenAt"
+        | "snoozedUntil"
+        | "summary"
+        | "tagIds"
+        | "tags"
+        | "title"
+        | "updatedAt"
     > & {
         _id: string;
     },
@@ -141,6 +156,8 @@ const projectThread = (
         createdAt: thread._creationTime,
         lastViewedAt: thread.lastViewedAt,
         model: thread.model,
+        // When the owner last chose a snooze, or the thread last woke from one.
+        snoozeChosenAt: thread.snoozeChosenAt,
         snoozedUntil: thread.snoozedUntil,
         summary: thread.summary,
         tags: thread.tags,
@@ -169,6 +186,24 @@ export const collectThreadTags = internalQuery
         });
     });
 
+/** Every row of a paged export read: the pages one after another until the last. */
+const readAllPages = async <T>(readPage: (cursor: string | null) => Promise<{ continueCursor: string | null; isDone: boolean; page: T[] }>): Promise<T[]> => {
+    const rows: T[] = [];
+    let cursor: string | null = null;
+
+    for (;;) {
+        const result = await readPage(cursor);
+
+        rows.push(...result.page);
+
+        if (result.isDone) {
+            return rows;
+        }
+
+        cursor = result.continueCursor;
+    }
+};
+
 export const collectConversations = internalAction.input({ userId: v.string() }).action(async ({ args: { userId }, ctx: context }) => {
     // OPTIMIZED: Use paginated approach to handle large datasets safely
     // Process threads in batches to prevent memory exhaustion and timeouts
@@ -183,6 +218,10 @@ export const collectConversations = internalAction.input({ userId: v.string() })
     const conversations: {
         /** The condensed copies of the thread's older turns made while it sat idle (`agent/thread-summaries.ts`). */
         contextSummaries: { coveredCount: number; coveredUpToMessageId: string; createdAt: number; kind?: "compact"; summary: string }[];
+        /** The thread's guest links, with or without notes: when each was made and when it lapses. */
+        guestLinks: { createdAt: number; expiresAt: number }[];
+        /** The notes strangers left through the thread's guest link, held and sent (`chat/guest-links.ts`). */
+        guestNotes: { createdAt: number; status: string; text: string }[];
         messages: {
             _id: string;
             createdAt: number;
@@ -229,6 +268,8 @@ export const collectConversations = internalAction.input({ userId: v.string() })
 
         // Process current batch of threads
         for (const listed of threads.page) {
+            let collected: Omit<(typeof conversations)[number], "guestLinks" | "guestNotes"> | undefined;
+
             try {
                 // A locked chat is listed as its stub (no title, no model, no tags). The export
                 // is the owner's own data-access right, not a view into the chat, so it reads the
@@ -273,9 +314,25 @@ export const collectConversations = internalAction.input({ userId: v.string() })
                     threadId: thread._id as Id<"threads">,
                 });
 
-                conversations.push({ contextSummaries, messages, thread: projectThread(thread, tagNames) });
+                collected = { contextSummaries, messages, thread: projectThread(thread, tagNames) };
             } catch (error) {
                 gdprLogger.error(`Failed to collect messages for thread ${listed._id}:`, error);
+            }
+
+            // Outside the catch above: a failed guest-link or guest-note read fails this export step (the workflow retries it), instead of
+            // shipping an export that silently lacks the notes of a thread it did collect.
+            if (collected) {
+                const threadId = listed._id as Id<"threads">;
+                const guestLinks = await readAllPages(
+                    async (cursor) => await context.runQuery(internal.chat.guest_links.listGuestLinksForExport, { cursor, threadId }),
+                );
+                // A link goes only once its notes have (`deleteGuestLink`), so a thread with no links has no notes to read.
+                const guestNotes =
+                    guestLinks.length === 0
+                        ? []
+                        : await readAllPages(async (cursor) => await context.runQuery(internal.chat.guest_links.listGuestNotesForExport, { cursor, threadId }));
+
+                conversations.push({ ...collected, guestLinks, guestNotes });
             }
         }
 
@@ -359,6 +416,9 @@ const EXPORT_ACTIVITY_CAP = 5000;
 /** The export JSON is built whole in memory before it is stored; this is the largest one we will write. */
 const MAX_EXPORT_BYTES = 32 * 1024 * 1024;
 
+/** The share of the export trigger run history may take; past it, the oldest runs are left out and marked as cut. */
+const TRIGGER_EXPORT_BYTES = 8 * 1024 * 1024;
+
 /**
  * Usage history, sub-agent delegations (their task text and results) and
  * knowledge collections — user data the export used to leave out.
@@ -367,10 +427,16 @@ export const collectActivityForExport = internalQuery
     .input({ userId: v.string() })
     .output(v.object({ knowledgeCollections: v.array(v.any()), subAgentRuns: v.array(v.any()), usageDaily: v.array(v.any()) }))
     .query(async ({ args: { userId }, ctx: context }) => {
-        const [usageDaily, subAgentRuns, { page: collections }] = await Promise.all([
+        // Project rows are read on their own, under their own cap, so they never crowd the day and skill rows out of it.
+        const [{ page: dayAndSkillRows }, projectRows, subAgentRuns, { page: collections }] = await Promise.all([
+            context.db.usageDaily.findMany({
+                limit: EXPORT_ACTIVITY_CAP,
+                orderBy: [{ date: "asc" }],
+                where: { skillKey: { ne: PROJECT_SKILL_KEY }, userId },
+            }),
             context.db
                 .query("usageDaily")
-                .withIndex("by_user_date", (q) => q.eq("userId", userId))
+                .withIndex("by_user_skill_date", (q) => q.eq("userId", userId).eq("skillKey", PROJECT_SKILL_KEY))
                 .take(EXPORT_ACTIVITY_CAP),
             context.db
                 .query("subAgentRuns")
@@ -404,15 +470,15 @@ export const collectActivityForExport = internalQuery
                     task: run.task,
                 };
             }),
-            usageDaily: usageDaily.map((row) => {
-                return {
-                    costMicrodollars: row.costMicrodollars,
-                    date: row.date,
-                    replies: row.replies,
-                    skill: row.skillName ?? row.skillKey,
-                    tokens: row.tokens,
-                };
-            }),
+            // In date order, project rows among the day and skill rows of their day.
+            usageDaily: [...dayAndSkillRows, ...projectRows]
+                .toSorted((a, b) => a.date.localeCompare(b.date))
+                .map((row) => {
+                    // A project row is the day's usage in one project, not one more skill: it names the project instead.
+                    const breakdown = row.projectKey === undefined ? { skill: row.skillName ?? row.skillKey } : { project: row.projectKey };
+
+                    return { costMicrodollars: row.costMicrodollars, date: row.date, replies: row.replies, tokens: row.tokens, ...breakdown };
+                }),
         };
     });
 
@@ -522,14 +588,36 @@ export const generateExportFile = internalAction
     })
     .action(async ({ args, ctx: context }) => {
         const activity = args.activity as { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[] } | undefined;
+        // Read here, a page per query, so no workflow step result or action argument carries the history.
+        const acpSessions =
+            args.acpSessions ??
+            (await collectAcpSessionPages(
+                async (cursor) => await context.runQuery(internal.acp.gdpr.collectAcpSessionsForExport, { cursor, userId: args.userId }),
+                MAX_EXPORT_BYTES,
+            ));
+        // The project repositories share the action's read budget with the ACP sessions. Their rows cannot be cut short,
+        // so a set too large for what is left fails with PAYLOAD_TOO_LARGE (a floor keeps a small set exportable even past
+        // the ACP sessions); their projects' details past the budget are marked as left out. The trigger history, which
+        // is cut oldest first, reads only from what is left after both.
+        const readBytes = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+        const acpReadBytes = readBytes(acpSessions);
+        // The user's repository rows with their projects' details (`projects/gdpr.ts`), read here a page per query.
+        const repositories = await collectAllRepositories(
+            async (cursor) => await context.runQuery(internal.projects.gdpr.collectProjectRepositoriesForExport, { cursor, userId: args.userId }),
+            async (projectIds) =>
+                await context.runQuery(internal.projects.gdpr.collectProjectDetailsForExport, {
+                    projectIds: projectIds as Id<"projects">[],
+                    userId: args.userId,
+                }),
+            repositoriesReadBudget(acpReadBytes),
+            // The rows have a floor, the details none: past what the ACP sessions left they are marked as left out.
+            projectDetailsReadBudget(acpReadBytes),
+        );
+        const projectRepositories = { projectRepositories: repositories.projectRepositories };
+        // The projects read for their details count too: a row is read whole, however little of it is exported.
+        const triggerReadBytes = triggerReadBudget(acpReadBytes + repositories.readBytes);
         const exportData = {
-            // Read here, a page per query, so no workflow step result or action argument carries the history.
-            acpSessions:
-                args.acpSessions ??
-                (await collectAcpSessionPages(
-                    async (cursor) => await context.runQuery(internal.acp.gdpr.collectAcpSessionsForExport, { cursor, userId: args.userId }),
-                    MAX_EXPORT_BYTES,
-                )),
+            acpSessions,
             bots: args.bots ?? { bots: [] },
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,
@@ -547,6 +635,7 @@ export const generateExportFile = internalAction
             notifications: args.notifications ?? { notifications: [], pushSubscriptions: [] },
             pages: args.pages ?? { comments: [], favorites: [], grants: [], pages: [] },
             profile: args.profile,
+            projectRepositories,
             prompts: args.prompts,
             pullRequestGuides: args.pullRequestGuides ?? { guides: [] },
             pullRequestThreads: args.pullRequestThreads ?? { links: [] },
@@ -555,6 +644,18 @@ export const generateExportFile = internalAction
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadTags: args.threadTags ?? [],
+            // Triggers with their settings and their newest runs, read here within a byte budget (`triggers/gdpr.ts`).
+            triggers: await collectAllTriggers(
+                async (cursor) => await context.runQuery(internal.triggers.gdpr.collectTriggersForExport, { cursor, userId: args.userId }),
+                async (triggerId, cursor) =>
+                    await context.runQuery(internal.triggers.gdpr.collectTriggerRunsForExport, {
+                        cursor,
+                        triggerId: triggerId as Id<"triggers">,
+                        userId: args.userId,
+                    }),
+                TRIGGER_EXPORT_BYTES,
+                triggerReadBytes,
+            ),
             usageDaily: activity?.usageDaily ?? [],
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };

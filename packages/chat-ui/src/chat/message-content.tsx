@@ -14,13 +14,16 @@ import { useLingui } from "@lingui/react/macro";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@neore/ui/components/ai-elements/reasoning";
 import { Source, Sources, SourcesContent, SourcesTrigger } from "@neore/ui/components/ai-elements/sources";
 import AnimatedTiles from "@neore/ui/components/animated-tiles";
+import CachedMarkdownBlock from "@neore/ui/components/cached-markdown-block";
 import { chatMarkdownComponents, hostMarkdownComponents } from "@neore/ui/components/chat-markdown-components";
 import type { FileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { getFileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
+import { useFocusableCodeBlocks } from "@neore/ui/hooks/use-focusable-code-blocks";
 import useStreamdownAppearance from "@neore/ui/hooks/use-streamdown-appearance";
-import useStreamdownPlugins from "@neore/ui/hooks/use-streamdown-plugins";
+import useStreamdownPlugins, { streamdownRehypePlugins } from "@neore/ui/hooks/use-streamdown-plugins";
+import { MarkdownBlockCacheContext } from "@neore/ui/utils/markdown-block-cache";
 import { AlertCircle, ChevronDown, ChevronRight, FileIcon, Globe, Loader2, Play, Presentation, Terminal } from "lucide-react";
-import type { ComponentType, FC, LazyExoticComponent, ReactNode } from "react";
+import type { ComponentType, FC, ReactNode } from "react";
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
 
@@ -34,8 +37,11 @@ import { isHostRunText } from "../utils/host-run-text";
 import { mcpToolMetaKey, resolveMcpToolName } from "../utils/mcp-tool-name";
 import { getPageContextInfo } from "../utils/page-context";
 import { SANDBOX_FILE_TOOL_TYPES, sandboxOutputsOf } from "../utils/sandbox-files";
+import { toolImageSource } from "../utils/tool-image-source";
 import PageContextChip from "./page-context-chip";
+import PdfPart from "./pdf-part";
 import ToolGroup from "./tool-group";
+import { TrimmedToolOutput } from "./tool-output-loader";
 import type { ToolGroupSegment } from "./turn-summary";
 import { segmentTurn } from "./turn-summary";
 
@@ -43,7 +49,7 @@ import { segmentTurn } from "./turn-summary";
 // `file-type-utilities`, a small module with no heavy dependencies, so importing it statically is free.
 const LazyGenericFileCard = lazy(() => import("@neore/ui/components/file-renderers/generic-file-card"));
 
-type FileRenderer = LazyExoticComponent<ComponentType<{ filename?: string; mediaType?: string; url: string }>>;
+type FileRenderer = ComponentType<{ filename?: string; mediaType?: string; url: string }>;
 
 /** Every file type the chat previews except images, which are the overridable `Image` component. */
 const FILE_RENDERERS: Record<Exclude<FileRendererType, "image">, FileRenderer> = {
@@ -52,7 +58,7 @@ const FILE_RENDERERS: Record<Exclude<FileRendererType, "image">, FileRenderer> =
     generic: LazyGenericFileCard,
     jsonl: lazy(() => import("@neore/ui/components/file-renderers/jsonl-viewer")),
     mermaid: lazy(() => import("@neore/ui/components/file-renderers/mermaid-preview")),
-    pdf: lazy(() => import("@neore/ui/components/file-renderers/pdf-viewer")),
+    pdf: PdfPart,
     table: lazy(() => import("@neore/ui/components/file-renderers/delimited-text-preview")),
     video: lazy(() => import("@neore/ui/components/file-renderers/video-player")),
 };
@@ -115,23 +121,37 @@ interface MessageContentProps {
  */
 const DefaultText: FC<{ isAnimating: boolean; literalImages?: boolean; text: string }> = memo(({ isAnimating, literalImages, text }) => {
     const plugins = useStreamdownPlugins(text);
+    const { t } = useLingui();
     // The user's code / diagram themes and code-block display (Appearance settings), provided by the app.
     const { codeLineNumbers, mermaid, shikiTheme } = useStreamdownAppearance();
 
+    // Streamdown renders each code block's scrolling `<pre>` itself: this makes it reachable from the keyboard.
+    const rootRef = useRef<HTMLDivElement>(null);
+
+    useFocusableCodeBlocks(rootRef, t`Code block`);
+
     // `codeBlockMaxHeight="none"`: the 24-line cap is per block (`chatMarkdownComponents`), not Streamdown's global 400px.
+    // `contents` keeps the wrapper out of the layout.
+    // A finished reply's parsed blocks are cached across mounts (`CachedMarkdownBlock`); a streaming one is not.
     return (
-        <Streamdown
-            className="streamdown-animate"
-            codeBlockMaxHeight="none"
-            components={literalImages ? hostMarkdownComponents : chatMarkdownComponents}
-            isAnimating={isAnimating}
-            lineNumbers={codeLineNumbers}
-            mermaid={mermaid}
-            plugins={plugins}
-            shikiTheme={shikiTheme}
-        >
-            {text}
-        </Streamdown>
+        <div className="contents" ref={rootRef}>
+            <MarkdownBlockCacheContext value={!isAnimating}>
+                <Streamdown
+                    BlockComponent={CachedMarkdownBlock}
+                    className="streamdown-animate"
+                    codeBlockMaxHeight="none"
+                    components={literalImages ? hostMarkdownComponents : chatMarkdownComponents}
+                    isAnimating={isAnimating}
+                    lineNumbers={codeLineNumbers}
+                    mermaid={mermaid}
+                    plugins={plugins}
+                    rehypePlugins={streamdownRehypePlugins(text)}
+                    shikiTheme={shikiTheme}
+                >
+                    {text}
+                </Streamdown>
+            </MarkdownBlockCacheContext>
+        </div>
     );
 });
 
@@ -192,8 +212,8 @@ const makeDefaultToolCall = (
                             {mcpInfo.serverName}
                         </span>
                     )}
-                    {isLoading && <span className="ml-2 animate-pulse text-xs opacity-60">{t`Running...`}</span>}
-                    {isError && <AlertCircle aria-hidden="true" className="ml-2 size-4 text-red-500" />}
+                    {isLoading && <span className="ml-2 animate-pulse text-xs opacity-80 dark:opacity-100">{t`Running...`}</span>}
+                    {isError && <AlertCircle aria-hidden="true" className="ml-2 size-4 text-red-700 dark:text-red-400" />}
                 </button>
 
                 {/* MCP App interactive view — shown directly below the header when available */}
@@ -215,7 +235,7 @@ const makeDefaultToolCall = (
                     >
                         {!!part.input && (
                             <div className="mb-2">
-                                <span className="text-xs font-semibold uppercase opacity-60">{t`Input:`}</span>
+                                <span className="text-xs font-semibold uppercase opacity-80 dark:opacity-100">{t`Input:`}</span>
                                 <pre className="mt-1 overflow-x-auto font-mono text-xs whitespace-pre-wrap">
                                     {String(typeof part.input === "string" ? part.input : JSON.stringify(part.input, null, 2))}
                                 </pre>
@@ -223,15 +243,22 @@ const makeDefaultToolCall = (
                         )}
                         {!!part.output && (
                             <div>
-                                <span className="text-xs font-semibold uppercase opacity-60">{t`Output:`}</span>
+                                <span className="text-xs font-semibold uppercase opacity-80 dark:opacity-100">{t`Output:`}</span>
                                 <pre className="mt-1 overflow-x-auto font-mono text-xs whitespace-pre-wrap">
                                     {String(typeof part.output === "string" ? part.output : JSON.stringify(part.output, null, 2))}
                                 </pre>
                             </div>
                         )}
+                        {part.output === undefined && part.outputRef && (
+                            <div>
+                                <span className="text-xs font-semibold uppercase opacity-80 dark:opacity-100">{t`Output:`}</span>
+                                {/* Keyed by the ref: a live update that swaps the part must not show the previous output. */}
+                                <TrimmedToolOutput key={`${part.outputRef.messageId}:${part.outputRef.toolCallId}`} outputRef={part.outputRef} />
+                            </div>
+                        )}
                         {part.errorText && (
-                            <div className="text-red-600 dark:text-red-400">
-                                <span className="text-xs font-semibold uppercase opacity-60">{t`Error:`}</span>
+                            <div className="text-red-700 dark:text-red-400">
+                                <span className="text-xs font-semibold uppercase opacity-80 dark:opacity-100">{t`Error:`}</span>
                                 <pre className="mt-1 font-mono text-xs whitespace-pre-wrap">{part.errorText}</pre>
                             </div>
                         )}
@@ -434,7 +461,7 @@ const DefaultFile: FC<{ part: FilePart }> = memo(({ part }) => {
         >
             <FileIcon className="size-4" />
             <span>{part.filename || t`Download file`}</span>
-            {part.mediaType && <span className="text-xs opacity-60">({part.mediaType})</span>}
+            {part.mediaType && <span className="text-xs opacity-80 dark:opacity-100">({part.mediaType})</span>}
         </a>
     );
 });
@@ -475,7 +502,7 @@ const GenerationLoading: FC<{ type: "audio" | "image" | "video" }> = memo(({ typ
                 rows={8}
                 tileSize={40}
             />
-            <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400">{label}</span>
         </div>
     );
 });
@@ -490,10 +517,14 @@ interface CodeExecutionOutput {
     results: {
         format?: string;
         type: "error" | "image" | "text";
+        /** A stored image's signed link, written by the server in place of `value`. */
+        url?: string;
         value: string;
     }[];
     stderr: string;
     stdout: string;
+    /** How many images could not be saved with the result (the server could not store them). */
+    unsavedMedia?: number;
 }
 
 const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
@@ -543,8 +574,8 @@ const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                     {output.stdout && (
                         <div className="border-b border-gray-100 p-3 dark:border-gray-800">
                             <div className="mb-1 flex items-center gap-1.5">
-                                <Terminal className="size-3 text-gray-400" />
-                                <span className="text-[10px] font-semibold text-gray-400 uppercase">{t`Output`}</span>
+                                <Terminal className="size-3 text-gray-600 dark:text-gray-400" />
+                                <span className="text-[10px] font-semibold text-gray-600 uppercase dark:text-gray-400">{t`Output`}</span>
                             </div>
                             <pre className="overflow-x-auto font-mono text-xs whitespace-pre-wrap text-gray-700 dark:text-gray-300">{output.stdout}</pre>
                         </div>
@@ -558,18 +589,17 @@ const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                     )}
 
                     {/* Results (images, text, errors) */}
-                    {output.results.map((result) => {
-                        // Content-based key: stable across re-renders for immutable execution output
-                        const resultKey = `${result.type}-${result.value?.slice(0, 20) ?? ""}`;
+                    {output.results.map((result, index) => {
+                        // Position and content: stable across re-renders for immutable execution output, and distinct for
+                        // stored images, whose `value` is empty.
+                        const resultKey = `${result.type}-${String(index)}-${result.value?.slice(0, 20) ?? ""}`;
 
                         if (result.type === "image") {
-                            return (
+                            const source = toolImageSource({ inline: result.value, mediaType: `image/${result.format || "png"}`, url: result.url });
+
+                            return source === undefined ? null : (
                                 <div className="flex justify-center border-b border-gray-100 p-3 last:border-b-0 dark:border-gray-800" key={resultKey}>
-                                    <img
-                                        alt={t`Code output`}
-                                        className="max-w-full rounded"
-                                        src={`data:image/${result.format || "png"};base64,${result.value}`}
-                                    />
+                                    <img alt={t`Code output`} className="max-w-full rounded" src={source} />
                                 </div>
                             );
                         }
@@ -577,7 +607,7 @@ const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                         if (result.type === "error") {
                             return (
                                 <div className="border-b border-gray-100 p-3 last:border-b-0 dark:border-gray-800" key={resultKey}>
-                                    <pre className="overflow-x-auto font-mono text-xs whitespace-pre-wrap text-red-600 dark:text-red-400">{result.value}</pre>
+                                    <pre className="overflow-x-auto font-mono text-xs whitespace-pre-wrap text-red-700 dark:text-red-400">{result.value}</pre>
                                 </div>
                             );
                         }
@@ -593,9 +623,15 @@ const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                         return null;
                     })}
 
+                    {output.unsavedMedia ? (
+                        <p className="border-b border-gray-100 p-3 text-xs text-gray-600 last:border-b-0 dark:border-gray-800 dark:text-gray-400">
+                            {t`Some images from this run could not be saved.`}
+                        </p>
+                    ) : null}
+
                     {/* Execution error */}
                     {(output.error || isError) && (
-                        <div className="flex items-start gap-2 p-3 text-red-600 dark:text-red-400">
+                        <div className="flex items-start gap-2 p-3 text-red-700 dark:text-red-400">
                             <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
                             <pre className="overflow-x-auto font-mono text-xs whitespace-pre-wrap">{output.error || part.errorText || t`Execution failed`}</pre>
                         </div>
@@ -605,7 +641,7 @@ const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
 
             {/* Error without output */}
             {!output && isError && (
-                <div className="flex items-start gap-2 p-3 text-red-600 dark:text-red-400">
+                <div className="flex items-start gap-2 p-3 text-red-700 dark:text-red-400">
                     <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
                     <pre className="overflow-x-auto font-mono text-xs whitespace-pre-wrap">{part.errorText || t`Code execution failed`}</pre>
                 </div>
@@ -646,7 +682,7 @@ const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                 <div className="size-5 animate-spin rounded-full border-2 border-blue-300 border-t-blue-600 dark:border-blue-600 dark:border-t-blue-300" />
                 <div className="min-w-0 flex-1">
                     <span className="text-sm text-blue-600 dark:text-blue-400">{actionLabel}</span>
-                    {input?.url && input.action === "navigate" && <p className="truncate text-[11px] text-blue-500/70 dark:text-blue-400/50">{input.url}</p>}
+                    {input?.url && input.action === "navigate" && <p className="truncate text-[11px] text-blue-700 dark:text-blue-400">{input.url}</p>}
                 </div>
             </div>
         );
@@ -658,30 +694,38 @@ const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
               error?: string;
               screenshot?: string;
               screenshotFormat?: string;
+              /** A stored screenshot's signed link, written by the server in place of `screenshot`. */
+              screenshotUrl?: string;
               success?: boolean;
               title?: string;
+              /** Set by the server when the screenshot could not be saved with the result. */
+              unsavedMedia?: number;
               url?: string;
           }
         | undefined;
 
+    const screenshotSource = output?.screenshotFormat
+        ? toolImageSource({ inline: output.screenshot, mediaType: `image/${output.screenshotFormat}`, url: output.screenshotUrl })
+        : undefined;
+
     // If we have a screenshot, show it prominently
-    if (output?.screenshot && output.screenshotFormat) {
+    if (output && screenshotSource) {
         return (
             <div className="mb-4 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
                 {/* Header */}
                 <div className="flex items-center gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
-                    <Globe aria-hidden="true" className="size-3.5 text-blue-500" />
+                    <Globe aria-hidden="true" className="size-3.5 text-blue-700 dark:text-blue-400" />
                     <span className="min-w-0 flex-1 truncate text-xs font-medium text-gray-600 dark:text-gray-400">
                         {output.title || output.url || t`Screenshot`}
                     </span>
                     {output.url && (
-                        <a className="text-[10px] text-blue-500 hover:underline" href={output.url} rel="noopener noreferrer" target="_blank">
+                        <a className="text-[10px] text-blue-700 hover:underline dark:text-blue-400" href={output.url} rel="noopener noreferrer" target="_blank">
                             {t`Open`}
                         </a>
                     )}
                 </div>
                 {/* Screenshot */}
-                <img alt={output.title || t`Browser screenshot`} className="w-full" src={`data:image/${output.screenshotFormat};base64,${output.screenshot}`} />
+                <img alt={output.title || t`Browser screenshot`} className="w-full" src={screenshotSource} />
             </div>
         );
     }
@@ -699,8 +743,9 @@ const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                 <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 dark:bg-gray-800">
                     <Globe aria-hidden="true" className="size-3.5 text-green-500" />
                     <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{doneLabel ?? input?.action ?? t`Browser`}</span>
-                    {output.title && <span className="min-w-0 truncate text-xs text-gray-500">—{output.title}</span>}
+                    {output.title && <span className="min-w-0 truncate text-xs text-gray-600 dark:text-gray-400">—{output.title}</span>}
                 </div>
+                {output.unsavedMedia ? <p className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{t`The screenshot could not be saved.`}</p> : null}
                 {output.content && (
                     <div className="max-h-40 overflow-y-auto p-3">
                         <pre className="overflow-x-auto font-mono text-xs whitespace-pre-wrap text-gray-700 dark:text-gray-300">
@@ -716,10 +761,10 @@ const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
     if (isError || output?.error) {
         return (
             <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 dark:border-red-800 dark:bg-red-950/50">
-                <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-500" />
+                <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-700 dark:text-red-400" />
                 <div className="min-w-0 flex-1">
                     <span className="text-sm font-medium text-red-700 dark:text-red-300">{t`Browser error`}</span>
-                    <pre className="mt-1 overflow-x-auto font-mono text-xs whitespace-pre-wrap text-red-600 dark:text-red-400">
+                    <pre className="mt-1 overflow-x-auto font-mono text-xs whitespace-pre-wrap text-red-700 dark:text-red-400">
                         {output?.error || part.errorText || t`Browser action failed`}
                     </pre>
                 </div>
@@ -1109,7 +1154,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
     if (renderedParts.length === 0) {
         if (isAnimating) {
             renderedParts.push(
-                <span className="animate-pulse text-gray-400" key="loading">
+                <span className="text-muted-foreground animate-pulse" key="loading">
                     {t`Thinking...`}
                 </span>,
             );

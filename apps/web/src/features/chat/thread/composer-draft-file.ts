@@ -1,3 +1,5 @@
+import { breaksBefore, onOwnLines } from "./composer-paste/paste-plan";
+
 /** What a text-to-file conversion came back with: the attachment's id, and the reason it failed (absent on success). */
 export interface TextFileResult {
     attachmentId: string;
@@ -18,6 +20,39 @@ interface MoveDraftToFileOptions {
     /** Called with the reason when the upload failed; the draft is still in the composer. */
     onFailure: (error: string) => void;
 }
+
+const LINE_BREAK = /\r?\n/u;
+const PATH_SEPARATOR = /[/\\]/u;
+/** A line that is one URL or file URI: what a file manager or a browser's "Copy Image" puts next to the files it copies. */
+const LINK_LINE = /^(?:file|https?):\/\/\S+$/iu;
+/** Whitespace, the `<html>`/`<body>`/`<meta>` wrapper Windows and macOS put around clipboard HTML, and comments (`<!--StartFragment-->`). */
+// A comment never runs past its own `-->`, so each piece has one parse and the match stays linear on any clipboard.
+const HTML_WRAPPER = String.raw`(?:\s|<\/?(?:html|body|meta)\b[^>]*>|<!--(?:[^-]|-(?!->))*-->)*`;
+/** HTML that holds one image and nothing else, as a browser's "Copy Image" writes it. Only read to classify a paste, never inserted. */
+const IMAGE_ONLY_HTML = new RegExp(String.raw`^${HTML_WRAPPER}<img\b[^>]*>${HTML_WRAPPER}$`, "iu");
+/** HTML with nothing in it but its wrapper. */
+const EMPTY_HTML = new RegExp(`^${HTML_WRAPPER}$`, "iu");
+
+/**
+ * Whether a paste carries text of its own as well as its files: that text is the editor's to insert, or a file when it is
+ * long. Office apps add a picture of the copied text; a file manager's copy carries only the files' names, paths or file
+ * URIs as text, and a browser's image copy only the image's URL or an `<img>` as HTML, so none of those counts.
+ */
+export const pasteHasText = (data: Pick<DataTransfer, "getData">, files: ReadonlyArray<Pick<File, "name">>): boolean => {
+    const names = new Set(files.map((file) => file.name));
+    const html = data.getData("text/html");
+    // With nothing else in the HTML, the text can only describe the files (a file manager, "Copy Image"): their names, paths or
+    // links. HTML with text in it says the lines were copied as text, whatever they look like.
+    const describesFiles = EMPTY_HTML.test(html) || IMAGE_ONLY_HTML.test(html);
+    const lines = data
+        .getData("text/plain")
+        .split(LINE_BREAK)
+        .map((line) => line.trim())
+        .filter((line) => line !== "");
+
+    // No text lines at all (a picture copied out of Word or Outlook carries its HTML document and nothing else): files only.
+    return lines.length > 0 && (!describesFiles || lines.some((line) => !LINK_LINE.test(line) && !names.has(line.split(PATH_SEPARATOR).at(-1) ?? line)));
+};
 
 /** The characters a text attachment of `draft` adds to the context: its UTF-8 bytes, as `attachmentTextChars` counts them. */
 export const draftFileChars = (draft: string): number => new TextEncoder().encode(draft).length;
@@ -52,27 +87,6 @@ export const moveDraftToFile = async ({ attach, clearDraft, discard, getAttachme
     return true;
 };
 
-interface UndoLongPasteOptions {
-    attachmentId: string;
-    getAttachmentIds: () => string[];
-    getDraft: () => string;
-    pastedText: string;
-    removeAttachment: (attachmentId: string) => void;
-    setDraft: (text: string) => void;
-}
-
-/** Puts a pasted text back in the draft and drops its file, unless the file is already gone (sent or removed): then there is nothing to undo. */
-export const undoLongPaste = ({ attachmentId, getAttachmentIds, getDraft, pastedText, removeAttachment, setDraft }: UndoLongPasteOptions): boolean => {
-    if (!getAttachmentIds().includes(attachmentId)) {
-        return false;
-    }
-
-    removeAttachment(attachmentId);
-    setDraft(getDraft() + pastedText);
-
-    return true;
-};
-
 /** `text` spliced into `draft` over the offsets `start` to `end`, as a normal paste would; offsets past the end land at the end. */
 export const insertPastedText = (draft: string, text: string, start: number, end: number): string => {
     const from = Math.min(start, draft.length);
@@ -81,9 +95,64 @@ export const insertPastedText = (draft: string, text: string, start: number, end
     return draft.slice(0, from) + text + draft.slice(to);
 };
 
+/**
+ * `text` after `draft` on a line of its own, `breaks` line breaks after the draft's last text: a paste whose caret was
+ * lost to an edit goes at the end, and neither joins the last word nor, as a block, the last line.
+ */
+export const appendPastedText = (draft: string, text: string, breaks = 1): string => {
+    if (draft === "") {
+        return text;
+    }
+
+    let trailing = 0;
+
+    while (trailing < breaks && draft[draft.length - 1 - trailing] === "\n") {
+        trailing += 1;
+    }
+
+    return draft + "\n".repeat(breaks - trailing) + text;
+};
+
+interface UndoLongPasteOptions {
+    attachmentId: string;
+    /** Whether `pastedText` is converted Markdown: put back, a table, fence or list it opens with goes on a line of its own. */
+    converted?: boolean;
+    getAttachmentIds: () => string[];
+    getDraft: () => string;
+    pastedText: string;
+    removeAttachment: (attachmentId: string) => void;
+    setDraft: (text: string) => void;
+}
+
+/** Puts a pasted text back in the draft and drops its file, unless the file is already gone (sent or removed): then there is nothing to undo. */
+export const undoLongPaste = ({
+    attachmentId,
+    converted = false,
+    getAttachmentIds,
+    getDraft,
+    pastedText,
+    removeAttachment,
+    setDraft,
+}: UndoLongPasteOptions): boolean => {
+    if (!getAttachmentIds().includes(attachmentId)) {
+        return false;
+    }
+
+    removeAttachment(attachmentId);
+    setDraft(converted ? appendPastedText(getDraft(), pastedText, breaksBefore(pastedText)) : getDraft() + pastedText);
+
+    return true;
+};
+
 interface AttachLongPasteOptions {
     attach: (text: string) => Promise<TextFileResult>;
+    /** Whether the composer still takes text (not disabled or locked meanwhile); true when not given. */
+    canInsert?: () => boolean;
+    /** Whether `pastedText` is converted Markdown: put back, its tables, fences and lists then go on lines of their own. */
+    converted?: boolean;
     discard: (attachmentId: string) => void;
+    /** The draft when the paste was made, if that was before this call (a conversion ran in between); `selection` points into it. */
+    draftAtPaste?: string;
     /** Ids of the attachments in the composer right now. */
     getAttachmentIds: () => string[];
     /** The chat the composer belongs to right now; a paste is never written into a different one than it started in. */
@@ -96,20 +165,23 @@ interface AttachLongPasteOptions {
     /** Called instead of `onFailure` when the user left the chat meanwhile: the text went nowhere, the other chat's draft is untouched. */
     onNotInserted: (error: string) => void;
     pastedText: string;
-    /** Where the paste landed in the draft, read before the upload started. */
-    selection: { end: number; start: number };
+    /** Where the paste landed in the draft, read before the upload started, and whether the caret's line has text on either side. */
+    selection: { end: number; lineAfter?: boolean; lineBefore?: boolean; start: number; textAfter?: boolean; textBefore?: boolean };
     setDraft: (text: string) => void;
 }
 
 /**
  * Moves a pasted text (whose default paste was prevented) into a file. When that fails the text goes into the composer at
  * the paste position instead and the failed chip goes, so the paste is never in neither place. If the draft changed during
- * the upload the text is appended, since the saved offsets no longer point at the same characters; if the chat changed,
+ * the upload the text is appended on a line of its own, since the saved offsets no longer point at the same characters; if the chat changed,
  * nothing is written at all.
  */
 export const attachLongPaste = async ({
     attach,
+    canInsert = () => true,
+    converted = false,
     discard,
+    draftAtPaste: givenDraft,
     getAttachmentIds,
     getChatKey,
     getDraft,
@@ -121,7 +193,7 @@ export const attachLongPaste = async ({
     setDraft,
 }: AttachLongPasteOptions): Promise<boolean> => {
     const chatKey = getChatKey();
-    const draftAtPaste = getDraft();
+    const draftAtPaste = givenDraft ?? getDraft();
     const { attachmentId, error } = await attach(pastedText);
 
     if (error === undefined) {
@@ -135,7 +207,8 @@ export const attachLongPaste = async ({
 
     discard(attachmentId);
 
-    if (getChatKey() !== chatKey) {
+    // Another chat open, or the composer locked meanwhile: the text is not written into it.
+    if (getChatKey() !== chatKey || !canInsert()) {
         onNotInserted(error);
 
         return false;
@@ -143,7 +216,15 @@ export const attachLongPaste = async ({
 
     const draft = getDraft();
 
-    setDraft(draft === draftAtPaste ? insertPastedText(draft, pastedText, selection.start, selection.end) : draft + pastedText);
+    // The same line handling as a short paste: at the old caret its neighbours decide, appended the first line does.
+    if (draft === draftAtPaste) {
+        const text = converted ? onOwnLines(pastedText, selection.textBefore ?? false, selection.textAfter ?? false, selection) : pastedText;
+
+        setDraft(insertPastedText(draft, text, selection.start, selection.end));
+    } else {
+        setDraft(appendPastedText(draft, pastedText, converted ? breaksBefore(pastedText) : 1));
+    }
+
     onFailure(error);
 
     return false;

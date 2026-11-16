@@ -72,6 +72,7 @@ describe("the gateway app", () => {
             "/internal/keys",
             "/internal/embeddings",
             "/internal/speech",
+            "/internal/transcription",
             "/internal/whatever-is-added-next",
         ]) {
             const res = await app.fetch(post(path), createMockEnv() as unknown as AppEnv, createMockCtx() as unknown as ExecutionContext);

@@ -1,0 +1,935 @@
+[
+    {
+        "name": "p",
+        "input": "<p>Lorem ipsum</p>",
+        "expected": "Lorem ipsum",
+        "options": {}
+    },
+    {
+        "name": "multiple ps",
+        "input": "\n    <p>Lorem</p>\n    <p>ipsum</p>\n    <p>sit</p>\n  ",
+        "expected": "Lorem\n\nipsum\n\nsit",
+        "options": {}
+    },
+    {
+        "name": "em",
+        "input": "<em>em element</em>",
+        "expected": "_em element_",
+        "options": {}
+    },
+    {
+        "name": "i",
+        "input": "<i>i element</i>",
+        "expected": "_i element_",
+        "options": {}
+    },
+    {
+        "name": "strong",
+        "input": "<strong>strong element</strong>",
+        "expected": "**strong element**",
+        "options": {}
+    },
+    {
+        "name": "b",
+        "input": "<b>b element</b>",
+        "expected": "**b element**",
+        "options": {}
+    },
+    {
+        "name": "code",
+        "input": "<code>code element</code>",
+        "expected": "`code element`",
+        "options": {}
+    },
+    {
+        "name": "code containing a backtick",
+        "input": "<code>There is a literal backtick (`) here</code>",
+        "expected": "``There is a literal backtick (`) here``",
+        "options": {}
+    },
+    {
+        "name": "code containing three or more backticks",
+        "input": "<code>here are three ``` here are four ```` that's it</code>",
+        "expected": "`here are three ``` here are four ```` that's it`",
+        "options": {}
+    },
+    {
+        "name": "code containing one or more backticks",
+        "input": "<code>here are three ``` here are four ```` here is one ` that's it</code>",
+        "expected": "``here are three ``` here are four ```` here is one ` that's it``",
+        "options": {}
+    },
+    {
+        "name": "code starting with a backtick",
+        "input": "<code>`starting with a backtick</code>",
+        "expected": "`` `starting with a backtick ``",
+        "options": {}
+    },
+    {
+        "name": "code containing markdown syntax",
+        "input": "<code>_emphasis_</code>",
+        "expected": "`_emphasis_`",
+        "options": {}
+    },
+    {
+        "name": "code containing markdown syntax in a span",
+        "input": "<code><span>_emphasis_</span></code>",
+        "expected": "`_emphasis_`",
+        "options": {}
+    },
+    {
+        "name": "h1",
+        "input": "<h1>Level One Heading</h1>",
+        "expected": "Level One Heading\n=================",
+        "options": {}
+    },
+    {
+        "name": "escape = when used as heading",
+        "input": "===",
+        "expected": "\\===",
+        "options": {}
+    },
+    {
+        "name": "not escaping = outside of a heading",
+        "input": "A sentence containing =",
+        "expected": "A sentence containing =",
+        "options": {}
+    },
+    {
+        "name": "h1 as atx",
+        "input": "<h1>Level One Heading with ATX</h1>",
+        "expected": "# Level One Heading with ATX",
+        "options": {
+            "headingStyle": "atx"
+        }
+    },
+    {
+        "name": "h2",
+        "input": "<h2>Level Two Heading</h2>",
+        "expected": "Level Two Heading\n-----------------",
+        "options": {}
+    },
+    {
+        "name": "h2 as atx",
+        "input": "<h2>Level Two Heading with ATX</h2>",
+        "expected": "## Level Two Heading with ATX",
+        "options": {
+            "headingStyle": "atx"
+        }
+    },
+    {
+        "name": "h3",
+        "input": "<h3>Level Three Heading</h3>",
+        "expected": "### Level Three Heading",
+        "options": {}
+    },
+    {
+        "name": "heading with child",
+        "input": "<h4>Level Four Heading with <code>child</code></h4>",
+        "expected": "#### Level Four Heading with `child`",
+        "options": {}
+    },
+    {
+        "name": "invalid heading",
+        "input": "<h7>Level Seven Heading?</h7>",
+        "expected": "Level Seven Heading?",
+        "options": {}
+    },
+    {
+        "name": "hr",
+        "input": "<hr>",
+        "expected": "* * *",
+        "options": {}
+    },
+    {
+        "name": "hr with closing tag",
+        "input": "<hr>",
+        "expected": "* * *",
+        "options": {}
+    },
+    {
+        "name": "hr with option",
+        "input": "<hr>",
+        "expected": "- - -",
+        "options": {
+            "hr": "- - -"
+        }
+    },
+    {
+        "name": "br",
+        "input": "More<br>after the break",
+        "expected": "More  \nafter the break",
+        "options": {}
+    },
+    {
+        "name": "br with visible line-ending",
+        "input": "More<br>after the break",
+        "expected": "More\\\nafter the break",
+        "options": {
+            "br": "\\"
+        }
+    },
+    {
+        "name": "img with no alt",
+        "input": "<img src=\"http://example.com/logo.png\">",
+        "expected": "![](http://example.com/logo.png)",
+        "options": {}
+    },
+    {
+        "name": "img with relative src",
+        "input": "<img src=\"logo.png\">",
+        "expected": "![](logo.png)",
+        "options": {}
+    },
+    {
+        "name": "img with alt",
+        "input": "<img src=\"logo.png\" alt=\"img with alt\">",
+        "expected": "![img with alt](logo.png)",
+        "options": {}
+    },
+    {
+        "name": "img with escaped content in alt",
+        "input": "<img src=\"logo.png\" alt=\"_img_ *with* [alt]\">",
+        "expected": "![\\_img\\_ \\*with\\* \\[alt\\]](logo.png)",
+        "options": {}
+    },
+    {
+        "name": "img with no src",
+        "input": "<img>",
+        "expected": "",
+        "options": {}
+    },
+    {
+        "name": "img with parenthesis in src",
+        "input": "<img src=\"logo.png?(query)\">",
+        "expected": "![](logo.png?\\(query\\))",
+        "options": {}
+    },
+    {
+        "name": "img with a new line in alt",
+        "input": "<img src=\"logo.png\" alt=\"img with\n    alt\">",
+        "expected": "![img with\nalt](logo.png)",
+        "options": {}
+    },
+    {
+        "name": "img with more than one new line in alt",
+        "input": "<img src=\"logo.png\" alt=\"img with\n    \n    alt\">",
+        "expected": "![img with\nalt](logo.png)",
+        "options": {}
+    },
+    {
+        "name": "img with new lines in title",
+        "input": "<img src=\"logo.png\" title=\"the\n    \n    title\">",
+        "expected": "![](logo.png \"the\ntitle\")",
+        "options": {}
+    },
+    {
+        "name": "img with quotes in title",
+        "input": "<img src=\"logo.png\" title=\"&quot;hello&quot;\">",
+        "expected": "![](logo.png \"\\\"hello\\\"\")",
+        "options": {}
+    },
+    {
+        "name": "img with space in URL",
+        "input": "<img src=\"logo 1.png\" alt=\"An image\">",
+        "expected": "![An image](<logo 1.png>)",
+        "options": {}
+    },
+    {
+        "name": "a",
+        "input": "<a href=\"http://example.com\">An anchor</a>",
+        "expected": "[An anchor](http://example.com)",
+        "options": {}
+    },
+    {
+        "name": "a with space in URL",
+        "input": "<a href=\"http://example.com/foo bar\">An anchor</a>",
+        "expected": "[An anchor](<http://example.com/foo bar>)",
+        "options": {}
+    },
+    {
+        "name": "a with title",
+        "input": "<a href=\"http://example.com\" title=\"Title for link\">An anchor</a>",
+        "expected": "[An anchor](http://example.com \"Title for link\")",
+        "options": {}
+    },
+    {
+        "name": "a with multiline title",
+        "input": "<a href=\"http://example.com\" title=\"Title for\n    \n    link\">An anchor</a>",
+        "expected": "[An anchor](http://example.com \"Title for\nlink\")",
+        "options": {}
+    },
+    {
+        "name": "a with quotes in title",
+        "input": "<a href=\"http://example.com\" title=\"&quot;hello&quot;\">An anchor</a>",
+        "expected": "[An anchor](http://example.com \"\\\"hello\\\"\")",
+        "options": {}
+    },
+    {
+        "name": "a with parenthesis in query",
+        "input": "<a href=\"http://example.com?(query)\">An anchor</a>",
+        "expected": "[An anchor](http://example.com?\\(query\\))",
+        "options": {}
+    },
+    {
+        "name": "a without a src",
+        "input": "<a id=\"about-anchor\">Anchor without a title</a>",
+        "expected": "Anchor without a title",
+        "options": {}
+    },
+    {
+        "name": "a with a child",
+        "input": "<a href=\"http://example.com/code\">Some <code>code</code></a>",
+        "expected": "[Some `code`](http://example.com/code)",
+        "options": {}
+    },
+    {
+        "name": "a with a brackets in text",
+        "input": "<a href=\"http://example.com/code\">Some [text]</a>",
+        "expected": "[Some \\[text\\]](http://example.com/code)",
+        "options": {}
+    },
+    {
+        "name": "a reference",
+        "input": "<a href=\"http://example.com\">Reference link</a>",
+        "expected": "[Reference link][1]\n\n[1]: http://example.com",
+        "options": {
+            "linkStyle": "referenced"
+        }
+    },
+    {
+        "name": "a reference with space in URL",
+        "input": "<a href=\"http://example.com/foo bar\">Reference link</a>",
+        "expected": "[Reference link][1]\n\n[1]: <http://example.com/foo bar>",
+        "options": {
+            "linkStyle": "referenced"
+        }
+    },
+    {
+        "name": "a reference with collapsed style",
+        "input": "<a href=\"http://example.com\">Reference link with collapsed style</a>",
+        "expected": "[Reference link with collapsed style][]\n\n[Reference link with collapsed style]: http://example.com",
+        "options": {
+            "linkStyle": "referenced",
+            "linkReferenceStyle": "collapsed"
+        }
+    },
+    {
+        "name": "a reference with shortcut style",
+        "input": "<a href=\"http://example.com\">Reference link with shortcut style</a>",
+        "expected": "[Reference link with shortcut style]\n\n[Reference link with shortcut style]: http://example.com",
+        "options": {
+            "linkStyle": "referenced",
+            "linkReferenceStyle": "shortcut"
+        }
+    },
+    {
+        "name": "a reference with title",
+        "input": "<a href=\"http://example.com\" title=\"Hello &quot; World\">Reference link</a>",
+        "expected": "[Reference link][1]\n\n[1]: http://example.com \"Hello \\\" World\"",
+        "options": {
+            "linkStyle": "referenced"
+        }
+    },
+    {
+        "name": "pre/code block",
+        "input": "<pre><code>def code_block\n  # 42 &lt; 9001\n  \"Hello world!\"\nend</code></pre>",
+        "expected": "    def code_block\n      # 42 < 9001\n      \"Hello world!\"\n    end",
+        "options": {}
+    },
+    {
+        "name": "multiple pre/code blocks",
+        "input": "<pre><code>def first_code_block\n  # 42 &lt; 9001\n  \"Hello world!\"\nend</code></pre>\n\n<p>next:</p>\n\n<pre><code>def second_code_block\n  # 42 &lt; 9001\n  \"Hello world!\"\nend</code></pre>",
+        "expected": "    def first_code_block\n      # 42 < 9001\n      \"Hello world!\"\n    end\n\nnext:\n\n    def second_code_block\n      # 42 < 9001\n      \"Hello world!\"\n    end",
+        "options": {}
+    },
+    {
+        "name": "pre/code block with multiple new lines",
+        "input": "<div><pre><code>Multiple new lines\n\n\nshould not be\n\n\nremoved</code></pre></div>",
+        "expected": "    Multiple new lines\n    \n    \n    should not be\n    \n    \n    removed",
+        "options": {}
+    },
+    {
+        "name": "fenced pre/code block",
+        "input": "\n    <pre><code>def a_fenced_code block; end</code></pre>\n  ",
+        "expected": "```\ndef a_fenced_code block; end\n```",
+        "options": {
+            "codeBlockStyle": "fenced"
+        }
+    },
+    {
+        "name": "pre/code block fenced with ~",
+        "input": "\n    <pre><code>def a_fenced_code block; end</code></pre>\n  ",
+        "expected": "~~~\ndef a_fenced_code block; end\n~~~",
+        "options": {
+            "codeBlockStyle": "fenced",
+            "fence": "~~~"
+        }
+    },
+    {
+        "name": "escaping ~~~",
+        "input": "\n    <pre>~~~ foo</pre>\n  ",
+        "expected": "\\~~~ foo",
+        "options": {}
+    },
+    {
+        "name": "not escaping ~~~",
+        "input": "A sentence containing ~~~",
+        "expected": "A sentence containing ~~~",
+        "options": {}
+    },
+    {
+        "name": "fenced pre/code block with language",
+        "input": "\n    <pre><code class=\"language-ruby\">def a_fenced_code block; end</code></pre>\n  ",
+        "expected": "```ruby\ndef a_fenced_code block; end\n```",
+        "options": {
+            "codeBlockStyle": "fenced"
+        }
+    },
+    {
+        "name": "empty pre does not throw error",
+        "input": "\n    <pre></pre>\n  ",
+        "expected": "",
+        "options": {}
+    },
+    {
+        "name": "ol",
+        "input": "\n    <ol>\n      <li>Ordered list item 1</li>\n      <li>Ordered list item 2</li>\n      <li>Ordered list item 3</li>\n    </ol>\n  ",
+        "expected": "1.  Ordered list item 1\n2.  Ordered list item 2\n3.  Ordered list item 3",
+        "options": {}
+    },
+    {
+        "name": "ol with start",
+        "input": "\n    <ol start=\"42\">\n      <li>Ordered list item 42</li>\n      <li>Ordered list item 43</li>\n      <li>Ordered list item 44</li>\n    </ol>\n  ",
+        "expected": "42.  Ordered list item 42\n43.  Ordered list item 43\n44.  Ordered list item 44",
+        "options": {}
+    },
+    {
+        "name": "ol with content",
+        "input": "\n    <ol start=\"42\">\n      <li>\n        <p>Ordered list item 42</p>\n        <p>Ordered list's additional content</p>\n      </li>\n    </ol>\n  ",
+        "expected": "42.  Ordered list item 42\n     \n     Ordered list's additional content",
+        "options": {}
+    },
+    {
+        "name": "list spacing",
+        "input": "\n    <p>A paragraph.</p>\n    <ol>\n      <li>Ordered list item 1</li>\n      <li>Ordered list item 2</li>\n      <li>Ordered list item 3</li>\n    </ol>\n    <p>Another paragraph.</p>\n    <ul>\n      <li>Unordered list item 1</li>\n      <li>Unordered list item 2</li>\n      <li>Unordered list item 3</li>\n    </ul>\n  ",
+        "expected": "A paragraph.\n\n1.  Ordered list item 1\n2.  Ordered list item 2\n3.  Ordered list item 3\n\nAnother paragraph.\n\n*   Unordered list item 1\n*   Unordered list item 2\n*   Unordered list item 3",
+        "options": {}
+    },
+    {
+        "name": "ul",
+        "input": "\n    <ul>\n      <li>Unordered list item 1</li>\n      <li>Unordered list item 2</li>\n      <li>Unordered list item 3</li>\n    </ul>\n  ",
+        "expected": "*   Unordered list item 1\n*   Unordered list item 2\n*   Unordered list item 3",
+        "options": {}
+    },
+    {
+        "name": "ul with custom bullet",
+        "input": "\n    <ul>\n      <li>Unordered list item 1</li>\n      <li>Unordered list item 2</li>\n      <li>Unordered list item 3</li>\n    </ul>\n  ",
+        "expected": "-   Unordered list item 1\n-   Unordered list item 2\n-   Unordered list item 3",
+        "options": {
+            "bulletListMarker": "-"
+        }
+    },
+    {
+        "name": "ul with paragraph",
+        "input": "\n    <ul>\n      <li><p>List item with paragraph</p></li>\n      <li>List item without paragraph</li>\n    </ul>\n  ",
+        "expected": "*   List item with paragraph\n    \n*   List item without paragraph",
+        "options": {}
+    },
+    {
+        "name": "ol with paragraphs",
+        "input": "\n    <ol>\n      <li>\n        <p>This is a paragraph in a list item.</p>\n        <p>This is a paragraph in the same list item as above.</p>\n      </li>\n      <li>\n        <p>A paragraph in a second list item.</p>\n      </li>\n    </ol>\n  ",
+        "expected": "1.  This is a paragraph in a list item.\n    \n    This is a paragraph in the same list item as above.\n    \n2.  A paragraph in a second list item.",
+        "options": {}
+    },
+    {
+        "name": "nested uls",
+        "input": "\n    <ul>\n      <li>This is a list item at root level</li>\n      <li>This is another item at root level</li>\n      <li>\n        <ul>\n          <li>This is a nested list item</li>\n          <li>This is another nested list item</li>\n          <li>\n            <ul>\n              <li>This is a deeply nested list item</li>\n              <li>This is another deeply nested list item</li>\n              <li>This is a third deeply nested list item</li>\n            </ul>\n          </li>\n        </ul>\n      </li>\n      <li>This is a third item at root level</li>\n    </ul>\n  ",
+        "expected": "*   This is a list item at root level\n*   This is another item at root level\n*   *   This is a nested list item\n    *   This is another nested list item\n    *   *   This is a deeply nested list item\n        *   This is another deeply nested list item\n        *   This is a third deeply nested list item\n*   This is a third item at root level",
+        "options": {}
+    },
+    {
+        "name": "nested ols and uls",
+        "input": "\n    <ul>\n      <li>This is a list item at root level</li>\n      <li>This is another item at root level</li>\n      <li>\n        <ol>\n          <li>This is a nested list item</li>\n          <li>This is another nested list item</li>\n          <li>\n            <ul>\n              <li>This is a deeply nested list item</li>\n              <li>This is another deeply nested list item</li>\n              <li>This is a third deeply nested list item</li>\n            </ul>\n          </li>\n        </ol>\n      </li>\n      <li>This is a third item at root level</li>\n    </ul>\n  ",
+        "expected": "*   This is a list item at root level\n*   This is another item at root level\n*   1.  This is a nested list item\n    2.  This is another nested list item\n    3.  *   This is a deeply nested list item\n        *   This is another deeply nested list item\n        *   This is a third deeply nested list item\n*   This is a third item at root level",
+        "options": {}
+    },
+    {
+        "name": "ul with blockquote",
+        "input": "\n    <ul>\n      <li>\n        <p>A list item with a blockquote:</p>\n        <blockquote>\n          <p>This is a blockquote inside a list item.</p>\n        </blockquote>\n      </li>\n    </ul>\n  ",
+        "expected": "*   A list item with a blockquote:\n    \n    > This is a blockquote inside a list item.",
+        "options": {}
+    },
+    {
+        "name": "blockquote",
+        "input": "\n    <blockquote>\n      <p>This is a paragraph within a blockquote.</p>\n      <p>This is another paragraph within a blockquote.</p>\n    </blockquote>\n  ",
+        "expected": "> This is a paragraph within a blockquote.\n> \n> This is another paragraph within a blockquote.",
+        "options": {}
+    },
+    {
+        "name": "nested blockquotes",
+        "input": "\n    <blockquote>\n      <p>This is the first level of quoting.</p>\n      <blockquote>\n        <p>This is a paragraph in a nested blockquote.</p>\n      </blockquote>\n      <p>Back to the first level.</p>\n    </blockquote>\n  ",
+        "expected": "> This is the first level of quoting.\n> \n> > This is a paragraph in a nested blockquote.\n> \n> Back to the first level.",
+        "options": {}
+    },
+    {
+        "name": "html in blockquote",
+        "input": "\n    <blockquote>\n      <h2>This is a header.</h2>\n      <ol>\n        <li>This is the first list item.</li>\n        <li>This is the second list item.</li>\n      </ol>\n      <p>A code block:</p>\n      <pre><code>return 1 &lt; 2 ? shell_exec('echo $input | $markdown_script') : 0;</code></pre>\n    </blockquote>\n  ",
+        "expected": "> This is a header.\n> -----------------\n> \n> 1.  This is the first list item.\n> 2.  This is the second list item.\n> \n> A code block:\n> \n>     return 1 < 2 ? shell_exec('echo $input | $markdown_script') : 0;",
+        "options": {}
+    },
+    {
+        "name": "multiple divs",
+        "input": "\n    <div>A div</div>\n    <div>Another div</div>\n  ",
+        "expected": "A div\n\nAnother div",
+        "options": {}
+    },
+    {
+        "name": "multiple divs",
+        "input": "\n    <div>A div</div>\n    <div>Another div</div>\n  ",
+        "expected": "A div\n\nAnother div",
+        "options": {}
+    },
+    {
+        "name": "comment",
+        "input": "<!-- comment -->",
+        "expected": "",
+        "options": {}
+    },
+    {
+        "name": "pre/code with comment",
+        "input": "\n    <pre><code>Hello<!-- comment --> world</code></pre>\n  ",
+        "expected": "    Hello world",
+        "options": {}
+    },
+    {
+        "name": "leading whitespace in heading",
+        "input": "<h3>\n    h3 with leading whitespace</h3>",
+        "expected": "### h3 with leading whitespace",
+        "options": {}
+    },
+    {
+        "name": "trailing whitespace in li",
+        "input": "\n    <ol>\n      <li>Chapter One\n        <ol>\n          <li>Section One</li>\n          <li>Section Two with trailing whitespace </li>\n          <li>Section Three with trailing whitespace </li>\n        </ol>\n      </li>\n      <li>Chapter Two</li>\n      <li>Chapter Three with trailing whitespace  </li>\n    </ol>\n  ",
+        "expected": "1.  Chapter One\n    1.  Section One\n    2.  Section Two with trailing whitespace\n    3.  Section Three with trailing whitespace\n2.  Chapter Two\n3.  Chapter Three with trailing whitespace",
+        "options": {}
+    },
+    {
+        "name": "multilined and bizarre formatting",
+        "input": "\n    <ul>\n      <li>\n        Indented li with leading/trailing newlines\n      </li>\n      <li>\n        <strong>Strong with trailing space inside li with leading/trailing whitespace </strong> </li>\n      <li>li without whitespace</li>\n      <li> Leading space, text, lots of whitespace …\n                          text\n      </li>\n    \n  </ul>",
+        "expected": "*   Indented li with leading/trailing newlines\n*   **Strong with trailing space inside li with leading/trailing whitespace**\n*   li without whitespace\n*   Leading space, text, lots of whitespace … text",
+        "options": {}
+    },
+    {
+        "name": "whitespace between inline elements",
+        "input": "\n    <p>I <a href=\"http://example.com/need\">need</a> <a href=\"http://www.example.com/more\">more</a> spaces!</p>\n  ",
+        "expected": "I [need](http://example.com/need) [more](http://www.example.com/more) spaces!",
+        "options": {}
+    },
+    {
+        "name": "whitespace in inline elements",
+        "input": "Text with no space after the period.<em> Text in em with leading/trailing spaces </em><strong>text in strong with trailing space </strong>",
+        "expected": "Text with no space after the period. _Text in em with leading/trailing spaces_ **text in strong with trailing space**",
+        "options": {}
+    },
+    {
+        "name": "whitespace in nested inline elements",
+        "input": "Text at root <strong><a href=\"http://www.example.com\">link text with trailing space in strong </a></strong>more text at root",
+        "expected": "Text at root **[link text with trailing space in strong](http://www.example.com)** more text at root",
+        "options": {}
+    },
+    {
+        "name": "blank inline elements",
+        "input": "\n    Text before blank em … <em></em> text after blank em\n  ",
+        "expected": "Text before blank em … text after blank em",
+        "options": {}
+    },
+    {
+        "name": "blank block elements",
+        "input": "\n    Text before blank div … <div></div> text after blank div\n  ",
+        "expected": "Text before blank div …\n\ntext after blank div",
+        "options": {}
+    },
+    {
+        "name": "blank inline element with br",
+        "input": "<strong><br></strong>",
+        "expected": "",
+        "options": {}
+    },
+    {
+        "name": "whitespace between blocks",
+        "input": "<div><div>Content in a nested div</div></div>\n<div>Content in another div</div>",
+        "expected": "Content in a nested div\n\nContent in another div",
+        "options": {}
+    },
+    {
+        "name": "escaping backslashes",
+        "input": "backslash \\",
+        "expected": "backslash \\\\",
+        "options": {}
+    },
+    {
+        "name": "escaping headings with #",
+        "input": "### This is not a heading",
+        "expected": "\\### This is not a heading",
+        "options": {}
+    },
+    {
+        "name": "not escaping # outside of a heading",
+        "input": "#This is not # a heading",
+        "expected": "#This is not # a heading",
+        "options": {}
+    },
+    {
+        "name": "escaping em markdown with *",
+        "input": "To add emphasis, surround text with *. For example: *this is emphasis*",
+        "expected": "To add emphasis, surround text with \\*. For example: \\*this is emphasis\\*",
+        "options": {}
+    },
+    {
+        "name": "escaping em markdown with _",
+        "input": "To add emphasis, surround text with _. For example: _this is emphasis_",
+        "expected": "To add emphasis, surround text with \\_. For example: \\_this is emphasis\\_",
+        "options": {}
+    },
+    {
+        "name": "not escaping within code",
+        "input": "<pre><code>def this_is_a_method; end;</code></pre>",
+        "expected": "    def this_is_a_method; end;",
+        "options": {}
+    },
+    {
+        "name": "escaping strong markdown with *",
+        "input": "To add strong emphasis, surround text with **. For example: **this is strong**",
+        "expected": "To add strong emphasis, surround text with \\*\\*. For example: \\*\\*this is strong\\*\\*",
+        "options": {}
+    },
+    {
+        "name": "escaping strong markdown with _",
+        "input": "To add strong emphasis, surround text with __. For example: __this is strong__",
+        "expected": "To add strong emphasis, surround text with \\_\\_. For example: \\_\\_this is strong\\_\\_",
+        "options": {}
+    },
+    {
+        "name": "escaping hr markdown with *",
+        "input": "* * *",
+        "expected": "\\* \\* \\*",
+        "options": {}
+    },
+    {
+        "name": "escaping hr markdown with -",
+        "input": "- - -",
+        "expected": "\\- - -",
+        "options": {}
+    },
+    {
+        "name": "escaping hr markdown with _",
+        "input": "_ _ _",
+        "expected": "\\_ \\_ \\_",
+        "options": {}
+    },
+    {
+        "name": "escaping hr markdown without spaces",
+        "input": "***",
+        "expected": "\\*\\*\\*",
+        "options": {}
+    },
+    {
+        "name": "escaping hr markdown with more than 3 characters",
+        "input": "* * * * *",
+        "expected": "\\* \\* \\* \\* \\*",
+        "options": {}
+    },
+    {
+        "name": "escaping ol markdown",
+        "input": "1984. by George Orwell",
+        "expected": "1984\\. by George Orwell",
+        "options": {}
+    },
+    {
+        "name": "not escaping . outside of an ol",
+        "input": "1984.George Orwell wrote 1984.",
+        "expected": "1984.George Orwell wrote 1984.",
+        "options": {}
+    },
+    {
+        "name": "escaping ul markdown *",
+        "input": "* An unordered list item",
+        "expected": "\\* An unordered list item",
+        "options": {}
+    },
+    {
+        "name": "escaping ul markdown -",
+        "input": "- An unordered list item",
+        "expected": "\\- An unordered list item",
+        "options": {}
+    },
+    {
+        "name": "escaping ul markdown +",
+        "input": "+ An unordered list item",
+        "expected": "\\+ An unordered list item",
+        "options": {}
+    },
+    {
+        "name": "not escaping - outside of a ul",
+        "input": "Hello-world, 45 - 3 is 42",
+        "expected": "Hello-world, 45 - 3 is 42",
+        "options": {}
+    },
+    {
+        "name": "not escaping + outside of a ul",
+        "input": "+1 and another +",
+        "expected": "+1 and another +",
+        "options": {}
+    },
+    {
+        "name": "escaping *",
+        "input": "You can use * for multiplication",
+        "expected": "You can use \\* for multiplication",
+        "options": {}
+    },
+    {
+        "name": "escaping ** inside strong tags",
+        "input": "<strong>**test</strong>",
+        "expected": "**\\*\\*test**",
+        "options": {}
+    },
+    {
+        "name": "escaping _ inside em tags",
+        "input": "<em>test_italics</em>",
+        "expected": "_test\\_italics_",
+        "options": {}
+    },
+    {
+        "name": "escaping > as blockquote",
+        "input": "&gt; Blockquote in markdown",
+        "expected": "\\> Blockquote in markdown",
+        "options": {}
+    },
+    {
+        "name": "escaping > as blockquote without space",
+        "input": "&gt;Blockquote in markdown",
+        "expected": "\\>Blockquote in markdown",
+        "options": {}
+    },
+    {
+        "name": "not escaping > outside of a blockquote",
+        "input": "42 &gt; 1",
+        "expected": "42 > 1",
+        "options": {}
+    },
+    {
+        "name": "escaping code",
+        "input": "`not code`",
+        "expected": "\\`not code\\`",
+        "options": {}
+    },
+    {
+        "name": "escaping []",
+        "input": "[This] is a sentence with brackets",
+        "expected": "\\[This\\] is a sentence with brackets",
+        "options": {}
+    },
+    {
+        "name": "escaping [",
+        "input": "<a href=\"http://www.example.com\">c[iao</a>",
+        "expected": "[c\\[iao](http://www.example.com)",
+        "options": {}
+    },
+    {
+        "name": "escaping * performance",
+        "input": "fasdf *883 asdf wer qweasd fsd asdf asdfaqwe rqwefrsdf",
+        "expected": "fasdf \\*883 asdf wer qweasd fsd asdf asdfaqwe rqwefrsdf",
+        "options": {}
+    },
+    {
+        "name": "escaping multiple asterisks",
+        "input": "<p>* * ** It aims to be*</p>",
+        "expected": "\\* \\* \\*\\* It aims to be\\*",
+        "options": {}
+    },
+    {
+        "name": "escaping delimiters around short words and numbers",
+        "input": "<p>_Really_? Is that what it _is_? A **2000** year-old computer?</p>",
+        "expected": "\\_Really\\_? Is that what it \\_is\\_? A \\*\\*2000\\*\\* year-old computer?",
+        "options": {}
+    },
+    {
+        "name": "non-markdown block elements",
+        "input": "\n    Foo\n    <div>Bar</div>\n    Baz\n  ",
+        "expected": "Foo\n\nBar\n\nBaz",
+        "options": {}
+    },
+    {
+        "name": "non-markdown inline elements",
+        "input": "\n    Foo <span>Bar</span>\n  ",
+        "expected": "Foo Bar",
+        "options": {}
+    },
+    {
+        "name": "blank inline elements",
+        "input": "\n    Hello <em></em>world\n  ",
+        "expected": "Hello world",
+        "options": {}
+    },
+    {
+        "name": "elements with a single void element",
+        "input": "\n    <p><img src=\"http://example.com/logo.png\"></p>\n  ",
+        "expected": "![](http://example.com/logo.png)",
+        "options": {}
+    },
+    {
+        "name": "elements with a nested void element",
+        "input": "\n    <p><span><img src=\"http://example.com/logo.png\"></span></p>\n  ",
+        "expected": "![](http://example.com/logo.png)",
+        "options": {}
+    },
+    {
+        "name": "text separated by a space in an element",
+        "input": "\n    <p>Foo<span> </span>Bar</p>\n  ",
+        "expected": "Foo Bar",
+        "options": {}
+    },
+    {
+        "name": "text separated by a non-breaking space in an element",
+        "input": "\n    <p>Foo<span>&nbsp;</span>Bar</p>\n  ",
+        "expected": "Foo Bar",
+        "options": {}
+    },
+    {
+        "name": "triple tildes inside code",
+        "input": "\n<pre><code>~~~\nCode\n~~~\n</code></pre>\n  ",
+        "expected": "~~~~\n~~~\nCode\n~~~\n~~~~",
+        "options": {
+            "codeBlockStyle": "fenced",
+            "fence": "~~~"
+        }
+    },
+    {
+        "name": "triple ticks inside code",
+        "input": "\n<pre><code>```\nCode\n```\n</code></pre>\n  ",
+        "expected": "````\n```\nCode\n```\n````",
+        "options": {
+            "codeBlockStyle": "fenced",
+            "fence": "```"
+        }
+    },
+    {
+        "name": "four ticks inside code",
+        "input": "\n<pre><code>````\nCode\n````\n</code></pre>\n  ",
+        "expected": "`````\n````\nCode\n````\n`````",
+        "options": {
+            "codeBlockStyle": "fenced",
+            "fence": "```"
+        }
+    },
+    {
+        "name": "empty line in start/end of code block",
+        "input": "\n<pre><code>\nCode\n\n</code></pre>\n  ",
+        "expected": "```\n\nCode\n\n```",
+        "options": {
+            "codeBlockStyle": "fenced",
+            "fence": "```"
+        }
+    },
+    {
+        "name": "text separated by ASCII and nonASCII space in an element",
+        "input": "\n    <p>Foo<span>  &nbsp;  </span>Bar</p>\n  ",
+        "expected": "Foo   Bar",
+        "options": {}
+    },
+    {
+        "name": "list-like text with non-breaking spaces",
+        "input": "&nbsp;1. First<br>&nbsp;2. Second",
+        "expected": " 1. First  \n 2. Second",
+        "options": {}
+    },
+    {
+        "name": "element with trailing nonASCII WS followed by nonWS",
+        "input": "<i>foo&nbsp;</i>bar",
+        "expected": "_foo_ bar",
+        "options": {}
+    },
+    {
+        "name": "element with trailing nonASCII WS followed by nonASCII WS",
+        "input": "<i>foo&nbsp;</i>&nbsp;bar",
+        "expected": "_foo_  bar",
+        "options": {}
+    },
+    {
+        "name": "element with trailing ASCII WS followed by nonASCII WS",
+        "input": "<i>foo </i>&nbsp;bar",
+        "expected": "_foo_  bar",
+        "options": {}
+    },
+    {
+        "name": "element with trailing nonASCII WS followed by ASCII WS",
+        "input": "<i>foo&nbsp;</i> bar",
+        "expected": "_foo_  bar",
+        "options": {}
+    },
+    {
+        "name": "nonWS followed by element with leading nonASCII WS",
+        "input": "foo<i>&nbsp;bar</i>",
+        "expected": "foo _bar_",
+        "options": {}
+    },
+    {
+        "name": "nonASCII WS followed by element with leading nonASCII WS",
+        "input": "foo&nbsp;<i>&nbsp;bar</i>",
+        "expected": "foo  _bar_",
+        "options": {}
+    },
+    {
+        "name": "nonASCII WS followed by element with leading ASCII WS",
+        "input": "foo&nbsp;<i> bar</i>",
+        "expected": "foo  _bar_",
+        "options": {}
+    },
+    {
+        "name": "ASCII WS followed by element with leading nonASCII WS",
+        "input": "foo <i>&nbsp;bar</i>",
+        "expected": "foo  _bar_",
+        "options": {}
+    },
+    {
+        "name": "preformatted code with leading whitespace",
+        "input": "Four spaces <code>    make an indented code block in Markdown</code>",
+        "expected": "Four spaces `    make an indented code block in Markdown`",
+        "options": {
+            "preformattedCode": true
+        }
+    },
+    {
+        "name": "preformatted code with trailing whitespace",
+        "input": "<code>A line break  </code> <b> note the spaces</b>",
+        "expected": "`A line break  ` **note the spaces**",
+        "options": {
+            "preformattedCode": true
+        }
+    },
+    {
+        "name": "preformatted code tightly surrounded",
+        "input": "<b>tight</b><code>code</code><b>wrap</b>",
+        "expected": "**tight**`code`**wrap**",
+        "options": {
+            "preformattedCode": true
+        }
+    },
+    {
+        "name": "preformatted code loosely surrounded",
+        "input": "<b>not so tight </b><code>code</code><b> wrap</b>",
+        "expected": "**not so tight** `code` **wrap**",
+        "options": {
+            "preformattedCode": true
+        }
+    },
+    {
+        "name": "preformatted code with newlines",
+        "input": "\n<code>\n\n nasty\ncode\n\n</code>\n  ",
+        "expected": "`    nasty code   `",
+        "options": {
+            "preformattedCode": true
+        }
+    }
+]

@@ -217,14 +217,14 @@ const DesignPresetSelector: FC<DesignPresetSelectorProps> = ({ className, onSele
             {/* Tab bar */}
             <div className="flex border-b">
                 <button
-                    className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === "presets" ? "border-primary text-primary border-b-2" : "text-muted-foreground hover:text-foreground"}`}
+                    className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === "presets" ? "border-primary text-primary-text border-b-2" : "text-muted-foreground hover:text-foreground"}`}
                     onClick={() => setActiveTab("presets")}
                     type="button"
                 >
                     {t`Presets`}
                 </button>
                 <button
-                    className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === "templates" ? "border-primary text-primary border-b-2" : "text-muted-foreground hover:text-foreground"}`}
+                    className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === "templates" ? "border-primary text-primary-text border-b-2" : "text-muted-foreground hover:text-foreground"}`}
                     onClick={() => setActiveTab("templates")}
                     type="button"
                 >

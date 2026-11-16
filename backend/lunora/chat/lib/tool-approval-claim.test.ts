@@ -225,6 +225,41 @@ describe("a collaborator's paused turn", () => {
 });
 
 describe("what a pause notifies as", () => {
+    it("marks a headless pause's thread awaiting in the write that records its request", async () => {
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(recordPendingToolApprovals, {
+                    approvalIds: ["plain-1"],
+                    awaitingInput: "approval",
+                    config: CONFIG,
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
+
+        expect(thread.awaitingInput).toBe("approval");
+    });
+
+    it("leaves a question the owner was asked in the thread as what it waits on", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { awaitingInput: "question" }));
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(recordPendingToolApprovals, {
+                    approvalIds: ["plain-2"],
+                    awaitingInput: "approval",
+                    config: CONFIG,
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
+
+        expect(thread.awaitingInput).toBe("question");
+    });
+
     const notifications = async () => await harness.run(async (ctx: any) => await ctx.db.query("notifications").collect());
 
     it("is a tool approval for an ordinary call, a question for askUser and its own type for a secret request", async () => {
@@ -241,6 +276,49 @@ describe("what a pause notifies as", () => {
 
         expect(rows.map((row) => row.type).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["ask_user", "secret_request", "tool_approval"]);
         expect(rows.find((row) => row.type === "secret_request")?.dedupeKey).toBe("secret_request:secret-1");
+    });
+
+    it("names the task that started a waiting sub-agent's chain, and nothing for the owner's own chat", async () => {
+        const subAgentRun = async (fields: Record<string, unknown>) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("subAgentRuns", {
+                        childThreadId: threadId,
+                        createdAt: 0,
+                        depth: 1,
+                        parentThreadId: "lead",
+                        status: "running",
+                        task: "Tidy up",
+                        updatedAt: 0,
+                        userId: OWNER,
+                        ...fields,
+                    }),
+            );
+        const fromTask = await subAgentRun({ chainSource: "task:t1", dispatchedBy: "trigger" });
+        const fromChat = await subAgentRun({ dispatchedBy: "lead" });
+
+        // Each run's request is on the child's latest turn, so the run waits and its owner is told.
+        await insertMessage(2, { content: [...assistantWithRequest("task-1").content, ...assistantWithRequest("chat-1").content], role: "assistant" }, true);
+
+        for (const [approvalId, subAgentRunId] of [
+            ["task-1", fromTask],
+            ["chat-1", fromChat],
+        ]) {
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(recordPendingToolApprovals, {
+                        approvalIds: [approvalId],
+                        config: { ...CONFIG, subAgentRunId },
+                        threadId,
+                        userId: OWNER,
+                    }),
+            );
+        }
+
+        const rows = (await notifications()) as { body?: string; dedupeKey: string }[];
+
+        expect(rows.find((row) => row.dedupeKey === "tool_approval:task-1")?.body).toBe("A sub-agent started by a task is waiting for you.");
+        expect(rows.find((row) => row.dedupeKey === "tool_approval:chat-1")).not.toHaveProperty("body");
     });
 
     it("words the push for a secret request, and sends it urgently like the other things a run waits on", async () => {

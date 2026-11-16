@@ -70,7 +70,7 @@ const ResultCard: FC<{ result: SearchResult }> = memo(({ result }) => {
                     <span className="text-muted-foreground truncate text-[11px]">{domain}</span>
                     {result.publishedDate && <span className="text-muted-foreground shrink-0 text-[10px]">· {formatDate(result.publishedDate)}</span>}
                 </div>
-                <h4 className="group-hover:text-primary mt-0.5 line-clamp-1 text-sm font-medium transition-colors">
+                <h4 className="group-hover:text-primary-text mt-0.5 line-clamp-1 text-sm font-medium transition-colors">
                     {result.title}
                     <span className="sr-only">
                         {" "}

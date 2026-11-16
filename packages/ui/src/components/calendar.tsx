@@ -5,7 +5,7 @@ import { formatDate } from "@ui/utils/locale-format";
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import * as React from "react";
 import type { CustomComponents, DayButton } from "react-day-picker";
-import { DayPicker, getDefaultClassNames } from "react-day-picker";
+import { DateLib, DayPicker, getDefaultClassNames } from "react-day-picker";
 
 const CalendarChevron: CustomComponents["Chevron"] = ({ className: chevronClassName, orientation, ...chevronProps }) => {
     if (orientation === "left") {
@@ -36,12 +36,13 @@ const Calendar = ({
     classNames,
     components,
     formatters,
+    labels,
     showOutsideDays = true,
     ...props
 }: React.ComponentProps<typeof DayPicker> & {
     buttonVariant?: React.ComponentProps<typeof Button>["variant"];
 }) => {
-    const { i18n } = useLingui();
+    const { i18n, t } = useLingui();
     const defaultClassNames = getDefaultClassNames();
 
     return (
@@ -117,6 +118,17 @@ const Calendar = ({
             formatters={{
                 formatMonthDropdown: (date) => formatDate(date, i18n.locale, { month: "short" }),
                 ...formatters,
+            }}
+            labels={{
+                // The default "PPPP" spells the day as an ordinal ("November 1st"), so the visible "1" is not a word in it
+                // (axe label-content-name-mismatch). "d" keeps the plain number.
+                labelDayButton: (date, modifiers, options, dateLibrary) => {
+                    const label = (dateLibrary ?? new DateLib(options)).format(date, "EEEE, MMMM d, yyyy");
+                    const prefixed = modifiers.today ? t`Today, ${label}` : label;
+
+                    return modifiers.selected ? t`${prefixed}, selected` : prefixed;
+                },
+                ...labels,
             }}
             showOutsideDays={showOutsideDays}
             {...props}

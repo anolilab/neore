@@ -67,7 +67,7 @@ differently.
 pnpm --filter @neore/chat-ui run lint:types   # tsc --noEmit
 pnpm --filter @neore/chat-ui run test         # vitest run (the utils have tests)
 pnpm --filter @neore/chat-ui run lint:eslint
-pnpm --filter @neore/chat-ui run lint:prettier
+pnpm lint:oxfmt   # from the repository root: formatting is checked repo-wide
 ```
 
 With `vis`, target the project by its `package.json` name:

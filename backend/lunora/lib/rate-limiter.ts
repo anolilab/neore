@@ -6,6 +6,7 @@ import { internal } from "../_generated/internal";
 import type { ActionCtx as ActionContext, MutationCtx as MutationContext } from "../_generated/server";
 import { getSessionNetworkSignals } from "../auth";
 import type { SessionUser } from "../auth/functions";
+import { noteRateLimitsPending } from "./shard-housekeeping";
 
 /**
  * The earlier `Ratelimit.fixedWindow(rate, period)` / `.tokenBucket(...)` builders and
@@ -277,6 +278,14 @@ export const RATE_LIMIT_CONFIGS = {
     // GDPR limits
     "gdpr/request:free": Ratelimit.fixedWindow(3, HOUR),
     "gdpr/request:premium": Ratelimit.fixedWindow(5, HOUR),
+    // A guest leaving a message through a link (`chat/guest-links.ts`): per client address, and again per
+    // link, which is what bounds a link passed around. The held cap on the link is the other bound.
+    "guest/message:free": Ratelimit.fixedWindow(30, HOUR),
+    "guest/message:premium": Ratelimit.fixedWindow(30, HOUR),
+    "guest/message:public": Ratelimit.fixedWindow(30, HOUR),
+    // An owner working through a full queue of guest notes: each takes a send and a confirm, and a dismiss for the rest.
+    "guest/review:free": Ratelimit.fixedWindow(40, MINUTE),
+    "guest/review:premium": Ratelimit.fixedWindow(80, MINUTE),
     // Remote control of a coding agent (`acp/remote.ts`, `acp/send.ts`): each one queues a signed command for a
     // computer that holds three open ones, so a person gets a burst, not a stream.
     "hosts/answer:free": Ratelimit.fixedWindow(60, MINUTE),
@@ -354,6 +363,15 @@ export const RATE_LIMIT_CONFIGS = {
     // and push subscribe/unsubscribe (each a browser permission prompt at most).
     "notifications/push:free": Ratelimit.fixedWindow(10, MINUTE),
     "notifications/push:premium": Ratelimit.fixedWindow(30, MINUTE),
+    // A phone fetching one notification's text before it shows the push: per account, a few per notification at most.
+    "notifications/pushContent": Ratelimit.fixedWindow(120, MINUTE),
+    // Registering a phone (sign-in, token rotation, each return to the front): its own bucket, so a phone opened often
+    // never uses up the browser push one.
+    "notifications/pushRegister:free": Ratelimit.fixedWindow(30, MINUTE),
+    "notifications/pushRegister:premium": Ratelimit.fixedWindow(60, MINUTE),
+    // Releasing a phone on sign-out: its own bucket, so registering or browser push calls never use it up.
+    "notifications/pushRelease:free": Ratelimit.fixedWindow(30, MINUTE),
+    "notifications/pushRelease:premium": Ratelimit.fixedWindow(60, MINUTE),
     "notifications/update:free": Ratelimit.fixedWindow(60, MINUTE),
     "notifications/update:premium": Ratelimit.fixedWindow(180, MINUTE),
     "organization/accept:free": Ratelimit.fixedWindow(10, MINUTE),
@@ -618,6 +636,10 @@ export const RATE_LIMIT_CONFIGS = {
     // under the per-character credit cost.
     "voice/dailySpeechChars:free": Ratelimit.fixedWindow(10_000, DAY),
     "voice/dailySpeechChars:premium": Ratelimit.fixedWindow(200_000, DAY),
+    // Mobile voice input (`voice/transcription.ts`): seconds of audio per day,
+    // charged with `count` = the clip's length.
+    "voice/dailyTranscribeSeconds:free": Ratelimit.fixedWindow(600, DAY),
+    "voice/dailyTranscribeSeconds:premium": Ratelimit.fixedWindow(3600, DAY),
     // Realtime dictation — each token is one billed ElevenLabs Scribe session,
     // minted per mic press. Anonymous is refused outright (`voice/functions.ts`).
     "voice/scribeToken:free": Ratelimit.fixedWindow(30, HOUR),
@@ -626,6 +648,9 @@ export const RATE_LIMIT_CONFIGS = {
     // is a reply's worth. Guests are refused outright (`voice/speech.ts`).
     "voice/speech:free": Ratelimit.tokenBucket(30, MINUTE, 40),
     "voice/speech:premium": Ratelimit.tokenBucket(90, MINUTE, 120),
+    // One clip per mic hold. Guests are refused outright (`voice/transcription.ts`).
+    "voice/transcribe:free": Ratelimit.tokenBucket(10, MINUTE, 15),
+    "voice/transcribe:premium": Ratelimit.tokenBucket(30, MINUTE, 40),
     // Workflow execution — same story as the skills entries above: the name was
     // used but never defined, so every `executeWorkflow` call threw. A run can fan
     // out into many model calls, so this is deliberately tighter than CRUD.
@@ -708,9 +733,31 @@ export const createRatelimit = (
         throw new LunoraError("BAD_REQUEST", `Unknown rate limit config: ${name}`);
     }
 
+    // A charge that adds a row must flag the shard for the dormant sweep (`lib/shard-housekeeping.ts`); one that only
+    // updates a row needs nothing, since a table holding a row keeps the flag on.
+    let inserts = 0;
+    const store = createDbStore({
+        db: new Proxy(database, {
+            get: (target, property) => {
+                if (property === "insert") {
+                    return async (...args: Parameters<RateLimitDb["insert"]>) => {
+                        const id = await target.insert(...args);
+
+                        inserts += 1;
+
+                        return id;
+                    };
+                }
+
+                const value: unknown = Reflect.get(target, property, target);
+
+                return typeof value === "function" ? value.bind(target) : value;
+            },
+        }),
+    });
     const limiter = new RateLimiter({
         config: { [name]: config },
-        store: createDbStore({ db: database }),
+        store,
         ...(clock && { now: clock }),
     });
 
@@ -729,9 +776,16 @@ export const createRatelimit = (
 
             return { remaining: Math.max(0, value), reset: ts + remainingConfig.period };
         },
-        limit: async (identifier: string, args?: { count?: number }) => {
+        /** `reserve`: book the units even past what is left (the window goes into debt, so later calls are refused). */
+        limit: async (identifier: string, args?: { count?: number; reserve?: boolean }) => {
             try {
-                const status = await limiter.limit(name, { count: args?.count, key: `neore:${name}:${identifier}` });
+                const insertsBefore = inserts;
+                const status = await limiter.limit(name, { count: args?.count, key: `neore:${name}:${identifier}`, reserve: args?.reserve });
+
+                if (inserts > insertsBefore) {
+                    // `database` is the charging mutation's `ctx.db`, typed here by the store's narrower interface.
+                    await noteRateLimitsPending({ db: database as unknown as MutationContext["db"] });
+                }
 
                 // The earlier implementation reported an absolute `reset` timestamp; Lunora reports a
                 // relative `retryAfter`. Callers want the timestamp, so convert.
@@ -790,6 +844,59 @@ export const getUserTier = (user: { isAdmin?: boolean; plan?: SessionUser["plan"
     return "free";
 };
 
+const DOTTED_IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/u;
+const LEADING_ZEROS = /^0+(?=.)/u;
+
+const groupsOf = (part: string): string[] => (part === "" ? [] : part.split(":"));
+
+/**
+ * The bucket an address is limited in: an IPv4-mapped IPv6 address (`::ffff:` and the IPv4 address, written dotted or in hex,
+ * compressed or expanded) as its IPv4 form; any other IPv6 address by its /64 network, which one connection is usually handed
+ * whole, so stepping through it buys no fresh allowance; an IPv4 address as is.
+ */
+export const clientBucket = (ip: string): string => {
+    if (!ip.includes(":")) {
+        return ip;
+    }
+
+    const lower = ip.toLowerCase();
+    const compressed = lower.includes("::");
+    const [head = "", tail = ""] = lower.split("::", 2);
+    const headGroups = groupsOf(head);
+    const tailGroups = groupsOf(tail);
+    // A dotted IPv4 address at the end stands for the last two groups.
+    const lastPart = compressed ? tailGroups : headGroups;
+    const dotted = lastPart.length > 0 && DOTTED_IPV4.test(lastPart.at(-1)!) ? lastPart.pop() : undefined;
+    const width = dotted === undefined ? 8 : 6;
+    const groups = [...headGroups];
+
+    // `::` stands for as many zero groups as the address leaves out.
+    if (compressed) {
+        while (groups.length < width - tailGroups.length) {
+            groups.push("0");
+        }
+
+        groups.push(...tailGroups);
+    }
+
+    const values = groups.map((group) => Number.parseInt(group, 16));
+
+    if (values.slice(0, 5).every((value) => value === 0) && values[5] === 0xff_ff) {
+        if (dotted !== undefined) {
+            return dotted;
+        }
+
+        const [high = 0, low = 0] = values.slice(6, 8);
+
+        return [high >> 8, high & 0xff, low >> 8, low & 0xff].join(".");
+    }
+
+    return `${groups
+        .slice(0, 4)
+        .map((group) => group.replace(LEADING_ZEROS, ""))
+        .join(":")}::/64`;
+};
+
 /**
  * Guard function to check and enforce rate limits for mutations and actions.
  * For mutation contexts, uses ctx.db directly.
@@ -818,17 +925,21 @@ export const rateLimitGuard = async (
         identifier = context.identifier;
     } else if (context.user?.userId) {
         identifier = context.user.userId;
+    } else if ((context as { ip?: string }).ip) {
+        // An anonymous call with the request's address (on Cloudflare the edge-stamped client address; every context type
+        // can carry it). Checked before `db`, which an action carries too: tested first, `db` sent every anonymous action to
+        // the session lookup below, which had no session to read, and so to the one bucket every anonymous caller shared.
+        identifier = clientBucket((context as { ip: string }).ip);
     } else if ("db" in context) {
-        // Mutation context: use IP for anonymous users to prevent shared bucket abuse
+        // No request address (a call the server started): the session's sign-in address, if there is a session.
         const signals = await getSessionNetworkSignals(context as MutationContext).catch(() => {
             return {};
         });
 
         identifier = (signals as { ip?: string }).ip ?? "anonymous";
     } else {
-        // An action has no session and no `db`. On Cloudflare `ip` is the edge-stamped
-        // client address; elsewhere it is undefined and the one shared bucket applies.
-        identifier = (context as { ip?: string }).ip ?? "anonymous";
+        // No address to key on: the one shared bucket applies.
+        identifier = "anonymous";
     }
 
     if ("db" in context) {

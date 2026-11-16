@@ -8,6 +8,7 @@ import type { useLunora } from "@/lib/lunora/crpc";
 import type { RateLimitPause } from "../../thread/rate-limit-pause-notice";
 import type { ThreadOwnerState } from "../../thread-list/lib/thread-state-rules";
 import type { PendingAttachment } from "../stores/chat-ui-store";
+import type { SendOutcome } from "./send-message";
 
 /**
  * Thread capabilities - what actions are available
@@ -41,12 +42,14 @@ export interface ThreadData extends ThreadOwnerState {
     customSystemPrompt?: string;
     enabledFeatures?: string[];
     language?: string;
-    /** Set while the chat has a passcode (`thread-lock.ts`); a locked chat takes no file attachments. */
+    /** Set while the chat has a passcode. A locked read without its proof is a stub that carries no mode. */
     lockedAt?: number | null;
     mode?: "text" | "image" | "video";
     model: string;
     multiChat?: boolean;
     parentThreadId?: string;
+    /** How much of a cloud run the owner leaves unasked; unset is "auto". Owner-only, never on a host thread. */
+    permissionMode?: "auto" | "full" | "supervised";
     reasoningEffort?: number;
     /** `host`: a coding agent on a paired computer runs the turns (`backend/lunora/acp/`). Unset: the cloud. */
     runner?: "host";
@@ -65,6 +68,8 @@ export interface ChatThreadContextValue {
     thread: ThreadData | null | undefined;
     threadId: string | undefined;
 }
+
+export type ChatThreadIdentity = Pick<ChatThreadContextValue, "isNewThread" | "model" | "threadId">;
 
 export interface ChatMessagesContextValue {
     isEmpty: boolean;
@@ -116,7 +121,8 @@ export interface ChatActionsContextValue {
     lunora: ReturnType<typeof useLunora>;
     regenerate: () => Promise<void>;
     reloadMessage: (messageId: string) => Promise<void>;
-    sendMessage: (text: string, attachments?: PendingAttachment[]) => Promise<void>;
+    /** Resolves once the send has started or failed: a guest note's failure comes back here, not in the chat's error banner. */
+    sendMessage: (text: string, attachments?: PendingAttachment[], options?: { guestMessageId?: string }) => Promise<SendOutcome>;
 }
 
 /**

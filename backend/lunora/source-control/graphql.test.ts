@@ -40,6 +40,31 @@ describe("graphqlRequest", () => {
         await expect(graphqlRequest(limited.request, "q", {}, SCHEMA)).rejects.toMatchObject({ rateLimited: true, status: 429 });
     });
 
+    it("keeps an error with no type a refusal for every caller but a write that may have run", async () => {
+        const untyped = { errors: [{ message: "Something went wrong while executing your query. This may be the result of a timeout." }] };
+
+        await expect(graphqlRequest(answering(untyped).request, "q", {}, SCHEMA)).rejects.toMatchObject({ status: 422 });
+        await expect(graphqlRequest(answering(untyped).request, "q", {}, SCHEMA, "/graphql", { untypedMayHaveRun: true })).rejects.toMatchObject({
+            status: 0,
+        });
+    });
+
+    it("keeps a validation error a refusal even for a write that may have run: nothing executed", async () => {
+        const validation = { errors: [{ extensions: { code: "undefinedField" }, message: "Field 'x' doesn't exist on type 'Mutation'" }] };
+
+        await expect(graphqlRequest(answering(validation).request, "q", {}, SCHEMA, "/graphql", { untypedMayHaveRun: true })).rejects.toMatchObject({
+            status: 422,
+        });
+    });
+
+    it("reads an execution error that carries a code as unconfirmed: it may have taken effect", async () => {
+        const execution = { errors: [{ extensions: { code: "INTERNAL_SERVER_ERROR" }, message: "Something went wrong" }] };
+
+        await expect(graphqlRequest(answering(execution).request, "q", {}, SCHEMA, "/graphql", { untypedMayHaveRun: true })).rejects.toMatchObject({
+            status: 0,
+        });
+    });
+
     it("refuses data of the wrong shape", async () => {
         const { request } = answering({ data: { viewer: { login: 7 } } });
 

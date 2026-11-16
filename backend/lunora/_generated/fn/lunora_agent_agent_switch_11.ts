@@ -15,15 +15,29 @@ installCompiledValidatorMap(lunora_agent_agent_switch_11.getHandoffAbove.args, (
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["belowMessageId"] !== "string") return DEFER;
+let __has1 = false;
+let __val1;
+if (source["fromOrder"] !== undefined) {
+if (typeof source["fromOrder"] !== "number" || !Number.isFinite(source["fromOrder"])) return DEFER;
+__val1 = source["fromOrder"];
+__has1 = true;
+}
 if (typeof source["threadId"] !== "string") return DEFER;
-return { "belowMessageId": source["belowMessageId"], "threadId": source["threadId"] };
+return { "belowMessageId": source["belowMessageId"], ...(__has1 ? { "fromOrder": __val1 } : {}), "threadId": source["threadId"] };
 });
 installCompiledValidatorMap(lunora_agent_agent_switch_11.getHandoffBeforeDelta.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["dividerMessageId"] !== "string") return DEFER;
+let __has1 = false;
+let __val1;
+if (source["fromOrder"] !== undefined) {
+if (typeof source["fromOrder"] !== "number" || !Number.isFinite(source["fromOrder"])) return DEFER;
+__val1 = source["fromOrder"];
+__has1 = true;
+}
 if (typeof source["threadId"] !== "string") return DEFER;
-return { "dividerMessageId": source["dividerMessageId"], "threadId": source["threadId"] };
+return { "dividerMessageId": source["dividerMessageId"], ...(__has1 ? { "fromOrder": __val1 } : {}), "threadId": source["threadId"] };
 });
 installCompiledValidatorMap(lunora_agent_agent_switch_11.getRunAgentModel.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;

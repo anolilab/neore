@@ -1,7 +1,7 @@
 "use client";
 
 import type { GatewayModel } from "@neore/ai/models";
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 
 import env from "@/lib/env";
 
@@ -33,6 +33,15 @@ async function fetchGatewayModels(): Promise<GatewayModelsResponse> {
     return response.json() as Promise<GatewayModelsResponse>;
 }
 
+const gatewayModelsQuery = queryOptions({
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    queryFn: fetchGatewayModels,
+    queryKey: ["gateway-models"],
+    refetchOnWindowFocus: false,
+    retry: 1,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+});
+
 /**
  * Hook that fetches the full model catalog from the LLM Gateway.
  *
@@ -41,14 +50,7 @@ async function fetchGatewayModels(): Promise<GatewayModelsResponse> {
  * Refetches every 5 minutes; the gateway caches for 1 hour.
  */
 export function useGatewayModels(): GatewayModel[] {
-    const { data } = useQuery({
-        gcTime: 30 * 60 * 1000, // 30 minutes
-        queryFn: fetchGatewayModels,
-        queryKey: ["gateway-models"],
-        refetchOnWindowFocus: false,
-        retry: 1,
-        staleTime: 5 * 60 * 1000, // 5 minutes
-    });
+    const { data } = useQuery(gatewayModelsQuery);
 
     if (!data?.data) {
         return EMPTY_MODELS;
@@ -57,3 +59,6 @@ export function useGatewayModels(): GatewayModel[] {
     // Filter out the "auto" meta-model — gateway is the source of truth
     return data.data.filter((m) => m.id !== "auto" && m.enabled);
 }
+
+/** Whether the catalog has loaded or failed to: an empty list is then the gateway's answer, not a load still under way. */
+export const useGatewayModelsSettled = (): boolean => !useQuery(gatewayModelsQuery).isPending;

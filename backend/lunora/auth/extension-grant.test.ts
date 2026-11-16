@@ -20,7 +20,7 @@ const USER: ExtensionGrantUser = { email: "ada@example.test", id: "user-1", imag
  */
 const createStore = (users: ExtensionGrantUser[] = [USER]) => {
     const codes = new Map<string, { expiresAt: Date; value: string }>();
-    const sessions = new Map<string, { expiresAt: Date; userId: string }>();
+    const sessions = new Map<string, { expiresAt: Date; id: string; userId: string }>();
     const signed: Record<string, unknown>[] = [];
     let sessionCount = 0;
 
@@ -37,7 +37,7 @@ const createStore = (users: ExtensionGrantUser[] = [USER]) => {
 
             const session = { expiresAt: new Date(Date.now() + 7 * 86_400_000), token: `session-${sessionCount}` };
 
-            sessions.set(session.token, { expiresAt: session.expiresAt, userId });
+            sessions.set(session.token, { expiresAt: session.expiresAt, id: `sid-${String(sessionCount)}`, userId });
 
             return session;
         },
@@ -55,7 +55,7 @@ const createStore = (users: ExtensionGrantUser[] = [USER]) => {
             const session = sessions.get(token);
             const user = users.find((candidate) => candidate.id === session?.userId);
 
-            return session && user ? { session: { expiresAt: session.expiresAt }, user } : null;
+            return session && user ? { session: { expiresAt: session.expiresAt, id: session.id }, user } : null;
         },
         findUser: async (userId) => users.find((candidate) => candidate.id === userId) ?? null,
         saveCode: async (identifier, value, expiresAt) => {
@@ -75,6 +75,7 @@ const authorize = async (store: ExtensionGrantStore, overrides: Partial<Paramete
     await authorizeExtension(store, {
         codeChallenge: await pkceChallenge(VERIFIER),
         redirectUri: REDIRECT_URI,
+        session: {},
         trustedRedirectUris: [REDIRECT_URI],
         userId: USER.id,
         ...overrides,
@@ -116,6 +117,27 @@ describe("authorizeExtension", () => {
         await expect(authorize(store, { userId: "guest" })).rejects.toMatchObject({ code: "access_denied", name: "ExtensionGrantError" });
         await expect(authorize(store, { userId: "banned" })).rejects.toMatchObject({ code: "access_denied", name: "ExtensionGrantError" });
         await expect(authorize(store, { codeChallenge: "plain-verifier" })).rejects.toMatchObject({ code: "invalid_request", name: "ExtensionGrantError" });
+    });
+});
+
+describe("authorizeExtension while an admin is impersonating the user", () => {
+    it("issues no code, so no app session can follow", async () => {
+        const { codes, sessions, store } = createStore();
+
+        await expect(authorize(store, { session: { impersonating: true } })).rejects.toMatchObject({
+            code: "access_denied",
+            message: expect.stringContaining("while impersonating"),
+            name: "ExtensionGrantError",
+        });
+        expect(codes.size).toBe(0);
+        expect(sessions.size).toBe(0);
+    });
+
+    it("refuses a sign-in whose session could not be read (an app's grant, or a session gone)", async () => {
+        const { codes, store } = createStore();
+
+        await expect(authorize(store, { session: null })).rejects.toMatchObject({ code: "unauthorized", name: "ExtensionGrantError" });
+        expect(codes.size).toBe(0);
     });
 });
 
@@ -220,7 +242,9 @@ describe("mintExtensionAccessToken", () => {
         const result = await mintExtensionAccessToken(store, { now: 5_000_000, origin: ORIGIN, token });
 
         expect(result.token).toBe("jwt-1");
-        expect(signed[0]).toMatchObject({ aud: ORIGIN, email: USER.email, iat: 5000, iss: ORIGIN, sub: USER.id });
+        // `gsid`, never `sid`: the sign-in it stands for reaches procedures as `grantSessionId`, not `sessionId`.
+        expect(signed[0]).toMatchObject({ aud: ORIGIN, email: USER.email, gsid: "sid-1", iat: 5000, iss: ORIGIN, sub: USER.id });
+        expect(signed[0]).not.toHaveProperty("sid");
     });
 
     it("rejects an unknown, expired or revoked session", async () => {

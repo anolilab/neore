@@ -4,9 +4,14 @@
  * Prompt queue store — per-thread queues of messages submitted while a turn was
  * streaming.
  *
- * Mirrored per thread into sessionStorage so a reload does not lose them, TEXT
- * ONLY: queued attachments hold `File` objects, which storage cannot keep, so a
- * restored prompt carries a count of what it lost instead. A restored queue is
+ * Mirrored per thread into sessionStorage so a reload does not lose them. A
+ * queued attachment is kept by its uploaded file id, never its bytes, and comes
+ * back as an uploaded attachment with an empty stand-in `File`, which the
+ * composer neither previews nor edits; one without an id is counted as lost
+ * instead. The queue lives in the tab's
+ * sessionStorage, not shared by every tab on the thread: each tab drains its own
+ * queue, so a shared one would send its head once per open tab. A duplicated tab
+ * starts with a copy, which is restored paused like any other. A restored queue is
  * always paused — it waits for "Send next" rather than auto-sending prompts the
  * user may no longer remember queuing. Storage can be unavailable (private
  * windows, blocked site data), so every access is guarded and failure just
@@ -17,7 +22,7 @@
 
 import { create } from "zustand";
 
-import type { PromptQueueState, QueuedPrompt } from "@/features/chat/core/utils/prompt-queue";
+import type { PromptQueueState, QueuedPrompt, StoredAttachment } from "@/features/chat/core/utils/prompt-queue";
 import {
     dequeuePrompt,
     editQueuedPrompt,
@@ -33,6 +38,14 @@ import {
 } from "@/features/chat/core/utils/prompt-queue";
 
 import type { PendingAttachment } from "./chat-ui-store";
+import {
+    claimPromptQueueRestore,
+    isPromptQueueRestoreAllowed,
+    PROMPT_QUEUE_STORAGE_KEY_PREFIX as STORAGE_KEY_PREFIX,
+    registerPromptQueueReset,
+} from "./prompt-queue-session";
+
+export { allowPromptQueueRestore, clearPromptQueues } from "./prompt-queue-session";
 
 export type QueuedChatPrompt = QueuedPrompt<PendingAttachment>;
 type ThreadQueue = PromptQueueState<PendingAttachment>;
@@ -44,22 +57,59 @@ interface PromptQueueStore {
     enqueue: (threadId: string, prompt: Omit<QueuedChatPrompt, "id"> & { id?: string }) => void;
     /** Puts the prompt first and lifts a pause, so it is the next one sent. */
     enqueueNext: (threadId: string, prompt: Omit<QueuedChatPrompt, "id"> & { id?: string }) => void;
+
+    /**
+     * Keeps a send asked for while the browser was offline, so it goes once the network is back, even if the thread's
+     * composer unmounted meanwhile. `explicit` (the Send next button) sticks. Memory only: a reload restores the queue paused.
+     */
+    holdOffline: (threadId: string, explicit: boolean) => void;
+
     /** Loads a thread's queue from sessionStorage once per page load, if memory has none. */
     hydrate: (threadId: string) => void;
     /** Moves a queued message to `toIndex`, or one place up (`-1`) or down (`1`). */
     move: (threadId: string, id: string, to: number | { step: -1 | 1 }) => void;
+    /** Sends asked for offline, by thread. */
+    offlineHolds: Record<string, { explicit: boolean }>;
     queues: Record<string, ThreadQueue>;
     remove: (threadId: string, id: string) => void;
     setPaused: (threadId: string, paused: boolean) => void;
     /** `steerRun` answered: keeps the steer (`accepted`) or makes it an ordinary queued message (`refused`). */
     settleSteer: (threadId: string, steerId: string, outcome: "accepted" | "refused") => void;
+    /** Marks whether a send was made under a queued message's id whose answer may have been lost. */
+    setTried: (threadId: string, id: string, tried: boolean) => void;
     /** Removes and returns the oldest queued prompt. */
     shift: (threadId: string) => QueuedChatPrompt | undefined;
+    /** Removes and returns the thread's offline-held send, if any. */
+    takeOfflineHold: (threadId: string) => { explicit: boolean } | undefined;
 }
 
-const STORAGE_KEY_PREFIX = "neore:prompt-queue:";
-
 const generatePromptId = () => `queued-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+/** Keeps an attachment by its uploaded file id; one still uploading or failed has none, so it is not kept. */
+export const toStoredAttachment = (attachment: PendingAttachment): StoredAttachment | undefined =>
+    attachment.status === "complete" && attachment.fileId
+        ? {
+              fileId: attachment.fileId,
+              kind: attachment.type,
+              mediaType: attachment.file.type,
+              name: attachment.name,
+              size: attachment.restoredSize ?? attachment.file.size,
+          }
+        : undefined;
+
+/** An uploaded attachment again: the send reads only its file id, so its `File` is an empty stand-in. */
+export const fromStoredAttachment = (stored: StoredAttachment, index: number): PendingAttachment => {
+    return {
+        file: new File([], stored.name, { type: stored.mediaType }),
+        fileId: stored.fileId,
+        // By position as well: the same uploaded file can be attached twice, and each chip is removed on its own.
+        id: `restored-${index}-${stored.fileId}`,
+        name: stored.name,
+        restoredSize: stored.size,
+        status: "complete",
+        type: stored.kind,
+    };
+};
 
 const readStoredQueue = (threadId: string): string | null => {
     try {
@@ -71,7 +121,7 @@ const readStoredQueue = (threadId: string): string | null => {
 
 const writeStoredQueue = (threadId: string, queue: ThreadQueue): void => {
     try {
-        const serialized = serializePromptQueue(queue);
+        const serialized = serializePromptQueue(queue, toStoredAttachment);
 
         if (serialized) {
             globalThis.sessionStorage?.setItem(STORAGE_KEY_PREFIX + threadId, serialized);
@@ -79,14 +129,23 @@ const writeStoredQueue = (threadId: string, queue: ThreadQueue): void => {
             globalThis.sessionStorage?.removeItem(STORAGE_KEY_PREFIX + threadId);
         }
     } catch {
-        // Quota or blocked storage: the queue still works for this page load.
+        // Quota or blocked storage: the queue still works for this page load. An older stored copy must not come back on a
+        // reload with messages already sent in it, so it goes (a removal needs no quota).
+        try {
+            globalThis.sessionStorage?.removeItem(STORAGE_KEY_PREFIX + threadId);
+        } catch {
+            // Storage is blocked altogether: there is nothing stored to come back.
+        }
     }
 };
 
-/** Threads already checked against storage this page load, so a drained queue is not resurrected. */
-const hydratedThreadIds = new Set<string>();
-
 export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
+    // `clearPromptQueues` lives apart from the store (`prompt-queue-session`) and drops what is in memory through this.
+    registerPromptQueueReset(() => {
+        // The ended session's held sends go too: a later queue under the same thread id must not inherit its request.
+        set({ offlineHolds: {}, queues: {} });
+    });
+
     const update = (threadId: string, next: (queue: ThreadQueue) => ThreadQueue) => {
         // A write that beats the composer's hydrate effect must not clobber the stored queue.
         get().hydrate(threadId);
@@ -101,7 +160,12 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
         set((state) => {
             return { queues: { ...state.queues, [threadId]: updated } };
         });
-        writeStoredQueue(threadId, updated);
+
+        // Before the session is confirmed, in memory only: storing it would replace the queue kept from before a reload,
+        // which `hydrate` merges in once it may be read.
+        if (isPromptQueueRestoreAllowed()) {
+            writeStoredQueue(threadId, updated);
+        }
     };
 
     return {
@@ -112,29 +176,56 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
                 return { ...prependPrompt(queue, { ...prompt, id: prompt.id ?? generatePromptId() }), paused: false };
             }),
         hydrate: (threadId) => {
-            if (hydratedThreadIds.has(threadId)) {
+            // Not yet: not marked either, so the first read once the session is confirmed still restores it.
+            if (!claimPromptQueueRestore(threadId)) {
                 return;
             }
 
-            hydratedThreadIds.add(threadId);
+            const current = get().queues[threadId];
+            const restored = restorePromptQueue(readStoredQueue(threadId), fromStoredAttachment);
 
-            if (get().queues[threadId]?.items.length) {
+            if (!current?.items.length) {
+                if (restored) {
+                    set((state) => {
+                        return { queues: { ...state.queues, [threadId]: restored } };
+                    });
+                }
+
                 return;
             }
 
-            const restored = restorePromptQueue(readStoredQueue(threadId));
+            // Queued before the session was confirmed, so kept in memory only (`update`): the stored queue comes first, in
+            // its paused state, then what was queued since; then both are stored.
+            const restoredIds = new Set(restored?.items.map((item) => item.id));
+            const merged: ThreadQueue = restored
+                ? { ...restored, items: [...restored.items, ...current.items.filter((item) => !restoredIds.has(item.id))] }
+                : current;
 
-            if (restored) {
-                set((state) => {
-                    return { queues: { ...state.queues, [threadId]: restored } };
-                });
-            }
+            set((state) => {
+                return { queues: { ...state.queues, [threadId]: merged } };
+            });
+            writeStoredQueue(threadId, merged);
         },
+        holdOffline: (threadId, explicit) =>
+            set((state: PromptQueueStore) => {
+                return { offlineHolds: { ...state.offlineHolds, [threadId]: { explicit: explicit || state.offlineHolds[threadId]?.explicit === true } } };
+            }),
         move: (threadId, id, to) =>
             update(threadId, (queue) => (typeof to === "number" ? moveQueuedPrompt(queue, id, to) : stepQueuedPrompt(queue, id, to.step))),
+        offlineHolds: {},
         queues: {},
         remove: (threadId, id) => update(threadId, (queue) => removeQueuedPrompt(queue, id)),
         setPaused: (threadId, paused) => update(threadId, (queue) => (queue.paused === paused ? queue : { ...queue, paused })),
+        setTried: (threadId, id, tried) =>
+            update(threadId, (queue) => {
+                const target = queue.items.find((item) => item.id === id);
+
+                if (!target || Boolean(target.tried) === tried) {
+                    return queue;
+                }
+
+                return { ...queue, items: queue.items.map((item) => (item === target ? { ...item, tried } : item)) };
+            }),
         settleSteer: (threadId, steerId, outcome) => update(threadId, (queue) => settleQueuedSteer(queue, steerId, outcome)),
         shift: (threadId) => {
             const { next, state } = dequeuePrompt(get().queues[threadId] ?? EMPTY_PROMPT_QUEUE);
@@ -144,6 +235,21 @@ export const usePromptQueueStore = create<PromptQueueStore>()((set, get) => {
             }
 
             return next;
+        },
+        takeOfflineHold: (threadId) => {
+            const held = get().offlineHolds[threadId];
+
+            if (held) {
+                set((state: PromptQueueStore) => {
+                    const offlineHolds = { ...state.offlineHolds };
+
+                    delete offlineHolds[threadId];
+
+                    return { offlineHolds };
+                });
+            }
+
+            return held;
         },
     };
 });

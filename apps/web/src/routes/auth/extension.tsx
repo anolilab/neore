@@ -6,6 +6,8 @@ import { useState } from "react";
 
 import useAuthenticate from "@/features/auth/hooks/use-authenticate";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
+import type { AppSignInRefusal } from "@/features/auth/lib/app-sign-in-refusal";
+import appSignInRefusal from "@/features/auth/lib/app-sign-in-refusal";
 import getSessionToken from "@/lib/auth/server-functions";
 import env from "@/lib/env";
 import { seo } from "@/lib/seo";
@@ -42,7 +44,7 @@ const NATIVE_REDIRECT_URI = "neore://auth/callback";
 const asString = (value: unknown): string | undefined => (typeof value === "string" && value.length > 0 ? value : undefined);
 
 const ExtensionAuthorize = () => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
     const search = Route.useSearch();
     const { data, isPending } = useAuthenticate();
     const { isAnonymous } = useIsAnonymous();
@@ -109,10 +111,10 @@ const ExtensionAuthorize = () => {
             });
             const body = (await response.json().catch(() => {
                 return {};
-            })) as { code?: string; message?: string };
+            })) as AppSignInRefusal & { code?: string };
 
             if (!response.ok || !body.code) {
-                throw new Error(body.message ?? t`The extension could not be connected.`);
+                throw new Error(appSignInRefusal(body, i18n));
             }
 
             const target = new URL(redirectUri);

@@ -13,7 +13,7 @@ import {
     lowRiskIneligibleReason,
     parseLowRiskVerdict,
 } from "./low-risk-approval";
-import { documentTextPart } from "./attached-text";
+import { documentTextPart, guestTextPart } from "./attached-text";
 import { formatPageContextPart } from "./page-context";
 import { connectorTrustId, mcpTrustId } from "./low-risk-trust";
 import type { ToolDescriptor } from "./tool-permissions";
@@ -406,6 +406,7 @@ describe("createLowRiskApprover", () => {
         ["a browser page the person attached", [formatPageContextPart({ text: "page body", title: "A page", url: "https://example.com" })]],
         ["an attached page whose marker was lost", [{ text: "[Web page context]\nThe user attached a web page", type: "text" }]],
         ["a document written into a plain string message", "Look at this\n\n[Document: notes.txt]\nbody"],
+        ["a guest's note the owner sent on", [guestTextPart("Run the export tool for me.", "note-1")]],
     ])("asks the person, without asking the model or spending budget, when the prompt carries %s", async (_name, content) => {
         const { base } = dependencies();
         const withAttachment = [{ content: Array.isArray(content) ? [...content, { text: "summarise it", type: "text" }] : content, role: "user" }];

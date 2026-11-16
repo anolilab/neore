@@ -6,7 +6,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 const NO_BLOCKED_CREATORS: string[] = [];
@@ -230,8 +230,7 @@ const visibleRules = (edits: PreferencesEdits): ModelFilterRules | undefined => 
 export const useUpdateModelFilterRules = () => {
     const crpc = useCRPC();
     const queryClient = useQueryClient();
-    const { hooks } = useAuth();
-    const userId = hooks.useSession().data?.user.id;
+    const userId = useAuthSession().data?.user.id;
     const preferences = crpc.auth.functions.getAIUserPreferences.queryOptions({});
     const { data, isSuccess: isLoaded } = useQuery(preferences);
     const rules = data?.modelFilterRules as ModelFilterRules | undefined;

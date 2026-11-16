@@ -174,6 +174,7 @@ export const AUDIT_TABLES: Record<string, Attribution> = {
     prompts: { organizationId: (d) => asString(d["organizationId"]), userId: (d) => asString(d["userId"]) },
     session: { userId: (d) => asString(d["userId"]) },
     team: { organizationId: (d) => asString(d["organizationId"]) },
+    teammateConnectorAccess: { userId: (d) => asString(d["userId"]) },
     teamMember: { userId: (d) => asString(d["userId"]) },
     teamSettings: { organizationId: (d) => asString(d["organizationId"]) },
     twoFactor: { userId: (d) => asString(d["userId"]) },

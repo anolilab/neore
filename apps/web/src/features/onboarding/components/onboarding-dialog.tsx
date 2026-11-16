@@ -4,12 +4,10 @@ import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Dialog, DialogPopup, DialogTitle } from "@neore/ui/components/dialog";
 import cn from "@neore/ui/utils/cn";
-import { createPostHogPlugin } from "@onboardjs/posthog-plugin";
 import type { OnboardingError } from "@onboardjs/react";
 import { OnboardingErrorBoundary, OnboardingProvider, useOnboarding } from "@onboardjs/react";
 import { ArrowLeft, ArrowRight, BrainCircuit, Check, FileText, Image, Loader2, MessageSquare, Repeat, Search, Sparkles } from "lucide-react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
-import { posthog } from "posthog-js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
@@ -17,6 +15,7 @@ import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
 import { trackEvent } from "@/lib/analytics";
 
+import useOnboardingPlugins from "../hooks/use-onboarding-plugins";
 import { shouldShowOnboarding } from "../should-show-onboarding";
 import type { NeoreOnboardingPayload } from "../steps";
 import { ONBOARDING_FLOW_ID, ONBOARDING_PERSISTENCE_KEY, onboardingSteps } from "../steps";
@@ -96,7 +95,7 @@ const TemplatePicker: React.FC<{
                     onClick={() => onSelectTemplate(template.prompt)}
                     type="button"
                 >
-                    <span className="text-primary shrink-0">{template.icon}</span>
+                    <span className="text-primary-text shrink-0">{template.icon}</span>
                     <span className="font-medium">{template.label}</span>
                 </button>
             ))}
@@ -255,7 +254,7 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
                     <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 px-8 py-12">
                         <motion.div
                             animate={{ opacity: 1, scale: 1 }}
-                            className="bg-primary/10 text-primary flex size-16 items-center justify-center rounded-full"
+                            className="bg-primary/10 text-primary-text flex size-16 items-center justify-center rounded-full"
                             initial={{ opacity: 0, scale: 0.5 }}
                             transition={{ duration: 0.3, ease: "easeOut" }}
                         >
@@ -340,7 +339,7 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
                                 key={currentStep?.id}
                                 transition={{ duration: 0.2, ease: "easeOut" }}
                             >
-                                <div className="bg-primary/10 text-primary flex size-16 items-center justify-center rounded-2xl">
+                                <div className="bg-primary/10 text-primary-text flex size-16 items-center justify-center rounded-2xl">
                                     {STEP_ICONS[payload.icon]}
                                 </div>
                                 <h2 className="font-heading text-xl font-semibold">{title}</h2>
@@ -439,31 +438,7 @@ const OnboardingDialog = () => {
         }
     };
 
-    // A lazy `useState` initializer, not `useMemo`: React may discard a memo
-    // cache at any time, and re-creating the plugin would re-register its
-    // PostHog listeners.
-    const [plugins] = useState(() => {
-        if (typeof window === "undefined" || !posthog.__loaded) {
-            return [];
-        }
-
-        return [
-            createPostHogPlugin({
-                churnTimeoutMs: 30_000,
-                debug: import.meta.env.DEV,
-                enableChurnDetection: true,
-                enablePerformanceTracking: true,
-                enableProgressMilestones: true,
-                excludePersonalData: true,
-                milestonePercentages: [25, 50, 75, 100],
-                performanceThresholds: {
-                    slowRenderMs: 500,
-                    slowStepMs: 10_000,
-                },
-                posthogInstance: posthog,
-            }),
-        ];
-    });
+    const plugins = useOnboardingPlugins();
 
     if (!shouldShowOnboarding({ onboardingCompleted, user })) {
         return null;

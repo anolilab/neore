@@ -22,6 +22,7 @@ import { internalAction, internalMutation } from "../_generated/server";
 import { enqueueJob } from "../lib/job-queue";
 import { logger } from "../lib/logger";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
+import { cancelForDeletion, subscriptionStatus } from "./provider";
 
 const billingLogger = logger.scope("billing");
 
@@ -64,19 +65,23 @@ export const deleteBillingRows = internalMutation
     .input({ referenceId: v.string() })
     .output(v.object({ hasMore: v.boolean() }))
     .mutation(async ({ args: { referenceId }, ctx }) => {
-        const [subscriptions, sessions, customers, usageEvents] = await Promise.all([
+        // `payment_referenceRevisions` holds a counter per reference only under `singleSubscriptionPerReference`, which
+        // is off here, so it stays empty; it is keyed by the user or organization id, so it is erased all the same.
+        const [subscriptions, sessions, customers, usageEvents, referenceRevisions] = await Promise.all([
             ctx.db.payment_subscriptions.findMany({ limit: BATCH, where: { referenceId } }),
             ctx.db.payment_sessions.findMany({ limit: BATCH, where: { referenceId } }),
             ctx.db.payment_customers.findMany({ limit: BATCH, where: { referenceId } }),
             ctx.db.payment_usageEvents.findMany({ limit: BATCH, where: { referenceId } }),
+            ctx.db.payment_referenceRevisions.findMany({ limit: BATCH, where: { referenceId } }),
         ]);
-        const pages = [subscriptions.page, sessions.page, customers.page, usageEvents.page];
+        const pages = [subscriptions.page, sessions.page, customers.page, usageEvents.page, referenceRevisions.page];
 
         await Promise.all([
             ...subscriptions.page.map(async (row) => await ctx.db.delete("payment_subscriptions", row._id)),
             ...sessions.page.map(async (row) => await ctx.db.delete("payment_sessions", row._id)),
             ...customers.page.map(async (row) => await ctx.db.delete("payment_customers", row._id)),
             ...usageEvents.page.map(async (row) => await ctx.db.delete("payment_usageEvents", row._id)),
+            ...referenceRevisions.page.map(async (row) => await ctx.db.delete("payment_referenceRevisions", row._id)),
         ]);
 
         return { hasMore: pages.some((page) => page.length >= BATCH) };
@@ -97,13 +102,13 @@ export const cancelBilling = internalAction
             // Asked of Creem, not the store: a run that cancelled and then failed
             // before its row deletes is retried, and the store only learns of the
             // cancel from a webhook that may not have landed yet.
-            const current = await ctx.payments.adapter.getSubscriptionStatus(subscription.id);
+            const current = await subscriptionStatus(referenceId, subscription.id);
 
             if (isCancellable(current)) {
-                // The adapter, not the facade: the facade authorizes against the
+                // `./provider.ts`, not the facade: the facade authorizes against the
                 // caller, and a workflow step or queued job has none. Immediate,
                 // not at period end — the subject is going away.
-                await ctx.payments.adapter.cancelSubscription(subscription.id);
+                await cancelForDeletion(referenceId, subscription.id);
             }
         }
 

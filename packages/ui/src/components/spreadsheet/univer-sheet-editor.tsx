@@ -26,6 +26,7 @@ import UniverPresetSheetsSortEnUS from "@univerjs/preset-sheets-sort/locales/en-
 import { createUniver, defaultTheme, LocaleType, mergeLocales } from "@univerjs/presets";
 import { useCallback, useEffect, useRef } from "react";
 
+import { observeUniverAccessibility } from "./univer-accessibility";
 import type { UniverWorkbookData } from "./univer-utilities";
 import { csvToUniverWorkbook, univerWorkbookToCsv } from "./univer-utilities";
 
@@ -95,6 +96,8 @@ export const UniverSheetEditor = ({
 
         univerAPIRef.current = univerAPI;
 
+        const stopRepairingAccessibility = observeUniverAccessibility(containerRef.current);
+
         // Load initial data
         const workbookData = csvToUniverWorkbook(contentRef.current, title);
 
@@ -131,6 +134,7 @@ export const UniverSheetEditor = ({
                 }
 
                 subscription?.dispose();
+                stopRepairingAccessibility();
                 univerAPI.dispose();
                 univerAPIRef.current = null;
             };
@@ -141,6 +145,7 @@ export const UniverSheetEditor = ({
                 clearTimeout(debounceRef.current);
             }
 
+            stopRepairingAccessibility();
             univerAPI.dispose();
             univerAPIRef.current = null;
         };

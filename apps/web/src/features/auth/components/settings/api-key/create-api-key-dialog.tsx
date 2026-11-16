@@ -143,7 +143,8 @@ const CreateAPIKeyDialog = ({ classNames, onOpenChange, onSuccess, refetch, ...p
 
                                         <Select onValueChange={(value) => field.handleChange(value ?? "")} value={field.state.value}>
                                             <field.FormControl>
-                                                <SelectTrigger className={classNames?.input}>
+                                                {/* Base UI gives the trigger its own id, so the label's `htmlFor` does not reach it. */}
+                                                <SelectTrigger aria-label={t`Expires`} className={classNames?.input}>
                                                     <SelectValue placeholder={t`No expiration`} />
                                                 </SelectTrigger>
                                             </field.FormControl>

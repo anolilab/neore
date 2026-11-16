@@ -32,7 +32,7 @@ const RunningDots: FC = () => {
         // With no beat attribute (reduced motion, clock stopped) the :not rule keeps every dot fully visible.
         <svg
             aria-hidden="true"
-            className="text-ring dark:text-primary h-3 w-3 shrink-0 [:root:not([data-status-beat])_&_circle]:opacity-100"
+            className="text-ring dark:text-primary-text h-3 w-3 shrink-0 [:root:not([data-status-beat])_&_circle]:opacity-100"
             fill="currentColor"
             viewBox="0 0 16 16"
         >

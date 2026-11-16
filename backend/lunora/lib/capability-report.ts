@@ -131,6 +131,17 @@ export const vCapabilityReport = v.object({
                         v.object({ reason: v.union(v.literal("not_offered"), v.literal("not_enforced"), v.literal("unknown")), supported: v.literal(false) }),
                     ),
                 ),
+                fork: v.optional(
+                    v.union(
+                        v.object({ degradation: v.literal("none"), supported: v.literal(true) }),
+                        v.object({
+                            degradation: v.union(v.literal("restart"), v.literal("synthetic"), v.literal("divergent")),
+                            note: v.string().max(MAX_LENGTH.long),
+                            supported: v.literal(true),
+                        }),
+                        v.object({ reason: v.union(v.literal("not_offered"), v.literal("not_enforced"), v.literal("unknown")), supported: v.literal(false) }),
+                    ),
+                ),
                 listNative: v.optional(
                     v.union(
                         v.object({ degradation: v.literal("none"), supported: v.literal(true) }),

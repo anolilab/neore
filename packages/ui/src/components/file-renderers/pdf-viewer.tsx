@@ -13,30 +13,25 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
 import { useLingui } from "@lingui/react/macro";
+import { isFetchableUrl, useFetchableOrigins } from "@ui/hooks/use-fetchable-origins";
 import cn from "@ui/utils/cn";
 import { ChevronLeft, ChevronRight, Minus, Plus, ZoomIn } from "lucide-react";
-// Emitted by Vite as a hashed asset next to this chunk. `new URL("pdfjs-dist/…",
-// import.meta.url)` resolved RELATIVE to this file (packages/ui/src/…), which does
-// not exist: the worker 404'd at runtime and every PDF failed to load. The
-// `pdfjs-dist` dependency must stay at exactly the version react-pdf depends on,
-// or the API and worker versions disagree and pdf.js refuses to start.
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import type { FC } from "react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { Document, Page, pdfjs } from "react-pdf";
+import { Document, Page } from "react-pdf";
 
-pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-
-// A stalled signed-URL request must not leave the spinner up forever.
-const PDF_LOAD_TIMEOUT_MS = 30_000;
+import { PDF_LOAD_TIMEOUT_MS } from "./pdf-limits";
+import { useSharedPdfOptions } from "./pdf-worker";
 
 export interface PdfViewerProps {
     className?: string;
     filename?: string;
+    /** Takes the height its parent gives it, instead of a 600px document area. */
+    fill?: boolean;
     url: string;
 }
 
-const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, url }) => {
+const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, fill, url }) => {
     const { t } = useLingui();
     const [numberPages, setNumberPages] = useState<number>(0);
     const [loadState, setLoadState] = useState<"failed" | "loaded" | "loading">("loading");
@@ -44,6 +39,11 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, url }) => {
     const [scale, setScale] = useState(1);
     const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined);
     const containerRef = useRef<HTMLDivElement>(null);
+    // A URL the page may not fetch is refused before any request, as the thumbnail refuses it.
+    const origins = useFetchableOrigins();
+    const refused = !isFetchableUrl(url, origins);
+    // The shared pdf.js worker, taken after commit and only for a document that will load: it renders once it is there.
+    const pdfOptions = useSharedPdfOptions(loadState !== "failed" && !refused);
 
     const loadDeadlineRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -98,8 +98,31 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, url }) => {
     // Calculate page width: fit to container at scale 1
     const pageWidth = containerWidth ? (containerWidth - 32) * scale : undefined;
 
+    const loadingPreview = (
+        <div className="flex items-center justify-center py-12" role="status">
+            <ZoomIn aria-hidden="true" className="text-muted-foreground size-6 animate-pulse motion-reduce:animate-none" />
+            <span className="sr-only">{t`Loading preview…`}</span>
+        </div>
+    );
+    const documentOrLoading = pdfOptions ? (
+        <Document
+            file={url}
+            loading={loadingPreview}
+            onLoadError={onDocumentLoadError}
+            onLoadProgress={armLoadDeadline}
+            onLoadSuccess={onDocumentLoadSuccess}
+            options={pdfOptions}
+            // react-pdf 11 suspends by default; keep the inline `loading` UI instead.
+            suspense={false}
+        >
+            <Page pageNumber={pageNumber} renderAnnotationLayer renderTextLayer width={pageWidth} />
+        </Document>
+    ) : (
+        loadingPreview
+    );
+
     return (
-        <div className={cn("my-2 w-full max-w-2xl overflow-hidden rounded-lg border", className)}>
+        <div className={cn("my-2 w-full max-w-2xl overflow-hidden rounded-lg border", fill && "flex flex-col", className)}>
             {/* Toolbar */}
             <div className="bg-muted/50 flex items-center justify-between border-b px-3 py-1.5">
                 <div className="flex items-center gap-1">
@@ -154,28 +177,17 @@ const PdfViewer: FC<PdfViewerProps> = memo(({ className, filename, url }) => {
             </div>
 
             {/* PDF Content */}
-            <div className="overflow-auto bg-gray-100 p-4 dark:bg-gray-900" ref={containerRef} style={{ maxHeight: "600px" }}>
-                {loadState === "failed" ? (
+            <div
+                className={cn("overflow-auto bg-gray-100 p-4 dark:bg-gray-900", fill && "min-h-0 flex-1")}
+                ref={containerRef}
+                style={fill ? undefined : { maxHeight: "600px" }}
+            >
+                {loadState === "failed" || refused ? (
                     <p className="text-muted-foreground py-12 text-center text-sm" role="status">
                         {t`This preview could not be loaded.`}
                     </p>
                 ) : (
-                    <Document
-                        file={url}
-                        loading={
-                            <div className="flex items-center justify-center py-12" role="status">
-                                <ZoomIn aria-hidden="true" className="text-muted-foreground size-6 animate-pulse" />
-                                <span className="sr-only">{t`Loading preview…`}</span>
-                            </div>
-                        }
-                        onLoadError={onDocumentLoadError}
-                        onLoadProgress={armLoadDeadline}
-                        onLoadSuccess={onDocumentLoadSuccess}
-                        // react-pdf 11 suspends by default; keep the inline `loading` UI instead.
-                        suspense={false}
-                    >
-                        <Page pageNumber={pageNumber} renderAnnotationLayer renderTextLayer width={pageWidth} />
-                    </Document>
+                    documentOrLoading
                 )}
             </div>
         </div>

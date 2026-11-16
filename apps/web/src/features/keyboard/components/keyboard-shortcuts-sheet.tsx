@@ -68,15 +68,18 @@ const KeyboardShortcutsSheet = ({ shortcuts }: { shortcuts: Partial<KeyboardShor
     };
 
     const labels: Record<string, string> = {
+        archiveThread: t`Archive open thread`,
         audioRecord: t`Record audio`,
         commandPalette: t`Open command palette`,
         copyLastCodeBlock: t`Copy last code block`,
         decreaseEffort: t`Lower reasoning effort`,
+        deleteThread: t`Delete open thread (asks first)`,
         escape: t`Cancel or close`,
         findInThread: t`Find in thread`,
         firstItem: t`Go to first item`,
         focusSearch: t`Search threads`,
         help: t`Show keyboard shortcuts`,
+        jumpToLastMessage: t`Jump to my last message`,
         helpKey: t`Show keyboard shortcuts (outside text fields)`,
         increaseEffort: t`Raise reasoning effort`,
         lastItem: t`Go to last item`,
@@ -123,7 +126,7 @@ const KeyboardShortcutsSheet = ({ shortcuts }: { shortcuts: Partial<KeyboardShor
                     <DialogDescription>
                         {t`The keys you have set now.`}{" "}
                         <Link
-                            className="text-primary underline-offset-4 hover:underline"
+                            className="text-primary-text underline-offset-4 hover:underline"
                             onClick={() => setOpen(false)}
                             to="/dashboard/settings/app/keyboard-shortcuts"
                         >

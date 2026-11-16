@@ -12,11 +12,15 @@ export type ResearchDepth = "speed" | "balanced" | "thorough";
 
 export type ToolCtx = ActionContext & {
     agent?: Agent;
+    /** The task, trigger or eval run whose chain this run belongs to, for a sub-agent it starts to carry; unset for the owner's chat. */
+    chainSource?: string;
     /** What started this run, for a dispatch to a worker to carry as `dispatchedBy`; unset when the run never said, which refuses one. */
     dispatchOrigin?: DispatchOrigin;
     /** Set when the run is headless (a sub-agent, trigger, task or messenger reply): nobody is there to approve a call. */
     headless?: boolean;
     messageId?: string;
+    /** The organization that caps this run's tools; a sub-agent it dispatches inherits it when its parent thread has none. */
+    organizationId?: string | null;
     /** Controls search depth/thoroughness for web search and deep research tools */
     researchDepth?: ResearchDepth;
     /** Who started the turn this run belongs to; a continuation runs as the thread's owner whoever that was. Unset when the run never said. */

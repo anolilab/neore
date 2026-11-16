@@ -190,6 +190,12 @@ export type ContextOptions = {
     excludeToolMessages?: boolean;
 
     /**
+     * The lowest `order` of this thread's rows the model reads: a fresh-context run that paused resumes from its own
+     * prompt, never the turns above it (`ToolRunConfig.contextFromOrder`). Rows of other threads are not cut.
+     */
+    fromOrder?: number;
+
+    /**
      * How many recent messages to include. These are added after the search
      * messages, and do not count against the search limit.
      * Default: 100
@@ -386,8 +392,11 @@ export type RawRequestResponseHandler = (
 // The component surface is the whole generated api.
 export type AgentComponent = typeof api;
 
+/** The tools a call runs with: its own `TOOLS` when given, else the agent's. */
+export type ResolvedTools<AgentTools extends ToolSet, TOOLS extends ToolSet | undefined> = TOOLS extends undefined ? AgentTools : TOOLS;
+
 export type TextArgs<AgentTools extends ToolSet, TOOLS extends ToolSet | undefined = undefined, OUTPUT extends Output<any, any, any> = never> = AgentPrompt &
-    Omit<Parameters<typeof generateText<TOOLS extends undefined ? AgentTools : TOOLS, AiContext, OUTPUT>>[0], "model" | "prompt" | "messages"> & {
+    Omit<Parameters<typeof generateText<ResolvedTools<AgentTools, TOOLS>, AiContext, OUTPUT>>[0], "model" | "prompt" | "messages"> & {
         /**
          * The tools to use for the tool calls. This will override tools specified
          * in the Agent constructor or createThread / continueThread.
@@ -400,7 +409,7 @@ export type StreamingTextArgs<
     TOOLS extends ToolSet | undefined = undefined,
     OUTPUT extends Output<any, any, any> = never,
 > = AgentPrompt &
-    Omit<Parameters<typeof streamText<TOOLS extends undefined ? AgentTools : TOOLS, AiContext, OUTPUT>>[0], "model" | "prompt" | "messages"> & {
+    Omit<Parameters<typeof streamText<ResolvedTools<AgentTools, TOOLS>, AiContext, OUTPUT>>[0], "model" | "prompt" | "messages"> & {
         /**
          * The tools to use for the tool calls. This will override tools specified
          * in the Agent constructor or createThread / continueThread.

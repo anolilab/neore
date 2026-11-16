@@ -11,7 +11,7 @@ Neore Chat v2 — AI chat app: React + TypeScript frontend, a **Lunora** backend
 ├── apps/
 │   ├── web/                # Main React app (TanStack Start)
 │   ├── browser-extension/  # CRXJS + React
-│   ├── desktop/            # Electron 44 shell around the DEPLOYED web app
+│   ├── desktop/            # Electron 45 shell around the DEPLOYED web app
 │   ├── cli/                # `neore` CLI for the public v1 API
 │   └── mobile/             # Expo / React Native app
 ├── backend/                # Lunora backend (ShardDO + .global() D1 + R2), Better Auth
@@ -56,17 +56,15 @@ Entry points: `apps/web/src/routes/__root.tsx` (app), `backend/lunora/chat/execu
 
 ## COMMANDS
 
-Always `pnpm`. Lint does not include types: run both.
+Always `pnpm`. Lint does not include types: run both. Git hooks format on commit and check formatting on push.
 
 ```bash
 pnpm lint:types                          # vis run lint:types — NOT `pnpm typecheck`
-pnpm lint                                # prettier + eslint + dedupe; `lint:eslint:fix`, `lint:prettier:fix`
+pnpm lint                                # vis run lint:all: eslint + oxlint + oxfmt (Prettier for md) + dedupe; `lint:eslint:fix`, `lint:oxfmt:fix`
 pnpm vis run test                        # every test; there is NO root `pnpm test` (`pnpm test` inside a project)
 pnpm build:packages                      # then `pnpm --filter @neore/backend run build` for the Worker
 cd backend && pnpm codegen               # backend codegen
 ```
-
-Root Prettier covers only `*.{json,yml,yaml,js,mjs,cjs,ts}`: root markdown is not linted.
 
 ## SCOPED KNOWLEDGE — READ BEFORE YOU TOUCH
 
@@ -87,10 +85,11 @@ the files from the root down to their working directory, so **read the file for 
 | AI model registry, prompt optimizer, multi-reference images                         | `packages/ai/AGENTS.md`                                 |
 | LLM gateway, video render queue, FAL media                                          | `services/llm-gateway/AGENTS.md`                        |
 | Web app, frontend lessons, accessibility                                            | `apps/web/AGENTS.md`, `apps/web/src/AGENTS.md`           |
+| Storybook: stories, MSW fixtures, page stories, a11y in CI                          | `apps/web/src/storybook/AGENTS.md`                      |
 | Web auth (session reads), chat UI, local models                                     | `apps/web/src/features/{auth,chat,local-models}/AGENTS.md` |
 | Desktop shell, dictation, ACP registry installs; mobile app; UI components          | `apps/desktop/AGENTS.md`, `apps/mobile/AGENTS.md`, `packages/ui/AGENTS.md` |
 | Device execution, sandbox, SSH servers, `neore-host`                                | `packages/device-core/AGENTS.md`                        |
-| Dev servers and local failures; build, deploy, Worker size; pnpm and vis              | `docs/agents/{local-dev,build-and-deploy,tooling}.md`   |
+| Dev servers, build, deploy, pnpm, vis; review checklist and test rules for a PR      | `docs/agents/{local-dev,build-and-deploy,tooling,review-checklist,testing}.md` |
 
 ## A NOTE TO THE AGENT
 

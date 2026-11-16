@@ -53,7 +53,7 @@ const getCellClassName = (value: unknown): string => {
     }
 
     if (typeof value === "boolean") {
-        return value ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
+        return value ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400";
     }
 
     return "";
@@ -66,7 +66,11 @@ const CsvTable = ({ className, data, headers, labels, onClearSearch, onSort, sea
             return <ArrowUpDownIcon className="text-muted-foreground size-3" />;
         }
 
-        return sortConfig.direction === "asc" ? <ChevronUpIcon className="text-primary size-3" /> : <ChevronDownIcon className="text-primary size-3" />;
+        return sortConfig.direction === "asc" ? (
+            <ChevronUpIcon className="text-primary-text size-3" />
+        ) : (
+            <ChevronDownIcon className="text-primary-text size-3" />
+        );
     };
 
     return (
@@ -124,7 +128,7 @@ const CsvTable = ({ className, data, headers, labels, onClearSearch, onSort, sea
                         }}
                     >
                         <button
-                            className="group hover:text-primary flex w-full items-center gap-2 text-left transition-colors"
+                            className="group hover:text-primary-text flex w-full items-center gap-2 text-left transition-colors"
                             onClick={() => onSort(header)}
                             type="button"
                         >

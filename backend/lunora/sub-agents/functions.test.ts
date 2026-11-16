@@ -19,7 +19,14 @@ import {
     postRunResult,
     runShouldStop,
 } from "./functions";
-import { SUB_AGENT_MAX_CONCURRENT, SUB_AGENT_MAX_PER_RUN, SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS, SUB_AGENT_POST_MAX_ATTEMPTS, stopWhenRequested } from "./logic";
+import {
+    SUB_AGENT_APPROVAL_EXPIRED_MESSAGE,
+    SUB_AGENT_MAX_CONCURRENT,
+    SUB_AGENT_MAX_PER_RUN,
+    SUB_AGENT_POST_FAILURE_MAX_ATTEMPTS,
+    SUB_AGENT_POST_MAX_ATTEMPTS,
+    stopWhenRequested,
+} from "./logic";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -77,6 +84,7 @@ const firstRun = async () => {
 const NEEDS_ACCOUNT = /need an account/u;
 const ONLY_OWNER = /Only the owner/u;
 const FAN_OUT_CAP = /At most 3 sub-agents/u;
+const CHAIN_WAITS = /this task started earlier is still waiting/u;
 const DEPTH_CAP = /at most 2 levels/u;
 const PER_RUN_CAP = /at most 5 sub-agents of its own/u;
 const GONE_PARENT = /is gone/u;
@@ -129,6 +137,19 @@ describe("admitSubAgentRun", () => {
         expect(await runs()).toHaveLength(0);
     });
 
+    it("refuses a conversation being hard-deleted, whose runs are ending, and says so", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deletingAt: Date.now() }));
+
+        expect(await admit()).toStrictEqual({ error: "This chat is being deleted." });
+        expect(await runs()).toHaveLength(0);
+    });
+
+    it("admits again in a conversation whose delete was abandoned an hour ago or more", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deletingAt: Date.now() - 2 * 60 * 60_000 }));
+
+        expect(await admit()).toHaveProperty("runId");
+    });
+
     it(`caps concurrent children at ${String(SUB_AGENT_MAX_CONCURRENT)} and frees a slot when one ends`, async () => {
         for (let index = 0; index < SUB_AGENT_MAX_CONCURRENT; index += 1) {
             expect(await admit()).toHaveProperty("runId");
@@ -141,6 +162,37 @@ describe("admitSubAgentRun", () => {
         await harness.run(async (ctx: any) => await finishRun(ctx, first._id, { kind: "succeeded", result: "done" }));
 
         expect(await admit()).toHaveProperty("runId");
+    });
+
+    describe("a task's chain, which starts a new thread every run", () => {
+        /** The task's first run delegated, and its child now waits for approval; the next run is in a thread of its own. */
+        const waitingChild = async () => {
+            const first = (await admit({ chainSource: "task:t1" })) as { runId: string };
+
+            await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", first.runId, { status: "awaiting" }));
+            threadId = await insertThread(userId);
+
+            return first.runId;
+        };
+
+        it("refuses the task's next delegation while one of its children waits, and nobody else's", async () => {
+            await waitingChild();
+
+            expect(await admit({ chainSource: "task:t1" })).toStrictEqual({ error: expect.stringMatching(CHAIN_WAITS) });
+            expect(await admit({ chainSource: "task:t2" })).toHaveProperty("runId");
+            expect(await admit()).toHaveProperty("runId");
+        });
+
+        it.each([
+            ["answered", { status: "running" }],
+            ["expired", { completedAt: 1, error: SUB_AGENT_APPROVAL_EXPIRED_MESSAGE, status: "failed" }],
+        ])("delegates again once the waiting child is %s", async (_state, patch) => {
+            const waiting = await waitingChild();
+
+            await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", waiting, patch));
+
+            expect(await admit({ chainSource: "task:t1" })).toHaveProperty("runId");
+        });
     });
 
     it("nests to depth 2 and refuses depth 3", async () => {

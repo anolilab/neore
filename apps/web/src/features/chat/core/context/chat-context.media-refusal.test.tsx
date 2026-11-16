@@ -4,7 +4,8 @@
  * A refused `/v1/chat/media` kick-off (here the 403 daily limit) reaches the
  * chat error UI, as a refused `/v1/chat` does. `fetch` does not reject on a
  * 4xx, so before the helper the provider swallowed it and the reply sat on
- * "generating" with no explanation.
+ * "generating" with no explanation. A guest note's refusal is the exception: it goes back to the Guests tab, never to the
+ * chat error UI, whose Retry would rerun the owner's last reply.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
@@ -111,7 +112,7 @@ afterAll(() => {
     server.close();
 });
 
-const holder: { send?: (text: string) => Promise<void> } = {};
+const holder: { send?: (text: string, attachments?: undefined, options?: { guestMessageId?: string }) => Promise<unknown> } = {};
 
 const Probe = () => {
     const { sendMessage } = useChatActions();
@@ -158,5 +159,44 @@ describe("media kick-off refusal", () => {
         await waitFor(() => {
             expect(screen.getByRole("alert").textContent).toBe("You've reached your daily message limit.");
         });
+    });
+});
+
+describe("guest note refusal", () => {
+    it("never reaches the chat error UI, whose Retry reruns the owner's last reply, and comes back to the Guests tab", async () => {
+        server.use(
+            http.post("https://gateway.test/v1/chat", async ({ request }) => {
+                const body = (await request.json()) as { guestMessageId?: string };
+
+                return body.guestMessageId === undefined
+                    ? HttpResponse.json({ error: "unavailable", message: "The service is unavailable." }, { status: 503 })
+                    : HttpResponse.json({ error: "GUEST_NOTE_BEING_SENT", message: "That guest note is being sent." }, { status: 409 });
+            }),
+        );
+
+        render(
+            <QueryClientProvider client={new QueryClient()}>
+                <ChatProvider jwtToken="token" model={"text-model" as never} threadId="thread-1">
+                    <Probe />
+                </ChatProvider>
+            </QueryClientProvider>,
+        );
+
+        let outcome: unknown;
+
+        await act(async () => {
+            outcome = await holder.send?.("please call me back", undefined, { guestMessageId: "note-1" });
+        });
+
+        expect(outcome).toMatchObject({ failure: "That message is being sent.", started: false });
+        // No error, so no banner and no Retry.
+        expect(screen.getByRole("alert").textContent).toBe("");
+
+        // The owner's own send still reports its failure there.
+        await act(async () => {
+            await holder.send?.("my own words");
+        });
+
+        await waitFor(() => expect(screen.getByRole("alert").textContent).not.toBe(""));
     });
 });

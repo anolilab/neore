@@ -21,6 +21,7 @@ import { ACP_CLAIM_WINDOW_MS } from "../devices/lib/constants";
 import { countOpenCalls, isDeviceOnline, isDeviceOutdated } from "../devices/lib/state";
 import { withdrawSend } from "./lib/withdraw";
 import { isHostRunThread } from "./lib/host-thread";
+import { hostOrganizationRefusal } from "./lib/organization-cap";
 import { sessionOfThread } from "./lib/sessions";
 import { offerOf, startFailureMessage, webSessionId } from "./lib/start";
 import { openHostSession } from "./lib/start-session";
@@ -91,6 +92,8 @@ export interface StartHostSessionInput {
     clientId: string;
     deviceId: Id<"devices">;
     folderId: string;
+    /** The caller's verified active organization (`ctx.user.activeOrganization`), unset in the personal space. */
+    organizationId?: string;
 }
 
 /** The body of {@link startHostSession}, callable from another mutation that starts an agent for its own purpose. */
@@ -116,10 +119,19 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
         return { started: false, ...(first && { threadId: first.threadId as string }) };
     }
 
+    // After the claim, so a retry of a start that went through still finds its session. Throwing gives the claim back.
+    const refused = await hostOrganizationRefusal(ctx, args.organizationId, userId);
+
+    if (refused) {
+        throw new LunoraError("FORBIDDEN", refused);
+    }
+
+    // Filed under the organization it was started in, as a chat is: its cap holds the thread whatever space it is used from.
     const threadId = await insertThread(ctx.db, {
         createdBy: userId,
         mode: "text",
         model: offer.agentKey,
+        ...(args.organizationId && { organizationId: args.organizationId }),
         runner: "host",
         status: "active",
         tags: ["chat", "host"],
@@ -153,7 +165,7 @@ export const startHostSession = authMutation
     })
     .output(v.object({ started: v.boolean(), threadId: v.optional(v.string()) }))
     .mutation(async ({ args, ctx }) => {
-        const result = await startHostSessionFor(ctx, ctx.user.userId, args);
+        const result = await startHostSessionFor(ctx, ctx.user.userId, { ...args, organizationId: ctx.user.activeOrganization?.id });
 
         ctx.log.event("acp.start_host_session", { started: result.started });
 

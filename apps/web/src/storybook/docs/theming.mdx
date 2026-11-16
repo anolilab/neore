@@ -1,0 +1,31 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Foundations/Theming" />
+
+# Theming
+
+Every colour, radius and shadow is a CSS variable defined in `packages/ui/src/global.css`. Components use the variables through Tailwind classes such as `bg-card` or `text-muted-foreground`, never hard-coded colours.
+
+## How a theme is applied
+
+| Setting   | What it sets on `<html>`          | Toolbar item |
+| --------- | --------------------------------- | ------------ |
+| Theme     | `class="dark"` and `color-scheme` | Theme        |
+| Accent    | `data-accent="<preset>"`          | Accent       |
+| Direction | `dir="ltr"` or `dir="rtl"`        | Direction    |
+
+The app sets the same attributes in `AppearanceSync` and its boot script, so a story and a real page look the same.
+
+## Tokens
+
+- **Surfaces and their text**: `background`, `card`, `popover`, `primary`, `secondary`, `muted`, `accent`. Each has a `-foreground` partner for its text. See [Colors](?path=/story/foundations--colors).
+- **Status**: `destructive`, `success`, `warning`, `info`.
+- **Lines and focus**: `border`, `input`, `ring`.
+- **Charts**: `chart-1` to `chart-5`.
+- **Radius**: `--radius` and its scale. See [Radius](?path=/story/foundations--radius).
+
+## Rules
+
+- Pair a background with its own `-foreground`, not with an unrelated text colour.
+- Do not use an accent for text on the page background unless it is `--primary-text`, which is tuned for that.
+- A new colour is a new token in `global.css`, in both themes, checked by the contrast test in every mode.

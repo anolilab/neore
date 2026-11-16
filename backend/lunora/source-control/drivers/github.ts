@@ -8,17 +8,21 @@
 import z from "zod/v4";
 
 import type { HostCapabilityReport } from "../capabilities";
+import { excerptLog, excerptRead, isLogAddress, readTail } from "../check-log";
 import { requirementOf } from "../checks-logic";
 import type { CreatePullRequestInput, CreatedPullRequest, HostDriver } from "../driver";
 import { graphqlRequest } from "../graphql";
+import { FETCH_TIMEOUT_LONG_MS, FETCH_TIMEOUT_MS, fetchWithDeadline } from "../../lib/fetch-timeout";
 import { HostApiError } from "../origin-fetch";
 import type { HostRequest } from "../origin-fetch";
 import { discard, parse, readJson } from "../response";
 import type {
+    CheckLog,
     CheckRun,
     CheckState,
     CheckSummary,
     CommitPage,
+    RevertPullRequestResult,
     CursorPage,
     DiffSide,
     FilePage,
@@ -31,11 +35,14 @@ import type {
     MergeState,
     MergeStatus,
     PullRequestDetail,
+    PullRequestEdit,
     PullRequestFile,
     PullRequestRef,
+    PullRequestReview,
     PullRequestSummary,
     RepoPoll,
     RequiredChecks,
+    ReviewState,
     ReviewSubmission,
     ReviewThread,
     SubmittedReview,
@@ -95,7 +102,17 @@ export const GITHUB_CAPABILITIES: HostCapabilityReport = {
             readyToMerge: { degradation: "synthetic", note: "Approved and not a draft. Branch protection is not checked.", supported: true },
         },
         merge: { auto: NATIVE, now: NATIVE },
-        pullRequest: { checks: NATIVE, commits: NATIVE, create: NATIVE, description: NATIVE, diff: NATIVE, files: NATIVE, guide: NATIVE },
+        pullRequest: {
+            checks: NATIVE,
+            commits: NATIVE,
+            create: NATIVE,
+            description: NATIVE,
+            diff: NATIVE,
+            edit: NATIVE,
+            files: NATIVE,
+            guide: NATIVE,
+            revert: NATIVE,
+        },
         review: {
             batchedSubmit: NATIVE,
             lineComments: NATIVE,
@@ -107,6 +124,7 @@ export const GITHUB_CAPABILITIES: HostCapabilityReport = {
             verdictRequestChanges: NATIVE,
             viewedMarks: NATIVE,
         },
+        reviewers: { request: NATIVE },
     },
     reportedAt: 0,
     version: 1,
@@ -515,10 +533,11 @@ const THREADS_QUERY = `query ($owner: String!, $name: String!, $number: Int!, $a
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       reviewThreads(first: ${THREAD_PAGE_SIZE}, after: $after) {
+        totalCount
         pageInfo { endCursor hasNextPage }
         nodes {
           id isResolved isOutdated path line startLine diffSide viewerCanResolve viewerCanUnresolve
-          comments(first: ${THREAD_COMMENTS}) { pageInfo { endCursor hasNextPage } nodes { fullDatabaseId author { login } body createdAt } }
+          comments(first: ${THREAD_COMMENTS}) { totalCount pageInfo { endCursor hasNextPage } nodes { fullDatabaseId author { login } body createdAt } }
         }
       }
     }
@@ -534,7 +553,7 @@ const COMMENTS_QUERY = `query ($id: ID!, $after: String) {
   }
 }`;
 
-const commentsSchema = z.object({ nodes: z.array(z.unknown()), pageInfo: pageInfoSchema.optional() });
+const commentsSchema = z.object({ nodes: z.array(z.unknown()), pageInfo: pageInfoSchema.optional(), totalCount: z.number().optional() });
 
 const commentsDataSchema = z.object({ node: z.object({ comments: commentsSchema }).nullable() });
 
@@ -560,7 +579,11 @@ const threadSchema = z.object({
 
 const threadsDataSchema = z.object({
     repository: z
-        .object({ pullRequest: z.object({ reviewThreads: z.object({ nodes: z.array(z.unknown()), pageInfo: pageInfoSchema }) }).nullable() })
+        .object({
+            pullRequest: z
+                .object({ reviewThreads: z.object({ nodes: z.array(z.unknown()), pageInfo: pageInfoSchema, totalCount: z.number().optional() }) })
+                .nullable(),
+        })
         .nullable(),
 });
 
@@ -582,7 +605,12 @@ const commentsOf = (nodes: unknown[]): ThreadComment[] =>
     });
 
 /** A thread's comments past the first page, a page at a time up to {@link MAX_THREAD_COMMENT_PAGES}; a longer thread ends there. */
-const laterComments = async (request: HostRequest, threadId: string, first: z.infer<typeof commentsSchema>): Promise<unknown[]> => {
+/** The thread's comments past the first page, up to the page bound, and whether they were read to the end. */
+const laterComments = async (
+    request: HostRequest,
+    threadId: string,
+    first: z.infer<typeof commentsSchema>,
+): Promise<{ complete: boolean; nodes: unknown[] }> => {
     const nodes: unknown[] = [];
     let { pageInfo } = first;
 
@@ -597,7 +625,7 @@ const laterComments = async (request: HostRequest, threadId: string, first: z.in
         pageInfo = data.node.comments.pageInfo;
     }
 
-    return nodes;
+    return { complete: pageInfo?.hasNextPage !== true, nodes };
 };
 
 const toThread = async (request: HostRequest, value: unknown): Promise<ReviewThread | undefined> => {
@@ -607,11 +635,16 @@ const toThread = async (request: HostRequest, value: unknown): Promise<ReviewThr
         return undefined;
     }
 
-    const comments = commentsOf([...thread.data.comments.nodes, ...(await laterComments(request, thread.data.id, thread.data.comments))]);
+    const later = await laterComments(request, thread.data.id, thread.data.comments);
+    const comments = commentsOf([...thread.data.comments.nodes, ...later.nodes]);
 
     return {
         canResolve: thread.data.viewerCanResolve,
         canUnresolve: thread.data.viewerCanUnresolve,
+        // How many the thread holds, read or not: a thread longer than the pages read says so.
+        ...(thread.data.comments.totalCount !== undefined && { commentCount: thread.data.comments.totalCount }),
+        // Pages left unread, whatever the total says: the latest comments are among them.
+        ...(!later.complete && { commentsComplete: false as const }),
         comments,
         id: thread.data.id,
         isOutdated: thread.data.isOutdated,
@@ -632,6 +665,7 @@ const listThreads = async (request: HostRequest, ref: PullRequestRef, after: str
         endCursor: reviewThreads.pageInfo.endCursor,
         hasMore: reviewThreads.pageInfo.hasNextPage,
         items: threads.filter((thread): thread is ReviewThread => thread !== undefined),
+        ...(reviewThreads.totalCount !== undefined && { total: reviewThreads.totalCount }),
     };
 };
 
@@ -653,6 +687,101 @@ const replyToThread = async (request: HostRequest, ref: PullRequestRef, commentI
     }
 
     return { id: String(reply.id) };
+};
+
+const REVIEW_PAGE_SIZE = 100;
+const REVIEW_BODY_MAX_CHARS = 20_000;
+
+const submittedReviewSchema = z.object({
+    body: z.string().nullable().optional(),
+    id: z.number(),
+    state: z.string(),
+    submitted_at: z.string().nullable().optional(),
+    user: z.object({ login: z.string() }).nullable().optional(),
+});
+
+const REVIEW_STATES: Record<string, ReviewState> = {
+    APPROVED: "approved",
+    CHANGES_REQUESTED: "changes_requested",
+    COMMENTED: "commented",
+    DISMISSED: "dismissed",
+    PENDING: "pending",
+};
+
+/** The page number a `Link` header names as `rel="last"`, or `undefined` when there is one page. Split, not matched by pattern. */
+export const lastPageOf = (link: string | null): number | undefined => {
+    const last = link?.split(",").find((part) => part.includes('rel="last"'));
+    const start = last?.indexOf("<") ?? -1;
+    const end = last?.indexOf(">") ?? -1;
+
+    if (last === undefined || start < 0 || end <= start) {
+        return undefined;
+    }
+
+    try {
+        const page = Number(new URL(last.slice(start + 1, end)).searchParams.get("page"));
+
+        return Number.isSafeInteger(page) && page > 0 ? page : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
+/**
+ * The newest reviews, newest first, and how many there are in all. The host lists reviews oldest first, so past one
+ * page the last page is read too, with the one before it when the last is short.
+ */
+const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<{ items: PullRequestReview[]; total: number }> => {
+    const path = `${repoPath(ref)}/pulls/${ref.number}/reviews`;
+    const readPage = async (page: number): Promise<{ last: number | undefined; values: unknown[] }> => {
+        const response = await request(path, { query: { page, per_page: REVIEW_PAGE_SIZE } });
+        const last = lastPageOf(response.headers.get("link"));
+
+        return { last, values: parse(z.array(z.unknown()), await readJson(response)) };
+    };
+    const first = await readPage(1);
+    let { values } = first;
+    let total = first.values.length;
+
+    if (first.last !== undefined && first.last > 1) {
+        const last = await readPage(first.last);
+
+        values = last.values;
+        total = (first.last - 1) * REVIEW_PAGE_SIZE + last.values.length;
+
+        if (last.values.length < REVIEW_PAGE_SIZE) {
+            const before = first.last > 2 ? await readPage(first.last - 1) : first;
+
+            values = [...before.values, ...last.values];
+        }
+    }
+
+    const items = values.flatMap((value): PullRequestReview[] => {
+        const review = submittedReviewSchema.safeParse(value);
+        const state = review.success ? REVIEW_STATES[review.data.state] : undefined;
+
+        // Someone's own unsubmitted review is not a review anyone else has read.
+        if (!review.success || state === undefined || state === "pending") {
+            return [];
+        }
+
+        return [
+            {
+                authorLogin: review.data.user?.login ?? "",
+                body: (review.data.body ?? "").slice(0, REVIEW_BODY_MAX_CHARS),
+                id: String(review.data.id),
+                state,
+                submittedAt: toMs(review.data.submitted_at),
+            },
+        ];
+    });
+
+    // Newest first: the latest verdict is what a reader acts on.
+    // The total counts what the host listed; drafts and entries that could not be read on the pages read are not reviews
+    // anyone sees, so they leave the count. Pages not read may hold more of them: the count is then an upper bound.
+    const dropped = values.length - items.length;
+
+    return { items: items.toSorted((left, right) => right.submittedAt - left.submittedAt), total: Math.max(items.length, total - dropped) };
 };
 
 const RESOLVE_MUTATION = `mutation ($threadId: ID!) { resolveReviewThread(input: { threadId: $threadId }) { thread { id isResolved } } }`;
@@ -1015,7 +1144,19 @@ const requiredChecksOf = async (request: HostRequest, ref: PullRequestRef): Prom
     };
 };
 
-const listChecks = async (request: HostRequest, ref: PullRequestRef, headSha: string): Promise<CheckSummary> => {
+/** Every page past the first, up to `maxPages`, of a list whose first page said how many it holds. */
+const laterPages = async (request: HostRequest, path: string, total: number, maxPages: number, itemsOf: (body: unknown) => unknown[]): Promise<unknown[]> => {
+    const pages = Math.min(maxPages, Math.ceil(total / GITHUB_PAGE_SIZE));
+    const items: unknown[] = [];
+
+    for (let page = 2; page <= pages; page += 1) {
+        items.push(...itemsOf(await readJson(await request(path, { query: { page, per_page: GITHUB_PAGE_SIZE } }))));
+    }
+
+    return items;
+};
+
+const listChecks = async (request: HostRequest, ref: PullRequestRef, headSha: string, maxPages = 1): Promise<CheckSummary> => {
     if (!SHA.test(headSha)) {
         throw new HostApiError("Not a commit id", 404);
     }
@@ -1051,6 +1192,17 @@ const listChecks = async (request: HostRequest, ref: PullRequestRef, headSha: st
     }
 
     const statuses = parse(commitStatusSchema, await readJson(statusResponse));
+
+    // A reader that wants more than one bounded page (an agent looking for every failure) reads on, page by page.
+    if (maxPages > 1) {
+        runs.check_runs.push(
+            ...(await laterPages(request, `${base}/check-runs`, runs.total_count, maxPages, (body) => parse(checkRunsSchema, body).check_runs)),
+        );
+        statuses.statuses.push(
+            ...(await laterPages(request, `${base}/status`, statuses.total_count ?? 0, maxPages, (body) => parse(commitStatusSchema, body).statuses)),
+        );
+    }
+
     const required = await requiredChecksOf(request, ref);
     const checks: CheckRun[] = [
         ...runs.check_runs.flatMap((value) => {
@@ -1114,6 +1266,195 @@ const rerunCheck = async (request: HostRequest, ref: PullRequestRef, checkId: st
 
         throw error;
     }
+};
+
+const jobRunSchema = z.object({ run_id: z.number() });
+
+/** The workflow run an Actions job belongs to: its jobs re-run together. Any other app's check re-runs alone. */
+const rerunGroupOf = async (request: HostRequest, ref: PullRequestRef, checkId: string): Promise<string | null> => {
+    if (!COMMENT_ID.test(checkId)) {
+        throw new HostApiError("Not a check id", 404);
+    }
+
+    const repo = repoPath(ref);
+    const run = parse(runAppSchema, await readJson(await request(`${repo}/check-runs/${checkId}`)));
+
+    if (run.app?.slug !== ACTIONS_APP) {
+        return null;
+    }
+
+    const job = parse(jobRunSchema, await readJson(await request(`${repo}/actions/jobs/${checkId}`)));
+
+    return Number.isSafeInteger(job.run_id) ? String(job.run_id) : null;
+};
+
+const runJobsSchema = z.object({ jobs: z.array(z.object({ conclusion: z.string().nullable(), id: z.number() })), total_count: z.number() });
+
+/** Conclusions the host's "re-run failed jobs" call re-runs. */
+const RERUN_FAILED_CONCLUSIONS: ReadonlySet<string> = new Set(["action_required", "cancelled", "failure", "startup_failure", "timed_out"]);
+
+/** The latest jobs of a workflow run that its "re-run failed jobs" call would re-run; `null` past one page of jobs. */
+const rerunnableOfGroup = async (request: HostRequest, ref: PullRequestRef, groupId: string): Promise<string[] | null> => {
+    if (!COMMENT_ID.test(groupId)) {
+        throw new HostApiError("Not a workflow run id", 404);
+    }
+
+    const page = parse(
+        runJobsSchema,
+        await readJson(await request(`${repoPath(ref)}/actions/runs/${groupId}/jobs`, { query: { filter: "latest", per_page: GITHUB_PAGE_SIZE } })),
+    );
+
+    if (page.total_count > page.jobs.length) {
+        return null;
+    }
+
+    return page.jobs.flatMap((job) => (job.conclusion !== null && RERUN_FAILED_CONCLUSIONS.has(job.conclusion) ? [String(job.id)] : []));
+};
+
+/** One call that re-runs every failed job of a workflow run: re-running them one by one is refused after the first. */
+const rerunFailedOfGroup = async (request: HostRequest, ref: PullRequestRef, groupId: string): Promise<void> => {
+    if (!COMMENT_ID.test(groupId)) {
+        throw new HostApiError("Not a workflow run id", 404);
+    }
+
+    try {
+        await discard(await request(`${repoPath(ref)}/actions/runs/${groupId}/rerun-failed-jobs`, { json: {}, method: "POST" }));
+    } catch (error) {
+        // As for one job: a 403 that says why is a refusal of this call, and its reason is what the person needs.
+        if (error instanceof HostApiError && error.status === 403 && !error.rateLimited && error.detail !== undefined) {
+            throw new HostApiError(error.message, 422, false, { detail: error.detail });
+        }
+
+        throw error;
+    }
+};
+
+const checkOutputSchema = z.object({
+    app: z.object({ slug: z.string() }).nullable().optional(),
+    output: z
+        .object({ summary: z.string().nullable().optional(), text: z.string().nullable().optional(), title: z.string().nullable().optional() })
+        .nullable()
+        .optional(),
+});
+
+/** The job's log answer: `undefined` when the host has none to give (expired, not written yet, gone), `refused` on a 403. */
+const jobLogAnswer = async (request: HostRequest, ref: PullRequestRef, checkId: string, timeoutMs: number): Promise<Response | "refused" | undefined> => {
+    try {
+        // An Actions job has the id of its check run, so the check's id names the job.
+        return await request(`${repoPath(ref)}/actions/jobs/${checkId}/logs`, { redirect: "return", timeoutMs });
+    } catch (error) {
+        // Gone, never written, or refused to this account (403 that is not a rate limit): the check's own output is next.
+        if (error instanceof HostApiError && !error.rateLimited && [404, 410].includes(error.status)) {
+            return undefined;
+        }
+
+        if (error instanceof HostApiError && !error.rateLimited && error.status === 403) {
+            return "refused";
+        }
+
+        throw error;
+    }
+};
+
+/** A job log: the API answers with a redirect to a signed address on a storage origin, read there without the token. */
+const jobLog = async (
+    request: HostRequest,
+    ref: PullRequestRef,
+    checkId: string,
+    maxChars: number,
+    timeoutMs: number,
+): Promise<CheckLog | "refused" | undefined> => {
+    // One deadline for the whole log read: the API's answer, then the download, each gets only what is left of it.
+    const deadline = Date.now() + timeoutMs;
+    const answer = await jobLogAnswer(request, ref, checkId, Math.min(timeoutMs, FETCH_TIMEOUT_MS));
+
+    if (answer === undefined || answer === "refused") {
+        return answer;
+    }
+
+    const location = answer.headers.get("location");
+
+    if (answer.status < 300 || answer.status >= 400) {
+        // A host that answers the log in place: read it here, it came from the API's own origin.
+        const read = await readTail(answer).catch(() => {
+            // Cut off before any byte (its deadline, the connection): a host failure, so the check's own output is next.
+            throw new HostApiError("The log could not be read", 0);
+        });
+
+        return excerptRead(read, maxChars);
+    }
+
+    if (location === null || !isLogAddress(location)) {
+        return undefined;
+    }
+
+    // Not followed: the signed address is the log itself, and a redirect from it leads nowhere this reads.
+    // A log is a large download: the longer deadline, and what arrived before it fires is still read (`readTail`).
+    const response = await fetchWithDeadline(location, { redirect: "manual", timeoutMs: Math.max(1, deadline - Date.now()) }).catch(() => {
+        throw new HostApiError("The log could not be fetched", 0);
+    });
+
+    if (!response.ok) {
+        await discard(response);
+
+        // A log that has expired, or is not written yet, is a check without one.
+        return undefined;
+    }
+
+    const read = await readTail(response).catch(() => {
+        throw new HostApiError("The log could not be read", 0);
+    });
+
+    return excerptRead(read, maxChars);
+};
+
+const readCheckLog = async (
+    request: HostRequest,
+    ref: PullRequestRef,
+    checkId: string,
+    maxChars: number,
+    timeoutMs: number = FETCH_TIMEOUT_LONG_MS,
+): Promise<CheckLog> => {
+    if (!COMMENT_ID.test(checkId)) {
+        throw new HostApiError("Not a check id", 404);
+    }
+
+    // The caller's time budget covers every request of this read, not the download alone.
+    const deadline = Date.now() + timeoutMs;
+    const left = (): number => Math.max(1, deadline - Date.now());
+    const run = parse(
+        checkOutputSchema,
+        await readJson(await request(`${repoPath(ref)}/check-runs/${checkId}`, { timeoutMs: Math.min(left(), FETCH_TIMEOUT_MS) })),
+    );
+
+    // A log that could not be had in the time left (or the host could not be reached for it) is no log: the check's own
+    // output, already read, is the excerpt then. A rate limit is the host's answer, and stays one.
+    const log =
+        run.app?.slug === ACTIONS_APP
+            ? await jobLog(request, ref, checkId, maxChars, left()).catch((error: unknown) => {
+                  if (error instanceof HostApiError && !error.rateLimited && error.status === 0) {
+                      return undefined;
+                  }
+
+                  throw error;
+              })
+            : undefined;
+
+    if (log !== undefined && log !== "refused" && log.excerpt !== "") {
+        return log;
+    }
+
+    // Any other app reports what failed in the check's own output.
+    const output = [run.output?.title, run.output?.summary, run.output?.text]
+        .filter((part): part is string => typeof part === "string" && part.trim() !== "")
+        .join("\n\n");
+
+    if (output === "") {
+        // A log refused to the account is one that may exist: unavailable, not absent.
+        return { excerpt: "", source: "none", truncated: false, ...(log === "refused" && { refused: true as const }) };
+    }
+
+    return { ...excerptLog(output, maxChars), source: "check_output" };
 };
 
 // ─── Merge ──────────────────────────────────────────────────────────────────
@@ -1257,25 +1598,158 @@ const setAutoMerge = async (request: HostRequest, ref: PullRequestRef, enabled: 
     }
 };
 
+const PULL_EDIT_MUTATION = `mutation ($input: UpdatePullRequestInput!) { updatePullRequest(input: $input) { pullRequest { id title body } } }`;
+const REQUEST_REVIEWERS_MUTATION = `mutation ($pullRequestId: ID!, $logins: [String!]!) { requestReviewsByLogin(input: { pullRequestId: $pullRequestId, userLogins: $logins, union: true }) { pullRequest { id } } }`;
+const REVERT_MUTATION = `mutation ($pullRequestId: ID!, $title: String, $body: String) { revertPullRequest(input: { pullRequestId: $pullRequestId, title: $title, body: $body }) { revertPullRequest { number url } } }`;
+
+/**
+ * A GitHub login: letters and digits, with single hyphens or underscores between them (managed users have underscores),
+ * at most 39 characters. A trailing or doubled hyphen or underscore is not a login.
+ */
+const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9]|[-_](?=[A-Za-z0-9])){0,38}$/u;
+const CRLF = /\r\n/gu;
+
+/** Reviewers one call may add; a longer list is refused rather than split without the person knowing. */
+export const MAX_REVIEWERS_PER_CALL = 15;
+
+/**
+ * A mutation the host accepted but whose answer could not be read may have happened, so it is unconfirmed and a retry is
+ * not offered as safe. A real refusal (a status, the host's reason, a rate limit) keeps its own classification.
+ */
+const confirmedOrUnknown = async <T>(mutation: () => Promise<T>): Promise<T> => {
+    try {
+        return await mutation();
+    } catch (error) {
+        // A real refusal always carries a status, so only a failure that could not be read lands here.
+        if (error instanceof HostApiError && error.status === 0 && !error.unconfirmed && !error.rateLimited) {
+            throw new HostApiError("The host's answer to the change could not be read", 0, false, { unconfirmed: true });
+        }
+
+        throw error;
+    }
+};
+
+const editedSchema = z.object({ pullRequest: z.object({ body: z.string().nullable(), id: z.string(), title: z.string() }).nullable() }).nullable();
+
+export const BODY_TOO_LONG_REASON = "This description is too long to edit here; edit it on the host.";
+
+const editPullRequest = async (request: HostRequest, ref: PullRequestRef, edit: PullRequestEdit): Promise<void> => {
+    // The title is compared after the host's own trimming, so a stray space does not read as a change the host did not keep.
+    const title = edit.title?.trim();
+
+    // getPullRequest cuts a long description for display, so an edit built on that cut would overwrite the rest. A change
+    // to the description is refused while the host's current one is longer than what is read.
+    const current = edit.body === undefined ? null : await getPullRequest(request, ref);
+
+    if (current?.bodyTruncated === true) {
+        throw new HostApiError("The description is too long to edit", 422, false, { detail: BODY_TOO_LONG_REASON });
+    }
+
+    const pullRequestId = await pullNodeId(request, ref);
+    const data = await confirmedOrUnknown(
+        async () =>
+            await graphqlRequest(
+                request,
+                PULL_EDIT_MUTATION,
+                // Only the fields the person changed go in the input: a field left out is not sent at all, so it keeps its value.
+                { input: { pullRequestId, ...(title !== undefined && { title }), ...(edit.body !== undefined && { body: edit.body }) } },
+                z.object({ updatePullRequest: editedSchema.optional() }),
+                "/graphql",
+                { untypedMayHaveRun: true },
+            ),
+    );
+    const pull = data.updatePullRequest?.pullRequest;
+
+    // A mutation that answers without the pull request did not change it. What the host kept must match what was asked
+    // (line endings aside): a title or description it changed is not a confirmed edit.
+    if (
+        pull == null ||
+        (title !== undefined && pull.title.trim() !== title) ||
+        (edit.body !== undefined && (pull.body ?? "").replaceAll(CRLF, "\n") !== edit.body.replaceAll(CRLF, "\n"))
+    ) {
+        throw new HostApiError("The host did not confirm the edit", 0, false, { unconfirmed: true });
+    }
+};
+
+const isReviewerLogin = (login: string): boolean => LOGIN.test(login);
+
+const requestReviewers = async (request: HostRequest, ref: PullRequestRef, reviewerLogins: string[]): Promise<void> => {
+    if (reviewerLogins.length === 0 || reviewerLogins.length > MAX_REVIEWERS_PER_CALL || reviewerLogins.some((login) => !isReviewerLogin(login))) {
+        throw new HostApiError("Not a list of logins", 422);
+    }
+
+    const pullRequestId = await pullNodeId(request, ref);
+    const data = await confirmedOrUnknown(
+        async () =>
+            await graphqlRequest(
+                request,
+                REQUEST_REVIEWERS_MUTATION,
+                { logins: reviewerLogins, pullRequestId },
+                z.object({ requestReviewsByLogin: z.object({ pullRequest: z.object({ id: z.string() }).nullable() }).optional() }),
+                "/graphql",
+                { untypedMayHaveRun: true },
+            ),
+    );
+
+    if (data.requestReviewsByLogin?.pullRequest == null) {
+        throw new HostApiError("The host did not confirm the review request", 0, false, { unconfirmed: true });
+    }
+};
+
+// The mutation's payload carries the new pull request under its own `revertPullRequest` field.
+const revertedSchema = z.object({
+    revertPullRequest: z
+        .object({ revertPullRequest: z.object({ number: z.int().positive(), url: z.string() }).nullable().optional() })
+        .nullable()
+        .optional(),
+});
+
+const revertPullRequest = async (request: HostRequest, ref: PullRequestRef, revert: PullRequestEdit): Promise<RevertPullRequestResult> => {
+    const pullRequestId = await pullNodeId(request, ref);
+    const data = await confirmedOrUnknown(
+        async () =>
+            await graphqlRequest(request, REVERT_MUTATION, { body: revert.body, pullRequestId, title: revert.title }, revertedSchema, "/graphql", {
+                untypedMayHaveRun: true,
+            }),
+    );
+    const created = data.revertPullRequest?.revertPullRequest;
+
+    // The host took the revert and answered without a usable link: it must not be posted again.
+    if (created == null || !created.url.startsWith(`${GITHUB_WEB_ORIGIN}/`)) {
+        throw new HostApiError("The host's answer to the revert could not be read", 0, false, { unconfirmed: true });
+    }
+
+    return { number: created.number, repository: ref.repository, url: created.url };
+};
+
 export const githubDriver: HostDriver = {
     apiOrigin: GITHUB_API_ORIGIN,
     createPullRequest,
+    editPullRequest,
     findOpenPullRequest,
     getMergeStatus,
     getPullRequest,
     headers: { Accept: "application/vnd.github+json", "User-Agent": "neore-chat", "X-GitHub-Api-Version": "2022-11-28" },
+    isReviewerLogin,
     kind: "github",
     listChecks,
     listCommits,
     listFiles,
     listInbox,
+    listReviews,
     listThreads,
     listViewed,
     mergePullRequest,
     normalizeRepository: normalizeRepo,
     pollReviewRequests,
+    readCheckLog,
     replyToThread,
+    requestReviewers,
     rerunCheck,
+    rerunFailedOfGroup,
+    rerunGroupOf,
+    rerunnableOfGroup,
+    revertPullRequest,
     setAutoMerge,
     setThreadResolved,
     setViewed,
@@ -1284,7 +1758,7 @@ export const githubDriver: HostDriver = {
         capabilities: GITHUB_CAPABILITIES,
         connectorSlug: "github",
         label: "GitHub",
-        limits: { commits: GITHUB_COMMIT_LIMIT, files: GITHUB_FILE_LIMIT },
+        limits: { commits: GITHUB_COMMIT_LIMIT, files: GITHUB_FILE_LIMIT, reviewers: MAX_REVIEWERS_PER_CALL },
         requestNoun: "pull request",
     },
     webhookScheme: "native",

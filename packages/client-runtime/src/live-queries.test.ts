@@ -1,7 +1,8 @@
 import { lunoraQueryOptions } from "@lunora/react";
-import { dehydrate, hashKey, hydrate, QueryClient, QueryObserver, skipToken } from "@tanstack/react-query";
+import { dehydrate, environmentManager, hashKey, hydrate, QueryClient, QueryObserver, skipToken } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { seedHydratedAuthToken } from "./hydrate-auth-token";
 import type { LiveQueryClient } from "./live-queries";
 import {
     FIRST_VALUE_TIMEOUT_MS,
@@ -12,6 +13,7 @@ import {
     SEED_SLOT_TIMEOUT_MS,
     tokenSubject,
 } from "./live-queries";
+import { createQueryClient } from "./query-client";
 import { currentUnlockProof, rememberUnlockProof } from "./unlock-proofs";
 
 type OnData = (value: unknown) => void;
@@ -28,17 +30,36 @@ interface FakeSubscription {
 const createClient = () => {
     let token: string | null = null;
     const tokenListeners = new Set<(token: string | null) => void>();
+    const identityListeners = new Set<() => void>();
     const subscriptions: FakeSubscription[] = [];
 
     return {
+        /** Lunora's `onIdentityChange`: a sign-out or user switch it retired, a cookie session's included. */
+        changeIdentity: () => {
+            for (const listener of identityListeners) {
+                listener();
+            }
+        },
         client: {
             getAuthToken: () => token,
+            onIdentityChange: (listener: () => void) => {
+                identityListeners.add(listener);
+
+                return () => identityListeners.delete(listener);
+            },
             onAuthTokenChange: (listener: (token: string | null) => void) => {
                 tokenListeners.add(listener);
 
                 return () => tokenListeners.delete(listener);
             },
             query: vi.fn(async (_reference: never, _args: never) => "rpc"),
+            setAuthToken: (next: string | null) => {
+                token = next;
+
+                for (const listener of tokenListeners) {
+                    listener(next);
+                }
+            },
             setWsToken: vi.fn(),
             subscribe: vi.fn((reference: never, args: never, onData: OnData, options?: { onError?: OnError }) => {
                 const subscription: FakeSubscription = {
@@ -346,6 +367,41 @@ describe(LiveQueryManager, () => {
         expect(fake.client.setWsToken).toHaveBeenCalledTimes(4);
     });
 
+    it("drops the thread list when another account's token lands, not on the server-rendered first token or a refresh", () => {
+        const threadList = key("chat_composite:getThreadListData");
+        const other = key("tasks_functions:getTaskBoard");
+
+        queryClient.setQueryData(threadList, ["rendered for user-1"]);
+        queryClient.setQueryData(other, ["kept"]);
+
+        vi.stubGlobal("window", globalThis);
+        seedHydratedAuthToken(fake.client, jwt("user-1"));
+        vi.unstubAllGlobals();
+        fake.setToken(jwt("user-1", 2));
+
+        expect(queryClient.getQueryData(threadList)).toStrictEqual(["rendered for user-1"]);
+
+        fake.setToken(jwt("user-2"));
+
+        expect(queryClient.getQueryData(threadList)).toBeUndefined();
+        expect(queryClient.getQueryData(other)).toStrictEqual(["kept"]);
+
+        // Across a token-less gap, the next account is still another one.
+        queryClient.setQueryData(threadList, ["user-2's"]);
+        fake.setToken(null);
+        fake.setToken(jwt("user-3"));
+
+        expect(queryClient.getQueryData(threadList)).toBeUndefined();
+
+        // The same account back after a gap reads its list again: what was read without a bearer may be another
+        // account's cookie session.
+        fake.setToken(null);
+        queryClient.setQueryData(threadList, ["read without a bearer"]);
+        fake.setToken(jwt("user-3", 2));
+
+        expect(queryClient.getQueryData(threadList)).toBeUndefined();
+    });
+
     it("seeds at most MAX_CONCURRENT_SEEDS subscriptions at once", () => {
         const unobserve = Array.from({ length: MAX_CONCURRENT_SEEDS + 2 }, (_, index) => observe(key(`x:q${String(index)}`)));
 
@@ -365,6 +421,229 @@ describe(LiveQueryManager, () => {
         for (const stop of unobserve) {
             stop();
         }
+    });
+
+    it("seeds thread reads before the queued others, in the order they asked", () => {
+        const first = Array.from({ length: MAX_CONCURRENT_SEEDS }, (_, index) => observe(key(`x:q${String(index)}`)));
+        const later = [
+            observe(key("x:sidebar")),
+            observe(key("chat_composite:getThreadListData")),
+            observe(key("x:settings")),
+            observe(key("chat_functions:getThread", { threadId: "t1" })),
+        ];
+
+        for (const subscription of fake.subscriptions.slice(0, MAX_CONCURRENT_SEEDS)) {
+            subscription.onData("seeded");
+        }
+
+        fake.subscriptions.at(-1)!.onData("seeded");
+
+        expect(fake.subscriptions.map((subscription) => subscription.path)).toStrictEqual([
+            "x:q0",
+            "x:q1",
+            "x:q2",
+            "chat_composite:getThreadListData",
+            "chat_functions:getThread",
+            "x:sidebar",
+            "x:settings",
+        ]);
+
+        for (const stop of [...first, ...later]) {
+            stop();
+        }
+    });
+
+    it("closes a thread read's subscription after the linger while the app's client keeps its value for the thread gcTime", () => {
+        environmentManager.setIsServer(() => false);
+        const appClient = createQueryClient();
+
+        environmentManager.setIsServer(() => typeof window === "undefined");
+        const appManager = new LiveQueryManager(fake.client as unknown as LiveQueryClient, appClient, mintWsTicket);
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+
+        appManager.connect();
+
+        const unobserve = new QueryObserver(appClient, {
+            queryFn: async ({ queryKey: k }) => await appManager.fetch(k, hashKey(k), { __lunoraRef: threadKey[1] }, threadKey[2]),
+            queryKey: threadKey,
+        }).subscribe(() => {});
+
+        fake.subscriptions[0]!.onData({ title: "t1" });
+        unobserve();
+        vi.advanceTimersByTime(LINGER_MS);
+
+        expect(appManager.size).toBe(0);
+        expect(fake.subscriptions[0]!.unsubscribe).toHaveBeenCalledOnce();
+
+        vi.advanceTimersByTime(10 * 60 * 1000);
+
+        expect(appClient.getQueryData(threadKey)).toStrictEqual({ title: "t1" });
+
+        appManager.disconnect();
+        appClient.clear();
+    });
+
+    it("drops the previous user's unobserved thread reads when the token's subject changes", () => {
+        fake.setToken(jwt("alice"));
+        queryClient.setQueryData(key("chat_functions:getThread", { threadId: "old" }), { title: "alice's" });
+        queryClient.setQueryData(key("tasks_functions:getTaskBoard"), ["kept"]);
+        const unobserve = observe(key("chat_composite:getThreadListData"));
+
+        fake.setToken(jwt("bob"));
+
+        expect(queryClient.getQueryData(key("chat_functions:getThread", { threadId: "old" }))).toBeUndefined();
+        expect(queryClient.getQueryData(key("tasks_functions:getTaskBoard"))).toStrictEqual(["kept"]);
+        expect(queryClient.getQueryCache().find({ queryKey: key("chat_composite:getThreadListData") })).toBeDefined();
+
+        unobserve();
+    });
+
+    it("keeps the thread reads a page was rendered with when its first token arrives, and drops them on sign-out", async () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+        const server = new QueryClient();
+
+        // Hydrated from the server render, before any component observes it.
+        await server.prefetchQuery({ queryFn: async () => ({ title: "server-rendered" }), queryKey: threadKey });
+        hydrate(queryClient, dehydrate(server));
+        vi.stubGlobal("window", globalThis);
+        seedHydratedAuthToken(fake.client, jwt("alice"));
+        vi.unstubAllGlobals();
+
+        expect(queryClient.getQueryData(threadKey)).toStrictEqual({ title: "server-rendered" });
+
+        fake.setToken(null);
+
+        expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+    });
+
+    it("drops a cookie session's thread reads when the page then adopts another account's token", () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+        const listKey = key("chat_composite:getThreadListData");
+
+        // A cookie session (no bearer) read alice's chats; one is on screen, one is not.
+        queryClient.setQueryData(threadKey, { title: "alice's" });
+        queryClient.setQueryData(listKey, ["alice's list"]);
+        const unobserve = observe(listKey);
+
+        fake.client.query.mockRejectedValue(new Error("FORBIDDEN"));
+        fake.setToken(jwt("bob"));
+
+        expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+        expect(queryClient.getQueryData(listKey)).toBeUndefined();
+
+        unobserve();
+    });
+
+    it("keeps hydrated threads only for the token the page was rendered with, and only as its first", async () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+        const server = new QueryClient();
+
+        await server.prefetchQuery({ queryFn: async () => ({ title: "alice's" }), queryKey: threadKey });
+        hydrate(queryClient, dehydrate(server));
+        vi.stubGlobal("window", globalThis);
+        // The server rendered for alice, but bob's token lands first: a different account.
+        fake.setToken(jwt("bob"));
+        fake.setToken(null);
+        hydrate(queryClient, dehydrate(server));
+        seedHydratedAuthToken(fake.client, jwt("alice"));
+        vi.unstubAllGlobals();
+
+        expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+    });
+
+    it("blanks an observed thread read on an account switch and subscribes it again, so a failed read shows nothing of the old account", async () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+
+        fake.setToken(jwt("alice"));
+        const unobserve = observe(threadKey);
+
+        fake.subscriptions[0]!.onData({ title: "alice's" });
+        await vi.runAllTimersAsync();
+        fake.client.query.mockRejectedValueOnce(new Error("FORBIDDEN"));
+
+        // The sockets are swapped before the read subscribes again: no new subscription exists yet when they close.
+        const subscriptionsAtSwap: number[] = [];
+
+        fake.client.setWsToken.mockImplementation(() => {
+            subscriptionsAtSwap.push(fake.subscriptions.length);
+        });
+        fake.setToken(jwt("bob"));
+
+        expect(subscriptionsAtSwap).toStrictEqual([1]);
+        expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+        expect(fake.subscriptions[0]!.unsubscribe).toHaveBeenCalledOnce();
+        expect(fake.subscriptions).toHaveLength(2);
+
+        fake.subscriptions[1]!.onError!({ code: "FORBIDDEN", message: "not bob's" });
+        await vi.runAllTimersAsync();
+
+        expect(queryClient.getQueryState(threadKey)).toMatchObject({ data: undefined, status: "error" });
+
+        unobserve();
+    });
+
+    it("blanks an observed thread read seeded with the loader's initialData, which a reset would bring back", async () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+
+        fake.setToken(jwt("alice"));
+        // `chat-context.tsx` hands `getThread` the route loader's row as `initialData`: the query's initial state.
+        const unobserve = observe(threadKey, { initialData: { title: "alice's" } });
+
+        fake.client.query.mockRejectedValue(new Error("FORBIDDEN"));
+        fake.setToken(jwt("bob"));
+
+        expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+
+        fake.subscriptions.at(-1)!.onError!({ code: "FORBIDDEN", message: "not bob's" });
+        await vi.runAllTimersAsync();
+
+        expect(queryClient.getQueryState(threadKey)).toMatchObject({ data: undefined, status: "error" });
+
+        unobserve();
+    });
+
+    it("blanks an observed thread read hydrated from the server on an account switch, and a failed read never brings it back", async () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+        const server = new QueryClient();
+
+        await server.prefetchQuery({ queryFn: async () => ({ title: "alice's" }), queryKey: threadKey });
+        hydrate(queryClient, dehydrate(server));
+        vi.stubGlobal("window", globalThis);
+        seedHydratedAuthToken(fake.client, jwt("alice"));
+        vi.unstubAllGlobals();
+        const unobserve = observe(threadKey);
+
+        fake.client.query.mockRejectedValue(new Error("FORBIDDEN"));
+        fake.setToken(jwt("bob"));
+
+        expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+
+        fake.subscriptions.at(-1)!.onError!({ code: "FORBIDDEN", message: "not bob's" });
+        await vi.runAllTimersAsync();
+
+        expect(queryClient.getQueryState(threadKey)).toMatchObject({ data: undefined, status: "error" });
+
+        unobserve();
+    });
+
+    it("drops the thread reads when a cookie session's account changes, which moves no token, and not on a bearer's", () => {
+        const threadKey = key("chat_functions:getThread", { threadId: "t1" });
+
+        queryClient.setQueryData(threadKey, { title: "cookie user's" });
+        const reconnects = fake.client.setWsToken.mock.calls.length;
+
+        fake.changeIdentity();
+
+        expect(queryClient.getQueryData(threadKey)).toBeUndefined();
+        // The sockets reconnect under the current cookie before the reads subscribe again.
+        expect(fake.client.setWsToken).toHaveBeenCalledTimes(reconnects + 1);
+
+        // With a token the subject decides: Lunora reports a refresh without a user id as an identity change too.
+        fake.setToken(jwt("alice"));
+        queryClient.setQueryData(threadKey, { title: "alice's" });
+        fake.changeIdentity();
+
+        expect(queryClient.getQueryData(threadKey)).toStrictEqual({ title: "alice's" });
     });
 
     it("gives a slot back when a seed never answers, and skips queued entries that were released", () => {

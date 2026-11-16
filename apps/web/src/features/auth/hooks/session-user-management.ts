@@ -1,3 +1,4 @@
+import useIsHydrated from "@neore/ui/hooks/use-hydrated";
 import type { AnyUseQueryOptions } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { use, useMemo } from "react";
@@ -55,6 +56,25 @@ export const useSession = <TAuthClient extends AnyAuthClient>(authClient: TAuthC
     );
 
     const data = useMemo(() => (result.data ? ({ ...result.data, session, user } as SessionData) : result.data), [result.data, session, user]);
+    // The server never has the session query, and a Suspense boundary hydrated after the query answered on the client
+    // would draw the user where the server drew nothing (React #418). Read as pending until this component has hydrated,
+    // on the server and in a hydration render alike; the render right after shows the real result.
+    const isHydrated = useIsHydrated();
+
+    if (!isHydrated) {
+        // Its error too: a read that failed before this subtree hydrated must not make it draw an unknown session here.
+        return {
+            ...result,
+            data: undefined,
+            error: null,
+            isError: false,
+            isPending: true,
+            isSuccess: false,
+            session: undefined,
+            status: "pending" as const,
+            user: undefined,
+        };
+    }
 
     return {
         ...result,

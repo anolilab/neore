@@ -16,6 +16,7 @@ import { Link } from "@tanstack/react-router";
 import { ArchiveIcon, Bot, SquareIcon } from "lucide-react";
 import type { FC } from "react";
 
+import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { useUpdateThread } from "@/features/chat/core/hooks/use-threads";
 import { quietMinutesAt, useNow, useQuietMinutes, useStopWorker } from "@/features/sub-agents/hooks/use-stop-worker";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
@@ -66,6 +67,8 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
     const crpc = useCRPC();
     const afterFirstPaint = useAfterFirstPaint();
     const updateThread = useUpdateThread();
+    // An admin acting as the owner may not archive a chat, a worker's included: the server refuses it.
+    const isImpersonating = useImpersonating();
     const unlockProof = useUnlockProof(threadId ?? "");
     const { data: workers } = useQuery(
         crpc.sub_agents.functions.listWorkers.queryOptions(threadId && afterFirstPaint ? { leadThreadId: threadId as Id<"threads">, unlockProof } : skipToken),
@@ -124,7 +127,7 @@ const WorkerList: FC<{ className?: string; threadId: string | undefined }> = ({ 
                                 workerId={worker.workerId}
                             />
                         )}
-                        {!worker.archived && worker.state === "idle" && !worker.stopping && (
+                        {!worker.archived && worker.state === "idle" && !worker.stopping && !isImpersonating && (
                             <Button
                                 aria-label={t`Archive ${worker.name}`}
                                 onClick={() => {

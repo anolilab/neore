@@ -229,13 +229,23 @@ const Sidebar = <T extends string>({
     children,
     className,
     collapsible = "offcanvas",
+    "data-focus-area": focusArea,
     name,
+    rail,
     side = "left",
     variant = "sidebar",
     ...properties
 }: ComponentProps<"div"> & {
     collapsible?: "offcanvas" | "icon" | "none";
+    /** Marks the sidebar as a screen area for F6 focus traversal; set on the element the user sees (the sheet on mobile). */
+    "data-focus-area"?: string;
     name: T;
+
+    /**
+     * The `SidebarRail` that reopens the sidebar. It is fixed to the viewport, so it is rendered outside the sliding box: a
+     * translated box would carry it off screen with the panel.
+     */
+    rail?: ReactNode;
     side?: "left" | "right";
     variant?: "sidebar" | "floating" | "inset";
 }) => {
@@ -250,6 +260,7 @@ const Sidebar = <T extends string>({
                 {...properties}
             >
                 {children}
+                {rail}
             </div>
         );
     }
@@ -259,6 +270,7 @@ const Sidebar = <T extends string>({
             <Sheet onOpenChange={(open) => setState({ isMobileOpen: open })} open={isMobileOpen} {...properties}>
                 <SheetContent
                     className="dark:bg-sidebar text-brand-black dark:text-brand-white w-(--sidebar-width) p-0 [&>button]:hidden"
+                    data-focus-area={focusArea}
                     data-mobile="true"
                     data-sidebar="sidebar"
                     data-slot="sidebar"
@@ -291,7 +303,12 @@ const Sidebar = <T extends string>({
             {/* This is what handles the sidebar gap on desktop */}
             <div
                 className={cn(
-                    "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+                    "relative w-(--sidebar-width) bg-transparent",
+                    collapsible === "offcanvas"
+                        ? // The gap sets the page's width, so it changes once rather than every frame: at once when the sidebar opens (it slides
+                          // in over the room it got), and when it has slid out on closing (the room stays until then).
+                          "[transition:width_0s_linear] group-data-[collapsible=offcanvas]:[transition-delay:200ms] motion-reduce:group-data-[collapsible=offcanvas]:[transition-delay:0s]"
+                        : "transition-[width] duration-200 ease-linear",
                     "group-data-[collapsible=offcanvas]:w-0",
                     "group-data-[side=right]:rotate-180",
                     variant === "floating" || variant === "inset"
@@ -302,10 +319,16 @@ const Sidebar = <T extends string>({
             />
             <div
                 className={cn(
-                    "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
+                    "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) md:flex",
+                    collapsible === "offcanvas"
+                        ? // Slides on the compositor (translate); its resting place off screen is set once the slide has ended, or at once on opening.
+                          "[transition:translate_200ms_linear,left_0s_linear,right_0s_linear] group-data-[collapsible=offcanvas]:[transition-delay:0s,200ms,200ms] motion-reduce:[transition-duration:0s] motion-reduce:group-data-[collapsible=offcanvas]:[transition-delay:0s]"
+                        : "transition-[left,right,width] duration-200 ease-linear",
                     side === "left"
-                        ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
-                        : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
+                        ? // The slide clears the box's own width plus `--sidebar-offset`, the room it starts from (a launcher beside it), so
+                          // its last frames do not sit over what is there.
+                          "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] group-data-[collapsible=offcanvas]:translate-x-[calc(-100%_-_var(--sidebar-offset,0px))]"
+                        : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] group-data-[collapsible=offcanvas]:translate-x-[calc(100%_+_var(--sidebar-offset,0px))]",
                     // Adjust the padding for floating and inset variants.
                     variant === "floating" || variant === "inset"
                         ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
@@ -313,6 +336,7 @@ const Sidebar = <T extends string>({
                     // group-data-[side=left]:border-r
                     className,
                 )}
+                data-focus-area={focusArea}
                 data-slot="sidebar-container"
                 {...properties}
             >
@@ -324,6 +348,7 @@ const Sidebar = <T extends string>({
                     {children}
                 </div>
             </div>
+            {rail}
         </div>
     );
 };
@@ -379,7 +404,8 @@ const SidebarRail = <T extends string>({
                     <button
                         aria-label={t`Toggle Sidebar`}
                         className={cn(
-                            "fixed top-1/2 h-20 w-8 -translate-y-1/2 cursor-pointer transition-[left,right,translate] duration-300 ease-in-out in-data-[side=left]:left-(--sidebar-width) in-data-[side=left]:group-data-[collapsible=icon]:left-(--sidebar-width-icon) in-data-[side=left]:group-data-[collapsible=offcanvas]:left-16 in-data-[side=right]:right-(--sidebar-width) in-data-[side=right]:group-data-[collapsible=icon]:right-(--sidebar-width-icon) in-data-[side=right]:group-data-[collapsible=offcanvas]:right-0 max-md:hidden",
+                            // Above the page: outside the sliding box it has no stacking context of its own, and the page beside it is positioned.
+                            "fixed top-1/2 z-20 h-20 w-8 -translate-y-1/2 cursor-pointer transition-[left,right,translate] duration-300 ease-in-out in-data-[side=left]:left-(--sidebar-width) in-data-[side=left]:group-data-[collapsible=icon]:left-(--sidebar-width-icon) in-data-[side=left]:group-data-[collapsible=offcanvas]:left-16 in-data-[side=right]:right-(--sidebar-width) in-data-[side=right]:group-data-[collapsible=icon]:right-(--sidebar-width-icon) in-data-[side=right]:group-data-[collapsible=offcanvas]:right-0 max-md:hidden",
                             {
                                 "in-data-[side=left]:-translate-x-2 hover:in-data-[side=left]:translate-x-1 in-data-[side=right]:translate-x-1 hover:in-data-[side=right]:-translate-x-2":
                                     isOpen,
@@ -498,7 +524,7 @@ const SidebarMenuItem = ({ className, ...properties }: ComponentProps<"li">) => 
 );
 
 const sidebarMenuButtonVariants = cva(
-    "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-hidden ring-sidebar-ring transition-[width,height,padding] hover:dark:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:dark:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:dark:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-gray-200 data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
+    "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-hidden ring-sidebar-ring transition-[width,height,padding] web:hover:dark:bg-sidebar-accent web:hover:text-sidebar-accent-foreground focus-visible:ring-2 active:dark:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:dark:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-gray-200 data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
     {
         defaultVariants: {
             size: "default",
@@ -511,7 +537,7 @@ const sidebarMenuButtonVariants = cva(
                 sm: "h-7 text-xs",
             },
             variant: {
-                default: "hover:dark:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                default: "web:hover:dark:bg-sidebar-accent web:hover:text-sidebar-accent-foreground",
                 outline:
                     "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:dark:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
             },

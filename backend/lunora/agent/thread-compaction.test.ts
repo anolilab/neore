@@ -11,6 +11,7 @@ import schema from "../schema";
 import { autoCompactBeforeReply, compactThreadContext, estimateContext, reportedUsageTokens, transcriptTextOf } from "./thread-compaction";
 import { COMPACT_KEEP_TURNS } from "./thread-compaction-logic";
 import { documentTextPart } from "../chat/lib/attached-text";
+import { clearContextRowHandler } from "../chat/context-reset";
 import {
     claimKey,
     deleteThreadSummaries,
@@ -169,6 +170,49 @@ describe("compacting a thread", () => {
 
         expect(read?.summary).toBe("The user is planning a trip.");
         expect(read?.boundary?.messageId).toBe(rowIds[(TURNS - COMPACT_KEEP_TURNS) * 2 - 1]);
+    });
+
+    it("after a /clear, sends the compaction made since, though one from before the clear covers more", async () => {
+        expect.assertions(2);
+
+        await seedThread(TURNS);
+        await compact();
+        await harness.run(async (ctx: any) => await clearContextRowHandler(ctx, { clientId: "clear-1", threadId: threadId as never, userId: OWNER }));
+
+        // Four exchanges after the clear, at the orders past it.
+        const resetOrder = await harness.run(async (ctx: any) => {
+            const thread = await ctx.db.get("threads", threadId);
+            const reset = await ctx.db.get("messages", thread.contextResetMessageId);
+
+            return reset.order;
+        });
+
+        for (let index = 0; index < 8; index += 1) {
+            rowIds.push(
+                await harness.run(
+                    async (ctx: any) =>
+                        await ctx.db.insert("messages", {
+                            message: { content: `after ${index}`, role: index % 2 === 0 ? "user" : "assistant" },
+                            order: resetOrder + 1 + Math.floor(index / 2),
+                            status: "success",
+                            stepOrder: index % 2,
+                            text: `after ${index}`,
+                            threadId,
+                            tool: false,
+                            userId: OWNER,
+                        }),
+                ),
+            );
+        }
+
+        generateText.mockResolvedValue({ text: "Since the clear: a budget.", usage: { inputTokens: 10, outputTokens: 5 } });
+        await compact();
+
+        const read = await contextRead(rowIds.at(-1));
+
+        expect(read?.summary).toBe("Since the clear: a budget.");
+        // It folds the first two exchanges after the clear, not the turns before it.
+        expect(read?.boundary?.messageId).toBe(rowIds.at(-5));
     });
 
     it("does nothing for a thread that is too short, and calls no model", async () => {

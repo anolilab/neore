@@ -219,7 +219,7 @@ const CsvRenderer = ({ className, compact = false, containerHeight = 300, conten
             <div className="bg-muted/30 shrink-0 space-y-3 border-b p-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <FileSpreadsheetIcon className="text-primary size-5" />
+                        <FileSpreadsheetIcon className="text-primary-text size-5" />
                         <div className="flex items-center gap-2">
                             <h3 className="text-foreground font-medium">{labels?.title ?? t`CSV Data`}</h3>
                             <p className="text-muted-foreground text-xs">

@@ -4,6 +4,6 @@ import type { HostCapabilityReportInput } from "@neore/backend/source-control/ca
 export interface HostInfo {
     capabilities: HostCapabilityReportInput;
     label: string;
-    limits: { commits: number; files: number };
+    limits: { commits: number; files: number; reviewers: number };
     requestNoun: "merge request" | "pull request";
 }

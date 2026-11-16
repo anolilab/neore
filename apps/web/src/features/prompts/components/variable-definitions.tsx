@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/to
 import { Braces, HelpCircle, Trash2 } from "lucide-react";
 import { useCallback } from "react";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 
 import type { PromptVariable } from "../lib/prompt-variables";
 
@@ -25,8 +25,7 @@ interface VariableDefinitionsProps {
 
 const VariableDefinitions = ({ onChange, variables }: VariableDefinitionsProps) => {
     const { t } = useLingui();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const isLoggedIn = !!sessionData?.user;
 
     const handleUpdateVariable = useCallback(
@@ -82,7 +81,7 @@ const VariableDefinitions = ({ onChange, variables }: VariableDefinitionsProps) 
                 {variables.map((variable, index) => (
                     <div className="bg-muted/50 grid gap-3 rounded-lg border p-3" key={variable.name}>
                         <div className="flex items-center justify-between">
-                            <code className="bg-primary/10 text-primary rounded px-2 py-1 font-mono text-sm">{`{{${variable.name}}}`}</code>
+                            <code className="bg-primary/10 text-primary-text rounded px-2 py-1 font-mono text-sm">{`{{${variable.name}}}`}</code>
                             <div className="flex items-center gap-2">
                                 <div className="flex items-center gap-1.5">
                                     <Switch

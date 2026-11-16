@@ -9,12 +9,14 @@
  * re-plans against the user's current state and the selection, and refuses if
  * anything it was asked to create is blocked.
  */
+import { stripHiddenText } from "@neore/ai/utils";
 import { LunoraError } from "lunorash/server";
 
 import { normalizeGroupOptions, validateParticipantIds } from "../chat/group/logic";
 import { resolveTimeZone } from "../memory/reflection-logic";
 import { assertValidFilters } from "../triggers/filters";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "../triggers/schedule";
+import { webhookTemplateProblem } from "../triggers/webhook-template";
 import type { BundleFilter, BundleGroup, BundleItemKind, BundleTrigger, ParsedBundle } from "./bundle-format";
 import type { SkillMarkdownData } from "./markdown";
 import { planSkillImport } from "./import-plan";
@@ -189,6 +191,15 @@ const planTrigger = (trigger: BundleTrigger, env: PlanEnv, problems: string[]): 
         } catch (error) {
             problems.push(messageOf(error));
         }
+    }
+
+    // The same check `createTrigger` runs, so the preview does not promise an import that is then refused.
+    // Hidden characters are stripped first, as `createTrigger` stores the template: stripping can join a placeholder.
+    const templateProblem =
+        trigger.type === "webhook" && trigger.inputTemplate !== undefined ? webhookTemplateProblem(stripHiddenText(trigger.inputTemplate).text) : undefined;
+
+    if (templateProblem !== undefined) {
+        problems.push(templateProblem);
     }
 
     if (problems.length > 0) {

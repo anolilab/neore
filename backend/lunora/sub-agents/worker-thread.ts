@@ -9,3 +9,13 @@ export const isWorkerThread = async (ctx: Pick<QueryCtx, "db">, threadId: string
 
     return first?.mode === "worker";
 };
+
+/** The lead thread `threadId` was started from, when it is a sub-agent's or worker's thread. */
+export const leadThreadOf = async (ctx: Pick<QueryCtx, "db">, threadId: string): Promise<string | undefined> => {
+    const run = await ctx.db
+        .query("subAgentRuns")
+        .withIndex("by_childThreadId", (q) => q.eq("childThreadId", threadId))
+        .first();
+
+    return run?.parentThreadId;
+};

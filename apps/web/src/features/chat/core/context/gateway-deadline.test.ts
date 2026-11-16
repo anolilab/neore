@@ -86,7 +86,12 @@ describe("gateway deadline in chat actions", () => {
             setGatewayInfo: vi.fn(),
             setOptimisticMessages: vi.fn(),
             setTransitioningMessage: vi.fn(),
-            texts: { bannedContent: () => "banned", localTextOnly: () => "text only", sessionNotReady: () => "no session" },
+            texts: {
+                bannedContent: () => "banned",
+                guestNoteNotLocal: () => "hosted only",
+                localTextOnly: () => "text only",
+                sessionNotReady: () => "no session",
+            },
             turnRef: { current: 1 },
         };
 

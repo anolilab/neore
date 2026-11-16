@@ -8,6 +8,7 @@ import { CLOUD_HEADLESS_CAPABILITIES, followUpControl } from "@neore/ai/capabili
 import type { StopCondition, ToolSet } from "ai";
 
 import { HOST_TEXT_MARK } from "../acp/lib/reply";
+import { RUN_STALE_MS, RUN_WATCH_MS } from "../chat/lib/interrupted-run";
 
 /**
  * How deep delegation may nest. A user's own thread is depth 0; its sub-agent
@@ -60,6 +61,25 @@ export const SUB_AGENT_RESULT_MAX = 12_000;
 export const SUB_AGENT_STALE_MS = 75 * 60_000;
 
 /**
+ * How late a reaper is scheduled past the deadline it owns, so it never finds its own deadline a millisecond in the
+ * future and does nothing (`oneShotReapDue`).
+ */
+export const SUB_AGENT_REAP_SLACK_MS = 1000;
+
+/** What a one-shot run ends with when its approval request was never answered. */
+export const SUB_AGENT_APPROVAL_EXPIRED_MESSAGE = "The sub-agent's request for approval was not answered in time.";
+
+/** The newest rows of a continuation handed to its run's end (`completeResumedRun`), searched for its answer. */
+export const COMPLETION_MESSAGE_IDS_MAX = 50;
+
+/**
+ * Whether a one-shot run's reaper may end it now. A run that waited on an approval carries its own deadline
+ * (`reapAt`), and an earlier reaper (the admission's, or one from before a resume) finds it not yet due. Without one,
+ * the reaper scheduled at admission ends it, as it always did.
+ */
+export const oneShotReapDue = (run: { reapAt?: number }, now: number): boolean => run.reapAt === undefined || now >= run.reapAt;
+
+/**
  * How long a running worker may go without a new message in its thread before the thread shows
  * "No progress" with a Stop control. It must stay below {@link SUB_AGENT_STALE_MS}. Provisional: set
  * from the longest quiet gaps a real run shows, which are not measured yet.
@@ -89,7 +109,7 @@ export const SUB_AGENT_NAME = "Sub-agent";
 
 const TOOL_NAME_RE = /^[\w.:-]{1,128}$/;
 
-export type SubAgentStatus = "cancelled" | "failed" | "queued" | "running" | "succeeded";
+export type SubAgentStatus = "awaiting" | "cancelled" | "failed" | "queued" | "running" | "succeeded";
 
 /**
  * Whether an ended run posts its result to the lead. A worker run the user typed (or created) has no
@@ -97,7 +117,10 @@ export type SubAgentStatus = "cancelled" | "failed" | "queued" | "running" | "su
  */
 export const postsBack = (run: { mode?: "run" | "worker"; toolCallId?: string }): boolean => run.mode !== "worker" || run.toolCallId !== undefined;
 
-export const isActiveSubAgentStatus = (status: SubAgentStatus): boolean => status === "queued" || status === "running";
+const ACTIVE_STATUSES: ReadonlySet<SubAgentStatus> = new Set(["awaiting", "queued", "running"]);
+
+/** A waiting child (`awaiting`) still holds its fan-out slot, and a Stop or the reaper can still end it. */
+export const isActiveSubAgentStatus = (status: SubAgentStatus): boolean => ACTIVE_STATUSES.has(status);
 
 /**
  * Why a new sub-agent may not start under a parent at `parentDepth` that
@@ -289,9 +312,44 @@ export const workerReapDecision = (input: {
 /** The error a worker run quiet for the whole window ends with; it reaches the lead as a failed run. */
 export const WORKER_STALE_MESSAGE = `The worker made no progress for ${String(SUB_AGENT_STALE_MS / 60_000)} minutes and was stopped.`;
 
+type LoopState = { loopExitedAt?: number; mode?: "run" | "worker"; startedAt?: number; status: SubAgentStatus };
+
+/**
+ * Whether a run's cloud loop may still be going: it is running, or, for a worker, it was stopped while running and has
+ * not exited ({@link isWorkerLoopLive}). A one-shot run's loop after a stop is nobody's concern: no line waits on it.
+ */
+export const isLoopLive = (run: LoopState): boolean => run.status === "running" || (run.mode === "worker" && isWorkerLoopLive(run));
+
+/**
+ * What the beat watch (`functions.ts:watchRunBeat`) does with a cloud run's loop. The loop beats once a
+ * minute while it lives (`execute.ts`); one that has not beaten for {@link RUN_STALE_MS} died with its
+ * worker (a deploy, a crash, an evicted isolate), and a redelivery of its job is refused by the claim, so nothing
+ * else would end it before {@link SUB_AGENT_STALE_MS}. A loop that is not live (ended, or a queued run) is left alone.
+ */
+export const beatWatchDecision = (input: {
+    /** The newest row in the run's thread: a loop that still saves steps is alive, even if its beats do not land. */
+    lastActivityAt?: number;
+    now: number;
+    run: LoopState & { beatAt?: number };
+}): { kind: "dead" } | { delayMs: number; kind: "later" } | { kind: "skip" } => {
+    const { run } = input;
+
+    if (!isLoopLive(run) || run.startedAt === undefined) {
+        return { kind: "skip" };
+    }
+
+    const silentFor = input.now - Math.max(run.startedAt, run.beatAt ?? 0, input.lastActivityAt ?? 0);
+
+    return silentFor >= RUN_STALE_MS ? { kind: "dead" } : { delayMs: Math.max(RUN_STALE_MS - silentFor, RUN_WATCH_MS), kind: "later" };
+};
+
+/** The error a run whose loop died ends with; it reaches the lead as a failed run, with a link to the steps it saved. */
+export const INTERRUPTED_RUN_MESSAGE =
+    "The sub-agent was interrupted: the server running it stopped (a deploy or a crash) before it finished. The steps it completed are saved in its thread. Send the task again to retry.";
+
 /** The run a worker is on, from its runs newest first: the one going, else the next in line. A Stop in its thread means this one. */
 export const workerCurrentRun = <T extends { status: SubAgentStatus }>(newestFirst: ReadonlyArray<T>): T | undefined =>
-    newestFirst.find((run) => run.status === "running") ?? newestFirst.findLast((run) => run.status === "queued");
+    newestFirst.find((run) => run.status === "running" || run.status === "awaiting") ?? newestFirst.findLast((run) => run.status === "queued");
 
 /**
  * Why the lead never got the worker's latest result, from its runs newest first: the newest run the
@@ -330,6 +388,70 @@ const SOURCE_LABELS: Record<DispatchSource, string> = {
 };
 
 export const dispatchSourceLabel = (source: DispatchSource): string => SOURCE_LABELS[source];
+
+/** The unattended runs that can start a sub-agent chain, each named on the chain's runs (`subAgentRuns.chainSource`). */
+const CHAIN_SOURCE_KINDS = ["eval", "task", "trigger"] as const;
+
+export type ChainSourceKind = (typeof CHAIN_SOURCE_KINDS)[number];
+
+/** A chain's source as stored: the kind and the id of the task, trigger or eval run (`task:<taskId>`). */
+export const chainSourceKey = (kind: ChainSourceKind, id: string): string => `${kind}:${id}`;
+
+const chainSourceKind = (key: string | undefined): ChainSourceKind | undefined => {
+    const kind = key?.slice(0, key.indexOf(":"));
+
+    return CHAIN_SOURCE_KINDS.find((known) => known === kind);
+};
+
+/**
+ * Whether a one-shot child of this chain may pause for its owner's approval. An eval measures one headless answer, so its
+ * chain keeps the headless rule: an `ask` tool is refused, nothing waits.
+ */
+export const chainPausesForApproval = (key: string | undefined): boolean => chainSourceKind(key) !== "eval";
+
+const CHAIN_SOURCE_LABELS: Record<ChainSourceKind, string> = { eval: "an eval", task: "a task", trigger: "a trigger" };
+
+/** Who started the chain a waiting child belongs to, for its owner: its task or trigger, else what dispatched it. */
+export const chainStarterLabel = (run: { chainSource?: string; dispatchedBy?: DispatchSource }): string | undefined => {
+    const kind = chainSourceKind(run.chainSource);
+
+    if (kind !== undefined) {
+        return CHAIN_SOURCE_LABELS[kind];
+    }
+
+    const origin = originOfRun(run.dispatchedBy);
+
+    return origin === "lead" ? undefined : dispatchSourceLabel(origin);
+};
+
+/**
+ * Why a chain source that already has a child waiting for approval may not start another, or `undefined` when it may.
+ * A task or trigger starts a fresh thread every run, so the per-thread cap never fills: one waiting child per source.
+ */
+export const chainWaitProblem = (key: string | undefined, waiting: boolean): string | undefined => {
+    const kind = chainSourceKind(key);
+
+    if (kind === undefined || kind === "eval" || !waiting) {
+        return undefined;
+    }
+
+    return `A sub-agent this ${kind} started earlier is still waiting for the owner's approval, so this ${kind} starts no other until that one is answered or expires. Do this part of the work yourself.`;
+};
+
+/**
+ * Why a child of this chain may not wait for approval, or `undefined` when it may: another child of the same task or trigger
+ * already waits. Admission ({@link chainWaitProblem}) cannot see children that were all running when they were admitted, so
+ * the pause checks again (`markRunAwaiting`); the child's request is refused and its run ends with this as its result.
+ */
+export const chainPauseProblem = (key: string | undefined, waiting: boolean): string | undefined => {
+    const kind = chainSourceKind(key);
+
+    if (kind === undefined || kind === "eval" || !waiting) {
+        return undefined;
+    }
+
+    return `Another sub-agent this ${kind} started is already waiting for the owner, so this sub-agent's request to use a tool was refused and it stopped. Its ${kind} waits for one answer at a time.`;
+};
 
 /**
  * Why a dispatch from `source` may not reach a lead whose policy is `policy`, or `undefined` when it may.

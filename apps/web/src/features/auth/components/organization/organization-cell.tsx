@@ -5,6 +5,7 @@ import { Button } from "@neore/ui/components/button";
 import { Card } from "@neore/ui/components/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import cn from "@neore/ui/utils/cn";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Organization } from "better-auth/plugins/organization";
 import { EllipsisIcon, Loader2, LogOutIcon, SettingsIcon } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -12,6 +13,7 @@ import { useCallback, useState } from "react";
 import type { SettingsCardClassNames } from "@/components/settings/settings-card";
 import { useActiveOrganization } from "@/features/auth/hooks/organization-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 import { getLocalizedError } from "../../lib/utilities";
 import LeaveOrganizationDialog from "./leave-organization-dialog";
@@ -26,6 +28,8 @@ export interface OrganizationCellProperties {
 const OrganizationCell = ({ className, classNames, organization }: OrganizationCellProperties) => {
     const { authClient, basePath, navigate, settings, toast, viewPaths } = useAuth();
     const { t } = useLingui();
+    const crpc = useCRPC();
+    const queryClient = useQueryClient();
 
     const { data: activeOrganization, refetch: refetchActiveOrganization } = useActiveOrganization(authClient);
     const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
@@ -48,6 +52,8 @@ const OrganizationCell = ({ className, classNames, organization }: OrganizationC
                 organizationId: organization.id,
             });
 
+            // The billing read follows the session's active organization, so drop the previous one's cached plan.
+            void queryClient.resetQueries({ queryKey: crpc.auth.billing.getBillingInfo.queryKey({}) });
             await refetchActiveOrganization?.();
 
             navigate(`${settings?.basePath || basePath}/${viewPaths.ORGANIZATION}`);
@@ -59,7 +65,7 @@ const OrganizationCell = ({ className, classNames, organization }: OrganizationC
         }
 
         setIsManagingOrganization(false);
-    }, [activeOrganization, authClient, organization.id, basePath, settings, viewPaths, navigate, toast, refetchActiveOrganization, t]);
+    }, [activeOrganization, authClient, crpc, organization.id, basePath, settings, viewPaths, navigate, queryClient, toast, refetchActiveOrganization, t]);
 
     return (
         <>

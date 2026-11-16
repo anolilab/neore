@@ -48,6 +48,8 @@ const usePagedProjects = (organizationId: string | undefined, enabled: boolean) 
  * The projects a task can be filed in: the caller's own, and the active organization's projects nobody owns
  * (the ones a member may file into, as `writableProject` decides), each a page at a time. The task's own project
  * is looked up by id when it is not on a loaded page, so an existing assignment always shows its name.
+ * `readableProjects` are those a member may read, teammates' included: a coding-agent run's repository picker offers
+ * their repositories (`listProjectRepos` lets any member read them), though a task is not filed in them.
  */
 const useTaskProjects = (assignedId: Id<"projects"> | "") => {
     const crpc = useCRPC();
@@ -57,7 +59,8 @@ const useTaskProjects = (assignedId: Id<"projects"> | "") => {
     const own = usePagedProjects(undefined, true);
     const shared = usePagedProjects(organizationId, organizationId !== undefined);
     const seen = new Set(own.projects.map((project) => project._id));
-    const loaded = [...own.projects, ...shared.projects.filter((project) => !project.userId && !seen.has(project._id))];
+    const sharedUnseen = shared.projects.filter((project) => !seen.has(project._id));
+    const loaded = [...own.projects, ...sharedUnseen.filter((project) => !project.userId)];
     const missing = assignedId !== "" && loaded.every((project) => project._id !== assignedId);
     const { data: assigned } = useQuery(crpc.projects.functions.getProject.queryOptions(missing ? { projectId: assignedId } : skipToken));
 
@@ -70,6 +73,7 @@ const useTaskProjects = (assignedId: Id<"projects"> | "") => {
             shared.loadMore();
         },
         projects: missing && assigned ? [...loaded, assigned] : loaded,
+        readableProjects: [...own.projects, ...sharedUnseen],
         retry: () => {
             own.retry();
             shared.retry();

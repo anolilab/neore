@@ -96,7 +96,7 @@ const ChatView = ({
                         aria-label={t`Go back`}
                         className={cn(
                             "flex size-7 shrink-0 items-center justify-center rounded-lg",
-                            "text-gray-500 hover:bg-gray-100 hover:text-gray-700",
+                            "text-gray-600 hover:bg-gray-100 hover:text-gray-700",
                             "dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200",
                             "focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none",
                             "transition-colors",

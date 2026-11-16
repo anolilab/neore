@@ -43,7 +43,8 @@ export interface RunLocalTurnOptions {
 }
 
 export type RunLocalTurnResult =
-    { error?: LocalErrorInfo; outcome: "aborted" | "complete" | "failed"; saved: true; threadId: string } | { error: LocalErrorInfo; saved: false };
+    | { error?: LocalErrorInfo; outcome: "aborted" | "complete" | "failed"; saved: true; threadId: string }
+    | { error: LocalErrorInfo; saved: false };
 
 /**
  * Earlier turns as plain text. Only user/assistant rows with text survive:

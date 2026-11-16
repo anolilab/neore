@@ -22,10 +22,14 @@
  * | `worker-stop`      | `<threadId>:<clientId>`  | {@link WORKER_DISPATCH_CLAIM_TTL_MS} | `sub-agents/functions.ts` |
  * | `switch-summary`   | `<threadId>`             | 2 min (`AGENT_SWITCH_SUMMARY_CLAIM_TTL_MS`) | `chat/agent-switch.ts` (one summary call in flight per thread) |
  * | `host-send`        | `<userId>:<requestId>`   | 24 h                          | `acp/send.ts` (`POST /hosts/send`) |
+ * | `chat-start`       | `<userId>:<clientMessageId>` | 24 h (`CHAT_START_CLAIM_TTL_MS`); taken over when nothing was saved within `CHAT_START_LEASE_MS` | `chat/start-claim.ts` (`/chat/start` with `clientMessageId`): its `result` is the request's fingerprint from the claim on (another send under the id is refused), then the saved thread and message ids, recorded in the save's transaction |
+ * | `thread-category`  | `<threadId>:<promptId>` (`<threadId>:thread` without one) | 24 h (`CATEGORY_CLAIM_TTL_MS`); an unanswered claim is taken over after `CATEGORY_LEASE_MS` and released when the call fails; its `result` keeps the answer, written by any later delivery without a call | `chat/functions.ts` (`createCategoryChat`: one paid category call per prompt, however often a resend schedules the job) |
  * | `host-start`       | `<userId>:<clientId>`    | 24 h                          | `acp/remote.ts` (`startHostSession`) |
  * | `bundle-import` | `<userId>:<importId>` | 24 h (released when the import fails) | `skills/bundle.ts` (`importBundle`) |
  * | `public-api-idempotency` | `<sha256 of api key id + Idempotency-Key>` | 24 h        | `public-api/router.ts` (POSTs with an `Idempotency-Key`) |
  * | `aside-add`        | `<userId>:<threadId>:<entryId>` | {@link ASIDE_ADD_CLAIM_TTL_MS} | `chat/aside.ts` ("Add to thread", one click, retried or doubled) |
+ * | `guest-post`       | `<linkId>:<hash of request id>` and `<linkId>:<hash of request id and text>` | {@link GUEST_POST_CLAIM_TTL_MS} | `chat/guest-links.ts` (`holdGuestMessage`: a guest's retry after a lost reply writes its note once) |
+ * | `guest-send`       | `<threadGuestMessages id>` | {@link GUEST_SEND_CLAIM_TTL_MS} | `chat/http.ts` (`/chat/start` with `guestMessageId`): one send of a held guest note; its `result` is the saved message's id (or `past-scan`), recorded with the note's sent mark; one without a result, once its lease (`GUEST_SEND_LEASE_MS`) lapses or its own send failed, is settled from the thread's messages (`chat/guest-links.ts#settleSend`): marked sent when its tagged message is found or the 3-page walk runs out (`past-scan`), freed only when none is found |
  * | `thread-cut`        | `<threadId>:<covered row id>` | 30 min | `agent/thread-summaries.ts` (idle summary) and `agent/thread-compaction.ts` (compaction): one scope, so a cut is paid for once |
  * | `thread-fold`       | `<threadId>`             | 3 min, released when the call ends | `agent/thread-summaries.ts` (`claimCut`): one paid summarising call in flight per thread, so two runs planning different cuts of the same rows do not both pay |
  * | `regenerate-title`  | `<threadId>`             | 5 min until the job starts, then held for 15 min from its start (`REGENERATE_TITLE_RUN_TTL_MS`); released when the job ends, or by `retryTitleWrite` once a handed-off write settles | `chat/functions.ts` (`regenerateThreadTitle`: one regenerate in flight per thread) |
@@ -33,7 +37,7 @@
  * | `title-answer`      | the run's `title-charge` key | 24 h; deleted when the run's write settles, is refused, or the chat is locked | `agent/thread-title.ts` (`recordTitleAnswer`: the model's answer, in `result`, for a write that has not landed yet) |
  * | `title-dispatch`    | `<threadId>:<request id>` | 2 min, released once the request is answered | `agent/thread-title.ts` (`beginTitleDispatch`: a title model request being sent; `enableThreadLock` refuses while one is held) |
  * | `organization-policy-create` | `<organizationId>` | {@link ORGANIZATION_POLICY_CREATE_CLAIM_TTL_MS} | `auth/organization-policy.ts` (`setOrganizationPolicy`: one writer creates an organization's first policy row) |
- * | `daily-charge`     | `<requestId>`            | 24 h                          | `chat/daily-charge.ts`       |
+ * | `daily-charge`     | `<requestId>`; `chat-start:<userId>:<clientMessageId>:<fingerprint>` (`chat/start-claim.ts#startChargeKey`) | 24 h | `chat/daily-charge.ts` (`chargeDailyLimitOnce`: one charge per keyed `/chat/start` send, kept when its start claim is released after a failed save, so a retry is not charged again) |
  * | `video-charge`     | `<requestId>`            | 24 h                          | `workflow/video-billing.ts`  |
  * | `video-reservation` | `<requestId>`            | 24 h                          | `auth/billing.ts`            |
  * | `posthog-retry-scheduled` / `-started` / `-outcome` / `-erased` / `-deferred` | `<requestId>:<chain>:<attempt>` (`-erased`: `:<deleted\|no_profile>`, `-deferred`: `:<n>` appended; `posthog-retry-chain`: `<requestId>:<failureId>`) | 14 days (`-lease`: 10 min) | `gdpr/posthog-retry.ts` (not user-tagged: erasing the account must not reopen a finished attempt) |
@@ -108,6 +112,21 @@ export const ASIDE_ADD_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** The scope of those claims. */
 export const ASIDE_ADD_SCOPE = "aside-add";
+
+/** A guest post the owner's shard already wrote: a retry of the same request (a lost reply) within a day writes nothing. */
+export const GUEST_POST_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** The scope of those claims. */
+export const GUEST_POST_SCOPE = "guest-post";
+
+/** A held guest note's send: outlives the note's link (24 h), so a stored send is never repeated while the note exists. */
+export const GUEST_SEND_CLAIM_TTL_MS = 2 * 24 * 60 * 60 * 1000;
+
+/** The scope of those claims. */
+export const GUEST_SEND_SCOPE = "guest-send";
+
+/** How long a guest send may take before a send with no stored message counts as dead and the note can be acted on again. */
+export const GUEST_SEND_LEASE_MS = 5 * 60 * 1000;
 
 /** A worker dispatch (`sub-agents/functions.ts`): the lead's tool call or the user's `clientId`, redelivered or retried within a day. */
 export const WORKER_DISPATCH_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;

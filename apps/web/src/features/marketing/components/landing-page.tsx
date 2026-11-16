@@ -469,7 +469,7 @@ const SectionBadge = ({ className, index, light = false, title }: { className?: 
                 transition={{ delay: 0.15, duration: 0.4, ease: "easeOut" }}
                 variants={{ hidden: { opacity: 0, x: -10 }, visible: { opacity: 1, x: 0 } }}
             >
-                [ <span className="text-primary">{String(index).padStart(2, "0")}</span> / <span>{String(TOTAL_SECTIONS).padStart(2, "0")}</span> ]
+                [ <span className="text-primary-text">{String(index).padStart(2, "0")}</span> / <span>{String(TOTAL_SECTIONS).padStart(2, "0")}</span> ]
             </motion.div>
             <motion.span
                 className={clsx("text-sm font-medium tracking-wide", {
@@ -564,14 +564,14 @@ const LandingPage: FC = () => {
                 <section className="relative container mx-auto mt-px flex min-h-[85svh] flex-col items-center justify-center border-x px-4 pt-24 pb-12 sm:min-h-screen sm:pt-32 sm:pb-20">
                     <SectionSeperator />
                     <div className="mx-auto w-full max-w-3xl text-center">
-                        <span className="text-primary mb-3 inline-block font-mono text-[10px] font-medium tracking-widest uppercase sm:mb-4 sm:text-xs">
+                        <span className="text-primary-text mb-3 inline-block font-mono text-[10px] font-medium tracking-widest uppercase sm:mb-4 sm:text-xs">
                             {t`Chat · Images · Video · Audio · Documents`}
                         </span>
                         <h1 className="mb-4 text-3xl leading-[1.1] font-bold tracking-tight sm:mb-6 sm:text-5xl md:text-6xl lg:text-[4.5rem]">
                             <Trans>
                                 Where thoughts
                                 <br />
-                                <span className="text-primary">become actions.</span>
+                                <span className="text-primary-text">become actions.</span>
                             </Trans>
                         </h1>
                         <p className="mx-auto mb-8 max-w-3xl text-base leading-relaxed text-white/60 sm:mb-10 sm:text-lg">
@@ -606,7 +606,7 @@ const LandingPage: FC = () => {
                             <div className="mb-10 sm:mb-16">
                                 <h2 className="mb-3 max-w-xl text-3xl leading-tight font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl">
                                     <Trans>
-                                        One subscription. <span className="text-primary">Every model.</span>
+                                        One subscription. <span className="text-primary-text">Every model.</span>
                                     </Trans>
                                 </h2>
                                 <p className="max-w-xl text-base text-white/50 sm:text-lg">
@@ -706,7 +706,7 @@ const LandingPage: FC = () => {
                             <div className="px-4 pt-16 pb-10 sm:px-6 sm:pt-28 sm:pb-16 lg:px-10">
                                 <h2 className="text-brand-obsidian mb-3 max-w-lg text-3xl leading-tight font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl">
                                     <Trans>
-                                        Chat, create, <span className="text-primary">and build.</span>
+                                        Chat, create, <span className="text-primary-text">and build.</span>
                                     </Trans>
                                 </h2>
                                 <p className="text-brand-graphite max-w-lg text-base sm:text-lg">
@@ -734,7 +734,7 @@ const LandingPage: FC = () => {
                                                     <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md">
                                                         <feature.icon className="size-4" />
                                                     </div>
-                                                    <span className="text-primary font-mono text-xs font-medium tracking-widest uppercase">
+                                                    <span className="text-primary-text font-mono text-xs font-medium tracking-widest uppercase">
                                                         {i18n._(feature.tabLabel)}
                                                     </span>
                                                 </div>
@@ -772,7 +772,7 @@ const LandingPage: FC = () => {
                             <div className="px-4 pt-16 pb-10 sm:px-6 sm:pt-28 sm:pb-16 lg:px-10">
                                 <h2 className="text-brand-obsidian mb-3 max-w-lg text-3xl leading-tight font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl">
                                     <Trans>
-                                        Why <span className="text-primary">Neore.</span>
+                                        Why <span className="text-primary-text">Neore.</span>
                                     </Trans>
                                 </h2>
                                 <p className="text-brand-graphite max-w-lg text-base sm:text-lg">{t`Stop juggling subscriptions. One workspace, every model, one price.`}</p>
@@ -801,7 +801,7 @@ const LandingPage: FC = () => {
                                         <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md">
                                             <benefit.icon className="size-4" />
                                         </div>
-                                        <span className="text-primary font-mono text-xs font-medium tracking-widest uppercase">
+                                        <span className="text-primary-text font-mono text-xs font-medium tracking-widest uppercase">
                                             {String(index + 1).padStart(2, "0")}
                                         </span>
                                     </div>
@@ -855,7 +855,7 @@ const LandingPage: FC = () => {
                             <div className="px-4 pt-16 pb-10 text-center sm:px-6 sm:pt-28 sm:pb-16 lg:px-10">
                                 <h2 className="text-brand-obsidian mb-3 text-3xl leading-tight font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl">
                                     <Trans>
-                                        Everything built <span className="text-primary">in.</span>
+                                        Everything built <span className="text-primary-text">in.</span>
                                     </Trans>
                                 </h2>
                                 <p className="text-brand-graphite mx-auto max-w-lg text-base sm:text-lg">
@@ -917,7 +917,7 @@ const LandingPage: FC = () => {
                             <div className="px-4 pt-16 pb-10 sm:px-6 sm:pt-28 sm:pb-16 lg:px-10">
                                 <h2 className="text-brand-obsidian mb-3 max-w-lg text-3xl leading-tight font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl">
                                     <Trans>
-                                        Built for <span className="text-primary">real workflows.</span>
+                                        Built for <span className="text-primary-text">real workflows.</span>
                                     </Trans>
                                 </h2>
                                 <p className="text-brand-graphite max-w-lg text-base sm:text-lg">
@@ -948,7 +948,7 @@ const LandingPage: FC = () => {
                                         <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md">
                                             <useCase.icon className="size-4" />
                                         </div>
-                                        <span className="text-primary font-mono text-xs font-medium tracking-widest uppercase">
+                                        <span className="text-primary-text font-mono text-xs font-medium tracking-widest uppercase">
                                             {String(index + 1).padStart(2, "0")}
                                         </span>
                                     </div>
@@ -972,7 +972,7 @@ const LandingPage: FC = () => {
                             <div className="px-4 pt-16 pb-10 text-center sm:px-6 sm:pt-28 sm:pb-16 lg:px-10">
                                 <h2 className="text-brand-obsidian mb-3 text-3xl leading-tight font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl">
                                     <Trans>
-                                        Simple, transparent <span className="text-primary">pricing</span>.
+                                        Simple, transparent <span className="text-primary-text">pricing</span>.
                                     </Trans>
                                 </h2>
                                 <p className="text-brand-graphite mx-auto mb-6 max-w-lg text-base sm:mb-8 sm:text-lg">
@@ -1023,7 +1023,7 @@ const LandingPage: FC = () => {
                                     <ul className="mb-8 flex-1 space-y-3">
                                         {tier.features.map((feature) => (
                                             <li className="text-brand-graphite flex items-start gap-2 text-sm" key={feature.id}>
-                                                <Check className="text-primary mt-0.5 size-4 shrink-0" />
+                                                <Check className="text-primary-text mt-0.5 size-4 shrink-0" />
                                                 {i18n._(feature)}
                                             </li>
                                         ))}
@@ -1081,7 +1081,7 @@ const LandingPage: FC = () => {
                         <FadeIn variant="scale">
                             <h2 className="mb-3 text-3xl font-bold sm:mb-4 sm:text-4xl md:text-5xl">
                                 <Trans>
-                                    Your AI workspace <span className="text-primary">starts here.</span>
+                                    Your AI workspace <span className="text-primary-text">starts here.</span>
                                 </Trans>
                             </h2>
                             <p className="mx-auto mb-6 max-w-md text-base text-white/50 sm:mb-8 sm:text-lg">
@@ -1118,7 +1118,7 @@ const LandingPage: FC = () => {
                             <div className="px-4 pt-16 pb-10 text-center sm:px-6 sm:pt-28 sm:pb-16 lg:px-10">
                                 <h2 className="text-brand-obsidian mb-3 text-3xl leading-tight font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl">
                                     <Trans>
-                                        Frequently asked <span className="text-primary">questions</span>.
+                                        Frequently asked <span className="text-primary-text">questions</span>.
                                     </Trans>
                                 </h2>
                                 <p className="text-brand-graphite text-sm sm:text-base">{t`Everything you need to know about Neore.`}</p>
@@ -1130,7 +1130,7 @@ const LandingPage: FC = () => {
                                 {faqItems.map((item, index) => (
                                     <AccordionItem className="border-brand-silver" key={item.question.id}>
                                         <AccordionTrigger className="text-brand-obsidian px-4 py-4 text-left text-sm font-semibold hover:no-underline sm:px-6 sm:py-5 lg:px-10">
-                                            <span className="text-primary mr-3 font-mono text-xs font-normal tracking-wider sm:mr-4">
+                                            <span className="text-primary-text mr-3 font-mono text-xs font-normal tracking-wider sm:mr-4">
                                                 {String(index + 1).padStart(2, "0")}
                                             </span>
                                             {i18n._(item.question)}

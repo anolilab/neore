@@ -3,13 +3,16 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
+import { titleOnScreen, useTitleSaveRevision } from "@/features/chat/core/lib/thread-title-saves";
 import { useOptimisticDeletions, useOptimisticPins, useOptimisticStatuses } from "@/features/chat/core/stores/thread-store-hooks";
 import { matchesThreadFilters, pruneSelectedTagIds, resolveThreadTags } from "@/features/chat/tags/thread-tag-logic";
 import { useProjectList } from "@/features/projects/hooks/use-projects";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import { useDateBoundaries } from "../contexts/date-boundaries-context";
-import { nextSnoozeWake, partitionDerivedSections } from "../lib/derived-sections";
+import { isIdleThread, nextSnoozeWake, partitionDerivedSections } from "../lib/derived-sections";
+import type { NodesById } from "../lib/share-unchanged-nodes";
+import { shareUnchangedNodes } from "../lib/share-unchanged-nodes";
 import { selectSelectedTagIds, useThreadListUIStore } from "../stores/thread-list-ui-store";
 import type { BranchNode, GroupType, MinimalThreadRelationship, ThreadGroup } from "../types";
 import { usePersistThreadList, useThreadListPlaceholder } from "./use-thread-list-cache";
@@ -44,6 +47,24 @@ const sortThreadsInGroup = (threads: BranchNode[]): BranchNode[] => {
         return b.createdAt - a.createdAt;
     });
 };
+
+/** The nodes of one build, shared with the build before it, and the build they came from. */
+interface SharedNodes {
+    built: BranchNode[][];
+    byId: NodesById;
+    lists: BranchNode[][];
+}
+
+const NO_NODES: NodesById = new Map();
+
+/** The same nodes, in the same order, in every list. */
+const sameNodeLists = (left: ReadonlyArray<ReadonlyArray<BranchNode>>, right: ReadonlyArray<ReadonlyArray<BranchNode>>): boolean =>
+    left.length === right.length &&
+    left.every((list, index) => {
+        const other = right[index];
+
+        return other !== undefined && list.length === other.length && list.every((node, position) => node === other[position]);
+    });
 
 /** The longest delay setTimeout accepts; a snooze further out simply re-arms when this one fires. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
@@ -89,6 +110,8 @@ const useThreadGroups = (
 
     // Tag filter, with ids of since-deleted tags ignored so they cannot hide everything.
     const rawSelectedTagIds = useThreadListUIStore(selectSelectedTagIds);
+    // Re-derives the rows on every save that begins or settles: their titles come from the save coordinator.
+    const titleRevision = useTitleSaveRevision();
     const selectedTagIds = useMemo(() => pruneSelectedTagIds(rawSelectedTagIds, compositeData?.tags), [rawSelectedTagIds, compositeData?.tags]);
 
     const { isAnswered: projectsAnswered, projects } = useProjectList();
@@ -104,6 +127,11 @@ const useThreadGroups = (
 
     // Get date boundaries from context (updates at midnight)
     const dateBoundaries = useDateBoundaries();
+
+    // Snoozes end on their own (the timer below re-arms per wake); idle rows read the same clock.
+    const [now, setNow] = useState(() => Date.now());
+    // The last build's nodes, shared with the one before (see the sharing step below).
+    const [sharedNodes, setSharedNodes] = useState<SharedNodes | null>(null);
 
     // --- Stage 1: Build lookup maps (only recomputes when raw data changes) ---
     const lookupMaps = useMemo(() => {
@@ -182,7 +210,7 @@ const useThreadGroups = (
     ]);
 
     // --- Stage 2: Build thread hierarchy trees (only recomputes when maps or optimistic state changes) ---
-    const hierarchyData = useMemo(() => {
+    const builtNodes = useMemo(() => {
         if (!lookupMaps) {
             return null;
         }
@@ -209,14 +237,29 @@ const useThreadGroups = (
                 .filter((node): node is BranchNode => node !== null);
 
             // Apply optimistic state overrides (instant UI updates)
+            // The title the header shows too (`titleOnScreen`): the save coordinator, which the metadata store is written with.
+            const screenTitle = titleOnScreen(thread._id, thread.title);
             const optimisticPin = optimisticPins.get(threadId);
             const optimisticStatus = optimisticStatuses.get(threadId);
+            const status = optimisticStatus === undefined ? thread.status || "active" : optimisticStatus;
+            const { scheduled } = thread;
 
             return {
                 awaitingInput: thread.awaitingInput,
                 branchPoint: 0,
                 branchType: "branch",
                 category: thread.category,
+                isIdle: isIdleThread(
+                    {
+                        awaitingInput: thread.awaitingInput,
+                        lastReplyAt: thread.lastReplyAt,
+                        lastUserMessageAt: thread.lastUserMessageAt,
+                        scheduled,
+                        snoozedUntil: thread.snoozedUntil,
+                        status,
+                    },
+                    now,
+                ),
                 lockedAt: thread.lockedAt,
                 children,
                 createdAt: thread.createdAt ?? thread._creationTime,
@@ -230,26 +273,64 @@ const useThreadGroups = (
                 projectId: thread.projectId,
                 relevantMessages: thread.relevantMessages,
                 runner: thread.runner,
+                scheduled,
                 snoozedUntil: thread.snoozedUntil,
                 source: thread.source,
                 statelessMode: thread.statelessMode,
-                status: optimisticStatus === undefined ? thread.status || "active" : optimisticStatus,
+                status,
+                storedTitle: screenTitle ?? "",
                 tagIds: thread.tagIds,
                 tags: resolveThreadTags(thread.tagIds, userTags),
                 threadId: thread._id,
-                title: thread.title || t`New Chat`,
+                title: screenTitle || t`New Chat`,
                 updatedAt: thread.updatedAt,
             };
         };
 
-        const allThreadsList = rootThreads
-            .map((thread: any) => buildHierarchy(thread._id))
-            .filter((node: BranchNode | null): node is BranchNode => node !== null);
+        const threads = rootThreads.map((thread: any) => buildHierarchy(thread._id)).filter((node: BranchNode | null): node is BranchNode => node !== null);
 
         // Build temporary threads hierarchy separately
-        const temporaryThreadsList: BranchNode[] = temporaryRootThreads
+        const temporaryNodes: BranchNode[] = temporaryRootThreads
             .map((thread: any) => buildHierarchy(thread._id))
             .filter((node: BranchNode | null): node is BranchNode => node !== null && node.expiresAt !== undefined);
+
+        return [threads, temporaryNodes];
+    }, [lookupMaps, optimisticPins, optimisticStatuses, optimisticDeletions, compositeData?.tags, titleRevision, now, t]);
+
+    // --- Sharing: an unchanged thread gets the node it had, so only the rows whose thread changed re-render ---
+    // Kept in state and adjusted during render, not in a ref: an update made during a render is thrown away with that render, so the
+    // nodes compared against are always those of the last render React kept, and the hook stays compiled. The deep compare runs once
+    // per build: renders that bring no new build reuse it, and so does React's immediate retry after the update below, which finds
+    // the state already holding this build's nodes.
+    const sharedBuild = useMemo(() => {
+        if (builtNodes === null) {
+            return null;
+        }
+
+        if (sharedNodes?.built === builtNodes) {
+            return sharedNodes;
+        }
+
+        const shared = shareUnchangedNodes(sharedNodes?.byId ?? NO_NODES, builtNodes);
+
+        return { built: builtNodes, byId: shared.byId, lists: shared.lists };
+    }, [builtNodes, sharedNodes]);
+    let currentShared = sharedNodes;
+
+    // A build that changed no node keeps the state it has: no update, so a rebuild can never loop through this.
+    if (sharedBuild !== null && sharedBuild !== currentShared && (!currentShared || !sameNodeLists(currentShared.lists, sharedBuild.lists))) {
+        currentShared = sharedBuild;
+        setSharedNodes(sharedBuild);
+    }
+
+    const sharedLists = builtNodes === null ? null : (currentShared?.lists ?? null);
+
+    const hierarchyData = useMemo(() => {
+        if (!sharedLists) {
+            return null;
+        }
+
+        const [allThreadsList = [], temporaryThreadsList = []] = sharedLists;
 
         // Single pass: separate threads by type (more efficient than multiple filters)
         // Apply category + tag filters if selected
@@ -286,7 +367,7 @@ const useThreadGroups = (
             statelessThreads,
             temporaryThreadsList: filteredTemporaryThreadsList,
         };
-    }, [lookupMaps, optimisticPins, optimisticStatuses, optimisticDeletions, selectedCategory, selectedTagIds, compositeData?.tags, t]);
+    }, [sharedLists, selectedCategory, selectedTagIds]);
 
     // --- Stage 3: Sort callback for search results (stable reference) ---
     const sortThreadsByPriority = useCallback(
@@ -359,9 +440,12 @@ const useThreadGroups = (
         return { heldProjectThreads, map, threadsWithoutProject };
     }, [hierarchyData, holdProjectThreads, projects, searchQuery]);
 
-    // Snoozes end on their own: one timer to the next wake, none while nothing is snoozed.
-    const [now, setNow] = useState(() => Date.now());
-    const nextWake = useMemo(() => (hierarchyData ? nextSnoozeWake(hierarchyData.regularThreads, now) : undefined), [hierarchyData, now]);
+    // Snoozes end on their own: one timer to the next wake, none while nothing is snoozed. Every root counts, since an idle
+    // marker reads the clock too, and stateless and temporary roots sit outside the regular list.
+    const nextWake = useMemo(
+        () => (hierarchyData ? nextSnoozeWake([...hierarchyData.allThreadsList, ...hierarchyData.temporaryThreadsList], now) : undefined),
+        [hierarchyData, now],
+    );
 
     useEffect(() => {
         const delay = nextWake === undefined ? 0 : Math.min(Math.max(nextWake - Date.now(), 0) + 25, MAX_TIMEOUT_MS);

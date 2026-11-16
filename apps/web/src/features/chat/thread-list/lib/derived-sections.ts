@@ -14,6 +14,26 @@ export interface DerivedSections {
 
 type Candidate = Pick<BranchNode, "awaitingInput" | "isPinned" | "snoozedUntil" | "status">;
 
+type IdleCandidate = Pick<BranchNode, "awaitingInput" | "lastReplyAt" | "lastUserMessageAt" | "scheduled" | "snoozedUntil" | "status">;
+
+/**
+ * A finished thread that nothing will resume: its last turn replied and the run is over, nothing waits on the owner,
+ * no recurring task is bound to it, and it is not snoozed. Shown as a quiet marker, so nobody sends "continue" to find out.
+ * A failed last turn is not idle; the row shows it as failed.
+ *
+ * Two inputs need care. `lastUserMessageAt` is stamped only for a message after the first, so unset means only the first
+ * turn exists; a reply older than the newest person's message means that turn went unanswered (an interrupted run).
+ * `scheduled` must be known to be false: the list row does not report a bound schedule yet, and an absent flag is not
+ * evidence that nothing is scheduled.
+ */
+export const isIdleThread = (thread: IdleCandidate, now: number): boolean =>
+    thread.status === "active" &&
+    thread.lastReplyAt !== undefined &&
+    (thread.lastUserMessageAt === undefined || thread.lastReplyAt >= thread.lastUserMessageAt) &&
+    thread.awaitingInput === undefined &&
+    thread.scheduled === false &&
+    !isSnoozed(thread.snoozedUntil, now);
+
 /**
  * Which derived section a thread belongs to, if any. A snooze beats everything (it is the owner's explicit
  * choice), then a pin keeps the thread where it is, then waiting for the owner beats running.
@@ -36,6 +56,33 @@ const sectionOf = (thread: Candidate, now: number): "needsYou" | "rest" | "snooz
 };
 
 const activityOf = (thread: BranchNode): number => Math.max(thread.lastReplyAt ?? 0, thread.updatedAt ?? 0, thread.createdAt);
+
+export type ThreadState = "idle" | "needsYou" | "other" | "snoozed" | "working";
+
+/**
+ * A thread's single state for the command palette's `#` filters: a snooze wins, then a run in flight, then waiting
+ * for the owner, then idle. Pins do not change it, so a pinned running thread is still working.
+ */
+export const threadStateOf = (thread: IdleCandidate, now: number): ThreadState => {
+    // Archived threads leave every active section, whatever their run or snooze fields still say, so they carry no state tag.
+    if (thread.status === "archived") {
+        return "other";
+    }
+
+    if (isSnoozed(thread.snoozedUntil, now)) {
+        return "snoozed";
+    }
+
+    if (thread.status === "running") {
+        return "working";
+    }
+
+    if (thread.awaitingInput !== undefined) {
+        return "needsYou";
+    }
+
+    return isIdleThread(thread, now) ? "idle" : "other";
+};
 
 /** Splits root threads into the derived sections shown above and below the ordinary groups. Archived threads must be filtered out first. */
 export const partitionDerivedSections = (threads: ReadonlyArray<BranchNode>, now: number): DerivedSections => {

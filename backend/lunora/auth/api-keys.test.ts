@@ -173,6 +173,14 @@ describe("createScopedApiKey", () => {
         expect(createApiKey).not.toHaveBeenCalled();
     });
 
+    it("refuses a key while an admin is impersonating the account", async () => {
+        session.current = { ...(session.current as object), impersonatedBy: "admin-1" };
+
+        await expect(create({ name: "CI", scopes: ["threads:read"] })).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+        expect(createApiKey).not.toHaveBeenCalled();
+    });
+
     it("allows the last free slot and refuses the one after", async () => {
         state = { existingKeys: MAX_API_KEYS_PER_USER - 1, isAnonymous: false };
 

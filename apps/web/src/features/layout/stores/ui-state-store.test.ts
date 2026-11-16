@@ -1,12 +1,79 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultKeyboardShortcuts, mergeKeyboardShortcuts } from "./ui-state-store";
+import { defaultKeyboardShortcuts, mergeKeyboardShortcuts, migrateUIState, UI_STATE_VERSION, useUIStateStore } from "./ui-state-store";
 
 describe("default keyboard shortcuts", () => {
     it("carry no binding that nothing registers", () => {
-        for (const key of ["archiveThread", "createBranch", "deleteThread", "pinThread", "search"]) {
+        for (const key of ["createBranch", "pinThread", "search"]) {
             expect(defaultKeyboardShortcuts).not.toHaveProperty(key);
         }
+    });
+});
+
+describe("thread action defaults against saved bindings", () => {
+    it("leaves archive unbound when a saved binding already takes its chord, and keeps that binding", () => {
+        const merged = mergeKeyboardShortcuts({ newChat: defaultKeyboardShortcuts.archiveThread });
+
+        expect(merged.archiveThread).toBe("");
+        expect(merged.newChat).toBe(defaultKeyboardShortcuts.archiveThread);
+    });
+
+    it("leaves delete unbound on the same collision", () => {
+        expect(mergeKeyboardShortcuts({ newChat: defaultKeyboardShortcuts.deleteThread }).deleteThread).toBe("");
+    });
+
+    it("keeps the default when no saved binding takes its chord", () => {
+        expect(mergeKeyboardShortcuts({ newChat: "ctrl+j" }).archiveThread).toBe(defaultKeyboardShortcuts.archiveThread);
+    });
+
+    it("starts the jump unbound, since browsers reserve every Ctrl+Shift letter it could take", () => {
+        expect(defaultKeyboardShortcuts.jumpToLastMessage).toBe("");
+        expect(mergeKeyboardShortcuts(undefined).jumpToLastMessage).toBe("");
+    });
+
+    it("keeps a jump binding the person saved, even one on a chord another action holds", () => {
+        const merged = mergeKeyboardShortcuts({ jumpToLastMessage: "ctrl+shift+k", newChat: "ctrl+shift+k" });
+
+        expect(merged.jumpToLastMessage).toBe("ctrl+shift+k");
+    });
+
+    it("drops the thread actions' old defaults from a set saved before version 1, so the new defaults apply", () => {
+        const migrated = migrateUIState({ keyboardShortcuts: { archiveThread: "ctrl+a", deleteThread: "ctrl+d", newChat: "ctrl+j" } }, 0) as {
+            keyboardShortcuts: Record<string, string>;
+        };
+        const merged = mergeKeyboardShortcuts(migrated.keyboardShortcuts);
+
+        expect(merged.archiveThread).toBe(defaultKeyboardShortcuts.archiveThread);
+        expect(merged.deleteThread).toBe(defaultKeyboardShortcuts.deleteThread);
+        expect(merged.newChat).toBe("ctrl+j");
+    });
+
+    it("keeps Mod+D for delete when the person chose it from version 1 on", () => {
+        const migrated = migrateUIState({ keyboardShortcuts: { deleteThread: "ctrl+d" } }, UI_STATE_VERSION) as {
+            keyboardShortcuts: Record<string, string>;
+        };
+
+        expect(mergeKeyboardShortcuts(migrated.keyboardShortcuts).deleteThread).toBe("ctrl+d");
+    });
+
+    it("drops the jump's retired Ctrl+Shift+J default from a set saved before version 2, so the jump starts unbound", () => {
+        const migrated = migrateUIState({ keyboardShortcuts: { jumpToLastMessage: "ctrl+shift+j" } }, 1) as {
+            keyboardShortcuts: Record<string, string>;
+        };
+
+        expect(mergeKeyboardShortcuts(migrated.keyboardShortcuts).jumpToLastMessage).toBe("");
+    });
+
+    it("keeps a jump binding on Ctrl+Shift+J that the person saved from version 2 on", () => {
+        const migrated = migrateUIState({ keyboardShortcuts: { jumpToLastMessage: "ctrl+shift+j" } }, UI_STATE_VERSION) as {
+            keyboardShortcuts: Record<string, string>;
+        };
+
+        expect(mergeKeyboardShortcuts(migrated.keyboardShortcuts).jumpToLastMessage).toBe("ctrl+shift+j");
+    });
+
+    it("keeps a binding the user saved for the thread action itself", () => {
+        expect(mergeKeyboardShortcuts({ archiveThread: "ctrl+j" }).archiveThread).toBe("ctrl+j");
     });
 });
 
@@ -38,5 +105,21 @@ describe("find in thread shortcut", () => {
 
     it("fills every default for nothing saved", () => {
         expect(mergeKeyboardShortcuts(undefined)).toEqual(defaultKeyboardShortcuts);
+    });
+});
+
+describe("focus-area keys", () => {
+    it("clears a saved binding on F6 or Shift+F6, so it cannot run beside focus navigation", () => {
+        const merged = mergeKeyboardShortcuts({ help: "f6", newChat: "Shift+F6", newTemporaryChat: "ctrl+f6" });
+
+        expect(merged.help).toBe("");
+        expect(merged.newChat).toBe("");
+        expect(merged.newTemporaryChat).toBe("ctrl+f6");
+    });
+
+    it("refuses a binding on F6 when one is set in the store", () => {
+        useUIStateStore.getState().setKeyboardShortcuts({ help: "f6" });
+
+        expect(useUIStateStore.getState().keyboardShortcuts.help).toBe("");
     });
 });

@@ -40,10 +40,14 @@ const isValidKey = (value: string): boolean =>
     value.length > 0 && value.length <= 255 && [...value].every((char) => (char.codePointAt(0) ?? 0) >= 0x21 && (char.codePointAt(0) ?? 0) <= 0x7e);
 
 export type IdempotencyRecord =
-    { fingerprint: string; state: "pending" } | { body: string; contentType: string; fingerprint: string; state: "done"; status: number };
+    | { fingerprint: string; state: "pending" }
+    | { body: string; contentType: string; fingerprint: string; state: "done"; status: number };
 
 export type IdempotencyDecision =
-    { kind: "conflict" } | { kind: "in_progress" } | { kind: "proceed" } | { kind: "replay"; record: Extract<IdempotencyRecord, { state: "done" }> };
+    | { kind: "conflict" }
+    | { kind: "in_progress" }
+    | { kind: "proceed" }
+    | { kind: "replay"; record: Extract<IdempotencyRecord, { state: "done" }> };
 
 /** Validate the header. `undefined` = not sent (the route runs normally). */
 export const parseIdempotencyKey = (raw: string | null | undefined): string | undefined => {

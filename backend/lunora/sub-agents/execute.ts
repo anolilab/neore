@@ -6,12 +6,18 @@
  *
  * On the jobs queue (at-least-once): the run claims its row first
  * (`claimRun`), so only one delivery ever runs it, and reports once at the end
- * (`completeRun`), which posts once. A delivery killed mid-run leaves the row
- * `running` until the reaper fails it. A run the owner cancels is ended by
+ * (`completeRun`), which posts once. A delivery killed mid-run is refused on
+ * redelivery by the claim, so the loop beats once a minute while it lives
+ * (`beatRun`), and the watch (`watchRunBeat`) fails a run whose beat stopped as
+ * interrupted; the reaper bounds every run. A run the owner cancels is ended by
  * `cancelRun` at once; this loop sees it between steps (`shouldRunStop`) and
  * stops, and its own `completeRun` then finds the run already ended. Enqueued from the parent run's shard —
  * the owner's — so the child thread, its messages and the post-back all live
  * there.
+ *
+ * A one-shot child below the depth cap that needs a tool its owner set to `ask` stops on the request instead of
+ * losing the tool: the run waits (`awaiting`), its owner answers on the child's thread, and the answer's continuation
+ * (`continueAfterToolApproval`) ends the run and posts its answer, once.
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { MODEL_LOOKUP } from "@neore/ai/models";
@@ -21,11 +27,14 @@ import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
+import { isAgentRunError } from "../chat/lib/agent-run";
+import { RUN_BEAT_MS } from "../chat/lib/interrupted-run";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
 import { isTaskModelAllowed } from "../tasks/logic";
 import {
     buildSubAgentPrompt,
     canNest,
+    chainPausesForApproval,
     MESSAGE_WORKER_TOOL_NAME,
     originOfRun,
     resolveSubAgentModel,
@@ -47,6 +56,21 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
     }
 
     const { userId } = claim;
+    // A beat that does not land is not fatal (the next one may), but a loop that stops beating is read as dead.
+    // One beat at a time: a tick while one is still in flight is skipped, and that one is awaited before the run
+    // returns, so no write outlives it.
+    let beatInFlight: Promise<void> | undefined;
+    const beat = setInterval(() => {
+        beatInFlight ??= ctx
+            .runMutation(internal.sub_agents.functions.beatRun, { runId })
+            .then(() => undefined)
+            .catch((error: unknown) => {
+                console.warn(`[SubAgent] Run ${runId}: a heartbeat failed:`, error);
+            })
+            .finally(() => {
+                beatInFlight = undefined;
+            });
+    }, RUN_BEAT_MS);
 
     try {
         const skillRun = claim.skillSlug
@@ -87,13 +111,15 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             await assertCanRun();
         }
 
-        const { text } = await runHeadlessAgent(ctx, {
+        const { paused, text } = await runHeadlessAgent(ctx, {
+            organizationId: claim.organizationId ?? null,
             // The parent's `delegateToSubAgent` call only ran past its permission
             // check (approved, or set to `auto`), so that consent carries into
             // this child and nesting stays reachable. At the depth cap the
-            // grant is withheld, so a default `ask` removes the tool there.
+            // grant is withheld, and the tools with it (`withheldTools` below).
             ...(canNest(claim.depth) && { approvedTools: [SUB_AGENT_TOOL_NAME, MESSAGE_WORKER_TOOL_NAME] }),
             beforeThread: assertCanRun,
+            ...(claim.chainSource !== undefined && { chainSource: claim.chainSource }),
             keepThreadStatus: worker !== undefined,
             memory: false,
             model,
@@ -112,6 +138,14 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             },
             // A nested dispatch carries what reached this run, so an unattended chain is not read as the lead's own.
             origin: originOfRun(claim.dispatchedBy),
+            // A one-shot child keeps the tools its owner set to `ask` and pauses on them, whether the owner's turn, a task or a
+            // trigger started its chain: the pause notifies the owner (`recordPendingToolApprovals`), who answers on the child's
+            // thread. A worker's are removed, as before, and so are those of an eval's chain, which measures a headless answer
+            // (`chainPausesForApproval`). The depth
+            // cap limits delegation only: a child there keeps its other `ask` tools, but the dispatch tools are withheld
+            // rather than left to ask for a nesting that would be refused.
+            ...(claim.mode !== "worker" && chainPausesForApproval(claim.chainSource) && { pauseForApproval: { subAgentRunId: runId } }),
+            ...(!canNest(claim.depth) && { withheldTools: [SUB_AGENT_TOOL_NAME, MESSAGE_WORKER_TOOL_NAME] }),
             personalization: "full",
             // A message the user typed into the worker's thread is the prompt as written.
             prompt: worker && claim.clientId !== undefined ? claim.task : buildSubAgentPrompt(claim.task),
@@ -135,12 +169,25 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             userId,
         });
 
+        // Stopped on an approval request: recording it moved the run to `awaiting` before the owner was told, or ended it refused
+        // (`recordPendingToolApprovals`). Either way the run is settled; the answer's continuation ends a waiting one (`chat/execute.ts`).
+        if (paused) {
+            return;
+        }
+
         await ctx.runMutation(internal.sub_agents.functions.completeRun, { outcome: { kind: "succeeded", result: text }, runId });
     } catch (error) {
         console.error(`[SubAgent] Run ${runId} failed:`, error);
 
-        const message = error instanceof SubAgentRunError ? error.message : toUserFacingError(error, { customEndpoint: false });
+        // The owner left the run's organization: our own wording, safe to show, and it says what to do.
+        const message =
+            error instanceof SubAgentRunError || isAgentRunError(error, "left-organization")
+                ? error.message
+                : toUserFacingError(error, { customEndpoint: false });
 
         await ctx.runMutation(internal.sub_agents.functions.completeRun, { outcome: { error: message, kind: "failed" }, runId });
+    } finally {
+        clearInterval(beat);
+        await beatInFlight;
     }
 });

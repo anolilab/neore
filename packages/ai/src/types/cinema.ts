@@ -1,5 +1,14 @@
 export type CameraType =
-    "red-v-raptor" | "sony-venice" | "imax" | "arriflex-16sr" | "panavision-dxl2" | "arri-alexa" | "blackmagic" | "red-epic" | "70mm-film" | "8k-digital";
+    | "red-v-raptor"
+    | "sony-venice"
+    | "imax"
+    | "arriflex-16sr"
+    | "panavision-dxl2"
+    | "arri-alexa"
+    | "blackmagic"
+    | "red-epic"
+    | "70mm-film"
+    | "8k-digital";
 
 export type LensType =
     | "cooke-s4"

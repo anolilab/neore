@@ -4,10 +4,17 @@
  * one. Without an admission the rebuilt tools are built as before.
  */
 import { describe, expect, it, vi } from "vitest";
+import z from "zod/v4";
+
+import { internal } from "../../_generated/internal";
+import { LEFT_ORGANIZATION_MESSAGE } from "../../auth/lib/organization-policy";
+import { createTool } from "../../agent/client/create-tool";
 
 import { buildAgentTools } from "./agent-tools";
 import getAgent from "./get-agent";
 import { resumeApprovedRun } from "./agent-run";
+import { createAnsweredAskUserTool } from "../tools/ask-user";
+import { createAnsweredRequestSecretTool } from "../tools/request-secret";
 
 // The rebuilt tools and the agent are not what this checks: the run stops at the approval lookup.
 vi.mock("./get-agent", () => {
@@ -17,6 +24,22 @@ vi.mock("./agent-tools", () => {
     return {
         buildAgentTools: vi.fn(async () => {
             return { mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
+        }),
+    };
+});
+
+// Each answered tool is a marker, so a test can tell it reached the agent the continuation runs.
+vi.mock("../tools/ask-user", () => {
+    return {
+        createAnsweredAskUserTool: vi.fn(() => {
+            return { answered: "askUser" };
+        }),
+    };
+});
+vi.mock("../tools/request-secret", () => {
+    return {
+        createAnsweredRequestSecretTool: vi.fn(() => {
+            return { answered: "requestSecret" };
         }),
     };
 });
@@ -52,6 +75,241 @@ describe(resumeApprovedRun, () => {
         const [, args] = vi.mocked(buildAgentTools).mock.calls[0] as unknown as [unknown, Record<string, unknown>];
 
         expect(args).not.toHaveProperty("admittedRun");
+    });
+
+    it("rebuilds a sub-agent child's tools headless, so no time grant or quick check answers its other ask tools", async () => {
+        vi.mocked(buildAgentTools).mockClear();
+
+        await resumeApprovedRun(ctx as never, {
+            approvalId: "approval-1",
+            approved: true,
+            config: { ...(CONFIG as object), headlessApproved: ["delegateToSubAgent"], subAgentRunId: "run-1" } as never,
+            streamId: "stream-1",
+            threadId: "thread-1",
+            userId: "owner-1",
+        }).catch(() => undefined);
+
+        expect(buildAgentTools).toHaveBeenCalledWith(
+            ctx,
+            expect.objectContaining({ headless: true, headlessApproved: ["delegateToSubAgent"], headlessCanAsk: true }),
+        );
+    });
+});
+
+describe("a sub-agent child's continuation after its owner left the organization", () => {
+    it("is refused before any tool is rebuilt, as a new run would be", async () => {
+        vi.mocked(buildAgentTools).mockClear();
+
+        const runQuery = vi.fn(async (reference: unknown) => (reference === internal.auth.organization_policy.isOrganizationMemberQuery ? false : null));
+        const failure = await resumeApprovedRun({ runQuery } as never, {
+            approvalId: "approval-1",
+            approved: true,
+            config: { ...(CONFIG as object), organizationId: "org-left", subAgentRunId: "run-1" } as never,
+            streamId: "stream-1",
+            threadId: "thread-1",
+            userId: "owner-1",
+        }).catch((error: unknown) => error);
+
+        expect(failure).toMatchObject({ kind: "left-organization", message: LEFT_ORGANIZATION_MESSAGE });
+        expect(buildAgentTools).not.toHaveBeenCalled();
+    });
+
+    it("still resumes for a member, rebuilding its tools", async () => {
+        vi.mocked(buildAgentTools).mockClear();
+
+        const runQuery = vi.fn(async (reference: unknown) => (reference === internal.auth.organization_policy.isOrganizationMemberQuery ? true : null));
+
+        await resumeApprovedRun({ runQuery } as never, {
+            approvalId: "approval-1",
+            approved: true,
+            config: { ...(CONFIG as object), organizationId: "org-a", subAgentRunId: "run-1" } as never,
+            streamId: "stream-1",
+            threadId: "thread-1",
+            userId: "owner-1",
+        }).catch(() => undefined);
+
+        expect(buildAgentTools).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ organizationId: "org-a" }));
+    });
+});
+
+describe("a headless pause's continuation", () => {
+    const resumeWith = async (config: Record<string, unknown>) => {
+        const approveToolCall = vi.fn(async () => {
+            throw new Error("stop here");
+        });
+
+        vi.mocked(getAgent).mockClear();
+        vi.mocked(getAgent).mockResolvedValue({ approveToolCall, options: {} } as never);
+
+        const error = await resumeApprovedRun(
+            {
+                runQuery: vi.fn(async () => {
+                    return { toolName: null };
+                }),
+            } as never,
+            {
+                approvalId: "approval-1",
+                approved: true,
+                config: { ...(CONFIG as object), ...config } as never,
+                streamId: "stream-1",
+                threadId: "thread-1",
+                userId: "owner-1",
+            },
+        ).catch((error_: unknown) => error_);
+
+        return { approveToolCall, error };
+    };
+
+    it("runs at most the steps a sub-agent child's run had left, and none once they are spent", async () => {
+        await resumeWith({ stepsLeft: 2, subAgentRunId: "run-1" });
+        expect(getAgent).toHaveBeenCalledWith("gpt-4o", expect.objectContaining({ maxSteps: 2 }));
+
+        const { approveToolCall, error } = await resumeWith({ stepsLeft: 0, subAgentRunId: "run-1" });
+
+        expect(String(error)).toContain("no steps left");
+        expect(getAgent).not.toHaveBeenCalled();
+        expect(approveToolCall).not.toHaveBeenCalled();
+    });
+
+    it("offers a sub-agent child no ask tool on its last step left, and an interactive continuation every tool", async () => {
+        const lastStep = async (config: Record<string, unknown>) => {
+            vi.mocked(buildAgentTools).mockResolvedValueOnce({
+                mcpClients: [],
+                mcpLabels: {},
+                mcpServerNames: [],
+                permissionKeys: {},
+                requiresApproval: ["asks"],
+                // A real tool, as every built-in is: it carries a `needsApproval` function, which never asks.
+                tools: { asks: { needsApproval: true }, plain: createTool({ description: "Plain", execute: async () => "done", inputSchema: z.object({}) }) },
+            } as never);
+
+            const { approveToolCall } = await resumeWith(config);
+            const streamArgs = (approveToolCall.mock.calls[0] as unknown[])[3] as {
+                prepareStep: (step: { messages: unknown[]; stepNumber: number }) => Promise<{ activeTools?: string[] } | undefined>;
+            };
+
+            const prepared = await streamArgs.prepareStep({ messages: [], stepNumber: 0 });
+
+            return prepared?.activeTools;
+        };
+
+        expect(await lastStep({ stepsLeft: 1, subAgentRunId: "run-1" })).toStrictEqual(["plain"]);
+        expect(await lastStep({ stepsLeft: 1 })).toBeUndefined();
+    });
+
+    it("stops a sub-agent child's continuation at its next step once its run is stopped, and only a sub-agent child's", async () => {
+        const stopsAfterAStep = async (config: Record<string, unknown>) => {
+            const approveToolCall = vi.fn(async () => {
+                throw new Error("stop here");
+            });
+
+            vi.mocked(getAgent).mockResolvedValue({ approveToolCall, options: {} } as never);
+
+            // The run was stopped (a parent's Stop, `cancelRun`, the reaper): `shouldRunStop` answers yes.
+            const runQuery = vi.fn(async (reference: unknown) => (reference === internal.sub_agents.functions.shouldRunStop ? true : { toolName: null }));
+
+            await resumeApprovedRun({ runQuery } as never, {
+                approvalId: "approval-1",
+                approved: true,
+                config: { ...(CONFIG as object), stepsLeft: 3, ...config } as never,
+                streamId: "stream-1",
+                threadId: "thread-1",
+                userId: "owner-1",
+            }).catch(() => undefined);
+
+            const { stopWhen } = (approveToolCall.mock.calls[0] as unknown[])[3] as { stopWhen: ((step: { steps: unknown[] }) => Promise<boolean>)[] };
+            const verdicts = await Promise.all(stopWhen.map(async (condition) => await condition({ steps: [{}] })));
+
+            return verdicts.includes(true);
+        };
+
+        expect(await stopsAfterAStep({ subAgentRunId: "run-1" })).toBe(true);
+        expect(await stopsAfterAStep({})).toBe(false);
+    });
+
+    it("gives an interactive continuation its full budget, whatever stepsLeft its snapshot holds", async () => {
+        const { approveToolCall } = await resumeWith({ stepsLeft: 0 });
+
+        expect(getAgent).toHaveBeenCalledWith("gpt-4o", expect.objectContaining({ maxSteps: 5 }));
+        expect(approveToolCall).toHaveBeenCalled();
+    });
+
+    it("reads the thread from a fresh-context run's own prompt, not the turns before it", async () => {
+        const { approveToolCall } = await resumeWith({ contextFromOrder: 4 });
+
+        expect(approveToolCall).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            expect.anything(),
+            expect.anything(),
+            expect.objectContaining({ contextOptions: { fromOrder: 4 } }),
+        );
+    });
+});
+
+describe("an answer whose tool left the rebuilt set", () => {
+    let approveToolCall: ReturnType<typeof vi.fn>;
+    let denyToolCall: ReturnType<typeof vi.fn>;
+
+    /**
+     * Resumes an approved `toolName` against an empty rebuilt set, which is what an `off` cap gives, and returns the tools
+     * the continuation's agent was built with. The agent here is a stub, so the run stops right after it is built; what
+     * matters is that the agent received the answered tool, and that the resume was not refused before it.
+     */
+    const toolsOfResumedAgent = async (toolName: string, extra: Record<string, unknown>): Promise<Record<string, unknown>> => {
+        const resumeCtx = {
+            runQuery: vi.fn(async () => {
+                return { toolName };
+            }),
+        };
+
+        // Both continuations stop the run once called: which one is called is what an answer decides.
+        approveToolCall = vi.fn(async () => {
+            throw new Error("stop after approve");
+        });
+        denyToolCall = vi.fn(async () => {
+            throw new Error("stop after deny");
+        });
+        vi.mocked(getAgent).mockClear();
+        vi.mocked(getAgent).mockResolvedValue({ approveToolCall, denyToolCall, options: {} } as never);
+
+        const failure = await resumeApprovedRun(resumeCtx as never, {
+            approvalId: "approval-1",
+            approved: true,
+            config: CONFIG,
+            streamId: "stream-1",
+            threadId: "thread-1",
+            userId: "owner-1",
+            ...extra,
+        })
+            .then(() => undefined)
+            .catch((error: unknown) => error);
+
+        // A refusal before the agent (a stale or unanswerable approval) would leave the answer unused.
+        expect(failure).not.toMatchObject({ kind: "stale-approval" });
+        expect(getAgent).toHaveBeenCalledTimes(1);
+
+        const [, options] = vi.mocked(getAgent).mock.calls[0] as unknown as [string, { tools: Record<string, unknown> }];
+
+        return options.tools;
+    };
+
+    it("runs the person's answer to a question as the call's result, rather than recording a denial", async () => {
+        const tools = await toolsOfResumedAgent("askUser", { answer: "Blue" });
+
+        expect(createAnsweredAskUserTool).toHaveBeenLastCalledWith("Blue", [], []);
+        expect(tools).toStrictEqual({ askUser: { answered: "askUser" } });
+        expect(approveToolCall).toHaveBeenCalledTimes(1);
+        expect(denyToolCall).not.toHaveBeenCalled();
+    });
+
+    it("runs the reference to a requested secret as the call's result, rather than recording a denial", async () => {
+        const tools = await toolsOfResumedAgent("requestSecret", { answer: "secret-ref-1" });
+
+        expect(createAnsweredRequestSecretTool).toHaveBeenLastCalledWith("secret-ref-1");
+        expect(tools).toStrictEqual({ requestSecret: { answered: "requestSecret" } });
+        expect(approveToolCall).toHaveBeenCalledTimes(1);
+        expect(denyToolCall).not.toHaveBeenCalled();
     });
 });
 

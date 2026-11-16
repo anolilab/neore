@@ -19,6 +19,7 @@ import type { ToolCtx as ToolContext } from "../agent/client";
 import { createTool } from "../agent/client";
 import toonEncodeOutput from "../chat/tools/toon-encode";
 import { toolsLogger } from "../lib/logger";
+import { validateSlug } from "./validators";
 
 export const createSkillFromAgent = internalMutation
     .input({
@@ -34,6 +35,13 @@ export const createSkillFromAgent = internalMutation
     })
     .mutation(async ({ args, ctx }) => {
         const { additionalTools, category, description, instructions, name, preferredModel, slug, tags, userId } = args;
+
+        // The editor's rules: a reserved slug (a composer command such as `/clear`) would run the command, not the skill.
+        const slugValidation = validateSlug(slug);
+
+        if (!slugValidation.valid) {
+            throw new LunoraError("BAD_REQUEST", slugValidation.errors.join(". "));
+        }
 
         // Check for slug uniqueness
         const existing = await ctx.db.skills.findFirst({ where: { slug, userId } });

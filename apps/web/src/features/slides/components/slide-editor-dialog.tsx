@@ -102,6 +102,7 @@ const SlideEditorDialog = ({ htmlContent: initialHtml, onOpenChange, onSaved, op
                             onChange={(e) => setHtmlContent(e.target.value)}
                             placeholder="<h1>Slide content...</h1>"
                             rows={18}
+                            spellCheck={false}
                             value={htmlContent}
                         />
                     </div>

@@ -2,6 +2,7 @@
  * Process entry: wires the real terminal, network and filesystem into `run`.
  */
 import { readFile } from "node:fs/promises";
+import { hostname } from "node:os";
 import { createInterface } from "node:readline";
 import { Writable } from "node:stream";
 
@@ -92,10 +93,17 @@ process.once("SIGINT", () => {
 const code = await run(process.argv.slice(2), {
     configFile: configPath(),
     fetch: fetchUntilPipeCloses,
+    hostname: hostname(),
     io: { env: process.env, stderr: process.stderr, stdout: process.stdout },
+    now: () => Date.now(),
     readFile: async (path) => new Uint8Array(await readFile(path)),
     readLine,
     readStdin,
+    sleep: async (ms) => {
+        await new Promise((resolve) => {
+            setTimeout(resolve, ms);
+        });
+    },
     stdinIsTTY: process.stdin.isTTY === true,
 }).catch((error: unknown) => {
     // The abort above surfaces here when the reader left mid-download.

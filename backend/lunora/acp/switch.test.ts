@@ -39,7 +39,8 @@ const devices = await import("../devices/functions");
 const { signDevicePayload } = await import("../devices/lib/signing");
 const { applyHostEvents } = await import("./ingest");
 const { agentSwitchOf } = await import("../agent/agent-switch-logic");
-const { runAgentSwitch } = await import("../chat/agent-switch");
+const { claimKeyOf, runAgentSwitch } = await import("../chat/agent-switch");
+const { claimOnce } = await import("../lib/claim-once");
 const { HOST_HANDOFF_MAX_BYTES, pendingHandoffOf } = await import("./lib/pending-handoff");
 const { jsonBytes } = await import("../agent/handoff");
 const { assembleHandoffContext } = await import("../agent/handoff-context");
@@ -76,6 +77,7 @@ const CODEX = { agentKey: "codex", agentLabel: "Codex", folderId: "f1", folderLa
 const CLAUDE_OTHER_FOLDER = { ...CLAUDE, folderId: "f2", folderLabel: "docs" };
 const MODEL = "openai/gpt-4.1-mini";
 const OTHER_MODEL = "google/gemini-2.0-flash-001";
+const NOT_ALLOWED = /does not allow agents on your computer/u;
 const NOT_APPROVED = /not approved/u;
 const NOT_ONLINE = /not online/u;
 const ALREADY_MADE = /already made/u;
@@ -89,6 +91,7 @@ const TEMPORARY_CHAT = /temporary chat cannot be handed/u;
 const SOMEONE_ELSES_TEXT = /messages someone else wrote/u;
 const SHARED_OR_PUBLIC = /shared, public/u;
 const OMITTED_NOTE = /earlier turns? (is|are) not included/u;
+const CLEAR_REFUSED = /already made|Wait for the agent/u;
 
 const as = (userId: string) => harness.withIdentity({ userId } as never);
 const run = async <T>(read: (ctx: any) => Promise<T>): Promise<T> => (await harness.run(read)) as T;
@@ -679,6 +682,107 @@ describe("host to cloud", () => {
     });
 });
 
+describe("the origin of a computer's thread", () => {
+    const originOf = async (hostId: string, parentId: string, mode: string | undefined) => {
+        await run(async (ctx) => {
+            await ctx.db.insert("threadRelationships", {
+                branchType: "continuation",
+                createdAt: 1,
+                parentThreadId: parentId,
+                threadId: hostId,
+                userId: ownerId,
+            } as never);
+        });
+
+        if (mode !== undefined) {
+            await run(async (ctx) => {
+                await ctx.db.patch("threads", parentId as never, { permissionMode: mode } as never);
+            });
+        }
+    };
+
+    it("inherits no mode when a computer's thread has two origins, whichever is listed first", async () => {
+        const device = await pairedDevice(ownerId);
+        const host = await hostThread(device);
+        const full = await cloudThread();
+        const other = await cloudThread();
+
+        await originOf(host, full, "full");
+        await originOf(host, other, undefined);
+
+        const result = await switchTo(host, { kind: "model", model: OTHER_MODEL });
+        const [fork] = await rows("threads", { _id: result.forkedThreadId });
+
+        expect(fork).not.toHaveProperty("permissionMode");
+    });
+
+    it("keeps the mode of its one origin", async () => {
+        const device = await pairedDevice(ownerId);
+        const host = await hostThread(device);
+        const origin = await cloudThread();
+
+        await originOf(host, origin, "full");
+
+        const result = await switchTo(host, { kind: "model", model: OTHER_MODEL });
+        const [fork] = await rows("threads", { _id: result.forkedThreadId });
+
+        expect(fork).toMatchObject({ permissionMode: "full" });
+    });
+
+    it("inherits nothing from an origin in the trash", async () => {
+        const device = await pairedDevice(ownerId);
+        const host = await hostThread(device);
+        const origin = await cloudThread();
+
+        await originOf(host, origin, "full");
+        await run(async (ctx) => {
+            await ctx.db.patch("threads", origin, { deleted: true });
+        });
+
+        const result = await switchTo(host, { kind: "model", model: OTHER_MODEL });
+        const [fork] = await rows("threads", { _id: result.forkedThreadId });
+
+        expect(fork?.permissionMode).toBeUndefined();
+    });
+});
+
+describe("a round trip through a computer", () => {
+    it("gives the cloud chat it returns to the mode the owner set before the hop", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await run(async (ctx) => {
+            await ctx.db.patch("threads", source as never, { permissionMode: "supervised" } as never);
+        });
+
+        const out = await switchTo(source, hostTarget(device));
+        // The computer has opened its session: an agent that is still starting cannot be switched from.
+        const [session] = await rows("acpSessions", { threadId: out.forkedThreadId });
+
+        await run(async (ctx) => {
+            await ctx.db.patch("acpSessions", session?._id as never, { status: "idle" } as never);
+        });
+
+        const back = await switchTo(out.forkedThreadId as string, { kind: "model", model: OTHER_MODEL });
+        const [fork] = await rows("threads", { _id: back.forkedThreadId });
+
+        expect(fork).toMatchObject({ permissionMode: "supervised" });
+    });
+
+    it("gives the computer's thread no mode of its own", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await run(async (ctx) => {
+            await ctx.db.patch("threads", source as never, { permissionMode: "full" } as never);
+        });
+
+        const out = await switchTo(source, hostTarget(device));
+
+        expect(await row(out.forkedThreadId as string)).not.toHaveProperty("permissionMode");
+    });
+});
+
 describe("what a takeover carries into a command on the computer", () => {
     it("signs the source thread's taint onto every prompt sent to the agent that took over", async () => {
         const device = await pairedDevice(ownerId);
@@ -757,9 +861,11 @@ describe("what a takeover carries into a command on the computer", () => {
 });
 
 describe("the organisation of a switched thread", () => {
+    // The owner is a member: a switch to a computer is refused for an organization they left (`acp/lib/organization-cap.ts`).
     const inOrganisation = async (threadId: string) =>
         await run(async (ctx) => {
             await ctx.db.patch("threads", threadId as never, { organizationId: "org-1", teamId: "team-1" } as never);
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: ownerId });
         });
 
     it("is carried to the continuation that opens on a computer", async () => {
@@ -784,6 +890,155 @@ describe("the organisation of a switched thread", () => {
         const [fork] = await rows("threads", { _id: result.forkedThreadId });
 
         expect(fork).toMatchObject({ organizationId: "org-1", teamId: "team-1" });
+    });
+});
+
+describe("an organization's cap on a computer", () => {
+    const capped = async (permissionCap = "ask", member = true) =>
+        await run(async (ctx) => {
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap, schemaVersion: 1 }),
+                organizationId: "org-1",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+
+            if (member) {
+                await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: ownerId });
+            }
+        });
+
+    const fileUnder = async (threadId: string) => await run(async (ctx) => await ctx.db.patch("threads", threadId as never, { organizationId: "org-1" }));
+
+    it("refuses a switch to a computer for a chat whose organization holds agents below auto, making nothing", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await fileUnder(source);
+        await capped();
+
+        await expect(switchTo(source, hostTarget(device))).rejects.toThrow(NOT_ALLOWED);
+        expect(await rows("threads")).toHaveLength(1);
+        expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(0);
+    });
+
+    it("holds a personal chat to the cap of the organization the switch is made from", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await cloudThread();
+
+        await capped();
+
+        await expect(
+            runAgentSwitch(
+                runner,
+                { clientId: nextClick(), target: hostTarget(device) as never, threadId: source as never, userId: ownerId },
+                summary,
+                "org-1",
+            ),
+        ).rejects.toThrow(NOT_ALLOWED);
+        expect(await rows("acpSessions")).toHaveLength(0);
+    });
+
+    it("carries an unfiled chat's own cap across switches, and stamps no space on a personal chat", async () => {
+        const device = await pairedDevice(ownerId);
+        const personal = await cloudThread();
+
+        await capped("auto");
+
+        // A personal chat switched from an organization's space is capped by the space it is used from, not stamped.
+        const stamped = await runAgentSwitch(
+            runner,
+            { clientId: nextClick(), target: hostTarget(device) as never, threadId: personal as never, userId: ownerId },
+            summary,
+            "org-1",
+        );
+
+        expect(await run(async (ctx) => await ctx.db.get("threads", stamped.forkedThreadId as never))).not.toHaveProperty("capOrganizationId");
+
+        // A chat capped by an organization it is not filed under keeps that cap on the computer's thread.
+        const source = await cloudThread();
+
+        await run(async (ctx) => await ctx.db.patch("threads", source as never, { capOrganizationId: "org-1" } as never));
+
+        const result = await switchTo(source, hostTarget(device));
+        const fork = await run(async (ctx) => await ctx.db.get("threads", result.forkedThreadId as never));
+
+        expect(fork).toMatchObject({ capOrganizationId: "org-1" });
+        expect(fork?.organizationId).toBeUndefined();
+
+        // Back to a cloud model, and from there to the computer from the personal space: still held by that cap.
+        const [session] = await rows("acpSessions", { threadId: result.forkedThreadId });
+
+        await run(async (ctx) => {
+            await ctx.db.patch("acpSessions", session?._id as never, { status: "idle" } as never);
+        });
+
+        const back = await switchTo(result.forkedThreadId as string, { kind: "model", model: OTHER_MODEL });
+        const cloud = await run(async (ctx) => await ctx.db.get("threads", back.forkedThreadId as never));
+
+        expect(cloud).toMatchObject({ capOrganizationId: "org-1" });
+
+        const [policy] = await rows("organizationPolicies");
+
+        await run(async (ctx) => {
+            await ctx.db.patch(
+                "organizationPolicies",
+                policy?._id as never,
+                { document: JSON.stringify({ permissionCap: "ask", schemaVersion: 1 }), revision: 2 } as never,
+            );
+        });
+
+        await expect(switchTo(back.forkedThreadId as string, hostTarget(device))).rejects.toThrow(NOT_ALLOWED);
+    });
+
+    it("refuses a switch to another agent on the computer too, and lets the chat leave the computer for a cloud model", async () => {
+        const device = await pairedDevice(ownerId);
+        const source = await hostThread(device);
+
+        await fileUnder(source);
+        await capped();
+
+        await expect(switchTo(source, hostTarget(device, CODEX))).rejects.toThrow(NOT_ALLOWED);
+        expect(await rows("acpSessions", { threadId: source })).toHaveLength(1);
+
+        const result = await switchTo(source, { kind: "model", model: OTHER_MODEL });
+
+        expect(result.switched).toBe(true);
+    });
+
+    it("refuses /clear, which opens a new session, with a code the app names: the cap, or an owner who left", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await hostThread(device, 1);
+
+        await fileUnder(threadId);
+        await capped("ask", false);
+
+        const clear = async (clientId: string) =>
+            await run(async (ctx) => await switchModule.clearHostSessionHandler(ctx, { clientId, threadId: threadId as never, userId: ownerId }));
+
+        await expect(clear("clear-left")).rejects.toMatchObject({ data: { code: "CONTEXT_CLEAR_LEFT_ORGANIZATION" } });
+
+        await run(async (ctx) => await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: ownerId }));
+
+        await expect(clear("clear-capped")).rejects.toMatchObject({ data: { code: "CONTEXT_CLEAR_NOT_ALLOWED" } });
+        expect(await rows("acpSessions", { threadId })).toHaveLength(1);
+    });
+
+    it("answers a /clear already made as made, even after the cap tightened", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await hostThread(device, 1);
+
+        await fileUnder(threadId);
+        await capped("ask");
+        await run(
+            async (ctx) =>
+                await claimOnce(ctx, "switch", claimKeyOf({ clientId: "clear-once", threadId: threadId as never, userId: ownerId }), 60_000, ownerId),
+        );
+
+        await expect(
+            run(async (ctx) => await switchModule.clearHostSessionHandler(ctx, { clientId: "clear-once", threadId: threadId as never, userId: ownerId })),
+        ).rejects.toMatchObject({ data: { code: "CONTEXT_CLEAR_ALREADY_MADE" } });
     });
 });
 
@@ -1021,6 +1276,48 @@ describe("native reattach (S4)", () => {
         await openStartedSession(device, threadId, { loaded: true }, "native-1");
         expect((await sendText(threadId, "carry on")).outcome).toBe("sent");
         expect((await acpSends()).at(-1)).toBe("carry on");
+    });
+
+    it("never reloads a session from before a /clear: that session holds the turns that were cleared", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await loadableHostThread(device);
+
+        await switchAway(device, threadId);
+        await run(
+            async (ctx) => await switchModule.clearHostSessionHandler(ctx, { clientId: "clear-then-back", threadId: threadId as never, userId: ownerId }),
+        );
+        await openStartedSession(device, threadId);
+        await switchTo(threadId, hostTarget(device, CLAUDE));
+
+        const start = await lastStart();
+
+        expect(start).toMatchObject({ agentKey: "claude", folderId: "f1" });
+        expect(start?.nativeSessionId).toBeUndefined();
+        expect((await dividers(threadId)).at(-1)).toMatchObject({ mode: "portable", to: { agentKey: "claude", kind: "host" } });
+    });
+
+    it("reloads the session a /clear started, which holds nothing from before it", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await loadableHostThread(device);
+
+        await run(
+            async (ctx) => await switchModule.clearHostSessionHandler(ctx, { clientId: "clear-then-away", threadId: threadId as never, userId: ownerId }),
+        );
+        await openStartedSession(device, threadId, undefined, "native-2", CAN_LOAD);
+        expect((await sendText(threadId, "after the clear")).outcome).toBe("sent");
+        await finishSentTurn(device, threadId);
+        // The computer took the calls so far: the open-call budget is free for the switches.
+        await run(async (ctx) => {
+            const { page } = await ctx.db.deviceCalls.findMany({ where: {} });
+
+            for (const call of page) {
+                await ctx.db.patch("deviceCalls", call._id, { status: "completed" });
+            }
+        });
+        await switchAway(device, threadId);
+        await switchTo(threadId, hostTarget(device, CLAUDE));
+
+        expect(await lastStart()).toMatchObject({ agentKey: "claude", nativeSessionId: "native-2" });
     });
 
     it("goes portable and never reattaches for another folder, another computer, or an agent that cannot load", async () => {
@@ -1678,5 +1975,74 @@ describe("a load report that cannot be checked", () => {
         expect(reattachFailureOf("native-1", { reattach: { loaded: true } })).toBeDefined();
         expect(reattachFailureOf("native-1", { nativeSessionId: "native-1", reattach: { loaded: true } })).toBeUndefined();
         expect(reattachFailureOf("native-1", { nativeSessionId: "other", reattach: { loaded: true } })).toBe("other_session");
+    });
+});
+
+describe("/clear on a coding agent's thread", () => {
+    const sessionsOf = async (threadId: string): Promise<Row[]> =>
+        (await rows("acpSessions", { threadId })).toSorted((a, b) => b.createdAt - a.createdAt || b._creationTime - a._creationTime);
+
+    it("opens a new session for the same agent in the same thread, and ends the one it cleared", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await hostThread(device, 2);
+        const sessionsBefore = await sessionsOf(threadId);
+        const before = sessionsBefore[0] as Row;
+
+        const result = await run(
+            async (ctx) => await switchModule.clearHostSessionHandler(ctx, { clientId: "clear-1", threadId: threadId as never, userId: ownerId }),
+        );
+        const sessions = await sessionsOf(threadId);
+        const after = sessions[0] as Row;
+
+        // A new session row, with its own id, for the same agent, folder and computer.
+        expect(sessions).toHaveLength(2);
+        expect(after._id).not.toBe(before._id);
+        expect(after.hostSessionId).not.toBe(before.hostSessionId);
+        expect(after).toMatchObject({ agentKey: CLAUDE.agentKey, deviceId: device.deviceId, folderId: CLAUDE.folderId, threadId });
+        expect(after.status).not.toBe("ended");
+        // The session it cleared is over.
+        expect(await row(before._id)).toMatchObject({ status: "ended" });
+
+        // The reset row marks the point in the thread, and the new session is owed nothing from before it.
+        const messages = await rows("messages", { threadId });
+        const reset = messages.find((message) => message._id === result.messageId);
+
+        expect(reset).toMatchObject({ message: { content: "", role: "system" } });
+        expect(await run(async (ctx) => await pendingHandoffOf(ctx, await ctx.db.get("threads", threadId as never)))).toBeUndefined();
+    });
+
+    it("refuses a chat that may not run on a computer, and starts no session", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await hostThread(device, 1);
+
+        await run(async (ctx) => await ctx.db.patch("threads", threadId as never, { groupChat: { mode: "round-robin", participants: [] } }));
+
+        await expect(
+            run(async (ctx) => await switchModule.clearHostSessionHandler(ctx, { clientId: "clear-group", threadId: threadId as never, userId: ownerId })),
+        ).rejects.toThrow("cannot be handed to a computer");
+        expect(await sessionsOf(threadId)).toHaveLength(1);
+    });
+
+    it("gives a repeated click no second session", async () => {
+        const device = await pairedDevice(ownerId);
+        const threadId = await hostThread(device, 1);
+        const args = { clientId: "clear-repeat", threadId: threadId as never, userId: ownerId };
+
+        await run(async (ctx) => await switchModule.clearHostSessionHandler(ctx, args));
+        // The new session is still starting, so the repeat is refused for that; either refusal means no second session.
+        await expect(run(async (ctx) => await switchModule.clearHostSessionHandler(ctx, args))).rejects.toThrow(CLEAR_REFUSED);
+        expect(await sessionsOf(threadId)).toHaveLength(2);
+
+        // The refusal says the agent is not ready yet, so the app can say so instead of blaming a reply.
+        await expect(run(async (ctx) => await switchModule.clearHostSessionHandler(ctx, args))).rejects.toMatchObject({
+            data: { code: "CONTEXT_CLEAR_AGENT_STARTING" },
+        });
+
+        // Once the new session is ready, the same click is still refused, by its claim, and says so.
+        await openStartedSession(device, threadId);
+        await expect(run(async (ctx) => await switchModule.clearHostSessionHandler(ctx, args))).rejects.toMatchObject({
+            data: { code: "CONTEXT_CLEAR_ALREADY_MADE" },
+        });
+        expect(await sessionsOf(threadId)).toHaveLength(2);
     });
 });

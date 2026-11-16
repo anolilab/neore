@@ -2,7 +2,6 @@
 // builder is declared against these, and the concrete Workers types are not
 // assignable to them. Each lives in the add-on package that owns it.
 import type { PaymentsFromContextOptions } from "@lunora/payment";
-import { createCreemAdapter } from "@lunora/payment/creem";
 import type { JSONWebKeySet } from "jose";
 import type { D1DatabaseLike } from "@lunora/d1";
 import type { MessageBatchLike, QueueBindingLike } from "@lunora/queue";
@@ -10,10 +9,14 @@ import type { DurableObjectNamespaceLike } from "@lunora/scheduler";
 import type { R2BucketLike } from "@lunora/storage";
 import type { ExecutionContextLike, ScheduledControllerLike, ShardNamespaceLike } from "lunorash/runtime";
 
+import type { BearerIdentity } from "./bearer-identity";
+import { identityFromBearerClaims } from "./bearer-identity";
 import { createJwksCache, type JwksCache } from "./jwks-cache.js";
 import { inTimingFrame, installFetchTiming, isTimingEnabled, logTiming, timedD1 } from "./development-timing.js";
 import { env as workerEnv } from "cloudflare:workers";
 
+import { authorizeBilling } from "../lunora/billing/authorize.js";
+import { buildCreemAdapter } from "../lunora/billing/creem-adapter.js";
 import { allowLocalJurisdiction } from "../lunora/lib/local-jurisdiction.js";
 import { routedShardNamespace } from "../lunora/lib/shard-namespace.js";
 import { posthogErrorSink } from "./posthog-sink.js";
@@ -149,36 +152,16 @@ const requirePublicOrigin = (env: Env): string => {
     return origin;
 };
 
-/** Every outbound Creem call holds the shard it runs on while it waits, so it gets a deadline. */
-const CREEM_TIMEOUT_MS = 10_000;
-
 let payments: PaymentsFromContextOptions | undefined;
 
 /**
  * Backs `ctx.payments`, built once per isolate. It must not throw when Creem is
  * not configured: billing procedures report that themselves.
- *
- * `authorize` is Lunora's default — the reference must be the caller's own user
- * id — so the facade can never act on someone else's billing. Every call that
- * needs more goes to `ctx.payments.adapter` behind its own check:
- * `billing/checkout.ts` (Team: `billingOrganizationOf`, portal:
- * `portalCustomerFor`) and the GDPR deletion step (`billing/gdpr.ts`).
  */
 const creemPayments = (env: Env): PaymentsFromContextOptions => {
     payments ??= {
-        adapter: createCreemAdapter({
-            // The adapter calls this once, on first use, so the SDK is not loaded at worker startup.
-            client: async () => {
-                const { Creem } = await import("creem");
-
-                return new Creem({
-                    apiKey: env.CREEM_API_KEY ?? "",
-                    server: env.CREEM_TEST_MODE === "true" ? "test" : "prod",
-                    timeoutMs: CREEM_TIMEOUT_MS,
-                });
-            },
-            webhookSecret: env.CREEM_WEBHOOK_SECRET ?? "",
-        }),
+        adapter: buildCreemAdapter({ apiKey: env.CREEM_API_KEY, testMode: env.CREEM_TEST_MODE, webhookSecret: env.CREEM_WEBHOOK_SECRET }),
+        authorize: authorizeBilling,
     };
 
     return payments;
@@ -233,7 +216,7 @@ const verifyBearer = async (env: Env, token: string, origin: string) => {
  * Shared by `resolveIdentity` and the ws-ticket mint, which must accept exactly
  * the callers RPC accepts.
  */
-const resolveSessionIdentity = async (env: Env, request: Request): Promise<null | { sessionId?: string; userId: string }> => {
+const resolveSessionIdentity = async (env: Env, request: Request): Promise<BearerIdentity | null> => {
     // Bearer first, deliberately. The browser's `LunoraClient`
     // authenticates with the JWT from `/api/auth/token`, so on the RPC
     // path — the hottest path in the app — a cookie lookup would be a
@@ -257,11 +240,11 @@ const resolveSessionIdentity = async (env: Env, request: Request): Promise<null 
             // replayed here if the key set is ever shared.
             const { payload } = await verifyBearer(env, bearer, origin);
 
-            if (typeof payload.sub === "string") {
-                // `sessionId` is what `getSession(ctx)` reads back
-                // (`lunora/auth/session.ts`); a token minted before
-                // `sid` was added simply carries none.
-                return { userId: payload.sub, ...(typeof payload.sid === "string" && { sessionId: payload.sid }) };
+            // `sid` and the grant's `gsid` stay apart: `bearer-identity.ts`.
+            const identity = identityFromBearerClaims(payload);
+
+            if (identity !== null) {
+                return identity;
             }
         } catch (error) {
             // Expired, wrong signature, unreachable JWKS — fall through

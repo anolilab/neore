@@ -376,7 +376,9 @@ test("only the dictation window is given the microphone", async () => {
 
                 return status.state;
             });
-        // The Quick Composer is a local page of ours, and is refused.
+
+        // The Quick Composer is a local page of ours, and is refused. It is created on its first use.
+        await app.evaluate(() => (globalThis as { neoreShell?: { toggleQuickComposer: () => void } }).neoreShell?.toggleQuickComposer());
         const composer = await findPage(app, (url) => url.endsWith("/quick-composer/index.html"));
 
         expect(await microphone(composer)).toBe("denied");

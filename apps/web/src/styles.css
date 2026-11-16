@@ -14,7 +14,8 @@
 /* UI density tokens and font families (`data-density` / `data-font`) */
 @import "./features/appearance/display-presets.css";
 @import "./features/appearance/contrast-presets.css";
-@import "@c15t/react/styles.css";
+/* The desktop shell: cursor, selection, hover and vibrancy (`data-native` on <html>) */
+@import "./lib/native/native-shell.css";
 /* Import KaTeX styles for math rendering */
 @import "katex/dist/katex.min.css";
 
@@ -72,6 +73,22 @@
 
 :root .message-text .message-text-fixed {
     font-size: 0.875rem;
+}
+
+/* Every loaded message row stays mounted, so its state, focus, selection, media and find-in-page survive
+   scrolling (message-list.tsx). A row off screen skips layout and paint; it stays in the accessibility tree
+   and in find. `auto` keeps a row's real height once it has rendered, so the scroll height settles instead
+   of jumping back to the estimate. The streaming placeholder is not a row and always renders. */
+.message-list > [data-list-message-id] {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 160px;
+}
+
+/* Printing renders every row, not just the ones near the viewport. */
+@media print {
+    .message-list > [data-list-message-id] {
+        content-visibility: visible;
+    }
 }
 
 .thread-viewport > [data-radix-scroll-area-content] {
@@ -193,7 +210,7 @@
     background-color: #caff00 !important; /* brand-lime */
 }
 
-/* Docs prose links: app global .prose a uses text-primary (lime) which fails
+/* Docs prose links: app global .prose a uses text-primary-text (lime) which fails
    contrast on light/dark backgrounds. Use fd-foreground for text; lime only
    as underline decoration for the brand touch. */
 #nd-page .prose a:not(.not-prose a) {
@@ -204,4 +221,9 @@
 .dark #nd-page .prose a:not(.not-prose a) {
     color: #f2f2f2;
     text-decoration-color: #caff00;
+}
+
+/* An area F6 moved focus to (sidebar, thread, panel): the outline shows where focus went. The composer editor sets its own. */
+[data-focus-area]:not([contenteditable]):focus-visible {
+    @apply outline-ring outline-2 -outline-offset-2 outline-solid;
 }

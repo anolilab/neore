@@ -6,7 +6,6 @@ export default defineConfig({
         "@ai-sdk/groq",
         "@ai-sdk/provider",
         "@ai-sdk/react",
-        "@ai-sdk/ui-utils",
         "@ai-sdk/xai",
         "@openrouter/ai-sdk-provider",
         "@requesty/ai-sdk",
@@ -24,7 +23,7 @@ export default defineConfig({
     validation: {
         dependencies: {
             unused: {
-                exclude: ["@ai-sdk/react", "@ai-sdk/ui-utils", "ollama-ai-provider-v2"],
+                exclude: ["@ai-sdk/react", "ollama-ai-provider-v2"],
             },
         },
     },

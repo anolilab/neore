@@ -209,7 +209,7 @@ const AssistantMessage = ({
 
                 {/* Stats bar */}
                 {hasUsage && (
-                    <div className="flex flex-wrap items-center gap-3 px-1 text-[11px] text-gray-400 dark:text-gray-500">
+                    <div className="flex flex-wrap items-center gap-3 px-1 text-[11px] text-gray-600 dark:text-gray-400">
                         {tokenRate && (
                             <span className="flex items-center gap-1">
                                 <Timer aria-hidden="true" className="size-3" />
@@ -230,7 +230,7 @@ const AssistantMessage = ({
                 {/* Model badge when no usage */}
                 {!hasUsage && message.model && (
                     <div className="px-1">
-                        <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-400 dark:bg-gray-800 dark:text-gray-500">
+                        <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-600 dark:bg-gray-800 dark:text-gray-400">
                             {message.model}
                         </span>
                     </div>

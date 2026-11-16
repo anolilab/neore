@@ -80,7 +80,7 @@ const WorkOnPullRequest = ({
                 <ul className="space-y-1">
                     {rows.map((row) => (
                         <li className="flex flex-wrap items-baseline gap-2 text-sm" key={`${row.kind}-${row.threadId}`}>
-                            <Link className="text-primary font-medium underline" params={{ threadId: row.threadId }} to="/chat/$threadId">
+                            <Link className="text-primary-text font-medium underline" params={{ threadId: row.threadId }} to="/chat/$threadId">
                                 {row.title}
                             </Link>
                             <span className="text-muted-foreground text-xs">

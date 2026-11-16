@@ -5,14 +5,17 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { ThreadDoc } from "@neore/backend/agent";
+import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
+import { shardOptionsFor } from "@neore/client-runtime";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useShallow } from "zustand/react/shallow";
 
+import { routeIsOn, survivingPaneAfterDelete } from "@/features/chat/split/split-layout-store";
 import { trackEvent } from "@/lib/analytics";
 import { providerLogger } from "@/lib/logger";
-import { useCRPC } from "@/lib/lunora/crpc";
+import { useCRPC, useLunora } from "@/lib/lunora/crpc";
 
 import type { ThreadMetadata } from "../stores/thread-store";
 import useThreadStore from "../stores/thread-store";
@@ -26,6 +29,16 @@ import useAllThreadsData from "./use-all-threads-data";
 type ThreadDocument = ThreadDoc & {
     parentThreadIds?: string[];
 };
+
+/**
+ * What a delete settled to. The thread and its branches settle one by one, so the thread can be refused while
+ * branches were deleted: `deletedIds` lists every row the server deleted (the thread first when it was), which is
+ * what an undo restores.
+ */
+export interface DeleteBranchResult {
+    deletedIds: string[];
+    threadDeleted: boolean;
+}
 
 export interface BranchNode {
     children: BranchNode[];
@@ -43,6 +56,7 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
     const { t } = useLingui();
     const navigate = useNavigate();
     const crpc = useCRPC();
+    const lunora = useLunora();
     const queryClient = useQueryClient();
 
     const threadMetadata = useThreadStore((state) => state.threadMetadata);
@@ -159,61 +173,67 @@ export const useThreadManager = (enabled: boolean = true, currentThreadId?: stri
         return branchId;
     };
 
-    const deleteBranch = async (threadId: string): Promise<string[]> => {
+    const deleteBranch = async (threadId: string): Promise<DeleteBranchResult> => {
         if (threadId === "default") {
             throw new Error("Cannot delete the default thread");
         }
 
         const childBranches = getChildBranches(threadId);
-        const isCurrent = currentThreadId === threadId;
-
-        if (isCurrent) {
-            navigate({
-                replace: true,
-                to: "/chat",
-            });
-        }
-
-        // Optimistic deletion - thread disappears instantly from UI
-        addOptimisticDeletion(threadId);
-
-        for (const childId of childBranches) {
-            addOptimisticDeletion(childId);
-        }
-
-        // Also clean up local metadata
-        deleteThreadMetadata(threadId);
-
-        for (const childId of childBranches) {
-            deleteThreadMetadata(childId);
-        }
-
-        trackEvent("thread_deleted", {});
-
-        // Server deletion runs in background
-        const deletedIds = [threadId, ...childBranches];
-
         // Each row settles on its own: a row whose delete failed reappears, one that was deleted stays hidden.
         const targets = [...childBranches, threadId];
 
-        Promise.allSettled(targets.map((id) => deleteThreadMutation({ threadId: id as Id<"threads"> })))
-            .then((results) => {
-                targets.forEach((id, index) => {
-                    const result = results[index];
+        // Hidden at once, and shown again for any row the server refuses (an admin acting as the owner is refused).
+        for (const id of targets) {
+            addOptimisticDeletion(id);
+        }
 
-                    if (result?.status === "rejected") {
-                        providerLogger.error("[ThreadManager] Failed to delete thread", { error: result.reason, threadId: id });
-                        removeOptimisticDeletion(id);
-                    }
+        const results = await Promise.allSettled(targets.map((id) => deleteThreadMutation({ threadId: id as Id<"threads"> })));
+        const deletedIds: string[] = [];
+
+        targets.forEach((id, index) => {
+            const result = results[index];
+
+            if (result?.status === "rejected") {
+                providerLogger.error("[ThreadManager] Failed to delete thread", { error: result.reason, threadId: id });
+                removeOptimisticDeletion(id);
+
+                return;
+            }
+
+            // Local metadata goes only once the server has deleted the row.
+            deleteThreadMetadata(id);
+            deletedIds.push(id);
+        });
+
+        const threadDeleted = deletedIds.includes(threadId);
+
+        if (threadDeleted) {
+            trackEvent("thread_deleted", {});
+        }
+
+        if (currentThreadId !== undefined && deletedIds.includes(currentThreadId)) {
+            // The survivor is read, then the route moves only if it still shows a deleted chat.
+            // With the split view on, the other open panes stay: the route moves to one of them instead of `/chat`.
+            void (async () => {
+                const survivor = await survivingPaneAfterDelete(deletedIds, (id) => {
+                    const args = { threadId: id as Id<"threads"> };
+
+                    return lunora.query(api.chat.functions.getThread, args, shardOptionsFor(args));
                 });
 
-                return undefined;
-            })
-            .catch((error) => {
-                providerLogger.error("[ThreadManager] Failed to settle thread deletes", { error });
-            });
+                if (!routeIsOn(deletedIds)) {
+                    return;
+                }
 
-        return deletedIds;
+                navigate(survivor === undefined ? { replace: true, to: "/chat" } : { params: { threadId: survivor }, replace: true, to: "/chat/$threadId" });
+            })();
+        }
+
+        // The thread first, then the branches deleted with it: what an undo restores.
+        return {
+            deletedIds: threadDeleted ? [threadId, ...deletedIds.filter((id) => id !== threadId)] : deletedIds,
+            threadDeleted,
+        };
     };
 
     const getBranchTree = (rootThreadId?: string): BranchNode[] => {

@@ -61,7 +61,6 @@ export interface ModelPickerProps {
 interface ModelItem {
     label: string;
     model: GatewayModel;
-    onSelect: () => void;
     value: string;
 }
 
@@ -70,6 +69,58 @@ interface ModelGroup {
     items: ModelItem[];
     value: string;
 }
+
+// ─── Stable rows ───────────────────────────────────────────────────────────────
+// A search keystroke rebuilds the filtered list. The row and group objects are reused for a model (and a group with
+// the same rows) that is still there, so the memoised groups and rows below re-render only where a match changed.
+
+const itemsByModel = new WeakMap<GatewayModel, ModelItem>();
+
+const stableModelItem = (model: GatewayModel): ModelItem => {
+    let item = itemsByModel.get(model);
+
+    if (!item) {
+        item = { label: model.name ?? model.id, model, value: model.id };
+        itemsByModel.set(model, item);
+    }
+
+    return item;
+};
+
+/**
+ * The last group built with each first row, per picker: a group is reused while its label and rows are the same. Two
+ * pickers showing different groups that start with the same row would replace each other's entries if they shared one.
+ * Renders only read the cache; a layout effect records what was committed.
+ */
+type GroupCache = WeakMap<ModelItem, ModelGroup>;
+
+const stableModelGroup = (groupsByFirstItem: GroupCache, value: string, items: ModelItem[], isFavorite: boolean): ModelGroup => {
+    const [first] = items;
+    const previous = first ? groupsByFirstItem.get(first) : undefined;
+
+    if (
+        previous &&
+        previous.value === value &&
+        Boolean(previous.isFavorite) === isFavorite &&
+        previous.items.length === items.length &&
+        previous.items.every((item, index) => item === items[index])
+    ) {
+        return previous;
+    }
+
+    return isFavorite ? { isFavorite: true, items, value } : { items, value };
+};
+
+/** Records the groups a committed render showed; a render React abandons leaves the cache as it was. */
+const rememberGroups = (groupsByFirstItem: GroupCache, groups: ModelGroup[]): void => {
+    for (const group of groups) {
+        const [first] = group.items;
+
+        if (first) {
+            groupsByFirstItem.set(first, group);
+        }
+    }
+};
 
 // ─── Provider sidebar button ───────────────────────────────────────────────────
 
@@ -81,14 +132,13 @@ const ProviderSidebarButton = memo<{
     showBorder?: boolean;
 }>(({ icon, isSelected, label, onClick, showBorder = false }) => (
     <button
-        aria-label={label}
         aria-pressed={isSelected}
         className={cn(
             "relative flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors duration-150",
             showBorder && "mb-0.5 border-b pb-2",
             isSelected
                 ? "text-foreground before:bg-primary-text before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full"
-                : "text-muted-foreground/70 hover:text-foreground",
+                : "text-muted-foreground hover:text-foreground",
         )}
         onClick={onClick}
         type="button"
@@ -121,12 +171,10 @@ ProviderSidebarItem.displayName = "ProviderSidebarItem";
 // ─── Model item content ────────────────────────────────────────────────────────
 
 const ModelItemContent = memo<{
-    isFavorite: boolean;
     isSelected: boolean;
     model: GatewayModel;
-    onToggleFavorite?: (modelId: string) => void;
     showCheckmark?: boolean;
-}>(({ isFavorite, isSelected, model, onToggleFavorite, showCheckmark = false }) => {
+}>(({ isSelected, model, showCheckmark = false }) => {
     const { i18n, t } = useLingui();
     const capabilities = getModelCapabilities(model);
 
@@ -137,12 +185,12 @@ const ModelItemContent = memo<{
                 <div className="flex min-w-0 items-baseline gap-1.5">
                     <span className="truncate text-[13px] leading-none font-medium">{stripProviderPrefix(model.name ?? model.id)}</span>
                     {requiresPaidPlan(model) ? (
-                        <span className="shrink-0 rounded-[3px] bg-amber-500/15 px-1 py-0 text-[9px] font-semibold tracking-wide text-amber-600 uppercase dark:bg-amber-400/15 dark:text-amber-400">
+                        <span className="shrink-0 rounded-[3px] bg-amber-500/15 px-1 py-0 text-[9px] font-semibold tracking-wide text-amber-800 uppercase dark:bg-amber-400/15 dark:text-amber-400">
                             {t`Pro`}
                         </span>
                     ) : null}
                     {(model as any).isNew ? (
-                        <span className="shrink-0 rounded-[3px] bg-emerald-500/12 px-1 py-0 text-[9px] font-semibold tracking-wide text-emerald-600 uppercase dark:bg-emerald-400/15 dark:text-emerald-400">
+                        <span className="shrink-0 rounded-[3px] bg-emerald-500/12 px-1 py-0 text-[9px] font-semibold tracking-wide text-emerald-800 uppercase dark:bg-emerald-400/15 dark:text-emerald-400">
                             {t`New`}
                         </span>
                     ) : null}
@@ -151,7 +199,7 @@ const ModelItemContent = memo<{
                     <div className="mt-0.5 flex flex-wrap gap-1">
                         {capabilities.slice(0, 3).map((cap) => (
                             <span
-                                className="border-border/40 text-muted-foreground/60 bg-muted/50 inline-flex h-4 items-center rounded px-1 text-[9px] font-medium"
+                                className="border-border/40 text-muted-foreground bg-muted/50 inline-flex h-4 items-center rounded px-1 text-[9px] font-medium"
                                 key={cap.id}
                             >
                                 {i18n._(cap.label)}
@@ -161,36 +209,155 @@ const ModelItemContent = memo<{
                 ) : null}
             </div>
 
-            {/* Actions */}
-            <div className="flex shrink-0 items-center gap-0.5">
-                {onToggleFavorite ? (
-                    <button
-                        aria-label={isFavorite ? t`Remove from starred` : t`Add to starred`}
-                        className={cn(
-                            "rounded p-1 transition-all duration-100",
-                            isFavorite ? "text-amber-400 opacity-100" : "text-muted-foreground/30 opacity-0 group-hover/row:opacity-100 hover:text-amber-400",
-                        )}
-                        onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            onToggleFavorite(model.id);
-                        }}
-                        type="button"
-                    >
-                        <Star aria-hidden="true" className={cn("size-3.5", isFavorite && "fill-current")} />
-                    </button>
-                ) : null}
-                {showCheckmark ? (
-                    <span className="ml-0.5 flex size-3.5 shrink-0 items-center justify-center">
-                        {isSelected ? <CheckIcon aria-hidden="true" className="text-primary-text size-3.5" /> : null}
-                    </span>
-                ) : null}
-            </div>
+            {showCheckmark ? (
+                <span className="ml-0.5 flex size-3.5 shrink-0 items-center justify-center">
+                    {isSelected ? <CheckIcon aria-hidden="true" className="text-primary-text size-3.5" /> : null}
+                </span>
+            ) : null}
         </div>
     );
 });
 
 ModelItemContent.displayName = "ModelItemContent";
+
+// ─── Model item favorite toggle ────────────────────────────────────────────────
+// Rendered beside the option, not inside it, and hidden from assistive technology: a listbox may only own options, so
+// this pointer control cannot be part of its accessibility tree. Keyboard and screen-reader users reach the same
+// action through the Alt+S shortcut on the search field (see `handleActionShortcut` in ModelPicker).
+
+const ModelItemFavoriteToggle = memo<{
+    isFavorite: boolean;
+    modelId: string;
+    onToggleFavorite: (modelId: string) => void;
+}>(({ isFavorite, modelId, onToggleFavorite }) => {
+    const { t } = useLingui();
+
+    return (
+        <button
+            aria-hidden="true"
+            aria-label={isFavorite ? t`Remove from starred` : t`Add to starred`}
+            className={cn(
+                "absolute top-1/2 right-2 -translate-y-1/2 rounded p-1 transition-all duration-100",
+                isFavorite ? "text-amber-400 opacity-100" : "text-muted-foreground/30 opacity-0 group-hover/row:opacity-100 hover:text-amber-400",
+            )}
+            onClick={() => onToggleFavorite(modelId)}
+            tabIndex={-1}
+            type="button"
+        >
+            <Star aria-hidden="true" className={cn("size-3.5", isFavorite && "fill-current")} />
+        </button>
+    );
+});
+
+ModelItemFavoriteToggle.displayName = "ModelItemFavoriteToggle";
+
+// ─── Model row ─────────────────────────────────────────────────────────────────
+// Memoised on the (stable) row object and its flags: a search keystroke re-renders only rows whose state changed.
+
+const ModelRow = memo<{
+    anchorMode: string | null;
+    isFavorite: boolean;
+    isLockedForAnonymous: boolean;
+    isParallelSelected: boolean;
+    isSelected: boolean;
+    item: ModelItem;
+    onSelectModel: (modelId: string) => void;
+    onToggleFavorite?: (modelId: string) => void;
+    parallelMaxReached: boolean;
+    selectionMode: "parallel" | "single";
+    showProviderIcon: boolean;
+}>(
+    ({
+        anchorMode,
+        isFavorite,
+        isLockedForAnonymous,
+        isParallelSelected,
+        isSelected,
+        item,
+        onSelectModel,
+        onToggleFavorite,
+        parallelMaxReached,
+        selectionMode,
+        showProviderIcon,
+    }) => {
+        const { t } = useLingui();
+        const isTypeMismatch = selectionMode === "parallel" && anchorMode !== null && getModelMode(item.model) !== anchorMode && !isParallelSelected;
+        const isDisabled = isLockedForAnonymous || (selectionMode === "parallel" && ((parallelMaxReached && !isParallelSelected) || isTypeMismatch));
+
+        let unavailableClassName = "";
+        let unavailableTitle: string | undefined;
+
+        if (isLockedForAnonymous) {
+            unavailableClassName = "cursor-not-allowed opacity-40";
+            unavailableTitle = t`Sign up to unlock all models`;
+        } else if (isTypeMismatch) {
+            unavailableClassName = "cursor-not-allowed opacity-25";
+            unavailableTitle = t`Only same-type models can be compared. Clear selection to switch types.`;
+        } else if (isDisabled) {
+            unavailableClassName = "cursor-not-allowed opacity-40";
+        }
+
+        let parallelCheckbox = <Square className={cn("size-4", isDisabled ? "text-muted-foreground/20" : "text-muted-foreground/30")} />;
+
+        if (isTypeMismatch) {
+            parallelCheckbox = <Lock className="text-muted-foreground/30 size-4" />;
+        } else if (isParallelSelected) {
+            parallelCheckbox = <CheckSquare2 className="text-primary-text size-4" />;
+        }
+
+        return (
+            <div className={cn("group/row relative mx-1.5", unavailableClassName)}>
+                <CommandItem
+                    aria-disabled={isDisabled || undefined}
+                    className={cn(
+                        "flex-row !items-center rounded-md py-2 pl-2 transition-colors duration-100",
+                        onToggleFavorite ? "pr-8" : "pr-2",
+                        isSelected && selectionMode === "single" ? "bg-accent/60" : "",
+                        isParallelSelected && selectionMode === "parallel" ? "bg-accent/40" : "",
+                    )}
+                    data-model-id={item.model.id}
+                    onClick={(event: React.MouseEvent & { preventBaseUIHandler?: () => void }) => {
+                        event.preventBaseUIHandler?.();
+
+                        if (!isDisabled) {
+                            onSelectModel(item.model.id);
+                        }
+                    }}
+                    title={unavailableTitle}
+                    value={item.value}
+                >
+                    {/* Anonymous lock */}
+                    {isLockedForAnonymous ? (
+                        <span aria-hidden="true" className="mr-2 flex shrink-0 items-center justify-center">
+                            <Lock className="text-muted-foreground/30 size-4" />
+                        </span>
+                    ) : null}
+
+                    {/* Parallel selection checkbox */}
+                    {!isLockedForAnonymous && selectionMode === "parallel" ? (
+                        <span aria-hidden="true" className="mr-2 flex shrink-0 items-center justify-center">
+                            {parallelCheckbox}
+                        </span>
+                    ) : null}
+
+                    {/* Provider icon — shown on starred tab */}
+                    {showProviderIcon ? (
+                        <ProviderIcon
+                            className="mr-2 size-5 shrink-0"
+                            provider={item.model.provider || item.model.displayProvider || ""}
+                            providerIcon={item.model.id.split("/", 1)[0] || item.model.displayProvider || ""}
+                        />
+                    ) : null}
+
+                    <ModelItemContent isSelected={isSelected} model={item.model} showCheckmark={selectionMode === "single"} />
+                </CommandItem>
+                {onToggleFavorite ? <ModelItemFavoriteToggle isFavorite={isFavorite} modelId={item.model.id} onToggleFavorite={onToggleFavorite} /> : null}
+            </div>
+        );
+    },
+);
+
+ModelRow.displayName = "ModelRow";
 
 // ─── Model group renderer ──────────────────────────────────────────────────────
 
@@ -199,6 +366,7 @@ const ModelGroupRenderer = memo<{
     favorites: Set<string>;
     group: ModelGroup;
     isAnonymous?: boolean;
+    onSelectModel: (modelId: string) => void;
     onToggleFavorite?: (modelId: string) => void;
     parallelMaxReached: boolean;
     parallelSelectedIds: Set<string>;
@@ -212,6 +380,7 @@ const ModelGroupRenderer = memo<{
         favorites,
         group,
         isAnonymous = false,
+        onSelectModel,
         onToggleFavorite,
         parallelMaxReached,
         parallelSelectedIds,
@@ -219,103 +388,37 @@ const ModelGroupRenderer = memo<{
         selectionMode,
         showGroupLabel = true,
         showProviderIcon = false,
-    }) => {
-        const { t } = useLingui();
+    }) => (
+        <CommandGroup items={group.items}>
+            {showGroupLabel ? (
+                <CommandGroupLabel className="text-muted-foreground px-3 pt-3 pb-0.5 text-[10px] font-semibold tracking-widest uppercase">
+                    {group.value}
+                </CommandGroupLabel>
+            ) : null}
+            <CommandCollection>
+                {(item: ModelItem) => {
+                    const isParallelSelected = parallelSelectedIds.has(item.model.id);
 
-        return (
-            <CommandGroup items={group.items}>
-                {showGroupLabel ? (
-                    <CommandGroupLabel className="text-muted-foreground/40 px-3 pt-3 pb-0.5 text-[10px] font-semibold tracking-widest uppercase">
-                        {group.value}
-                    </CommandGroupLabel>
-                ) : null}
-                <CommandCollection>
-                    {(item: ModelItem) => {
-                        const isParallelSelected = parallelSelectedIds.has(item.model.id);
-                        const isSelected = selectionMode === "parallel" ? isParallelSelected : selectedModelId === item.value;
-                        const isTypeMismatch =
-                            selectionMode === "parallel" && anchorMode !== null && getModelMode(item.model) !== anchorMode && !isParallelSelected;
-                        const isLockedForAnonymous = isAnonymous && item.model.id !== selectedModelId;
-                        const isDisabled =
-                            isLockedForAnonymous || (selectionMode === "parallel" && ((parallelMaxReached && !isParallelSelected) || isTypeMismatch));
-
-                        let unavailableClassName = "";
-                        let unavailableTitle: string | undefined;
-
-                        if (isLockedForAnonymous) {
-                            unavailableClassName = "cursor-not-allowed opacity-40";
-                            unavailableTitle = t`Sign up to unlock all models`;
-                        } else if (isTypeMismatch) {
-                            unavailableClassName = "cursor-not-allowed opacity-25";
-                            unavailableTitle = t`Only same-type models can be compared. Clear selection to switch types.`;
-                        } else if (isDisabled) {
-                            unavailableClassName = "cursor-not-allowed opacity-40";
-                        }
-
-                        let parallelCheckbox = <Square className={cn("size-4", isDisabled ? "text-muted-foreground/20" : "text-muted-foreground/30")} />;
-
-                        if (isTypeMismatch) {
-                            parallelCheckbox = <Lock className="text-muted-foreground/30 size-4" />;
-                        } else if (isParallelSelected) {
-                            parallelCheckbox = <CheckSquare2 className="text-primary-text size-4" />;
-                        }
-
-                        return (
-                            <CommandItem
-                                className={cn(
-                                    "group/row mx-1.5 flex-row !items-center rounded-md px-2 py-2 transition-colors duration-100",
-                                    isSelected && selectionMode === "single" ? "bg-accent/60" : "",
-                                    isParallelSelected && selectionMode === "parallel" ? "bg-accent/40" : "",
-                                    unavailableClassName,
-                                )}
-                                key={item.value}
-                                onClick={(event: React.MouseEvent & { preventBaseUIHandler?: () => void }) => {
-                                    event.preventBaseUIHandler?.();
-
-                                    if (!isDisabled) {
-                                        item.onSelect();
-                                    }
-                                }}
-                                title={unavailableTitle}
-                                value={item.value}
-                            >
-                                {/* Anonymous lock */}
-                                {isLockedForAnonymous ? (
-                                    <span aria-hidden="true" className="mr-2 flex shrink-0 items-center justify-center">
-                                        <Lock className="text-muted-foreground/30 size-4" />
-                                    </span>
-                                ) : null}
-
-                                {/* Parallel selection checkbox */}
-                                {!isLockedForAnonymous && selectionMode === "parallel" ? (
-                                    <span aria-hidden="true" className="mr-2 flex shrink-0 items-center justify-center">
-                                        {parallelCheckbox}
-                                    </span>
-                                ) : null}
-
-                                {/* Provider icon — shown on starred tab */}
-                                {showProviderIcon ? (
-                                    <ProviderIcon
-                                        className="mr-2 size-5 shrink-0"
-                                        provider={item.model.provider || item.model.displayProvider || ""}
-                                        providerIcon={item.model.id.split("/", 1)[0] || item.model.displayProvider || ""}
-                                    />
-                                ) : null}
-
-                                <ModelItemContent
-                                    isFavorite={favorites.has(item.model.id)}
-                                    isSelected={isSelected}
-                                    model={item.model}
-                                    onToggleFavorite={onToggleFavorite}
-                                    showCheckmark={selectionMode === "single"}
-                                />
-                            </CommandItem>
-                        );
-                    }}
-                </CommandCollection>
-            </CommandGroup>
-        );
-    },
+                    return (
+                        <ModelRow
+                            anchorMode={anchorMode}
+                            isFavorite={favorites.has(item.model.id)}
+                            isLockedForAnonymous={isAnonymous && item.model.id !== selectedModelId}
+                            isParallelSelected={isParallelSelected}
+                            isSelected={selectionMode === "parallel" ? isParallelSelected : selectedModelId === item.value}
+                            item={item}
+                            key={item.value}
+                            onSelectModel={onSelectModel}
+                            onToggleFavorite={onToggleFavorite}
+                            parallelMaxReached={parallelMaxReached}
+                            selectionMode={selectionMode}
+                            showProviderIcon={showProviderIcon}
+                        />
+                    );
+                }}
+            </CommandCollection>
+        </CommandGroup>
+    ),
 );
 
 ModelGroupRenderer.displayName = "ModelGroupRenderer";
@@ -343,6 +446,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     const [selectedModelId, setSelectedModelId] = useState<string | undefined>(initialModelId);
     const [parallelSelectedIds, setParallelSelectedIds] = useState<Set<string>>(() => new Set(initialModelIds));
     const [searchQuery, setSearchQuery] = useState("");
+    const [groupCache] = useState((): GroupCache => new WeakMap());
     const [activeTab, setActiveTab] = useState<ModelPickerTab>(defaultTab);
     const [selectionMode, setSelectionMode] = useState<"parallel" | "single">(() => ((initialModelIds?.length ?? 0) > 0 ? "parallel" : "single"));
     const [modeFilter, setModeFilter] = useState<ModelModeFilter>(defaultModeFilter);
@@ -351,6 +455,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     const [chosenProvider, setChosenProvider] = useState<string | null | undefined>(undefined);
     const selectedProvider = chosenProvider === undefined ? initialCreatorSlug(models, initialModelId) : chosenProvider;
 
+    const pickerRef = useRef<HTMLDivElement>(null);
     const onSelectRef = useRef(onSelect);
     const onSelectMultipleRef = useRef(onSelectMultiple);
 
@@ -452,39 +557,23 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         return { favoriteModels: favorites, regularModels: regulars };
     }, [models, favoriteSet, searchQuery, selectedProvider, activeTab, modeFilter]);
 
-    const createModelItems = useCallback(
-        (modelList: GatewayModel[]): ModelItem[] =>
-            modelList.map((model) => {
-                return {
-                    label: model.name ?? model.id,
-                    model,
-                    onSelect: () => handleModelSelect(model.id),
-                    value: model.id,
-                };
-            }),
-        [handleModelSelect],
-    );
-
     const groupedItems = useMemo(() => {
         const groups: ModelGroup[] = [];
+        const isStarred = activeTab === "starred";
+        const grouped = groupModelsByCreator(isStarred ? favoriteModels : [...favoriteModels, ...regularModels]);
 
-        if (activeTab === "starred") {
-            const grouped = groupModelsByCreator(favoriteModels);
+        for (const [creator, creatorModels] of grouped.entries()) {
+            const items = creatorModels.map((model) => stableModelItem(model));
 
-            for (const [creator, creatorModels] of grouped.entries()) {
-                groups.push({ isFavorite: true, items: createModelItems(creatorModels), value: creator });
-            }
-        } else {
-            const allModels = [...favoriteModels, ...regularModels];
-            const grouped = groupModelsByCreator(allModels);
-
-            for (const [creator, creatorModels] of grouped.entries()) {
-                groups.push({ items: createModelItems(creatorModels), value: creator });
-            }
+            groups.push(stableModelGroup(groupCache, creator, items, isStarred));
         }
 
         return groups;
-    }, [favoriteModels, regularModels, activeTab, createModelItems]);
+    }, [favoriteModels, regularModels, activeTab, groupCache]);
+
+    useLayoutEffect(() => {
+        rememberGroups(groupCache, groupedItems);
+    }, [groupCache, groupedItems]);
 
     const isParallelMaxReached = parallelSelectedIds.size >= MAX_PARALLEL;
     const isShowProviderSidebar = activeTab === "all" && !searchQuery.trim();
@@ -507,8 +596,38 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     const selectedCount = parallelSelectedIds.size;
     const anchorModeName = anchorMode ? i18n._(getModelModeName(anchorMode)) : "";
 
+    const [favoriteNotice, setFavoriteNotice] = useState("");
+
+    // The star button on each row is pointer-only (it cannot live inside the listbox), so the same action is bound to
+    // Alt+S on the highlighted row, from the search field.
+    const handleActionShortcut = useCallback(
+        (event: React.KeyboardEvent) => {
+            if (!onToggleFavorite || event.code !== "KeyS" || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+                return;
+            }
+
+            const modelId = pickerRef.current?.querySelector<HTMLElement>("[data-model-id][data-highlighted]")?.dataset.modelId;
+
+            if (!modelId) {
+                return;
+            }
+
+            // Announced from its own region: the focus stays on the search field, and the footer's count is a different message.
+            const name = models.find((model) => model.id === modelId)?.name ?? modelId;
+
+            setFavoriteNotice(favoriteSet.has(modelId) ? t`${name} removed from starred` : t`${name} added to starred`);
+            onToggleFavorite(modelId);
+            event.preventDefault();
+            event.stopPropagation();
+        },
+        [favoriteSet, models, onToggleFavorite, t],
+    );
+
     return (
-        <div>
+        <div ref={pickerRef}>
+            <span aria-live="polite" className="sr-only" role="status">
+                {favoriteNotice}
+            </span>
             <Command filter={() => true} items={groupedItems} onValueChange={setSearchQuery} value={searchQuery}>
                 {/* Anonymous banner */}
                 {isAnonymous ? (
@@ -520,7 +639,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                     </div>
                 ) : null}
 
-                <CommandInput placeholder={t`Search models...`} />
+                <CommandInput aria-keyshortcuts="Alt+S" onKeyDown={handleActionShortcut} placeholder={t`Search models...`} />
 
                 {/* Tab bar */}
                 <div className="flex items-center border-t">
@@ -532,7 +651,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                                     "flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[12.5px] font-medium transition-colors duration-150",
                                     activeTab === "starred"
                                         ? "text-foreground border-foreground -mb-px"
-                                        : "text-muted-foreground/60 hover:text-foreground border-transparent",
+                                        : "text-muted-foreground hover:text-foreground border-transparent",
                                 )}
                                 onClick={() => handleTabChange("starred")}
                                 role="tab"
@@ -548,7 +667,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                                 "flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[12.5px] font-medium transition-colors duration-150",
                                 activeTab === "all"
                                     ? "text-foreground border-foreground -mb-px"
-                                    : "text-muted-foreground/60 hover:text-foreground border-transparent",
+                                    : "text-muted-foreground hover:text-foreground border-transparent",
                             )}
                             onClick={() => handleTabChange("all")}
                             role="tab"
@@ -569,7 +688,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                                         "rounded-[5px] px-2.5 py-1 text-[11.5px] font-medium transition-all duration-150",
                                         selectionMode === "single"
                                             ? "bg-background text-foreground shadow-sm"
-                                            : "text-muted-foreground/50 hover:text-muted-foreground",
+                                            : "text-muted-foreground hover:text-muted-foreground",
                                     )}
                                     onClick={() => handleSelectionModeChange("single")}
                                     type="button"
@@ -582,7 +701,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                                         "rounded-[5px] px-2.5 py-1 text-[11.5px] font-medium transition-all duration-150",
                                         selectionMode === "parallel"
                                             ? "bg-background text-foreground shadow-sm"
-                                            : "text-muted-foreground/50 hover:text-muted-foreground",
+                                            : "text-muted-foreground hover:text-muted-foreground",
                                     )}
                                     onClick={() => handleSelectionModeChange("parallel")}
                                     type="button"
@@ -597,14 +716,14 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                 {/* Mode filter row */}
                 {hideModeFilter ? null : (
                     <div aria-label={t`Filter by mode`} className="flex items-center gap-1 border-t px-2 py-1.5" role="group">
-                        <span className="text-muted-foreground/50 mr-1 text-[10px] font-medium tracking-wider uppercase" id="mode-filter-label">
+                        <span className="text-muted-foreground mr-1 text-[10px] font-medium tracking-wider uppercase" id="mode-filter-label">
                             {t`Type`}
                         </span>
                         <button
                             aria-pressed={modeFilter === null}
                             className={cn(
                                 "rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                modeFilter === null ? "bg-primary/10 text-primary-text" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                modeFilter === null ? "bg-primary/10 text-primary-text" : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter(null)}
                             type="button"
@@ -615,7 +734,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                             aria-pressed={modeFilter === "text"}
                             className={cn(
                                 "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                modeFilter === "text" ? "bg-primary/10 text-primary-text" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                modeFilter === "text" ? "bg-primary/10 text-primary-text" : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter("text")}
                             type="button"
@@ -627,7 +746,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                             aria-pressed={modeFilter === "image"}
                             className={cn(
                                 "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                modeFilter === "image" ? "bg-primary/10 text-primary-text" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                modeFilter === "image" ? "bg-primary/10 text-primary-text" : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter("image")}
                             type="button"
@@ -639,7 +758,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                             aria-pressed={modeFilter === "video"}
                             className={cn(
                                 "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
-                                modeFilter === "video" ? "bg-primary/10 text-primary-text" : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                modeFilter === "video" ? "bg-primary/10 text-primary-text" : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter("video")}
                             type="button"
@@ -653,7 +772,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                                 "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                 modeFilter === "speech-to-text"
                                     ? "bg-primary/10 text-primary-text"
-                                    : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                             )}
                             onClick={() => setModeFilter("speech-to-text")}
                             type="button"
@@ -689,41 +808,42 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
                     {/* Model list */}
                     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                        {isStarredEmpty ? (
-                            <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-                                <div className="border-border/30 flex size-10 items-center justify-center rounded-xl border">
-                                    <Star aria-hidden="true" className="text-muted-foreground/30 size-4" />
+                        <CommandEmpty className="not-empty:size-full">
+                            {isStarredEmpty ? (
+                                <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+                                    <div className="border-border/30 flex size-10 items-center justify-center rounded-xl border">
+                                        <Star aria-hidden="true" className="text-muted-foreground/30 size-4" />
+                                    </div>
+                                    <div>
+                                        <p className="text-foreground/80 text-sm font-medium">{t`No starred models`}</p>
+                                        <p className="text-muted-foreground mt-1 text-[11.5px] leading-relaxed">
+                                            {t`Click the star on any model in All models to add it here.`}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-foreground/80 text-sm font-medium">{t`No starred models`}</p>
-                                    <p className="text-muted-foreground/40 mt-1 text-[11.5px] leading-relaxed">
-                                        {t`Click the star on any model in All models to add it here.`}
-                                    </p>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                <CommandEmpty className="not-empty:size-full">{t`No models found.`}</CommandEmpty>
-                                <CommandList className="py-1.5">
-                                    {groupedItems.map((group) => (
-                                        <ModelGroupRenderer
-                                            anchorMode={selectionMode === "parallel" ? anchorMode : null}
-                                            favorites={favoriteSet}
-                                            group={group}
-                                            isAnonymous={isAnonymous}
-                                            key={`${activeTab}-${group.value}`}
-                                            onToggleFavorite={onToggleFavorite}
-                                            parallelMaxReached={isParallelMaxReached}
-                                            parallelSelectedIds={parallelSelectedIds}
-                                            selectedModelId={selectedModelId}
-                                            selectionMode={selectionMode}
-                                            showGroupLabel={isShowGroupLabels}
-                                            showProviderIcon={activeTab === "starred"}
-                                        />
-                                    ))}
-                                </CommandList>
-                            </>
-                        )}
+                            ) : (
+                                t`No models found.`
+                            )}
+                        </CommandEmpty>
+                        <CommandList className="py-1.5">
+                            {groupedItems.map((group) => (
+                                <ModelGroupRenderer
+                                    anchorMode={selectionMode === "parallel" ? anchorMode : null}
+                                    favorites={favoriteSet}
+                                    group={group}
+                                    isAnonymous={isAnonymous}
+                                    key={`${activeTab}-${group.value}`}
+                                    onSelectModel={handleModelSelect}
+                                    onToggleFavorite={onToggleFavorite}
+                                    parallelMaxReached={isParallelMaxReached}
+                                    parallelSelectedIds={parallelSelectedIds}
+                                    selectedModelId={selectedModelId}
+                                    selectionMode={selectionMode}
+                                    showGroupLabel={isShowGroupLabels}
+                                    showProviderIcon={activeTab === "starred"}
+                                />
+                            ))}
+                        </CommandList>
                     </div>
                 </CommandPanel>
 
@@ -733,13 +853,13 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                         <div className="flex flex-col gap-0.5">
                             <span
                                 aria-live="polite"
-                                className={cn("text-[11.5px]", isParallelMaxReached ? "text-amber-500 dark:text-amber-400" : "text-muted-foreground/50")}
+                                className={cn("text-[11.5px]", isParallelMaxReached ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}
                                 role="status"
                             >
                                 {isParallelMaxReached ? t`Maximum ${MAX_PARALLEL} models reached` : t`${selectedCount} of ${MAX_PARALLEL} selected`}
                             </span>
                             {anchorMode ? (
-                                <span className="text-muted-foreground/40 flex items-center gap-1 text-[10px]">
+                                <span className="text-muted-foreground flex items-center gap-1 text-[10px]">
                                     <Lock aria-hidden="true" className="size-2.5" />
                                     {t`Locked to ${anchorModeName} models`}
                                 </span>
@@ -751,7 +871,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                                 "rounded-md px-3 py-1 text-[12px] font-medium transition-colors duration-100",
                                 parallelSelectedIds.size > 0
                                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                                    : "text-muted-foreground/30 cursor-not-allowed",
+                                    : "text-muted-foreground cursor-not-allowed",
                             )}
                             disabled={parallelSelectedIds.size === 0}
                             onClick={() => {

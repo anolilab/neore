@@ -294,7 +294,7 @@ const SectionBadge = ({ className, index, light = false, title }: { className?: 
                 transition={{ delay: 0.15, duration: 0.4, ease: "easeOut" }}
                 variants={{ hidden: { opacity: 0, x: -10 }, visible: { opacity: 1, x: 0 } }}
             >
-                [ <span className="text-primary">{String(index).padStart(2, "0")}</span> / <span>{String(TOTAL_SECTIONS).padStart(2, "0")}</span> ]
+                [ <span className="text-primary-text">{String(index).padStart(2, "0")}</span> / <span>{String(TOTAL_SECTIONS).padStart(2, "0")}</span> ]
             </motion.div>
             <motion.span
                 className={clsx("text-sm font-medium tracking-wide", {
@@ -404,14 +404,14 @@ const GatewayLandingPage: FC = () => {
                 <section className="relative container mx-auto mt-px flex min-h-[85svh] flex-col items-center justify-center border-x px-4 pt-24 pb-12 sm:min-h-screen sm:pt-32 sm:pb-20">
                     <SectionSeperator />
                     <div className="mx-auto w-full max-w-3xl text-center">
-                        <span className="text-primary mb-3 inline-block font-mono text-[10px] font-medium tracking-widest uppercase sm:mb-4 sm:text-xs">
+                        <span className="text-primary-text mb-3 inline-block font-mono text-[10px] font-medium tracking-widest uppercase sm:mb-4 sm:text-xs">
                             {t`Completions · Embeddings · Images · Audio · Video`}
                         </span>
                         <h1 className="mb-4 text-3xl leading-[1.1] font-bold tracking-tight sm:mb-6 sm:text-5xl md:text-6xl lg:text-[4.5rem]">
                             <Trans>
                                 One API.
                                 <br />
-                                <span className="text-primary">Every LLM.</span>
+                                <span className="text-primary-text">Every LLM.</span>
                             </Trans>
                         </h1>
                         <p className="mx-auto mb-8 max-w-3xl text-base leading-relaxed text-white/60 sm:mb-10 sm:text-lg">
@@ -461,7 +461,7 @@ const GatewayLandingPage: FC = () => {
                             <div className="mb-10 sm:mb-16">
                                 <h2 className="mb-3 max-w-xl text-3xl leading-tight font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl">
                                     <Trans>
-                                        Every provider. <span className="text-primary">One SDK.</span>
+                                        Every provider. <span className="text-primary-text">One SDK.</span>
                                     </Trans>
                                 </h2>
                                 <p className="max-w-xl text-base text-white/50 sm:text-lg">
@@ -516,7 +516,7 @@ const GatewayLandingPage: FC = () => {
                             <div className="px-4 pt-16 pb-10 sm:px-6 sm:pt-28 sm:pb-16 lg:px-10">
                                 <h2 className="text-brand-obsidian mb-3 max-w-lg text-3xl leading-tight font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl">
                                     <Trans>
-                                        Route, track, <span className="text-primary">optimize.</span>
+                                        Route, track, <span className="text-primary-text">optimize.</span>
                                     </Trans>
                                 </h2>
                                 <p className="text-brand-graphite max-w-lg text-base sm:text-lg">
@@ -544,7 +544,7 @@ const GatewayLandingPage: FC = () => {
                                                     <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md">
                                                         <feature.icon className="size-4" />
                                                     </div>
-                                                    <span className="text-primary font-mono text-xs font-medium tracking-widest uppercase">
+                                                    <span className="text-primary-text font-mono text-xs font-medium tracking-widest uppercase">
                                                         {i18n._(feature.tabLabel)}
                                                     </span>
                                                 </div>
@@ -581,7 +581,7 @@ const GatewayLandingPage: FC = () => {
                             <div className="px-4 pt-16 pb-10 sm:px-6 sm:pt-28 sm:pb-16 lg:px-10">
                                 <h2 className="text-brand-obsidian mb-3 max-w-lg text-3xl leading-tight font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl">
                                     <Trans>
-                                        Built for <span className="text-primary">production.</span>
+                                        Built for <span className="text-primary-text">production.</span>
                                     </Trans>
                                 </h2>
                                 <p className="text-brand-graphite max-w-lg text-base sm:text-lg">
@@ -612,7 +612,7 @@ const GatewayLandingPage: FC = () => {
                                         <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md">
                                             <feature.icon className="size-4" />
                                         </div>
-                                        <span className="text-primary font-mono text-xs font-medium tracking-widest uppercase">
+                                        <span className="text-primary-text font-mono text-xs font-medium tracking-widest uppercase">
                                             {String(index + 1).padStart(2, "0")}
                                         </span>
                                     </div>
@@ -663,7 +663,7 @@ const GatewayLandingPage: FC = () => {
                             <div className="px-4 pt-16 pb-10 sm:px-6 sm:pt-28 sm:pb-16 lg:px-10">
                                 <h2 className="text-brand-obsidian mb-3 max-w-lg text-3xl leading-tight font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl">
                                     <Trans>
-                                        OpenAI-compatible <span className="text-primary">API.</span>
+                                        OpenAI-compatible <span className="text-primary-text">API.</span>
                                     </Trans>
                                 </h2>
                                 <p className="text-brand-graphite max-w-lg text-base sm:text-lg">
@@ -689,7 +689,7 @@ const GatewayLandingPage: FC = () => {
                                     <span
                                         className={cn(
                                             "inline-block w-14 shrink-0 rounded font-mono text-[10px] font-bold tracking-wider",
-                                            endpoint.method === "POST" ? "text-primary" : "text-blue-500",
+                                            endpoint.method === "POST" ? "text-primary-text" : "text-blue-500",
                                         )}
                                     >
                                         {endpoint.method}
@@ -722,7 +722,7 @@ const GatewayLandingPage: FC = () => {
                             <div className="px-4 pt-16 pb-10 text-center sm:px-6 sm:pt-28 sm:pb-16 lg:px-10">
                                 <h2 className="text-brand-obsidian mb-3 text-3xl leading-tight font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl">
                                     <Trans>
-                                        Pay for what <span className="text-primary">you use.</span>
+                                        Pay for what <span className="text-primary-text">you use.</span>
                                     </Trans>
                                 </h2>
                                 <p className="text-brand-graphite mx-auto mb-6 max-w-lg text-base sm:mb-8 sm:text-lg">
@@ -753,7 +753,7 @@ const GatewayLandingPage: FC = () => {
                                     </button>
                                     <span className={cn("text-sm transition-colors", isAnnual ? "text-brand-obsidian font-semibold" : "text-brand-graphite")}>
                                         {t`Annual`}
-                                        <span className="text-primary ml-1.5 text-xs font-semibold">{t`Save 25%`}</span>
+                                        <span className="text-primary-text ml-1.5 text-xs font-semibold">{t`Save 25%`}</span>
                                     </span>
                                 </div>
                             </div>
@@ -809,7 +809,7 @@ const GatewayLandingPage: FC = () => {
                                     <ul className="mb-8 flex-1 space-y-3">
                                         {tier.features.map((feature) => (
                                             <li className="text-brand-graphite flex items-start gap-2 text-sm" key={feature.id}>
-                                                <Check className="text-primary mt-0.5 size-4 shrink-0" />
+                                                <Check className="text-primary-text mt-0.5 size-4 shrink-0" />
                                                 {i18n._(feature)}
                                             </li>
                                         ))}
@@ -843,7 +843,7 @@ const GatewayLandingPage: FC = () => {
                         <FadeIn variant="scale">
                             <h2 className="mb-3 text-3xl font-bold sm:mb-4 sm:text-4xl md:text-5xl">
                                 <Trans>
-                                    Ship AI features <span className="text-primary">faster.</span>
+                                    Ship AI features <span className="text-primary-text">faster.</span>
                                 </Trans>
                             </h2>
                             <p className="mx-auto mb-6 max-w-md text-base text-white/50 sm:mb-8 sm:text-lg">
@@ -877,7 +877,7 @@ const GatewayLandingPage: FC = () => {
                             <div className="px-4 pt-16 pb-10 text-center sm:px-6 sm:pt-28 sm:pb-16 lg:px-10">
                                 <h2 className="text-brand-obsidian mb-3 text-3xl leading-tight font-bold tracking-tight sm:mb-4 sm:text-4xl md:text-5xl">
                                     <Trans>
-                                        Frequently asked <span className="text-primary">questions</span>.
+                                        Frequently asked <span className="text-primary-text">questions</span>.
                                     </Trans>
                                 </h2>
                                 <p className="text-brand-graphite text-sm sm:text-base">{t`Everything you need to know about Neore Gateway.`}</p>
@@ -889,7 +889,7 @@ const GatewayLandingPage: FC = () => {
                                 {faqItems.map((item, index) => (
                                     <AccordionItem className="border-brand-silver" key={item.question.id}>
                                         <AccordionTrigger className="text-brand-obsidian px-4 py-4 text-left text-sm font-semibold hover:no-underline sm:px-6 sm:py-5 lg:px-10">
-                                            <span className="text-primary mr-3 font-mono text-xs font-normal tracking-wider sm:mr-4">
+                                            <span className="text-primary-text mr-3 font-mono text-xs font-normal tracking-wider sm:mr-4">
                                                 {String(index + 1).padStart(2, "0")}
                                             </span>
                                             {i18n._(item.question)}

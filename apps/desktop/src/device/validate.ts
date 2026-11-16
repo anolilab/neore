@@ -179,6 +179,15 @@ export const readAgentKey = (value: unknown): string => text(value, "agent", 40)
 
 export const readSessionId = (value: unknown): string => text(value, "session", 64);
 
+/** The listed process a stop is for: the page sends back what the ports list gave it, and main re-checks it against the live table. */
+export const readPortTarget = (pid: unknown, startedAt: unknown, name: unknown): { name: string; pid: number; startedAt: string } => {
+    if (typeof pid !== "number" || !Number.isSafeInteger(pid) || pid < 2) {
+        throw new Error("device: process is invalid");
+    }
+
+    return { name: text(name, "process name", 40), pid, startedAt: text(startedAt, "start time", 40) };
+};
+
 /** The agent's own id for a saved session; it comes from the agent's list and goes back to the same agent. */
 export const readNativeSessionId = (value: unknown): string => text(value, "saved session", 256);
 

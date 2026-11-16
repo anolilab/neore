@@ -12,6 +12,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LockedChatGate } from "./locked-chat-gate";
 
+const draft = (threadId: string, text: string): void => {
+    localStorage.setItem(`neore-draft:user-1:${threadId}`, JSON.stringify({ t: Date.now(), v: { t: text }, w: "w" }));
+};
+
+const draftKeys = (): string[] => Object.keys(localStorage).filter((key) => key.startsWith("neore-draft:"));
+
 const harness = vi.hoisted(() => {
     // `validProof` is the passcode epoch: null accepts any proof, a string accepts only that one.
     const state = { failNetwork: false, hang: false, passcodeRemoved: false, validProof: null as string | null };
@@ -99,9 +105,80 @@ beforeEach(() => {
 
 afterEach(() => {
     forgetAllUnlockProofs();
+    vi.doUnmock("@/features/chat/split/stored-drafts");
+    localStorage.clear();
 });
 
 describe("a locked chat behind its gate", () => {
+    it("removes the chat's draft stored before the lock, and leaves the other chats' drafts", async () => {
+        draft("thread-1", "secret");
+        draft("thread-2", "other");
+        renderGate();
+        await promptHeading();
+        await vi.dynamicImportSettled();
+
+        expect(draftKeys()).toStrictEqual(["neore-draft:user-1:thread-2"]);
+    });
+
+    it("leaves the draft alone when the chat unlocked before the storage code loaded", async () => {
+        const chunk = { loaded: false };
+
+        // The draft storage chunk loads only once `chunk.loaded` is set.
+        vi.doMock("@/features/chat/split/stored-drafts", async (importOriginal: () => Promise<typeof import("@/features/chat/split/stored-drafts")>) => {
+            await vi.waitUntil(() => chunk.loaded);
+
+            return importOriginal();
+        });
+        renderGate();
+        await promptHeading();
+        act(() => {
+            rememberUnlockProof("thread-1", "proof-1", Date.now() + 60_000);
+        });
+        expect(await screen.findByText("chat body")).toBeTruthy();
+        // The unlocked chat's composer stores its draft.
+        draft("thread-1", "typed after unlocking");
+        chunk.loaded = true;
+        await import("@/features/chat/split/stored-drafts");
+        await settle();
+
+        expect(draftKeys()).toStrictEqual(["neore-draft:user-1:thread-1"]);
+    });
+
+    it("still removes the locked chat's draft when the gate is left before the storage code loaded", async () => {
+        const chunk = { loaded: false };
+
+        vi.doMock("@/features/chat/split/stored-drafts", async (importOriginal: () => Promise<typeof import("@/features/chat/split/stored-drafts")>) => {
+            await vi.waitUntil(() => chunk.loaded);
+
+            return importOriginal();
+        });
+        draft("thread-1", "secret");
+
+        const view = renderGate();
+
+        await promptHeading();
+        // The user goes elsewhere while the chunk is still loading: the chat is still locked.
+        view.unmount();
+        chunk.loaded = true;
+        await import("@/features/chat/split/stored-drafts");
+        await settle();
+
+        expect(draftKeys()).toStrictEqual([]);
+    });
+
+    it("removes the locked chat's draft, and only its own, when the storage code cannot load", async () => {
+        vi.doMock("@/features/chat/split/stored-drafts", () => {
+            throw new Error("chunk load failed");
+        });
+        draft("thread-1", "secret");
+        draft("thread-2", "other");
+        renderGate();
+        await promptHeading();
+        await settle();
+
+        expect(draftKeys()).toStrictEqual(["neore-draft:user-1:thread-2"]);
+    });
+
     it("shows the unlock prompt, not the chat, while no proof is in memory", async () => {
         renderGate();
 

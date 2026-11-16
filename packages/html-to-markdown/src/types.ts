@@ -1,0 +1,79 @@
+/**
+ * An element that the converter has annotated while walking the tree. Rules
+ * only ever receive elements; text nodes are annotated too but never reach a rule.
+ * `Node` (see node.ts) adds these before any rule runs.
+ */
+export interface AnnotatedNode extends Element {
+    flankingWhitespace: { leading: string; trailing: string };
+    isBlank: boolean;
+    isBlock: boolean;
+    isCode: boolean;
+}
+
+export type ReplacementFunction = (content: string, node: AnnotatedNode, options: Options) => string;
+
+export interface Options {
+    blankReplacement: ReplacementFunction;
+    br: string;
+    bulletListMarker: string;
+    codeBlockStyle: string;
+    defaultReplacement: ReplacementFunction;
+    emDelimiter: string;
+    fence: string;
+    headingStyle: string;
+    hr: string;
+    keepReplacement: ReplacementFunction;
+    linkReferenceStyle: string;
+    linkStyle: string;
+    preformattedCode: boolean;
+    rules?: Record<string, Rule>;
+
+    /**
+     * When true, a link whose destination has a scheme other than http, https, mailto or tel renders as its text only.
+     * Relative destinations are kept, unless the decoded destination has a `&` before its first `/`, `?` or `#`.
+     * Decoding undoes backslash escapes of ASCII punctuation and numeric references, decimal or hex, with or without `;`.
+     * Named references such as `&colon;` are not decoded, so their `&` stays in the checked text.
+     * `\` and `&` are escaped in the output, so the rendered destination is the raw attribute, which the check covers
+     * through a decoded copy. Off by default, as upstream.
+     *
+     * Images are out of scope: an `<img src>` is rendered unchanged, even a `javascript:` one, because an image does not
+     * run script.
+     */
+    safeLinks: boolean;
+    strongDelimiter: string;
+}
+
+/** Asks which rule handles a node. Passed to filters and replacements. */
+export interface RuleLookup {
+    /** True when a rule of any kind (built-in, added, keep or remove) matches the node. */
+    hasRuleFor: (node: Node) => boolean;
+
+    /**
+     * True when a remove filter matches the node. A rule added with `addRule` is matched before the remove filters, so
+     * an added rule that must let a removed element go asks this in its filter.
+     */
+    isRemoved: (node: Node) => boolean;
+
+    /**
+     * The rule the node would get if `rule` did not match it: the next match in the search order, or the default rule.
+     * A rule that adds to what another rule writes, such as emphasis set by a style, passes its output on to that rule.
+     * A rule the service does not hold gets the default rule. Not cached: ask it from a replacement, which runs once per
+     * node.
+     */
+    ruleAfter: (rule: Rule, node: AnnotatedNode) => Rule;
+
+    /**
+     * The first rule whose filter matches the node, or undefined when none matches. Asked once per node, so the answer
+     * does not change. A blank node is still written by `blankReplacement`, whatever this returns.
+     */
+    ruleFor: (node: Node) => Rule | undefined;
+}
+
+export type FilterFunction = (this: Rule, node: AnnotatedNode, options: Options, rules: RuleLookup) => boolean;
+
+export interface Rule {
+    append?: (options: Options) => string;
+    filter?: string | string[] | FilterFunction;
+    references?: string[];
+    replacement: (this: Rule, content: string, node: AnnotatedNode, options: Options, rules: RuleLookup) => string;
+}

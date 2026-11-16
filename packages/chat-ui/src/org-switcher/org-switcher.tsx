@@ -154,7 +154,12 @@ const OrgSwitcher: FC<OrgSwitcherProps> = ({
 
     const triggerContent = (
         <div className="flex min-w-0 items-center gap-2">
-            {triggerAvatar}
+            {/* The name comes from the content, so the visible workspace name is part of it. */}
+            <span className="sr-only">{t`Switch workspace: currently`} </span>
+            {/* The avatar's alt text repeats the workspace name, so it stays out of the trigger's name. */}
+            <span aria-hidden="true" className="contents">
+                {triggerAvatar}
+            </span>
             {size === "icon" ? <span className="sr-only">{triggerLabel}</span> : <span className="min-w-0 truncate text-xs font-medium">{triggerLabel}</span>}
             {size === "icon" ? null : <ChevronsUpDown aria-hidden="true" className="ml-auto size-3.5 shrink-0 opacity-40" />}
         </div>
@@ -167,7 +172,6 @@ const OrgSwitcher: FC<OrgSwitcherProps> = ({
                     <Button
                         aria-expanded={open}
                         aria-haspopup="menu"
-                        aria-label={t`Switch workspace: currently ${triggerLabel}`}
                         className={cn(
                             "justify-start gap-2 px-2",
                             size === "icon" && "size-7 p-0",
@@ -199,6 +203,7 @@ const OrgSwitcher: FC<OrgSwitcherProps> = ({
                                     aria-label={t`Open settings`}
                                     className="text-muted-foreground hover:text-foreground shrink-0 rounded p-0.5 transition-colors"
                                     onClick={handleOpenSettings}
+                                    role="menuitem"
                                     type="button"
                                 >
                                     <SettingsIcon aria-hidden="true" className="size-3.5" />

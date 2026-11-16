@@ -87,7 +87,7 @@ const VideoSearchResults: FC<VideoSearchResultsProps> = ({ output }) => {
 
                             {/* Details */}
                             <div className="min-w-0 flex-1">
-                                <h4 className="group-hover:text-primary line-clamp-2 text-sm font-medium transition-colors">
+                                <h4 className="group-hover:text-primary-text line-clamp-2 text-sm font-medium transition-colors">
                                     {result.title}
                                     <span className="sr-only">
                                         {" "}

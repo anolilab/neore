@@ -172,7 +172,7 @@ const PromptOptimizeDialog = ({ onClose, onOptimized, open, prompt }: PromptOpti
                         {/* Optimized prompt preview */}
                         {optimizedContent && (
                             <div className="space-y-2">
-                                <Label className="text-primary flex items-center gap-2">
+                                <Label className="text-primary-text flex items-center gap-2">
                                     <Sparkles className="size-4" />
                                     {t`Optimized Prompt`}
                                 </Label>

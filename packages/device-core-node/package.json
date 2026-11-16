@@ -10,7 +10,7 @@
         "build": "napi build --platform --release --no-js --dts index.d.ts"
     },
     "devDependencies": {
-        "@napi-rs/cli": "3.10.8"
+        "@napi-rs/cli": "3.10.12"
     },
     "napi": {
         "binaryName": "device-core-node"

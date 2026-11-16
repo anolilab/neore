@@ -68,7 +68,6 @@ export const TranscriptionSegment = ({ className, index, onClick, segment, ...pr
     const { currentTime, onSeek } = useTranscription();
 
     const isActive = currentTime >= segment.startSecond && currentTime < segment.endSecond;
-    const isPast = currentTime >= segment.endSecond;
 
     const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
         if (onSeek) {
@@ -82,9 +81,8 @@ export const TranscriptionSegment = ({ className, index, onClick, segment, ...pr
         <button
             className={cn(
                 "inline text-left",
-                isActive && "text-primary",
-                isPast && "text-muted-foreground",
-                !(isActive || isPast) && "text-muted-foreground/60",
+                isActive && "text-primary-text",
+                !isActive && "text-muted-foreground",
                 onSeek && "hover:text-foreground cursor-pointer",
                 !onSeek && "cursor-default",
                 className,

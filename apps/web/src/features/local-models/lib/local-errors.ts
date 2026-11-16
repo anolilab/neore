@@ -24,7 +24,16 @@ import { isNativeShell } from "@/lib/native/bridge";
 import { LocalStreamError } from "./openai-sse";
 
 export type LocalErrorKind =
-    "aborted" | "cors" | "http" | "mixed-content" | "not-found" | "permission-denied" | "stream" | "timeout" | "unknown" | "unreachable";
+    | "aborted"
+    | "cors"
+    | "http"
+    | "mixed-content"
+    | "not-found"
+    | "permission-denied"
+    | "stream"
+    | "timeout"
+    | "unknown"
+    | "unreachable";
 
 export interface LocalErrorInfo {
     /** The server's own message (an `{ error }` body or stream error), when it sent one. */

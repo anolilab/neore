@@ -11,6 +11,7 @@ import type { SettingsCardClassNames } from "@/components/settings/settings-card
 import SettingsCard from "@/components/settings/settings-card";
 import { useListPasskeys } from "@/features/auth/hooks/passkey-management";
 import { useSession } from "@/features/auth/hooks/session-user-management";
+import useCredentialChangeBlock from "@/features/auth/hooks/use-credential-change-block";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
 import PasskeyCell from "./passkey-cell";
@@ -23,6 +24,7 @@ export interface PasskeysCardProperties {
 const PasskeysCard = ({ className, classNames }: PasskeysCardProperties) => {
     const { authClient, freshAge, toast } = useAuth();
     const { t } = useLingui();
+    const credentialBlock = useCredentialChangeBlock();
 
     const { data: passkeys, isPending, refetch } = useListPasskeys(authClient);
 
@@ -53,6 +55,10 @@ const PasskeysCard = ({ className, classNames }: PasskeysCardProperties) => {
     const form = useAppForm({
         defaultValues: {},
         onSubmit: async () => {
+            if (credentialBlock.blocked) {
+                return;
+            }
+
             // If session isn't fresh, show the freshness dialog
             if (!isSessionFresh()) {
                 setShowFreshnessDialog(true);
@@ -88,7 +94,8 @@ const PasskeysCard = ({ className, classNames }: PasskeysCardProperties) => {
                         className={className}
                         classNames={classNames}
                         description={t`Passkeys allow you to sign in securely using your device's biometric authentication or security key.`}
-                        instructions={t`Click the button below to register a new passkey with your device.`}
+                        disabled={credentialBlock.blocked}
+                        instructions={credentialBlock.reason ?? t`Click the button below to register a new passkey with your device.`}
                         isPending={isPending}
                         title={t`Passkeys`}
                     >

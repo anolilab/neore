@@ -15,6 +15,7 @@ import { getMembersByUserId, getOrganization, getUser } from "../auth/lib/better
 import { resolveUserPlan } from "../auth/lib/plan";
 import { claimOnce, releaseClaim } from "../lib/claim-once";
 import { createRatelimit } from "../lib/rate-limiter";
+import { applyLimit } from "../lib/rate-limiter-mutations";
 import { MAX_LENGTH } from "../lib/validators";
 import { dailyLimitKeyOf, dailyLimitTierOf } from "./lib/daily-limit";
 
@@ -86,4 +87,27 @@ export const chargeDailyUnit = internalMutation
         }
 
         return ok;
+    });
+
+/**
+ * {@link chargeDailyLimit}'s charge for one keyed send (`chargeKey`, `chat/start-claim.ts#startChargeKey`): the units are
+ * taken once per key. The claim and the units are one transaction; a send already charged under the key answers `ok`
+ * with no second charge, and a refused charge releases its claim, so a retry after a refusal is charged normally. The
+ * claim outlives the send's own claim being given back after a failed save, so its retry is not charged again.
+ */
+export const chargeDailyLimitOnce = internalMutation
+    .input({ chargeKey: v.string().max(MAX_LENGTH.long), count: v.optional(v.number()), identifier: v.string(), key: v.string() })
+    .output(v.object({ ok: v.boolean(), retryAfter: v.optional(v.number()) }))
+    .mutation(async ({ args: { chargeKey, count, identifier, key }, ctx }) => {
+        if (!(await claimOnce(ctx, DAILY_CHARGE_SCOPE, chargeKey, DAILY_CHARGE_CLAIM_TTL_MS, identifier))) {
+            return { ok: true };
+        }
+
+        const { ok, retryAfter } = await applyLimit(ctx, { count, identifier, key });
+
+        if (!ok) {
+            await releaseClaim(ctx, DAILY_CHARGE_SCOPE, chargeKey);
+        }
+
+        return { ok, ...(retryAfter !== undefined && { retryAfter }) };
     });

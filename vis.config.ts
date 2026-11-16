@@ -10,6 +10,11 @@ import { defineConfig } from "@visulima/vis/config";
 // tracking without any error — keep them strictly separate.
 
 export default defineConfig({
+    // A file outside every project marks `root` affected, and that rebuilds and retests every package
+    // downstream of it. The listed files are ignored for that. The workflows among them are checked by
+    // actionlint and zizmor, and the tests do not read them. `test.yml` and the local actions it uses stay
+    // visible, because editing them changes what the Test and Rust jobs execute.
+    affectedIgnore: [".github/workflows/!(test).{yml,yaml}", ".github/ISSUE_TEMPLATE/**", ".github/assets/**", ".github/*.{md,json5,td}", ".github/CODEOWNERS"],
     // Releases: every workspace package moves together under one version and one
     // `v<version>` tag, which is what `deploy.yml` matches. Versions come from
     // conventional commits (`vis release ci release --generate`). Merging the
@@ -138,7 +143,13 @@ export default defineConfig({
     // 11 projects), so wiring it to pre-commit would block every commit until
     // that debt is paid. Add it once `pnpm lint:eslint` is green.
     staged: {
-        "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,yml,yaml,md,css,html}": "prettier --config=.prettierrc.cjs --ignore-unknown --write",
+        // The same formatters as `pnpm lint:oxfmt`: oxfmt for code, data, CSS and HTML, Prettier
+        // for Markdown. Both read the root .gitignore and .prettierignore, so an ignored file
+        // that is staged is left alone.
+        "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,json5,yml,yaml,css,html}": "pnpm exec oxfmt --no-error-on-unmatched-pattern",
+        "*.{md,mdx}": "pnpm exec prettier --config=.prettierrc.cjs --write",
+        // CI checks the key order of every package.json (`lint.yml`, "Types").
+        "**/package.json": "sort-package-json",
     },
 
     security: {
@@ -182,18 +193,25 @@ export default defineConfig({
             inputs: ["default"],
             cache: true,
         },
-        "lint:prettier": {
-            inputs: ["default", "{workspaceRoot}/.prettierrc.cjs"],
-            cache: true,
-        },
-        "lint:prettier:fix": {
-            inputs: ["default", "{workspaceRoot}/.prettierrc.cjs"],
-            cache: false,
-        },
         "lint:types": {
             // Type-checking a consumer needs its dependencies' emitted .d.ts files.
             dependsOn: ["^build"],
             inputs: ["default", "^production"],
+            cache: true,
+        },
+        "lint:types:fast": {
+            // The pre-push check: `tsrs`, a Rust port of the compiler with TS 7.1
+            // semantics, about ten times faster than `lint:types`, which stays the
+            // CI gate. It depends on what it reads, not on `^build`, which would
+            // also build the backend Worker and the N-API addon: the two packages
+            // that export only a built `dist`, and the backend's generated API for
+            // the apps that import it. `^lint:types:fast` puts each workspace
+            // dependency's check (and so its source) into this task's cache key:
+            // vis does not hash `^production` files, so without it a change in
+            // `@neore/chat-ui` alone restored `@neore/web`'s old result.
+            dependsOn: [{ projects: ["@neore/ai", "@neore/service-sdk"], target: "build" }, "^codegen", "^lint:types:fast"],
+            // The lockfile pins the compiler: a `tsrs` bump must not reuse old results.
+            inputs: ["default", "^production", "{workspaceRoot}/pnpm-lock.yaml"],
             cache: true,
         },
         test: {
@@ -203,6 +221,14 @@ export default defineConfig({
         "test:coverage": {
             inputs: ["default", "^production", "{projectRoot}/vite.config.ts", "{projectRoot}/vitest.config.ts"],
             cache: true,
+        },
+        // Every story of the project, in Chromium, once per mode (`apps/web/vitest.storybook.config.ts`).
+        // Not cached: `^production` does not hash the `.storybook/` directory, the Vitest config or the stories
+        // of `packages/ui` and `packages/chat-ui`, so a cached pass could outlive the change it was run for.
+        // Packages are built by the caller (`pnpm build:packages`): `^build` would also build the backend Worker.
+        "test:storybook": {
+            inputs: ["default", "^production"],
+            cache: false,
         },
         "build-storybook": {
             dependsOn: ["^build", "^build-storybook"],

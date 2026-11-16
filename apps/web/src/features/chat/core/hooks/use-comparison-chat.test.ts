@@ -1,12 +1,14 @@
 import { forgetAllUnlockProofs, rememberUnlockProof } from "@neore/client-runtime";
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useModelStore } from "../stores/model-store";
 import useComparisonChat from "./use-comparison-chat";
 
 const settings = { newChatsTemporary: false };
 const mutations: { args: Record<string, unknown>; name: string }[] = [];
+// Holds the comparison link write open (or fails it) so a test can see what the column's first request waits for.
+const linkGate: { pending?: Promise<void> } = {};
 
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -73,6 +75,10 @@ vi.mock("@tanstack/react-query", () => {
                 mutateAsync: async (args: Record<string, unknown>) => {
                     mutations.push({ args, name: options.name });
 
+                    if (options.name === "createThreadRelationshipPublic") {
+                        await linkGate.pending;
+                    }
+
                     return options.name === "createThread" ? `thread-${mutations.length}` : undefined;
                 },
             };
@@ -90,6 +96,7 @@ const createdThreads = () => mutations.filter((entry) => entry.name === "createT
 
 beforeEach(() => {
     mutations.length = 0;
+    linkGate.pending = undefined;
     vi.stubGlobal(
         "fetch",
         vi.fn(async () => Response.json({ streamId: "stream" }, { status: 200 })),
@@ -246,5 +253,51 @@ describe("useComparisonChat reasoning effort", () => {
 
         expect(sentBodies().find((body) => body.threadId === "child-a")).toMatchObject({ reasoningEffort: 25 });
         expect(sentBodies().find((body) => body.threadId === "child-b")?.reasoningEffort).toBeUndefined();
+    });
+});
+
+describe("useComparisonChat link before the first reply", () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("writes the comparison link before the column's first request goes out", async () => {
+        vi.useFakeTimers();
+        // The link write stays open until the timer fires.
+        linkGate.pending = new Promise<void>((resolve) => {
+            setTimeout(resolve, 1000);
+        });
+
+        const { result } = renderHook(() => useComparisonChat({ jwtToken: "jwt", parentThreadId: "parent" }));
+        let sending: Promise<unknown> = Promise.resolve();
+
+        act(() => {
+            sending = result.current.sendComparisonMessage("hi", ["model-a", "model-b"]);
+        });
+
+        await vi.advanceTimersByTimeAsync(500);
+        expect(mutations.some((entry) => entry.name === "createThreadRelationshipPublic")).toBe(true);
+        // The link write has begun and is still open: no column request may have gone out yet.
+        expect(fetch).not.toHaveBeenCalled();
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(1000);
+            await sending;
+        });
+
+        expect(fetch).toHaveBeenCalled();
+    });
+
+    it("sends no request for a column whose link could not be written", async () => {
+        linkGate.pending = Promise.reject(new Error("link refused"));
+        linkGate.pending.catch(() => {});
+
+        const { result } = renderHook(() => useComparisonChat({ jwtToken: "jwt", parentThreadId: "parent" }));
+
+        await act(async () => {
+            await result.current.sendComparisonMessage("hi", ["model-a", "model-b"]).catch(() => {});
+        });
+
+        expect(fetch).not.toHaveBeenCalled();
     });
 });

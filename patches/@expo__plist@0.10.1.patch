@@ -1,0 +1,13 @@
+diff --git a/build/parse.js b/build/parse.js
+index e00107a..bfb2b01 100644
+--- a/build/parse.js
++++ b/build/parse.js
+@@ -79,7 +79,7 @@ function parse(xml) {
+     // prevent the parser from logging non-fatal errors
+     const doc = new (_xmldom()).DOMParser({
+         errorHandler () {}
+-    }).parseFromString(xml);
++    }).parseFromString(xml.trimStart(), 'text/xml');
+     (0, _assert().default)(doc.documentElement.nodeName === 'plist', 'malformed document. First element should be <plist>');
+     let plist = parsePlistXML(doc.documentElement);
+     // the root <plist> node gets interpreted as an Array,

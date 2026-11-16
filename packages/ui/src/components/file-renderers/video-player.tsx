@@ -129,7 +129,8 @@ const VideoPlayer: FC<VideoPlayerProps> = memo(({ className, filename, mediaType
                 />
                 <MediaControlBar>
                     <MediaPlayButton />
-                    <MediaTimeDisplay />
+                    {/* Without the toggle, media-chrome drops the button role and the name it sets, so the visible time is the name. */}
+                    <MediaTimeDisplay noToggle />
                     <MediaTimeRange />
                     <MediaDurationDisplay />
                     <MediaMuteButton />

@@ -646,6 +646,9 @@ export type MessageDoc = Infer<typeof vMessageDoc>; // Public
  */
 export const vThreadCreateFields = {
     autoModel: v.optional(v.boolean()),
+    // A temporary chat's organization, for its cap alone: written by `agent/threads.ts#createTemporaryThread`, and kept on a
+    // lasting chat made from it when the owner has left that organization (`agent/threads.ts#lastingChatPlacement`).
+    capOrganizationId: v.optional(v.string()),
     category: v.optional(v.string()), // Auto-categorized thread topic
     createdBy: v.optional(v.string()),
     customSystemPrompt: v.optional(v.string()),
@@ -693,10 +696,15 @@ export const vThreadDocFields = {
     awaitingInput: v.optional(v.union(v.literal("approval"), v.literal("question"))),
     // Written once by `chat/functions.ts#createThread`, which checks the bot belongs to the caller.
     botId: v.optional(v.string()),
+    contextResetMessageId: v.optional(v.string()),
     createdAt: v.optional(v.number()),
+    // Written only by a hard delete's first page (`agent/threads.ts`): the thread is going, so not a create or patch field.
+    deletingAt: v.optional(v.number()),
     // Written only by `chat/group/functions.ts`, which checks every participant
     // is a skill the owner may use — so it is deliberately not a create field.
     groupChat: v.optional(vGroupChat),
+    // Written only by `chat/context-reset.ts`, when `/clear` writes a context reset.
+    hasContextReset: v.optional(v.boolean()),
     // Written only by `chat/agent-switch.ts`, when a switch stores a handoff.
     hasHandoff: v.optional(v.boolean()),
     // Written with the status write that ends a successful run, never by a client.
@@ -708,9 +716,15 @@ export const vThreadDocFields = {
     // Written only by `agent/thread-passcode.ts` (set on lock, cleared on removal).
     lockedAt: v.optional(v.number()),
     order: v.optional(v.number()),
+    // Written by `chat/thread-state.ts#setThreadPermissionMode` (the owner, for a cloud thread), by its internal
+    // `copyThreadPermissionMode` (a branch of the owner's own thread, after the owner check), and by the ACP handoff's insert
+    // (`acp/switch.ts`, carrying a cloud thread's mode to the thread that takes over).
+    permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
     // Written once by `acp/ingest.ts` when a host session opens, so deliberately not a create field: a client
     // that could set it could mint a host thread, or turn a cloud thread into one.
     runner: v.optional(v.literal("host")),
+    // The newest snooze ordering, a choice or a wake (`agent/table-writes.ts#setThreadSnooze`, `#patchThread`).
+    snoozeChosenAt: v.optional(v.number()),
     // Written only by `chat/thread-state.ts` (snooze / unsnooze), which checks the caller owns the thread.
     snoozedUntil: v.optional(v.number()),
     status: vThreadStatus,

@@ -139,6 +139,8 @@ export type HostQueueEvent =
     | { type: "stopped" }
     /** A queued message was edited, and took a new id. */
     | { from: string; to: string; type: "edited" }
+    /** Send now with no turn to stop: `itemId`, moved to the head, goes next past a paused queue, which stays paused behind it. */
+    | { itemId: string; type: "released" }
     /** A wait that has a deadline ran out (`waitDeadline`). */
     | { type: "timed-out" };
 
@@ -178,7 +180,13 @@ const leftSession = (state: HostQueueState, sessionLive: string | undefined): Ho
         return state;
     }
 
-    return { ...retire(state, phase.streamId), live: state.live === phase.streamId ? undefined : state.live, phase: { kind: "idle" } };
+    // How that turn ended is not known, so a message released to go after it waits for the person.
+    return {
+        ...retire(state, phase.streamId),
+        live: state.live === phase.streamId ? undefined : state.live,
+        phase: { kind: "idle" },
+        released: undefined,
+    };
 };
 
 /** The stopped turn is over and the stop reached the computer: the interrupting message goes next. */
@@ -224,8 +232,9 @@ const onEnd = (state: HostQueueState, end: HostTurnEnd): HostQueueStep => {
             // seen running (named by a send's answer) has not started for the reads, and another turn's end says nothing of it.
             (phase.streamId !== state.live && state.liveSeen.includes(phase.streamId)))
     ) {
-        // The awaited turn ended (or the turn it waited for is no longer live, and only the newest end is reported).
-        return { effects: pauses ? [{ type: "pause" }] : [], state: { ...next, phase: { kind: "idle" } } };
+        // The awaited turn ended (or the turn it waited for is no longer live, and only the newest end is reported). One that
+        // pauses the queue holds a released message too: it was released before that turn ran.
+        return { effects: pauses ? [{ type: "pause" }] : [], state: { ...next, phase: { kind: "idle" }, released: pauses ? undefined : next.released } };
     }
 
     // A send in flight notes the end, unless it is of a turn already known to be over: the send's answer then decides whether
@@ -235,8 +244,11 @@ const onEnd = (state: HostQueueState, end: HostTurnEnd): HostQueueStep => {
     }
 
     // Any other end: another tab's turn, an older turn, or one known to be over. Its reason still decides whether what is
-    // queued waits for the person.
-    return { effects: pauses ? [{ type: "pause" }] : [], state: next };
+    // queued waits for the person. A release was made with no turn running: a turn that ran and paused the queue since, and
+    // is not this composer's own stopped one, holds the released message too.
+    const held = pauses && !wasRetired && phase.kind === "idle" ? { ...next, released: undefined } : next;
+
+    return { effects: pauses ? [{ type: "pause" }] : [], state: held };
 };
 
 /** What a new observation does on top of any end it carried: a live turn is noted by a send, and awaited otherwise. */
@@ -256,6 +268,7 @@ const onLive = (step: HostQueueStep, live: string | undefined): HostQueueStep =>
     // A turn that runs is awaited until it ends, whoever started it.
     const awaitsNothing = phase.kind === "idle" || (phase.kind === "awaiting-turn-end" && phase.streamId === undefined);
 
+    // A released message waits behind it: a pausing end of that turn holds it (`onEnd`), a finished one lets it go.
     return { effects, state: awaitsNothing ? { ...next, phase: waitFor(live) } : next };
 };
 
@@ -417,6 +430,10 @@ export const stepHostQueue = (state: HostQueueState, event: HostQueueEvent): Hos
             // A refused queued message waits at the head for the person: the composer pauses the queue for it, if it is still queued.
             return { effects: [{ error: event.error, itemId: event.itemId, type: "send-refused" }], state: { ...state, phase: { kind: "idle" } } };
         }
+        case "released": {
+            // Only from idle: anything else is a send or a stop in flight, which the message must not overtake.
+            return { effects: [], state: phase.kind === "idle" && !state.sent.includes(event.itemId) ? { ...state, released: event.itemId } : state };
+        }
         case "send": {
             // One send at a time, and a queued one only from idle. A direct send may go before the reads have answered, as the
             // backend refuses it if a turn runs.
@@ -503,3 +520,32 @@ export const canSendQueueHead = (
     !gates.starting &&
     !gates.running &&
     !gates.editing;
+
+/** Whether a queued message may be edited: not while it is being sent, and never once the backend took it. */
+export const canEditQueued = (state: HostQueueState, itemId: string): boolean =>
+    !(state.phase.kind === "sending" && state.phase.itemId === itemId) && !state.sent.includes(itemId);
+
+/**
+ * What Send now does for a queued message: `interrupt` stops the running turn and sends it next (the Interrupt and send
+ * path), `release` sends it next when no turn runs. `undefined` while a send or a stop is in flight, before the reads have
+ * answered, while an accepted send's turn has not shown, for a message the backend already took (it is sent once), and,
+ * while a turn runs, for a message a send may already have been taken for (`tried`, kept on the queued message).
+ */
+export const sendNowAction = (state: HostQueueState, gates: { itemId: string; running: boolean; tried: boolean }): "interrupt" | "release" | undefined => {
+    const { phase } = state;
+
+    // Before the reads have answered, nothing is known about a running turn (a refused direct send can leave the phase idle).
+    if (!state.arrived || state.sent.includes(gates.itemId)) {
+        return undefined;
+    }
+
+    if (phase.kind === "idle" && !gates.running) {
+        return "release";
+    }
+
+    const turnKnown = phase.kind === "idle" || (phase.kind === "awaiting-turn-end" && phase.streamId !== undefined);
+
+    // A message tried before may be the very turn running (its answer was lost): stopping that turn and sending it again under
+    // its id would come back as a duplicate of the stopped turn, so it would never run. It goes after the turn ends instead.
+    return turnKnown && gates.running && !gates.tried && canInterruptAndSend() ? "interrupt" : undefined;
+};

@@ -122,9 +122,9 @@ const leafOf = async (context: Reader, thread: Doc<"threads">): Promise<Doc<"mes
         ? await getMaxMessage(context as QueryContext, thread._id)
         : await resolveLeafRow(context, thread._id, thread.activeLeafMessageId);
 
-/** A thread no background title may read or write: gone, locked, deleted or host-run. */
+/** A thread no background title may read or write: gone, locked, deleted (by either marker) or host-run. */
 const closedToTitles = (thread: Doc<"threads"> | null): thread is null =>
-    !thread || isThreadLocked(thread) || thread.runner === "host" || thread.deletedAt !== undefined;
+    !thread || isThreadLocked(thread) || thread.runner === "host" || thread.deletedAt !== undefined || thread.deleted === true;
 
 /** The earliest successful user prompt within the active path's last {@link TITLE_READ_WINDOW} rows, or `undefined` when there is none. */
 export const titlePromptIn = async (context: Reader, thread: Doc<"threads">): Promise<{ id: string | undefined; text: string } | undefined> => {

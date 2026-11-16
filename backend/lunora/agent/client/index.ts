@@ -59,6 +59,7 @@ import type {
     GenerateObjectArgs,
     GenerationOutputMetadata,
     PendingMessageAccess,
+    ResolvedTools,
     MaybeCustomCtx as MaybeCustomContext,
     MutationCtx as MutationContext,
     ObjectMode,
@@ -229,6 +230,11 @@ export class Agent<
         ctx: ActionContext & CustomContext,
         args?: {
             /**
+             * The organization the thread belongs to, written with its first insert so no linked thread exists without it.
+             */
+            organizationId?: string | null;
+
+            /**
              * The summary of the thread. Not currently used for anything.
              */
             summary?: string;
@@ -264,6 +270,11 @@ export class Agent<
         ctx: MutationContext,
         args?: {
             /**
+             * The organization the thread belongs to, written with its first insert so no linked thread exists without it.
+             */
+            organizationId?: string | null;
+
+            /**
              * The summary of the thread. Not currently used for anything.
              */
             summary?: string;
@@ -287,7 +298,7 @@ export class Agent<
     ): Promise<{ threadId: string }>;
     async createThread(
         context: (ActionContext & CustomContext) | MutationContext,
-        args?: { summary?: string; tags?: string[]; title?: string; userId: string | null },
+        args?: { organizationId?: string | null; summary?: string; tags?: string[]; title?: string; userId: string | null },
     ): Promise<{ thread?: Thread<AgentTools>; threadId: string }> {
         const threadId = await createThread(context, this.component, args);
 
@@ -368,7 +379,7 @@ export class Agent<
                  * aborted, it will trigger this signal when detected.
                  */
                 abortSignal?: AbortSignal;
-                stopWhen?: StopCondition<TOOLS extends undefined ? AgentTools : TOOLS> | StopCondition<TOOLS extends undefined ? AgentTools : TOOLS>[];
+                stopWhen?: StopCondition<ResolvedTools<AgentTools, TOOLS>> | StopCondition<ResolvedTools<AgentTools, TOOLS>>[];
 
                 /**
                  * The tools to use for the tool calls. This will override tools specified
@@ -384,7 +395,7 @@ export class Agent<
                 model: LanguageModel;
                 prompt?: never;
                 system?: string;
-                tools?: TOOLS extends undefined ? AgentTools : TOOLS;
+                tools?: ResolvedTools<AgentTools, TOOLS>;
             };
         fail: (reason: string) => Promise<void>;
         getSavedMessages: () => MessageDoc[];
@@ -398,7 +409,7 @@ export class Agent<
         updateModel: (model: LanguageModel | undefined) => void;
         userId: string | undefined;
     }> {
-        type Tools = TOOLS extends undefined ? AgentTools : TOOLS;
+        type Tools = ResolvedTools<AgentTools, TOOLS>;
 
         return startGeneration<T, Tools, CustomContext>(
             context,
@@ -441,10 +452,10 @@ export class Agent<
          */
         generateTextArgs: AgentPrompt & TextArgs<AgentTools, TOOLS, OUTPUT>,
         options?: Options,
-    ): Promise<GenerateTextResult<TOOLS extends undefined ? AgentTools : TOOLS, AiContext, OUTPUT> & GenerationOutputMetadata> {
+    ): Promise<GenerateTextResult<ResolvedTools<AgentTools, TOOLS>, AiContext, OUTPUT> & GenerationOutputMetadata> {
         const { args, order, promptMessageId, ...call } = await this.start(ctx, generateTextArgs, { ...threadOptions, ...options });
 
-        type Tools = TOOLS extends undefined ? AgentTools : TOOLS;
+        type Tools = ResolvedTools<AgentTools, TOOLS>;
         const steps: StepResult<Tools>[] = [];
 
         try {
@@ -533,8 +544,8 @@ export class Agent<
              */
             saveStreamDeltas?: boolean | StreamingOptions;
         },
-    ): Promise<GenerationOutputMetadata & PendingMessageAccess & StreamTextResult<TOOLS extends undefined ? AgentTools : TOOLS, AiContext, OUTPUT>> {
-        type Tools = TOOLS extends undefined ? AgentTools : TOOLS;
+    ): Promise<GenerationOutputMetadata & PendingMessageAccess & StreamTextResult<ResolvedTools<AgentTools, TOOLS>, AiContext, OUTPUT>> {
+        type Tools = ResolvedTools<AgentTools, TOOLS>;
 
         return streamText<Tools, OUTPUT>(
             context,

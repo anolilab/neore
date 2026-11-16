@@ -19,13 +19,17 @@ import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate } from "./permission";
 import { declineGate } from "./permission";
+import type { PortView, StopResult, StopTarget } from "./ports/ports";
+import { PortsService } from "./ports/ports";
+import { realPortsSystem } from "./ports/system";
 import type { AgentProcess, Spawner } from "./process";
 import { acpSupported } from "./process";
 import type { Handshake } from "./protocol";
 import { initialize } from "./protocol";
 import type { SendResult } from "./session";
 import { AgentSession } from "./session";
-import type { AcpView, ProbeResult, SessionSnapshot, SessionStatus, SessionSummary, SpawnPlan } from "./types";
+import { AgentSignedOutError } from "./signed-out";
+import type { AcpUpdate, AcpView, ProbeResult, SessionSnapshot, SessionStatus, SessionSummary, SpawnPlan } from "./types";
 
 /** The window is told about changes at most this often; streamed text would otherwise re-render per chunk. */
 const CHANGE_INTERVAL_MS = 50;
@@ -71,8 +75,25 @@ export interface ManagerOptions {
     startupTimeoutMs?: number;
 }
 
+/** The agent session a backend start opens from: one to load again (`nativeSessionId`) or one to fork (`forkSessionId`). */
+const savedSessionFields = (remote: { forkSessionId?: string; nativeSessionId?: string }): { forkSessionId?: string; resumeSessionId?: string } => {
+    return {
+        ...(remote.forkSessionId !== undefined && { forkSessionId: remote.forkSessionId }),
+        ...(remote.nativeSessionId !== undefined && { resumeSessionId: remote.nativeSessionId }),
+    };
+};
+
 export class AcpManager {
     private changeTimer: ReturnType<typeof setTimeout> | undefined;
+
+    /** Agents whose account is changing (`holdingAgent`): none of their sessions may start. */
+    private readonly held = new Set<string>();
+
+    /**
+     * Imports and installs running now, per agent (`usingAgent`): a sign-out waits for them, so no import stays connected
+     * to the account it removes and no install changes the program whose account it checks.
+     */
+    private readonly inUse = new Map<string, Set<Promise<unknown>>>();
 
     private readonly processes = new Set<AgentProcess>();
 
@@ -83,6 +104,8 @@ export class AcpManager {
     private readonly reports = new Map<string, CapabilityReport>();
 
     private readonly sessions = new Map<string, AgentSession>();
+
+    private readonly portsService = new PortsService(realPortsSystem);
 
     public constructor(private readonly options: ManagerOptions) {}
 
@@ -159,8 +182,15 @@ export class AcpManager {
 
             return await use({ connection, handshake, plan, report, scrub: child.scrub, secretLength: child.secretLength });
         } catch (error) {
+            const masked = child.scrub((error as Error).message);
+
+            // The type stays: callers tell "not signed in" from other failures by it. The message is masked like the rest.
+            if (error instanceof AgentSignedOutError) {
+                throw new AgentSignedOutError(masked);
+            }
+
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
-            throw new Error(child.scrub((error as Error).message));
+            throw new Error(masked);
         } finally {
             connection.close(new Error("finished"));
 
@@ -190,13 +220,27 @@ export class AcpManager {
         agentKey: string,
         agentLabel: string,
         folder: string,
-        remote?: { nativeSessionId?: string; sessionId: string; threadId: string },
+        remote?: { forkSessionId?: string; nativeSessionId?: string; sessionId: string; threadId: string },
     ): Promise<string> {
         requireSupported();
+        // Before anything is closed: a start refused for a sign-out must not end the thread's session either.
+        this.refuseHeld(agentKey);
 
-        if (this.summaries().filter((session) => session.status !== "ended").length >= MAX_SESSIONS) {
-            throw new Error(`at most ${String(MAX_SESSIONS)} agents at once; close one first`);
+        // The backend ends a thread's session when it starts the next one in that thread (an agent switch, `/clear`): the
+        // one this computer still runs for it is closed, or every switch or clear would leave an agent process behind.
+        if (remote !== undefined) {
+            const superseded: AgentSession[] = [];
+
+            for (const session of this.sessions.values()) {
+                if (session.threadId === remote.threadId && session.summary().status !== "ended") {
+                    superseded.push(session);
+                }
+            }
+
+            await Promise.all(superseded.map(async (session) => await session.close()));
         }
+
+        this.refuseStart(agentKey);
 
         // The core decides: it refuses an unregistered agent and (with consent) a folder the user has not approved.
         const plan = this.options.plan(agentKey, folder);
@@ -207,7 +251,7 @@ export class AcpManager {
         let runner: HookRunner | undefined;
         // The fields only a remote, a resumed or a host-run session has.
         const remoteFields = remote === undefined ? {} : { sessionId: remote.sessionId, threadId: remote.threadId };
-        const resumeFields = remote?.nativeSessionId === undefined ? {} : { resumeSessionId: remote.nativeSessionId };
+        const resumeFields = remote === undefined ? {} : savedSessionFields(remote);
         const { observer } = this.options;
         const hostFields = folderInfo === undefined || observer === undefined ? {} : { hostInfo: { agentKey, agentLabel, ...folderInfo }, observer };
         const session = new AgentSession({
@@ -302,6 +346,88 @@ export class AcpManager {
     }
 
     /**
+     * Runs `use` while no session of `agentKey` may start, for a change to the agent's account (a sign-out): a session
+     * started meanwhile would run on an account that is going away. A second hold of the same agent is refused.
+     */
+    public async holdingAgent<Result>(agentKey: string, use: () => Promise<Result>): Promise<Result> {
+        if (this.held.has(agentKey)) {
+            throw new Error("that agent is already being signed out");
+        }
+
+        this.held.add(agentKey);
+
+        try {
+            await Promise.allSettled(this.inUse.get(agentKey) ?? []);
+
+            return await use();
+        } finally {
+            this.held.delete(agentKey);
+        }
+    }
+
+    /**
+     * Runs an import of the agent's saved sessions or an install of its program. Refused while the agent's account is
+     * being signed out, and a sign-out that begins meanwhile waits for it.
+     */
+    public async usingAgent<Result>(agentKey: string, use: () => Promise<Result>): Promise<Result> {
+        this.refuseHeld(agentKey);
+
+        const run = use();
+        const running = this.inUse.get(agentKey) ?? new Set<Promise<unknown>>();
+
+        running.add(run);
+        this.inUse.set(agentKey, running);
+
+        try {
+            return await run;
+        } finally {
+            running.delete(run);
+
+            if (running.size === 0) {
+                this.inUse.delete(agentKey);
+            }
+        }
+    }
+
+    /**
+     * Throws when `update` would change which account an agent being signed out reaches: its command, or a variable it
+     * gets (one for all agents, while any is signed out). A folder approval changes no account and is never refused.
+     */
+    public refuseUpdateWhileSigningOut(update: AcpUpdate): void {
+        if (update.op === "grant" || update.op === "revoke") {
+            return;
+        }
+
+        if (update.op === "saveAgent" || update.op === "removeAgent") {
+            this.refuseHeld(update.key);
+
+            return;
+        }
+
+        // The window's update is checked only for shape: a `null` key is "all agents" to the core, so anything not a key is too.
+        if (typeof update.agentKey === "string") {
+            this.refuseHeld(update.agentKey);
+        } else if (this.held.size > 0) {
+            throw new Error("an agent is being signed out; change the variables for all agents once that ends");
+        }
+    }
+
+    /** Ends every open session of one agent: its account is about to change (a sign-out). */
+    public async closeAgent(agentKey: string): Promise<void> {
+        const closing: Promise<void>[] = [];
+
+        for (const session of this.sessions.values()) {
+            const summary = session.summary();
+
+            if (summary.agentKey === agentKey && summary.status !== "ended") {
+                closing.push(session.close());
+            }
+        }
+
+        await Promise.all(closing);
+    }
+
+    /**
      * Ends the sessions the user's approvals no longer cover: an agent that was removed, or a folder whose
      * approval is gone (revoked, or dropped because the agent's command or `PATH` changed).
      */
@@ -323,6 +449,22 @@ export class AcpManager {
         }
 
         await Promise.all(closing);
+    }
+
+    /** The ports the session's agent processes listen on (`ports/ports.ts`). Empty for a session with no local process. */
+    public async ports(sessionId: string): Promise<PortView[]> {
+        const session = this.require(sessionId);
+        const { agentPid } = session;
+        const ports = await this.portsService.list(agentPid);
+
+        // A pid is reused only after its process ended, which ends the session: an agent that ended while its ports were
+        // read may have handed its pid to another process, so its answer is dropped.
+        return session.agentPid === agentPid ? ports : [];
+    }
+
+    /** Ends one listening server of the session and its own descendants; never the agent (`ports/ports.ts`). */
+    public async stopPort(sessionId: string, target: StopTarget): Promise<StopResult> {
+        return await this.portsService.stop(this.require(sessionId).agentPid, target);
     }
 
     /** Forgets an ended session. */
@@ -378,6 +520,22 @@ export class AcpManager {
             } catch {
                 // One group that cannot be signalled must not spare the others.
             }
+        }
+    }
+
+    private refuseHeld(agentKey: string): void {
+        if (this.held.has(agentKey)) {
+            throw new Error("that agent is being signed out; start it again once that ends");
+        }
+    }
+
+    /** Throws when no session of `agentKey` may start now: its account is changing, or too many agents run. */
+    private refuseStart(agentKey: string): void {
+        // Again: a sign-out can have begun while the superseded sessions were closing.
+        this.refuseHeld(agentKey);
+
+        if (this.summaries().filter((session) => session.status !== "ended").length >= MAX_SESSIONS) {
+            throw new Error(`at most ${String(MAX_SESSIONS)} agents at once; close one first`);
         }
     }
 

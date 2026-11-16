@@ -53,7 +53,7 @@ const make = (env: Record<string, string>, approved: () => { folderId: string; f
     };
 
     return new AcpImporter({
-        agentLabel: (key) => key === "fake" ? "Fake Agent" : undefined,
+        agentLabel: (key) => (key === "fake" ? "Fake Agent" : undefined),
         agents: manager,
         hostInfo: approved,
         io,
@@ -61,7 +61,7 @@ const make = (env: Record<string, string>, approved: () => { folderId: string; f
 };
 
 /** A backend that holds nothing yet: the open makes the thread, every batch is taken, the end finishes. */
-const freshBackend = (): (payload: Payload) => PostResult => {
+const freshBackend = (): ((payload: Payload) => PostResult) => {
     let held = 0;
 
     return (payload) => {
@@ -119,17 +119,33 @@ describe("importing", () => {
     it("loads the session and saves it as turns, opening with what the agent advertised", async () => {
         const importer = make({ FAKE_AGENT_SESSIONS: "list,load" });
 
-        await expect(importer.import("fake", scratch.work, "s-new", "New chat")).resolves.toEqual({ droppedTurns: 0, shortenedTurns: 0, status: "imported", turns: 2 });
+        await expect(importer.import("fake", scratch.work, "s-new", "New chat")).resolves.toEqual({
+            droppedTurns: 0,
+            shortenedTurns: 0,
+            status: "imported",
+            turns: 2,
+        });
 
         const [open, turns] = posted;
 
         expect(open).toMatchObject({
             deviceId: "device-1",
-            events: [{ agentKey: "fake", agentLabel: "Fake Agent", folderId: "f1", folderLabel: "neore", kind: "import_open", nativeSessionId: "s-new", title: "New chat" }],
+            events: [
+                {
+                    agentKey: "fake",
+                    agentLabel: "Fake Agent",
+                    folderId: "f1",
+                    folderLabel: "neore",
+                    kind: "import_open",
+                    nativeSessionId: "s-new",
+                    title: "New chat",
+                },
+            ],
             kind: "turn",
             sessionId: hostSessionIdOf("fake", "s-new"),
         });
         expect(open?.events[0]?.capabilities?.groups.sessions).toEqual({
+            fork: { reason: "not_offered", supported: false },
             listNative: { degradation: "none", supported: true },
             load: { degradation: "none", supported: true },
         });
@@ -143,7 +159,10 @@ describe("importing", () => {
             firstSeq: 0,
             threadId: "thread-1",
         });
-        expect(scratch.log().find((entry) => entry.received?.method === "session/load")?.received?.params).toMatchObject({ cwd: scratch.work, sessionId: "s-new" });
+        expect(scratch.log().find((entry) => entry.received?.method === "session/load")?.received?.params).toMatchObject({
+            cwd: scratch.work,
+            sessionId: "s-new",
+        });
     });
 
     it("sends nothing past the open when the session is already in Neore", async () => {
@@ -171,7 +190,8 @@ describe("importing", () => {
         const importer = make({ FAKE_AGENT_SESSIONS: "list,load" });
         const fresh = freshBackend();
 
-        backend = (payload) => payload.events[0]?.kind === "import_open" ? { ended: false, existing: true, kind: "ok", next: 1, threadId: "thread-1" } : fresh(payload);
+        backend = (payload) =>
+            payload.events[0]?.kind === "import_open" ? { ended: false, existing: true, kind: "ok", next: 1, threadId: "thread-1" } : fresh(payload);
 
         await importer.import("fake", scratch.work, "s-new");
 

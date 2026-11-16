@@ -25,15 +25,19 @@
  *    deny) the call via `approveToolCall` / `denyToolCall`, and pipes the
  *    continuation into `persistentChunks` exactly like the original run.
  */
+import { threadConnectorAccess, vAccessLevel } from "../connectors/access";
 import { MAX_LENGTH } from "../lib/validators";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import { resolveThreadReadAccess } from "../agent/thread-read-access";
+import type { ThreadPermissionMode } from "./lib/thread-permission-mode";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { AuthMutationCtx } from "../lib/crpc";
 import { saveAiUserPreferences } from "../auth/lib/preference-writes";
+import { patchThread } from "../agent/table-writes";
 import { isDeviceEligibleThread } from "../devices/internal";
 import { getConnectorMcpServers, withMcpServerGrants } from "../connectors/lib/grant-runtime";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
@@ -44,8 +48,8 @@ import { assertSafeMcpUrl, headersToRecord } from "./lib/mcp-tools";
 import type { ToolPermissionGrants } from "./lib/tool-permission-grants";
 import { activeGrants, grantExpiry, isGrantableKey, MAX_TOOL_GRANTS } from "./lib/tool-permission-grants";
 import type { ToolApprovalDecision } from "./lib/tool-approval-claim";
-import { claimToolApproval, findPendingApprovalOnLatestTurn } from "./lib/tool-approval-claim";
-import { purgeExpiredToolApprovalRunsForUser } from "./lib/tool-approval-cleanup";
+import { claimToolApproval, findPendingApprovalOnLatestTurn, SUB_AGENT_RUN_ENDED_BY } from "./lib/tool-approval-claim";
+import { denyToolApprovalRun, purgeExpiredToolApprovalRunsForUser } from "./lib/tool-approval-cleanup";
 import { listBuiltInTools } from "./lib/tool-builder";
 import type { ToolPermissionMode } from "./lib/tool-permissions";
 import { defaultToolPermission, toolPermissionKey } from "./lib/tool-permissions";
@@ -57,6 +61,10 @@ import { DEFAULT_RECENT_MESSAGES } from "../agent/shared";
 import { threadSummaryTaint } from "../agent/thread-summary-taint";
 import { REQUEST_SECRET_TOOL_NAME } from "./tools/request-secret-constants";
 import { assertRunHeld, vRunHold } from "./lib/run-epoch";
+import { APPROVAL_REMINDER_SCHEDULE_DELAY_MS } from "./lib/approval-reminder";
+import { runAfterOnShard } from "../lib/shard-scheduler";
+import { chainStarterLabel } from "../sub-agents/logic";
+import { markRunAwaiting } from "../sub-agents/functions";
 
 const vToolPermissionMode = v.union(v.literal("auto"), v.literal("ask"), v.literal("off"));
 const vToolPermissions = v.record(v.string(), vToolPermissionMode);
@@ -189,6 +197,186 @@ export const getLowRiskApprovalContext = internalQuery
         async ({ args: { permissionKey, threadId, trustId, userId }, ctx }) =>
             await quickCheckAllowed(ctx, threadId, userId, permissionKey === undefined ? undefined : { permissionKey, trustId }),
     );
+
+const modeFor = (thread: Doc<"threads"> | null, userId: string): ThreadPermissionMode | null => {
+    const mode = thread?.permissionMode;
+
+    if (!thread || mode === undefined || thread.runner === "host") {
+        return null;
+    }
+
+    return mode === "full" && thread.userId !== userId ? null : mode;
+};
+
+/** Relationship rows read for one thread when its mode is resolved. */
+const MAX_LINKS_CHECKED = 50;
+
+/** The relationship rows where `threadId` is the child, read up to the bound (`MAX_LINKS_CHECKED`). */
+const linksOf = async (ctx: QueryCtx, threadId: Id<"threads">) =>
+    await ctx.db
+        .query("threadRelationships")
+        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+        .take(MAX_LINKS_CHECKED);
+
+/** A parent that is gone, or in the trash, gives a column nothing to take a mode from. */
+const isLive = (parent: Doc<"threads"> | null): parent is Doc<"threads"> => parent !== null && parent.deleted !== true;
+
+/**
+ * The live comparison parent whose mode a thread runs under, or `null` when no parent can be shown to decide it: its links do not fit in
+ * one read, they name no comparison parent or several, or the one parent is gone or trashed (its link rows outlive it). The setter's
+ * guard and the resolver both read it, so a thread the setter refuses is exactly one that runs under a parent's mode.
+ */
+const comparisonParentOf = async (ctx: QueryCtx, threadId: Id<"threads">): Promise<Doc<"threads"> | null> => {
+    // Every link is read, not the first: a child with a comparison link and another link must still find its parent, whichever is listed
+    // first. The rows per child are few; the bound only keeps a runaway row count from being read whole.
+    const links = await linksOf(ctx, threadId);
+
+    if (links.length >= MAX_LINKS_CHECKED) {
+        return null;
+    }
+
+    const parentIds = new Set(links.filter((link) => link.branchType === "comparison").map((link) => link.parentThreadId));
+
+    if (parentIds.size !== 1) {
+        return null;
+    }
+
+    const [parentId] = parentIds;
+    const parent = await ctx.db.get("threads", parentId as Id<"threads">);
+
+    return isLive(parent) ? parent : null;
+};
+
+/** Whether a thread runs under a comparison parent's mode. A mode set on such a column would never apply, so `setThreadPermissionMode` refuses it. */
+export const isComparisonColumn = async (ctx: QueryCtx, threadId: Id<"threads">): Promise<boolean> => (await comparisonParentOf(ctx, threadId)) !== null;
+
+/**
+ * A comparison column is a thread of its own, but the mode is chosen once, on the comparison it belongs to: a column with a live parent runs
+ * under that parent's mode, whatever mode it holds, so the shared composer's choice reaches every send. Any other thread, a column whose
+ * parent cannot decide included, runs under its own stored mode (none stored: the defaults, as for any thread without a mode).
+ */
+export const modeOfThread = async (ctx: QueryCtx, thread: Doc<"threads"> | null, userId: string): Promise<ThreadPermissionMode | null> => {
+    // A host thread has no mode, and a comparison link must not give it one.
+    if (!thread || thread.runner === "host") {
+        return modeFor(thread, userId);
+    }
+
+    const parent = await comparisonParentOf(ctx, thread._id);
+
+    return modeFor(parent ?? thread, userId);
+};
+
+/** The continuation hops a computer's thread is walked back through before the walk gives up. */
+const MAX_CONTINUATION_HOPS = 8;
+
+/**
+ * The mode a cloud thread taking over from `thread` inherits. A computer's thread has no mode of its own (`modeOfThread`), so it is read
+ * from the cloud thread it was switched from: the nearest cloud thread up its continuation links. A round trip through a computer then
+ * keeps the mode the owner set. A chain too long to walk, one with two origins, or one whose origin is gone inherits nothing (the defaults): no mode can be shown to apply.
+ */
+export const modeInheritedFrom = async (ctx: QueryCtx, thread: Doc<"threads">, userId: string): Promise<ThreadPermissionMode | null> => {
+    let current: Doc<"threads"> | null = thread;
+    let hops = 0;
+
+    while (current?.runner === "host") {
+        if (hops >= MAX_CONTINUATION_HOPS) {
+            return null;
+        }
+
+        hops += 1;
+
+        const links = await linksOf(ctx, current._id);
+        const continuations = links.filter((link) => link.branchType === "continuation");
+
+        // Two origins leave no one origin to take a mode from, and a read that reached the bound may hide a second one: fail closed rather
+        // than take whichever is listed first.
+        if (links.length >= MAX_LINKS_CHECKED || new Set(continuations.map((link) => link.parentThreadId)).size > 1) {
+            return null;
+        }
+
+        const [continuation] = continuations;
+
+        if (!continuation) {
+            return null;
+        }
+
+        current = await ctx.db.get("threads", continuation.parentThreadId);
+
+        // An origin that is gone or in the trash gives nothing, as a comparison parent does (`isLive`).
+        if (!isLive(current)) {
+            return null;
+        }
+    }
+
+    return await modeOfThread(ctx, current, userId);
+};
+
+/**
+ * The permission mode a run on this thread builds its tools under (`lib/thread-permission-mode.ts`), or `null` for the
+ * default. A host thread has none. In a thread someone else owns only the modes that ask MORE apply: `full` is the
+ * owner's to give, so a collaborator's turn is not run under it.
+ */
+export const getThreadPermissionMode = internalQuery
+    .input({ threadId: v.id("threads"), userId: v.string() })
+    .output(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"), v.null()))
+    .query(async ({ args: { threadId, userId }, ctx }) => await modeOfThread(ctx, await ctx.db.get("threads", threadId), userId));
+
+/**
+ * The mode of the thread an app call runs under, and the connection levels of the teammate it belongs to. The levels are read
+ * with the thread's OWNER, so a shared chat is held to the owner's settings, not the caller's.
+ */
+export const threadModeForApp = async (
+    ctx: QueryCtx,
+    threadId: string,
+    userId: string,
+): Promise<{
+    allowed: boolean;
+    connectorAccess: { connectorSlug: string; level: "none" | "read_only" | "read_write" }[];
+    mode: ThreadPermissionMode | null;
+    organizationId: string | null;
+}> => {
+    const access = await resolveThreadReadAccess(ctx, threadId as Id<"threads">, userId);
+
+    if (access?.kind !== "full" && access?.kind !== "locked") {
+        return { allowed: false, connectorAccess: [], mode: null, organizationId: null };
+    }
+
+    // A thread with no owner on record is not reachable through an app call: the same refusal as a thread that is not there.
+    const owner = access.thread.userId;
+
+    if (owner === undefined) {
+        return { allowed: false, connectorAccess: [], mode: null, organizationId: null };
+    }
+
+    const connectorAccess = await threadConnectorAccess(ctx, { threadId: access.thread._id, userId: owner });
+
+    // The organization whose cap holds the thread's tools, as `readRunPermissionCap` reads it: the one it is filed under,
+    // else the one a temporary chat was started in.
+    return {
+        allowed: true,
+        connectorAccess,
+        mode: await modeOfThread(ctx, access.thread, userId),
+        organizationId: access.thread.organizationId ?? access.thread.capOrganizationId ?? null,
+    };
+};
+
+/**
+ * The mode of the thread an MCP App is shown in, with whether the caller may reach that thread at all, and the organization
+ * whose cap holds it. The content read gate is not applied: the app was already rendered, and a passcode-locked chat's
+ * owner (no unlock proof here) is who it belongs to. `allowed` is the owner, or someone with a live grant; a locked thread
+ * is the owner's alone.
+ */
+export const getThreadPermissionModeForApp = internalQuery
+    .input({ threadId: v.string().max(MAX_LENGTH.id), userId: v.string() })
+    .output(
+        v.object({
+            allowed: v.boolean(),
+            connectorAccess: v.array(v.object({ connectorSlug: v.string(), level: vAccessLevel })),
+            mode: v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"), v.null()),
+            organizationId: v.union(v.string(), v.null()),
+        }),
+    )
+    .query(async ({ args: { threadId, userId }, ctx }) => await threadModeForApp(ctx, threadId, userId));
 
 /** The servers the user trusts to have their tools put to the quick check, as the run builds its tools. */
 export const getLowRiskTrustedServers = internalQuery
@@ -529,6 +717,11 @@ export const pruneExpiredToolPermissionGrants = internalMutation
  * Snapshot a run that paused on approval requests, one row per request. Written
  * by the run itself (and by a continuation that pauses again, inheriting the
  * same snapshot) before its stream closes.
+ *
+ * A sub-agent's pause (`config.subAgentRunId`) moves its run to `awaiting` here, after the rows and before the thread mark,
+ * the reminder and the notification (`markRunAwaiting`, which also applies the one-waiting-child-per-source rule). A pause
+ * refused there has the requests it recorded denied and sends nothing, and a notified request can be answered at once: its
+ * run already waits. Returns whether the pause stands (false only for a sub-agent's run that does not wait).
  */
 export const recordPendingToolApprovals = internalMutation
     .input({
@@ -536,74 +729,125 @@ export const recordPendingToolApprovals = internalMutation
         // The subset of `approvalIds` that are `askUser` questions rather than
         // tool calls — they notify as "a question is waiting", not "approve".
         askUserApprovalIds: v.optional(v.array(v.string())),
+        // A headless pause (`runHeadlessAgent`) marks its thread here, with the rows and the notification, never apart from them.
+        awaitingInput: v.optional(v.literal("approval")),
         config: vToolRunConfig,
         // The run that records: refused here, in this mutation and before any row or notification, once a newer run holds its stream.
         run: v.optional(vRunHold),
         // The subset that are `requestSecret` cards: answered with a value, not approved, so they notify as their own thing.
         secretApprovalIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
+        // A sub-agent's pause: the resume it runs under (`continuingRun`), 0 for the run's first pause. Its wait is bound to it.
+        subAgentResumedWith: v.optional(v.number()),
         threadId: v.string(),
         userId: v.string(),
     })
-    .output(v.null())
-    .mutation(async ({ args: { approvalIds, askUserApprovalIds, config, run, secretApprovalIds, threadId, userId }, ctx }) => {
-        await assertRunHeld(ctx, run);
+    .output(v.boolean())
+    .mutation(
+        async ({ args: { approvalIds, askUserApprovalIds, awaitingInput, config, run, secretApprovalIds, subAgentResumedWith, threadId, userId }, ctx }) => {
+            await assertRunHeld(ctx, run);
 
-        const createdAt = ctx.now;
-        const thread = await ctx.db.get("threads", threadId as Id<"threads">);
-        // The row belongs to the thread OWNER, whoever's turn paused: only the
-        // owner can answer (`claimToolApproval` requires `run.userId` to be the
-        // owner), and their home's "Needs you" lists rows by `userId`. Stored
-        // under a collaborator's id, it was on neither dashboard and could not
-        // be answered at all.
-        const ownerId = thread?.userId ?? userId;
+            const createdAt = ctx.now;
+            const thread = await ctx.db.get("threads", threadId as Id<"threads">);
+            // The row belongs to the thread OWNER, whoever's turn paused: only the
+            // owner can answer (`claimToolApproval` requires `run.userId` to be the
+            // owner), and their home's "Needs you" lists rows by `userId`. Stored
+            // under a collaborator's id, it was on neither dashboard and could not
+            // be answered at all.
+            const ownerId = thread?.userId ?? userId;
 
-        await purgeExpiredToolApprovalRunsForUser(ctx, ownerId, createdAt);
+            await purgeExpiredToolApprovalRunsForUser(ctx, ownerId, createdAt);
 
-        const uniqueIds = new Set(approvalIds);
-        const secretIds = new Set(secretApprovalIds);
+            const uniqueIds = new Set(approvalIds);
+            const secretIds = new Set(secretApprovalIds);
+            // Every row of this pause carries the same id, so the reminder can tell this pause from another in the same millisecond.
+            const [pauseId] = uniqueIds;
+            const recordedIds: Id<"toolApprovalRuns">[] = [];
 
-        for (const approvalId of uniqueIds) {
-            await ctx.db.insert("toolApprovalRuns", {
-                approvalId,
-                config,
-                createdAt,
-                secretRequest: secretIds.has(approvalId),
-                status: "pending",
-                threadId,
-                userId: ownerId,
-            });
-        }
+            for (const approvalId of uniqueIds) {
+                const recordedId = await ctx.db.insert("toolApprovalRuns", {
+                    approvalId,
+                    config,
+                    createdAt,
+                    ...(pauseId !== undefined && { pauseId }),
+                    secretRequest: secretIds.has(approvalId),
+                    status: "pending",
+                    threadId,
+                    userId: ownerId,
+                });
 
-        // One notification per pause, to the thread OWNER — only they can answer
-        // (`respondToToolApproval`). A secret request and a question take precedence over approvals: they are
-        // answered with something, and nothing offers to "approve" them.
-        const askUserIds = new Set(askUserApprovalIds);
-        const [first] = uniqueIds;
-        const secret = [...uniqueIds].find((id) => secretIds.has(id));
-        const question = [...uniqueIds].find((id) => askUserIds.has(id));
-
-        if (first !== undefined) {
-            let type: "ask_user" | "secret_request" | "tool_approval" = "tool_approval";
-
-            if (secret !== undefined) {
-                type = "secret_request";
-            } else if (question !== undefined) {
-                type = "ask_user";
+                recordedIds.push(recordedId);
             }
 
-            const key = secret ?? question ?? first;
+            // A sub-agent's run waits before anyone is told: one refused (another child of its task waits, or it ended meanwhile)
+            // has its requests closed and sends nothing, and an answer to the notification finds the run already waiting.
+            if (config.subAgentRunId !== undefined && !(await markRunAwaiting(ctx, config.subAgentRunId, subAgentResumedWith))) {
+                // An end there closed them; a refusal that ended nothing (a run already settled, a newer resume, a worker, a
+                // run gone) did not. Nothing can answer them either way, so they close now instead of waiting out their expiry.
+                for (const recordedId of recordedIds) {
+                    const row = await ctx.db.get("toolApprovalRuns", recordedId);
 
-            await notifyQuietly(ctx, {
-                dedupeKey: `${type}:${key}`,
-                link: `/chat/${threadId}`,
-                title: thread?.title ?? "Chat",
-                type,
-                userId: ownerId,
-            });
-        }
+                    if (row?.status === "pending") {
+                        await denyToolApprovalRun(ctx, recordedId, { now: createdAt, resolvedBy: SUB_AGENT_RUN_ENDED_BY });
+                    }
+                }
 
-        return null;
-    });
+                return false;
+            }
+
+            // A question the owner was asked in this thread stays the thing it waits on: an approval does not overwrite it.
+            if (awaitingInput && thread && thread.awaitingInput !== "question") {
+                await patchThread(ctx.db, thread._id, { awaitingInput });
+            }
+
+            // The four-hour reminder is due on the owner's shard when this pause comes due. Scheduled here, not left to the idle
+            // housekeeping sweep, which can wait a day and so miss the reminder's one-hour window (`lib/approval-reminder.ts`).
+            if (uniqueIds.size > 0) {
+                await runAfterOnShard(
+                    ctx.scheduler,
+                    APPROVAL_REMINDER_SCHEDULE_DELAY_MS,
+                    internal.chat.approval_reminder_sweep.sweepApprovalReminders,
+                    { userId: ownerId },
+                    ownerId,
+                );
+            }
+
+            // One notification per pause, to the thread OWNER — only they can answer
+            // (`respondToToolApproval`). A secret request and a question take precedence over approvals: they are
+            // answered with something, and nothing offers to "approve" them.
+            const askUserIds = new Set(askUserApprovalIds);
+            const [first] = uniqueIds;
+            const secret = [...uniqueIds].find((id) => secretIds.has(id));
+            const question = [...uniqueIds].find((id) => askUserIds.has(id));
+
+            if (first !== undefined) {
+                let type: "ask_user" | "secret_request" | "tool_approval" = "tool_approval";
+
+                if (secret !== undefined) {
+                    type = "secret_request";
+                } else if (question !== undefined) {
+                    type = "ask_user";
+                }
+
+                const key = secret ?? question ?? first;
+                // A sub-agent's pause says who started its chain, so the owner knows a task or a trigger is asking.
+                const subAgentRun = config.subAgentRunId ? await ctx.db.get("subAgentRuns", config.subAgentRunId) : null;
+                const starter = subAgentRun ? chainStarterLabel(subAgentRun) : undefined;
+
+                await notifyQuietly(ctx, {
+                    ...(starter !== undefined && { body: `A sub-agent started by ${starter} is waiting for you.` }),
+                    dedupeKey: `${type}:${key}`,
+                    link: `/chat/${threadId}`,
+                    title: thread?.title ?? "Chat",
+                    type,
+                    userId: ownerId,
+                    // The phone's approve and deny act on this approval (`notifications/phone-delivery.ts`).
+                    ...(type === "tool_approval" && { approvalId: first }),
+                });
+            }
+
+            return true;
+        },
+    );
 
 /**
  * What an answer leaves behind for next time: `always` stores `auto` for the tool, `hour` / `today` a time-boxed

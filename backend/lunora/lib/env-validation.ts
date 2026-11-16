@@ -110,6 +110,9 @@ const toolApiEnvSchema = z.object({
 // signed-storage base and the scheduler's callback origin), so a second
 // required-ness check would only produce a different message for one cause.
 const optionalEnvSchema = z.object({
+    // Android kill switch for the data-only phone push (`notifications/native-push-config.ts`). `off` sends every Android phone
+    // the notification-style push again; unset keeps the data-only push on.
+    ANDROID_DATA_ONLY_PUSH: z.string().trim().optional(),
     APP_NAME: z.string().trim().optional(),
     AUTH_GITHUB_CLIENT_ID: z.string().trim().optional(),
     AUTH_GITHUB_CLIENT_SECRET: z.string().trim().optional(),
@@ -129,6 +132,9 @@ const optionalEnvSchema = z.object({
     CREEM_WEBHOOK_SECRET: z.string().trim().optional(),
     CREEM_YEARLY_CHECKOUT: z.string().trim().optional(),
     DPO_EMAIL: z.string().trim().optional(),
+    // Phone push through Expo's push service (`notifications/native-push-config.ts`), with
+    // its access-token security on. Optional: unset, phones get no push.
+    EXPO_ACCESS_TOKEN: z.string().trim().optional(),
     FEATUREBASE_API_KEY: z.string().trim().optional(),
     // Pre-registered OAuth clients for connectors whose MCP server has no dynamic
     // client registration. A connector without its client id shows "not configured".

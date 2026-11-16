@@ -16,7 +16,9 @@ import { failureOf, PROBLEM_STATUS } from "./read-host";
 export type WriteFailure = ReadFailure | "rejected" | "unconfirmed";
 
 export type WriteOutcome<T extends object> =
-    (T & { status: "ok" }) | { reason: string | null; status: "rejected" } | { status: Exclude<WriteFailure, "rejected"> };
+    | (T & { status: "ok" })
+    | { reason: string | null; status: "rejected" }
+    | { status: Exclude<WriteFailure, "rejected"> };
 
 /** The statuses a host answers a request it understood and will not carry out (405: a merge its rules refuse). */
 const REFUSAL_STATUSES = new Set([400, 405, 409, 422]);

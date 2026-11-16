@@ -72,7 +72,7 @@ const ChangelogCard: FC = () => {
                 {latestUnread.categories.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                         {latestUnread.categories.map((cat) => (
-                            <span className="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-[10px] font-medium" key={cat.name}>
+                            <span className="bg-primary/10 text-primary-text rounded px-1.5 py-0.5 text-[10px] font-medium" key={cat.name}>
                                 {cat.name}
                             </span>
                         ))}
@@ -86,7 +86,7 @@ const ChangelogCard: FC = () => {
                 </p>
             </div>
 
-            <p className="text-primary text-[11px] font-medium">{t`See what's new →`}</p>
+            <p className="text-primary-text text-[11px] font-medium">{t`See what's new →`}</p>
         </div>
     );
 };

@@ -13,6 +13,8 @@
  */
 
 export const API_ERROR_CODES = {
+    chat_start_in_progress: 409,
+    client_message_id_reused: 422,
     conflict: 409,
     daily_limit_reached: 429,
     forbidden: 403,

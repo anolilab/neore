@@ -7,6 +7,7 @@ import { internalAction, internalMutation, internalQuery, type MutationCtx as Mu
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
+import { revokeGuestLinksForThread, withdrawGuestLinksForThread } from "../chat/lib/guest-link-store";
 import { deleteThreadSecrets } from "../chat/lib/secret-requests";
 import { deleteToolApprovalRunsForThread } from "../chat/lib/tool-approval-cleanup";
 import { deleteGoalsForThread, endActiveGoals, hasLiveStream } from "../chat/goals/rows";
@@ -15,6 +16,7 @@ import { deleteGoalsForThread, endActiveGoals, hasLiveStream } from "../chat/goa
  * Thread operations.
  * Migrated from `@neore/backend-agent` component.
  */
+import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { omit } from "../lib/collections";
 import { assert } from "../lib/error-helpers";
 import { patchById, patchRow, withoutUndefined } from "../lib/patch";
@@ -28,7 +30,7 @@ import { meetsThreadPermission, redactThreadForPublicViewer, requireOwnedThread,
 import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as vThreadDocument, vThreadPatchFields, vThreadStatus } from "./validators";
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
-import { clearAwaitingInput, patchesWithoutAwaitingInput } from "./table-writes";
+import { clearAwaitingInput, patchThread } from "./table-writes";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
 import { deleteThreadSummaries } from "./thread-summaries";
 
@@ -49,10 +51,10 @@ export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
 };
 
 /**
- * Unread, snooze and "needs you" belong to the thread's OWNER; the row is shared with grantees, who must not see
- * (or act on) them. Reads that can reach a grantee return the row through here.
+ * Unread, snooze and "needs you" belong to the thread's OWNER, as does the organization a temporary chat was started in; the
+ * row is shared with grantees, who must not see (or act on) them. Reads that can reach a grantee return the row through here.
  */
-const OWNER_STATE_KEYS = ["awaitingInput", "lastReplyAt", "lastViewedAt", "snoozedUntil"] as const;
+const OWNER_STATE_KEYS = ["awaitingInput", "capOrganizationId", "lastReplyAt", "lastViewedAt", "permissionMode", "snoozeChosenAt", "snoozedUntil"] as const;
 
 export const threadForViewer = (thread: Doc<"threads">, viewerId: string | undefined): ThreadDoc => {
     const isOwner = thread.userId !== undefined && thread.userId === viewerId;
@@ -264,6 +266,10 @@ export type ThreadFieldsSupportingPatch = (typeof threadFieldsSupportingPatch)[n
 
 export const updateThread = internalMutation
     .input({
+        /** The run failed in place: a snoozed thread wakes in this same write (`patchThread`). */
+        failed: v.optional(v.boolean()),
+        /** A question the thread waits on stays what it waits on: an approval does not overwrite it (a sub-agent's pause). */
+        keepQuestion: v.optional(v.boolean()),
         patch: v.object({ ...vThreadPatchFields }),
         threadId: v.id("threads"),
     })
@@ -273,12 +279,11 @@ export const updateThread = internalMutation
 
         assert(oldThread, `Thread ${args.threadId} not found`);
 
-        // Back to `running` ends a pause: awaitingInput goes in the same write (see `patchThread`).
-        if (patchesWithoutAwaitingInput(oldThread, args.patch)) {
-            await patchRow(ctx.db, "threads", oldThread, { ...withoutUndefined(args.patch), awaitingInput: undefined });
-        } else {
-            await ctx.db.patch("threads", args.threadId, withoutUndefined(args.patch));
-        }
+        const { awaitingInput, ...rest } = args.patch;
+        const keptQuestion = args.keepQuestion === true && awaitingInput === "approval" && oldThread.awaitingInput === "question";
+
+        // The run-state rules (a pause ending, a pause or failure waking a snooze) live in `patchThread`.
+        await patchThread(ctx.db, args.threadId, keptQuestion ? rest : args.patch, { failed: args.failed });
 
         const newThread = (await ctx.db.get("threads", args.threadId))!;
 
@@ -333,6 +338,8 @@ export const markThreadArchived = async (context: MutationContext, threadId: Id<
         status: "archived",
         updatedAt: context.now,
     });
+    // A guest link is for a thread in use: archiving withdraws it and what guests left on it.
+    await withdrawGuestLinksForThread(context, threadId);
 };
 
 export const archiveThread = internalMutation
@@ -485,7 +492,15 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         const host = await context.db.get("threads", args.threadId);
 
         if (host) {
+            // The thread is going from here on, whatever page the delete is on: no sub-agent's result posts into it.
+            await context.db.patch("threads", args.threadId, { deletingAt: context.now });
             await endHostThread(context, host, context.now);
+
+            // A sub-agent waiting on this thread's request, or one this thread delegated, ends with it. Loaded lazily, as
+            // every reader of the sub-agent module from the chat path.
+            const { endSubAgentRunsOfDeletedThread } = await import("../sub-agents/functions");
+
+            await endSubAgentRunsOfDeletedThread(context, args.threadId, host.userId);
         }
 
         // A goal's review queued between pages would read a half-deleted transcript, charge and open another round.
@@ -521,8 +536,14 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
             return { cursor: messages.continueCursor, isDone: false };
         }
 
+        // The thread's guest links and their notes, one batch per call as the file links above;
+        // their routes go in a job that runs once the page commits.
+        if (!(await revokeGuestLinksForThread(context, args.threadId))) {
+            return { cursor: messages.continueCursor, isDone: false };
+        }
+
         // Steered messages still waiting on a run of this thread have nobody left to take them.
-        // Here, not above the link batches: this page re-runs once per batch of links.
+        // Here, after every batched removal (file links, guest links): this page re-runs once per batch.
         await dropQueuedSteersForThread(context, args.threadId);
 
         const thread = await context.db.get("threads", args.threadId);
@@ -754,6 +775,7 @@ export const softDeleteThread = internalMutation
         // A coding agent's turn does not outlive the thread it writes into, nor does a goal.
         await endHostThread(ctx, oldThread, ctx.now);
         await endActiveGoals(ctx, args.threadId, "user");
+        await withdrawGuestLinksForThread(ctx, args.threadId);
         const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         // Remove from aggregates when soft deleted
@@ -855,8 +877,44 @@ export const createThreadRelationship = internalMutation
         return null;
     });
 
+/**
+ * The branch relationship of a thread, for its OWNER only (null for anyone else,
+ * an anonymous caller or a missing thread). A locked chat's parent id and branch
+ * point say where it came from, so they need its proof. Plain function over
+ * `ctx.db` so other modules read it in their own transaction.
+ */
+export const readThreadRelationship = async (
+    ctx: Pick<QueryContext, "db">,
+    userId: string | null | undefined,
+    threadId: Id<"threads">,
+    unlockProof?: string | null,
+) => {
+    if (!userId) {
+        return null;
+    }
+
+    const thread = await ctx.db.get("threads", threadId);
+
+    if (!thread || thread.userId !== userId) {
+        return null;
+    }
+
+    if (isThreadLocked(thread)) {
+        const access = await resolveThreadReadAccess(ctx, threadId, userId, unlockProof);
+
+        if (access?.kind !== "full") {
+            return null;
+        }
+    }
+
+    return ctx.db
+        .query("threadRelationships")
+        .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+        .unique();
+};
+
 export const getThreadRelationship = query
-    .input({ threadId: v.id("threads") })
+    .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(
         v.union(
             v.object({
@@ -875,22 +933,7 @@ export const getThreadRelationship = query
     .query(async ({ args, ctx }) => {
         const identity = await getAuthUserIdentity(ctx);
 
-        if (!identity) {
-            return null;
-        }
-
-        const thread = await ctx.db.get("threads", args.threadId);
-
-        if (!thread || thread.userId !== identity.userId) {
-            return null;
-        }
-
-        const relationship = await ctx.db
-            .query("threadRelationships")
-            .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
-            .unique();
-
-        return relationship;
+        return readThreadRelationship(ctx, identity?.userId, args.threadId, args.unlockProof);
     });
 
 export const getChildThreads = query
@@ -1142,9 +1185,9 @@ export const checkThreadAccessBatch = internalQuery
  */
 export const checkThreadAccessBatchHandler = async (
     context: QueryContext,
-    args: { requiredPermission?: ThreadPermission; threadId: Id<"threads">; userId: string },
+    args: { requiredPermission?: ThreadPermission; threadId: Id<"threads">; unlockProof?: string | null; userId: string },
 ) => {
-    const access = await resolveThreadReadAccess(context, args.threadId, args.userId);
+    const access = await resolveThreadReadAccess(context, args.threadId, args.userId, args.unlockProof);
 
     if (access?.kind !== "full" || !meetsThreadPermission(access.permission, args.requiredPermission ?? "read")) {
         return { hasAccess: false as const, permission: null, thread: null };
@@ -1203,28 +1246,44 @@ export const searchThreadsByTitleAndSummary = query
 // Temporary threads functions
 export const createTemporaryThread = internalMutation
     .input({
+        /**
+         * The organization the chat was started in. A temporary chat is not filed under it (it stays off that organization's
+         * list), so it is kept on the thread for the permission cap alone (`threads.capOrganizationId`).
+         */
+        capOrganizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         expiresAt: v.number(),
         retentionHours: v.optional(v.number()),
         threadId: v.id("threads"),
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const thread = await ctx.db.get("threads", args.threadId);
-
-        await ctx.db.insert("temporaryThreads", {
-            expiresAt: args.expiresAt,
-            retentionHours: args.retentionHours,
-            threadId: args.threadId,
-            userId: thread?.userId,
-        });
-
-        // Denormalize isTemporary onto thread for efficient filtering
-        if (thread) {
-            await ctx.db.patch("threads", args.threadId, { isTemporary: true });
-        }
+        await insertTemporaryThread(ctx, args);
 
         return null;
     });
+
+/** A thread made temporary, in the caller's transaction (`createThreadWithInitialMessage` creates one as temporary). */
+export const insertTemporaryThread = async (
+    ctx: MutationContext,
+    args: { capOrganizationId?: string; expiresAt: number; retentionHours?: number; threadId: Id<"threads"> },
+): Promise<void> => {
+    const thread = await ctx.db.get("threads", args.threadId);
+
+    await ctx.db.insert("temporaryThreads", {
+        expiresAt: args.expiresAt,
+        retentionHours: args.retentionHours,
+        threadId: args.threadId,
+        userId: thread?.userId,
+    });
+
+    // Denormalize isTemporary onto thread for efficient filtering
+    if (thread) {
+        await ctx.db.patch("threads", args.threadId, { isTemporary: true, ...(args.capOrganizationId && { capOrganizationId: args.capOrganizationId }) });
+    }
+
+    // A temporary chat takes no guest posts: a link already given out is withdrawn with its notes, as archiving does.
+    await withdrawGuestLinksForThread(ctx, args.threadId);
+};
 
 export const getTemporaryThreads = query
     .input({
@@ -1381,6 +1440,39 @@ export const getTemporaryThreadsByThreadIds = query
         return Object.fromEntries(expiresAtMap);
     });
 
+/**
+ * Where a lasting chat made from `source` (a saved temporary chat, or a branch) goes. One started in an organization is filed
+ * under it while the owner is still a member, as a lasting chat started there is, so it keeps that organization's cap. Once the
+ * owner has left, filing it there would hide it from every list they can open: it stays in their personal list and keeps the
+ * cap through `capOrganizationId`. Membership is read from the primary, as the other left-member checks are.
+ */
+const placeLastingChat = async (
+    ctx: MutationContext | QueryContext,
+    source: Pick<Doc<"threads">, "capOrganizationId" | "organizationId" | "userId">,
+): Promise<{ capOrganizationId?: string; organizationId?: string }> => {
+    if (source.organizationId) {
+        return { organizationId: source.organizationId };
+    }
+
+    if (!source.capOrganizationId) {
+        return {};
+    }
+
+    const member = source.userId ? await getMemberByOrganizationAndUser(ctx, source.capOrganizationId, source.userId, "primary") : null;
+
+    return member ? { organizationId: source.capOrganizationId } : { capOrganizationId: source.capOrganizationId };
+};
+
+/** `placeLastingChat` for an action that makes a lasting chat from a thread (`chat/functions.ts#branchThread`). */
+export const lastingChatPlacement = internalQuery
+    .input({ threadId: v.id("threads") })
+    .output(v.object({ capOrganizationId: v.optional(v.string()), organizationId: v.optional(v.string()) }))
+    .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get("threads", args.threadId);
+
+        return thread ? await placeLastingChat(ctx, thread) : {};
+    });
+
 export const convertTemporaryToPermanent = internalMutation
     .input({ threadId: v.id("threads") })
     .output(v.null())
@@ -1394,9 +1486,11 @@ export const convertTemporaryToPermanent = internalMutation
             throw new LunoraError("NOT_FOUND", `Temporary thread ${args.threadId} not found`);
         }
 
+        const thread = await ctx.db.get("threads", args.threadId);
+        const placement = thread ? await placeLastingChat(ctx, thread) : {};
+
         await ctx.db.delete("temporaryThreads", temporaryThread._id);
-        // Clear denormalized flag
-        await patchById(ctx.db, "threads", args.threadId, { isTemporary: undefined });
+        await patchById(ctx.db, "threads", args.threadId, { capOrganizationId: undefined, isTemporary: undefined, ...placement });
 
         return null;
     });

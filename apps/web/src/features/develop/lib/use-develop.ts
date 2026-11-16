@@ -4,7 +4,7 @@ import { LIVE_META_KEY } from "@neore/client-runtime";
 import { keepPreviousData, skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { createLunoraActionQueryOptions, useAction, useCRPC, useLunora } from "@/lib/lunora/crpc";
 
 import { retryFailedPage } from "./failed-pages";
@@ -30,11 +30,7 @@ export interface PullRequestAddress {
  * cache key and nothing is fetched before it is known: another account on the same browser
  * can never be handed the previous one's results.
  */
-export const useDevelopUser = (): string | undefined => {
-    const { hooks } = useAuth();
-
-    return hooks.useSession().data?.user.id;
-};
+export const useDevelopUser = (): string | undefined => useAuthSession().data?.user.id;
 
 /** Which host Develop reads, what it can do, and whether it is connected. Fetched once the page opens. */
 export const useDevelopHost = () => {

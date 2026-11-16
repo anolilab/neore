@@ -12,7 +12,7 @@ const ImpressumPage: FC = () => (
 
         <main className="border-brand-silver container mx-auto border-x">
             <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-24 lg:px-10">
-                <p className="text-primary mb-4 font-mono text-xs font-medium tracking-widest uppercase">Rechtliches</p>
+                <p className="text-primary-text mb-4 font-mono text-xs font-medium tracking-widest uppercase">Rechtliches</p>
                 <h1 className="mb-10 text-4xl font-bold tracking-tight sm:text-5xl">Impressum</h1>
 
                 <div className="prose-brand text-brand-graphite space-y-10 leading-relaxed">
@@ -60,7 +60,7 @@ const ImpressumPage: FC = () => (
                         <p>
                             Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit:{" "}
                             <a
-                                className="text-primary underline underline-offset-2 hover:opacity-80"
+                                className="text-primary-text underline underline-offset-2 hover:opacity-80"
                                 href="https://ec.europa.eu/consumers/odr/"
                                 rel="noopener noreferrer"
                                 target="_blank"
@@ -126,7 +126,7 @@ const ImpressumPage: FC = () => (
 
                     {/* Navigation */}
                     <div className="border-brand-silver border-t pt-8">
-                        <Link className="text-primary text-sm font-medium underline underline-offset-2 hover:opacity-80" to="/datenschutz">
+                        <Link className="text-primary-text text-sm font-medium underline underline-offset-2 hover:opacity-80" to="/datenschutz">
                             Datenschutzerklärung ansehen →
                         </Link>
                     </div>

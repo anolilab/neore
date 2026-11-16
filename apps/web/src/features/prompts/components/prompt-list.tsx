@@ -13,7 +13,7 @@ import { ArrowDownAZ, CheckSquare, Clock, Grid3x3, List, Plus, Search, Star, Tag
 import { useCallback, useEffect, useMemo, useOptimistic, useState } from "react";
 import { toast } from "sonner";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useCheckout from "@/features/billing/hooks/use-checkout";
 import { useCRPC, useLunoraActionOptions } from "@/lib/lunora/crpc";
 
@@ -52,8 +52,7 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
     const [historyPrompt, setHistoryPrompt] = useState<Doc<"prompts"> | null>(null);
 
     // Auth
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const isLoggedIn = !!sessionData?.user;
 
     // Fetch prompts using action (with caching)

@@ -57,8 +57,8 @@ const ACTION_ICONS: Record<string, FC<{ className?: string }>> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-    active: "text-green-600 dark:text-green-400",
-    failed: "text-red-600 dark:text-red-400",
+    active: "text-green-800 dark:text-green-400",
+    failed: "text-red-700 dark:text-red-400",
 };
 
 const STATUS_LABELS: Record<string, MessageDescriptor> = {
@@ -173,7 +173,7 @@ export const BrowserPanel = memo(({ actions, className, latestScreenshot, onTerm
     const { i18n, t } = useLingui();
     const [isExpanded, setIsExpanded] = useState(true);
     const isActive = session.status === "active";
-    const statusColor = STATUS_COLORS[session.status] ?? "text-gray-500 dark:text-gray-400";
+    const statusColor = STATUS_COLORS[session.status] ?? "text-gray-600 dark:text-gray-400";
     const startedAgo = formatRelativeTime(i18n, session.startedAt);
     const lastActivityAgo = formatRelativeTime(i18n, session.lastActivityAt);
     const statusLabel = STATUS_LABELS[session.status];
@@ -191,7 +191,10 @@ export const BrowserPanel = memo(({ actions, className, latestScreenshot, onTerm
             {/* ── Header ─────────────────────────────────────────────── */}
             <div className="flex items-center justify-between px-3 py-2">
                 <button className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => setIsExpanded(!isExpanded)} type="button">
-                    <Globe aria-hidden="true" className={cn("size-4 shrink-0", isActive ? "text-blue-500" : "text-gray-400")} />
+                    <Globe
+                        aria-hidden="true"
+                        className={cn("size-4 shrink-0", isActive ? "text-blue-700 dark:text-blue-400" : "text-gray-600 dark:text-gray-400")}
+                    />
                     <span className="truncate text-sm font-medium text-gray-800 dark:text-gray-200">{t`Browser Session`}</span>
                     <span className={cn("flex items-center gap-1 text-[11px]", statusColor)}>
                         {isActive && <span className="inline-block size-1.5 animate-pulse rounded-full bg-green-500" />}
@@ -203,7 +206,7 @@ export const BrowserPanel = memo(({ actions, className, latestScreenshot, onTerm
                     {session.currentUrl && (
                         <a
                             aria-label={t`Open current URL`}
-                            className="rounded p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                            className="rounded p-1 text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
                             href={session.currentUrl}
                             rel="noopener noreferrer"
                             target="_blank"
@@ -214,10 +217,10 @@ export const BrowserPanel = memo(({ actions, className, latestScreenshot, onTerm
 
                     {isActive && onTerminate && (
                         <button
-                            aria-label={t`Terminate browser session`}
+                            aria-label={t`Stop browser session`}
                             className={cn(
                                 "flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium",
-                                "text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/40",
+                                "text-red-700 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/40",
                                 "focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none",
                                 "transition-colors",
                             )}
@@ -231,7 +234,7 @@ export const BrowserPanel = memo(({ actions, className, latestScreenshot, onTerm
 
                     <button
                         aria-label={isExpanded ? t`Collapse browser panel` : t`Expand browser panel`}
-                        className="rounded p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        className="rounded p-1 text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
                         onClick={() => setIsExpanded(!isExpanded)}
                         type="button"
                     >
@@ -245,7 +248,7 @@ export const BrowserPanel = memo(({ actions, className, latestScreenshot, onTerm
                     {/* ── Current URL ─────────────────────────────────── */}
                     {session.currentUrl && (
                         <div className="border-t border-gray-200/60 px-3 py-1.5 dark:border-gray-700/60">
-                            <div className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                            <div className="flex items-center gap-1.5 text-[11px] text-gray-600 dark:text-gray-400">
                                 <Globe aria-hidden="true" className="size-3 shrink-0" />
                                 <span className="truncate">{session.currentUrl}</span>
                             </div>
@@ -267,7 +270,7 @@ export const BrowserPanel = memo(({ actions, className, latestScreenshot, onTerm
                     {actions.length > 0 && (
                         <div className="border-t border-gray-200/60 dark:border-gray-700/60">
                             <div className="px-3 py-1.5">
-                                <span className="text-[10px] font-semibold text-gray-400 uppercase">
+                                <span className="text-[10px] font-semibold text-gray-600 uppercase dark:text-gray-400">
                                     {t`Action Log`} ({actions.length})
                                 </span>
                             </div>
@@ -280,20 +283,20 @@ export const BrowserPanel = memo(({ actions, className, latestScreenshot, onTerm
                                             {action.success ? (
                                                 <CheckCircle2 aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-green-500" />
                                             ) : (
-                                                <AlertCircle aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-red-500" />
+                                                <AlertCircle aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-red-700 dark:text-red-400" />
                                             )}
-                                            <Icon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-gray-400" />
+                                            <Icon aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-gray-600 dark:text-gray-400" />
                                             <span
                                                 className={cn(
                                                     "min-w-0 flex-1 truncate",
-                                                    action.success ? "text-gray-600 dark:text-gray-300" : "text-red-600 dark:text-red-400",
+                                                    action.success ? "text-gray-600 dark:text-gray-300" : "text-red-700 dark:text-red-400",
                                                 )}
                                                 title={action.errorMessage ?? undefined}
                                             >
                                                 {formatAction(i18n, action.action, action.target)}
                                                 {action.errorMessage && ` — ${action.errorMessage}`}
                                             </span>
-                                            <span className="shrink-0 text-gray-400">{formatDuration(action.durationMs)}</span>
+                                            <span className="shrink-0 text-gray-600 dark:text-gray-400">{formatDuration(action.durationMs)}</span>
                                         </li>
                                     );
                                 })}
@@ -302,13 +305,13 @@ export const BrowserPanel = memo(({ actions, className, latestScreenshot, onTerm
                     )}
 
                     {/* ── Session timing ───────────────────────────────── */}
-                    <div className="flex items-center gap-3 border-t border-gray-200/60 px-3 py-1.5 text-[10px] text-gray-400 dark:border-gray-700/60">
+                    <div className="flex items-center gap-3 border-t border-gray-200/60 px-3 py-1.5 text-[10px] text-gray-600 dark:border-gray-700/60 dark:text-gray-400">
                         <span className="flex items-center gap-1">
                             <Clock aria-hidden="true" className="size-3" />
                             {t`Started ${startedAgo}`}
                         </span>
                         {session.lastActivityAt !== session.startedAt && <span>{t`Last activity ${lastActivityAgo}`}</span>}
-                        {session.errorMessage && <span className="text-red-500">{session.errorMessage}</span>}
+                        {session.errorMessage && <span className="text-red-700 dark:text-red-400">{session.errorMessage}</span>}
                     </div>
                 </>
             ) : null}
@@ -332,10 +335,10 @@ export const BrowserToolStatus = memo(({ action, className, url }: { action: str
                 className,
             )}
         >
-            <Loader2 aria-hidden="true" className="size-4 animate-spin text-blue-500" />
+            <Loader2 aria-hidden="true" className="size-4 animate-spin text-blue-700 dark:text-blue-400" />
             <div className="min-w-0 flex-1">
                 <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{formatAction(i18n, action, url)}</span>
-                {url && action === "navigate" && <p className="truncate text-[11px] text-blue-500/80 dark:text-blue-400/60">{url}</p>}
+                {url && action === "navigate" && <p className="truncate text-[11px] text-blue-700 dark:text-blue-400">{url}</p>}
             </div>
         </div>
     );

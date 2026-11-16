@@ -1,12 +1,13 @@
 import { Field } from "@base-ui/react/field";
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { useUnlockProof } from "@neore/client-runtime";
 import { Avatar, AvatarFallback, AvatarImage } from "@neore/ui/components/avatar";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@neore/ui/components/responsive-popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Switch } from "@neore/ui/components/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@neore/ui/components/tabs";
@@ -18,7 +19,13 @@ import React, { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
+import { useChatActions, useChatThread } from "@/features/chat/core/context/chat-context-hooks";
 import { getValidThreadId } from "@/features/chat/core/hooks/use-validated-thread";
+import { canHaveGuestLink } from "@/features/chat/guest-links/can-have-guest-link";
+import GuestLinkPanel from "@/features/chat/guest-links/guest-link-panel";
+import useGuestLinkRevoke from "@/features/chat/guest-links/use-guest-link-revoke";
+import useGuestNoteSend from "@/features/chat/guest-links/use-guest-note-send";
+import useWorker from "@/features/sub-agents/hooks/use-worker";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 interface ThreadShareButtonProperties {
@@ -43,15 +50,39 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
     const [userToRemove, setUserToRemove] = useState<{ name: string; userId: Id<"users"> } | null>(null);
 
     const actualThreadId = getValidThreadId(threadId);
+    // The guest-link revoke and its confirm live here, beside the menu, so they outlast the menu's popup.
+    const { confirmDialog: guestRevokeDialog, revokeLink: revokeGuestLink } = useGuestLinkRevoke(actualThreadId);
     const canShare = !!actualThreadId;
 
-    const { data: threadAccess } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(actualThreadId ? { threadId: actualThreadId } : skipToken));
-    const { data: threadInvites } = useQuery(crpc.chat.sharing.getThreadInvites.queryOptions(actualThreadId ? { threadId: actualThreadId } : skipToken));
+    // Read with the unlock proof: an unlocked chat's owner is granted access, and the reads refresh on unlock or relock.
+    const unlockProof = useUnlockProof(actualThreadId);
+    const { data: threadAccess } = useQuery(
+        crpc.chat.sharing.getThreadAccess.queryOptions(actualThreadId ? { threadId: actualThreadId, unlockProof } : skipToken),
+    );
+    const { data: threadInvites } = useQuery(
+        crpc.chat.sharing.getThreadInvites.queryOptions(actualThreadId ? { threadId: actualThreadId, unlockProof } : skipToken),
+    );
 
     const { mutateAsync: createInviteMutation } = useMutation(crpc.chat.sharing.createThreadInvite.mutationOptions());
     const { mutateAsync: revokeInviteMutation } = useMutation(crpc.chat.sharing.revokeThreadInvite.mutationOptions());
     const { mutateAsync: removeAccessMutation } = useMutation(crpc.chat.sharing.removeThreadAccess.mutationOptions());
     const { mutateAsync: toggleVisibilityMutation } = useMutation(crpc.chat.sharing.toggleThreadVisibility.mutationOptions());
+
+    const { thread } = useChatThread();
+    // A guest note goes out alone through the ordinary send, with its id; the owner's draft stays in the composer. Held here,
+    // beside the menu, so a send still goes through when the menu closes mid-check.
+    const { sendMessage } = useChatActions();
+    const { sendingId, sendNote, turnRunning } = useGuestNoteSend(
+        actualThreadId,
+        async (text, guestMessageId) => await sendMessage(text, undefined, { guestMessageId }),
+    );
+    const { knownNotWorker } = useWorker(actualThreadId);
+    // No tab until the thread and its relationship are known (`canHaveGuestLink`). A locked chat's read says nothing of its
+    // relationship (`null`), so a locked worker's thread shows the tab; there Create is off and the backend refuses a link.
+    const showGuests =
+        threadAccess?.isOwner === true && canHaveGuestLink(thread as Parameters<typeof canHaveGuestLink>[0], knownNotWorker) && Boolean(actualThreadId);
+    // The Guests tab can go while it is open (the chat is archived, or turns out to be a worker's): fall back to the first tab.
+    const shownTab = tab === "guests" && !showGuests ? "access" : tab;
 
     const handleTabChange = useCallback((value: string) => setTab(value), []);
     const handleInviteEmailChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => setInviteEmail(event.target.value), []);
@@ -217,8 +248,8 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
     };
 
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger
+        <Popover>
+            <PopoverTrigger
                 render={
                     <Button className={cn(classes?.button, "text-white")} size="icon" variant="ghost">
                         <Share2 className={cn(classes?.icon, "h-4 w-4")} />
@@ -226,12 +257,14 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
                     </Button>
                 }
             />
-            <DropdownMenuContent className="w-[420px] p-0">
-                <Tabs className="w-full" onValueChange={handleTabChange} value={tab}>
-                    <TabsList className="grid w-full grid-cols-3">
+            {/* A popover, not a menu: it holds tabs and a form, which a `role="menu"` may not contain. Full width in the phone drawer. */}
+            <PopoverContent align="end" aria-label={t`Share Thread`} className="w-full p-0 md:w-[420px]">
+                <Tabs className="w-full" onValueChange={handleTabChange} value={shownTab}>
+                    <TabsList className={cn("grid w-full", showGuests ? "grid-cols-4" : "grid-cols-3")}>
                         <TabsTrigger value="access">{t`Access`}</TabsTrigger>
                         <TabsTrigger value="invites">{t`Invites`}</TabsTrigger>
                         <TabsTrigger value="public">{t`Public`}</TabsTrigger>
+                        {showGuests && <TabsTrigger value="guests">{t`Guests`}</TabsTrigger>}
                     </TabsList>
                     <TabsContent className="px-4 py-2" value="access">
                         {threadAccess.users.length === 0 ? (
@@ -369,8 +402,21 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
                             </Field.Root>
                         )}
                     </TabsContent>
+                    {showGuests && actualThreadId && (
+                        <TabsContent className="px-4 py-2" value="guests">
+                            <GuestLinkPanel
+                                key={actualThreadId}
+                                locked={thread?.lockedAt !== undefined && thread?.lockedAt !== null}
+                                revokeLink={revokeGuestLink}
+                                sendingId={sendingId}
+                                sendNote={sendNote}
+                                threadId={actualThreadId}
+                                turnRunning={turnRunning}
+                            />
+                        </TabsContent>
+                    )}
                 </Tabs>
-            </DropdownMenuContent>
+            </PopoverContent>
             <DeleteConfirmationDialog
                 description={t`Are you sure you want to remove ${userToRemoveName} from this thread?`}
                 itemName={userToRemove?.name}
@@ -390,7 +436,8 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
                 open={!!userToRemove}
                 title={t`Remove User`}
             />
-        </DropdownMenu>
+            {guestRevokeDialog}
+        </Popover>
     );
 };
 

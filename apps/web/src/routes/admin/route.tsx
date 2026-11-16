@@ -78,7 +78,7 @@ const RouteComponent = () => {
     const adminNavItems = ADMIN_NAV_ITEMS.map((item) => {
         return { ...item, name: i18n._(item.name) };
     });
-    const sidebarContent = <NavItems classes={{ group: "pl-2" }} colorMode="dark" items={adminNavItems} label={i18n._(msg`Admin`)} />;
+    const sidebarContent = <NavItems classes={{ group: "pl-2" }} colorMode="light" items={adminNavItems} label={i18n._(msg`Admin`)} />;
     const location = useLocation();
     const { pathname } = location;
 

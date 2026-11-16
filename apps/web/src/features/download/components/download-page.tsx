@@ -61,7 +61,7 @@ const DownloadPage = () => {
 
             <main className="border-brand-silver container mx-auto border-x">
                 <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-24 lg:px-10">
-                    <p className="text-primary mb-4 font-mono text-xs font-medium tracking-widest uppercase">
+                    <p className="text-primary-text mb-4 font-mono text-xs font-medium tracking-widest uppercase">
                         <Trans>Desktop</Trans>
                     </p>
                     <h1 className="mb-4 text-4xl font-bold tracking-tight sm:text-5xl">
@@ -108,7 +108,7 @@ const DownloadPage = () => {
                                         <span className="text-brand-graphite"> · {installer.files}</span>
                                     </span>
                                     <a
-                                        className="text-primary text-sm font-medium hover:underline"
+                                        className="text-primary-text text-sm font-medium hover:underline"
                                         href={RELEASES_URL}
                                         onClick={() => {
                                             trackEvent("desktop_download_clicked", {

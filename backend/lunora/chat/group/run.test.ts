@@ -94,6 +94,8 @@ const speakerTools = vi.hoisted(() => new Map<string, unknown>());
 const progressProbe = vi.hoisted(() => {
     return { on: false };
 });
+/** The organization each faked `buildAgentTools` call was capped by. */
+const toolOrganizations = vi.hoisted(() => [] as (string | null | undefined)[]);
 const routerScript = vi.hoisted(() => {
     return { calls: 0, failRulesReadAt: 0, rulesReads: 0, speakers: [] as string[] };
 });
@@ -123,7 +125,12 @@ vi.mock("../lib/get-agent", () => {
 
 vi.mock("../lib/agent-tools", () => {
     return {
-        buildAgentTools: async (_ctx: unknown, options: { mcpProgress?: (tool: { serverName: string; toolCallId: string; toolName: string }) => any }) => {
+        buildAgentTools: async (
+            _ctx: unknown,
+            options: { mcpProgress?: (tool: { serverName: string; toolCallId: string; toolName: string }) => any; organizationId?: string | null },
+        ) => {
+            toolOrganizations.push(options.organizationId);
+
             if (progressProbe.on) {
                 const call = options.mcpProgress?.({ serverName: "Docs", toolCallId: "call_1", toolName: "index" });
 
@@ -210,9 +217,11 @@ const fakeProcedures = () => {
 beforeAll(async () => {
     const modules: Record<string, Record<string, unknown>> = {
         agent_branches: await import("../../agent/branches"),
+        agent_context_reset_read: await import("../../agent/context-reset-read"),
         agent_messages: await import("../../agent/messages"),
         agent_streams: await import("../../agent/streams"),
         agent_threads: await import("../../agent/threads"),
+        chat_approval_reminder_sweep: await import("../approval-reminder-sweep"),
         chat_group_functions: await import("./functions"),
         chat_mcp_tool_labels: await import("../mcp-tool-labels"),
         chat_streaming_persistent_library: await import("../streaming/persistent/library"),
@@ -338,6 +347,7 @@ beforeEach(async () => {
     speakerModels.clear();
     speakerTools.clear();
     progressProbe.on = false;
+    toolOrganizations.length = 0;
     routerScript.calls = 0;
     routerScript.failRulesReadAt = 0;
     routerScript.rulesReads = 0;
@@ -464,6 +474,19 @@ describe("runGroupTurn — cap and mentions", () => {
 
         expect(routerScript.calls).toBe(0);
         expect(await speakersSaid()).toStrictEqual(["DESIGNER"]);
+    });
+});
+
+describe("runGroupTurn — organization cap", () => {
+    it("caps a temporary chat's speakers by the organization it was started in, not the space the turn is sent from", async () => {
+        await setGroup("supervisor", ["writer", "checker"]);
+        routerScript.speakers = ["p1", "p2"];
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { capOrganizationId: "org-temp", isTemporary: true }));
+
+        await runTurn();
+
+        expect(toolOrganizations.length).toBeGreaterThan(0);
+        expect(new Set(toolOrganizations)).toStrictEqual(new Set(["org-temp"]));
     });
 });
 

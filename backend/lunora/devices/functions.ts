@@ -23,19 +23,22 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { deleteShardRoute, setShardRoute, shardRouteOwner } from "../lib/shard-routes";
-import { decryptKey, encryptKey } from "../lib/encryption";
+import { decryptKey } from "../lib/encryption";
 import {
     ACP_CLAIM_LEASE_MS,
     DEVICE_SIGNATURE_WINDOW_MS,
+    MAX_APP_VERSION_INPUT_LENGTH,
     MAX_DEVICE_OUTPUT_BYTES,
     MAX_DEVICE_SCOPE_PROJECTS,
     MAX_DEVICES_PER_USER,
     MAX_MANIFEST_BYTES,
 } from "./lib/constants";
+import { isAppVersion } from "./lib/app-version";
+import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
 import { filterOwnProjectIds } from "./lib/scope";
 import { claimWindowMs, expireOpenCalls, isAcpTool, isDeviceOutdated, isForwardPhase } from "./lib/state";
-import { capUtf8, clockSkewData, clockSkewMessage, generateDeviceSecret, isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "./lib/signing";
+import { capUtf8, clockSkewData, clockSkewMessage, isFreshTimestamp, parseSignedPayload, verifyDevicePayload } from "./lib/signing";
 import { vDeviceCallView, vDevicePlatform, vDeviceView, vDeviceCallStatusView } from "./validators";
 
 const vDeviceName = v.string().check((value) => value.trim().length > 0 && value.length <= 80, { message: "Name must be 1-80 characters" });
@@ -119,37 +122,29 @@ export const registerDevice = authMutation
             throw new LunoraError("FORBIDDEN", "This account is being deleted");
         }
 
-        const { page: existing } = await ctx.db.devices.findMany({ limit: MAX_DEVICES_PER_USER + 1, where: { userId } });
-
-        if (existing.length >= MAX_DEVICES_PER_USER) {
-            throw new LunoraError("BAD_REQUEST", `At most ${String(MAX_DEVICES_PER_USER)} devices can be paired. Remove one first.`);
-        }
+        await assertRoomForDevice(ctx, userId);
 
         // A server is paired by a desktop of the caller's that is itself paired directly: no chains.
         if (args.viaDeviceId !== undefined) {
             const desktop = await requireOwnDevice(ctx, args.viaDeviceId, userId);
 
-            if (desktop.encryptedSecret === undefined) {
+            // A headless machine (or another server) is paired directly too, but speaks for itself: no relay of ours
+            // claims calls for what hangs off it, so a server under it could never answer.
+            if (desktop.encryptedSecret === undefined || desktop.transport !== undefined) {
                 throw new LunoraError("FORBIDDEN", "The desktop is not paired");
             }
         }
 
-        const secret = generateDeviceSecret();
-        const deviceId = await ctx.db.insert("devices", {
-            createdAt: ctx.now,
-            encryptedSecret: await encryptKey(secret, "device-secrets"),
+        const { deviceId, secret } = await insertDevice(ctx, {
             name: args.name.trim(),
             platform: args.platform,
             userId,
             ...(args.viaDeviceId !== undefined && { transport: "ssh" as const, viaDeviceId: args.viaDeviceId }),
         });
 
-        // The host ingest has no session: it finds this device's owner, hence its shard, from this row.
-        await setShardRoute(ctx, "device", deviceId as string, userId);
-
         ctx.log.event("devices.register_device", { platform: args.platform, ssh: args.viaDeviceId !== undefined });
 
-        return { deviceId: deviceId as string, secret };
+        return { deviceId, secret };
     });
 
 /** The caller's paired devices. Online state is the client's to derive from `lastSeenAt` (`DEVICE_ONLINE_WINDOW_MS`). */
@@ -174,6 +169,7 @@ export const listDevices = authQuery
                 toolNames: (device.manifest ?? []).map((tool) => tool.name),
                 updateRequired: isDeviceOutdated(device),
                 ...(device.acpOffers !== undefined && device.acpOffers.length > 0 && { acpOffers: device.acpOffers }),
+                ...(device.appVersion !== undefined && { appVersion: device.appVersion }),
                 ...(device.lastSeenAt !== undefined && { lastSeenAt: device.lastSeenAt }),
                 ...(device.projectIds !== undefined && { projectIds: device.projectIds.filter((id) => liveProjects.has(id)) }),
                 ...(device.transport !== undefined && { transport: device.transport }),
@@ -272,6 +268,13 @@ export const revokeDevice = authMutation
         for (const revoked of [device, ...hosts]) {
             // An option change still waiting gets its answer first, as the session it belongs to is about to end.
             await recordRemovedDeviceOptions(ctx, revoked._id, ctx.now);
+            // A machine that paired itself by code may still hold the code (a lost reply puts it back,
+            // `auth/cli-device-auth.ts`). Remembered here, on this shard and in this mutation, so the code cannot
+            // register a device again: `registerHeadlessDevice` runs on the same shard and refuses it.
+            if (revoked.pairedByCode !== undefined) {
+                await ctx.db.insert("devicePairingRevocations", { codeId: revoked.pairedByCode, revokedAt: ctx.now, userId });
+            }
+
             await expireOpenCalls(ctx, revoked._id, "The device was removed");
             await endHostSessionsOfDevice(ctx, revoked._id, ctx.now);
             await deleteShardRoute(ctx, "device", revoked._id as string);
@@ -350,7 +353,14 @@ const parseProtocol = (value: unknown): number | undefined => {
  */
 export const updateDeviceManifest = authMutation
     .use(rateLimit("devices/manifest"))
-    .input({ deviceId: v.id("devices"), payload: vManifestPayload, signature: vSignature, viaDeviceId: vViaDeviceId })
+    .input({
+        // Wider than what is kept (`MAX_APP_VERSION_LENGTH`): an over-long value is ignored by `isAppVersion`, not a failed manifest update.
+        appVersion: v.optional(v.string().max(MAX_APP_VERSION_INPUT_LENGTH)),
+        deviceId: v.id("devices"),
+        payload: vManifestPayload,
+        signature: vSignature,
+        viaDeviceId: vViaDeviceId,
+    })
     .output(v.object({ toolCount: v.number() }))
     .mutation(async ({ args, ctx }) => {
         const device = await requireOwnDevice(ctx, args.deviceId, ctx.user.userId, args.viaDeviceId);
@@ -390,9 +400,19 @@ export const updateDeviceManifest = authMutation
 
         // Signed with the rest: a computer that predates the field reports none, which is not "outdated".
         const protocol = parseProtocol(manifest.protocol);
+        // Not covered by the signature: display-only, so a value that is not shaped like a version is ignored, never an error.
+        const appVersion = args.appVersion !== undefined && isAppVersion(args.appVersion) ? args.appVersion : undefined;
 
-        // `undefined` removes the field: a later build that stops reporting it is judged as unreported, not by the old number.
-        await patchRow(ctx.db, "devices", device, { acpOffers: offers, hostProtocol: protocol, lastSeenAt: now, manifest: tools, manifestIssuedAt: issuedAt });
+        // `undefined` removes the field: a later build that stops reporting the protocol is judged as unreported, not by the old number.
+        // The app version is left out of the patch when none was reported, so the stored one stays.
+        await patchRow(ctx.db, "devices", device, {
+            acpOffers: offers,
+            hostProtocol: protocol,
+            lastSeenAt: now,
+            manifest: tools,
+            manifestIssuedAt: issuedAt,
+            ...(appVersion !== undefined && { appVersion }),
+        });
 
         ctx.log.event("devices.update_device_manifest", { toolCount: tools.length });
 

@@ -198,12 +198,12 @@ const RouteComponent = () => {
     const sidebarContent = (
         <>
             {isAdmin && navigationItems.admin.length > 0 && (
-                <NavItems classes={{ group: "pl-2" }} colorMode="dark" items={navigationItems.admin} label={i18n._(DASHBOARD_PAGE_NAMES.admin)} />
+                <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.admin} label={i18n._(DASHBOARD_PAGE_NAMES.admin)} />
             )}
-            <NavItems classes={{ group: "pl-2" }} colorMode="dark" items={navigationItems.app} label={i18n._(DASHBOARD_PAGE_NAMES.app)} />
-            <NavItems classes={{ group: "pl-2" }} colorMode="dark" items={navigationItems.chat} label={i18n._(DASHBOARD_PAGE_NAMES.chat)} />
-            <NavItems classes={{ group: "pl-2" }} colorMode="dark" items={navigationItems.auth} label={i18n._(DASHBOARD_PAGE_NAMES.auth)} />
-            <NavItems classes={{ group: "pl-2" }} colorMode="dark" items={navigationItems.privacy} label={i18n._(DASHBOARD_PAGE_NAMES.privacy)} />
+            <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.app} label={i18n._(DASHBOARD_PAGE_NAMES.app)} />
+            <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.chat} label={i18n._(DASHBOARD_PAGE_NAMES.chat)} />
+            <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.auth} label={i18n._(DASHBOARD_PAGE_NAMES.auth)} />
+            <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.privacy} label={i18n._(DASHBOARD_PAGE_NAMES.privacy)} />
         </>
     );
 

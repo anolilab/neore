@@ -76,7 +76,7 @@ const CinemaToggleButton: FC<CinemaToggleButtonProps> = ({ compact, disabled, va
                             <ApertureIcon
                                 className={cn(
                                     "h-3.5 w-3.5 transition-colors duration-150",
-                                    cinemaPanelOpen ? "text-primary" : "text-muted-foreground group-hover:text-foreground",
+                                    cinemaPanelOpen ? "text-primary-text" : "text-muted-foreground group-hover:text-foreground",
                                 )}
                             />
                         </motion.div>

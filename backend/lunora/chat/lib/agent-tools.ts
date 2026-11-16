@@ -13,6 +13,7 @@ import type { LanguageModel, ToolSet } from "ai";
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
+import { levelOfConnection, toolOfferedAt } from "../../connectors/access-levels";
 import { getConnectorMcpServers, withMcpServerGrants } from "../../connectors/lib/grant-runtime";
 import { toolsLogger } from "../../lib/logger";
 import type { DeviceToolsResult } from "./device-tools";
@@ -22,12 +23,14 @@ import { createRunLowRiskCheck } from "./low-risk-check";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import type { MCPServerConfig } from "./mcp-tools";
 import { getMCPTools } from "./mcp-tools";
+import { isSafeToRepeat } from "./repeatable-tools";
 import { connectorTrustId, mcpTrustId } from "./low-risk-trust";
 import type { ToolProgressSink } from "./mcp-progress";
 import type { SearchMode } from "./tool-builder";
 import { ToolName } from "../tools";
 import { admittedKnowledgeSearchTool } from "../tools/knowledge-search";
-import { getToolsForModelAndMode, listBuiltInTools } from "./tool-builder";
+import { getToolsForModelAndMode, listBuiltInTools, PULL_REQUEST_TOOLS } from "./tool-builder";
+import { readRunPermissionCap } from "./run-permission-cap";
 import type { ToolDescriptor, ToolPermissionOverrides } from "./tool-permissions";
 import type { RunOrigin } from "./tool-run-config";
 import { applyToolPermissions, toolPermissionKey } from "./tool-permissions";
@@ -58,13 +61,30 @@ export interface BuildAgentToolsOptions {
     headless?: boolean;
     /** Headless only: built-ins whose `ask` the run inherited an approval for (`ToolPermissionOptions.headlessApproved`). */
     headlessApproved?: ReadonlyArray<string>;
+    /** Headless only: keep `ask` tools for a run that pauses for its owner's answer (`ToolPermissionOptions.headlessCanAsk`). */
+    headlessCanAsk?: boolean;
     /** Interactive runs: where a long MCP call's progress is shown. Omitted, none is relayed. */
     mcpProgress?: ToolProgressSink;
     /** Restrict MCP servers to these names; empty/undefined means every enabled server. */
     mcpServerNames?: string[];
     model: LanguageModel | string;
+    /**
+     * The organization the run was started from, whose policy caps its tools (`org-policy.md` §6a). A thread's stored
+     * organization takes precedence over it when a `threadId` is given. `null` is the personal space (no policy).
+     */
+    organizationId: string | null;
     /** Who started the run, when not the person at the app: an API key's run gets no device tools and no `auto` tool. */
     origin?: RunOrigin;
+    /**
+     * The thread whose permission mode applies to these tools, when it is not `threadId`: a group turn's speakers build their tools
+     * without a thread of their own, but the mode is the group thread's. Omitted, the mode is read for `threadId`.
+     */
+    permissionModeThreadId?: string;
+    /**
+     * Who started the turn, when the tools are built as someone else: an approval resumes a run as the thread's owner, so the
+     * mode is read for the person the snapshot names — `full` is the owner's to give, not a collaborator's. Omitted, `userId`.
+     */
+    permissionModeUserId?: string;
     searchMode: SearchMode;
     /**
      * An invoked skill's tool config. It only changes the CANDIDATES: extra
@@ -103,12 +123,18 @@ export interface BuildAgentToolsResult {
     mcpLabels: McpToolLabels;
     /** Enabled MCP servers this run connected to — recorded in approval snapshots. */
     mcpServerNames: string[];
+    /** Runtime name -> fingerprint, for every MCP tool in `tools` (`mcp-tool-fingerprint.ts`). Recorded in approval snapshots. */
+    mcpToolFingerprints: Record<string, string>;
     /**
      * Runtime tool name -> stable permission key, for every tool in `tools`.
      * Recorded in approval snapshots so "Always allow" writes the right key
      * without re-deriving it from the runtime name.
      */
     permissionKeys: Record<string, string>;
+    /** The runtime names of the tools a resume may call again after a worker died inside one (`repeatable-tools.ts`). */
+    repeatable: string[];
+    /** The runtime names of the tools whose permission is `ask`: each call needs an approval (`applyToolPermissions`). */
+    requiresApproval: string[];
     tools: ToolSet;
 }
 
@@ -119,10 +145,14 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         deviceThreadId,
         headless,
         headlessApproved,
+        headlessCanAsk,
         mcpProgress,
         mcpServerNames,
         model,
+        organizationId,
         origin,
+        permissionModeThreadId,
+        permissionModeUserId,
         searchMode,
         skillTools,
         snapshot,
@@ -130,26 +160,55 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         untrustedContext = true,
         userId,
     } = options;
+    const modeThreadId = permissionModeThreadId ?? threadId;
 
     // Built-ins beyond the search mode's set: a skill's extra tools on a fresh
     // run, or — on a snapshot rebuild — every built-in the paused run had (a
     // skill's extra tool is not in the mode's set, and the narrowing below keeps
     // this from ever exceeding the snapshot). Unavailable tools are never added.
     const availableBuiltIns = new Set(listBuiltInTools().flatMap((tool) => (tool.available ? [tool.name as string] : [])));
-    const extraBuiltIns = (snapshot ? snapshot.toolNames : (skillTools?.additionalTools ?? [])).filter((name) => availableBuiltIns.has(name));
+    // A skill never adds the pull request tools: they join a run only through the link check below (a snapshot rebuild
+    // keeps the ones its run had, and each tool checks the thread again when it runs).
+    const baseExtraBuiltIns = snapshot ? snapshot.toolNames : (skillTools?.additionalTools ?? []).filter((name) => !PULL_REQUEST_TOOLS.includes(name));
+    const linkThreadId = threadId ?? deviceThreadId;
 
-    const builtInTools = withAdmittedBuiltIns(
-        getToolsForModelAndMode(model, searchMode, extraBuiltIns.length > 0 ? { additionalTools: extraBuiltIns } : undefined, { autoMediaEnrichment }),
-        admittedRun,
-    );
-
-    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers] = await Promise.all([
+    // The cap is read beside the reads that do not depend on it. Under `off` every tool is removed, so no quick-check, MCP,
+    // connector or pull request work (token refresh included) starts. A failed read caps at `ask` (`org-policy.md` §6a).
+    const preferences = Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
         ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
         // A run nobody is at inherits no time-boxed allow, so it does not even read them.
         headless ? {} : ctx.runQuery(internal.chat.tool_permissions.getToolPermissionGrantsQuery, { userId }),
+    ]);
+
+    // Handled here so a failed preference read is not reported as unhandled when an `off` run never awaits it.
+    preferences.catch(() => undefined);
+
+    const permissionCap = await readRunPermissionCap(ctx, { organizationId, threadId });
+
+    // Decided before the preferences are awaited: a failed preference read cannot take down a run that offers no tools.
+    // A headless run below `auto` that cannot pause offers none either: the cap holds every tool at `ask` or `off`, and
+    // with nobody to answer, each `ask` is removed (`resolveToolPermission`). One that pauses keeps its `ask` tools.
+    if (permissionCap === "off" || (headless && !headlessCanAsk && permissionCap !== "auto")) {
+        return {
+            autoApprovals: {},
+            mcpClients: [],
+            mcpLabels: {},
+            mcpServerNames: [],
+            mcpToolFingerprints: {},
+            permissionKeys: {},
+            repeatable: [],
+            requiresApproval: [],
+            tools: {},
+        };
+    }
+
+    const [allMcpServers, overrides, timedGrants] = await preferences;
+
+    const [quickCheckOn, connectorServers, pullRequestTools, threadMode] = await Promise.all([
         // Nobody answers in a headless run, and an outside agent's calls stay `ask` because only the app approves them.
-        headless || origin === "outside_agent" || threadId === undefined
+        // Under a cap below `auto` the quick check is off anyway, so its eligibility and trusted servers are not read.
+        headless || origin === "outside_agent" || threadId === undefined || permissionCap !== "auto"
             ? false
             : // A failed read turns the quick check off; it must not take the run down.
               ctx
@@ -165,7 +224,38 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
             return [];
         }),
+        // The pull request tools join only a thread with a linked pull request; a snapshot rebuild already names them.
+        snapshot || linkThreadId === undefined
+            ? []
+            : ctx
+                  .runQuery(internal.source_control.pr_agent.linkedPullRequestsOfThread, { threadId: linkThreadId, userId })
+                  .then((linked) => (linked && linked.links.length > 0 ? PULL_REQUEST_TOOLS : []))
+                  .catch((error: unknown) => {
+                      toolsLogger.warn("[TOOLS] Pull request links unavailable:", error);
+
+                      return [];
+                  }),
+        // A headless run ignores the thread's mode, so it does not read it. A failed read fails closed (supervised) even for a
+        // thread with no stored mode: the read cannot tell, and restoring the automatic defaults could undo a mode the owner chose.
+        headless || modeThreadId === undefined
+            ? null
+            : ctx
+                  .runQuery(internal.chat.tool_permissions.getThreadPermissionMode, {
+                      threadId: modeThreadId as Id<"threads">,
+                      userId: permissionModeUserId ?? userId,
+                  })
+                  .catch((error: unknown) => {
+                      toolsLogger.warn("[TOOLS] Thread permission mode unavailable, using supervised:", error);
+
+                      return "supervised" as const;
+                  }),
     ]);
+
+    const extraBuiltIns = [...baseExtraBuiltIns, ...pullRequestTools].filter((name) => availableBuiltIns.has(name));
+    const builtInTools = withAdmittedBuiltIns(
+        getToolsForModelAndMode(model, searchMode, extraBuiltIns.length > 0 ? { additionalTools: extraBuiltIns } : undefined, { autoMediaEnrichment }),
+        admittedRun,
+    );
 
     // Bearer tokens for servers the user signed in to. The FULL list, so a grant
     // whose server was removed is recognised as orphaned and revoked.
@@ -192,7 +282,8 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         // An outside agent's (public API) event mapping drops progress chunks, so its runs write none.
         getMCPTools(selectedServers, { progress: origin === "outside_agent" ? undefined : mcpProgress }),
         // A device problem must never take the run down with it.
-        deviceThreadId === undefined || headless || origin === "outside_agent"
+        // Below `auto` every device tool is removed by the cap, so the device round-trip is skipped.
+        deviceThreadId === undefined || headless || origin === "outside_agent" || permissionCap !== "auto"
             ? noDevices
             : buildDeviceTools(ctx, { threadId: deviceThreadId, userId }).catch((error: unknown) => {
                   toolsLogger.warn("[TOOLS] Device tools unavailable:", error);
@@ -215,6 +306,40 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
         candidates = Object.fromEntries(Object.entries(candidates).filter(([name]) => !disabled.has(name)));
     }
+
+    // A teammate's access per connection (`connectors/access.ts`). A write tool its level does not allow is not offered to the
+    // model at all, and a connection set to none offers nothing. Fails closed: when the settings cannot be read, no connector
+    // tool is offered, never one the teammate may not use. The thread that governs the run is its own thread, or the one a group
+    // participant's permissions come from. A run with neither has no teammate and keeps every tool.
+    // Read only when a connector's tool is in the set, so a run without one makes no extra query.
+    const accessThreadId = threadId ?? permissionModeThreadId;
+    const hasConnectorTools = Object.keys(candidates).some((name) => mcpResult.descriptors.get(name)?.connectorSlug !== undefined);
+    const connectorAccess =
+        !hasConnectorTools || accessThreadId === undefined
+            ? []
+            : await ctx
+                  .runQuery(internal.connectors.access.listThreadConnectorAccess, { threadId: accessThreadId as Id<"threads">, userId })
+                  .catch((error: unknown) => {
+                      toolsLogger.warn("[TOOLS] Teammate connector access unavailable:", error);
+
+                      return null;
+                  });
+
+    candidates = Object.fromEntries(
+        Object.entries(candidates).filter(([name]) => {
+            const mcp = mcpResult.descriptors.get(name);
+
+            if (!mcp?.connectorSlug) {
+                return true;
+            }
+
+            if (connectorAccess === null) {
+                return false;
+            }
+
+            return toolOfferedAt(levelOfConnection(connectorAccess, mcp.connectorSlug), mcp.annotations);
+        }),
+    );
 
     // A server counts as trusted by what it is (name AND url), so one whose url changed has lost it.
     const trusted = quickCheckOn
@@ -266,8 +391,11 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         ...(origin === "outside_agent" && { apiKeyOrigin: true }),
         headless,
         ...(headlessApproved && { headlessApproved: new Set(headlessApproved) }),
+        permissionCap,
         ...(quickCheck && { lowRiskCheck: quickCheck.check }),
         ...(trusted && { lowRiskTrusted: trusted }),
+        ...(headlessCanAsk && { headlessCanAsk: true }),
+        ...(threadMode && { threadMode }),
         timedGrants,
     });
 
@@ -277,12 +405,17 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
     const permissionKeys = Object.fromEntries(Object.keys(tools).map((name) => [name, describe(name)?.key ?? toolPermissionKey("builtin", name)]));
     const mcpLabels: McpToolLabels = {};
+    const mcpToolFingerprints: Record<string, string> = {};
 
     for (const name of Object.keys(tools)) {
         const mcp = mcpResult.descriptors.get(name);
 
         if (mcp) {
             mcpLabels[name] = { serverName: mcp.serverName, toolName: mcp.toolName };
+
+            if (mcp.fingerprint !== undefined) {
+                mcpToolFingerprints[name] = mcp.fingerprint;
+            }
         }
 
         // Shown like an MCP call, with the device's name as the "server".
@@ -298,7 +431,10 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         mcpClients: mcpResult.clients,
         mcpLabels,
         mcpServerNames: selectedServers.map((s) => s.name),
+        mcpToolFingerprints,
         permissionKeys,
+        repeatable: Object.keys(tools).filter((name) => isSafeToRepeat(name, describe(name))),
+        requiresApproval,
         tools,
     };
 };

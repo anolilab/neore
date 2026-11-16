@@ -20,9 +20,8 @@
     "scripts": {
         "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
-        "lint:prettier": "prettier --check . --ignore-path ../../.prettierignore",
-        "lint:prettier:fix": "prettier --write . --ignore-path ../../.prettierignore",
         "lint:types": "tsc --noEmit",
+        "lint:types:fast": "tsrs --noEmit",
         "test": "vitest run",
         "test:coverage": "vitest run --coverage --coverage.reporter=lcov --coverage.reporter=text-summary"
     },
@@ -44,11 +43,14 @@
     "devDependencies": {
         "@anolilab/eslint-config": "catalog:lint",
         "@lingui/babel-plugin-lingui-macro": "catalog:i18n",
+        "@storybook/react-vite": "catalog:storybook",
         "@types/react": "catalog:types",
         "@types/react-dom": "catalog:types",
         "eslint": "catalog:lint",
+        "eslint-plugin-storybook": "catalog:storybook",
         "react": "catalog:react",
         "react-dom": "catalog:react",
+        "storybook": "catalog:storybook",
         "typescript": "catalog:tsc",
         "vitest": "catalog:test"
     },

@@ -19,12 +19,14 @@ export interface ProviderCellProperties {
     account?: { id: string; providerId: string } | null;
     className?: string;
     classNames?: SettingsCardClassNames;
+    /** Linking a new sign-in is withheld (an admin acting as the account); unlinking is not. */
+    linkDisabled?: boolean;
     other?: boolean;
     provider: Provider;
     refetch?: Refetch;
 }
 
-const ProviderCell = ({ account, className, classNames, other, provider, refetch }: ProviderCellProperties) => {
+const ProviderCell = ({ account, className, classNames, linkDisabled = false, other, provider, refetch }: ProviderCellProperties) => {
     const {
         authClient,
         basePath,
@@ -101,7 +103,7 @@ const ProviderCell = ({ account, className, classNames, other, provider, refetch
 
             <Button
                 className={cn("relative ms-auto", classNames?.button)}
-                disabled={isLoading}
+                disabled={isLoading || (!account && linkDisabled)}
                 onClick={account ? handleUnlink : handleLink}
                 size="sm"
                 type="button"

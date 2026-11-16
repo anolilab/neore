@@ -8,7 +8,8 @@
  * the card finds the run by the call's id and follows it through a live query.
  * The result itself is posted to the thread as a separate message. While the
  * run is working the card offers Stop; the child finishes the step it is in
- * (billed) and runs no more.
+ * (billed) and runs no more. A run waiting on its owner shows its requests here,
+ * answered on the child's thread (`SubAgentApprovals`).
  */
 
 import { useLingui } from "@lingui/react/macro";
@@ -21,16 +22,20 @@ import { Bot, CircleStop, ExternalLink, Loader2 } from "lucide-react";
 import type { FC } from "react";
 import { useId } from "react";
 
+import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
-type RunStatus = "cancelled" | "failed" | "queued" | "running" | "succeeded";
+import SubAgentApprovals from "./sub-agent-approvals";
+
+type RunStatus = "awaiting" | "cancelled" | "failed" | "queued" | "running" | "succeeded";
 
 const TASK_PREVIEW_MAX = 200;
 
 const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
+    const { threadId } = useChatThread();
     const headingId = useId();
     const isDenied = part.state === "output-denied";
     const { data: run, isPending } = useQuery(
@@ -48,6 +53,8 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     const output = part.state === "output-available" ? (part.output as { error?: string } | undefined) : undefined;
 
     const statusLabels: Record<RunStatus, string> = {
+        // Waiting on an approval its owner answers on this card or in the sub-agent's own thread: the owner has to act.
+        awaiting: t`Waiting for your approval`,
         cancelled: t`Stopped`,
         failed: t`Failed`,
         queued: t`Queued`,
@@ -71,6 +78,7 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     }
 
     const isStarting = !run && notice === undefined;
+    // A run waiting on its owner is not busy: it shows no spinner.
     const isActive = isStarting || run?.status === "queued" || run?.status === "running";
     let statusLabel = t`Not started`;
 
@@ -86,7 +94,11 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
         <div aria-labelledby={headingId} className="my-2 rounded-lg border p-3 text-sm" role="group">
             <div className="flex items-start gap-2">
                 {isActive ? (
-                    <Loader2 aria-hidden="true" className="text-muted-foreground mt-0.5 size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+                    <Loader2
+                        aria-hidden="true"
+                        className="text-muted-foreground mt-0.5 size-4 shrink-0 animate-spin motion-reduce:animate-none"
+                        data-testid="sub-agent-spinner"
+                    />
                 ) : (
                     <Bot aria-hidden="true" className="text-muted-foreground mt-0.5 size-4 shrink-0" />
                 )}
@@ -105,7 +117,9 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
 
             {notice && <p className="text-muted-foreground mt-2 text-xs">{notice}</p>}
 
-            {(run?.status === "running" || run?.status === "queued") && (
+            {run?.status === "awaiting" && threadId && <SubAgentApprovals parentThreadId={threadId} runId={run._id} />}
+
+            {(run?.status === "running" || run?.status === "queued" || run?.status === "awaiting") && (
                 <Button className="mt-2" disabled={stop.isPending} onClick={() => stop.mutate({ runId: run._id })} size="sm" type="button" variant="outline">
                     <CircleStop aria-hidden="true" />
                     {t`Stop`}
@@ -114,7 +128,7 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
 
             {run?.childThreadId && (
                 <Link
-                    className="text-primary mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
+                    className="text-primary-text mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
                     params={{ threadId: run.childThreadId }}
                     to="/chat/$threadId"
                 >

@@ -19,7 +19,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { linksToLockedThread, redactForLockedThread } from "./locked-link";
 import { webPushConfig } from "./push-config";
 import { isAllowedPushEndpoint } from "./push-endpoint";
-import { pushTitle, pushUrgency } from "./push-text";
+import { pushHeadline, pushUrgency } from "./push-text";
 
 /** Browsers one user may register; the one not seen for longest is dropped past this. */
 export const MAX_PUSH_SUBSCRIPTIONS_PER_USER = 10;
@@ -141,6 +141,7 @@ export const loadPushNotification = internalQuery
         v.union(
             v.null(),
             v.object({
+                approvalId: v.optional(v.string()),
                 body: v.optional(v.string()),
                 link: v.optional(v.string()),
                 outcome: v.optional(v.union(v.literal("success"), v.literal("failure"))),
@@ -161,15 +162,13 @@ export const loadPushNotification = internalQuery
 
         return {
             title: shown.title,
+            ...(notification.approvalId !== undefined && { approvalId: notification.approvalId }),
             type: shown.type,
             ...(shown.body !== undefined && { body: shown.body }),
             ...(shown.link !== undefined && { link: shown.link }),
             ...(shown.outcome !== undefined && { outcome: shown.outcome }),
         };
     });
-
-/** Push body cap, well inside the 4 KiB a push service accepts after encryption. */
-const PUSH_BODY_MAX = 300;
 
 export const sendPushForNotification = internalAction
     .input({ notificationId: v.id("notifications"), userId: v.string() })
@@ -188,9 +187,8 @@ export const sendPushForNotification = internalAction
         // `public/push-sw.js` reads `title`/`body` and `data.{link,tag}`.
         const result = await ctx.push.broadcast(
             {
-                body: notification.body ? `${notification.title}\n${notification.body}`.slice(0, PUSH_BODY_MAX) : notification.title.slice(0, PUSH_BODY_MAX),
+                ...pushHeadline(notification),
                 data: { link: notification.link ?? "/dashboard", tag: args.notificationId },
-                title: pushTitle(notification.type, notification.outcome),
                 urgency: pushUrgency(notification.type),
             },
             { userId: args.userId },

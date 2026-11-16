@@ -47,6 +47,55 @@ describe("followLive", () => {
         expect(seen.latest().rows).toEqual(["p1"]);
     });
 
+    it("reports each answer with rows as a successful read, and an error as none", () => {
+        const fake = fakeWatch();
+        let answered = 0;
+
+        followLive("a:projects", fake.watch, recorder().publish, () => {
+            answered += 1;
+        });
+        fake.error("FORBIDDEN");
+        expect(answered).toBe(0);
+
+        for (const rows of [["p1"], []]) {
+            fake.push(rows);
+        }
+
+        expect(answered).toBe(2);
+    });
+
+    it("does not count a held value replayed while subscribing, and counts the server's answer after it", () => {
+        let answered = 0;
+        let onRows: ((rows: string[]) => void) | undefined;
+        let onError: ((message: string) => void) | undefined;
+        const seen = recorder();
+
+        followLive(
+            "a:projects",
+            (rowsCallback, errorCallback) => {
+                onRows = rowsCallback;
+                onError = errorCallback;
+                // The Lunora client hands a held value to a new subscriber inside `subscribe()`, before the server answers.
+                rowsCallback(["cached"]);
+
+                return () => {};
+            },
+            seen.publish,
+            () => {
+                answered += 1;
+            },
+        );
+
+        expect(seen.latest().rows).toEqual(["cached"]);
+        expect(answered).toBe(0);
+
+        onError?.("FORBIDDEN");
+        expect(answered).toBe(0);
+
+        onRows?.(["p1"]);
+        expect(answered).toBe(1);
+    });
+
     it("drops the rows when the subscription fails", () => {
         const fake = fakeWatch();
         const seen = recorder();

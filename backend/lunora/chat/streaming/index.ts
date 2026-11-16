@@ -16,6 +16,8 @@ import { throwThreadLocked } from "../../lib/thread-lock";
 import { deliveredSteerIds, type SteerEntry } from "../lib/steer-queue";
 import { discardPausedThreadSecrets } from "../lib/secret-requests";
 import { lockedAfterCreation, streamLockedAfterStart } from "../lib/thread-gate";
+import { recordStartStream, vStartClaim } from "../start-claim";
+import { insertPersistentStream } from "./persistent/library";
 
 /**
  * Persistent Text Streaming Helper
@@ -135,6 +137,8 @@ export const createStreamWithMessage = internalMutation
         /** The goal this message started: `startGoal` already ended the thread's others, so nothing ends here. */
         goalId: v.optional(v.id("threadGoals")),
         messageId: v.string(),
+        /** A send with a `clientMessageId` (`chat/start-claim.ts`): the stream is recorded on its claim in this transaction. */
+        startClaim: v.optional(vStartClaim),
         streamingConfig: vStreamingConfig,
         threadId: v.string(),
         userId: v.string(),
@@ -143,22 +147,34 @@ export const createStreamWithMessage = internalMutation
     // inferring the brand into `api.ts`, where it landed as a bare name with no
     // import.
     .output(v.string())
-    .mutation(async ({ args: { goalId, messageId, streamingConfig, threadId, userId }, ctx: context }) => {
+    .mutation(async ({ args: { goalId, messageId, startClaim, streamingConfig, threadId, userId }, ctx: context }) => {
         // A new message in a thread ends the goal it was working toward (a goal's own rounds never come through here).
         // A goal-starting message skips it: `startGoal` ended the others with its insert, and a late stream must not end a later goal.
         if (!goalId) {
-            await endActiveGoals(context, threadId as Id<"threads">, "superseded");
+            // A send under a claim may be a resumed one, whose prompt was saved before its sender died: it ends the goals of
+            // prompts saved before its own, even one that started later, and never the goal of a later prompt. The claim is
+            // checked below, in this transaction.
+            const prompt = startClaim ? await context.db.get("messages", messageId as Id<"messages">) : null;
+
+            await endActiveGoals(context, threadId as Id<"threads">, "superseded", prompt ? { before: prompt } : {});
         }
 
         // A reply paused on a request that this message moves the conversation past is abandoned: drop what it kept through the pause.
         await discardPausedThreadSecrets(context, { threadId: threadId as Id<"threads"> });
 
-        const streamId = await persistentTextStreaming.createStream(context, {
+        // Inserted here, not through `persistentTextStreaming.createStream`: that is a nested mutation, which commits on its
+        // own, so a refused claim below would leave its stream behind.
+        const streamId = await insertPersistentStream(context, {
             messageId,
             streamingConfig,
             threadId,
             userId,
         });
+
+        if (startClaim) {
+            // Throws when another try holds the send, which rolls this stream back.
+            await recordStartStream(context, startClaim, streamId);
+        }
 
         // The thread shows as running from the moment its stream exists. This
         // was a scheduled `updateThread` that `/chat/start` awaited after

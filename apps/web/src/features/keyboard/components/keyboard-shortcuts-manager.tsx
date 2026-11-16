@@ -4,6 +4,7 @@ import { HotkeysProvider, useHotkeys } from "react-hotkeys-hook";
 import { useKeyboardShortcuts as useUIKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
+import { useFocusAreaHotkeys } from "../hooks/use-focus-area-hotkeys";
 import { hasFindInThreadTarget } from "../lib/find-in-thread-target";
 import { convertRecordedShortcutToHotkeysHook, effortCommandsToRegister } from "../lib/recorded-shortcut-converter";
 import convertShortcutToHotkeysHook from "../lib/shortcut-converter";
@@ -58,6 +59,8 @@ const KeyboardShortcutsHandler: React.FC<{
     onShortcut?: (action: keyof KeyboardShortcutsConfig, event: KeyboardEvent) => void;
     shortcuts: KeyboardShortcuts;
 }> = ({ onShortcut, shortcuts }) => {
+    useFocusAreaHotkeys();
+
     // Track if component is mounted using a ref to prevent state updates during unmount
 
     // Check if we're in an input - use a ref to track this without causing re-renders.
@@ -67,16 +70,19 @@ const KeyboardShortcutsHandler: React.FC<{
     // Memoize converted shortcuts to prevent unnecessary re-registrations
     const convertedShortcuts = useMemo(() => {
         return {
+            archiveThread: convertShortcutToHotkeysHook(shortcuts.archiveThread),
             askAside: convertShortcutToHotkeysHook(shortcuts.askAside),
             audioRecord: convertShortcutToHotkeysHook(shortcuts.audioRecord),
             copyLastCodeBlock: convertShortcutToHotkeysHook(shortcuts.copyLastCodeBlock),
             decreaseEffort: convertRecordedShortcutToHotkeysHook(shortcuts.decreaseEffort),
+            deleteThread: convertShortcutToHotkeysHook(shortcuts.deleteThread),
             escape: convertShortcutToHotkeysHook(shortcuts.escape),
             findInThread: convertShortcutToHotkeysHook(shortcuts.findInThread),
             firstItem: convertShortcutToHotkeysHook(shortcuts.firstItem),
             focusSearch: convertShortcutToHotkeysHook(shortcuts.focusSearch),
             help: convertShortcutToHotkeysHook(shortcuts.help),
             increaseEffort: convertRecordedShortcutToHotkeysHook(shortcuts.increaseEffort),
+            jumpToLastMessage: convertShortcutToHotkeysHook(shortcuts.jumpToLastMessage),
             lastItem: convertShortcutToHotkeysHook(shortcuts.lastItem),
             newChat: convertShortcutToHotkeysHook(shortcuts.newChat),
             newTemporaryChat: convertShortcutToHotkeysHook(shortcuts.newTemporaryChat),
@@ -87,16 +93,19 @@ const KeyboardShortcutsHandler: React.FC<{
             sidebarRight: convertShortcutToHotkeysHook(shortcuts.sidebarRight),
         };
     }, [
+        shortcuts.archiveThread,
         shortcuts.askAside,
         shortcuts.audioRecord,
         shortcuts.copyLastCodeBlock,
         shortcuts.decreaseEffort,
+        shortcuts.deleteThread,
         shortcuts.escape,
         shortcuts.findInThread,
         shortcuts.firstItem,
         shortcuts.focusSearch,
         shortcuts.help,
         shortcuts.increaseEffort,
+        shortcuts.jumpToLastMessage,
         shortcuts.lastItem,
         shortcuts.newChat,
         shortcuts.newTemporaryChat,
@@ -139,6 +148,42 @@ const KeyboardShortcutsHandler: React.FC<{
 
             event.preventDefault();
             onShortcut?.("copyLastCodeBlock", event);
+        },
+        [onShortcut],
+    );
+
+    const handleJumpToLastMessage = useCallback(
+        (event: KeyboardEvent) => {
+            if (isTextEntryKeystroke(event)) {
+                return;
+            }
+
+            event.preventDefault();
+            onShortcut?.("jumpToLastMessage", event);
+        },
+        [onShortcut],
+    );
+
+    const handleArchiveThread = useCallback(
+        (event: KeyboardEvent) => {
+            if (isTextEntryKeystroke(event)) {
+                return;
+            }
+
+            event.preventDefault();
+            onShortcut?.("archiveThread", event);
+        },
+        [onShortcut],
+    );
+
+    const handleDeleteThread = useCallback(
+        (event: KeyboardEvent) => {
+            if (isTextEntryKeystroke(event)) {
+                return;
+            }
+
+            event.preventDefault();
+            onShortcut?.("deleteThread", event);
         },
         [onShortcut],
     );
@@ -322,6 +367,35 @@ const KeyboardShortcutsHandler: React.FC<{
     );
 
     useHotkeys(
+        convertedShortcuts.archiveThread,
+        handleArchiveThread,
+        {
+            description: "Archive the open thread",
+            enabled: !!shortcuts.archiveThread && typeof shortcuts.archiveThread === "string",
+            // Never from a text field, modifier chord or not: these two options are what keep it out of the composer (the
+            // keystroke check in the handler lets every modifier chord through).
+            enableOnContentEditable: false,
+            enableOnFormTags: false,
+            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
+        },
+        [convertedShortcuts.archiveThread, handleArchiveThread],
+    );
+
+    useHotkeys(
+        convertedShortcuts.deleteThread,
+        handleDeleteThread,
+        {
+            description: "Delete the open thread (asks first)",
+            enabled: !!shortcuts.deleteThread && typeof shortcuts.deleteThread === "string",
+            // Never from a text field, as archive: these two options keep it out of the composer.
+            enableOnContentEditable: false,
+            enableOnFormTags: false,
+            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
+        },
+        [convertedShortcuts.deleteThread, handleDeleteThread],
+    );
+
+    useHotkeys(
         convertedShortcuts.escape,
         handleEscape,
         {
@@ -452,6 +526,20 @@ const KeyboardShortcutsHandler: React.FC<{
             preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
         },
         [convertedShortcuts.increaseEffort, effortRegistered.increaseEffort, handleIncreaseEffort],
+    );
+
+    useHotkeys(
+        convertedShortcuts.jumpToLastMessage,
+        handleJumpToLastMessage,
+        {
+            description: "Jump to my last message",
+            enabled: !!shortcuts.jumpToLastMessage && typeof shortcuts.jumpToLastMessage === "string",
+            // Like the copy shortcut: a modifier chord works from the composer, a bare key stays with the field.
+            enableOnContentEditable: true,
+            enableOnFormTags: true,
+            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event),
+        },
+        [convertedShortcuts.jumpToLastMessage, handleJumpToLastMessage],
     );
 
     useHotkeys(

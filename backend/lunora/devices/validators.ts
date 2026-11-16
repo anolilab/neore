@@ -7,8 +7,11 @@ import { v } from "lunorash/server";
 
 export const vDevicePlatform = v.union(v.literal("macos"), v.literal("windows"), v.literal("linux"));
 
-/** How a device is reached. Unset is a desktop paired directly; `ssh` is a server a desktop speaks for (`viaDeviceId`). */
-export const vDeviceTransport = v.literal("ssh");
+/**
+ * How a device is reached. Unset is a desktop paired directly; `ssh` is a server a desktop speaks for (`viaDeviceId`);
+ * `headless` is a machine that paired itself by code (`neore-host pair`) and holds its own secret.
+ */
+export const vDeviceTransport = v.union(v.literal("ssh"), v.literal("headless"));
 
 /**
  * A call's lifecycle. `pending` waits for the device to claim it, `claimed` is
@@ -60,6 +63,8 @@ export const vAcpOffer = v.object({
 export const vDeviceView = v.object({
     _id: v.string(),
     acpOffers: v.optional(v.array(vAcpOffer)),
+    /** The desktop app version last reported with the manifest; unset when never reported. */
+    appVersion: v.optional(v.string()),
     createdAt: v.number(),
     lastSeenAt: v.optional(v.number()),
     name: v.string(),

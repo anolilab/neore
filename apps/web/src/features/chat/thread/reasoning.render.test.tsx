@@ -66,7 +66,8 @@ describe("reasoning footer", () => {
         fireEvent.click(screen.getByRole("button", { name: "Collapse" }));
 
         expect(screen.queryByRole("button", { name: "Copy reasoning" })).toBeNull();
-        expect(screen.getByRole("button", { name: "Expand thinking" }).matches(":focus")).toBe(true);
+        // The trigger is named by its visible text, so it is found by its collapsed state.
+        expect(screen.getByRole("button", { expanded: false }).matches(":focus")).toBe(true);
     });
 
     it("offers neither control while the reasoning is still streaming", () => {

@@ -59,11 +59,11 @@ const HistoryEntryItem = ({ entry, isCurrent, onRestore }: HistoryEntryItemProps
             type="button"
         >
             <div className="mt-0.5 flex-shrink-0">
-                <Clock className={`size-4 ${isCurrent ? "text-primary" : "text-muted-foreground"}`} />
+                <Clock className={`size-4 ${isCurrent ? "text-primary-text" : "text-muted-foreground"}`} />
             </div>
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                    <span className={`text-sm font-medium ${isCurrent ? "text-primary" : ""}`}>
+                    <span className={`text-sm font-medium ${isCurrent ? "text-primary-text" : ""}`}>
                         {entry.label ?? (entry.isAutoSave ? t`Auto-save` : t`Edit`)}
                     </span>
                     {isCurrent && (

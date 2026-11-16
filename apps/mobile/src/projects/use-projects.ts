@@ -2,16 +2,22 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/auth/auth-state";
 import { getClient } from "@/lib/lunora";
+import { useOffline } from "@/offline/offline-context";
 
 import type { Live, Scoped } from "./live-follow";
 import { EMPTY_LIVE, followLive, liveFor } from "./live-follow";
 import type { ProjectRow, ProjectThreadRow } from "./projects-api";
 import { watchProject, watchProjects, watchProjectThreads } from "./projects-api";
 
-/** Follows one live query while the user is signed in; the subscription ends with the screen. */
+/**
+ * Follows one live query while the user is signed in with a token; the subscription ends with the screen. A start that
+ * is still confirming the stored user holds none yet, and a subscription opened without one would be refused. Its answers
+ * count as successful reads, so a project screen opened on its own gets its write controls back after a reconnect.
+ */
 const useLive = <T>(watch: (onRows: (rows: T[]) => void, onError: (message: string) => void) => () => void, key: string): Live<T> => {
-    const { status, user } = useAuth();
-    const scope = status === "signed-in" && user ? `${user.id}:${key}` : undefined;
+    const { hasToken, status, user } = useAuth();
+    const { reportRead } = useOffline();
+    const scope = status === "signed-in" && hasToken && user ? `${user.id}:${key}` : undefined;
     const [live, setLive] = useState<Scoped<T>>({ ...EMPTY_LIVE, scope: "" });
 
     useEffect(() => {
@@ -21,9 +27,9 @@ const useLive = <T>(watch: (onRows: (rows: T[]) => void, onError: (message: stri
             return undefined;
         }
 
-        return followLive(scope, watch, setLive);
-        // `scope` stands for the user and everything `watch` closes over.
-    }, [scope]);
+        return followLive(scope, watch, setLive, () => reportRead("succeeded"));
+        // `scope` stands for the user and everything `watch` closes over; `reportRead` is stable.
+    }, [reportRead, scope]);
 
     return liveFor(live, scope);
 };
@@ -36,12 +42,3 @@ export const useProject = (projectId: string): Live<ProjectRow> =>
 
 export const useProjectThreads = (projectId: string): Live<ProjectThreadRow> =>
     useLive((onRows, onError) => watchProjectThreads(getClient(), projectId, onRows, onError), `threads:${projectId}`);
-
-/** True while the client has no connection. Writes are refused then, never queued. */
-export const useIsOffline = (): boolean => {
-    const [isOffline, setIsOffline] = useState(false);
-
-    useEffect(() => getClient().onConnectionStatus((status) => setIsOffline(status === "offline")), []);
-
-    return isOffline;
-};

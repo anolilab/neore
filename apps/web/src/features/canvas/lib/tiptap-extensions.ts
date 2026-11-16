@@ -71,7 +71,7 @@ export const createCanvasExtensions = (options?: { placeholder?: string }): Exte
         autolink: true,
         defaultProtocol: "https",
         HTMLAttributes: {
-            class: "text-primary underline underline-offset-2",
+            class: "text-primary-text underline underline-offset-2",
         },
         openOnClick: false,
     }),

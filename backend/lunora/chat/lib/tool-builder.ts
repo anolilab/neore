@@ -30,6 +30,11 @@ import {
     findPlaceTool,
     flightTrackerTool,
     githubSearchTool,
+    mergePullRequestTool,
+    readFailingChecksTool,
+    readPullRequestTool,
+    replyToReviewCommentTool,
+    rerunFailedChecksTool,
     imageEditingTool,
     imageGenerationTool,
     imageSearchTool,
@@ -136,6 +141,16 @@ const CODING_AGENT_TOOLS = [ToolName.DelegateToCodingAgent];
 // secret on a card instead of in the chat, with the tools that spend it. Headless runs lose the two
 // that wait for a person (`tool-permissions.ts`), as nobody is there to answer.
 const INTERACTION_TOOLS = [ToolName.AskUser, ToolName.RequestSecret, ToolName.SaveSecretAsProviderKey, ToolName.SetMcpServerSecret];
+
+// Working on the pull requests linked to the thread. In no mode's list: a run offers them only to a thread that has one
+// (`agent-tools.ts`), so a chat without a pull request carries none of them.
+export const PULL_REQUEST_TOOLS: ReadonlyArray<string> = [
+    ToolName.ReadPullRequest,
+    ToolName.ReadFailingChecks,
+    ToolName.ReplyToReviewComment,
+    ToolName.RerunFailedChecks,
+    ToolName.MergePullRequest,
+];
 // Delegating a self-contained piece of work to a headless sub-agent (`sub-agents/`)
 const SUB_AGENT_TOOLS = [ToolName.DelegateToSubAgent, ToolName.MessageWorker];
 
@@ -375,6 +390,7 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
 
     [ToolName.ListCurrencies]: listCurrenciesTool,
     [ToolName.ListLanguages]: listLanguagesTool,
+    [ToolName.MergePullRequest]: mergePullRequestTool,
     [ToolName.MessageWorker]: messageWorkerTool,
 
     // Entertainment Tools
@@ -384,13 +400,17 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
     // People & Company Search Tools
     [ToolName.PeopleSearch]: peopleSearchTool,
 
+    [ToolName.ReadFailingChecks]: readFailingChecksTool,
+    [ToolName.ReadPullRequest]: readPullRequestTool,
     [ToolName.RedditSearch]: redditSearchTool,
 
     // Generative UI Tools
     [ToolName.RenderUI]: renderUITool,
+    [ToolName.ReplyToReviewComment]: replyToReviewCommentTool,
 
     // Asking the user for a secret, and spending it
     [ToolName.RequestSecret]: requestSecretTool,
+    [ToolName.RerunFailedChecks]: rerunFailedChecksTool,
     // Content Tools
     [ToolName.Retrieve]: retrieveTool,
     [ToolName.SaveSecretAsProviderKey]: saveSecretAsProviderKeyTool,
@@ -460,6 +480,7 @@ const TOOLS_BY_CATEGORY = {
     knowledge: [ToolName.KnowledgeSearch],
     location: [ToolName.FindPlace, ToolName.NearbyPlacesSearch, ToolName.Weather],
     memory: [ToolName.SearchMemory],
+    pullRequest: [ToolName.ReadPullRequest, ToolName.ReadFailingChecks, ToolName.ReplyToReviewComment, ToolName.RerunFailedChecks, ToolName.MergePullRequest],
     research: [ToolName.DeepResearch],
     sandbox: [ToolName.ShellExecution, ToolName.FileOperations],
     search: [

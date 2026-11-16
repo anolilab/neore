@@ -43,6 +43,7 @@ export const recordPausedRunUsage = async (ctx: MutationCtx, stream: Doc<"persis
             message: row.message as { role?: string } | null | undefined,
             order: row.order,
             providerMetadata: row.providerMetadata,
+            threadId: row.threadId as string,
             usage: row.usage,
         };
     });

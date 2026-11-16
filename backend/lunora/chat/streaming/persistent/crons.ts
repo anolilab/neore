@@ -1,11 +1,12 @@
 import type { Id } from "../../../_generated/dataModel";
 import { internalMutation } from "../../../_generated/server";
 import { expireHostStream } from "../../../acp/lib/reap";
-import { patchThread } from "../../../agent/table-writes";
 import { patchRow } from "../../../lib/patch";
+import { remindPendingApprovals } from "../../lib/approval-reminder";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
 import { type SteerEntry, withoutQueuedText } from "../../lib/steer-queue";
 import { purgeExpiredToolApprovalRuns } from "../../lib/tool-approval-cleanup";
+import { releaseThread } from "./host";
 
 const BATCH_SIZE = 100;
 
@@ -47,19 +48,9 @@ export const cleanupExpiredStreams = internalMutation.input({}).mutation(async (
 
         // A run that died without reaching `failRun` (evicted, or a dropped redelivery)
         // leaves its thread `running`; nothing else resets it. A newer live stream on the
-        // thread means another run owns that status.
-        const threadId = stream.threadId as Id<"threads">;
-        const thread = await ctx.db.threads.findFirst({ where: { _id: threadId } });
-        const live = await ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId } });
-        // An edit streams through `streamingMessages` instead, and it holds the same running status.
-        const liveEdit = await ctx.db
-            .query("streamingMessages")
-            .withIndex("threadId_state_order_stepOrder", (q) => q.eq("threadId", threadId).eq("stateKind", "streaming"))
-            .take(1);
-
-        if (thread?.status === "running" && !live && liveEdit.length === 0) {
-            await patchThread(ctx.db, thread._id, { status: "active", updatedAt: now });
-        }
+        // thread means another run owns that status. A timeout is a failed run, so a snoozed thread wakes (`releaseThread`,
+        // the same give-back a failed host turn makes).
+        await releaseThread(ctx, stream.threadId as Id<"threads">, now, { failed: true });
     }
 
     if (expiredStreams.length > 0) {
@@ -73,4 +64,7 @@ export const cleanupExpiredStreams = internalMutation.input({}).mutation(async (
     if (purgedApprovals > 0) {
         console.log(`Purged ${purgedApprovals} expired tool-approval snapshot(s)`);
     }
+
+    // The reminder for an approval left unanswered four hours (`lib/approval-reminder.ts`), in the same bounded tick.
+    await remindPendingApprovals(ctx, now);
 });

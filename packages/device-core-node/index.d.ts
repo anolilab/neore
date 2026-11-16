@@ -115,15 +115,29 @@ export declare class DeviceCore {
    */
   acpInstall(request: string): string
   /**
+   * Verifies a downloaded npm tarball against the package index's integrity, installs it with npm without
+   * running any lifecycle script, and registers the agent pinned, with the hash of the installed files
+   * (`NpmInstallRequest`, JSON). Not reachable through `acp_update`. Validation is in Rust.
+   *
+   * Asynchronous: npm can run for minutes, and the thread that calls this is the app's main thread.
+   */
+  acpInstallNpm(request: string): Promise<string>
+  /**
    * Deletes the installed versions of an agent other than the pinned one. Run it after closing the sessions
    * the install took the approval from.
    */
   acpInstallPrune(agentKey: string): void
   /**
    * What to spawn for an agent (JSON): command, arguments, folder and environment. `folder` absent is a
-   * version probe. The environment holds secrets: it goes to the main process and nowhere else.
+   * version probe. The environment holds secrets: it goes to the main process and nowhere else. An installed npm
+   * agent's files are hashed on the calling thread here; use `acpSpawnPlanAsync` where that thread is the app's.
    */
   acpSpawnPlan(agentKey: string, folder?: string | undefined | null): string
+  /**
+   * `acpSpawnPlan` on a worker thread: an installed npm agent's files are hashed first, which can take long
+   * on a big dependency tree, so the app's main thread must not do it.
+   */
+  acpSpawnPlanAsync(agentKey: string, folder?: string | undefined | null): Promise<string>
   /**
    * Registers, changes or removes a coding agent of a server, or approves it for a folder shared with the server
    * (an `acpUpdate` operation, JSON; JSON back: `{ agents, consents }` of that server). Local window only.
@@ -199,3 +213,11 @@ export interface AcpMedia {
   size: number
   status: string
 }
+
+/**
+ * What a tool file is, for "is this still the file the person confirmed": take it for `node` and `npm` when the
+ * person confirms an npm agent install (in the confirmation, not just before the install runs) and pass the two
+ * values back unchanged as `nodeIdentity` and `npmIdentity` of `acpInstallNpm`, which refuses a tool that is no
+ * longer that file. `null` when the path names no file. The value is opaque.
+ */
+export declare function toolIdentity(path: string): string | null

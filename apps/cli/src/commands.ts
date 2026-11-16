@@ -8,20 +8,25 @@ import { basename, extname } from "node:path";
 import type { Flags, ParsedCommand } from "./args";
 import { limitFlag, requireArgument, UsageError } from "./args";
 import { ApiError, hintFor, NeoreClient, stripTrailingSlashes } from "./client";
-import type { CliConfig } from "./config";
 import { deleteConfig, insecurePermissions, readConfig, resolveCredentials, writeConfig } from "./config";
+import { assertSecureBaseUrl, formatUserCode, pollForKey, REQUEST_TIMEOUT_MS, requestDeviceCode, revokeIssuedKey } from "./device-login";
 import type { Io } from "./render";
 import { formatDate, formatTable, paint, printJson, renderStream, shouldUseColor } from "./render";
 
 export interface Context {
     configFile: string;
     fetch: typeof fetch;
+    /** What this machine calls itself; sent with a sign-in code so the person approving can recognise it. */
+    hostname: string;
     io: Io;
+    /** Epoch ms; injected so the sign-in poll runs without real time in tests. */
+    now: () => number;
     readFile: (path: string) => Promise<Uint8Array>;
     /** One line of user input, or `null` at EOF. `secret` suppresses echo. */
     readLine: (prompt: string, options?: { secret?: boolean }) => Promise<string | null>;
     /** All of stdin, when it is piped; `null` when it is a terminal. */
     readStdin: () => Promise<string | null>;
+    sleep: (ms: number) => Promise<void>;
     stdinIsTTY: boolean;
 }
 
@@ -52,6 +57,8 @@ interface ChatStarted {
 }
 
 interface ChatCompleted {
+    /** With `status: "waiting_on_person"`: the approval or question only a person can answer, in the app. */
+    pendingRequest?: { question?: string; toolName?: string };
     status: string;
     text: string;
     threadId: string;
@@ -125,6 +132,201 @@ const sendPrompt = async (context: Context, client: NeoreClient, flags: Flags, p
     return { threadId: started.threadId };
 };
 
+// ─── Thread start / send ────────────────────────────────────────────────────
+
+/** Exit codes of `thread start|send` for an answer: a reply (0), a failed run (1), no finished reply yet (2). */
+const THREAD_EXIT = { failed: 1, ok: 0, other: 2 } as const;
+
+/**
+ * `ChatCompleted.status` values that mean the reply cannot be read from this
+ * answer (the five-minute wait or the read budget ran out, or the read was cut):
+ * not a failed run, so the caller is told where to read it later. A run paused
+ * on a person (`waiting_on_person`) also exits 2, with what it is waiting on.
+ */
+const UNFINISHED_STATUSES: ReadonlySet<string> = new Set(["interrupted", "relay_budget", "relay_timeout", "unknown"]);
+
+/** Error codes after which the run may have started, besides any 5xx: the send was lost, or a retry found it in progress or could not tell. */
+const MAYBE_RUNNING_CODES: ReadonlySet<string> = new Set(["idempotency_in_progress", "idempotency_outcome_unknown", "network_error"]);
+
+const readLaterHint = (threadId: string | undefined): string =>
+    threadId
+        ? `read it later with \`neore threads show ${threadId}\``
+        : "find the new thread with `neore threads ls`, then read it with `neore threads show <thread-id>`";
+
+/**
+ * Whether the server may have run the send despite the error: a 5xx, one of {@link MAYBE_RUNNING_CODES}, or a success
+ * status whose body could not be read.
+ */
+const isPossiblyRun = (error: ApiError): boolean =>
+    error.status >= 500 || MAYBE_RUNNING_CODES.has(error.code) || (error.code === "invalid_response" && error.status >= 200 && error.status < 300);
+
+/** A success answer from `POST /chat` that names no thread: the run started, but the CLI cannot say where. */
+const requireThreadId = <T extends { threadId?: unknown }>(answer: T | null, status: number): T & { threadId: string } => {
+    if (answer === null || typeof answer !== "object" || typeof answer.threadId !== "string" || answer.threadId === "") {
+        throw new ApiError({ code: "invalid_response", message: "The API answered without a thread id.", status });
+    }
+
+    return answer as T & { threadId: string };
+};
+
+/** Runs one send; an error after which the run may have started names where to find it instead of inviting a resend. */
+const withReadLaterHint = async <T>(threadId: string | undefined, request: Promise<T>): Promise<T> => {
+    try {
+        return await request;
+    } catch (error) {
+        if (error instanceof ApiError && isPossiblyRun(error)) {
+            // A new invocation sends a new idempotency key, so sending again could start and bill a second run.
+            throw new ApiError({
+                code: error.code,
+                details: error.details,
+                message: `${error.message} The run may have started; ${readLaterHint(threadId)} before sending it again.`,
+                requestId: error.requestId,
+                status: error.status,
+            });
+        }
+
+        throw error;
+    }
+};
+
+/** Control characters (newlines, escape sequences) in model text become spaces, so it cannot forge a line or restyle the terminal. */
+const CONTROL_CHARACTERS = /\p{Cc}+/gu;
+
+const oneLine = (text: string): string => text.replaceAll(CONTROL_CHARACTERS, " ").trim();
+
+/** The flags `thread start|send` use. Every flag is shared, so any other one would be dropped while a billed run starts. */
+const THREAD_FLAGS: ReadonlySet<string> = new Set(["api-key", "api-url", "help", "json", "model", "wait"]);
+
+/** Refuses a flag `thread start|send` would drop; checked before stdin is read, so an open pipe cannot hold it back. */
+const refuseUnusedFlags = (flags: Flags): void => {
+    const unused = Object.keys(flags).filter((flag) => !THREAD_FLAGS.has(flag));
+
+    if (unused.includes("thread")) {
+        throw new UsageError("`thread` has no -t/--thread: the thread id is the first argument of `thread send`.");
+    }
+
+    if (unused.length > 0) {
+        throw new UsageError(`\`thread\` has no ${unused.map((flag) => `--${flag}`).join(", ")}. It takes -m, --wait and --json; --wait waits for the reply.`);
+    }
+};
+
+const postThread = async (context: Context, flags: Flags, threadId: string | undefined, prompt: string): Promise<number> => {
+    const client = await clientFor(context, flags);
+    const body = { model: flags.model, prompt, ...(threadId && { threadId }) };
+
+    if (!flags.wait) {
+        const started = await withReadLaterHint(
+            threadId,
+            client
+                .request<ChatStarted>("POST", "/chat", { body: { ...body, stream: true }, retryAmbiguous: false })
+                .then((answer) => requireThreadId(answer, 202)),
+        );
+
+        if (flags.json) {
+            // `null`, not a missing key, when the answer names no message: the shape stays the same for a JSON caller.
+            printJson(context.io, { messageId: started.messageId ?? null, threadId: started.threadId });
+        } else {
+            context.io.stdout.write(`${started.threadId}\n`);
+        }
+
+        return THREAD_EXIT.ok;
+    }
+
+    const result = await withReadLaterHint(
+        threadId,
+        client
+            .request<ChatCompleted>("POST", "/chat", { body: { ...body, stream: false }, retryAmbiguous: false, timeoutMs: BLOCKING_TIMEOUT_MS })
+            .then((answer) => {
+                // An empty reply is a run that finished without writing; a missing one is an answer that cannot be read.
+                if (typeof (answer as { text?: unknown } | null)?.text !== "string") {
+                    throw new ApiError({ code: "invalid_response", message: "The API answered without the reply text.", status: 200 });
+                }
+
+                return requireThreadId(answer, 200);
+            }),
+    );
+
+    const colors = paint(shouldUseColor(context.io.stderr, context.io.env));
+
+    if (flags.json) {
+        printJson(context.io, result);
+    } else {
+        // Only a finished reply goes to stdout; a cut or failed one is read from the thread, as the message below says.
+        if (result.status === "done" && result.text) {
+            context.io.stdout.write(result.text.endsWith("\n") ? result.text : `${result.text}\n`);
+        }
+
+        context.io.stderr.write(colors.dim(`thread ${result.threadId}\n`));
+    }
+
+    if (result.status === "done") {
+        return THREAD_EXIT.ok;
+    }
+
+    if (result.status === "waiting_on_person") {
+        const { question, toolName } = result.pendingRequest ?? {};
+        const asked = oneLine(question ?? (toolName ? `approve ${toolName}` : "an answer"));
+
+        context.io.stderr.write(
+            `${colors.red("error:")} the run is waiting on a person (${asked}). Answer it in the app, then read the reply with \`neore threads show ${result.threadId}\`.\n`,
+        );
+
+        return THREAD_EXIT.other;
+    }
+
+    if (UNFINISHED_STATUSES.has(result.status)) {
+        context.io.stderr.write(
+            `${colors.red("error:")} no finished reply yet (${result.status}). Read it later with \`neore threads show ${result.threadId}\`.\n`,
+        );
+
+        return THREAD_EXIT.other;
+    }
+
+    context.io.stderr.write(
+        `${colors.red("error:")} the run ended in failure (${result.status}). See what happened with \`neore threads show ${result.threadId}\`.\n`,
+    );
+
+    return THREAD_EXIT.failed;
+};
+
+/** The prompt from the arguments, or from piped stdin when there are none. */
+const promptFrom = async (context: Context, args: ReadonlyArray<string>): Promise<string> => {
+    const prompt = args.join(" ").trim();
+
+    if (prompt || context.stdinIsTTY) {
+        return prompt;
+    }
+
+    const piped = await context.readStdin();
+
+    return piped?.trim() ?? "";
+};
+
+export const threadStart = async (context: Context, { args, flags }: ParsedCommand): Promise<number> => {
+    refuseUnusedFlags(flags);
+
+    const prompt = await promptFrom(context, args);
+
+    if (!prompt) {
+        throw new UsageError("Missing <prompt>.");
+    }
+
+    return await postThread(context, flags, undefined, prompt);
+};
+
+export const threadSend = async (context: Context, { args, flags }: ParsedCommand): Promise<number> => {
+    refuseUnusedFlags(flags);
+
+    const threadId = requireArgument(args, "thread-id");
+    const prompt = await promptFrom(context, args.slice(1));
+
+    if (!prompt) {
+        throw new UsageError("Missing <prompt>.");
+    }
+
+    return await postThread(context, flags, threadId, prompt);
+};
+
 const repl = async (context: Context, client: NeoreClient, flags: Flags): Promise<void> => {
     const colors = paint(shouldUseColor(context.io.stderr, context.io.env));
     let threadId = flags.thread;
@@ -186,21 +388,57 @@ export const chat = async (context: Context, { args, flags }: ParsedCommand): Pr
 
 // ─── Account ────────────────────────────────────────────────────────────────
 
+/** Show the code, then wait for the person to approve it elsewhere. Resolves with the new key. */
+const deviceLogin = async (context: Context, apiUrl: string): Promise<string> => {
+    const code = await requestDeviceCode(context, apiUrl, context.hostname);
+    const minutes = Math.max(1, Math.round((code.expiresAtMs - context.now()) / 60_000));
+
+    context.io.stderr.write(
+        [
+            "To sign in, open this page in a browser on any device and sign in to your account:",
+            `  ${code.verificationUri}`,
+            "Then enter this code:",
+            `  ${formatUserCode(code.userCode)}`,
+            `Or open this link, which has the code filled in: ${code.verificationUriComplete}`,
+            `Waiting for approval (the code expires in ${String(minutes)} minutes; Ctrl-C cancels)...`,
+            "",
+        ].join("\n"),
+    );
+
+    context.io.stderr.write(`Signing in to ${new URL(apiUrl).host}\n`);
+
+    return pollForKey(context, apiUrl, code);
+};
+
+/** `https://API.test/` and `https://api.test` name the same server. */
+const isSameServer = (left: string, right: string): boolean =>
+    URL.canParse(left) && URL.canParse(right) && stripTrailingSlashes(new URL(left).href) === stripTrailingSlashes(new URL(right).href);
+
 export const login = async (context: Context, { flags }: ParsedCommand): Promise<void> => {
+    if (flags.device && flags.key !== undefined) {
+        throw new UsageError("--device signs in by code; it does not take a key.");
+    }
+
     const existing = await readConfig(context.configFile);
-    const apiUrl = (
-        flags["api-url"] ??
-        context.io.env["NEORE_API_URL"] ??
-        existing.apiUrl ??
-        (await context.readLine("API URL (e.g. https://api.example.com): ")) ??
-        ""
-    ).trim();
+    const configured = flags["api-url"] ?? context.io.env["NEORE_API_URL"] ?? existing.apiUrl;
+
+    // Without a terminal nobody can type the URL, and asking would wait on an idle stdin (or swallow a piped key as the URL).
+    if (configured === undefined && !context.stdinIsTTY) {
+        throw new UsageError("There is no terminal to ask for the API URL. Pass `--api-url <url>` or set NEORE_API_URL.");
+    }
+
+    const apiUrl = (configured ?? (await context.readLine("API URL (e.g. https://api.example.com): ")) ?? "").trim();
 
     if (!apiUrl || !URL.canParse(apiUrl)) {
         throw new UsageError("An absolute API URL is required (--api-url).");
     }
 
-    let apiKey = flags.key?.trim();
+    if (flags.device) {
+        assertSecureBaseUrl(apiUrl);
+    }
+
+    const replaced = existing.apiKey;
+    let apiKey = flags.device ? await deviceLogin(context, apiUrl) : flags.key?.trim();
 
     if (!apiKey) {
         const entered = context.stdinIsTTY ? await context.readLine("Paste your API key: ", { secret: true }) : await context.readStdin();
@@ -212,11 +450,37 @@ export const login = async (context: Context, { flags }: ParsedCommand): Promise
         throw new UsageError("No API key given. Create one in Settings → API keys.");
     }
 
-    // Verify BEFORE saving, so a typo never replaces a working key.
-    const me = await new NeoreClient({ apiKey, baseUrl: apiUrl, fetch: context.fetch }).request<{ scopes: string[]; userId: string }>("GET", "/me");
-    const config: CliConfig = { apiKey, apiUrl };
+    // Verify BEFORE saving, so a typo never replaces a working key. A device sign-in has spent its code by now,
+    // so when the check or the save fails the key it was just issued is revoked (best effort) instead of left
+    // active and unused, where retries would stack toward the key limit.
+    let me: { scopes: string[]; userId: string };
 
-    await writeConfig(config, context.configFile);
+    try {
+        // A device key that fails the check is revoked below, so the check gets the device flow's time limit, not minutes of retries.
+        const client = new NeoreClient({ apiKey, baseUrl: apiUrl, fetch: context.fetch, ...(flags.device && { retries: 0, timeoutMs: REQUEST_TIMEOUT_MS }) });
+
+        me = await client.request<{ scopes: string[]; userId: string }>("GET", "/me");
+        await writeConfig({ apiKey, apiUrl }, context.configFile);
+    } catch (error) {
+        if (flags.device) {
+            const isRevoked = await revokeIssuedKey(context, apiUrl, apiKey);
+
+            context.io.stderr.write(
+                isRevoked
+                    ? "The new key could not be checked or saved, so it was revoked and nothing was changed. Run `neore login --device` again.\n"
+                    : "The new key could not be checked or saved and could not be revoked from here: revoke it in Settings -> API keys, then run `neore login --device` again.\n",
+            );
+        }
+
+        throw error;
+    }
+
+    // Each device sign-in mints a new year-long key, and the server only revokes one issued in the last 30 minutes.
+    const isDevice = Boolean(flags.device);
+
+    if (isDevice && replaced && replaced !== apiKey && existing.apiUrl !== undefined && isSameServer(existing.apiUrl, apiUrl)) {
+        context.io.stderr.write("Your previous key is still valid; revoke it in Settings -> API keys if nothing else uses it.\n");
+    }
 
     if (flags.json) {
         printJson(context.io, { apiUrl, configFile: context.configFile, scopes: me.scopes });

@@ -55,6 +55,7 @@ let harness: ReturnType<typeof lunoraTest>;
 beforeAll(async () => {
     registerModule(registry, "chat_functions", await import("./functions"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "lib_document_history", await import("../lib/document-history"));
 }, 30_000);
 
 beforeEach(() => {
@@ -85,5 +86,28 @@ describe("updateThread with autoModel", () => {
 
         await expect(update(threadId, { autoModel: true })).rejects.toMatchObject({ code: "BAD_REQUEST" });
         await expect(autoOf(threadId)).resolves.toBeUndefined();
+    });
+});
+
+describe("updateThread on a thread with no model", () => {
+    const titleOf = async (threadId: string) => {
+        const row = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
+
+        return row?.title as string | undefined;
+    };
+
+    it("renames it: a title needs no model", async () => {
+        const threadId = await insertThread({ model: undefined });
+
+        await update(threadId, { title: "Renamed" });
+
+        await expect(titleOf(threadId)).resolves.toBe("Renamed");
+    });
+
+    it("still refuses a change that writes the model", async () => {
+        const threadId = await insertThread({ model: undefined });
+
+        await expect(update(threadId, { reasoningEffort: 1 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        await expect(titleOf(threadId)).resolves.toBe("Chat");
     });
 });

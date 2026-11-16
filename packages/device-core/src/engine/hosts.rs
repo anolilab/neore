@@ -3342,7 +3342,10 @@ mod tests {
             state.ssh.keeps.lock().unwrap().is_empty(),
             "the keeping came back"
         );
-        assert!(state.ssh.attempting.lock().unwrap().is_empty());
+        // The attempt's thread leaves the set just after it closes the link: wait for it, a slow runner sees the gap.
+        eventually("the attempt left the attempting set", || {
+            state.ssh.attempting.lock().unwrap().is_empty()
+        });
 
         let _ = stdfs::remove_dir_all(dir);
     }

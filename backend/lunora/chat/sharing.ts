@@ -125,9 +125,10 @@ const vGetThreadAccessOutput = v.object({
 export const getThreadAccess = authQuery
     .input({
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.from(vGetThreadAccessOutput))
-    .query(async ({ args: { threadId }, ctx: context }): Promise<Infer<typeof vGetThreadAccessOutput>> => {
+    .query(async ({ args: { threadId, unlockProof }, ctx: context }): Promise<Infer<typeof vGetThreadAccessOutput>> => {
         const { userId } = context.user;
 
         // Direct handler calls — bypasses 3 levels of runQuery validator overhead.
@@ -136,6 +137,7 @@ export const getThreadAccess = authQuery
         const accessResult = await checkThreadAccessBatchHandler(context, {
             requiredPermission: "read",
             threadId: threadId as Id<"threads">,
+            unlockProof,
             userId,
         });
         const accessList = await listThreadAccessHandler(context, {
@@ -276,9 +278,10 @@ const vGetThreadInvitesOutput = v.array(
 export const getThreadInvites = authQuery
     .input({
         threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.from(vGetThreadInvitesOutput))
-    .query(async ({ args: { threadId }, ctx: context }): Promise<Infer<typeof vGetThreadInvitesOutput>> => {
+    .query(async ({ args: { threadId, unlockProof }, ctx: context }): Promise<Infer<typeof vGetThreadInvitesOutput>> => {
         const { userId } = context.user;
 
         if (!threadId || threadId.trim() === "") {
@@ -288,6 +291,7 @@ export const getThreadInvites = authQuery
         // Direct handler call — bypasses runQuery validator overhead on complex invite type
         const invites = await getThreadInvitesWithAccessCheckHandler(context, {
             threadId: threadId as Id<"threads">,
+            unlockProof,
             userId,
         });
 

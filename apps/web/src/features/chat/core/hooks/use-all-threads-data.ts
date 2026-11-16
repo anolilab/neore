@@ -23,6 +23,8 @@ const useAllThreadsData = (enabled: boolean = true) => {
     const { data } = useQuery(crpc.chat.composite.getThreadListData.queryOptions(shouldQuery ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS } : skipToken));
 
     return {
+        /** More threads exist than this first page holds; a view that filters the page says it is cut. */
+        hasMore: data?.threads.isDone === false,
         lunora: data?.threads.page ?? [],
     };
 };

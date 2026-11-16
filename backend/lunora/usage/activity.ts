@@ -14,27 +14,130 @@
  * A reply is counted once: `usageReplies` holds the key of every reply in the
  * rollup, so a redelivered record — or one the backfill already counted — adds
  * nothing.
+ *
+ * A reply in a thread that belongs to a project is also filed under that
+ * project, as the thread stands when the record lands; moving the thread later
+ * leaves its earlier usage where it was. The project breakdown and a project's
+ * totals read those rows ({@link getProjectBreakdown}, {@link getProjectUsage}).
  */
 import { v } from "lunorash/server";
 
-import type { MutationCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
+import { internal } from "../_generated/internal";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authQuery } from "../lib/crpc";
-import type { RollupIncrement } from "./activity-logic";
-import { addDays, BREAKDOWN_ROW_LIMIT, foldDayTotals, foldSkillTotals, HEATMAP_DAYS, isDayKey, TOTAL_SKILL_KEY, withDayTotals } from "./activity-logic";
+import { logger } from "../lib/logger";
+import { runAfterOnShard, runAfterWithRetry } from "../lib/shard-scheduler";
+import { readableProject, readableProjectTitles } from "../projects/functions";
+import { leadThreadOf } from "../sub-agents/worker-thread";
+import type { Attribution, AttributionIncrement, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
+import {
+    addDays,
+    attributionRows,
+    BREAKDOWN_ROW_LIMIT,
+    foldDayTotals,
+    foldProjectTotals,
+    foldSkillTotals,
+    HEATMAP_DAYS,
+    isDayKey,
+    PROJECT_ROW_LIMIT,
+    PROJECT_SKILL_KEY,
+    RECORD_RETRY,
+    remainderOf,
+    RETRY_COUNTS_WITHIN_MS,
+    sumRows,
+    TOTAL_SKILL_KEY,
+    withDayTotals,
+} from "./activity-logic";
+
+const usageLogger = logger.scope("usage");
 
 /** A `YYYY-MM-DD` argument, refused at the boundary when it is anything else. */
 const vDayKey = () => v.string().check(isDayKey, { message: "Expected a YYYY-MM-DD date", schema: { maxLength: 10, minLength: 10 } });
 
+/** `skillKey`s the rollup keeps for itself; a reply never records under one. */
+const RESERVED_SKILL_KEYS = new Set([PROJECT_SKILL_KEY, TOTAL_SKILL_KEY]);
+
 type DbCtx = Pick<MutationCtx, "db">;
+
+/** A context that only reads. */
+type ReadCtx = Pick<MutationCtx | QueryCtx, "db">;
 
 /** Whether the reply keyed `replyKey` is already in the user's rollup. */
 export const isReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: string): Promise<boolean> =>
     (await ctx.db.usageReplies.findFirst({ where: { replyKey, userId } })) !== null;
 
-export const markReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: string, at: number): Promise<void> => {
-    await ctx.db.insert("usageReplies", { recordedAt: at, replyKey, userId });
+/** `withoutProject`: the reply was counted while its project could not be read; a retry still files the project. */
+export const markReplyRecorded = async (ctx: DbCtx, userId: string, replyKey: string, at: number, withoutProject = false): Promise<void> => {
+    await ctx.db.insert("usageReplies", { recordedAt: at, replyKey, userId, ...(withoutProject && { withoutProject: true }) });
+};
+
+/** Where a reply in `thread` is filed besides the total: its project. */
+const attributionOf = (thread: { projectId?: string | null } | null): Attribution => (thread?.projectId ? { projectKey: thread.projectId } : {});
+
+/** Sub-agent threads started from sub-agent threads followed up to a lead with a project, at most. */
+const LEAD_HOPS = 4;
+
+/**
+ * What replies in `threadId` are filed under: its project, or — for a sub-agent's or worker's thread, which is in no
+ * project — its lead thread's, followed through nested runs. A run whose link has been pruned (`subAgentRuns`
+ * retention) has no lead to follow, and counts under no project.
+ */
+const threadProject = async (ctx: ReadCtx, threadId: string): Promise<Attribution> => {
+    let current: { projectId?: string | null } | null = await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } });
+    let currentId = threadId;
+
+    for (let hop = 0; hop < LEAD_HOPS && current && !current.projectId; hop += 1) {
+        const lead = await leadThreadOf(ctx, currentId);
+
+        if (lead === undefined) {
+            break;
+        }
+
+        currentId = lead;
+        current = await ctx.db.threads.findFirst({ where: { _id: lead as Id<"threads"> } });
+    }
+
+    return attributionOf(current);
+};
+
+/**
+ * `attribution` as `userId` may file it: without a project they cannot open (a confirmed lack of access — a teammate's
+ * personal project, or an organization they have left). A read that fails throws: the caller counts the total without the
+ * project and retries the project (`RECORD_RETRY`), never filing it as if the user had no access.
+ */
+const readableAttribution = async (ctx: MutationCtx | QueryCtx, attribution: Attribution, userId: string): Promise<Attribution> => {
+    if (attribution.projectKey === undefined) {
+        return attribution;
+    }
+
+    return (await readableProject(ctx, attribution.projectKey as Id<"projects">, userId)) ? attribution : {};
+};
+
+/** What `userId`'s reply in `threadId` is filed under: the thread's (or its lead's) project, when they can open it. */
+const attributionFor = async (ctx: MutationCtx | QueryCtx, threadId: string | undefined, userId: string): Promise<Attribution> =>
+    threadId === undefined || threadId.length === 0 ? {} : await readableAttribution(ctx, await threadProject(ctx, threadId), userId);
+
+const vAttribution = v.object({ projectKey: v.optional(v.string()) });
+
+/** Adds `increments` to the user's per-day project rows. */
+const addToAttributionRollup = async (ctx: DbCtx, userId: string, increments: ReadonlyArray<AttributionIncrement>, at: number): Promise<void> => {
+    for (const { costMicrodollars, date, projectKey, replies, skillKey, tokens } of attributionRows(increments)) {
+        const existing = await ctx.db.usageDaily.findFirst({ where: { date, projectKey, skillKey, userId } });
+
+        if (existing) {
+            await ctx.db.patch("usageDaily", existing._id, {
+                costMicrodollars: existing.costMicrodollars + costMicrodollars,
+                replies: existing.replies + replies,
+                tokens: existing.tokens + tokens,
+                updatedAt: at,
+            });
+        } else {
+            await ctx.db.insert("usageDaily", { costMicrodollars, date, projectKey, replies, skillKey, tokens, updatedAt: at, userId });
+        }
+    }
 };
 
 /**
@@ -81,15 +184,22 @@ export const recordReplyUsage = internalMutation
         at: v.number(),
         costMicrodollars: v.number(),
         date: v.string(),
+        /** The project could not be read where the record was sent from: count the total now, and file no project. */
+        projectUnread: v.optional(v.boolean()),
         replyKey: v.string(),
+        /** A record sent by a retry: with the reply's key missing it counts the reply only while the reply is recent. */
+        retry: v.optional(v.boolean()),
         skillKey: v.string(),
         skillName: v.optional(v.string()),
+        // Worked out where the thread is readable when the reply ran in another user's thread (`forwardReplyUsage`).
+        threadAttribution: v.optional(vAttribution),
+        threadId: v.optional(v.string()),
         tokens: v.number(),
         userId: v.string(),
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        if (!isDayKey(args.date) || args.skillKey === TOTAL_SKILL_KEY || args.replyKey.length === 0) {
+        if (!isDayKey(args.date) || RESERVED_SKILL_KEYS.has(args.skillKey) || args.replyKey.length === 0) {
             return null;
         }
 
@@ -98,27 +208,232 @@ export const recordReplyUsage = internalMutation
             return null;
         }
 
-        // A redelivered job, or a reply the backfill reached first.
-        if (await isReplyRecorded(ctx, args.userId, args.replyKey)) {
+        const costMicrodollars = Math.max(0, Math.round(args.costMicrodollars));
+        const tokens = Math.max(0, Math.round(args.tokens));
+
+        // A project read by the caller is checked again here: access revoked since that read files none.
+        const attributionNow = async (): Promise<Attribution> =>
+            args.threadAttribution === undefined
+                ? await attributionFor(ctx, args.threadId, args.userId)
+                : await readableAttribution(ctx, args.threadAttribution, args.userId);
+        const fileProject = async (attribution: Attribution): Promise<void> => {
+            if (attribution.projectKey !== undefined) {
+                await addToAttributionRollup(
+                    ctx,
+                    args.userId,
+                    [{ costMicrodollars, date: args.date, projectKey: attribution.projectKey, replies: 1, tokens }],
+                    args.at,
+                );
+            }
+        };
+        const countTotal = async (): Promise<void> => {
+            await addToRollup(
+                ctx,
+                args.userId,
+                [
+                    {
+                        costMicrodollars,
+                        date: args.date,
+                        replies: 1,
+                        skillKey: args.skillKey,
+                        tokens,
+                        ...(args.skillName !== undefined && { skillName: args.skillName }),
+                    },
+                ],
+                args.at,
+                true,
+            );
+        };
+        const recorded = await ctx.db.usageReplies.findFirst({ where: { replyKey: args.replyKey, userId: args.userId } });
+
+        // A redelivered job, or a reply the totals backfill already counted: counted once. A reply the backfill counted
+        // stays under "No project" (project usage starts at deploy, `usage/AGENTS.md`). One counted without its project
+        // (its read failed) is filed here once its project reads: a failed read throws, and the scheduler retries this.
+        // One a late retry's record noted (`awaitingTotal`) is counted now, by its first record, with the noted project.
+        if (recorded) {
+            // The project of a reply counted without it: the one a late retry noted on the key, else the thread's.
+            const projectNow = async (): Promise<Attribution> =>
+                recorded.deferredProjectKey === undefined
+                    ? await attributionNow()
+                    : await readableAttribution(ctx, { projectKey: recorded.deferredProjectKey }, args.userId);
+
+            if (recorded.awaitingTotal === true && args.retry !== true) {
+                await countTotal();
+
+                // The noted project, checked again: access revoked since files none. A check that fails never costs the
+                // total, counted already: the reply is marked without its project, and the project is tried again.
+                let project: Attribution | undefined;
+
+                try {
+                    project = await projectNow();
+                } catch (error) {
+                    usageLogger.warn("[usage] the noted project could not be read; counting the reply now and trying the project again", {
+                        error,
+                        replyKey: args.replyKey,
+                    });
+                    await ctx.db.patch("usageReplies", recorded._id, { awaitingTotal: false, withoutProject: true });
+                    await runAfterWithRetry(
+                        ctx.scheduler,
+                        RECORD_RETRY.baseMs,
+                        internal.usage.activity.recordReplyUsage,
+                        { ...args, retry: true },
+                        RECORD_RETRY,
+                    ).catch((bookingError: unknown) => {
+                        usageLogger.warn("[usage] the project retry could not be booked; the reply stays without its project", {
+                            error: bookingError,
+                            replyKey: args.replyKey,
+                        });
+                    });
+                }
+
+                // Only the access check is guarded: the project row and the flag are written once it has answered.
+                if (project !== undefined) {
+                    await fileProject(project);
+                    await ctx.db.patch("usageReplies", recorded._id, { awaitingTotal: false });
+                }
+            } else if (recorded.withoutProject === true && (args.projectUnread !== true || args.retry === true)) {
+                // A retry: a read that fails throws, and the scheduler runs it again (`RECORD_RETRY`).
+                await fileProject(await projectNow());
+                await ctx.db.patch("usageReplies", recorded._id, { withoutProject: false });
+            }
+
             return null;
         }
 
-        await markReplyRecorded(ctx, args.userId, args.replyKey, args.at);
-        await addToRollup(
-            ctx,
-            args.userId,
-            [
-                {
-                    costMicrodollars: Math.max(0, Math.round(args.costMicrodollars)),
-                    date: args.date,
-                    replies: 1,
-                    skillKey: args.skillKey,
-                    tokens: Math.max(0, Math.round(args.tokens)),
-                    ...(args.skillName !== undefined && { skillName: args.skillName }),
-                },
-            ],
-            args.at,
-            true,
+        // A retry's record whose reply is no longer known: a recent reply's record simply has not landed yet, so this one
+        // counts it. An old one may have had its key pruned after its total was counted, or its first record may still be
+        // on its way: it counts nothing, and notes the project it read on the key, so a first record still to come counts
+        // the total with it (`RETRY_COUNTS_WITHIN_MS`). A pruned reply's note is pruned in turn.
+        if (args.retry === true && ctx.now - args.at > RETRY_COUNTS_WITHIN_MS) {
+            const attribution = await attributionNow();
+
+            // Stamped with when it is written, so the prune keeps it as long as any key, for the first record to find.
+            await ctx.db.insert("usageReplies", {
+                awaitingTotal: true,
+                recordedAt: ctx.now,
+                replyKey: args.replyKey,
+                userId: args.userId,
+                ...(attribution.projectKey !== undefined && { deferredProjectKey: attribution.projectKey }),
+            });
+
+            return null;
+        }
+
+        // The total and skill rows land now, whatever the project read does: a read that fails counts the reply without
+        // its project and tries the project again on its own (`RECORD_RETRY`).
+        let attribution: Attribution = {};
+        let projectUnread = args.projectUnread === true;
+
+        if (!projectUnread) {
+            try {
+                attribution = await attributionNow();
+            } catch (error) {
+                usageLogger.warn("[usage] the reply's project could not be read; counting it now and trying the project again", {
+                    error,
+                    replyKey: args.replyKey,
+                    threadId: args.threadId,
+                    userId: args.userId,
+                });
+                projectUnread = true;
+                // Booking the retry never costs the total: if it fails, the reply is counted without its project.
+                await runAfterWithRetry(
+                    ctx.scheduler,
+                    RECORD_RETRY.baseMs,
+                    internal.usage.activity.recordReplyUsage,
+                    { ...args, retry: true },
+                    RECORD_RETRY,
+                ).catch((bookingError: unknown) => {
+                    usageLogger.warn("[usage] the project retry could not be booked; the reply stays without its project", {
+                        error: bookingError,
+                        replyKey: args.replyKey,
+                    });
+                });
+            }
+        }
+
+        await markReplyRecorded(ctx, args.userId, args.replyKey, args.at, projectUnread);
+        await countTotal();
+
+        await fileProject(attribution);
+
+        return null;
+    });
+
+/**
+ * A reply that ran in another user's thread (shared with the replier) is recorded on the replier's own shard, where the
+ * thread is not stored. This runs first on the thread's shard, works out the thread's project, and forwards the
+ * record to the replier's shard with it.
+ */
+export const forwardReplyUsage = internalMutation
+    .input({
+        at: v.number(),
+        costMicrodollars: v.number(),
+        date: v.string(),
+        /** A retry for the project alone: the reply's total has been sent already. */
+        projectRetry: v.optional(v.boolean()),
+        replyKey: v.string(),
+        skillKey: v.string(),
+        skillName: v.optional(v.string()),
+        threadId: v.string(),
+        tokens: v.number(),
+        userId: v.string(),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const { projectRetry, ...usage } = args;
+        let threadAttribution: Attribution;
+
+        try {
+            threadAttribution = await attributionFor(ctx, usage.threadId, usage.userId);
+        } catch (error) {
+            // A retry that fails again throws, and the scheduler runs it again (`RECORD_RETRY`).
+            if (projectRetry === true) {
+                throw error;
+            }
+
+            // The total and skill rows go now, without the project; the project is tried again from here.
+            usageLogger.warn("[usage] the thread's project could not be read; forwarding the reply's total and trying the project again", {
+                error,
+                replyKey: usage.replyKey,
+                threadId: usage.threadId,
+                userId: usage.userId,
+            });
+            await runAfterOnShard(ctx.scheduler as never, 0, internal.usage.activity.recordReplyUsage, { ...usage, projectUnread: true }, usage.userId);
+            // Booking the retry never costs the total sent above: if it fails, the reply stays without its project.
+            await runAfterWithRetry(
+                ctx.scheduler,
+                RECORD_RETRY.baseMs,
+                internal.usage.activity.forwardReplyUsage,
+                { ...usage, projectRetry: true },
+                RECORD_RETRY,
+            ).catch((bookingError: unknown) => {
+                usageLogger.warn("[usage] the project retry could not be booked; the reply stays without its project", {
+                    error: bookingError,
+                    replyKey: usage.replyKey,
+                });
+            });
+
+            return null;
+        }
+
+        // A retry's record is a full one: nothing orders it after the total record the first try sent, and the reply's
+        // key keeps whichever lands second from counting the total again. Marked as a retry, it counts nothing for a reply
+        // old enough that its key may have been pruned.
+        const record: ReplyUsageArgs & { retry?: boolean; threadAttribution: Attribution } = {
+            ...usage,
+            threadAttribution,
+            ...(projectRetry === true && { retry: true }),
+        };
+
+        // A retry's record may find the reply counted without its project and re-check access: a read that fails there
+        // throws, so it runs under the same retry policy as the local path's retry.
+        await runAfterOnShard(
+            ctx.scheduler as never,
+            0,
+            internal.usage.activity.recordReplyUsage,
+            { ...record },
+            usage.userId,
+            projectRetry === true ? RECORD_RETRY : undefined,
         );
 
         return null;
@@ -180,11 +495,118 @@ export const getSkillBreakdown = authQuery
         const rows = await ctx.db.usageDaily.findMany({
             limit: BREAKDOWN_ROW_LIMIT,
             orderBy: [{ date: "desc" }],
-            where: { date: { gte: args.fromDate }, userId },
+            // Project rows are another breakdown's; they must not use up this read's bound.
+            where: { date: { gte: args.fromDate }, skillKey: { ne: PROJECT_SKILL_KEY }, userId },
         });
 
         return {
             skills: foldSkillTotals(rows.page),
             truncated: rows.page.length >= BREAKDOWN_ROW_LIMIT,
         };
+    });
+
+const vTotals = { costMicrodollars: v.number(), replies: v.number(), tokens: v.number() };
+
+/** Projects one breakdown names, costliest first; the rest are summed as `otherProjects`, with no title read. */
+const PROJECTS_LISTED = 100;
+
+/** Total rows one project breakdown sums: one a day, two years of them. */
+const TOTAL_ROW_LIMIT = HEATMAP_DAYS * 2;
+
+/** Total rows from `fromDate` on, summed: one per day, so a year is a bounded read. */
+const totalSince = async (ctx: Pick<QueryCtx, "db">, userId: string, fromDate: string) => {
+    // One row past the limit tells a full read from a cut one.
+    const read = await ctx.db.usageDaily.findMany({
+        limit: TOTAL_ROW_LIMIT + 1,
+        orderBy: [{ date: "desc" }],
+        where: { date: { gte: fromDate }, skillKey: TOTAL_SKILL_KEY, userId },
+    });
+    const truncated = read.page.length > TOTAL_ROW_LIMIT;
+    const page = read.page.slice(0, TOTAL_ROW_LIMIT);
+
+    // When the read stopped short, the total covers only from its oldest day on: whatever is summed beside it must too.
+    return { coveredFrom: truncated ? page.at(-1)?.date : undefined, rows: page, total: sumRows(page), truncated };
+};
+
+/**
+ * Replies, tokens and cost per project from `fromDate` on, with what no project
+ * accounts for (`noProject`) and the overall `total` — the projects and
+ * `noProject` add up to it. A project the caller can no longer read has no
+ * `title`. Past the {@link PROJECTS_LISTED} costliest projects, the rest are summed as `otherProjects`. `truncated` as in {@link getSkillBreakdown}.
+ */
+export const getProjectBreakdown = authQuery
+    .input({ fromDate: vDayKey() })
+    .output(
+        v.object({
+            noProject: v.object({ ...vTotals }),
+            otherProjects: v.optional(v.object({ ...vTotals })),
+            projects: v.array(v.object({ ...vTotals, projectKey: v.string(), title: v.optional(v.string()) })),
+            total: v.object({ ...vTotals }),
+            truncated: v.boolean(),
+        }),
+    )
+    .query(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        const [totals, read] = await Promise.all([
+            totalSince(ctx, userId, args.fromDate),
+            ctx.db.usageDaily.findMany({
+                limit: PROJECT_ROW_LIMIT + 1,
+                orderBy: [{ date: "desc" }],
+                where: { date: { gte: args.fromDate }, skillKey: PROJECT_SKILL_KEY, userId },
+            }),
+        ]);
+        // When either read stopped short, both cover only the days after the oldest day the shorter one reached — that
+        // day may be read only in part — so the projects and "No project" are taken over the same whole days as the
+        // total and add up to it.
+        const projectsCut = read.page.length > PROJECT_ROW_LIMIT;
+        const rows = { page: read.page.slice(0, PROJECT_ROW_LIMIT) };
+        const projectsFrom = projectsCut ? rows.page.at(-1)?.date : undefined;
+        const coveredFrom = [totals.coveredFrom, projectsFrom]
+            .filter((date) => date !== undefined)
+            .toSorted((a, b) => a!.localeCompare(b!))
+            .at(-1);
+        const projects = foldProjectTotals(coveredFrom === undefined ? rows.page : rows.page.filter((row) => row.date > coveredFrom));
+        const total = coveredFrom === undefined ? totals.total : sumRows(totals.rows.filter((row) => row.date > coveredFrom));
+
+        const listed = projects.slice(0, PROJECTS_LISTED);
+        const others = projects.slice(PROJECTS_LISTED);
+        // A few reads for all the listed projects, whatever their number: their rows, then the caller's memberships.
+        const titles = await readableProjectTitles(
+            ctx,
+            listed.map((project) => project.projectKey as Id<"projects">),
+            userId,
+        );
+        const titled = listed.map((project) => {
+            const title = titles.get(project.projectKey);
+
+            return { ...project, ...(title !== undefined && { title }) };
+        });
+
+        return {
+            noProject: remainderOf(total, projects),
+            ...(others.length > 0 && { otherProjects: sumRows(others) }),
+            projects: titled,
+            total,
+            truncated: totals.truncated || projectsCut,
+        };
+    });
+
+/** Project rows one project read sums: one row per day the project was used, two years of them. */
+const PROJECT_USAGE_ROW_LIMIT = HEATMAP_DAYS * 2;
+
+/**
+ * The caller's replies, tokens and cost in one project from `fromDate` on. `truncated` is set when the period held more
+ * rows than one read sums — the oldest days are the ones left out.
+ */
+export const getProjectUsage = authQuery
+    .input({ fromDate: vDayKey(), projectId: v.id("projects") })
+    .output(v.object({ ...vTotals, truncated: v.boolean() }))
+    .query(async ({ args, ctx }) => {
+        const { page } = await ctx.db.usageDaily.findMany({
+            limit: PROJECT_USAGE_ROW_LIMIT + 1,
+            orderBy: [{ date: "desc" }],
+            where: { date: { gte: args.fromDate }, projectKey: args.projectId as string, userId: ctx.user.userId },
+        });
+
+        return { ...sumRows(page.slice(0, PROJECT_USAGE_ROW_LIMIT)), truncated: page.length > PROJECT_USAGE_ROW_LIMIT };
     });

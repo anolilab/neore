@@ -5,6 +5,8 @@
  * handed; the editor, its extensions and the match logic are the real ones.
  */
 import { act, render, waitFor } from "@testing-library/react";
+import { closeHistory } from "@tiptap/pm/history";
+import type { EditorProps } from "@tiptap/pm/view";
 import { createRef } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -87,6 +89,11 @@ vi.mock("./file-mention-popup", () => {
     };
 });
 
+// Its reads are covered in `file-mention-popup.prefetch.render.test.tsx`; here it would need a query client and auth.
+vi.mock("./use-mention-prefetch", () => {
+    return { default: () => false };
+});
+
 vi.mock("./variable-autocomplete-popup", () => {
     return {
         default: ({ match }: { match: unknown }) => {
@@ -157,7 +164,8 @@ describe("ComposerTiptapEditor suggestions", () => {
         // Tiptap hangs its editor on the editable element.
         // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the editor has no role to query by
         const element = view.container.querySelector(".ProseMirror") as
-            (HTMLElement & { editor?: { commands: { insertContent: (value: string) => boolean } } }) | null;
+            | (HTMLElement & { editor?: { commands: { insertContent: (value: string) => boolean } } })
+            | null;
 
         await waitFor(() => {
             expect(element?.editor).toBeTruthy();
@@ -172,5 +180,107 @@ describe("ComposerTiptapEditor suggestions", () => {
         });
 
         expect(opened(handed.slash) || opened(handed.file) || opened(handed.variable)).toBe(false);
+    });
+});
+
+describe("ComposerTiptapEditor paste", () => {
+    const pasteInto = (element: HTMLElement, text: string) => {
+        const event = new Event("paste", { bubbles: true, cancelable: true });
+
+        Object.defineProperty(event, "clipboardData", {
+            value: { files: [], getData: (type: string) => (type === "text/plain" ? text : ""), items: [], types: ["text/plain"] },
+        });
+        act(() => {
+            element.dispatchEvent(event);
+        });
+    };
+
+    it.each([
+        ["inserts a paste the composer leaves alone", () => {}, "pasted"],
+        ["leaves out a paste the composer took (a long text it attaches)", (event: React.ClipboardEvent) => event.preventDefault(), ""],
+    ])("%s", async (_label, onPaste, expected) => {
+        const ref = createRef<ComposerTiptapEditorRef>();
+        const view = render(<ComposerTiptapEditor onChange={() => {}} onPaste={onPaste} onSubmit={() => {}} ref={ref} value="" />);
+
+        await waitFor(() => {
+            expect(ref.current?.getEditor()).toBeTruthy();
+        });
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the editor has no role to query by
+        pasteInto(view.container.querySelector(".ProseMirror") as HTMLElement, "pasted");
+
+        expect(ref.current!.getEditor()!.getText()).toBe(expected);
+    });
+
+    it("pastes converted text inside a line with its blank lines, as one undo step, and spots Ctrl+Shift+V", async () => {
+        const ref = createRef<ComposerTiptapEditorRef>();
+        const view = render(<ComposerTiptapEditor onChange={() => {}} onSubmit={() => {}} ref={ref} value="ab" />);
+
+        await waitFor(() => {
+            expect(ref.current?.getEditor()?.getText()).toBe("ab");
+        });
+
+        const editor = ref.current!.getEditor()!;
+
+        act(() => {
+            // The draft was set just before: without a boundary, undo would take it back with the paste.
+            editor.view.dispatch(closeHistory(editor.state.tr));
+            editor.commands.setTextSelection(2);
+            ref.current!.pasteText("- **x**\n\n| a |");
+        });
+
+        expect(editor.getText({ blockSeparator: "\n" })).toBe("a- **x**\n\n| a |b");
+
+        act(() => {
+            editor.commands.undo();
+        });
+
+        expect(editor.getText()).toBe("ab");
+
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the editor has no role to query by
+        const element = view.container.querySelector(".ProseMirror") as HTMLElement;
+        const keydown = new KeyboardEvent("keydown", { bubbles: true, ctrlKey: true, key: "V", shiftKey: true });
+
+        act(() => {
+            element.dispatchEvent(keydown);
+        });
+
+        expect(ref.current!.isPlainPaste({ timeStamp: keydown.timeStamp + 10 })).toBe(true);
+        // The next paste is a normal one.
+        expect(ref.current!.isPlainPaste({ timeStamp: keydown.timeStamp + 20 })).toBe(false);
+
+        act(() => {
+            element.dispatchEvent(keydown);
+        });
+
+        expect(ref.current!.isPlainPaste({ timeStamp: keydown.timeStamp + 5000 })).toBe(false);
+
+        // A Cyrillic layout: the same physical key reads as "м".
+        const cyrillic = new KeyboardEvent("keydown", { bubbles: true, code: "KeyV", ctrlKey: true, key: "м", shiftKey: true });
+
+        act(() => {
+            element.dispatchEvent(cyrillic);
+        });
+
+        expect(ref.current!.isPlainPaste({ timeStamp: cyrillic.timeStamp + 10 })).toBe(true);
+    });
+
+    it("submits through the latest onSubmit on Enter, not the one the editor was built with", async () => {
+        const ref = createRef<ComposerTiptapEditorRef>();
+        const first = vi.fn();
+        const latest = vi.fn();
+        const view = render(<ComposerTiptapEditor onChange={() => {}} onSubmit={first} ref={ref} value="" />);
+
+        view.rerender(<ComposerTiptapEditor onChange={() => {}} onSubmit={latest} ref={ref} value="" />);
+        await typeInto(ref, "hello");
+        act(() => {
+            const editorView = ref.current!.getEditor()!.view;
+
+            editorView.someProp("handleKeyDown", (handle: NonNullable<EditorProps["handleKeyDown"]>) =>
+                handle(editorView, new KeyboardEvent("keydown", { key: "Enter" })),
+            );
+        });
+
+        expect(latest).toHaveBeenCalledOnce();
+        expect(first).not.toHaveBeenCalled();
     });
 });

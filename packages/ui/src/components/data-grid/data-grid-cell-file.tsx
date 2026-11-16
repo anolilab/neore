@@ -760,7 +760,7 @@ export const FileCell = <TData extends RowData>({
                 </Popover>
             ) : null}
             {isDraggingOver ? (
-                <div className="text-primary flex items-center justify-center gap-2 text-sm">
+                <div className="text-primary-text flex items-center justify-center gap-2 text-sm">
                     <Upload className="size-4" />
                     <span>{t`Drop files here`}</span>
                 </div>

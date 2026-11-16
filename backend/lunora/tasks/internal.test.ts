@@ -15,13 +15,14 @@ import { patchById } from "../lib/patch";
 import schema from "../schema";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { DAILY_LIMIT_MESSAGE, ANONYMOUS_TASKS_MESSAGE } from "./account";
-import { checkDueTasks, claimRound, completeRound, recordRunNotice, runProjectFor, runThreadProblem } from "./internal";
+import { CODING_AGENT_CAPPED_MESSAGE, checkDueTasks, claimRound, completeRound, recordRunNotice, runProjectFor, runThreadProblem } from "./internal";
+import { LEFT_ORGANIZATION_MESSAGE } from "../auth/lib/organization-policy";
 import { MAX_RECURRENCES_PER_USER_PER_SWEEP } from "./logic";
 
 // `user` is a `.global()` (D1) table the in-memory harness cannot write, so the
 // account behind each claim is looked up here instead.
-const { users } = vi.hoisted(() => {
-    return { users: new Map<string, { isAnonymous?: boolean; role?: string }>() };
+const { members, users } = vi.hoisted(() => {
+    return { members: new Set<string>(), users: new Map<string, { isAnonymous?: boolean; role?: string }>() };
 });
 
 // `projects` is a `.global()` table too: which projects the owner may file into, and their context, is set here.
@@ -39,9 +40,32 @@ vi.mock("../projects/functions", () => {
     return { readableProject: found, writableProject: found };
 });
 
+// A test sets `failing` to make the stuck-task notice write throw, as an inbox write or a schedule can.
+const { noticeWrites } = vi.hoisted(() => {
+    return { noticeWrites: { failing: false } };
+});
+
+vi.mock("../notifications/notify", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../notifications/notify")>();
+
+    return {
+        ...actual,
+        notify: async (ctx: unknown, input: Parameters<typeof actual.notify>[1]) => {
+            if (noticeWrites.failing && input.type === "task_stuck") {
+                throw new Error("inbox unavailable");
+            }
+
+            return await actual.notify(ctx as never, input);
+        },
+    };
+});
+
 vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../auth/lib/better-auth-queries")>()),
+        // `member` is a `.global()` table too: membership is `organizationId:userId` in `members`.
+        getMemberByOrganizationAndUser: async (_ctx: unknown, organizationId: string, userId: string) =>
+            members.has(`${organizationId}:${userId}`) ? { organizationId, userId } : null,
         getUser: async (_ctx: unknown, userId: string) => {
             const user = users.get(userId);
 
@@ -120,6 +144,7 @@ beforeEach(() => {
     users.clear();
     users.set(USER, {});
     readableProjects.clear();
+    members.clear();
 });
 
 afterEach(() => {
@@ -208,6 +233,18 @@ describe("repair loop", () => {
         expect(task.status).toBe("failed");
         expect(task.lastError).toBe("The agent run failed.");
         expect(await inbox()).toStrictEqual([{ outcome: "failure", title: "Summary", type: "task" }]);
+    });
+
+    it("stops a recurring task's schedule on an error no later round can cure, keeping the schedule itself", async () => {
+        const taskId = await insertTask({ activeCycle: "c1", cronExpression: "0 9 * * *", nextRunAt: 1000, recurring: true, status: "queued" });
+        const claimed = await claim(taskId, 0);
+
+        expect(await complete({ outcome: { error: "You left.", kind: "error", stopsRecurrence: true }, runId: claimed.runId })).toBe("failed");
+
+        const task = await getTask(taskId);
+
+        expect(task).toMatchObject({ cronExpression: "0 9 * * *", lastError: "You left.", status: "failed" });
+        expect("nextRunAt" in task).toBe(false);
     });
 });
 
@@ -824,6 +861,94 @@ describe("claim refusals", () => {
         expect(await runCount()).toBe(limit);
     });
 
+    it("stops a task whose owner left its organization, charging nothing", async () => {
+        const taskId = await insertTask({
+            activeCycle: "c1",
+            cronExpression: "0 9 * * *",
+            nextRunAt: 1000,
+            organizationId: "org-left",
+            recurring: true,
+            status: "queued",
+        });
+
+        expect(await claim(taskId, 0)).toBeNull();
+        expect(await runCount()).toBe(0);
+
+        const task = await getTask(taskId);
+
+        expect(task).toMatchObject({ cronExpression: "0 9 * * *", lastError: LEFT_ORGANIZATION_MESSAGE, status: "failed" });
+        expect("nextRunAt" in task).toBe(false);
+        // Its schedule ended for good, so the owner is told once.
+        expect(await inbox()).toStrictEqual([{ outcome: "failure", title: "Summary", type: "task" }]);
+    });
+
+    it("stops a task whose owner left its organization even when its model is gone too, instead of retrying every slot", async () => {
+        const taskId = await insertTask({
+            activeCycle: "c1",
+            cronExpression: "0 9 * * *",
+            model: "not-a-registry-model",
+            nextRunAt: 1000,
+            organizationId: "org-left",
+            recurring: true,
+            status: "queued",
+        });
+
+        expect(await claim(taskId, 0)).toBeNull();
+
+        const task = await getTask(taskId);
+
+        // The permanent stop wins: the model's refusal is for one round and keeps the schedule.
+        expect(task).toMatchObject({ lastError: LEFT_ORGANIZATION_MESSAGE, status: "failed" });
+        expect("nextRunAt" in task).toBe(false);
+    });
+
+    it("refuses a coding-agent task under a cap below auto without charging, and keeps it scheduled", async () => {
+        members.add(`org-capped:${USER}`);
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("organizationPolicies", {
+                    document: JSON.stringify({ permissionCap: "ask", schemaVersion: 1 }),
+                    organizationId: "org-capped",
+                    revision: 1,
+                    schemaVersion: 1,
+                    updatedAt: Date.now(),
+                }),
+        );
+
+        const codingAgent = { agent: "codex", repoUrl: "https://github.com/example/repo" };
+
+        // As many refusals as the daily limit allows: a charged refusal would leave nothing for the task after them.
+        for (let index = 0; index < 10; index += 1) {
+            const taskId = await insertTask({
+                activeCycle: `c${String(index)}`,
+                codingAgent,
+                cronExpression: "0 9 * * *",
+                nextRunAt: 1000,
+                organizationId: "org-capped",
+                recurring: true,
+                status: "queued",
+            });
+
+            expect(await claim(taskId, 0, `c${String(index)}`)).toBeNull();
+            expect(await getTask(taskId)).toMatchObject({ lastError: CODING_AGENT_CAPPED_MESSAGE, nextRunAt: 1000, status: "failed" });
+        }
+
+        expect(await claim(await insertTask({ activeCycle: "c-last", status: "queued" }), 0, "c-last")).not.toBeNull();
+    });
+
+    it("lets a member's coding-agent task start when the cap is auto", async () => {
+        members.add(`org-open:${USER}`);
+
+        const taskId = await insertTask({
+            activeCycle: "c1",
+            codingAgent: { agent: "codex", repoUrl: "https://github.com/example/repo" },
+            organizationId: "org-open",
+            status: "queued",
+        });
+
+        expect(await claim(taskId, 0)).toMatchObject({ codingAgent: { agent: "codex" }, organizationId: "org-open" });
+    });
+
     it("does not charge an admin", async () => {
         users.set(USER, { role: "admin" });
 
@@ -832,6 +957,248 @@ describe("claim refusals", () => {
 
             expect(await claim(taskId, 0, `c${String(index)}`)).not.toBeNull();
         }
+    });
+});
+
+describe("stuck blocked tasks", () => {
+    const DAY = 24 * 60 * 60_000;
+    const T0 = Date.UTC(2026, 10, 6, 12, 30);
+
+    beforeEach(() => {
+        vi.useFakeTimers({ now: T0, toFake: ["Date"] });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    const stuckNotices = async (): Promise<{ outcome?: string; title: string; type: string }[]> => {
+        const rows = await inbox();
+
+        return rows.filter((row) => row.type === "task_stuck");
+    };
+
+    /** The stored body of each stuck notice: `inbox()` drops the body, so the privacy check reads it here. */
+    const stuckNoticeBodies = async (): Promise<unknown[]> =>
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("notifications").collect();
+
+            return rows.filter((row: any) => row.type === "task_stuck").map((row: any) => row.body);
+        });
+
+    const sweepAt = async (at: number): Promise<void> => {
+        vi.setSystemTime(at);
+        await runInternal(checkDueTasks, {});
+    };
+
+    it("asks the owner once at 2 idle days, in the inbox, and names the task only", async () => {
+        const dependency = await insertTask({ status: "todo", title: "First" });
+        const taskId = await insertTask({ dependsOn: [dependency], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY - 1);
+        expect(await stuckNotices()).toStrictEqual([]);
+
+        await sweepAt(T0 + 2 * DAY);
+        await sweepAt(T0 + 3 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Waiting", type: "task_stuck" }]);
+        expect(await stuckNoticeBodies()).toStrictEqual([undefined]);
+        const task = await getTask(taskId);
+
+        expect(task.stuckNotice).toStrictEqual({ days: 2, since: T0 });
+        expect(task.stuckCheckAt).toBe(T0 + 7 * DAY);
+        // The notice is not progress: the idle clock keeps running from the last real change.
+        expect(task.updatedAt).toBe(T0);
+        expect(task.status).toBe("blocked");
+    });
+
+    it("finds a due task behind more rows than one sweep reads, when those rows have no check armed", async () => {
+        for (let index = 0; index < 30; index += 1) {
+            await insertTask({ dependsOn: ["missing"], status: "blocked", title: `Idle ${index}`, updatedAt: T0 });
+        }
+
+        await insertTask({ dependsOn: ["missing"], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Due", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Due", type: "task_stuck" }]);
+    });
+
+    it("leaves a failed recurring task to its next slot, and checks it again after that slot", async () => {
+        const taskId = await insertTask({
+            lastError: "boom",
+            nextRunAt: T0 + 5 * DAY,
+            recurring: true,
+            status: "failed",
+            stuckCheckAt: T0 + 2 * DAY,
+            title: "Weekly",
+            updatedAt: T0,
+        });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([]);
+
+        const task = await getTask(taskId);
+
+        expect(task.stuckCheckAt).toBe(T0 + 6 * DAY);
+    });
+
+    it("sends the notice again when its write fails, instead of counting the level as sent", async () => {
+        const dependency = await insertTask({ status: "todo", title: "First" });
+        const taskId = await insertTask({ dependsOn: [dependency], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        try {
+            noticeWrites.failing = true;
+            await sweepAt(T0 + 2 * DAY);
+        } finally {
+            noticeWrites.failing = false;
+        }
+
+        expect(await stuckNotices()).toStrictEqual([]);
+
+        const failed = await getTask(taskId);
+
+        expect(failed.stuckNotice).toBeUndefined();
+
+        await sweepAt(T0 + 2 * DAY + 60 * 60_000);
+
+        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Waiting", type: "task_stuck" }]);
+
+        const retried = await getTask(taskId);
+
+        expect(retried.stuckNotice).toStrictEqual({ days: 2, since: T0 });
+    });
+
+    it("does not notify a blocked task whose only open dependency is a failed recurring task on its schedule", async () => {
+        const weekly = await insertTask({
+            lastError: "boom",
+            nextRunAt: T0 + 5 * DAY,
+            recurring: true,
+            status: "failed",
+            title: "Weekly",
+            updatedAt: T0,
+        });
+        const taskId = await insertTask({ dependsOn: [weekly], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([]);
+
+        const task = await getTask(taskId);
+
+        expect(task.stuckCheckAt).toBe(T0 + 6 * DAY);
+    });
+
+    it("does not notify a task that waits, through a blocked task, on the owner's review", async () => {
+        const review = await insertTask({ status: "needs_review", title: "Review", updatedAt: T0 });
+        const middle = await insertTask({ dependsOn: [review], status: "blocked", title: "Middle", updatedAt: T0 });
+        const taskId = await insertTask({ dependsOn: [middle], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([]);
+
+        const waiting = await getTask(taskId);
+
+        expect(waiting.stuckCheckAt).toBe(T0 + 3 * DAY);
+    });
+
+    it("asks the owner about a failed task once, not about each task waiting behind it", async () => {
+        const failed = await insertTask({ lastError: "boom", status: "failed", stuckCheckAt: T0 + 2 * DAY, title: "Broken", updatedAt: T0 });
+
+        await insertTask({ dependsOn: [failed], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Behind one", updatedAt: T0 });
+        await insertTask({ dependsOn: [failed], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Behind two", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Broken", type: "task_stuck" }]);
+    });
+
+    it("asks once more at 7 idle days, and not again within that episode", async () => {
+        const dependency = await insertTask({ status: "todo", title: "First" });
+
+        await insertTask({ dependsOn: [dependency], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+        await sweepAt(T0 + 6 * DAY);
+        expect(await stuckNotices()).toHaveLength(1);
+
+        await sweepAt(T0 + 7 * DAY);
+        await sweepAt(T0 + 30 * DAY);
+
+        expect(await stuckNotices()).toHaveLength(2);
+    });
+
+    it("restarts the ladder after progress, so a later stall escalates again", async () => {
+        const dependency = await insertTask({ status: "todo", title: "First" });
+        // Queued from day 2 on: the sweep at day 2 would otherwise fail it as a stale round.
+        const progress = await insertTask({ activeCycle: "c1", status: "queued", title: "Progress", updatedAt: T0 + 2 * DAY });
+
+        const waiting = await insertTask({ dependsOn: [dependency, progress], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+        expect(await stuckNotices()).toHaveLength(1);
+
+        // One of its dependencies finishes while the other is still open: progress, so the ladder restarts.
+        vi.setSystemTime(T0 + 3 * DAY);
+        const claimed = await claim(progress, 0);
+
+        expect(await verified(claimed.runId, "Done.", PASS)).toBe("done");
+
+        const waitingTask = await getTask(waiting);
+
+        expect(waitingTask.updatedAt).toBe(T0 + 3 * DAY);
+        expect(waitingTask.stuckCheckAt).toBe(T0 + 5 * DAY);
+        expect(await statusOf(waiting)).toBe("blocked");
+
+        await sweepAt(T0 + 4 * DAY);
+        expect(await stuckNotices()).toHaveLength(1);
+
+        await sweepAt(T0 + 5 * DAY);
+
+        expect(await stuckNotices()).toHaveLength(2);
+    });
+
+    it("notifies a task whose twenty direct dependencies include one that a blocked dependency points back to", async () => {
+        const others: string[] = [];
+
+        for (let index = 1; index < 20; index += 1) {
+            others.push(await insertTask({ status: "todo", title: `Done ${index}` }));
+        }
+
+        // Its blocked dependency points back to one the search has already read: nothing unread is left to wait on.
+        const blocked = await insertTask({ dependsOn: [others[0]!], status: "blocked", title: "Middle", updatedAt: T0 });
+
+        await insertTask({ dependsOn: [blocked, ...others], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Root", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([{ outcome: undefined, title: "Root", type: "task_stuck" }]);
+    });
+
+    it("does not notify a task whose chain is longer than the search reads, since the chain may end in a review", async () => {
+        const review = await insertTask({ status: "needs_review", title: "Review", updatedAt: T0 });
+        let previous = review;
+
+        for (let index = 0; index < 25; index += 1) {
+            previous = await insertTask({ dependsOn: [previous], status: "blocked", title: `Link ${index}`, updatedAt: T0 });
+        }
+
+        await insertTask({ dependsOn: [previous], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "End", updatedAt: T0 });
+
+        await sweepAt(T0 + 2 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([]);
+    });
+
+    it("does not escalate a task waiting on a dependency that needs the owner's review", async () => {
+        const dependency = await insertTask({ status: "needs_review", title: "Review me" });
+
+        await insertTask({ dependsOn: [dependency], status: "blocked", stuckCheckAt: T0 + 2 * DAY, title: "Waiting", updatedAt: T0 });
+        await sweepAt(T0 + 8 * DAY);
+
+        expect(await stuckNotices()).toStrictEqual([]);
     });
 });
 

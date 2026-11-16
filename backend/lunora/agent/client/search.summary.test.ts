@@ -32,12 +32,17 @@ const contextFor = async (
         boundary?: { messageId: string; order: number; stepOrder: number };
         branched?: boolean;
         contextHandler?: never;
+        fromOrder?: number;
         promptMessageId?: string | null;
         recentMessages?: number;
         statelessMode?: boolean;
     } = {},
 ) => {
     const runQuery = vi.fn(async (ref: unknown) => {
+        if (ref === internal.agent.context_reset_read.getContextReset) {
+            return null;
+        }
+
         if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
             return summary === null ? null : { ...(boundary && { boundary }), branched: branched ?? false, summary };
         }
@@ -119,6 +124,16 @@ describe("fetchContextWithPrompt with a thread summary", () => {
         expect(threadNotes).toBeUndefined();
     });
 
+    it("adds none for a run read from its own first turn, which never read the turns a summary covers", async () => {
+        expect.assertions(3);
+
+        const { messages, runQuery, threadNotes } = await contextFor("A summary of the earlier turns", { fromOrder: 3 });
+
+        expect(texts(messages as never)).toStrictEqual(["the prompt"]);
+        expect(threadNotes).toBeUndefined();
+        expect(runQuery).not.toHaveBeenCalledWith(internal.agent.thread_summaries.getThreadSummaryForContext, expect.anything());
+    });
+
     it("does not look for one when the recent window is smaller than the one the summary was made for", async () => {
         expect.assertions(2);
 
@@ -143,6 +158,10 @@ describe("fetchContextWithPrompt with a thread summary", () => {
         expect.assertions(1);
 
         const runQuery = vi.fn(async (ref: unknown) => {
+            if (ref === internal.agent.context_reset_read.getContextReset) {
+                return null;
+            }
+
             if (ref === internal.agent.thread_summaries.getThreadSummaryForContext) {
                 throw new Error("shard busy");
             }

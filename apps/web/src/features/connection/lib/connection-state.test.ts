@@ -40,6 +40,14 @@ describe("connectionViewOf", () => {
         expect(connectionViewOf(state)).toBe("reconnecting");
     });
 
+    it("stays reconnecting between attempts at a backend that has never answered, instead of flickering online", () => {
+        let state = reduceConnection(start, { status: "offline", type: "live" });
+
+        state = reduceConnection(state, { status: "connecting", type: "live" });
+
+        expect(connectionViewOf(state)).toBe("reconnecting");
+    });
+
     it("treats a backend that never answered as reconnecting", () => {
         const state = reduceConnection(start, { status: "offline", type: "live" });
 
@@ -80,21 +88,36 @@ describe("reduceConnection", () => {
 
 describe("connectionPresentationOf", () => {
     it("shows nothing while online", () => {
-        expect(connectionPresentationOf("online", "screen")).toEqual({ banner: "online", screen: null });
+        expect(connectionPresentationOf("online", "screen")).toEqual({ backOnline: false, banner: "online", screen: null, view: "online" });
     });
 
-    it("shows an offline banner at once, and the screen after the offline threshold", () => {
-        expect(bannerDelayMs("offline")).toBe(0);
-        expect(screenDelayMs("offline")).toBe(CONNECTION_THRESHOLDS_MS.offlineScreen);
-        expect(connectionPresentationOf("offline", "pending")).toEqual({ banner: "offline", screen: null });
-        expect(connectionPresentationOf("offline", "screen")).toEqual({ banner: "offline", screen: "offline" });
+    it("on an offline start, shows the banner and the offline screen at once", () => {
+        expect(screenDelayMs("offline", false)).toBe(0);
+        expect(connectionPresentationOf("offline", "pending", { hasConnected: false })).toEqual({
+            backOnline: false,
+            banner: "offline",
+            screen: "offline",
+            view: "offline",
+        });
+    });
+
+    it("once connected, shows the offline banner at once and the screen only after the offline threshold", () => {
+        expect(bannerDelayMs("offline", true)).toBe(0);
+        expect(screenDelayMs("offline", true)).toBe(CONNECTION_THRESHOLDS_MS.offlineScreen);
+        expect(connectionPresentationOf("offline", "pending")).toMatchObject({ banner: "offline", screen: null });
+        expect(connectionPresentationOf("offline", "screen")).toMatchObject({ banner: "offline", screen: "offline" });
     });
 
     it("holds a reconnect back for the grace period, then counts the screen threshold from the banner", () => {
-        expect(bannerDelayMs("reconnecting")).toBe(CONNECTION_THRESHOLDS_MS.reconnectingBanner);
-        expect(screenDelayMs("reconnecting")).toBe(CONNECTION_THRESHOLDS_MS.reconnectingBanner + CONNECTION_THRESHOLDS_MS.reconnectingScreen);
-        expect(connectionPresentationOf("reconnecting", "pending")).toEqual({ banner: "online", screen: null });
-        expect(connectionPresentationOf("reconnecting", "banner")).toEqual({ banner: "reconnecting", screen: null });
-        expect(connectionPresentationOf("reconnecting", "screen")).toEqual({ banner: "reconnecting", screen: "reconnecting" });
+        expect(bannerDelayMs("reconnecting", true)).toBe(CONNECTION_THRESHOLDS_MS.reconnectingBanner);
+        expect(screenDelayMs("reconnecting", true)).toBe(CONNECTION_THRESHOLDS_MS.reconnectingBanner + CONNECTION_THRESHOLDS_MS.reconnectingScreen);
+        expect(connectionPresentationOf("reconnecting", "pending").banner).toBe("online");
+        expect(connectionPresentationOf("reconnecting", "banner")).toMatchObject({ banner: "reconnecting", screen: null });
+        expect(connectionPresentationOf("reconnecting", "screen")).toMatchObject({ banner: "reconnecting", screen: "reconnecting" });
+    });
+
+    it("shows a backend that never answered on this page load at once, with no bounce to wait out", () => {
+        expect(bannerDelayMs("reconnecting", false)).toBe(0);
+        expect(connectionPresentationOf("reconnecting", "pending", { hasConnected: false }).banner).toBe("reconnecting");
     });
 });

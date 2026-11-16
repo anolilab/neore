@@ -136,6 +136,7 @@
   "crons": [
     "*/1 * * * *"
   ],
+  "malformed": [],
   "name": "neore-backend",
   "unknown": [
     "dev",

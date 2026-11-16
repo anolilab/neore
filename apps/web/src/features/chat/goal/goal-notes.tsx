@@ -72,7 +72,7 @@ export const GoalBanner: FC<{ goal: ThreadGoalView; maxWidth?: string; threadId:
             data-goal-status={goal.status}
             style={{ maxWidth: maxWidth ?? "65ch" }}
         >
-            <Target aria-hidden="true" className="text-primary mt-0.5 size-4 shrink-0" />
+            <Target aria-hidden="true" className="text-primary-text mt-0.5 size-4 shrink-0" />
             <div className="min-w-0 flex-1">
                 <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">{t`Goal`}</p>
                 <p className="text-sm break-words">{goal.text}</p>

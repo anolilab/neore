@@ -9,6 +9,7 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { AgentSwitchPart } from "@neore/backend/agent/agent-switch-validators";
+import type { ContextResetPart } from "@neore/backend/agent/context-reset-shape";
 import type { Id } from "@neore/backend/dataModel";
 import { getVisibleUserText } from "@neore/chat-ui/utils/page-context";
 import { Message, MessageAction, MessageActions, MessageContent as MessageContentWrapper } from "@neore/ui/components/ai-elements/message";
@@ -37,7 +38,7 @@ import {
 import type { FC, ReactNode } from "react";
 import { memo, useCallback, useState } from "react";
 
-import { useChatActions, useChatThread } from "@/features/chat/core/context/chat-context";
+import { useChatActions, useChatThreadIdentity } from "@/features/chat/core/context/chat-context";
 import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager";
 import { isValidThreadId } from "@/features/chat/core/hooks/use-validated-thread";
 import { useChatUIStore, useMessageInteractionState } from "@/features/chat/core/stores/chat-ui-store";
@@ -57,6 +58,7 @@ import { showError } from "@/lib/toast";
 
 import AgentSwitchDivider from "./agent-switch-divider";
 import ContextResetDivider from "./context-reset-divider";
+import CopyPromptLinkAction from "./copy-prompt-link-action";
 import ForkBranchDialog from "./fork-branch-dialog";
 import formatMessageTime from "./format-message-time";
 import GenerationModelMenu from "./generation-model-menu";
@@ -198,7 +200,7 @@ const DefaultAssistantMessage: FC<AssistantMessageRendererProps> = ({ actionBar,
     return (
         <Message
             className={cn(
-                "relative grid w-full max-w-(--thread-max-width) grid-cols-[auto_auto_1fr] grid-rows-[auto_1fr] gap-y-2",
+                "relative grid w-full max-w-(--thread-max-width) grid-cols-[auto_auto_minmax(0,1fr)] grid-rows-[auto_1fr] gap-y-2",
                 isLast ? "pb-0" : "pb-(--density-message-gap)",
             )}
             from="assistant"
@@ -265,10 +267,9 @@ const MessageTimestamp: FC<{ message: UIMessage }> = ({ message }) => {
  * Uses MessageActions and MessageAction from AI elements
  */
 const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStreaming, message, messageIndex, onCopy, onCopyPlain, onEdit, onReload }) => {
-    const { model: currentModel, threadId } = useChatThread();
+    const { model: currentModel, threadId } = useChatThreadIdentity();
     const models = useFeatureFlaggedModels();
     const crpc = useCRPC();
-    const setActiveRightSidebarTab = useChatUIStore((state) => state.setActiveRightSidebarTab);
     const { createBranch } = useThreadManager(true);
     const [isForkDialogOpen, setIsForkDialogOpen] = useState(false);
     const { mutate: createPin } = useMutation(crpc.chat.pins.functions.createPin.mutationOptions());
@@ -330,7 +331,7 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
                 onError: (error) => showError(error as Error),
                 onSuccess: () => {
                     trackEvent("message_pinned", { has_note: false });
-                    setActiveRightSidebarTab("pins");
+                    useChatUIStore.getState().setActiveRightSidebarTab("pins");
                 },
             },
         );
@@ -398,6 +399,8 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
                 )}
 
                 {isUser && <RestoreToInputAction message={message} />}
+
+                {isUser && <CopyPromptLinkAction message={message} />}
 
                 {(isAssistant || isUser) && isTextModel && <SelectMessagesAction messageId={message.id} />}
 
@@ -490,9 +493,6 @@ const MessageItem: FC<MessageItemProps> = memo(
         // Actions
         const { copyMessage, reloadMessage } = useChatActions();
 
-        // Edit state - use separate selectors to avoid creating new objects
-        const startEditing = useChatUIStore((state) => state.startEditing);
-
         const messageIsStreaming = isStreaming || message.status === "streaming";
 
         // Handlers
@@ -519,8 +519,8 @@ const MessageItem: FC<MessageItemProps> = memo(
         }, [reloadMessage, message.id]);
 
         const handleEdit = useCallback(() => {
-            startEditing(message.id, message.role === "user" ? getVisibleUserText(message) : message.text);
-        }, [startEditing, message]);
+            useChatUIStore.getState().startEditing(message.id, message.role === "user" ? getVisibleUserText(message) : message.text);
+        }, [message]);
 
         // Render content
         const content = (
@@ -589,10 +589,12 @@ const MessageItem: FC<MessageItemProps> = memo(
                 );
             }
 
-            if (message.parts.some((part) => part.type === "data-contextReset")) {
+            const contextReset = message.parts.find((part) => part.type === "data-contextReset");
+
+            if (contextReset) {
                 return (
                     <div {...containerProps}>
-                        <ContextResetDivider />
+                        <ContextResetDivider reason={"data" in contextReset ? (contextReset.data as ContextResetPart | undefined)?.reason : undefined} />
                     </div>
                 );
             }

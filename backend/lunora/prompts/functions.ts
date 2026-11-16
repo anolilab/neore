@@ -1403,6 +1403,7 @@ export const setOrganizationVariableDefaults = authMutation
 export const getResolvedVariables = authQuery
     .input({
         threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(
         v.object({
@@ -1410,7 +1411,7 @@ export const getResolvedVariables = authQuery
             values: v.record(v.string(), v.string()),
         }),
     )
-    .query(async ({ args: { threadId }, ctx }) => {
+    .query(async ({ args: { threadId, unlockProof }, ctx }) => {
         const { userId } = ctx.user;
         const organizationId = ctx.user.activeOrganization?.id;
 
@@ -1447,8 +1448,9 @@ export const getResolvedVariables = authQuery
             }
         }
 
-        // Only the caller's own row — `threadId` is an arg (see `applyThreadVariablesToPrompt`).
-        if (threadVariables?.variables && threadVariables.userId === userId) {
+        // Only the caller's own row — `threadId` is an arg (see `applyThreadVariablesToPrompt`). A locked chat's values
+        // are its content: they come back only with the proof, like `getThreadVariables`.
+        if (threadVariables?.variables && threadVariables.userId === userId && threadId && !(await isLockedWithoutProof(ctx, threadId, unlockProof))) {
             for (const innerV of threadVariables.variables) {
                 values[innerV.name] = innerV.value;
                 sources[innerV.name] = "thread";

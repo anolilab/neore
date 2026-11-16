@@ -41,7 +41,7 @@ const LoginForm = ({ error, isLoading = false, onSignIn, onSignInWithGoogle }: L
         <div className="flex w-full flex-col gap-5">
             <div className="flex flex-col gap-1">
                 <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-50">{t`Sign in`}</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{t`Enter your credentials to continue`}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{t`Enter your credentials to continue`}</p>
             </div>
 
             {error && (
@@ -104,7 +104,7 @@ const LoginForm = ({ error, isLoading = false, onSignIn, onSignInWithGoogle }: L
                         />
                         <button
                             aria-label={showPassword ? t`Hide password` : t`Show password`}
-                            className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                            className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-600 dark:text-gray-400 dark:hover:text-gray-300"
                             onClick={() => setShowPassword((previous) => !previous)}
                             tabIndex={-1}
                             type="button"
@@ -134,7 +134,7 @@ const LoginForm = ({ error, isLoading = false, onSignIn, onSignInWithGoogle }: L
                 <>
                     <div className="flex items-center gap-3">
                         <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
-                        <span className="text-xs text-gray-400">{t`or`}</span>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">{t`or`}</span>
                         <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
                     </div>
 

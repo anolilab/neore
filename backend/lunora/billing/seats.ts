@@ -9,7 +9,7 @@
  * the CURRENT count when it runs, so bursts, reorderings and queue redeliveries
  * all converge on the same units; a run that finds them equal does nothing.
  *
- * Through `ctx.payments.adapter` (the facade authorizes against a caller, and a
+ * Through `./provider.ts` (the facade authorizes against a caller, and a
  * queued job has none). Units change with `proration: "next-invoice"`: the
  * prorated difference lands on the next invoice — no card charge per invite,
  * and a removed seat is credited the same way.
@@ -25,6 +25,7 @@ import { CREEM_API_KEY } from "../env";
 import { enqueueJob } from "../lib/job-queue";
 import { logger } from "../lib/logger";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
+import { setSeats, subscriptionStatus } from "./provider";
 
 const billingLogger = logger.scope("billing");
 
@@ -103,13 +104,13 @@ export const syncTeamSeats = internalAction
                 return null;
             }
 
-            const units = seatUnitsFor(subject.seats, await ctx.payments.adapter.getSubscriptionStatus(subscriptionId));
+            const units = seatUnitsFor(subject.seats, await subscriptionStatus(organizationId, subscriptionId));
 
             if (units === undefined) {
                 return null;
             }
 
-            await ctx.payments.adapter.updateSubscription(subscriptionId, { proration: "next-invoice", quantity: units });
+            await setSeats(organizationId, subscriptionId, units);
         }
 
         throw new LunoraError("CONFLICT", `Team seats for ${organizationId} did not settle in ${MAX_ROUNDS} rounds`);

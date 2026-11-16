@@ -24,6 +24,7 @@ import { admitOrganization } from "../lib/rls/scope";
 import { countedWorkflowFileIds } from "../workflow/images";
 import { changeRefcount } from "./files";
 import { listThreadItem } from "./threads";
+import { eraseProjectRepositories } from "../projects/gdpr";
 
 /**
  * A workflow keeps its images and reference media as chat-file references
@@ -301,6 +302,9 @@ export const deleteProject = internalMutation
             });
         }
 
+        // Its repositories go last before the row, so a check or thread move that fails above leaves both in place. The
+        // delete's marker stays until the caller is done (`projects/functions.ts#deleteProject`).
+        await eraseProjectRepositories(ctx, args.projectId, { keepMarker: true });
         await ctx.db.delete("projects", args.projectId);
         await recountWorkflowImages(ctx, project.userId, project.workflowContent, undefined);
 

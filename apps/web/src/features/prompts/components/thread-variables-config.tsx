@@ -227,7 +227,7 @@ const ThreadVariablesConfig = ({ threadId }: ThreadVariablesConfigProps) => {
                             <div className="space-y-1" key={variable.name}>
                                 <div className="flex items-center justify-between">
                                     <Label className="text-xs" htmlFor={`var-${index}`}>
-                                        <code className="bg-primary/10 text-primary rounded px-1">{`{{${variable.name}}}`}</code>
+                                        <code className="bg-primary/10 text-primary-text rounded px-1">{`{{${variable.name}}}`}</code>
                                     </Label>
                                     <Button aria-label={t`Remove ${variable.name}`} onClick={() => handleRemoveVariable(index)} size="icon-sm" variant="ghost">
                                         <X aria-hidden="true" className="size-3" />

@@ -42,7 +42,7 @@ use crate::outbox::Outbox;
 pub const MAX_AGENTS: usize = 8;
 const MAX_ARGS: usize = 50;
 const MAX_ARG_BYTES: usize = 1000;
-const MAX_ENV_VARS: usize = 100;
+pub(crate) const MAX_ENV_VARS: usize = 100;
 /// Bytes of an agent's output per chunk frame.
 const CHUNK_BYTES: usize = 32 * 1024;
 /// How long a polite stop waits before the group is killed.
@@ -162,7 +162,8 @@ pub struct AgentParams {
     pub command: String,
     /// Absolute, on this machine, inside one of `roots`.
     pub cwd: String,
-    /// The variables the person set (global, then the agent's own): applied on top of the built environment.
+    /// The variables the person set (global, then the agent's own), and Claude Code's entrypoint name: applied on top
+    /// of the built environment.
     #[serde(default)]
     pub env: BTreeMap<String, String>,
     /// The shared folders for this server.

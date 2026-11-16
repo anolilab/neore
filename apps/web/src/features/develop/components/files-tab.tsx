@@ -10,12 +10,14 @@ import { Checkbox } from "@neore/ui/components/checkbox";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import cn from "@neore/ui/utils/cn";
 import { ChevronRight } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { countViewed, viewedStatesOf } from "../lib/review";
 import type { PullRequestAddress } from "../lib/use-develop";
 import { usePullRequestFiles } from "../lib/use-develop";
 import { useReviewActions, useReviewDraft, useReviewThreads, useViewedFiles } from "../lib/use-review";
+import type { WriteResult } from "../lib/use-review-messages";
 import { useReviewMessages } from "../lib/use-review-messages";
 import DiffView from "./diff-view";
 import type { ReadFailureStatus } from "./failure-notice";
@@ -41,18 +43,112 @@ interface ReviewContext {
     hostLabel: string;
 }
 
-/** Everything the review adds to one file's row. */
+/** Everything the review adds to one file's row. Each is stable while its own data is, so a row is drawn again only when it changed. */
 interface FileReview {
     draftComments: DraftCommentEntry[];
     locked: boolean;
-    onToggleViewed: (viewed: boolean) => void;
+    onToggleViewed: (path: string, viewed: boolean) => void;
     threads: ReviewThread[];
     viewed: ViewedState | undefined;
     viewedPending: boolean;
 }
 
-/** Whether review data recorded under `path` belongs on this file's row: its path now, or the one it had before a rename. */
-const ownsPath = (file: FileEntry, path: string): boolean => path === file.path || path === file.previousPath;
+/** A row's identity in the list: a rename is its own row. */
+const fileKeyOf = (file: FileEntry): string => `${file.previousPath ?? ""}→${file.path}`;
+
+/** One empty list for every row without review items, so an empty row's props stay the same between renders. Never mutated. */
+const NONE: never[] = [];
+
+/**
+ * Review items (threads, draft comments) grouped by the row that owns them, in their own order, in one pass. A row owns
+ * what is recorded under its path now or under the one it had before a rename; what no row owns is `stray`.
+ */
+const groupByFile = <Item extends { path: string }>(
+    files: ReadonlyArray<FileEntry>,
+    items: ReadonlyArray<Item>,
+): { byFile: ReadonlyMap<string, Item[]>; stray: Item[] } => {
+    const owners = new Map<string, string[]>();
+
+    for (const file of files) {
+        const key = fileKeyOf(file);
+        const paths = file.previousPath && file.previousPath !== file.path ? [file.path, file.previousPath] : [file.path];
+
+        for (const path of paths) {
+            const list = owners.get(path);
+
+            if (list) {
+                list.push(key);
+            } else {
+                owners.set(path, [key]);
+            }
+        }
+    }
+
+    const byFile = new Map<string, Item[]>();
+    const stray: Item[] = [];
+
+    for (const item of items) {
+        const keys = owners.get(item.path);
+
+        if (!keys) {
+            stray.push(item);
+            continue;
+        }
+
+        for (const key of keys) {
+            const list = byFile.get(key);
+
+            if (list) {
+                list.push(item);
+            } else {
+                byFile.set(key, [item]);
+            }
+        }
+    }
+
+    return { byFile, stray };
+};
+
+/**
+ * Marks a file viewed or not on the host, keeping its checkbox disabled until the call ends. Module-level: a `finally`
+ * inside the component would keep the React Compiler from compiling `FilesTab`.
+ */
+const markViewed = async ({
+    messages,
+    mutateAsync,
+    next,
+    path,
+    setError,
+    setPending,
+}: {
+    messages: { write: (result: WriteResult) => string };
+    mutateAsync: (input: { path: string; viewed: boolean }) => Promise<WriteResult>;
+    next: boolean;
+    path: string;
+    setError: Dispatch<SetStateAction<string | null>>;
+    setPending: Dispatch<SetStateAction<ReadonlySet<string>>>;
+}): Promise<void> => {
+    setError(null);
+    setPending((current: ReadonlySet<string>) => new Set(current).add(path));
+
+    try {
+        const outcome = await mutateAsync({ path, viewed: next });
+
+        if (outcome.status !== "ok") {
+            setError(messages.write(outcome));
+        }
+    } catch {
+        setError(messages.write({ status: "failed" }));
+    } finally {
+        setPending((current: ReadonlySet<string>) => {
+            const rest = new Set(current);
+
+            rest.delete(path);
+
+            return rest;
+        });
+    }
+};
 
 /** The first failure among a query's pages, if any; a thrown page counts as the host failing. */
 const failureOf = (pages: ReadonlyArray<{ status: string }>, isError: boolean): ReadFailureStatus | undefined =>
@@ -64,21 +160,32 @@ export interface FileFocus {
     token: number;
 }
 
-const FileRow = ({
-    context,
-    file,
-    focus,
-    review,
-    showDiff,
-}: {
+interface FileRowProps extends FileReview {
     context: ReviewContext;
     file: FileEntry;
     focus: FileFocus | null;
-    review: FileReview;
     showDiff: boolean;
-}) => {
+}
+
+/** The same items in the same order: regrouping makes new lists, while the query keeps unchanged items as the same objects. */
+const sameItems = (left: ReadonlyArray<unknown>, right: ReadonlyArray<unknown>): boolean =>
+    left === right || (left.length === right.length && left.every((item: unknown, index: number) => item === right[index]));
+
+const sameRowProps = (previous: FileRowProps, next: FileRowProps): boolean =>
+    previous.context === next.context &&
+    previous.file === next.file &&
+    previous.focus === next.focus &&
+    previous.showDiff === next.showDiff &&
+    previous.locked === next.locked &&
+    previous.onToggleViewed === next.onToggleViewed &&
+    previous.viewed === next.viewed &&
+    previous.viewedPending === next.viewedPending &&
+    sameItems(previous.threads, next.threads) &&
+    sameItems(previous.draftComments, next.draftComments);
+
+const FileRowView = ({ context, file, focus, showDiff, ...review }: FileRowProps) => {
     const { t } = useLingui();
-    const wanted = focus !== null && ownsPath(file, focus.path);
+    const wanted = focus !== null && (focus.path === file.path || focus.path === file.previousPath);
     const [open, setOpen] = useState(wanted);
     const panelId = useId();
     const row = useRef<HTMLLIElement>(null);
@@ -148,7 +255,7 @@ const FileRow = ({
                             checked={review.viewed === "viewed"}
                             disabled={review.viewedPending}
                             id={checkboxId}
-                            onCheckedChange={(checked) => review.onToggleViewed(checked)}
+                            onCheckedChange={(checked) => review.onToggleViewed(file.path, checked)}
                         />
                         <label className="text-xs" htmlFor={checkboxId}>
                             {review.viewed === "changed" ? t`Viewed (changed since)` : t`Viewed`}
@@ -201,6 +308,9 @@ const FileRow = ({
     );
 };
 
+/** Memoized: a review change on one file (a comment, a viewed mark) draws that row again, not every open diff in the list. */
+const FileRow = memo(FileRowView, sameRowProps);
+
 /** Every file the host will list, page by page, and how many it will not. */
 const FilesTab = ({
     address,
@@ -237,7 +347,7 @@ const FilesTab = ({
     const [viewedPending, setViewedPending] = useState<ReadonlySet<string>>(new Set());
     const viewedStates = useMemo(() => viewedStatesOf(viewed.data?.pages ?? []), [viewed.data]);
     const loadedThreads = useMemo(() => (threads.data?.pages ?? []).flatMap((page) => (page.status === "ok" ? page.threads : [])), [threads.data]);
-    const draftComments = draft.data?.comments ?? [];
+    const draftComments = draft.data?.comments ?? NONE;
 
     // The host's pages are bounded by its own ceilings, so reading them to the end is bounded too.
     // A page that failed stays failed: asking again at once would only spend the read budget.
@@ -251,11 +361,26 @@ const FilesTab = ({
         }
     }, [threads, viewed]);
     const { fetchNextPage, hasNextPage, isFetchingNextPage } = files;
-    const pages = files.data?.pages ?? [];
+    const pages = files.data?.pages ?? NONE;
     // Pages are read one after another, so a push in between can move a file onto a second page: keep its first place.
-    const listed = [
-        ...new Map(pages.flatMap((page) => (page.status === "ok" ? page.files : [])).map((file) => [`${file.previousPath ?? ""}→${file.path}`, file])).values(),
-    ];
+    const listed = useMemo(
+        () => [
+            ...new Map((files.data?.pages ?? NONE).flatMap((page) => (page.status === "ok" ? page.files : [])).map((file) => [fileKeyOf(file), file])).values(),
+        ],
+        [files.data],
+    );
+    const threadGroups = useMemo(() => groupByFile(listed, loadedThreads), [listed, loadedThreads]);
+    const draftGroups = useMemo(() => groupByFile(listed, draftComments), [listed, draftComments]);
+    const context = useMemo(() => {
+        return { address, capabilities, headSha, hostLabel };
+    }, [address, capabilities, headSha, hostLabel]);
+    const { mutateAsync: setViewedMark } = actions.setViewed;
+    const onToggleViewed = useCallback(
+        (path: string, next: boolean) => {
+            void markViewed({ messages, mutateAsync: setViewedMark, next, path, setError: setViewedError, setPending: setViewedPending });
+        },
+        [messages, setViewedMark],
+    );
     const failure = failureOf(pages, files.isError);
     const reviewFailure = failureOf(threads.data?.pages ?? [], threads.isError) ?? failureOf(viewed.data?.pages ?? [], viewed.isError);
 
@@ -287,8 +412,8 @@ const FilesTab = ({
     }
 
     const loading = !failure && (hasNextPage || isFetchingNextPage);
-    const strayThreads = loadedThreads.filter((thread) => listed.every((file) => !ownsPath(file, thread.path)));
-    const strayDrafts = draftComments.filter((comment) => listed.every((file) => !ownsPath(file, comment.path)));
+    const strayThreads = threadGroups.stray;
+    const strayDrafts = draftGroups.stray;
     const viewedCount = countViewed(
         listed.map((file) => file.path),
         viewedStates,
@@ -321,44 +446,25 @@ const FilesTab = ({
                 </p>
             )}
             <ul className="rounded-md border">
-                {listed.map((file) => (
-                    <FileRow
-                        context={{ address, capabilities, headSha, hostLabel }}
-                        file={file}
-                        focus={focus ?? null}
-                        key={`${file.previousPath ?? ""}→${file.path}`}
-                        review={{
-                            draftComments: draftComments.filter((comment) => ownsPath(file, comment.path)),
-                            locked: draft.data?.submitting === true,
-                            onToggleViewed: async (next) => {
-                                setViewedError(null);
-                                setViewedPending((current) => new Set(current).add(file.path));
+                {listed.map((file) => {
+                    const key = fileKeyOf(file);
 
-                                try {
-                                    const outcome = await actions.setViewed.mutateAsync({ path: file.path, viewed: next });
-
-                                    if (outcome.status !== "ok") {
-                                        setViewedError(messages.write(outcome));
-                                    }
-                                } catch {
-                                    setViewedError(messages.write({ status: "failed" }));
-                                } finally {
-                                    setViewedPending((current) => {
-                                        const rest = new Set(current);
-
-                                        rest.delete(file.path);
-
-                                        return rest;
-                                    });
-                                }
-                            },
-                            threads: loadedThreads.filter((thread) => ownsPath(file, thread.path)),
-                            viewed: viewedStates.get(file.path),
-                            viewedPending: viewedPending.has(file.path),
-                        }}
-                        showDiff={showDiff}
-                    />
-                ))}
+                    return (
+                        <FileRow
+                            context={context}
+                            draftComments={draftGroups.byFile.get(key) ?? NONE}
+                            file={file}
+                            focus={focus ?? null}
+                            key={key}
+                            locked={draft.data?.submitting === true}
+                            onToggleViewed={onToggleViewed}
+                            showDiff={showDiff}
+                            threads={threadGroups.byFile.get(key) ?? NONE}
+                            viewed={viewedStates.get(file.path)}
+                            viewedPending={viewedPending.has(file.path)}
+                        />
+                    );
+                })}
             </ul>
             {!loading && (strayThreads.length > 0 || strayDrafts.length > 0) && (
                 <section aria-label={t`Other conversations`} className="space-y-2">

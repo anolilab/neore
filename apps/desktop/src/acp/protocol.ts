@@ -11,31 +11,36 @@
  * - **No client-side file system or terminal.** The host advertises `fs.readTextFile`, `fs.writeTextFile` and
  * `terminal` as false (plan §10 Q5), so an agent runs its own tools beside the device sandbox under its own
  * permission prompts. Any `fs/*` or `terminal/*` request is answered "method not found".
- * - **No `authenticate`.** Neore stores no credential for an agent. An agent that needs a login is told so in
- * plain words; the user signs in with the agent's own tool.
+ * - **Neore stores no credential for an agent.** A sign-in stays in the agent's own store on this computer. Whether an
+ * agent is signed in is asked by opening a session (`sign-in.ts`), and a sign-out is the agent's own `logout`.
  */
 import type {
     InitializeRequest,
     InitializeResponse,
     ListSessionsRequest,
     LoadSessionRequest,
+    LogoutRequest,
     NewSessionRequest,
     PromptRequest,
     SetSessionConfigOptionRequest,
     SetSessionModeRequest,
 } from "@agentclientprotocol/sdk";
+import type { ForkSessionRequest } from "@agentclientprotocol/sdk/unstable";
 
 import type { JsonRpcConnection } from "./jsonrpc";
 import { RpcError } from "./rpc-error";
+import { AgentSignedOutError } from "./signed-out";
 import type { AgentCapabilities } from "./types";
 
 export const PROTOCOL_VERSION = 1;
 
 export const METHOD = {
     cancel: "session/cancel",
+    forkSession: "session/fork",
     initialize: "initialize",
     listSessions: "session/list",
     loadSession: "session/load",
+    logout: "logout",
     newSession: "session/new",
     prompt: "session/prompt",
     requestPermission: "session/request_permission",
@@ -102,6 +107,8 @@ const displayName = (info: { name?: unknown; title?: unknown }): string => {
 export interface Handshake {
     agentName: string;
     agentVersion: string;
+    /** The agent advertised `agentCapabilities.auth.logout`: it can sign itself out. */
+    canLogout: boolean;
     capabilities: AgentCapabilities;
     protocolVersion: number;
 }
@@ -112,7 +119,11 @@ export const initialize = async (connection: JsonRpcConnection, appVersion: stri
         clientInfo: { name: "neore-desktop", title: "Neore", version: appVersion },
         protocolVersion: PROTOCOL_VERSION,
     };
-    const response = (await withTimeout(connection.request(METHOD.initialize, params), timeoutMs, "the agent did not answer the handshake")) as Partial<InitializeResponse> | null;
+    const response = (await withTimeout(
+        connection.request(METHOD.initialize, params),
+        timeoutMs,
+        "the agent did not answer the handshake",
+    )) as Partial<InitializeResponse> | null;
     const version = response?.protocolVersion;
 
     if (typeof version !== "number") {
@@ -129,11 +140,13 @@ export const initialize = async (connection: JsonRpcConnection, appVersion: stri
     }
 
     const info: { name?: unknown; title?: unknown; version?: unknown } = isRecord(response?.agentInfo) ? response.agentInfo : {};
+    const capabilities: AgentCapabilities = isRecord(response?.agentCapabilities) ? response.agentCapabilities : {};
 
     return {
         agentName: displayName(info),
         agentVersion: typeof info.version === "string" ? info.version : "",
-        capabilities: isRecord(response?.agentCapabilities) ? response.agentCapabilities : {},
+        canLogout: isRecord(capabilities.auth) && isRecord(capabilities.auth.logout),
+        capabilities,
         protocolVersion: version,
     };
 };
@@ -156,8 +169,7 @@ export const openNewSession = async (
         return { response, sessionId: response.sessionId };
     } catch (error) {
         if (error instanceof RpcError && error.code === AUTH_REQUIRED) {
-            // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
-            throw new Error("the agent needs you to sign in first. Sign in with the agent's own tool, then start the session again");
+            throw new AgentSignedOutError("the agent needs you to sign in first. Sign in with the agent's own login command on this computer, then start the session again");
         }
 
         throw error;
@@ -193,6 +205,26 @@ export const setMode = async (
     return await withTimeout(connection.request(METHOD.setMode, params), timeoutMs, "the agent did not answer", onLate);
 };
 
+/**
+ * `session/fork` (unstable in ACP v1): a new session that starts with the history of `sessionId`, which stays as it was.
+ * Returns the new session's id. Call only when the agent advertised `sessionCapabilities.fork`.
+ */
+export const forkSession = async (
+    connection: JsonRpcConnection,
+    sessionId: string,
+    cwd: string,
+    timeoutMs = LOAD_TIMEOUT_MS,
+): Promise<{ answer: Record<string, unknown>; sessionId: string }> => {
+    const params: ForkSessionRequest = { cwd, mcpServers: [], sessionId };
+    const response = await withTimeout(connection.request(METHOD.forkSession, params), timeoutMs, "the agent did not fork the session");
+
+    if (!isRecord(response) || typeof response.sessionId !== "string" || response.sessionId === "") {
+        throw new Error("the agent did not return a session id");
+    }
+
+    return { answer: response, sessionId: response.sessionId };
+};
+
 export const promptParams = (sessionId: string, text: string): PromptRequest => {
     return { prompt: [{ text, type: "text" }], sessionId };
 };
@@ -210,7 +242,7 @@ const MAX_LIST_PAGES = 10;
 const MAX_LISTED_SESSIONS = 200;
 const LIST_TIMEOUT_MS = 30_000;
 
-const textOf = (value: unknown): string => typeof value === "string" ? value : "";
+const textOf = (value: unknown): string => (typeof value === "string" ? value : "");
 
 /**
  * `session/list` for one folder, newest first. The agent may ignore the `cwd` filter, and the user approved this folder
@@ -262,10 +294,16 @@ export const loadSession = async (connection: JsonRpcConnection, sessionId: stri
         return await withTimeout(connection.request(METHOD.loadSession, params), timeoutMs, "the agent did not finish loading the session");
     } catch (error) {
         if (error instanceof RpcError && error.code === AUTH_REQUIRED) {
-            // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
-            throw new Error("the agent needs you to sign in first. Sign in with the agent's own tool, then import again");
+            throw new AgentSignedOutError("the agent needs you to sign in first. Sign in with the agent's own login command on this computer, then import again");
         }
 
         throw error;
     }
+};
+
+/** `logout`: the agent signs itself out of its own account. Call only when the handshake said `canLogout`. */
+export const logout = async (connection: JsonRpcConnection, timeoutMs = STARTUP_TIMEOUT_MS): Promise<void> => {
+    const params: LogoutRequest = {};
+
+    await withTimeout(connection.request(METHOD.logout, params), timeoutMs, "the agent did not answer the sign-out");
 };

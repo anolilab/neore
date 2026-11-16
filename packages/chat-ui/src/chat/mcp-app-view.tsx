@@ -21,6 +21,7 @@ import { memo, useCallback } from "react";
 
 import type { ToolPart } from "../types/message";
 import cn from "../utils/cn";
+import { mcpToolCallBody } from "./mcp-tool-call";
 
 type OnReadResource = NonNullable<AppRendererProps["onReadResource"]>;
 type OnCallTool = NonNullable<AppRendererProps["onCallTool"]>;
@@ -32,12 +33,14 @@ export interface McpAppViewProps {
     part: ToolPart;
     resourceUri: string;
     serverName: string;
+    /** The thread the app is shown in: its permission mode applies to the app's tool calls. */
+    threadId?: string;
     toolName: string;
 }
 
 const SANDBOX_URL = new URL("https://proxy.mcpui.dev");
 
-const McpAppView = memo<McpAppViewProps>(({ lunoraSiteUrl, part, resourceUri, serverName, toolName }) => {
+const McpAppView = memo<McpAppViewProps>(({ lunoraSiteUrl, part, resourceUri, serverName, threadId, toolName }) => {
     const { t } = useLingui();
     const isError = part.state === "output-error";
 
@@ -66,11 +69,7 @@ const McpAppView = memo<McpAppViewProps>(({ lunoraSiteUrl, part, resourceUri, se
     const onCallTool = useCallback<OnCallTool>(
         async (params) => {
             const response = await fetch(`${lunoraSiteUrl}/mcp/tool`, {
-                body: JSON.stringify({
-                    arguments: params.arguments ?? {},
-                    serverName,
-                    toolName: params.name,
-                }),
+                body: mcpToolCallBody({ arguments: params.arguments, serverName, threadId, toolName: params.name }),
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 method: "POST",
@@ -86,7 +85,7 @@ const McpAppView = memo<McpAppViewProps>(({ lunoraSiteUrl, part, resourceUri, se
 
             return response.json() as ReturnType<OnCallTool>;
         },
-        [lunoraSiteUrl, serverName],
+        [lunoraSiteUrl, serverName, threadId],
     );
 
     const onOpenLink = useCallback<OnOpenLink>(({ url }) => {

@@ -14,6 +14,7 @@ import Captcha from "@/features/auth/components/captcha/captcha";
 import { useListAccounts } from "@/features/auth/hooks/account-management";
 import { useSession } from "@/features/auth/hooks/session-user-management";
 import useCaptcha from "@/features/auth/hooks/use-captcha";
+import useCredentialChangeBlock from "@/features/auth/hooks/use-credential-change-block";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 
@@ -39,6 +40,7 @@ const ChangePasswordCardContent = ({
 }: ChangePasswordCardContentProperties) => {
     const { authClient, basePath, baseURL, credentials, toast, viewPaths } = useAuth();
     const { t } = useLingui();
+    const credentialBlock = useCredentialChangeBlock();
 
     const confirmPasswordEnabled = credentials?.confirmPassword;
     const contextPasswordValidation = credentials?.passwordValidation;
@@ -222,6 +224,8 @@ const ChangePasswordCardContent = ({
                         className={className}
                         classNames={classNames}
                         description={t`Set a password for your account`}
+                        disabled={credentialBlock.blocked}
+                        instructions={credentialBlock.reason}
                         isPending={isPending}
                         title={t`Set Password`}
                     />
@@ -245,7 +249,8 @@ const ChangePasswordCardContent = ({
                     className={className}
                     classNames={classNames}
                     description={t`Change your account password`}
-                    instructions={t`Enter your current password and choose a new one`}
+                    disabled={credentialBlock.blocked}
+                    instructions={credentialBlock.reason ?? t`Enter your current password and choose a new one`}
                     isPending={isPending}
                     title={t`Change Password`}
                 >

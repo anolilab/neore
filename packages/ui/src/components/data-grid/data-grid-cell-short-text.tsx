@@ -187,6 +187,8 @@ export const ShortTextCell = <TData extends RowData>({
                 onInput={onInput}
                 ref={cellRef}
                 role="textbox"
+                // The desktop shell turns spellcheck off on <html>; a text cell is prose.
+                spellCheck={isEditing}
                 suppressContentEditableWarning
                 tabIndex={-1}
             >

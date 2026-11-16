@@ -15,6 +15,7 @@ const CAPABILITY_KEYS: Record<CapabilityKey, true> = {
     "identity.reasoningEffort": true,
     "planning.planMode": true,
     "sessions.create": true,
+    "sessions.fork": true,
     "sessions.listNative": true,
     "sessions.load": true,
     "streaming.reasoning": true,

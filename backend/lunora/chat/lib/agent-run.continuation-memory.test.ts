@@ -7,7 +7,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { internal } from "../../_generated/internal";
-import { afterRun, memoryToCarry, resumeApprovedRun } from "./agent-run";
+import { afterRun, mayExtractMemory, memoryToCarry, resumeApprovedRun } from "./agent-run";
+import { guestTextPart } from "./attached-text";
 import { buildAgentTools } from "./agent-tools";
 import getAgent from "./get-agent";
 import type { ToolRunConfig } from "./tool-run-config";
@@ -35,17 +36,39 @@ const pausedAgain = {
 };
 
 /** Runs a steerable continuation that takes one steer (unless `steered` is off), and returns the scheduled jobs and recorded snapshots. */
-const resume = async (config: ToolRunConfig, savedMessages: unknown[], memoryEnabled = true, steered = true) => {
+const resume = async (
+    config: ToolRunConfig,
+    savedMessages: unknown[],
+    memoryEnabled = true,
+    steered = true,
+    steps: unknown[] = [],
+    failPreferences = false,
+    /** A sub-agent continuation's resume (`continuingRun`), handed to the pause it records. */
+    subAgentResumedWith?: number,
+) => {
     const runAfter = vi.fn(async () => "job");
-    const runMutation = vi.fn(async (ref: unknown) =>
-        ref === internal.chat.steering.deliverSteers && steered ? { messageId: "steer-1", text: "actually, vegetarian" } : null,
-    );
+    let preferenceReads = 0;
+    const runMutation = vi.fn(async (ref: unknown) => {
+        if (ref === internal.chat.steering.deliverSteers && steered) {
+            return { messageId: "steer-1", text: "actually, vegetarian" };
+        }
+
+        // A recorded pause whose sub-agent run was refused: it does not wait.
+        return ref === internal.chat.tool_permissions.recordPendingToolApprovals ? false : null;
+    });
     const runQuery = vi.fn(async (ref: unknown) => {
         if (ref === internal.chat.tool_permissions.getPendingToolApproval) {
             return { toolName: null };
         }
 
         if (ref === internal.auth.functions.getUserPreferencesQuery) {
+            preferenceReads += 1;
+
+            // The read before the run goes through; the one in the bookkeeping after the reply fails.
+            if (failPreferences && preferenceReads > 1) {
+                throw new Error("preferences read failed");
+            }
+
             return { memoryEnabled, timezone: "Europe/Berlin" };
         }
 
@@ -56,7 +79,14 @@ const resume = async (config: ToolRunConfig, savedMessages: unknown[], memoryEna
             async (_ctx: unknown, _ids: unknown, _approval: unknown, _args: unknown, runOptions: { takeSteer: (a: unknown) => Promise<unknown> }) => {
                 await runOptions.takeSteer({ pendingMessageId: "p1" });
 
-                return { consumeStream: async () => {}, fullStream: (async function* none() {})(), order: 2, promptMessageId: "tool-result-1", savedMessages };
+                return {
+                    consumeStream: async () => {},
+                    fullStream: (async function* none() {})(),
+                    order: 2,
+                    promptMessageId: "tool-result-1",
+                    savedMessages,
+                    steps: Promise.resolve(steps),
+                };
             },
         ),
         options: {},
@@ -65,15 +95,17 @@ const resume = async (config: ToolRunConfig, savedMessages: unknown[], memoryEna
     vi.mocked(getAgent).mockResolvedValue(agent as never);
     vi.mocked(buildAgentTools).mockClear();
 
-    await resumeApprovedRun(
-        { runMutation, runQuery, scheduler: { runAfter } } as never,
+    const ctx: Record<string, unknown> = { runMutation, runQuery, scheduler: { runAfter } };
+
+    const outcome = await resumeApprovedRun(
+        ctx as never,
         { approvalId: "approval-1", approved: true, config, streamId: "stream-1", threadId: "thread-1", userId: "owner-1" },
-        { steerable: true },
+        { steerable: true, ...(subAgentResumedWith !== undefined && { subAgentResumedWith }) },
     );
 
     const jobs = (ref: unknown) => runAfter.mock.calls.filter((call) => (call as unknown[])[1] === ref).map((call) => (call as unknown[])[2]);
 
-    return { jobs, runMutation };
+    return { ctx, jobs, outcome, runMutation };
 };
 
 /** What `runStreamingAgent` records when a run ends at a pause: `afterRun` over the prompt and the steers so far. */
@@ -116,6 +148,18 @@ describe("a run that pauses on a tool approval", () => {
 });
 
 describe("a tool-approval continuation", () => {
+    it("builds its tools for the person who started the turn, not the owner it resumes as, so a collaborator's turn never gets `full`", async () => {
+        await resume({ ...BASE_CONFIG, startedBy: "collaborator-1" }, [reply]);
+
+        expect(vi.mocked(buildAgentTools).mock.calls[0]?.[1]).toMatchObject({ permissionModeUserId: "collaborator-1", userId: "owner-1" });
+    });
+
+    it("names nobody for a snapshot that does not say who started the turn", async () => {
+        await resume(BASE_CONFIG, [reply]);
+
+        expect(vi.mocked(buildAgentTools).mock.calls[0]?.[1]).toMatchObject({ permissionModeUserId: "" });
+    });
+
     it("extracts only the steers it took after the pause, leaving the prompt and earlier steers to the pause", async () => {
         const { jobs } = await resume({ ...BASE_CONFIG, memory: CARRIED }, [reply]);
         const extractions = jobs(internal.memory.extract.extractMemories);
@@ -147,6 +191,12 @@ describe("a tool-approval continuation", () => {
         expect(jobs0(await resume({ ...BASE_CONFIG, memory: CARRIED }, [reply], false))).toHaveLength(0);
     });
 
+    it("still returns its pause when the bookkeeping after the reply fails, so a run that waits again is not failed", async () => {
+        const { outcome } = await resume({ ...BASE_CONFIG, memory: CARRIED }, [pausedAgain], true, true, [], true);
+
+        expect(outcome).toMatchObject({ paused: true, stopped: false });
+    });
+
     it("extracts nothing when it pauses again with no text yet, and hands the next approval the same snapshot", async () => {
         const { jobs, runMutation } = await resume({ ...BASE_CONFIG, memory: CARRIED }, [pausedAgain]);
 
@@ -155,6 +205,55 @@ describe("a tool-approval continuation", () => {
         const recorded = runMutation.mock.calls.find((call) => (call as unknown[])[0] === internal.chat.tool_permissions.recordPendingToolApprovals);
 
         expect((recorded as unknown[] | undefined)?.[1]).toMatchObject({ config: { memory: CARRIED } });
+    });
+
+    it("runs a sub-agent child headless and hands its next approval what is left of its budget; an interactive one neither", async () => {
+        const recordedConfig = (runMutation: ReturnType<typeof vi.fn>) =>
+            (runMutation.mock.calls.find((call) => (call as unknown[])[0] === internal.chat.tool_permissions.recordPendingToolApprovals) as unknown[])[1];
+        const child = await resume({ ...BASE_CONFIG, stepsLeft: 3, subAgentRunId: "run-1" } as ToolRunConfig, [pausedAgain], true, true, [{}], false, 42);
+
+        expect(child.ctx.headless).toBe(true);
+        // The pause is bound to the resume the continuation runs under, and the run's answer (refused here) comes back.
+        expect(recordedConfig(child.runMutation)).toMatchObject({ config: { stepsLeft: 2 }, subAgentResumedWith: 42 });
+        expect(child.outcome).toMatchObject({ paused: true, subAgentWaits: false });
+
+        const chat = await resume(BASE_CONFIG, [pausedAgain], true, true, [{}]);
+
+        expect(chat.ctx.headless).toBeUndefined();
+        expect((recordedConfig(chat.runMutation) as { config: object }).config).not.toHaveProperty("stepsLeft");
+        expect(recordedConfig(chat.runMutation)).not.toHaveProperty("subAgentResumedWith");
+        expect(chat.outcome).not.toHaveProperty("subAgentWaits");
+    });
+
+    it("records no pause for a request a sub-agent child's continuation saved on its last step, which no step is left to answer", async () => {
+        const recorded = (runMutation: ReturnType<typeof vi.fn>) =>
+            runMutation.mock.calls.some((call) => (call as unknown[])[0] === internal.chat.tool_permissions.recordPendingToolApprovals);
+        const lastStep = await resume({ ...BASE_CONFIG, stepsLeft: 1, subAgentRunId: "run-1" } as ToolRunConfig, [pausedAgain], true, true, [{}]);
+
+        expect(recorded(lastStep.runMutation)).toBe(false);
+
+        // With a step to spare it pauses as before.
+        const spare = await resume({ ...BASE_CONFIG, stepsLeft: 2, subAgentRunId: "run-1" } as ToolRunConfig, [pausedAgain], true, true, [{}]);
+
+        expect(recorded(spare.runMutation)).toBe(true);
+    });
+
+    it("hands the next approval the permission keys and fingerprints of the tools IT offered, not the first run's", async () => {
+        const rebuilt = { mcpToolFingerprints: { mcp_docs__search: "new" }, permissionKeys: { mcp_docs__search: "mcp:docs (work):search" } };
+
+        vi.mocked(buildAgentTools).mockImplementationOnce(async () => {
+            return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], repeatable: [], requiresApproval: [], tools: {}, ...rebuilt };
+        });
+
+        const { runMutation } = await resume(
+            { ...BASE_CONFIG, mcpToolFingerprints: { mcp_docs__search: "old" }, toolPermissionKeys: { mcp_docs__search: "mcp:docs:search" } },
+            [pausedAgain],
+        );
+        const recorded = runMutation.mock.calls.find((call) => (call as unknown[])[0] === internal.chat.tool_permissions.recordPendingToolApprovals);
+
+        expect((recorded as unknown[] | undefined)?.[1]).toMatchObject({
+            config: { mcpToolFingerprints: rebuilt.mcpToolFingerprints, toolPermissionKeys: rebuilt.permissionKeys },
+        });
     });
 });
 
@@ -212,5 +311,14 @@ describe("who started the turn a continuation resumes", () => {
 
     it("is nobody for a snapshot that does not say", async () => {
         expect(await resumeWith(BASE_CONFIG)).toBeUndefined();
+    });
+});
+
+describe(mayExtractMemory, () => {
+    const thread = { lockedAt: undefined };
+
+    it("mines the owner's own prompt, and never a guest's note the owner sent on", () => {
+        expect(mayExtractMemory(true, thread, { message: { content: [{ text: "I live in Berlin", type: "text" }], role: "user" } })).toBe(true);
+        expect(mayExtractMemory(true, thread, { message: { content: [guestTextPart("I live in Berlin", "note-1")], role: "user" } })).toBe(false);
     });
 });

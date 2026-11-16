@@ -194,12 +194,13 @@ const ThreadWelcomeSuggestions: FC<{ className?: string }> = ({ className }) => 
 
                         return (
                             <TabsTrigger
-                                className="hover:text-foreground dark:hover:text-muted-foreground dark:data-active:text-muted-foreground flex items-center gap-1.5 px-3 py-2 text-sm after:bg-transparent dark:text-white dark:after:bg-transparent"
+                                className="hover:text-foreground dark:hover:text-muted-foreground dark:data-active:text-muted-foreground text-foreground flex items-center gap-1.5 px-3 py-2 text-sm after:bg-transparent dark:text-neutral-200 dark:after:bg-transparent"
                                 key={key}
                                 value={key}
                             >
                                 <Icon className="size-3.5" />
-                                <span>{category.label}</span>
+                                {/* The label sets its own colour: an inactive tab's faded text fails contrast on the white page. */}
+                                <span className="text-neutral-700 dark:text-neutral-200">{category.label}</span>
                             </TabsTrigger>
                         );
                     })}

@@ -612,6 +612,35 @@ export const useFont = () => {
 
 **Example**: See `features/auth/hooks/use-last-signin-method.ts`
 
+## Desktop shell
+
+Rules in `apps/web/src/AGENTS.md`; the reasoning is here.
+
+- **Hydration ordering.** The boot script sets `data-native` / `data-native-vibrancy` on `<html>` before paint, so
+  shell styling lives in `lib/native/native-shell.css`, and a list row's hover background is gated with the `web:`
+  variant. Effects that apply a shell default (`AppearanceSync`) call `isNativeShell()` / `hasNativeCapability()`
+  inside the effect: a hook reads "no shell" during the hydration pass, and an effect run with that value would undo
+  the boot script's native font and accent for a frame.
+- **Marks.** The `system` accent and the `explicit` marks never reach the server (its validator knows only presets).
+  A mark is `true` (picked on this device) or `"synced"` (adopted from the account named by `syncedUserId`). Sign-out
+  or another account signing in resets `synced` values to their defaults (`withoutSyncedChoices`) and keeps `true`
+  ones. `adoptedMark` decides: the account echoing back the value already shown keeps it `true` (a value picked here,
+  or an unmarked non-default from before marks existed); replacing a different value or filling in the default is
+  `synced`. The boot script embeds `EXPLICIT_MARKS`, the list `isExplicit` uses, so both read a mark the same way.
+- **Account switch.** `getUserSettings`'s query key carries no user. `AppearanceSync` ignores a row whose `userId` is
+  not the session's and invalidates the query, so the new account's row is fetched and adopted.
+- **Contrast and tokens.** The OS accent is never painted raw. `systemAccentTokens` derives one shade per mode that
+  meets the preset contrast bars, a `-text` shade (`--primary-text`, 4.5:1 / 7:1 as text on the page), and a solid
+  `-hover` shade (`--primary-hover`) that keeps the label's contrast. The default Button's label is `--primary-label`
+  (black, or the OS accent's foreground under `system`), not `text-black`.
+- **Cursors and spellcheck.** The shell's `cursor: default` replaces only the hand; other cursor utilities and disabled
+  states keep theirs. The shell sets `spellcheck="false"` on `<html>`, so a raw prose `<textarea>` must set
+  `spellCheck` itself (`native-shell.test.ts` checks).
+- **Lazy shell code.** `scripts/check-web-bundle.ts` keeps shell-only code off the first load. `lib/native/bridge.ts`
+  holds only what web paths call; shell events, sign-in, devices and the OS accent live in `shell-inbox.ts`,
+  `device-bridge.ts` and `system-accent.ts`, imported only from lazy code. Interpolate values into inline scripts
+  with `toScriptLiteral`.
+
 ## CONVENTIONS
 
 - **Feature-based**: Organize by domain (auth, chat, etc.)

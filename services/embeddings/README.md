@@ -58,7 +58,7 @@ in the backend's `lunora dev` session.
 ```bash
 pnpm --filter embeddings lint:types
 pnpm --filter embeddings lint:eslint
-pnpm --filter embeddings lint:prettier
+pnpm lint:oxfmt   # from the repository root: formatting is checked repo-wide
 pnpm --filter embeddings build      # wrangler deploy --dry-run
 ```
 

@@ -62,12 +62,16 @@ describe("the single cron trigger", () => {
             cleanupExpiredExports: { everyMinutes: 360, kind: "interval" },
             deleteExpiredTemporaryChats: { everyMinutes: 60, kind: "interval" },
             deleteUnusedFiles: { everyMinutes: 60, kind: "interval" },
+            dispatchDormantRateLimitSweeps: { hourUTC: 5, kind: "daily", minuteUTC: 0 },
             dispatchShardHousekeeping: { everyMinutes: 10, kind: "interval" },
             handleGdprRequestTimeouts: { hourUTC: 0, kind: "daily", minuteUTC: 0 },
             keepAlive: { everyMinutes: 10, kind: "interval" },
             purgeActionCache: { everyMinutes: 60, kind: "interval" },
             purgeIdempotencyClaims: { everyMinutes: 60, kind: "interval" },
+            sweepExpiredAuthRateLimits: { everyMinutes: 60, kind: "interval" },
+            sweepExpiredRateLimits: { everyMinutes: 60, kind: "interval" },
             sweepOrphanedOrganizationPolicies: { hourUTC: 4, kind: "daily", minuteUTC: 15 },
+            sweepOrphanedOrganizationRepositories: { hourUTC: 4, kind: "daily", minuteUTC: 30 },
             vacuumDocumentHistory: { hourUTC: 3, kind: "daily", minuteUTC: 30 },
         });
     });
@@ -107,11 +111,15 @@ describe("claimDueCronJobs", () => {
             "keepAlive",
             "purgeActionCache",
             "purgeIdempotencyClaims",
+            "sweepExpiredAuthRateLimits",
+            "sweepExpiredRateLimits",
         ]);
         // 13:00: no six-hourly slot.
         expect(await claim(at("2026-09-23T13:00:05Z"))).not.toContain("cleanupExpiredExports");
         // 03:30 the next day: the daily vacuum is due; midnight's GDPR check already ran at 00:00.
         expect(await claim(at("2026-09-24T03:30:05Z"))).toContain("vacuumDocumentHistory");
+        // 05:00: the daily dormant-shard rate-limit dispatch.
+        expect(await claim(at("2026-09-24T05:00:05Z"))).toContain("dispatchDormantRateLimitSweeps");
     });
 });
 

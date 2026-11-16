@@ -81,6 +81,9 @@ const preloadEntries = [
 
 await esbuild.build({ ...common, entryPoints: [path.join(root, "src/main.ts")], outfile: path.join(dist, "main.cjs") });
 
+// The entry Electron starts (`package.json#main`): it turns on the compile cache, then loads `main.cjs` as its own file.
+await esbuild.build({ ...common, external: [...common.external, "./main.cjs"], entryPoints: [path.join(root, "src/boot.ts")], outfile: path.join(dist, "boot.cjs") });
+
 // The terminal host is its own process (an Electron utility process). `node-pty` is native: it stays outside the
 // bundle and is loaded from node_modules by the host, on the first spawn.
 await esbuild.build({

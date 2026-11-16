@@ -12,6 +12,9 @@
  * and flushes the stream, the post-run bookkeeping (`afterRun`), resuming an
  * approved run (`resumeApprovedRun`) and the error cleanup.
  */
+import { isThreadLocked } from "../../lib/thread-lock";
+import { GOAL_CONTINUATION_AGENT } from "../goals/shared";
+import { messageCarriesGuestText } from "./attached-text";
 import { MODEL_LOOKUP, type ModelDefinition, type ModelFilterRules, parseCustomModelId } from "@neore/ai/models";
 import type { UserPersonalization } from "@neore/ai/prompts";
 import { buildMemoryContext } from "@neore/ai/prompts";
@@ -22,11 +25,13 @@ import type { ActionCtx } from "../../_generated/server";
 import type { ContextHandler, TakeSteer } from "../../agent/client/types";
 import type { ResearchDepth } from "../../agent/client/create-tool";
 import { lastRowOf, SUMMARY_IDLE_MS, SUMMARY_MIN_ORDER } from "../../agent/thread-summary-logic";
+import { LEFT_ORGANIZATION_MESSAGE } from "../../auth/lib/organization-policy";
 import type { MessageDoc } from "../../agent/validators";
 import { streamLogger } from "../../lib/logger";
 import { buildAgentTools } from "./agent-tools";
 import { answerFilesMessage, filesTheModelReads, loadAskUserFiles, modelReads, withAnswerFiles } from "./ask-user-files";
 import { loadModelFilterRules } from "./model-filter-rules";
+import { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
 import { backupCanServe, backupCapabilities, backupFilterRejection, eligibleBackupModel, supportsBackupFallback } from "./backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "./paid-model";
 import { compressContextMessages, getFallbackContextWindow, getMaxSteps } from "./auto-continue";
@@ -40,6 +45,7 @@ import { isRunReplaced } from "./run-epoch";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import { labelMcpToolCalls } from "./mcp-tool-labels";
 import { closeMCPClients } from "./mcp-tools";
+import { mcpToolDrift, mcpToolDriftReason } from "./mcp-tool-fingerprint";
 import { scheduleRepliesUsage } from "./pause-usage";
 import {
     asRefusedWrite,
@@ -65,7 +71,9 @@ import { runAfterOnShard } from "../../lib/shard-scheduler";
 import { shouldNoteBriefActivity } from "../../notifications/daily-brief-logic";
 import { buildKnowledgeCitations, type KnowledgeSource } from "../../knowledge/citations";
 import type { ReplySkill } from "../../usage/activity-logic";
-import type { DispatchOrigin } from "../../sub-agents/logic";
+import { type DispatchOrigin, stopWhenRequested } from "../../sub-agents/logic";
+import { writeLoopStopNotice } from "../loop-stop";
+import { type LoopFinding, type RepeatedCallGuard, repeatedCallGuard } from "./repeated-call-guard";
 
 /** Registry providers carry an `internal-` prefix the provider-keyed options do not. */
 export const INTERNAL_PREFIX_RE = /^internal-/;
@@ -81,8 +89,13 @@ export const INTERNAL_PREFIX_RE = /^internal-/;
  *   longer answerable — the conversation moved on, or the tool is gone.
  * - `plan-required`: a model outside the free tier, asked for without a paid
  *   plan or the user's own key for its provider. Its message is ours and safe to show.
+ * - `left-organization`: a headless run (trigger, task, eval, sub-agent) whose owner
+ *   is no longer a member of the organization it was created in. It fails the same
+ *   way every time, so its trigger or task stops. Its message is ours and safe to show.
  */
-export type AgentRunErrorKind = "custom-endpoint" | "local-endpoint" | "plan-required" | "skill" | "stale-approval";
+export type AgentRunErrorKind = "custom-endpoint" | "left-organization" | "local-endpoint" | "plan-required" | "skill" | "stale-approval";
+
+export { LEFT_ORGANIZATION_MESSAGE } from "../../auth/lib/organization-policy";
 
 /** A failure a run raised itself, so the catch branches on `kind` rather than on message text. */
 export class AgentRunError extends Error {
@@ -96,6 +109,22 @@ export class AgentRunError extends Error {
 }
 
 export const isAgentRunError = (error: unknown, kind: AgentRunErrorKind): error is AgentRunError => error instanceof AgentRunError && error.kind === kind;
+
+/**
+ * What a failed approval continuation tells the person and a waiting parent run. A request no longer pending and an owner who
+ * left the run's organization say why, since retrying would fail the same way; anything else is a failure worth retrying.
+ */
+export const continuationFailureMessage = (error: unknown): string => {
+    if (isAgentRunError(error, "stale-approval")) {
+        return "This tool request is no longer pending.";
+    }
+
+    if (isAgentRunError(error, "left-organization")) {
+        return error.message;
+    }
+
+    return "An error occurred while continuing the response. Please try again.";
+};
 
 export interface RunModel {
     /** Unknown models often reject tool definitions outright; a custom endpoint gets tools only when the user said it supports them. */
@@ -228,9 +257,43 @@ export const setResearchDepth = (ctx: object, researchDepth: ResearchDepth): voi
     (ctx as { researchDepth?: ResearchDepth }).researchDepth = researchDepth;
 };
 
+/** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `chainSource`; the action ctx has no such field. */
+export const setChainSource = (ctx: object, chainSource: string | undefined): void => {
+    (ctx as { chainSource?: string }).chainSource = chainSource;
+};
+
 /** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `dispatchOrigin`; the action ctx has no such field. */
 export const setDispatchOrigin = (ctx: object, origin: DispatchOrigin): void => {
     (ctx as { dispatchOrigin?: DispatchOrigin }).dispatchOrigin = origin;
+};
+
+/**
+ * A paused sub-agent child's last step offers no tool that would ask for approval: a request made there would have no step left
+ * to answer it, so it could never be answered. Those are the tools its permissions set to `ask` (`requiresApproval`, from
+ * `buildAgentTools`) and the built-ins that always need a person. Picked by permission, never by `needsApproval`: every
+ * `createTool` tool carries a `needsApproval` function, most of which never ask. Every other tool stays, and the earlier
+ * steps keep them all.
+ */
+export const withoutAskToolsOnLastStep = (
+    args: Record<string, unknown>,
+    toolNames: ReadonlyArray<string>,
+    requiresApproval: ReadonlyArray<string> | undefined,
+    maxSteps: number,
+): void => {
+    const asking = new Set([...(requiresApproval ?? []), ...BUILTIN_TOOLS_NEEDING_A_PERSON]);
+    const plain = toolNames.filter((name) => !asking.has(name));
+
+    if (plain.length === toolNames.length) {
+        return;
+    }
+
+    const inner = args.prepareStep as ((step: { stepNumber: number }) => unknown) | undefined;
+
+    args.prepareStep = async (step: { stepNumber: number }) => {
+        const adjusted = (await inner?.(step)) as Record<string, unknown> | undefined;
+
+        return step.stepNumber >= maxSteps - 1 ? { ...adjusted, activeTools: plain } : adjusted;
+    };
 };
 
 /** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `headless`; the action ctx has no such field. */
@@ -241,6 +304,14 @@ export const setHeadlessRun = (ctx: object): void => {
 /** The agent forwards the action ctx to tools as their `ToolCtx`, which declares `startedBy`; the action ctx has no such field. */
 export const setRunStartedBy = (ctx: object, startedBy: string | undefined): void => {
     (ctx as { startedBy?: string }).startedBy = startedBy;
+};
+
+/**
+ * The organization whose policy caps this run's tools. A sub-agent it dispatches records it when the parent thread has no
+ * stored organization, so the child is capped as the run was.
+ */
+export const setRunOrganizationId = (ctx: object, organizationId: string | null | undefined): void => {
+    (ctx as { organizationId?: string | null }).organizationId = organizationId ?? null;
 };
 
 /**
@@ -749,6 +820,18 @@ export const buildRunStreamArgs = (options: {
     return streamTextArgs;
 };
 
+/** Whether a finished run mines its prompt for memory: never a locked chat, a goal round or a guest's note (not the owner's words). */
+export const mayExtractMemory = (
+    memoryEnabled: boolean,
+    thread: Parameters<typeof isThreadLocked>[0] | null,
+    prompt: { agentName?: string; message?: unknown } | null | undefined,
+): boolean =>
+    memoryEnabled &&
+    thread !== null &&
+    !isThreadLocked(thread) &&
+    !messageCarriesGuestText(prompt?.message as Parameters<typeof messageCarriesGuestText>[0]) &&
+    prompt?.agentName !== GOAL_CONTINUATION_AGENT;
+
 /**
  * What a run that may pause carries in its approval snapshot: that it was mined for memory, and for
  * which bot. The run extracts its own prompt and steers at the pause (`afterRun`), so an approval that
@@ -878,27 +961,36 @@ export const finishRun = async (
         autoApprovals?: AutoApprovals;
         keepOpenUnlessPaused?: boolean;
         mcpLabels: McpToolLabels;
+        /**
+         * Set when the run has no step left to answer a request with: one saved anyway is not recorded as a pause, and the
+         * run ends. The last step offers no tool that asks (`withoutAskToolsOnLastStep`), so this is a backstop.
+         */
+        noStepLeft?: boolean;
         pending: { reasoning: string; text: string };
         /** The run's epoch (`run-epoch.ts`): a run a newer one replaced finishes nothing and gets `RUN_REPLACED`. */
         runEpoch?: number;
         savedMessages: ReadonlyArray<{ _id: string; message?: { content?: unknown; role?: string } }> | undefined;
         snapshot: ToolRunConfig;
         streamId: string;
+        /** A sub-agent continuation's resume (`continuingRun`): a further pause moves the run to `awaiting` bound to it. */
+        subAgentResumedWith?: number;
         threadId: string;
         /** Text written since the run's last finished step: with `pending`, what a stop leaves owed to the reply. */
         unsaved?: StreamText;
         userId: string;
     },
-): Promise<{ awaitingInput: AwaitingInput | undefined; paused: boolean }> => {
+): Promise<{ awaitingInput: AwaitingInput | undefined; paused: boolean; subAgentWaits?: boolean }> => {
     const {
         autoApprovals = {},
         keepOpenUnlessPaused,
         mcpLabels,
+        noStepLeft = false,
         pending,
         runEpoch,
         savedMessages,
         snapshot,
         streamId,
+        subAgentResumedWith,
         threadId,
         unsaved = { reasoning: "", text: "" },
         userId,
@@ -909,21 +1001,29 @@ export const finishRun = async (
 
     await stampSavedToolCalls(ctx, { autoApprovals, mcpLabels, run, savedMessages, userId });
 
-    const approvalIds = collectApprovalRequestIds(savedMessages);
-    const askUserApprovalIds = collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME);
+    // With no step left to answer it, a request is not a pause: nothing could resume the run past it.
+    const approvalIds = noStepLeft ? [] : collectApprovalRequestIds(savedMessages);
+    const askUserApprovalIds = noStepLeft ? [] : collectAskUserApprovalIds(savedMessages, ASK_USER_TOOL_NAME);
+    // A sub-agent's further pause: whether its run waits again, decided where the requests are recorded, before any notification.
+    let subAgentWaits: boolean | undefined;
 
     if (approvalIds.length > 0) {
         const secretApprovalIds = collectAskUserApprovalIds(savedMessages, REQUEST_SECRET_TOOL_NAME);
 
-        await ctx.runMutation(internal.chat.tool_permissions.recordPendingToolApprovals, {
+        const recorded = await ctx.runMutation(internal.chat.tool_permissions.recordPendingToolApprovals, {
             approvalIds,
             ...(askUserApprovalIds.length > 0 && { askUserApprovalIds }),
             config: snapshot,
             ...(run && { run }),
             ...(secretApprovalIds.length > 0 && { secretApprovalIds }),
+            ...(subAgentResumedWith !== undefined && { subAgentResumedWith }),
             threadId,
             userId,
         });
+
+        if (snapshot.subAgentRunId !== undefined) {
+            subAgentWaits = recorded;
+        }
     }
 
     const paused = approvalIds.length > 0;
@@ -957,7 +1057,7 @@ export const finishRun = async (
         awaitingInput = askUserApprovalIds.length + secretPending === approvalIds.length ? "question" : "approval";
     }
 
-    return { awaitingInput, paused };
+    return { awaitingInput, paused, ...(subAgentWaits !== undefined && { subAgentWaits }) };
 };
 
 /**
@@ -1079,19 +1179,56 @@ export const resumeApprovedRun = async (
         contextHandler?: ContextHandler;
         keepOpenUnlessPaused?: boolean;
         steerable?: boolean;
+        /** A sub-agent child's resume (`continuingRun`): a further pause waits bound to it ({@link finishRun}). */
+        subAgentResumedWith?: number;
     } = {},
-): Promise<{ awaitingInput?: AwaitingInput; lastMessageId: string | undefined; paused: boolean; stopped: boolean }> => {
+): Promise<{
+    awaitingInput?: AwaitingInput;
+    lastMessageId: string | undefined;
+    /** The repeated-call loop the run ended on, when its guard ended it (its reply is finished and its notice written). */
+    looped?: LoopFinding;
+    messageIds?: string[];
+    paused: boolean;
+    stopped: boolean;
+    /** A sub-agent child that paused again: whether its run now waits (false: it was refused or ended, its requests closed). */
+    subAgentWaits?: boolean;
+}> => {
     const { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId } = args;
     const { customProvider } = await resolveRunModel(ctx, config.model, userId);
+    // A sub-agent child is not interactive: no person is in its chat, so it resumes with the refusals its paused run had
+    // (its workers and device calls) and keeps its `ask` tools, which the approval being answered needs.
+    const subAgentChild = config.subAgentRunId !== undefined;
+    const runOrganizationId = config.organizationId ?? config.group?.organizationId ?? null;
+
+    // A sub-agent child is refused for an owner who left its organization when it starts (`runHeadlessAgent`). Answering its
+    // pending approval must not get it past that: it is refused the same way, before any tool is rebuilt or the call runs.
+    if (
+        subAgentChild &&
+        runOrganizationId &&
+        !(await ctx.runQuery(internal.auth.organization_policy.isOrganizationMemberQuery, { organizationId: runOrganizationId, userId }))
+    ) {
+        throw new AgentRunError("left-organization", LEFT_ORGANIZATION_MESSAGE);
+    }
+
     const [toolResult, userProviderKeys, preferences] = await Promise.all([
         buildAgentTools(ctx, {
             ...(options.admittedRun && { admittedRun: true }),
             autoMediaEnrichment: config.autoMediaEnrichment,
-            // A person just answered in the chat, so this run is interactive.
+            // A person just answered in the chat; a sub-agent child is still rebuilt headless below.
             deviceThreadId: threadId,
+            ...(subAgentChild && {
+                headless: true,
+                headlessCanAsk: true,
+                ...(config.headlessApproved && { headlessApproved: config.headlessApproved }),
+            }),
             mcpProgress: toolProgressSink(ctx, streamId),
             model: config.model,
+            // The paused run's organization, for a thread that has no stored one (see BuildAgentToolsOptions.organizationId).
+            // A group speaker's snapshot keeps it under `group`.
+            organizationId: runOrganizationId,
             origin: config.dispatchOrigin,
+            // The run resumes as the owner; the mode is the one the person who started the turn gets (none named: nobody's `full`).
+            permissionModeUserId: config.startedBy ?? "",
             searchMode: config.searchMode as SearchMode,
             snapshot: { mcpServerNames: config.mcpServerNames, toolNames: config.toolNames },
             threadId,
@@ -1119,13 +1256,37 @@ export const resumeApprovedRun = async (
             throw new AgentRunError("stale-approval", "Approval is no longer pending on the latest turn");
         }
 
-        if (approved && pending.toolName !== null && !Object.hasOwn(toolResult.tools, pending.toolName)) {
-            throw new AgentRunError("stale-approval", `Tool ${pending.toolName} is no longer available`);
+        // The approval was given for the MCP tool as the paused run offered it. One that changed or went away since is not
+        // run under it: the call is answered as denied with the reason, so the model can call the tool again, which asks again.
+        const drift =
+            approved && pending.toolName !== null
+                ? mcpToolDrift(config.mcpToolFingerprints, toolResult.mcpToolFingerprints, pending.toolName, Object.hasOwn(toolResult.tools, pending.toolName))
+                : "unchanged";
+        let runApproved = approved && drift === "unchanged";
+        let runDenyReason = drift === "unchanged" ? denyReason : mcpToolDriftReason(drift);
+
+        if (drift !== "unchanged") {
+            streamLogger.warn(`[ToolApproval] Approved MCP tool ${pending.toolName} is ${drift} since the pause; the call is not run`);
+        }
+
+        // Any other tool that left the rebuilt set after the pause (its organization's cap, or the member's own setting) is
+        // denied, not refused: the approval is already claimed, so a refusal here would leave the request unanswerable. An
+        // answered question or secret request is not one: its handler below replaces the tool with one that only returns
+        // what the person submitted, so nothing runs that the cap took away.
+        if (
+            runApproved &&
+            pending.toolName !== null &&
+            pending.toolName !== ASK_USER_TOOL_NAME &&
+            pending.toolName !== REQUEST_SECRET_TOOL_NAME &&
+            !Object.hasOwn(toolResult.tools, pending.toolName)
+        ) {
+            runApproved = false;
+            runDenyReason = `Tool ${pending.toolName} is no longer available`;
         }
 
         // An answered question: the approved call executes a copy of the tool
         // that returns the answer, so the answer is the call's tool result.
-        if (approved && pending.toolName === ASK_USER_TOOL_NAME) {
+        if (runApproved && pending.toolName === ASK_USER_TOOL_NAME) {
             if (answer === undefined && answers === undefined) {
                 throw new AgentRunError("stale-approval", "A question can only be resumed with an answer");
             }
@@ -1149,7 +1310,7 @@ export const resumeApprovedRun = async (
         }
 
         // An answered secret request: the call's result is the stored value's reference, never the value.
-        if (approved && pending.toolName === REQUEST_SECRET_TOOL_NAME) {
+        if (runApproved && pending.toolName === REQUEST_SECRET_TOOL_NAME) {
             if (answer === undefined) {
                 throw new AgentRunError("stale-approval", "A secret request can only be resumed with a reference");
             }
@@ -1159,13 +1320,22 @@ export const resumeApprovedRun = async (
             toolResult.tools[REQUEST_SECRET_TOOL_NAME] = createAnsweredRequestSecretTool(answer) as (typeof toolResult.tools)[string];
         }
 
+        // A sub-agent child's continuation runs only what is left of its run's budget, and none once it is spent: refused
+        // here, before the approved call or any model step runs. An interactive continuation gets a full budget, as always.
+        const childStepsLeft = subAgentChild ? config.stepsLeft : undefined;
+        const maxSteps = childStepsLeft ?? getMaxSteps(config.shouldAutoContinue);
+
+        if (childStepsLeft !== undefined && maxSteps <= 0) {
+            throw new AgentRunError("stale-approval", "The run that paused has no steps left of its budget");
+        }
+
         const modelFilterRules = await loadModelFilterRules(ctx, userId);
         const backupModelId = await resolveBackupModelId(ctx, userId, preferences.backupModel, config.model, modelFilterRules);
         const agent = await getAgent(config.model, {
             backupModelId,
             customProvider,
             gateway: gatewayFetch(ctx),
-            maxSteps: getMaxSteps(config.shouldAutoContinue),
+            maxSteps,
             modelFilterRules,
             threadId,
             tools: toolResult.tools,
@@ -1189,8 +1359,16 @@ export const resumeApprovedRun = async (
         setResearchDepth(ctx, config.researchDepth);
         // The snapshot keeps what started the run: a person answering an approval does not make it the lead's.
         setDispatchOrigin(ctx, config.dispatchOrigin ?? "lead");
+        // And the chain it belongs to, so what it delegates next still counts toward its task's or trigger's limit.
+        setChainSource(ctx, config.chainSource);
+
+        if (subAgentChild) {
+            setHeadlessRun(ctx);
+        }
+
         // The continuation runs as the owner; who started the turn it resumes is in the snapshot (none for a snapshot that predates it).
         setRunStartedBy(ctx, config.startedBy);
+        setRunOrganizationId(ctx, config.organizationId ?? config.group?.organizationId);
 
         const stopping = new AbortController();
         const streamTextArgs = buildRunStreamArgs({
@@ -1202,7 +1380,32 @@ export const resumeApprovedRun = async (
         });
 
         streamTextArgs.abortSignal = stopping.signal;
-        streamTextArgs.stopWhen = stopWhenStopped(ctx, streamId, getMaxSteps(config.shouldAutoContinue));
+        // The repeated-call guard ends a looping turn here too, not only in the chat runner (`execute.ts`). Its closing line is
+        // written below once the continuation has finished, and the caller reads the loop it ended on (`looped`).
+        const loopGuard = repeatedCallGuard();
+
+        streamTextArgs.stopWhen = [
+            ...stopWhenStopped(ctx, streamId, maxSteps),
+            (guardInput: Parameters<RepeatedCallGuard["stop"]>[0]) => loopGuard.stop(guardInput),
+        ];
+
+        // A sub-agent child is also stopped from its run (a parent's Stop, `cancelRun`, the reaper), not only from its own
+        // stream, as its headless loop is. A failed read is not a stop.
+        if (subAgentChild && config.subAgentRunId !== undefined) {
+            const { subAgentRunId } = config;
+
+            streamTextArgs.stopWhen = [
+                ...(streamTextArgs.stopWhen as unknown[]),
+                stopWhenRequested(
+                    async () =>
+                        await ctx.runQuery(internal.sub_agents.functions.shouldRunStop, { runId: subAgentRunId }).catch((error: unknown) => {
+                            streamLogger.warn(`[AgentRun] Sub-agent run ${subAgentRunId}: could not check for a stop request:`, error);
+
+                            return false;
+                        }),
+                ),
+            ];
+        }
 
         if (answerFiles) {
             // Every step of the continuation reads the files, so a tool call inside it does not cost the model the
@@ -1219,15 +1422,24 @@ export const resumeApprovedRun = async (
             };
         }
 
+        if (childStepsLeft !== undefined) {
+            withoutAskToolsOnLastStep(streamTextArgs, Object.keys(toolResult.tools), toolResult.requiresApproval, maxSteps);
+        }
+
         await options.beforeStream?.();
 
         const steering = options.steerable === true ? createRunSteering(ctx, { streamId, threadId, userId }) : undefined;
-        const runOptions = { saveStreamDeltas: false, ...(steering && { takeSteer: steering.takeSteer }) };
-        const result = approved
+        const runOptions = {
+            // A fresh-context run's continuation reads from its own prompt, as the run did.
+            ...(config.contextFromOrder !== undefined && { contextOptions: { fromOrder: config.contextFromOrder } }),
+            saveStreamDeltas: false,
+            ...(steering && { takeSteer: steering.takeSteer }),
+        };
+        const result = runApproved
             ? await agent.approveToolCall(ctx, { threadId, userId }, { approvalId }, streamTextArgs as never, runOptions)
             : await agent.denyToolCall(
                   ctx,
-                  { approvalId, ...(denyReason !== undefined && { reason: denyReason }), threadId },
+                  { approvalId, ...(runDenyReason !== undefined && { reason: runDenyReason }), threadId },
                   streamTextArgs as never,
                   runOptions,
               );
@@ -1310,16 +1522,30 @@ export const resumeApprovedRun = async (
 
         let paused: boolean;
         let awaitingInput: AwaitingInput | undefined;
+        let subAgentWaits: boolean | undefined;
 
         try {
-            ({ awaitingInput, paused } = await finishRun(ctx, {
+            const usedSteps = childStepsLeft === undefined ? undefined : await result.steps;
+            const stepsLeft = usedSteps && Math.max(0, maxSteps - usedSteps.length);
+
+            ({ awaitingInput, paused, subAgentWaits } = await finishRun(ctx, {
                 autoApprovals: toolResult.autoApprovals,
                 keepOpenUnlessPaused: options.keepOpenUnlessPaused,
                 mcpLabels: toolResult.mcpLabels,
+                noStepLeft: stepsLeft === 0,
                 pending: piped.pending,
                 savedMessages: result.savedMessages,
-                snapshot: config,
+                // A further pause is checked against the tools THIS run offered, which may differ from the first run's: their
+                // fingerprints, and the permission key each runtime name stands for now ("Always allow" writes that key).
+                // A further pause leaves the next continuation only what this one did not use.
+                snapshot: {
+                    ...config,
+                    ...(stepsLeft !== undefined && { stepsLeft }),
+                    mcpToolFingerprints: toolResult.mcpToolFingerprints,
+                    toolPermissionKeys: toolResult.permissionKeys,
+                },
                 streamId,
+                ...(options.subAgentResumedWith !== undefined && { subAgentResumedWith: options.subAgentResumedWith }),
                 threadId,
                 unsaved: piped.unsaved,
                 userId,
@@ -1328,9 +1554,28 @@ export const resumeApprovedRun = async (
             return await stoppedAt(error);
         }
 
-        await recordRun(true);
+        // A loop the guard ended closes with its line, as in the chat runner. A continuation that paused again has no finished reply yet.
+        const looped = paused ? undefined : loopGuard.finding;
 
-        return { awaitingInput, lastMessageId: messageIds.at(-1), paused, stopped: false };
+        await writeLoopStopNotice(ctx, { finding: looped, savedMessages: result.savedMessages, streamId, threadId, userId });
+
+        // Bookkeeping after the reply (memory, the summary): a failure here is logged and never changes how the run ended,
+        // so a run that paused again still returns its pause (a sub-agent child then waits, rather than being failed).
+        try {
+            await recordRun(true);
+        } catch (recordError) {
+            streamLogger.error(`[AgentRun] Could not record the continuation of ${threadId}:`, recordError);
+        }
+
+        return {
+            awaitingInput,
+            lastMessageId: messageIds.at(-1),
+            looped,
+            messageIds,
+            paused,
+            stopped: false,
+            ...(subAgentWaits !== undefined && { subAgentWaits }),
+        };
     } catch (error) {
         if (started) {
             await stampSavedToolCallsQuietly(ctx, {
@@ -1357,6 +1602,10 @@ export type AwaitingInput = "approval" | "question";
  */
 export interface RunOutcome {
     awaitingInput?: AwaitingInput;
+    /** The run failed in place: its thread wakes if it was snoozed (`agent/table-writes.ts#patchThread`). */
+    failed?: boolean;
+    /** A `"question"` the thread waits on is not overwritten by an `"approval"` (a sub-agent child's pause). */
+    keepQuestion?: boolean;
     replied?: boolean;
 }
 
@@ -1369,6 +1618,8 @@ export const setThreadStatus = async (
     const now = Date.now();
 
     await ctx.runMutation(internal.agent.threads.updateThread, {
+        ...(outcome.failed === true && { failed: true }),
+        ...(outcome.keepQuestion === true && { keepQuestion: true }),
         patch: {
             status,
             updatedAt: now,
@@ -1463,7 +1714,9 @@ export const failRun = async (
 
     if (!replaced) {
         try {
-            await setThreadStatus(ctx, threadId, endedElsewhere ? "active" : threadStatus);
+            // A run that failed in place wakes its thread in the same write, whatever status it goes back to (an approval
+            // continuation returns to active). A stopped one does not.
+            await setThreadStatus(ctx, threadId, endedElsewhere ? "active" : threadStatus, endedElsewhere ? {} : { failed: true });
         } catch {
             // Ignore cleanup errors
         }

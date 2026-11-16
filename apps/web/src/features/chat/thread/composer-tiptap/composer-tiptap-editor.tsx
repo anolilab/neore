@@ -19,20 +19,23 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Editor } from "@tiptap/core";
 import PlaceholderExtension from "@tiptap/extension-placeholder";
+import type { EditorState } from "@tiptap/pm/state";
 import { Selection } from "@tiptap/pm/state";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKitExtension from "@tiptap/starter-kit";
 import clsx from "clsx";
-import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import useFavoriteModels from "@/features/chat/core/hooks/use-favorite-models";
 import type { PromptHistoryDirection } from "@/features/chat/core/utils/prompt-history";
 import type { PromptVariable } from "@/features/prompts/lib/prompt-variables";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
+import { LOAD_MARKS, useLoadMark } from "@/lib/analytics/load-marks";
 
 import type { ChatReference } from "../chat-reference";
 import { cleanEditorText } from "./clean-editor-text";
+import { readComposerText } from "./composer-text";
 import { composerEditorAttributes } from "./editor-attributes";
 import type { BannedWordMatch } from "./extensions/banned-word-decoration";
 import BannedWordDecoration from "./extensions/banned-word-decoration";
@@ -40,6 +43,7 @@ import type { FileMentionMatch } from "./extensions/file-mention";
 import FileMention from "./extensions/file-mention";
 import GhostCompletion from "./extensions/ghost-completion";
 import PromptHistoryKeys from "./extensions/prompt-history-keys";
+import QuoteChip, { refreshQuoteChipLabels } from "./extensions/quote-chip";
 import type { SlashCommandMatch } from "./extensions/slash-command";
 import SlashCommand from "./extensions/slash-command";
 import SubmitOnEnter from "./extensions/submit-on-enter";
@@ -50,8 +54,10 @@ import type { VaultFileRef } from "./file-mention-popup";
 import FileMentionPopup from "./file-mention-popup";
 import type { GhostController, GhostEligibility, GhostRequest } from "./ghost-completion-controller";
 import { createGhostController, shouldAnnounceGhost } from "./ghost-completion-controller";
+import { appendPlainText, composerCoreExtensionOptions, pastePlainText } from "./paste-plain-text";
 import { plainTextToHtml } from "./plain-text";
 import SlashCommandPopup from "./slash-command-popup";
+import useMentionPrefetch from "./use-mention-prefetch";
 import VariableAutocompletePopup from "./variable-autocomplete-popup";
 import type { VimMode as VimModeName } from "./vim-keys";
 
@@ -122,9 +128,15 @@ export interface ComposerTiptapEditorProps {
 }
 
 export interface ComposerTiptapEditorRef {
+    /** `text` typed at the document's end, the blocks before it untouched; false when the editor cannot take it. */
+    appendText: (text: string) => boolean;
     blur: () => void;
     focus: () => void;
     getEditor: () => Editor | null;
+    /** Whether `event` is a paste made with Ctrl/Cmd+Shift+V, which keeps the text exactly as copied. */
+    isPlainPaste: (event: { timeStamp: number }) => boolean;
+    /** Inserts `text` over the selection (of `at` when given) as one undoable paste, a paragraph per line; false without an editor or when the text changed since `at`. */
+    pasteText: (text: string, at?: EditorState) => boolean;
 }
 
 // ============================================================================
@@ -134,6 +146,9 @@ export interface ComposerTiptapEditorRef {
 
 const EMPTY_BANNED_MATCHES: BannedWordMatch[] = [];
 const EMPTY_VARIABLES: PromptVariable[] = [];
+
+/** A paste this soon after Ctrl/Cmd+Shift+V came from it: the paste event itself does not say. */
+const PLAIN_PASTE_WINDOW_MS = 1000;
 
 /** How long the "suggestion available" announcement stays in the live region. */
 const ANNOUNCEMENT_CLEAR_MS = 4000;
@@ -145,7 +160,7 @@ const editorGhostState = (editor: Editor, focused: boolean): Pick<GhostEligibili
     return {
         caretAtEnd: selection.empty && selection.head === Selection.atEnd(doc).from,
         focused,
-        text: editor.getText({ blockSeparator: "\n" }),
+        text: readComposerText(editor),
     };
 };
 
@@ -258,12 +273,36 @@ const ComposerTiptapEditor = ({
         historyRecalledRef.current = isHistoryRecalled;
     }, [isVimEnabled, isHistoryRecalled]);
 
+    const plainPasteKeyAt = useRef(-Infinity);
+
+    // The key handlers the extensions call. Tiptap's `extension.options` is a getter that returns a fresh object, and
+    // shortcuts read the options captured when the editor was built, so a handler assigned onto it later is lost; the
+    // extensions read this ref at key time instead. No popup check here: an open popup (one with items) takes Enter, the
+    // arrows and Escape on `window` in the capture phase, and a match without items must still let Enter send.
+    const keyHandlersRef = useRef({ isStreaming, onCancel, onHistoryNavigate, onSubmit });
+
+    useLayoutEffect(() => {
+        keyHandlersRef.current = { isStreaming, onCancel, onHistoryNavigate, onSubmit };
+    }, [isStreaming, onCancel, onHistoryNavigate, onSubmit]);
+
     // Create editor
     const editor = useEditor({
         autofocus: autoFocus ? "end" : false,
+        coreExtensionOptions: composerCoreExtensionOptions,
         editable: !disabled,
         editorProps: {
-            attributes: composerEditorAttributes({ describedBy, invalid }),
+            attributes: composerEditorAttributes({ describedBy, invalid, label: t`Message` }),
+            // The composer's paste handler runs first (capture phase) and prevents a paste it turns into a file; the editor
+            // then leaves that paste alone, so a long text is never both attached and inserted.
+            handlePaste: (_view, event) => event.defaultPrevented,
+            handleKeyDown: (_view, event) => {
+                // `code` is the physical key: on a Cyrillic or Greek layout `key` is not "v" for the same shortcut.
+                if (event.shiftKey && (event.ctrlKey || event.metaKey) && (event.code === "KeyV" || event.key.toLowerCase() === "v")) {
+                    plainPasteKeyAt.current = event.timeStamp;
+                }
+
+                return false;
+            },
         },
         extensions: [
             StarterKitExtension.configure({
@@ -288,16 +327,23 @@ const ComposerTiptapEditor = ({
                 placeholder: () => placeholderRef.current ?? "",
             }),
             // Before SubmitOnEnter: Escape restores a recalled prompt's draft first.
-            PromptHistoryKeys,
+            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
+            PromptHistoryKeys.configure({
+                onNavigate: (direction: PromptHistoryDirection) => keyHandlersRef.current.onHistoryNavigate?.(direction) ?? null,
+            }),
+            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             SubmitOnEnter.configure({
-                isStreaming: () => isStreaming,
-                onCancel,
-                onSubmit: () => {
-                    // Initial handler - will be kept in sync via useEffect
-                    onSubmit();
-                },
+                // Escape cancels only with a cancel handler to call; otherwise it falls through.
+                isStreaming: () => keyHandlersRef.current.isStreaming && keyHandlersRef.current.onCancel !== undefined,
+                onCancel: () => keyHandlersRef.current.onCancel?.(),
+                onSubmit: () => keyHandlersRef.current.onSubmit(),
             }),
             BannedWordDecoration,
+            QuoteChip.configure({
+                labels: () => {
+                    return { goToReply: t`Go to reply` };
+                },
+            }),
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             SlashCommand.configure({
                 onStateChange: handleSlashStateChange,
@@ -323,7 +369,7 @@ const ComposerTiptapEditor = ({
         onUpdate: ({ editor: ed }) => {
             isInternalUpdate.current = true;
             // Reads the raw text (the store counts what it removes), then cleans the document itself.
-            const text = ed.getText({ blockSeparator: "\n" });
+            const text = readComposerText(ed);
 
             cleanEditorText(ed);
             onChange(text);
@@ -333,6 +379,12 @@ const ComposerTiptapEditor = ({
             });
         },
     });
+
+    // The "@" and "/" menus' data, loaded on the first edit that leaves text in the composer, so they open with it.
+    const suggestionsWarm = useMentionPrefetch(editor, suggestions);
+
+    // Real-user load timing: the composer counts as visible once its editor exists (`lib/analytics/load-marks.ts`).
+    useLoadMark(LOAD_MARKS.composerVisible, editor !== null);
 
     // Sync placeholder ref + trigger a decoration re-render (with a brief fade) when placeholder changes.
     useEffect(() => {
@@ -372,6 +424,16 @@ const ComposerTiptapEditor = ({
             blur: () => editor?.commands.blur(),
             focus: () => editor?.commands.focus(),
             getEditor: () => editor,
+            // One shortcut, one paste: a normal paste right after it keeps its formatting.
+            isPlainPaste: (event: { timeStamp: number }) => {
+                const plain = event.timeStamp - plainPasteKeyAt.current < PLAIN_PASTE_WINDOW_MS;
+
+                plainPasteKeyAt.current = -Infinity;
+
+                return plain;
+            },
+            appendText: (text: string) => (editor && !editor.isDestroyed ? appendPlainText(editor, text) : false),
+            pasteText: (text: string, at?: EditorState) => (editor && !editor.isDestroyed ? pastePlainText(editor, text, at) : false),
         };
     }, [editor]);
 
@@ -381,7 +443,7 @@ const ComposerTiptapEditor = ({
             return;
         }
 
-        const currentText = editor.getText({ blockSeparator: "\n" });
+        const currentText = readComposerText(editor);
 
         if (currentText !== value) {
             // Convert plain text to paragraphs
@@ -405,9 +467,11 @@ const ComposerTiptapEditor = ({
     // The editor reads its attributes once, at creation: push a changed description or validity to the live element.
     useEffect(() => {
         if (editor && !editor.isDestroyed) {
-            editor.setOptions({ editorProps: { ...editor.options.editorProps, attributes: composerEditorAttributes({ describedBy, invalid }) } });
+            editor.setOptions({
+                editorProps: { ...editor.options.editorProps, attributes: composerEditorAttributes({ describedBy, invalid, label: t`Message` }) },
+            });
         }
-    }, [editor, describedBy, invalid]);
+    }, [editor, describedBy, invalid, t]);
 
     // Turning Vim on or off while the editor is open: the caret class and the mode label follow at once, not at the next keystroke.
     useEffect(() => {
@@ -415,6 +479,15 @@ const ComposerTiptapEditor = ({
             refreshVimMode(editor.view);
         }
     }, [isVimEnabled, editor]);
+
+    // A locale switch changes the labels of the quote chips already drawn; the editor itself is not recreated for it. The
+    // switch re-renders the composer, so the chips are repainted after each render. That is one small query, and a repaint
+    // only writes a label that changed.
+    useEffect(() => {
+        if (editor && !editor.isDestroyed) {
+            refreshQuoteChipLabels(editor.view.dom);
+        }
+    });
 
     // Update banned word decorations when matches change
     useEffect(() => {
@@ -428,40 +501,6 @@ const ComposerTiptapEditor = ({
         // transaction to make it take effect.
         editor.commands.setBannedWordMatches(bannedWordMatches);
     }, [bannedWordMatches, editor]);
-
-    // Update submit/cancel handlers - guard against submitting when a popup is open
-    useEffect(() => {
-        if (!editor) {
-            return;
-        }
-
-        for (const extension of editor.extensionManager.extensions) {
-            if (extension.name === "promptHistoryKeys") {
-                // eslint-disable-next-line react-hooks/immutability -- tiptap reads extension options at event time; reassigning them is its documented way to swap a handler without recreating the editor
-                extension.options.onNavigate = (direction: PromptHistoryDirection) => {
-                    if (slashMatch || fileMentionMatch || variableMatch || !onHistoryNavigate) {
-                        return null;
-                    }
-
-                    return onHistoryNavigate(direction);
-                };
-            }
-
-            if (extension.name !== "submitOnEnter") {
-                continue;
-            }
-
-            extension.options.onSubmit = () => {
-                if (slashMatch || fileMentionMatch || variableMatch) {
-                    return;
-                }
-
-                onSubmit();
-            };
-            extension.options.onCancel = onCancel;
-            extension.options.isStreaming = () => isStreaming;
-        }
-    }, [onSubmit, onCancel, onHistoryNavigate, isStreaming, slashMatch, fileMentionMatch, variableMatch, editor]);
 
     // ---- Ghost-text autocomplete -------------------------------------------
     const [ghostAnnouncement, setGhostAnnouncement] = useState("");
@@ -485,7 +524,7 @@ const ComposerTiptapEditor = ({
         let clearAnnouncement: ReturnType<typeof setTimeout> | undefined;
 
         const controller = createGhostController({
-            getText: () => editor.getText({ blockSeparator: "\n" }),
+            getText: () => readComposerText(editor),
             onSuggestion: (suggestion) => {
                 if (editor.isDestroyed) {
                     return;
@@ -554,6 +593,10 @@ const ComposerTiptapEditor = ({
         [editor],
     );
 
+    // The editor's text now, for a `/clear` that finished while the person may have kept typing. A destroyed editor (the
+    // chat changed) reads as empty, which no command matches.
+    const readDraft = useCallback(() => (editor && !editor.isDestroyed ? editor.getText() : ""), [editor]);
+
     // Dismiss popups
     const handleDismissSlash = useCallback(() => {
         setSlashMatch(null);
@@ -575,7 +618,7 @@ const ComposerTiptapEditor = ({
     const maxHeight = lineHeight * maxRows;
 
     return (
-        <div className="relative w-full" onPaste={onPaste} ref={editorContainerRef}>
+        <div className="relative w-full" onPasteCapture={onPaste} ref={editorContainerRef}>
             <div className="w-full overflow-y-auto" style={{ maxHeight: `${maxHeight}px` }}>
                 <EditorContent
                     className={clsx(
@@ -613,6 +656,8 @@ const ComposerTiptapEditor = ({
                 models={models}
                 onDismiss={handleDismissSlash}
                 onReplace={handleReplace}
+                readDraft={readDraft}
+                warm={suggestionsWarm}
             />
 
             {/* File mention popup */}

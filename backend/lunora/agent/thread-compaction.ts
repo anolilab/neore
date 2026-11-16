@@ -40,6 +40,7 @@ import { type ActionCtx, internalMutation, type QueryCtx } from "../_generated/s
 import { MAX_LENGTH } from "../lib/validators";
 import { isLocalBrowserModel, loadCustomProviders } from "../chat/lib/local-turn";
 import { getThreadRow, walkPath } from "./branch-rows";
+import { resetForTip, rowsAfterContextReset } from "./context-reset";
 import { hasLiveDeltaStream } from "./thread-streaming";
 import { filterOutOrphanedToolMessages } from "./client/search";
 import { replyWindowRows, rowCharacters } from "./handoff-source";
@@ -101,7 +102,9 @@ export const estimateContext = async (
     const optedIn = await summariesOptedIn(ctx, thread);
     const summaries = await summariesOf(ctx, thread._id);
     const usable = summaries.filter((row) => row.kind === "compact" || optedIn);
-    const onPath = await summariesOnPath(ctx, thread._id, tip, usable, SUMMARY_READ_REACH_ROWS);
+    // After a context reset (`/clear`) the request holds neither the turns before it nor a summary of them.
+    const reset = await resetForTip(ctx, thread, tip);
+    const onPath = await summariesOnPath(ctx, thread._id, tip, usable, SUMMARY_READ_REACH_ROWS, reset);
     const [best] = onPath;
     const stopAtId = best?.summary.kind === "compact" ? (best.covered._id as string) : undefined;
     // The reader sends an idle summary above a compaction beside it (`idleSummaryAbove`).
@@ -109,11 +112,13 @@ export const estimateContext = async (
     const summaryTokens = estimateTokensFromCharacters((best?.summary.summary.length ?? 0) + (older?.summary.summary.length ?? 0));
     // The rows as the reply reads them: successful ones only (a failed or unfinished row is not sent), and without a tool
     // result whose call fell out of the window, which the reply drops as orphaned.
-    const window = await replyWindowRows(ctx, thread._id, tip, SUMMARY_RECENT_ROWS, stopAtId);
+    const window = rowsAfterContextReset(await replyWindowRows(ctx, thread._id, tip, SUMMARY_RECENT_ROWS, stopAtId), reset);
     const sent = filterOutOrphanedToolMessages(window as Parameters<typeof filterOutOrphanedToolMessages>[0]) as Row[];
     const textTokens = estimateTokensFromCharacters(sent.reduce((total, row) => total + rowCharacters(row), 0));
 
-    const { rows } = await walkPath(ctx, thread._id, tip, { limit: USAGE_LOOKBACK_ROWS, ...(stopAtId && { stopAtId }) });
+    const { rows: lookback } = await walkPath(ctx, thread._id, tip, { limit: USAGE_LOOKBACK_ROWS, ...(stopAtId && { stopAtId }) });
+    // A reply before the reset reported the size of the context the reset left behind.
+    const rows = rowsAfterContextReset(lookback, reset);
     const compactedAt = best?.summary.kind === "compact" ? best.summary.createdAt : undefined;
     const textOnly = summaryTokens + textTokens;
 
@@ -216,7 +221,10 @@ export const prepareThreadCompaction = internalMutation
         // outlives the idle-summary opt-out, and a cover beyond the read reach is not sent to the model anyway.
         const summaries = await summariesOf(ctx, thread._id);
         const compactions = summaries.filter((row) => row.kind === "compact");
-        const [base] = await summariesOnPath(ctx, thread._id, tip, compactions, SUMMARY_READ_REACH_ROWS);
+        // A context reset (`/clear`) starts the context the model is sent: nothing before it is folded, and a compaction
+        // or idle summary made before it is neither extended nor read.
+        const reset = await resetForTip(ctx, thread, tip);
+        const [base] = await summariesOnPath(ctx, thread._id, tip, compactions, SUMMARY_READ_REACH_ROWS, reset);
         // Without one, an idle summary the reader sends (opted in, within reach) keeps standing in for the turns it
         // covers: the reader sends it beside the compaction, so the fold starts right after it.
         const [idle] =
@@ -228,12 +236,15 @@ export const prepareThreadCompaction = internalMutation
                       tip,
                       summaries.filter((row) => row.kind !== "compact"),
                       SUMMARY_READ_REACH_ROWS,
+                      reset,
                   );
         // Without a compaction to extend, the walk reads only the reader's reach: the fold below starts at the window and
         // never needs the rest of a long path, and reading it on every reply (then refusing) cost the reply and the chip.
         const { next, rows } = await walkPath(ctx, thread._id, tip, {
             limit: base ? SUMMARY_MAX_PATH_ROWS : SUMMARY_READ_REACH_ROWS,
             ...(base && { stopAtId: base.covered._id as string, stopBelowOrder: base.covered.order }),
+            // Without a compaction to extend, the fold stops at the reset: the row itself is not a turn.
+            ...(!base && reset && { stopBelowOrder: reset.order + 1 }),
         });
 
         // Only an extension can reach too far: a cover at the top of a long path is not read, so it is refused.

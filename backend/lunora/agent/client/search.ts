@@ -8,6 +8,7 @@ import { docsToModelMessages, toModelMessage } from "../mapping";
 import { DEFAULT_MESSAGE_RANGE, DEFAULT_RECENT_MESSAGES, extractText, getModelName, getProviderName, isTool, sorted } from "../shared";
 import type { MessageDoc as MessageDocument } from "../validators";
 import type { Message } from "../validators";
+import { rowsAfterContextReset } from "../context-reset";
 import { type CompactionBoundary, dropCompactedRows } from "../thread-compaction-logic";
 import { summaryNotesBlock, SUMMARY_RECENT_ROWS } from "../thread-summary-logic";
 import { validateVectorDimension, type VectorDimension } from "../vector/tables";
@@ -602,7 +603,7 @@ export const fetchContextWithPrompt = async (
     }
 
     // If only a messageId is provided, this will add that message to the end.
-    const [{ recentMessages: windowMessages, searchMessages: foundMessages }, olderSummary] = await Promise.all([
+    const [{ recentMessages: windowMessages, searchMessages: foundMessages }, olderSummary, contextReset] = await Promise.all([
         fetchRecentAndSearchMessages(context, component, {
             admittedRun: args.admittedRun,
             contextOptions: args.contextOptions ?? {},
@@ -628,23 +629,37 @@ export const fetchContextWithPrompt = async (
         }),
         // A context handler decides what the model reads (the group chats build their own history), so it gets no notes.
         args.contextHandler ? null : readOlderSummary(context, args),
+        readContextReset(context, args),
     ]);
 
     // A compaction REPLACES the turns up to its boundary: the notes stand in for them, so neither the window nor the
     // search hits show them again. The thread's stored rows are untouched; this is only what the model is sent.
+    // A context reset (`/clear`) cuts the same way: the rows before it are not sent, whatever the window holds.
+    const fromOrder = args.contextOptions?.fromOrder;
+    const inRun = (m: MessageDocument): boolean => fromOrder === undefined || m.threadId !== threadId || m.order >= fromOrder;
+    const afterReset = rowsAfterContextReset(
+        windowMessages.filter((m) => inRun(m)),
+        contextReset,
+    );
     const boundary = olderSummary?.boundary;
     // The window and the thread's own hits are on the prompt's path whenever that path is known (`fetchRecentAndSearchMessages`
     // keeps only those): an unbranched thread always has its path, and a branched one has it when the prompt is named. Then
     // a row at or below the boundary is covered by the notes. Without a known path the window also holds sibling rows the
     // summary never covered, so nothing is dropped by position: the notes may repeat a turn, but no turn goes missing.
     const pathKnown = olderSummary?.branched === false || args.promptMessageId !== undefined;
-    const recentMessages = boundary && pathKnown ? filterOutOrphanedToolMessages(dropCompactedRows(windowMessages, boundary)) : windowMessages;
+    const recentMessages = boundary && pathKnown ? filterOutOrphanedToolMessages(dropCompactedRows(afterReset, boundary)) : afterReset;
+    // A hit from before the reset is cut too, when the hits are known to be on the prompt's path (an unbranched thread, or
+    // a named prompt): a sibling branch (a regenerate of an earlier turn, made after the reset) holds orders below it that
+    // it never crossed. A hit in another thread is not the reset's to cut.
+    const hitsOnResetPath = contextReset !== null && (!contextReset.branched || args.promptMessageId !== undefined);
+    const hitsInRun = foundMessages.filter((m) => inRun(m));
+    const hitsAfterReset = contextReset && hitsOnResetPath ? hitsInRun.filter((m) => m.threadId !== threadId || m.order > contextReset.order) : hitsInRun;
     const searchMessages =
         boundary && pathKnown
-            ? foundMessages.filter(
+            ? hitsAfterReset.filter(
                   (m) => m.threadId !== threadId || m.order > boundary.order || (m.order === boundary.order && m.stepOrder > boundary.stepOrder),
               )
-            : foundMessages;
+            : hitsAfterReset;
 
     const promptMessageIndex = args.promptMessageId ? recentMessages.findIndex((m) => m._id === args.promptMessageId) : -1;
     const promptMessage = promptMessageIndex === -1 ? undefined : recentMessages[promptMessageIndex];
@@ -685,7 +700,12 @@ export const fetchContextWithPrompt = async (
     // The notes carry a compaction's summary, not a switch's handoff text, so the lookups run after a compaction too.
     const earlierHandoffs =
         threadId && oldest && oldest.order > 0 && needsEarlierHandoff(prePromptDocs)
-            ? await context.runQuery(internal.agent.agent_switch.getHandoffAbove, { belowMessageId: oldest._id, threadId: threadId as Id<"threads"> })
+            ? await context.runQuery(internal.agent.agent_switch.getHandoffAbove, {
+                  belowMessageId: oldest._id,
+                  // A run read from its own first turn gets no handoff of the turns before it.
+                  ...(fromOrder !== undefined && { fromOrder }),
+                  threadId: threadId as Id<"threads">,
+              })
             : [];
     const deltaBases = new Map(
         await Promise.all(
@@ -695,6 +715,7 @@ export const fetchContextWithPrompt = async (
                         model,
                         await context.runQuery(internal.agent.agent_switch.getHandoffBeforeDelta, {
                             dividerMessageId: id as Id<"messages">,
+                            ...(fromOrder !== undefined && { fromOrder }),
                             threadId: threadId as Id<"threads">,
                         }),
                     ] as const,
@@ -767,6 +788,24 @@ export const fetchContextWithPrompt = async (
 };
 
 /**
+ * The newest context reset (`/clear`) on the prompt's path, or `null`. Not caught: a read that fails must fail the run,
+ * because continuing would send the turns the person cleared.
+ */
+const readContextReset = async (
+    context: ActionContext,
+    args: { promptMessageId: string | undefined; statelessMode?: boolean; threadId: string | undefined },
+): Promise<{ branched: boolean; order: number } | null> => {
+    if (!args.threadId || args.statelessMode) {
+        return null;
+    }
+
+    return await context.runQuery(internal.agent.context_reset_read.getContextReset, {
+        ...(args.promptMessageId && { promptMessageId: args.promptMessageId as Id<"messages"> }),
+        threadId: args.threadId as Id<"threads">,
+    });
+};
+
+/**
  * The stored summary of this thread's older turns (`agent/thread-summaries.ts`) when the recent window is the
  * one it was made for and the summary belongs to the path being answered; otherwise `null`, today's behaviour.
  * A failed read is not a failed run.
@@ -776,7 +815,13 @@ const readOlderSummary = async (
     args: { contextOptions?: ContextOptions; promptMessageId: string | undefined; statelessMode?: boolean; threadId: string | undefined },
 ): Promise<{ boundary?: CompactionBoundary; branched: boolean; summary: string } | null> => {
     // A smaller window would leave rows uncovered between the summary and itself.
-    if (!args.threadId || args.statelessMode || (args.contextOptions?.recentMessages ?? DEFAULT_RECENT_MESSAGES) < SUMMARY_RECENT_ROWS) {
+    // A run read from its own first turn (`fromOrder`) never read the turns a summary covers.
+    if (
+        !args.threadId ||
+        args.statelessMode ||
+        args.contextOptions?.fromOrder !== undefined ||
+        (args.contextOptions?.recentMessages ?? DEFAULT_RECENT_MESSAGES) < SUMMARY_RECENT_ROWS
+    ) {
         return null;
     }
 

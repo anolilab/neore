@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, undoLongPaste } from "./composer-draft-file";
+import { appendPastedText, attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
 
 describe("attachLongPaste", () => {
     const setup = (result: { attachmentId: string; error?: string }, draft = "before after") => {
@@ -80,8 +80,44 @@ describe("attachLongPaste", () => {
         });
 
         expect(await attachLongPaste(options)).toBe(false);
-        expect(state.text).toBe("beforeTYPED afterPASTED");
+        expect(state.text).toBe("beforeTYPED after\nPASTED");
         expect(options.onFailure).toHaveBeenCalledWith("Too big");
+    });
+
+    it("appends the text when the draft changed before the upload started, while the paste was being converted", async () => {
+        const { options, state } = setup({ attachmentId: "a1", error: "Too big" }, "beforeTYPED after");
+
+        expect(await attachLongPaste({ ...options, draftAtPaste: "before after" })).toBe(false);
+        expect(state.text).toBe("beforeTYPED after\nPASTED");
+    });
+
+    it("puts a converted table back on lines of its own, at the paste position or appended, when the upload failed", async () => {
+        const table = "| A |\n| --- |\n| 1 |";
+        const atCaret = setup({ attachmentId: "a1", error: "Too big" });
+
+        expect(
+            await attachLongPaste({
+                ...atCaret.options,
+                converted: true,
+                pastedText: table,
+                selection: { end: 6, start: 6, textAfter: true, textBefore: true },
+            }),
+        ).toBe(false);
+        expect(atCaret.state.text).toBe(`before\n\n${table}\n\n after`);
+
+        const appended = setup({ attachmentId: "a1", error: "Too big" }, "beforeTYPED after");
+
+        expect(await attachLongPaste({ ...appended.options, converted: true, draftAtPaste: "before after", pastedText: table })).toBe(false);
+        expect(appended.state.text).toBe(`beforeTYPED after\n\n${table}`);
+    });
+
+    it("writes nothing into a composer that locked during the upload, and says the text was not inserted", async () => {
+        const { options } = setup({ attachmentId: "a1", error: "Too big" });
+
+        expect(await attachLongPaste({ ...options, canInsert: () => false })).toBe(false);
+        expect(options.setDraft).not.toHaveBeenCalled();
+        expect(options.discard).toHaveBeenCalledWith("a1");
+        expect(options.onNotInserted).toHaveBeenCalledWith("Too big");
     });
 
     it("leaves another chat's draft alone and says the text was not inserted when the chat changed during the upload", async () => {
@@ -100,6 +136,13 @@ describe("attachLongPaste", () => {
         expect(options.discard).toHaveBeenCalledWith("a1");
         expect(options.onNotInserted).toHaveBeenCalledWith("Too big");
         expect(options.onFailure).not.toHaveBeenCalled();
+    });
+
+    it("appends a paste on a line of its own, reusing the line breaks the draft already ends with", () => {
+        expect(appendPastedText("typed", "PASTED")).toBe("typed\nPASTED");
+        expect(appendPastedText("typed\n", "PASTED")).toBe("typed\nPASTED");
+        expect(appendPastedText("typed\n", "| a |", 2)).toBe("typed\n\n| a |");
+        expect(appendPastedText("", "| a |", 2)).toBe("| a |");
     });
 
     it("replaces a selection and clamps an offset past the end", () => {
@@ -205,6 +248,22 @@ describe("draftFitsAsFile", () => {
 });
 
 describe("undoLongPaste", () => {
+    it("puts a converted table back on lines of its own after the draft's last line", () => {
+        const setDraft = vi.fn();
+
+        undoLongPaste({
+            attachmentId: "a1",
+            converted: true,
+            getAttachmentIds: () => ["a1"],
+            getDraft: () => "Before:",
+            pastedText: "| A | B |\n| --- | --- |",
+            removeAttachment: vi.fn(),
+            setDraft,
+        });
+
+        expect(setDraft).toHaveBeenCalledWith("Before:\n\n| A | B |\n| --- | --- |");
+    });
+
     it("puts the text back and drops the file while the file is attached", () => {
         const removeAttachment = vi.fn();
         const setDraft = vi.fn();
@@ -225,5 +284,55 @@ describe("undoLongPaste", () => {
         );
         expect(removeAttachment).not.toHaveBeenCalled();
         expect(setDraft).not.toHaveBeenCalled();
+    });
+});
+
+describe(pasteHasText, () => {
+    const clipboard = (plain: string, html = "") => {
+        const formats: Record<string, string> = { "text/html": html, "text/plain": plain };
+
+        return { getData: (type: string) => formats[type] ?? "" };
+    };
+    const picture = [{ name: "image.png" }];
+
+    it.each([
+        ["text from an Office app, with a picture of it", "Q3 revenue\nup 12%", picture, true],
+        ["files alone", "", picture, false],
+        ["a file manager's copy, whose text is the files' names", "report.pdf\nnotes.txt", [{ name: "report.pdf" }, { name: "notes.txt" }], false],
+        ["a copy that names the files by path", "/Users/me/report.pdf", [{ name: "report.pdf" }], false],
+        ["a file manager's copy as file URIs", "file:///home/me/My%20Report.pdf", [{ name: "My Report.pdf" }], false],
+        [
+            "a browser's image copy, whose text is the image's URL",
+            "https://cdn.example.com/p/photo.jpg?w=800",
+            picture,
+            false,
+            '<img src="https://cdn.example.com/p/photo.jpg?w=800">',
+        ],
+        [
+            "a browser's image copy on Windows, whose HTML is wrapped",
+            "https://cdn.example.com/p/photo.jpg",
+            picture,
+            false,
+            '<html>\r\n<body>\r\n<!--StartFragment--><img src="https://cdn.example.com/p/photo.jpg"><!--EndFragment-->\r\n</body>\r\n</html>',
+        ],
+        [
+            "a picture copied out of Word, with an HTML document and no text",
+            "\r\n",
+            picture,
+            false,
+            '<html><head><style>p{}</style></head><body><p class=MsoNormal><img src="clip.png"></p></body></html>',
+        ],
+        // Many comments in a row, then text: a pattern that could read the comments more than one way would hang here.
+        ["copied page text after many empty markup comments", "words", picture, true, `${"<!-- -->".repeat(40)}<p>words</p>`],
+        ["copied text that happens to match the picture's name", "notes.txt", [{ name: "notes.txt" }], true, "<p>notes.txt</p>"],
+        [
+            "a spreadsheet's copied links, next to a picture of the cells",
+            "https://a.example\nhttps://b.example",
+            picture,
+            true,
+            "<table><tr><td>https://a.example</td></tr></table>",
+        ],
+    ])("%s: %s", (_label, plain, files, expected, html = "") => {
+        expect(pasteHasText(clipboard(plain, html), files)).toBe(expected);
     });
 });

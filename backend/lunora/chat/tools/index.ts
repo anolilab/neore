@@ -24,6 +24,7 @@ import deepfakeDetectionTool from "./deepfake-detection";
 import fileOperationsTool from "./file-operations";
 import flightTrackerTool from "./flight-tracker";
 import githubSearchTool from "./github-search";
+import { mergePullRequestTool, readFailingChecksTool, readPullRequestTool, replyToReviewCommentTool, rerunFailedChecksTool } from "./pull-request";
 import imageEditingTool from "./image-editing";
 import imageGenerationTool from "./image-generation";
 import imageSearchTool from "./image-search";
@@ -103,6 +104,7 @@ export type { MediaDetails, MediaResult } from "./movie-tv-search";
 export { default as movieTvSearchTool } from "./movie-tv-search";
 export { default as musicGenerationTool } from "./music-generation";
 export { default as peopleSearchTool } from "./people-search";
+export { mergePullRequestTool, readFailingChecksTool, readPullRequestTool, replyToReviewCommentTool, rerunFailedChecksTool } from "./pull-request";
 export type { RedditPost } from "./reddit-search";
 export { default as redditSearchTool } from "./reddit-search";
 export type { RenderUIOutput } from "./render-ui";
@@ -211,6 +213,9 @@ export enum ToolName {
     ListCurrencies = "listCurrencies",
     ListLanguages = "listLanguages",
 
+    // Pull requests linked to the thread
+    MergePullRequest = "mergePullRequest",
+
     // Sub-agent workers
     MessageWorker = "messageWorker",
 
@@ -222,13 +227,19 @@ export enum ToolName {
     // People & Company Search Tools
     PeopleSearch = "peopleSearch",
 
+    ReadFailingChecks = "readFailingChecks",
+    ReadPullRequest = "readPullRequest",
     RedditSearch = "redditSearch",
 
     // Generative UI Tools
     RenderUI = "renderUI",
 
+    ReplyToReviewComment = "replyToReviewComment",
+
     // Asking the user for a secret, and spending it
     RequestSecret = "requestSecret",
+
+    RerunFailedChecks = "rerunFailedChecks",
 
     // Content Tools
     Retrieve = "retrieve",
@@ -333,14 +344,19 @@ export const getAllTools = () => {
         [ToolName.KnowledgeSearch]: knowledgeSearchTool,
         [ToolName.ListCurrencies]: listCurrenciesTool,
         [ToolName.ListLanguages]: listLanguagesTool,
+        [ToolName.MergePullRequest]: mergePullRequestTool,
         [ToolName.MessageWorker]: messageWorkerTool,
         [ToolName.MovieTvSearch]: movieTvSearchTool,
         [ToolName.MusicGeneration]: musicGenerationTool,
         [ToolName.NearbyPlacesSearch]: nearbyPlacesSearchTool,
         [ToolName.PeopleSearch]: peopleSearchTool,
+        [ToolName.ReadFailingChecks]: readFailingChecksTool,
+        [ToolName.ReadPullRequest]: readPullRequestTool,
         [ToolName.RedditSearch]: redditSearchTool,
         [ToolName.RenderUI]: renderUITool,
+        [ToolName.ReplyToReviewComment]: replyToReviewCommentTool,
         [ToolName.RequestSecret]: requestSecretTool,
+        [ToolName.RerunFailedChecks]: rerunFailedChecksTool,
         [ToolName.Retrieve]: retrieveTool,
         [ToolName.SaveSecretAsProviderKey]: saveSecretAsProviderKeyTool,
         [ToolName.SearchMemory]: searchMemoryTool,

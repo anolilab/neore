@@ -61,7 +61,8 @@ describe("buildAuthOptions bearer token", () => {
 
         const { buildAuthOptions } = await import("./auth");
         const jwtPlugin = (buildAuthOptions().plugins ?? []).find((plugin) => plugin.id === "jwt") as
-            { options?: { jwt?: { audience?: string; issuer?: string } } } | undefined;
+            | { options?: { jwt?: { audience?: string; issuer?: string } } }
+            | undefined;
 
         expect(jwtPlugin?.options?.jwt?.issuer).toBe("https://api.example.test");
         expect(jwtPlugin?.options?.jwt?.audience).toBe("https://api.example.test");

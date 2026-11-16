@@ -33,7 +33,7 @@ The rules for working in `packages/device-core/`. The detail and reasoning are i
 - `tar` (`archive.rs`) walks with `openat` + `O_NOFOLLOW` and LEAVES OUT symlinks, hard-linked files, FIFOs and devices; the desktop never unpacks what it saves. The save path comes from a native dialog, never the window.
 - The connection reader never waits for disk: chunks (`CHUNK_TAG` raw frames) queue by bytes; > 64 MiB behind or an idle minute ends the download. Unix hosts only.
 - **Coding agents on a server**: `neore-host` only owns the process; the host kills the agent's process group on cancel, stdin end and SIGTERM. The core picks the secret by the payload's DEVICE.
-- `TurnChanges` and media stay off for a server (`folderIsRemote`); any new reader of the agent's folder must too. Build the agent's environment on the server.
+- `TurnChanges` and media stay off for a server (`folderIsRemote`); any new reader of the agent's folder must too. Build the agent's environment on the server; the desktop sends only the person's variables and fixed literals (`CLAUDE_CODE_ENTRYPOINT`).
 - **No write waits on a pipe** (`src/outbox.rs`): one writer thread, byte-bounded queue; readers and napi calls only queue (cancel gets `URGENT_HEADROOM`); producers wait for room. Stop an agent at `INPUT_BUDGET` (8 MiB).
 - Join every thread a launch spawns before its request ends.
 - Narrowing shared folders drops out-of-folder approvals (`apply_update`, `reviewApprovals`); removing a server or unpairing ends sessions FIRST (`ServerAgents.remove`).

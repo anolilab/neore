@@ -3,6 +3,10 @@ import { createConfig } from "@anolilab/eslint-config";
 /** @type {import("@anolilab/eslint-config").PromiseFlatConfigComposer} */
 const config = await createConfig({
     ignores: ["./dist/**", ".expo/**", "./web-build/**"],
+    // `app.json#expo.experiments.reactCompiler` compiles the app: the lint reports code the compiler would skip.
+    react: {
+        reactCompiler: true,
+    },
     typescript: {
         ignoresTypeAware: ["*.json", "*.md"],
         isTypeAware: false,

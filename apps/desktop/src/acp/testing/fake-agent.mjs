@@ -2,24 +2,39 @@
 // every frame the host sends against the SDK's published JSON schema and against the protocol's ordering rules, and writes what it saw (and any violation) to
 // $FAKE_AGENT_LOG as JSON lines. What it does is chosen by the first word of each prompt (see `behaviours`).
 import { spawn } from "node:child_process";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, existsSync, rmSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { createRequire } from "node:module";
 
 import { z } from "zod";
 
 const require = createRequire(import.meta.url);
-const schema = require("@agentclientprotocol/sdk/schema/v1/schema.json");
-const check = (name) => z.fromJSONSchema({ $ref: `#/$defs/${name}`, $defs: schema.$defs });
+// Each validator is built the first time a frame needs it, not at start: every test spawns this process, and building all of
+// them up front made each start slow enough to push the tests that start several agents past their time limit.
+const lazy = (build) => {
+    let built;
+
+    return { safeParse: (value) => (built ??= build()).safeParse(value) };
+};
+const check = (name) => lazy(() => z.fromJSONSchema({ $ref: `#/$defs/${name}`, $defs: require("@agentclientprotocol/sdk/schema/v1/schema.json").$defs }));
+const checkUnstable = (name) =>
+    lazy(() => z.fromJSONSchema({ $ref: `#/$defs/${name}`, $defs: require("@agentclientprotocol/sdk/schema/v1/schema.unstable.json").$defs }));
 const REQUEST_SCHEMAS = {
     initialize: check("InitializeRequest"),
     "session/new": check("NewSessionRequest"),
     "session/prompt": check("PromptRequest"),
     "session/list": check("ListSessionsRequest"),
     "session/load": check("LoadSessionRequest"),
+    "session/fork": checkUnstable("ForkSessionRequest"),
+    logout: check("LogoutRequest"),
 };
 
-// FAKE_AGENT_SESSIONS = "list", "load" or "list,load": which saved-session methods the agent advertises (and answers).
+// FAKE_AGENT_LOGOUT=1 advertises `auth.logout`. FAKE_AGENT_AUTH_FILE names a file that stands for the agent's own
+// stored sign-in: signed in while it exists, and `logout` deletes it, so the next start of the agent is signed out.
+const authFile = process.env.FAKE_AGENT_AUTH_FILE;
+const signedOut = () => process.env.FAKE_AGENT_AUTH === "1" || (authFile !== undefined && !existsSync(authFile));
+
+// FAKE_AGENT_SESSIONS = any of "list", "load" and "fork", comma-separated: which saved-session methods the agent advertises (and answers).
 const advertised = new Set((process.env.FAKE_AGENT_SESSIONS ?? "").split(",").filter(Boolean));
 // The sessions the agent keeps. One is for a folder nobody approved, which a host must not offer.
 const SAVED = [
@@ -81,7 +96,14 @@ const options = () => [
 
 const permissionRequest = (sessionId, index) => ({
     sessionId,
-    toolCall: { toolCallId: `perm-${index}`, title: `Run command ${index}`, kind: "execute", status: "pending", rawInput: { command: `echo ${index}` }, locations: [{ path: "/work/file.txt" }] },
+    toolCall: {
+        toolCallId: `perm-${index}`,
+        title: `Run command ${index}`,
+        kind: "execute",
+        status: "pending",
+        rawInput: { command: `echo ${index}` },
+        locations: [{ path: "/work/file.txt" }],
+    },
     options: options(),
 });
 
@@ -240,7 +262,8 @@ const handle = async (message) => {
                 agentCapabilities: {
                     loadSession: advertised.has("load"),
                     promptCapabilities: { image: false, audio: false, embeddedContext: false },
-                    ...advertised.has("list") && { sessionCapabilities: { list: {} } },
+                    sessionCapabilities: { ...(advertised.has("list") && { list: {} }), ...(advertised.has("fork") && { fork: {} }) },
+                    ...(process.env.FAKE_AGENT_LOGOUT === "1" && { auth: { logout: {} } }),
                 },
                 agentInfo: { name: "fake-agent", title: "Fake Agent", version: "1.2.3" },
                 authMethods: [],
@@ -250,7 +273,7 @@ const handle = async (message) => {
 
     if (message.method === "session/new") {
         record({ sessionNew: message.params });
-        if (process.env.FAKE_AGENT_AUTH === "1") {
+        if (signedOut()) {
             return send({ id: message.id, error: { code: -32000, message: "Authentication required" } });
         }
         if (process.env.FAKE_AGENT_SESSION_ERROR === "1") {
@@ -258,6 +281,29 @@ const handle = async (message) => {
             return send({ id: message.id, error: { code: -32603, message: `cannot start: ${process.env.API_KEY}` } });
         }
         state.sessionId = "fake-session-1";
+        return send({ id: message.id, result: { sessionId: state.sessionId } });
+    }
+
+    if (message.method === "logout") {
+        if (process.env.FAKE_AGENT_LOGOUT !== "1") {
+            return violation("logout without advertising it", message);
+        }
+        record({ logout: true });
+        if (authFile !== undefined) {
+            rmSync(authFile, { force: true });
+        }
+        return send({ id: message.id, result: {} });
+    }
+
+    if (message.method === "session/fork") {
+        if (!advertised.has("fork")) {
+            return violation(`${message.method} without advertising it`, message);
+        }
+        record({ fork: message.params });
+        if (HISTORY[message.params.sessionId] === undefined) {
+            return send({ id: message.id, error: { code: -32002, message: "Resource not found" } });
+        }
+        state.sessionId = process.env.FAKE_AGENT_FORK_SAME === "1" ? message.params.sessionId : `${message.params.sessionId}-fork`;
         return send({ id: message.id, result: { sessionId: state.sessionId } });
     }
 
@@ -281,7 +327,7 @@ const handle = async (message) => {
                 sessions.push({ sessionId: "s-elsewhere", title: "Other folder", cwd: "/elsewhere" });
             }
 
-            return send({ id: message.id, result: { sessions, ...process.env.FAKE_AGENT_PAGES === "1" && !second && { nextCursor: "p2" } } });
+            return send({ id: message.id, result: { sessions, ...(process.env.FAKE_AGENT_PAGES === "1" && !second && { nextCursor: "p2" }) } });
         }
 
         const history = HISTORY[message.params.sessionId];

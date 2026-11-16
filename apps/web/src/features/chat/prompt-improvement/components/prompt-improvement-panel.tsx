@@ -26,7 +26,6 @@ const PromptImprovementPanel: FC<PromptImprovementPanelProps> = ({ className }) 
     const { i18n, t } = useLingui();
     const styleLabels = useOptimizerStyleLabels();
 
-    const composerText = useChatUIStore((state) => state.composerText);
     const setComposerText = useChatUIStore((state) => state.setComposerText);
 
     const {
@@ -80,6 +79,9 @@ const PromptImprovementPanel: FC<PromptImprovementPanelProps> = ({ className }) 
             };
         }),
     );
+
+    // The draft only while the panel is open: the panel is always mounted, and a closed one must not re-render per keystroke.
+    const composerText = useChatUIStore((state) => (isOpen ? state.composerText : ""));
 
     const currentImprovedPrompt = improvedPrompts[currentPromptIndex] || "";
     const canGoPrevious = currentPromptIndex > 0;
@@ -328,7 +330,7 @@ const PromptImprovementPanel: FC<PromptImprovementPanelProps> = ({ className }) 
                                             {t`Apply`}
                                         </Button>
                                     )}
-                                    <Button className="text-black" disabled={isImproving || !currentPrompt.trim()} onClick={handleImprove}>
+                                    <Button disabled={isImproving || !currentPrompt.trim()} onClick={handleImprove}>
                                         {isImproving ? (
                                             <>
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

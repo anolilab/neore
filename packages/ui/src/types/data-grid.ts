@@ -131,7 +131,20 @@ export interface PasteDialogState {
 }
 
 export type NavigationDirection =
-    "up" | "down" | "left" | "right" | "home" | "end" | "ctrl+up" | "ctrl+down" | "ctrl+home" | "ctrl+end" | "pageup" | "pagedown" | "pageleft" | "pageright";
+    | "up"
+    | "down"
+    | "left"
+    | "right"
+    | "home"
+    | "end"
+    | "ctrl+up"
+    | "ctrl+down"
+    | "ctrl+home"
+    | "ctrl+end"
+    | "pageup"
+    | "pagedown"
+    | "pageleft"
+    | "pageright";
 
 export interface SearchState {
     matchIndex: number;
@@ -170,7 +183,15 @@ export interface FileCellData {
 export type TextFilterOperator = "contains" | "notContains" | "equals" | "notEquals" | "startsWith" | "endsWith" | "isEmpty" | "isNotEmpty";
 
 export type NumberFilterOperator =
-    "equals" | "notEquals" | "lessThan" | "lessThanOrEqual" | "greaterThan" | "greaterThanOrEqual" | "isBetween" | "isEmpty" | "isNotEmpty";
+    | "equals"
+    | "notEquals"
+    | "lessThan"
+    | "lessThanOrEqual"
+    | "greaterThan"
+    | "greaterThanOrEqual"
+    | "isBetween"
+    | "isEmpty"
+    | "isNotEmpty";
 
 export type DateFilterOperator = "equals" | "notEquals" | "before" | "after" | "onOrBefore" | "onOrAfter" | "isBetween" | "isEmpty" | "isNotEmpty";
 

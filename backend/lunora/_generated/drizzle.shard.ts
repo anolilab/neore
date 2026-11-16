@@ -12,7 +12,8 @@ export const acpSessions = sqliteTable("acpSessions", {
     agentLabel: text("agentLabel").notNull(),
     agentState: text("agentState", { mode: "json" }).$type<{ configOptions?: Array<{ category?: string; choices: Array<{ name: string; value: string }>; currentValue: string; id: string; name: string }>; models?: { available: Array<{ id: string; name: string }>; current: string }; modes?: { available: Array<{ id: string; name: string }>; current: string }; usage?: { cost?: { amount: number; currency: string }; size: number; used: number } }>(),
     agentStateAt: real("agentStateAt"),
-    capabilities: text("capabilities", { mode: "json" }).$type<{ groups: { checkpoints?: { fileRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; memoryRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; context?: { compactOnRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; usageMeter?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; identity?: { account?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; models?: Array<{ id: string; name: string }>; reasoningEffort?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; permissions?: { modes?: Array<string> }; planning?: { planMode?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; sessions?: { create?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; listNative?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; load?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; streaming?: { reasoning?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; text?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; toolParts?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; subagents?: { ownChildren?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; tools?: { approvalRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; call?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; declinePath?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; turns?: { cancel?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; followUp?: { degradation?: "restart"; kind: "steer" } | { kind: "queue" } | { kind: "none" } } }; reportedAt: number; version: 1 }>(),
+    agentStateSeq: real("agentStateSeq"),
+    capabilities: text("capabilities", { mode: "json" }).$type<{ groups: { checkpoints?: { fileRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; memoryRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; context?: { compactOnRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; usageMeter?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; identity?: { account?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; models?: Array<{ id: string; name: string }>; reasoningEffort?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; permissions?: { modes?: Array<string> }; planning?: { planMode?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; sessions?: { create?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; fork?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; listNative?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; load?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; streaming?: { reasoning?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; text?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; toolParts?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; subagents?: { ownChildren?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; tools?: { approvalRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; call?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; declinePath?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; turns?: { cancel?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; followUp?: { degradation?: "restart"; kind: "steer" } | { kind: "queue" } | { kind: "none" } } }; reportedAt: number; version: 1 }>(),
     createdAt: real("createdAt").notNull(),
     deviceId: text("deviceId").references((): AnySQLiteColumn => devices._id).notNull(),
     folderId: text("folderId").notNull(),
@@ -274,10 +275,22 @@ export const deviceCalls = sqliteTable("deviceCalls", {
     by_createdAt: index("by_createdAt").on(t.createdAt),
 }));
 
+export const devicePairingRevocations = sqliteTable("devicePairingRevocations", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    codeId: text("codeId").notNull(),
+    revokedAt: real("revokedAt").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId_codeId: index("by_userId_codeId").on(t.userId, t.codeId),
+    by_revokedAt: index("by_revokedAt").on(t.revokedAt),
+}));
+
 export const devices = sqliteTable("devices", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     acpOffers: text("acpOffers", { mode: "json" }).$type<Array<{ agentKey: string; agentLabel: string; folderId: string; folderLabel: string }>>(),
+    appVersion: text("appVersion"),
     createdAt: real("createdAt").notNull(),
     encryptedSecret: text("encryptedSecret"),
     hostProtocol: real("hostProtocol"),
@@ -285,10 +298,11 @@ export const devices = sqliteTable("devices", {
     manifest: text("manifest", { mode: "json" }).$type<Array<{ description: string; inputSchema?: unknown; kind: "fs" | "shell" | "mcp"; name: string; readOnly: boolean }>>(),
     manifestIssuedAt: real("manifestIssuedAt"),
     name: text("name").notNull(),
+    pairedByCode: text("pairedByCode"),
     platform: text("platform", { mode: "json" }).$type<"macos" | "windows" | "linux">().notNull(),
     projectIds: text("projectIds", { mode: "json" }).$type<Array<Id<"projects">>>(),
     revokedAt: real("revokedAt"),
-    transport: text("transport"),
+    transport: text("transport", { mode: "json" }).$type<"ssh" | "headless">(),
     userId: text("userId").notNull(),
     viaDeviceId: text("viaDeviceId").references((): AnySQLiteColumn => devices._id),
 }, (t) => ({
@@ -903,13 +917,14 @@ export const nodeExecutions = sqliteTable("nodeExecutions", {
 export const notifications = sqliteTable("notifications", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    approvalId: text("approvalId"),
     body: text("body"),
     dedupeKey: text("dedupeKey"),
     emailOutcome: integer("emailOutcome", { mode: "boolean" }),
     link: text("link"),
     outcome: text("outcome", { mode: "json" }).$type<"success" | "failure">(),
     title: text("title").notNull(),
-    type: text("type", { mode: "json" }).$type<"task" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request">().notNull(),
+    type: text("type", { mode: "json" }).$type<"task" | "task_stuck" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request">().notNull(),
     userId: text("userId").notNull(),
     createdAt: real("createdAt").notNull(),
     readAt: real("readAt"),
@@ -1046,7 +1061,7 @@ export const pageVersions = sqliteTable("pageVersions", {
 export const persistentChunks = sqliteTable("persistentChunks", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
-    event: text("event", { mode: "json" }).$type<{ agentKey: string; agentLabel: string; capabilities?: { groups: { checkpoints?: { fileRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; memoryRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; context?: { compactOnRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; usageMeter?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; identity?: { account?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; models?: Array<{ id: string; name: string }>; reasoningEffort?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; permissions?: { modes?: Array<string> }; planning?: { planMode?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; sessions?: { create?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; listNative?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; load?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; streaming?: { reasoning?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; text?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; toolParts?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; subagents?: { ownChildren?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; tools?: { approvalRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; call?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; declinePath?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; turns?: { cancel?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; followUp?: { degradation?: "restart"; kind: "steer" } | { kind: "queue" } | { kind: "none" } } }; reportedAt: number; version: 1 }; folderId: string; folderLabel: string; kind: "session_open"; nativeSessionId?: string; reattach?: { loaded: boolean; reason?: string } } | { agentKey: string; agentLabel: string; capabilities?: { groups: { checkpoints?: { fileRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; memoryRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; context?: { compactOnRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; usageMeter?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; identity?: { account?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; models?: Array<{ id: string; name: string }>; reasoningEffort?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; permissions?: { modes?: Array<string> }; planning?: { planMode?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; sessions?: { create?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; listNative?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; load?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; streaming?: { reasoning?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; text?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; toolParts?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; subagents?: { ownChildren?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; tools?: { approvalRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; call?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; declinePath?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; turns?: { cancel?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; followUp?: { degradation?: "restart"; kind: "steer" } | { kind: "queue" } | { kind: "none" } } }; reportedAt: number; version: 1 }; folderId: string; folderLabel: string; kind: "import_open"; nativeSessionId: string; title?: string } | { kind: "import_turn"; reasoning?: string; text: string; user: string } | { kind: "import_end" } | { at: number; configOptions?: Array<{ category?: string; choices: Array<{ name: string; value: string }>; currentValue: string; id: string; name: string }>; kind: "session_state"; models?: { available: Array<{ id: string; name: string }>; current: string }; modes?: { available: Array<{ id: string; name: string }>; current: string }; usage?: { cost?: { amount: number; currency: string }; size: number; used: number } } | { kind: "turn_start"; text: string } | { kind: "text"; text: string } | { kind: "reasoning"; text: string } | { id: string; kind: "tool"; status: "pending" | "in_progress" | "completed" | "failed" | "cancelled" | "declined"; title: string; toolKind: string } | { command?: string; complete?: boolean; folder?: string; kind: "permission_request"; options: Array<{ kind: string; name: string; optionId: string }>; requestId: string; target?: string; tool: string } | { kind: "permission_resolved"; outcome: "allowed" | "declined" | "cancelled"; requestId: string } | { field: "text" | "reasoning"; kind: "child_text"; spawnId: string; text: string } | { id: string; kind: "child_tool"; spawnId: string; status: "pending" | "in_progress" | "completed" | "failed" | "cancelled" | "declined"; title: string; toolKind: string } | { kind: "child_end"; spawnId: string; status: "completed" | "failed" | "cancelled"; text?: string } | { contentType?: string; fileId?: string; kind: "media"; name: string; reference: string; size: number; storageKey?: string; uploadId?: string } | { error?: string; kind: "turn_end"; reason: "finished" | "cancelled" | "failed" | "interrupted"; summary?: { files: Array<{ added: number; path: string; removed: number }>; patch?: string | { tooLarge: true } } }>(),
+    event: text("event", { mode: "json" }).$type<{ agentKey: string; agentLabel: string; capabilities?: { groups: { checkpoints?: { fileRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; memoryRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; context?: { compactOnRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; usageMeter?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; identity?: { account?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; models?: Array<{ id: string; name: string }>; reasoningEffort?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; permissions?: { modes?: Array<string> }; planning?: { planMode?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; sessions?: { create?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; fork?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; listNative?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; load?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; streaming?: { reasoning?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; text?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; toolParts?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; subagents?: { ownChildren?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; tools?: { approvalRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; call?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; declinePath?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; turns?: { cancel?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; followUp?: { degradation?: "restart"; kind: "steer" } | { kind: "queue" } | { kind: "none" } } }; reportedAt: number; version: 1 }; folderId: string; folderLabel: string; fork?: { forked: boolean; reason?: string }; kind: "session_open"; nativeSessionId?: string; reattach?: { loaded: boolean; reason?: string } } | { agentKey: string; agentLabel: string; capabilities?: { groups: { checkpoints?: { fileRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; memoryRollback?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; context?: { compactOnRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; usageMeter?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; identity?: { account?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; models?: Array<{ id: string; name: string }>; reasoningEffort?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; permissions?: { modes?: Array<string> }; planning?: { planMode?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; sessions?: { create?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; fork?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; listNative?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; load?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; streaming?: { reasoning?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; text?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; toolParts?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; subagents?: { ownChildren?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; tools?: { approvalRequest?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; call?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; declinePath?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false } }; turns?: { cancel?: { degradation: "none"; supported: true } | { degradation: "restart" | "synthetic" | "divergent"; note: string; supported: true } | { reason: "not_offered" | "not_enforced" | "unknown"; supported: false }; followUp?: { degradation?: "restart"; kind: "steer" } | { kind: "queue" } | { kind: "none" } } }; reportedAt: number; version: 1 }; folderId: string; folderLabel: string; kind: "import_open"; nativeSessionId: string; title?: string } | { kind: "import_turn"; reasoning?: string; text: string; user: string } | { kind: "import_end" } | { at: number; configOptions?: Array<{ category?: string; choices: Array<{ name: string; value: string }>; currentValue: string; id: string; name: string }>; kind: "session_state"; models?: { available: Array<{ id: string; name: string }>; current: string }; modes?: { available: Array<{ id: string; name: string }>; current: string }; seq?: number; usage?: { cost?: { amount: number; currency: string }; size: number; used: number } } | { kind: "turn_start"; text: string } | { kind: "text"; text: string } | { kind: "reasoning"; text: string } | { id: string; kind: "tool"; status: "pending" | "in_progress" | "completed" | "failed" | "cancelled" | "declined"; title: string; toolKind: string } | { command?: string; complete?: boolean; folder?: string; kind: "permission_request"; options: Array<{ kind: string; name: string; optionId: string }>; requestId: string; target?: string; tool: string } | { kind: "permission_resolved"; outcome: "allowed" | "declined" | "cancelled"; requestId: string } | { field: "text" | "reasoning"; kind: "child_text"; spawnId: string; text: string } | { id: string; kind: "child_tool"; spawnId: string; status: "pending" | "in_progress" | "completed" | "failed" | "cancelled" | "declined"; title: string; toolKind: string } | { kind: "child_end"; spawnId: string; status: "completed" | "failed" | "cancelled"; text?: string } | { contentType?: string; fileId?: string; kind: "media"; name: string; reference: string; size: number; storageKey?: string; uploadId?: string } | { error?: string; kind: "turn_end"; reason: "finished" | "cancelled" | "failed" | "interrupted"; summary?: { files: Array<{ added: number; path: string; removed: number }>; patch?: string | { tooLarge: true } } }>(),
     reasoning: text("reasoning"),
     restart: integer("restart", { mode: "boolean" }),
     seq: real("seq").notNull(),
@@ -1205,6 +1220,7 @@ export const rateLimits = sqliteTable("rateLimits", {
     value: real("value").notNull(),
 }, (t) => ({
     by_key: index("by_key").on(t.key),
+    by_ts: index("by_ts").on(t.ts),
 }));
 
 export const requestedSecrets = sqliteTable("requestedSecrets", {
@@ -1352,6 +1368,8 @@ export const streamingMessages = sqliteTable("streamingMessages", {
 export const subAgentRuns = sqliteTable("subAgentRuns", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    beatAt: real("beatAt"),
+    chainSource: text("chainSource"),
     childThreadId: text("childThreadId"),
     clientId: text("clientId"),
     completedAt: real("completedAt"),
@@ -1366,13 +1384,17 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     organizationId: text("organizationId"),
     parentModel: text("parentModel"),
     parentThreadId: text("parentThreadId").notNull(),
+    postCheckAt: real("postCheckAt"),
+    postCheckId: text("postCheckId"),
     postFailed: text("postFailed"),
+    reapAt: real("reapAt"),
     result: text("result"),
     resultPostedAt: real("resultPostedAt"),
+    resumedBy: text("resumedBy"),
     runner: text("runner", { mode: "json" }).$type<{ kind: "headless" } | { deviceId: Id<"devices">; kind: "host" }>(),
     skillSlug: text("skillSlug"),
     startedAt: real("startedAt"),
-    status: text("status", { mode: "json" }).$type<"queued" | "running" | "succeeded" | "failed" | "cancelled">().notNull(),
+    status: text("status", { mode: "json" }).$type<"queued" | "running" | "awaiting" | "succeeded" | "failed" | "cancelled">().notNull(),
     task: text("task").notNull(),
     toolAllowlist: text("toolAllowlist", { mode: "json" }).$type<Array<string>>(),
     toolCallId: text("toolCallId"),
@@ -1382,9 +1404,11 @@ export const subAgentRuns = sqliteTable("subAgentRuns", {
     by_parentThreadId_and_status: index("by_parentThreadId_and_status").on(t.parentThreadId, t.status),
     by_childThreadId: index("by_childThreadId").on(t.childThreadId),
     by_childThreadId_and_status: index("by_childThreadId_and_status").on(t.childThreadId, t.status),
+    by_status_and_reapAt: index("by_status_and_reapAt").on(t.status, t.reapAt),
     by_user_and_status: index("by_user_and_status").on(t.userId, t.status),
     by_user_and_toolCallId: index("by_user_and_toolCallId").on(t.userId, t.toolCallId),
     by_user_and_createdAt: index("by_user_and_createdAt").on(t.userId, t.createdAt),
+    by_chainSource_and_status: index("by_chainSource_and_status").on(t.chainSource, t.status),
     by_createdAt: index("by_createdAt").on(t.createdAt),
 }));
 
@@ -1453,6 +1477,8 @@ export const tasks = sqliteTable("tasks", {
     runDestination: text("runDestination", { mode: "json" }).$type<"new_thread" | "continue_thread" | "fresh_context">(),
     skillId: text("skillId"),
     status: text("status", { mode: "json" }).$type<"todo" | "queued" | "running" | "needs_review" | "done" | "failed" | "blocked">().notNull(),
+    stuckCheckAt: real("stuckCheckAt"),
+    stuckNotice: text("stuckNotice", { mode: "json" }).$type<{ days: number; since: number }>(),
     successCriteria: text("successCriteria"),
     title: text("title").notNull(),
     updatedAt: real("updatedAt").notNull(),
@@ -1462,6 +1488,21 @@ export const tasks = sqliteTable("tasks", {
     by_user_and_goal: index("by_user_and_goal").on(t.userId, t.goalId),
     by_recurring_and_nextRunAt: index("by_recurring_and_nextRunAt").on(t.recurring, t.nextRunAt),
     by_status_and_updatedAt: index("by_status_and_updatedAt").on(t.status, t.updatedAt),
+    by_status_and_stuckCheckAt: index("by_status_and_stuckCheckAt").on(t.status, t.stuckCheckAt),
+}));
+
+export const teammateConnectorAccess = sqliteTable("teammateConnectorAccess", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    botId: text("botId").references((): AnySQLiteColumn => bots._id).notNull(),
+    connectorSlug: text("connectorSlug").notNull(),
+    level: text("level", { mode: "json" }).$type<"read_only" | "read_write" | "none">().notNull(),
+    updatedAt: real("updatedAt").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_botId_connectorSlug: index("by_botId_connectorSlug").on(t.botId, t.connectorSlug),
+    by_userId_connectorSlug: index("by_userId_connectorSlug").on(t.userId, t.connectorSlug),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const temporaryThreads = sqliteTable("temporaryThreads", {
@@ -1520,6 +1561,37 @@ export const threadGoals = sqliteTable("threadGoals", {
     by_thread_and_status: index("by_thread_and_status").on(t.threadId, t.status),
     by_user: index("by_user").on(t.userId),
     by_status_and_updatedAt: index("by_status_and_updatedAt").on(t.status, t.updatedAt),
+}));
+
+export const threadGuestLinks = sqliteTable("threadGuestLinks", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    createdAt: real("createdAt").notNull(),
+    expiresAt: real("expiresAt").notNull(),
+    guestHash: text("guestHash"),
+    linkHash: text("linkHash").notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_thread_expiresAt: index("by_thread_expiresAt").on(t.threadId, t.expiresAt),
+    by_linkHash: index("by_linkHash").on(t.linkHash),
+    by_expiresAt: index("by_expiresAt").on(t.expiresAt),
+    by_userId: index("by_userId").on(t.userId),
+}));
+
+export const threadGuestMessages = sqliteTable("threadGuestMessages", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    createdAt: real("createdAt").notNull(),
+    linkId: text("linkId").references((): AnySQLiteColumn => threadGuestLinks._id).notNull(),
+    status: text("status", { mode: "json" }).$type<"held" | "sent">().notNull(),
+    text: text("text").notNull(),
+    threadId: text("threadId").references((): AnySQLiteColumn => threads._id).notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_link: index("by_link").on(t.linkId),
+    by_thread: index("by_thread").on(t.threadId),
+    by_userId: index("by_userId").on(t.userId),
 }));
 
 export const threadKnowledge = sqliteTable("threadKnowledge", {
@@ -1591,16 +1663,20 @@ export const threads = sqliteTable("threads", {
     autoModel: integer("autoModel", { mode: "boolean" }),
     awaitingInput: text("awaitingInput", { mode: "json" }).$type<"approval" | "question">(),
     botId: text("botId").references((): AnySQLiteColumn => bots._id),
+    capOrganizationId: text("capOrganizationId"),
     category: text("category"),
+    contextResetMessageId: text("contextResetMessageId"),
     createdAt: real("createdAt"),
     createdBy: text("createdBy"),
     customSystemPrompt: text("customSystemPrompt"),
     deleted: integer("deleted", { mode: "boolean" }),
     deletedAt: real("deletedAt"),
+    deletingAt: real("deletingAt"),
     dictationLanguage: text("dictationLanguage"),
     enabledFeatures: text("enabledFeatures", { mode: "json" }).$type<Array<string>>(),
     externalThreadId: text("externalThreadId"),
     groupChat: text("groupChat", { mode: "json" }).$type<{ debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ addedAt: number; skillId: string }>; stopRequestedAt?: number; synthesizerSkillId?: string }>(),
+    hasContextReset: integer("hasContextReset", { mode: "boolean" }),
     hasHandoff: integer("hasHandoff", { mode: "boolean" }),
     isPublic: integer("isPublic", { mode: "boolean" }),
     isTemporary: integer("isTemporary", { mode: "boolean" }),
@@ -1617,11 +1693,13 @@ export const threads = sqliteTable("threads", {
     order: real("order"),
     organizationId: text("organizationId"),
     parentThreadIds: text("parentThreadIds", { mode: "json" }).$type<Array<string>>(),
+    permissionMode: text("permissionMode", { mode: "json" }).$type<"supervised" | "auto" | "full">(),
     pinnedAt: real("pinnedAt"),
     projectId: text("projectId"),
     publicAccessToken: text("publicAccessToken"),
     reasoningEffort: real("reasoningEffort"),
     runner: text("runner"),
+    snoozeChosenAt: real("snoozeChosenAt"),
     snoozedUntil: real("snoozedUntil"),
     source: text("source"),
     statelessMode: integer("statelessMode", { mode: "boolean" }),
@@ -1681,8 +1759,10 @@ export const toolApprovalRuns = sqliteTable("toolApprovalRuns", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
     approvalId: text("approvalId").notNull(),
-    config: text("config", { mode: "json" }).$type<{ autoMediaEnrichment: boolean; dispatchOrigin?: "outside_agent"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; instructions?: string; mcpServerNames: Array<string>; memory?: { botId?: string }; model: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }>().notNull(),
+    config: text("config", { mode: "json" }).$type<{ autoMediaEnrichment: boolean; chainSource?: string; contextFromOrder?: number; dispatchOrigin?: "outside_agent" | "trigger" | "messenger"; group?: { baseModel: string; isAnonymous: boolean; organizationId?: string; queue: Array<string>; skillId: string; spokenSkillIds: Array<string>; step?: { role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }; steps?: Array<{ role: "independent" | "pro" | "contra" | "synthesizer"; round?: number; rounds?: number; skillId: string }>; turnStartedAt: number }; headlessApproved?: Array<string>; instructions?: string; mcpServerNames: Array<string>; mcpToolFingerprints?: Record<string, string>; memory?: { botId?: string }; model: string; organizationId?: string; promptMessageId?: string; reasoningEffort?: number; replyKey?: string; researchDepth: "speed" | "balanced" | "thorough"; searchMode: string; shouldAutoContinue: boolean; startedBy?: string; stepsLeft?: number; subAgentRunId?: Id<"subAgentRuns">; toolNames: Array<string>; toolPermissionKeys?: Record<string, string>; untrustedContext?: boolean }>().notNull(),
     createdAt: real("createdAt").notNull(),
+    pauseId: text("pauseId"),
+    reminderSentAt: real("reminderSentAt"),
     resolvedAt: real("resolvedAt"),
     resolvedBy: text("resolvedBy"),
     secretRequest: integer("secretRequest", { mode: "boolean" }),
@@ -1705,8 +1785,11 @@ export const triggerExecutions = sqliteTable("triggerExecutions", {
     completedAt: real("completedAt"),
     error: text("error"),
     firing: real("firing"),
+    pausedPermanently: integer("pausedPermanently", { mode: "boolean" }),
     pausedTrigger: integer("pausedTrigger", { mode: "boolean" }),
     payload: text("payload"),
+    prompt: text("prompt"),
+    promptExpiresAt: real("promptExpiresAt"),
     startedAt: real("startedAt").notNull(),
     status: text("status", { mode: "json" }).$type<"running" | "completed" | "failed" | "filtered">().notNull(),
     threadId: text("threadId"),
@@ -1714,6 +1797,7 @@ export const triggerExecutions = sqliteTable("triggerExecutions", {
 }, (t) => ({
     by_triggerId_startedAt: index("by_triggerId_startedAt").on(t.triggerId, t.startedAt),
     by_triggerId_status: index("by_triggerId_status").on(t.triggerId, t.status),
+    by_promptExpiresAt: index("by_promptExpiresAt").on(t.promptExpiresAt),
 }));
 
 export const triggers = sqliteTable("triggers", {
@@ -1786,6 +1870,7 @@ export const usageDaily = sqliteTable("usageDaily", {
     _creationTime: integer("_creationTime").notNull(),
     costMicrodollars: real("costMicrodollars").notNull(),
     date: text("date").notNull(),
+    projectKey: text("projectKey"),
     replies: real("replies").notNull(),
     skillKey: text("skillKey").notNull(),
     skillName: text("skillName"),
@@ -1795,15 +1880,71 @@ export const usageDaily = sqliteTable("usageDaily", {
 }, (t) => ({
     by_user_skill_date: index("by_user_skill_date").on(t.userId, t.skillKey, t.date),
     by_user_date: index("by_user_date").on(t.userId, t.date),
+    by_user_project_date: index("by_user_project_date").on(t.userId, t.projectKey, t.date),
     by_date: index("by_date").on(t.date),
+}));
+
+export const usageExportPieces = sqliteTable("usageExportPieces", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    backfill: text("backfill"),
+    bytes: real("bytes").notNull(),
+    closed: text("closed", { mode: "json" }).$type<{ cost: number; replies: number; rows: number; tokens: number }>(),
+    closedRows: real("closedRows"),
+    createdAt: real("createdAt"),
+    cutoff: text("cutoff"),
+    kind: text("kind", { mode: "json" }).$type<"projects" | "rows" | "titles" | "verified">().notNull(),
+    nextCursor: text("nextCursor"),
+    pass: real("pass").notNull(),
+    payload: text("payload").notNull(),
+    projectIds: text("projectIds", { mode: "json" }).$type<Array<string>>().notNull(),
+    requestId: text("requestId").notNull(),
+    rowCount: real("rowCount").notNull(),
+    seq: real("seq").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_createdAt: index("by_createdAt").on(t.createdAt),
+    by_request: index("by_request").on(t.requestId, t.pass, t.kind, t.seq),
+}));
+
+export const usageExportProjects = sqliteTable("usageExportProjects", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    pass: real("pass").notNull(),
+    projectId: text("projectId").notNull(),
+    requestId: text("requestId").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_request_project: index("by_request_project").on(t.requestId, t.pass, t.projectId),
+}));
+
+export const usageExportRuns = sqliteTable("usageExportRuns", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    createdAt: real("createdAt").notNull(),
+    deleteAt: real("deleteAt").notNull(),
+    erasingSince: real("erasingSince"),
+    requestId: text("requestId").notNull(),
+    usageKey: text("usageKey"),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_createdAt: index("by_createdAt").on(t.createdAt),
+    by_deleteAt: index("by_deleteAt").on(t.deleteAt),
+    by_userId: index("by_userId").on(t.userId),
+    by_requestId: index("by_requestId").on(t.requestId),
 }));
 
 export const usageReplies = sqliteTable("usageReplies", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
+    awaitingTotal: integer("awaitingTotal", { mode: "boolean" }),
+    deferredProjectKey: text("deferredProjectKey"),
     recordedAt: real("recordedAt").notNull(),
     replyKey: text("replyKey").notNull(),
     userId: text("userId").notNull(),
+    withoutProject: integer("withoutProject", { mode: "boolean" }),
 }, (t) => ({
     by_user_reply: index("by_user_reply").on(t.userId, t.replyKey),
     by_recordedAt: index("by_recordedAt").on(t.recordedAt),
@@ -1876,6 +2017,7 @@ export const userSettings = sqliteTable("userSettings", {
     resumeLastChat: integer("resumeLastChat", { mode: "boolean" }),
     searchDomainBlocklist: text("searchDomainBlocklist", { mode: "json" }).$type<Array<string>>(),
     sendBehavior: text("sendBehavior"),
+    setupStepsSkipped: text("setupStepsSkipped", { mode: "json" }).$type<Array<string>>(),
     taskEmailEnabled: integer("taskEmailEnabled", { mode: "boolean" }),
     temporaryChatRetentionHours: real("temporaryChatRetentionHours"),
     threadSummariesEnabled: integer("threadSummariesEnabled", { mode: "boolean" }),
@@ -1995,6 +2137,15 @@ export const payment_events = sqliteTable("payment_events", {
     type: text("type").notNull(),
 }, (t) => ({
     by_provider_event: uniqueIndex("by_provider_event").on(t.provider, t.providerEventId),
+}));
+
+export const payment_referenceRevisions = sqliteTable("payment_referenceRevisions", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    referenceId: text("referenceId").notNull(),
+    revision: real("revision").notNull(),
+}, (t) => ({
+    by_reference: uniqueIndex("by_reference").on(t.referenceId),
 }));
 
 export const payment_sessions = sqliteTable("payment_sessions", {

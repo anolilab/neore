@@ -138,6 +138,8 @@ const ComposerLanguageSelector: FC = () => {
                 <TooltipTrigger
                     render={
                         <ComboboxTrigger
+                            // A combobox is not named by its content: the label repeats the selected language.
+                            aria-label={t`Response language: ${selectedLanguageItem.label}`}
                             render={
                                 <Button
                                     className="bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 hover:border-border dark:hover:border-sidebar-border/50 text-foreground h-7 justify-between gap-1 px-2 dark:text-white"
@@ -147,7 +149,7 @@ const ComposerLanguageSelector: FC = () => {
                             }
                         >
                             <div className="flex min-w-0 flex-1 items-center gap-2">
-                                <Globe className="size-3 shrink-0" />
+                                <Globe aria-hidden="true" className="size-3 shrink-0" />
                                 <ComboboxValue />
                             </div>
                             <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />

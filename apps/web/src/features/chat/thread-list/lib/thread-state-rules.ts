@@ -42,3 +42,39 @@ export const snoozeUntil = (choice: SnoozeChoice, now: Date): number => {
 
     return morningAfter(now, (MONDAY + 7 - now.getDay()) % 7 || 7);
 };
+
+/** The farthest a snooze may end, from now. Mirrors the server's limit (`backend/lunora/chat/lib/thread-state-logic.ts`). */
+const SNOOZE_MAX_MS = 366 * 24 * HOUR_MS;
+
+const LOCAL_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/u;
+
+/**
+ * When a custom snooze ends, from a `datetime-local` value (local wall-clock time, `YYYY-MM-DDTHH:mm`), or `undefined` when the
+ * value is unreadable, not in the future, or more than the server's year away. A time a daylight-saving change skips resolves
+ * as the `Date` constructor does, to the hour after.
+ */
+export const customSnoozeUntil = (localValue: string, now: number): number | undefined => {
+    const match = LOCAL_DATE_TIME.exec(localValue);
+
+    if (!match) {
+        return undefined;
+    }
+
+    const [year, month, day, hour, minute] = match.slice(1).map(Number) as [number, number, number, number, number];
+    const until = new Date(year, month - 1, day, hour, minute).getTime();
+
+    return until > now && until <= now + SNOOZE_MAX_MS ? until : undefined;
+};
+
+/** This tab's last choice stamp. */
+const choiceClock = { last: 0 };
+
+/**
+ * The ordering stamp of a snooze choice made now: the clock, but always after this tab's previous stamp. Two choices in the same
+ * millisecond keep the order they were made in, whatever order their writes reach the server (`setThreadSnooze` drops the older).
+ */
+export const nextSnoozeChoiceAt = (now: number): number => {
+    choiceClock.last = Math.max(now, choiceClock.last + 1);
+
+    return choiceClock.last;
+};

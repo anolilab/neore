@@ -3,7 +3,7 @@ import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useMutation as useReactQueryMutation, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useCRPC, useLunoraActionOptions, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import { THREAD_LIST_PAGINATION_OPTS } from "../constants/query-options";
@@ -20,9 +20,8 @@ import { THREAD_LIST_PAGINATION_OPTS } from "../constants/query-options";
 export const useThreads = (enabled: boolean = true) => {
     const crpc = useCRPC();
     const { isAuthenticated, isLoading } = useLunoraAuth();
-    const { hooks } = useAuth();
-    const { data: activeOrganization, isPending: isOrgPending } = hooks.useActiveOrganization();
-    const { data: sessionData, isPending: isSessionPending } = hooks.useSession();
+    const { data: activeOrganization, isPending: isOrgPending } = useAuthActiveOrganization();
+    const { data: sessionData, isPending: isSessionPending } = useAuthSession();
 
     // Get active team ID from session
     const activeTeamId = (sessionData?.session as { activeTeamId?: string | null })?.activeTeamId ?? undefined;

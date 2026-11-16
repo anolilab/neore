@@ -9,6 +9,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { isHostRunThread } from "../acp/lib/host-thread";
 import { getFile } from "../agent/client";
+import { requestSignIn } from "../auth/lib/request-sign-in";
 import { getCurrentUserInternal } from "../auth/lib/helper";
 import type { BetterAuthUser } from "../auth/lib/types";
 import { assertPaidModel } from "./lib/enabled-model";
@@ -29,9 +30,13 @@ import { chargeDailyLimit, type DailyLimitKind } from "./lib/daily-limit";
 import { NO_SERVICE_FETCH } from "../lib/services";
 import getAgent from "./lib/get-agent";
 import { capTitlePrompt, fileOnlyPromptPart } from "./lib/first-user-prompt";
+import type { StartTitleJob } from "./lib/start-title-jobs";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
-import { documentTextPart } from "./lib/attached-text";
+import { documentTextPart, guestNoteIdOfMessage, guestTextPart } from "./lib/attached-text";
+import { unsendableGuestText } from "./lib/guest-link-store";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
+import type { ChatStartRequest, StartClaim } from "./start-claim";
+import { chatStartFingerprint, isValidClientMessageId, startChargeKey } from "./start-claim";
 import { createStreamToken } from "./streaming/persistent/stream-token";
 
 const SAFE_TOKEN_RE = /^[\w-]+$/;
@@ -352,12 +357,20 @@ export interface ChatStartBody {
     /** New thread only: each send routes to a model the gateway picks (`chat/lib/auto-model.ts`). An existing thread keeps its own setting. */
     autoModel?: boolean;
     cinemaSettings?: CinemaSettings;
+    /**
+     * The client's own id for this send (`chat/start-claim.ts`), so a resend after an ambiguous failure saves nothing
+     * twice: it is answered with the first send's ids and `duplicate: true`. 1–128 of `[A-Za-z0-9_-]`; not with `regenerate`.
+     * The same id on a different send (thread, prompt, attachments, guest note, goal, or any setting) is a 422 `CLIENT_MESSAGE_ID_REUSED`.
+     */
+    clientMessageId?: string;
     customSystemPrompt?: string;
     duration?: number;
     enabledFeatures?: string[];
     fileIds?: string[];
     /** Run until a reviewer confirms this goal is met (`chat/goals/`). Text turns in the caller's own chat only. */
     goal?: { maxRounds?: number; text: string };
+    /** A held guest note the owner sends on (`chat/guest-links.ts`): its own text is saved, marked as guest text. */
+    guestMessageId?: string;
     imageSize?: string;
     language?: string;
     mcpServerNames?: string[];
@@ -447,6 +460,9 @@ const emptyAfterStripping = (prompt: unknown): boolean => {
 const hostRunThreadResponse = (): Response =>
     Response.json({ error: "HOST_RUN_THREAD", message: "This thread runs on a paired computer. Send the message from the desktop app." }, { status: 409 });
 
+/** How long a send waits before it tries its failed `afterOwnerMessage` call once more. */
+const AFTER_SAVE_RETRY_MS = 5000;
+
 export const runChatStart = async (
     context: HttpActionCtx,
     rawBody: ChatStartBody,
@@ -468,6 +484,20 @@ export const runChatStart = async (
 
     if (pageContext === null) {
         return Response.json({ error: "Invalid pageContext" }, { status: 400 });
+    }
+
+    // A held note is a send of its own: never a regeneration, which would answer some other prompt, nor a goal, whose rounds
+    // would carry the guest's words as the owner's.
+    if (body.guestMessageId !== undefined && (!isValidDocumentIdFormat(body.guestMessageId) || body.regenerate)) {
+        return Response.json({ error: "Invalid guestMessageId" }, { status: 400 });
+    }
+
+    if (body.clientMessageId !== undefined && (!isValidClientMessageId(body.clientMessageId) || body.regenerate)) {
+        return Response.json({ error: "Invalid clientMessageId" }, { status: 400 });
+    }
+
+    if (body.guestMessageId !== undefined && body.goal !== undefined) {
+        return Response.json({ error: "GUEST_NOTE_AS_GOAL", message: "A guest's message cannot be sent as a goal." }, { status: 400 });
     }
 
     // Auth: extract user from the forwarded JWT
@@ -501,6 +531,65 @@ export const runChatStart = async (
     );
 };
 
+/**
+ * `/chat/start`'s answer when a held guest note cannot go: each reason its own code, so the owner is told why. A
+ * `Record` over the reasons, so a new reason fails the type check until it has its own answer.
+ */
+const GUEST_NOTE_REFUSALS: Record<"being-sent" | "ended" | "missing" | "sent", { error: string; message: string; status: 400 | 409 }> = {
+    "being-sent": { error: "GUEST_NOTE_BEING_SENT", message: "That guest note is being sent.", status: 409 },
+    ended: { error: "GUEST_LINK_ENDED", message: "That guest note's link has ended.", status: 400 },
+    missing: { error: "GUEST_NOTE_NOT_SENDABLE", message: "That guest note cannot be sent in this chat.", status: 400 },
+    sent: { error: "GUEST_NOTE_ALREADY_SENT", message: "That guest note was already sent.", status: 409 },
+};
+
+/**
+ * The rest of a send's inputs for its `clientMessageId` fingerprint (`chat/start-claim.ts`), listed in a fixed order so
+ * the client's key order never matters. Not the id itself, nor `unlockProof`, which a resend may refresh.
+ */
+const startSettingsOf = (body: ChatStartBody, pageContext: ReturnType<typeof parsePageContext>): ChatStartRequest["settings"] => {
+    return {
+        autoModel: body.autoModel,
+        cinemaSettings: body.cinemaSettings,
+        customSystemPrompt: body.customSystemPrompt,
+        duration: body.duration,
+        enabledFeatures: body.enabledFeatures,
+        goalMaxRounds: body.goal?.maxRounds,
+        imageSize: body.imageSize,
+        language: body.language,
+        mcpServerNames: body.mcpServerNames,
+        mode: body.mode,
+        model: body.model,
+        negativePrompt: body.negativePrompt,
+        numImages: body.numImages,
+        pageContext,
+        quality: body.quality,
+        reasoningEffort: body.reasoningEffort,
+        referenceImages: body.referenceImages,
+        researchDepth: body.researchDepth,
+        retentionHours: body.retentionHours,
+        searchMode: body.searchMode,
+        seed: body.seed,
+        shouldAutoContinue: body.shouldAutoContinue,
+        statelessMode: body.statelessMode,
+        style: body.style,
+        temporary: body.temporary,
+    };
+};
+
+/** A `clientMessageId` already used for a different send (another thread, prompt or attachment): the client needs a new id. */
+const startMismatchResponse = (): Response =>
+    Response.json({ error: "CLIENT_MESSAGE_ID_REUSED", message: "This message id was already used for a different message." }, { status: 422 });
+
+/** A send whose `clientMessageId` another request holds and has not saved yet: the client retries shortly. */
+const startInProgressResponse = (): Response =>
+    Response.json({ error: "CHAT_START_IN_PROGRESS", message: "This message is still being sent." }, { status: 409 });
+
+const guestNoteRefused = (reason: keyof typeof GUEST_NOTE_REFUSALS): Response => {
+    const { error, message, status } = GUEST_NOTE_REFUSALS[reason];
+
+    return Response.json({ error, message }, { status });
+};
+
 const runChatStartOnShard = async (
     context: HttpActionCtx,
     body: ChatStartBody,
@@ -519,7 +608,7 @@ const runChatStartOnShard = async (
 ): Promise<Response> => {
     // Force anonymous users onto free model
     const isAnonymous = user.isAnonymous === true;
-    // Reassigned once, below, when the thread belongs to a bot.
+    // Reassigned below for a bot's thread or a switched one, and for a resend, to the model its prompt was saved with.
     let effectiveModel = isAnonymous ? ANONYMOUS_FREE_MODEL : body.model;
 
     // Determine content type
@@ -545,31 +634,78 @@ const runChatStartOnShard = async (
         }
     }
 
-    // Scopes organization-shared skills. `user.activeOrganization` is always
-    // null here (no session read from an HTTP action), so resolve it from the
-    // session row, which also re-checks membership. It depends on nothing
-    // below, so it is read alongside the rest instead of just before enqueueing
-    // the run. Only a text run has one.
-    const activeOrganizationPromise = (async (): Promise<string | null> => {
-        if (contentType !== "text") {
-            return null;
-        }
+    // The sign-in the request comes from: the web app's session (`sid`) or the extension's, desktop's or phone's grant
+    // (`gsid`, which never becomes `sessionId`, `src/bearer-identity.ts`). It places the chat in its organization, so a
+    // signed-in caller with neither cannot be placed and must not read as the personal space, whose cap is `auto`. A
+    // public API key caller has neither; its run is held at `ask` by its origin (`apiKeyOrigin`).
+    const signIn = requestSignIn(await context.auth.getIdentity());
 
-        const identity = await context.auth.getIdentity();
-        const sessionId = identity?.sessionId;
+    if (signIn === undefined && origin !== "outside_agent") {
+        return Response.json({ error: "Your sign-in could not be confirmed. Sign in again, then retry." }, { status: 401 });
+    }
 
-        return typeof sessionId === "string"
-            ? await context.runQuery(internal.auth.session_organization.getActiveOrganizationIdForSession, { sessionId, userId })
-            : null;
-    })();
+    // The caller's active organization, from that sign-in's session row (`user.activeOrganization` is always null here:
+    // no session read from an HTTP action), with its membership re-checked. A sign-in whose session is gone, expired or
+    // another user's cannot be placed either, so it is refused before anything is spent or saved (below, at the first
+    // write), rather than read as the personal space (`getSessionOrganizationForCap`). One that still names an
+    // organization its user left is personal. It depends on nothing below, so it is read alongside the rest.
+    const placedPromise =
+        signIn === undefined
+            ? Promise.resolve(undefined)
+            : context.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId: signIn, userId });
+    const sessionOrganizationPromise = placedPromise.then((placed) => placed?.organizationId ?? null);
 
-    // A request refused below never awaits it; it is only a read.
-    activeOrganizationPromise.catch(() => undefined);
+    // A request refused before the first write never awaits these; they are only reads.
+    placedPromise.catch(() => undefined);
+    sessionOrganizationPromise.catch(() => undefined);
+
+    // Scopes organization-shared skills and goals. Only a text run has one.
+    const activeOrganizationPromise = contentType === "text" ? sessionOrganizationPromise : Promise.resolve(null);
+
+    const validThreadId = body.threadId && body.threadId !== "default" ? body.threadId : undefined;
+    const isGuestSend = body.guestMessageId !== undefined;
+
+    // As `sendHeldGuestMessage`: an admin acting as the owner sends no guest note on, resend or not.
+    const guestSendPlaced = isGuestSend ? await placedPromise : undefined;
+
+    if (guestSendPlaced?.impersonating === true) {
+        return Response.json({ error: "GUEST_NOTE_IMPERSONATING", message: "A guest's message cannot be sent while impersonating." }, { status: 403 });
+    }
+
+    // A held guest note goes only into its own chat, as text, and its stored text is saved, never the client's prompt.
+    const guestLookup = isGuestSend
+        ? await context.runQuery(internal.chat.guest_links.getGuestNoteForSend, {
+              messageId: body.guestMessageId as Id<"threadGuestMessages">,
+              userId,
+          })
+        : undefined;
+    const guestRefusal = guestLookup && "refused" in guestLookup ? guestLookup.refused : undefined;
+    // A resend of a send that took the note marked it sent (or holds it), or saved it before its link ended: its claim
+    // answers it below, and refuses it only when this id never saved the note. A note gone or not the caller's is refused here.
+    const deferredGuestRefusal = body.clientMessageId !== undefined && guestRefusal !== "missing" ? guestRefusal : undefined;
+
+    if (guestRefusal && !deferredGuestRefusal) {
+        return guestNoteRefused(guestRefusal);
+    }
+
+    const guestNote = guestLookup && !("refused" in guestLookup) ? guestLookup : undefined;
+
+    if (guestNote && (guestNote.threadId !== validThreadId || unsendableGuestText(guestNote.text))) {
+        return guestNoteRefused("missing");
+    }
+
+    // The chat's model makes images or video: the note can still go once a text model is picked, so this refusal is its own.
+    if (guestNote && contentType !== "text") {
+        return Response.json({ error: "GUEST_NOTE_NEEDS_TEXT_MODEL", message: "Switch to a text model to send this message." }, { status: 400 });
+    }
 
     // Build message content
     const messageContent: any[] = [];
 
-    if (body.prompt) {
+    if (guestNote && body.guestMessageId !== undefined) {
+        // The mark carries the note's id, so a send that stored this message but no record is found later (`settleSend`).
+        messageContent.push(guestTextPart(guestNote.text, body.guestMessageId));
+    } else if (body.prompt) {
         messageContent.push({ text: body.prompt.trim(), type: "text" });
     } else if (contentType === "image") {
         messageContent.push({ text: "Generate an image", type: "text" });
@@ -583,8 +719,6 @@ const runChatStartOnShard = async (
     if (pageContext && contentType === "text") {
         messageContent.unshift(formatPageContextPart(pageContext));
     }
-
-    const validThreadId = body.threadId && body.threadId !== "default" ? body.threadId : undefined;
 
     // Continuing a thread needs write access to it. Nothing checked this: the
     // continue branch below saved the prompt into whatever thread id it was
@@ -758,7 +892,8 @@ const runChatStartOnShard = async (
 
     // The config every round of a goal runs with, checked against what `startGoal` accepts BEFORE the turn is charged
     // and saved: an ordinary send tolerates any `researchDepth` and longer lists, a goal does not.
-    const goalSkill = body.goal === undefined || !body.prompt ? null : parseSkillCommand(body.prompt);
+    // A held guest note never selects a skill, whatever prompt the client sent alongside it.
+    const goalSkill = body.goal === undefined || !body.prompt || guestNote ? null : parseSkillCommand(body.prompt);
     const goalConfig =
         body.goal === undefined
             ? undefined
@@ -780,14 +915,302 @@ const runChatStartOnShard = async (
         return Response.json({ error: "These chat settings cannot be used with a goal." }, { status: 400 });
     }
 
+    // The sign-in check, read alongside the rest: an unconfirmed sign-in is refused here, before the first write.
+    if ((await placedPromise) === null) {
+        return Response.json({ error: "Your sign-in could not be confirmed. Sign in again, then retry." }, { status: 401 });
+    }
+
     // Rate limiting. Media prompts are charged where the paid generation actually
     // runs — `/chat/media`, which the client calls next with this prompt's id —
     // because that route can be called again for the same prompt; a charge here
     // would count the prompt, not the generations.
-    if (contentType === "text") {
-        const dailyLimit = await chargeDailyLimit(context, user, "Text");
+    // A send with a client id is taken before the charge too: a resend is answered with the first send's ids, uncharged.
+    // Its fingerprint binds the id to this thread and prompt, so a duplicate's thread is the one gated above (or the
+    // caller's own new chat), and the same id on another send is refused.
+    const startFingerprint =
+        body.clientMessageId === undefined
+            ? undefined
+            : await chatStartFingerprint({
+                  contentType,
+                  ...(body.fileIds !== undefined && { fileIds: body.fileIds }),
+                  ...(body.goal !== undefined && { goal: goalText }),
+                  ...(body.guestMessageId !== undefined && { guestMessageId: body.guestMessageId }),
+                  ...(body.parentId !== undefined && { parentId: body.parentId }),
+                  ...(body.prompt !== undefined && { prompt: body.prompt }),
+                  settings: startSettingsOf(body, pageContext),
+                  ...(validThreadId !== undefined && { threadId: validThreadId }),
+              });
+    const startOutcome =
+        body.clientMessageId === undefined || startFingerprint === undefined
+            ? undefined
+            : await context.runMutation(internal.chat.start_claim.claimChatStart, {
+                  clientMessageId: body.clientMessageId,
+                  fingerprint: startFingerprint,
+                  streams: contentType === "text",
+                  userId,
+              });
+
+    if (startOutcome?.outcome === "mismatch") {
+        return startMismatchResponse();
+    }
+
+    if (startOutcome?.outcome === "in_progress") {
+        return startInProgressResponse();
+    }
+
+    // The first send's goal was refused after its prompt was saved: the same answer, and no run.
+    if (startOutcome?.outcome === "refused") {
+        return Response.json({ error: startOutcome.error }, { status: 400 });
+    }
+
+    // A resend runs on the model its first try saved the prompt with: the thread's agent may have been switched since.
+    const savedModel = startOutcome?.outcome === "duplicate" || startOutcome?.outcome === "resume" ? startOutcome.model : undefined;
+
+    if (savedModel !== undefined) {
+        effectiveModel = savedModel;
+        streamingConfig.model = savedModel;
+    }
+
+    // The run of a text turn, on the jobs queue. A queue redelivery, or a second submission, is harmless: the run claims its stream first.
+    const enqueueRun = async (run: { messageId: string; streamId: string; threadId: string }): Promise<void> => {
+        const activeOrganizationId = await activeOrganizationPromise;
+
+        await enqueueJob(internal.chat.execute.runStreamingAgent, {
+            isAnonymous,
+            messageId: run.messageId,
+            ...(activeOrganizationId && { organizationId: activeOrganizationId }),
+            ...(origin && { origin }),
+            // The typed text, for skill-command detection. Not on regenerate: that
+            // replies to an existing prompt, which the run reads from the message.
+            // A guest note's text is not the owner's, so it is never handed over for skill detection.
+            ...(!body.regenerate && !isGuestSend && body.prompt && { userPrompt: body.prompt }),
+            streamId: run.streamId,
+            streamingConfig: {
+                ...streamingConfig,
+                mcpServerNames: streamingConfig.mcpServerNames,
+                researchDepth: streamingConfig.researchDepth,
+                shouldAutoContinue: streamingConfig.shouldAutoContinue,
+            },
+            threadId: run.threadId,
+            userId,
+        });
+    };
+
+    // Title/category jobs, scheduled only once the agent run is enqueued. Text
+    // prompts only: they are LLM calls, and only text was charged above
+    // (`chat/lib/start-title-jobs.ts`).
+    const titleJobs: { job: StartTitleJob; schedule: () => Promise<unknown> }[] = [];
+    const scheduleTitleJobs = (titleThreadId: string, promptId: string, jobs: StartTitleJob[]): void => {
+        // Capped where it is sent: the title is generated from the first characters of the prompt only.
+        const prompt = capTitlePrompt(body.prompt ?? " ");
+
+        for (const job of jobs) {
+            if (job === "title") {
+                // A fresh id per scheduled title job: its retries carry the same id (and so the same billing key), a later message's job does not.
+                // A send with a client id is keyed by its prompt, so a resend that schedules the title again shares the first one's charge.
+                const jobId = body.clientMessageId === undefined ? crypto.randomUUID() : promptId;
+
+                // The prompt's id: the job refuses to title from a prompt deleted before it runs.
+                titleJobs.push({
+                    job,
+                    schedule: async () =>
+                        await httpScheduler(context).runAfter(0, internal.chat.functions.createTitleChat, {
+                            jobId,
+                            prompt,
+                            promptId,
+                            threadId: titleThreadId,
+                        }),
+                });
+            } else {
+                // Keyed by the prompt too: one delivery per prompt calls the model, however often the job was scheduled.
+                titleJobs.push({
+                    job,
+                    schedule: async () =>
+                        await httpScheduler(context).runAfter(0, internal.chat.functions.createCategoryChat, { prompt, promptId, threadId: titleThreadId }),
+                });
+            }
+        }
+    };
+
+    // Titles and categories last: they are LLM calls on the one-at-a-time
+    // scheduler, and the reply must not queue behind them. Scheduled together —
+    // neither waits on the other, and the response waits on both.
+    // The turn is already saved, charged and queued: a title job that cannot be scheduled must not fail the
+    // request, or a retry (and an idempotency key) would run the turn a second time.
+    // The jobs that were scheduled.
+    const runTitleJobs = async (): Promise<StartTitleJob[]> => {
+        const titled = await Promise.allSettled(titleJobs.map(async ({ schedule }) => await schedule()));
+        const scheduled: StartTitleJob[] = [];
+
+        for (const [index, outcome] of titled.entries()) {
+            if (outcome.status === "rejected") {
+                chatLogger.warn("Failed to schedule a title job after the turn was queued:", outcome.reason);
+            } else if (titleJobs[index]) {
+                scheduled.push(titleJobs[index].job);
+            }
+        }
+
+        return scheduled;
+    };
+
+    // A claimed send's title jobs that were scheduled, each on its own: a resend schedules only the others (`claimChatStart`).
+    // Never throws: a job a resend schedules again is charged once anyway, as both are keyed by the prompt.
+    const recordTitlesScheduled = async (claim: StartClaim, promptId: string, jobs: StartTitleJob[]): Promise<void> => {
+        if (jobs.length === 0) {
+            return;
+        }
+
+        await context.runMutation(internal.chat.start_claim.recordStartTitlesScheduled, { claim, jobs, messageId: promptId }).catch((error: unknown) => {
+            chatLogger.warn("Could not record a send's title jobs as scheduled:", error);
+        });
+    };
+
+    /**
+     * The message is saved, whatever its content: a sub-agent waiting on this thread ends its wait, and a result held for
+     * the owner's own request here is released (`afterOwnerMessage`, idempotent). Its own transaction, after the save and
+     * its claim: a failure is logged and never fails this send, whose prompt is saved and charged. A new thread can be
+     * neither a sub-agent's child nor hold a request, so it costs nothing. Once per send, whichever path reaches it.
+     */
+    let afterSaveDone = false;
+    const afterSave = async (savedThreadId: string): Promise<void> => {
+        if (validThreadId === undefined || afterSaveDone) {
+            return;
+        }
+
+        afterSaveDone = true;
+
+        // A failed call is logged and tried once more shortly (it is idempotent); a failed retry schedule is logged too.
+        await context.runMutation(internal.sub_agents.functions.afterOwnerMessage, { threadId: savedThreadId }).catch(async (error: unknown) => {
+            chatLogger.warn("[chat] Could not end a sub-agent's wait or release its held results; retrying shortly", error);
+            await httpScheduler(context)
+                .runAfter(AFTER_SAVE_RETRY_MS, internal.sub_agents.functions.afterOwnerMessage, { threadId: savedThreadId })
+                .catch((error_: unknown) => {
+                    chatLogger.error("[chat] Could not end a sub-agent's wait or release its held results, nor schedule a retry", error_);
+                });
+        });
+    };
+
+    if (startOutcome?.outcome === "duplicate") {
+        // The stream token attaches to the first send's run as a reconnect does; a run that ended reads from the thread.
+        const { messageId, streamId: duplicateStreamId, threadId } = startOutcome;
+
+        // The first send recorded its stream but its run never started (its queue submission failed, or is still in flight):
+        // submitted again, so the reply is not lost.
+        try {
+            if (duplicateStreamId !== undefined && startOutcome.streamUnclaimed === true) {
+                await enqueueRun({ messageId, streamId: duplicateStreamId, threadId });
+            }
+        } finally {
+            // The first try may have died before its own call: a resend makes it, whether or not its run's submission
+            // succeeds (it is idempotent and catches its own errors).
+            await afterSave(threadId);
+
+            // Title jobs no try recorded scheduled: they follow the run, so a failed submission skipped them, or one was refused.
+            // Each is recorded once scheduled; one this resend fails to schedule, or dies before, is left to the next.
+            // A guest note's text never reaches the title model.
+            const pending = startOutcome.titleJobs;
+
+            if (pending !== undefined && !isGuestSend) {
+                scheduleTitleJobs(threadId, messageId, pending.jobs);
+                await recordTitlesScheduled(pending.claim, messageId, await runTitleJobs());
+            }
+        }
+
+        return Response.json(
+            {
+                contentType,
+                duplicate: true,
+                messageId,
+                streamId: duplicateStreamId ?? null,
+                streaming: duplicateStreamId !== undefined,
+                ...(duplicateStreamId !== undefined && { streamToken: await createStreamToken(duplicateStreamId, userId, threadId, signingSecret) }),
+                ...(contentType !== "text" && { streamingConfig }),
+                threadId,
+            },
+            { status: 200 },
+        );
+    }
+
+    const startClaim = startOutcome?.claim;
+    // A text turn whose first send saved its prompt and died before its stream: this request makes the stream and run only.
+    const resumed = startOutcome?.outcome === "resume" ? startOutcome : undefined;
+
+    // Never throws, like the guest send's release: kept when the save recorded its ids.
+    const releaseStartClaim = async (): Promise<void> => {
+        if (startClaim === undefined) {
+            return;
+        }
+
+        try {
+            await context.runMutation(internal.chat.start_claim.releaseChatStart, { claim: startClaim });
+        } catch (releaseError) {
+            chatLogger.error("Could not release a chat send's claim:", releaseError);
+        }
+    };
+
+    // The note was sent, or is being sent, by another send than this id's, or its link ended before this id saved it:
+    // refused as without an id. Nothing was saved, so the `messageContent` built without the note's text is never used.
+    if (deferredGuestRefusal && !resumed) {
+        await releaseStartClaim();
+
+        return guestNoteRefused(deferredGuestRefusal);
+    }
+
+    // A held note's send is taken before the charge, so one concurrent send wins and only it is charged (`settleSend` after).
+    const guestClaim =
+        guestNote && !resumed
+            ? await context
+                  .runMutation(internal.chat.guest_links.claimGuestNoteSend, {
+                      messageId: body.guestMessageId as Id<"threadGuestMessages">,
+                      userId,
+                  })
+                  .catch(async (error: unknown) => {
+                      await releaseStartClaim();
+
+                      throw error;
+                  })
+            : undefined;
+
+    if (guestClaim && "refused" in guestClaim) {
+        await releaseStartClaim();
+
+        return guestNoteRefused(guestClaim.refused);
+    }
+
+    const guestSend = guestClaim?.fence;
+
+    // Never throws: a failed release must not hide why the send failed. The lease settles the send later.
+    const releaseGuestSend = async (): Promise<void> => {
+        await releaseStartClaim();
+
+        if (guestSend === undefined) {
+            return;
+        }
+
+        try {
+            await context.runMutation(internal.chat.guest_links.releaseGuestNoteSend, {
+                claimedAt: guestSend,
+                messageId: body.guestMessageId as Id<"threadGuestMessages">,
+            });
+        } catch (releaseError) {
+            chatLogger.error("[GuestLink] Could not release a guest send:", releaseError);
+        }
+    };
+
+    // A resumed send was charged by its first try.
+    if (contentType === "text" && !resumed) {
+        // A keyed send is charged once per send: a retry after a failed save, which gave its claim back, is not charged again.
+        const chargeKey =
+            body.clientMessageId === undefined || startFingerprint === undefined ? undefined : startChargeKey(userId, body.clientMessageId, startFingerprint);
+        const dailyLimit = await chargeDailyLimit(context, user, "Text", 1, { ...(chargeKey !== undefined && { chargeKey }) }).catch(async (error: unknown) => {
+            await releaseGuestSend();
+
+            throw error;
+        });
 
         if (!dailyLimit.ok) {
+            await releaseGuestSend();
+
             return Response.json(
                 {
                     error: "DAILY_MESSAGE_LIMIT_REACHED",
@@ -802,38 +1225,27 @@ const runChatStartOnShard = async (
     // Create or continue thread
     let threadId: string;
     let messageId: string;
-    // Title/category jobs, scheduled only once the agent run is enqueued. Text
-    // prompts only: they are LLM calls, and only text was charged above
-    // (`chat/lib/start-title-jobs.ts`).
-    const titleJobs: (() => Promise<unknown>)[] = [];
-    const scheduleTitleJobs = (titleThreadId: string, isNewThread: boolean): void => {
-        // Capped where it is sent: the title is generated from the first characters of the prompt only.
-        const prompt = capTitlePrompt(body.prompt ?? " ");
 
-        for (const job of startTitleJobs(contentType, isNewThread)) {
-            if (job === "title") {
-                // A fresh id per scheduled title job: its retries carry the same id (and so the same billing key), a later message's job does not.
-                const jobId = crypto.randomUUID();
+    if (resumed) {
+        threadId = resumed.threadId;
+        messageId = resumed.messageId;
 
-                // The prompt's id: the job refuses to title from a prompt deleted before it runs.
-                titleJobs.push(
-                    async () =>
-                        await httpScheduler(context).runAfter(0, internal.chat.functions.createTitleChat, {
-                            jobId,
-                            prompt,
-                            promptId: messageId,
-                            threadId: titleThreadId,
-                        }),
-                );
-            } else {
-                titleJobs.push(
-                    async () => await httpScheduler(context).runAfter(0, internal.chat.functions.createCategoryChat, { prompt, threadId: titleThreadId }),
-                );
+        if (isGuestSend) {
+            // The dead send saved the note but may not have marked it sent; a failure is logged and settled later (`settleSend`).
+            try {
+                await context.runMutation(internal.chat.guest_links.recordResumedGuestNoteSent, {
+                    messageId: body.guestMessageId as Id<"threadGuestMessages">,
+                    savedMessageId: messageId,
+                    userId,
+                });
+            } catch (error) {
+                chatLogger.error("[GuestLink] Could not record a resumed send's note:", error);
             }
+        } else {
+            // The dead send's title jobs were to be scheduled after its run, which it never queued.
+            scheduleTitleJobs(threadId, messageId, startTitleJobs(contentType, resumed.newThread === true));
         }
-    };
-
-    if (validThreadId && body.regenerate && body.parentId) {
+    } else if (validThreadId && body.regenerate && body.parentId) {
         // Regenerate: a SIBLING reply to the same prompt row (see
         // `agent/branch-tree.ts`). This used to save a copy of the prompt, which
         // appended a duplicate turn at the end and left the old reply behind it.
@@ -877,134 +1289,170 @@ const runChatStartOnShard = async (
         // Existing thread: use agent to continue and save message
         // An HTTP action has no `ctx.services`: this agent only SAVES the user's
         // message. The reply is generated by `runStreamingAgent` on the jobs queue.
-        const agent = await getAgent(effectiveModel, { gateway: NO_SERVICE_FETCH, userId });
-
-        // `agent.continueThread(context, { threadId: validThreadId })` used to run
-        // here. It builds a Thread object with a dozen bound methods — and the only
-        // thing read off it was `thread.threadId`, which is the id that was just
-        // passed in. Removing it also removes the ctx problem: `continueThread`
-        // requires a full `ActionCtx` because the Thread it returns can generate
-        // text, and an HTTP handler's ctx has no `storage`.
-
         // Save message. `metadata.fileIds` is the attachment channel `saveMessages` reads
         // (see `SaveMessagesArgs.metadata` -> `base?.fileIds`), so it is typed, not `any`.
         const attachmentFileIds = body.fileIds && body.fileIds.length > 0 ? body.fileIds : undefined;
-        const result = await agent.saveMessage(context, {
-            fromUser: true,
-            message: { content: messageContent, role: "user" },
-            ...(attachmentFileIds && { metadata: { fileIds: attachmentFileIds } }),
-            promptMessageId: body.parentId,
-            threadId: validThreadId,
+        // A send with a client id saves in the mutation that checks its claim and records the ids on it.
+        const savePrompt = async (): Promise<{ messageId: string }> => {
+            if (startClaim !== undefined) {
+                return await context.runMutation(internal.chat.start_claim.saveStartPrompt, {
+                    claim: startClaim,
+                    ...(attachmentFileIds && { fileIds: attachmentFileIds }),
+                    messageContent,
+                    model: effectiveModel,
+                    ...(body.parentId !== undefined && { parentId: body.parentId }),
+                    threadId: validThreadId,
+                });
+            }
+
+            // An HTTP action has no `ctx.services`: this agent only SAVES the user's
+            // message. The reply is generated by `runStreamingAgent` on the jobs queue.
+            const agent = await getAgent(effectiveModel, { gateway: NO_SERVICE_FETCH, userId });
+
+            return await agent.saveMessage(context, {
+                fromUser: true,
+                message: { content: messageContent, role: "user" },
+                ...(attachmentFileIds && { metadata: { fileIds: attachmentFileIds } }),
+                promptMessageId: body.parentId,
+                threadId: validThreadId,
+            });
+        };
+        const result = await savePrompt().catch(async (error: unknown) => {
+            // Released, or marked sent if the save committed after all.
+            await releaseGuestSend();
+
+            throw error;
         });
 
         threadId = validThreadId;
         messageId = result.messageId;
 
+        // One write records the saved message and marks the note sent; a failed one is logged and settled later (`settleSend`).
+        if (guestSend !== undefined) {
+            try {
+                const recorded = await context.runMutation(internal.chat.guest_links.recordGuestNoteSent, {
+                    claimedAt: guestSend,
+                    messageId: body.guestMessageId as Id<"threadGuestMessages">,
+                    savedMessageId: messageId,
+                });
+
+                if (!recorded) {
+                    chatLogger.warn("[GuestLink] A sent note's record found its send taken over", { savedMessageId: messageId });
+                }
+            } catch (error) {
+                chatLogger.error("[GuestLink] Could not record a sent note:", error);
+            }
+        }
+
         // Title generation for existing threads too — scheduled after the agent run below.
-        scheduleTitleJobs(threadId, false);
+        // A guest note's text never reaches the title model.
+        if (!isGuestSend) {
+            scheduleTitleJobs(threadId, messageId, startTitleJobs(contentType, false));
+        }
     } else {
+        // The organization goes in with the insert, so no chat exists without it. Read first: a failed lookup refuses the
+        // request before anything is saved, rather than leaving a chat a later run would cap by a broader space.
+        const threadOrganizationId = await sessionOrganizationPromise;
+
         // New thread: batched creation
-        const result = await context.runMutation(internal.chat.functions.createThreadWithInitialMessage, {
-            // A plain hosted text thread only: a guest, a media thread and a custom endpoint have nothing to route.
-            ...(body.autoModel === true && contentType === "text" && !isAnonymous && MODEL_LOOKUP.has(effectiveModel) && { autoModel: true }),
-            customSystemPrompt: body.customSystemPrompt,
-            enabledFeatures: body.enabledFeatures,
-            fileIds: body.fileIds,
-            language: body.language,
-            messageContent,
-            mode: body.mode,
-            model: effectiveModel,
-            reasoningEffort: body.reasoningEffort,
-            statelessMode: body.statelessMode,
-            // Temporary only when the client asked for it; the composer applies the user's default itself.
-            ...(body.temporary === true && { retentionHours: body.retentionHours, temporary: true }),
-            // A media thread is titled from its prompt, with no model call.
-            ...(contentType !== "text" && { title: mediaThreadTitle(body.prompt) }),
-            userId,
-        });
+        const result = await context
+            .runMutation(internal.chat.functions.createThreadWithInitialMessage, {
+                // A plain hosted text thread only: a guest, a media thread and a custom endpoint have nothing to route.
+                ...(body.autoModel === true && contentType === "text" && !isAnonymous && MODEL_LOOKUP.has(effectiveModel) && { autoModel: true }),
+                customSystemPrompt: body.customSystemPrompt,
+                enabledFeatures: body.enabledFeatures,
+                fileIds: body.fileIds,
+                language: body.language,
+                messageContent,
+                mode: body.mode,
+                model: effectiveModel,
+                ...(threadOrganizationId && { organizationId: threadOrganizationId }),
+                reasoningEffort: body.reasoningEffort,
+                statelessMode: body.statelessMode,
+                // Temporary only when the client asked for it; the composer applies the user's default itself.
+                ...(body.temporary === true && { retentionHours: body.retentionHours, temporary: true }),
+                ...(startClaim !== undefined && { startClaim }),
+                // A media thread is titled from its prompt, with no model call.
+                ...(contentType !== "text" && { title: mediaThreadTitle(body.prompt) }),
+                userId,
+            })
+            .catch(async (error: unknown) => {
+                await releaseStartClaim();
+
+                throw error;
+            });
 
         threadId = result.threadId;
         messageId = result.messageId;
 
         // Title + category generation — scheduled after the agent run below.
-        scheduleTitleJobs(threadId, true);
+        scheduleTitleJobs(threadId, messageId, startTitleJobs(contentType, true));
     }
 
     // Create persistent stream + schedule agent (text content only)
     let streamId: string | null = null;
     let streamToken: string | undefined;
 
-    if (contentType === "text") {
-        const activeOrganizationId = await activeOrganizationPromise;
-        let goalId: Id<"threadGoals"> | undefined;
+    // The prompt is saved from here on: a stream or run that fails still ends a sub-agent's wait (`afterSave`, once).
+    try {
+        if (contentType === "text") {
+            const activeOrganizationId = await activeOrganizationPromise;
+            let goalId: Id<"threadGoals"> | undefined;
 
-        if (body.goal !== undefined && goalConfig?.ok) {
-            const started = await context.runMutation(internal.chat.goals.internal.startGoal, {
-                config: goalConfig.value,
-                ...(typeof body.goal.maxRounds === "number" && { maxRounds: body.goal.maxRounds }),
-                ...(activeOrganizationId && { organizationId: activeOrganizationId }),
-                promptMessageId: messageId,
-                // The trimmed text the length check above passed, so a padded goal cannot fail validation after the charge.
-                text: goalText,
-                threadId: threadId as Id<"threads">,
+            if (body.goal !== undefined && goalConfig?.ok) {
+                const started = await context.runMutation(internal.chat.goals.internal.startGoal, {
+                    // The goal's config was checked with the resolved model; a resumed send runs on its saved one.
+                    config: { ...goalConfig.value, model: effectiveModel },
+                    ...(typeof body.goal.maxRounds === "number" && { maxRounds: body.goal.maxRounds }),
+                    ...(activeOrganizationId && { organizationId: activeOrganizationId }),
+                    promptMessageId: messageId,
+                    ...(startClaim !== undefined && { startClaim }),
+                    // The trimmed text the length check above passed, so a padded goal cannot fail validation after the charge.
+                    text: goalText,
+                    threadId: threadId as Id<"threads">,
+                    userId,
+                });
+
+                if (!started.ok) {
+                    // The prompt is saved though its goal is refused: it moved the thread past what it waited on all the same.
+                    await afterSave(threadId);
+
+                    return Response.json({ error: started.error }, { status: 400 });
+                }
+
+                goalId = started.goalId;
+            }
+
+            streamId = await context.runMutation(internal.chat.streaming.createStreamWithMessage, {
+                ...(goalId && { goalId }),
+                messageId,
+                ...(startClaim !== undefined && { startClaim }),
+                streamingConfig,
+                threadId,
                 userId,
             });
 
-            if (!started.ok) {
-                return Response.json({ error: started.error }, { status: 400 });
-            }
+            streamToken = await createStreamToken(streamId!, userId, threadId, signingSecret);
 
-            goalId = started.goalId;
+            // On the jobs queue, not the scheduler: the SchedulerDO runs jobs one at a
+            // time, so a scheduled run waited behind every other user's run and
+            // behind this request's own title jobs (`lib/job-queue.ts`).
+            await enqueueRun({ messageId, streamId: streamId!, threadId });
+
+            // The thread's `running` status was set with the stream, in
+            // `createStreamWithMessage`.
         }
+    } catch (error) {
+        await afterSave(threadId);
 
-        streamId = await context.runMutation(internal.chat.streaming.createStreamWithMessage, {
-            ...(goalId && { goalId }),
-            messageId,
-            streamingConfig,
-            threadId,
-            userId,
-        });
-
-        streamToken = await createStreamToken(streamId!, userId, threadId, signingSecret);
-
-        // On the jobs queue, not the scheduler: the SchedulerDO runs jobs one at a
-        // time, so a scheduled run waited behind every other user's run and
-        // behind this request's own title jobs (`lib/job-queue.ts`). A queue
-        // redelivery is harmless — the run claims its stream first.
-        await enqueueJob(internal.chat.execute.runStreamingAgent, {
-            isAnonymous,
-            messageId,
-            ...(activeOrganizationId && { organizationId: activeOrganizationId }),
-            ...(origin && { origin }),
-            // The typed text, for skill-command detection. Not on regenerate: that
-            // replies to an existing prompt, which the run reads from the message.
-            ...(!body.regenerate && body.prompt && { userPrompt: body.prompt }),
-            streamId: streamId!,
-            streamingConfig: {
-                ...streamingConfig,
-                mcpServerNames: streamingConfig.mcpServerNames,
-                researchDepth: streamingConfig.researchDepth,
-                shouldAutoContinue: streamingConfig.shouldAutoContinue,
-            },
-            threadId,
-            userId,
-        });
-
-        // The thread's `running` status was set with the stream, in
-        // `createStreamWithMessage`.
+        throw error;
     }
 
-    // Titles and categories last: they are LLM calls on the one-at-a-time
-    // scheduler, and the reply must not queue behind them. Scheduled together —
-    // neither waits on the other, and the response waits on both.
-    // The turn is already saved, charged and queued: a title job that cannot be scheduled must not fail the
-    // request, or a retry (and an idempotency key) would run the turn a second time.
-    const titled = await Promise.allSettled(titleJobs.map(async (scheduleTitleJob) => await scheduleTitleJob()));
+    // A claimed send records each title job it scheduled, so a resend schedules only one it could not.
+    const [, scheduledTitleJobs] = await Promise.all([afterSave(threadId), runTitleJobs()]);
 
-    for (const outcome of titled) {
-        if (outcome.status === "rejected") {
-            chatLogger.warn("Failed to schedule a title job after the turn was queued:", outcome.reason);
-        }
+    if (startClaim !== undefined) {
+        await recordTitlesScheduled(startClaim, messageId, scheduledTitleJobs);
     }
 
     return Response.json(
@@ -1122,6 +1570,18 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
             return hostRunThreadResponse();
         }
 
+        // An edit of a guest's note the owner sent on is still the guest's words: it keeps the mark and the note's id.
+        const guestNoteId = guestNoteIdOfMessage(message.message as Parameters<typeof guestNoteIdOfMessage>[0]);
+
+        // A stateless reply saves its prompt again from the plain text (`streamAsync`), an untagged copy of the guest's words
+        // under the tagged edit: refused there, before anything is saved or charged.
+        if (guestNoteId !== undefined && thread.statelessMode === true) {
+            return Response.json(
+                { error: "A guest's message cannot be edited in a chat without memory." },
+                { headers: { "Content-Type": "application/json" }, status: 400 },
+            );
+        }
+
         // The reply is generated by `streamAsync`, which builds its own agent;
         // this handler only saves the edit.
         // A switched thread's reply runs on what the path above the edited prompt ends on.
@@ -1231,7 +1691,7 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
                         break;
                     }
 
-                    messageContent.push({ text, type: "text" });
+                    messageContent.push(guestNoteId === undefined ? { text, type: "text" } : guestTextPart(text, guestNoteId));
 
                     break;
                 }

@@ -10,7 +10,9 @@ const useHostSendErrorMessages = (): Record<HostSendError, string> => {
 
     return {
         busy: t`Your computer is busy. Try again in a moment.`,
+        left_organization: t`You are no longer a member of this chat's organization, so its agent cannot run.`,
         locked: t`This chat is locked. Unlock it to send.`,
+        not_allowed: t`Your organization does not allow agents on your computer.`,
         not_authenticated: t`Sign in again to send.`,
         not_found: t`This chat could not be found.`,
         offline: t`Your computer is offline. Open Neore on it and try again.`,

@@ -31,7 +31,9 @@ import { type HostAgentRef, type SwitchAgentRef, vSwitchAgentRef } from "../agen
 import { composeHandoff, composeTailHandoff, handoffLimitsFor, HandoffTooLargeError, HANDOFF_REFUSED_TOO_LARGE, jsonBytes } from "../agent/handoff";
 import { collectHandoffSource, findDividerEntering, findDividerLeaving } from "../agent/handoff-source";
 import { getMaxMessage } from "../agent/messages";
-import { insertAgentSwitchRow, insertThread, insertThreadRelationship, patchAgentSwitchRow, patchThread } from "../agent/table-writes";
+import { insertAgentSwitchRow, insertContextResetRow, insertThread, insertThreadRelationship, patchAgentSwitchRow, patchThread } from "../agent/table-writes";
+import { resetForTip } from "../agent/context-reset";
+import { CONTEXT_CLEAR_CONFLICT, CONTEXT_CLEAR_ORGANIZATION } from "../agent/context-reset-shape";
 import { inheritPasscodeHandler } from "../agent/thread-lock";
 import { requireThreadPermission } from "../agent/thread-read-access";
 import { HOST_HANDOFF_TAINT, threadPathTaint } from "../agent/thread-summary-taint";
@@ -53,15 +55,17 @@ import {
 } from "../chat/agent-switch";
 import { getModelContextWindow } from "../chat/lib/auto-continue";
 import { assertPaidModel, requireEnabledModel } from "../chat/lib/enabled-model";
+import { modeInheritedFrom } from "../chat/tool-permissions";
 import { loadEligibleThread } from "../devices/internal";
 import { isDeviceInScope, resolveThreadProject } from "../devices/lib/scope";
 import { isDeviceOnline } from "../devices/lib/state";
 import { type DeviceTaintSource, mergeTaint } from "../devices/lib/taint";
-import { claimedAtOf, claimOnce } from "../lib/claim-once";
+import { claimedAtOf, claimOnce, hasClaim } from "../lib/claim-once";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { isHostRunThread } from "./lib/host-thread";
+import { hostOrganizationOf, hostOrganizationRefusal, hostOrganizationRefusalCode } from "./lib/organization-cap";
 import { HOST_HANDOFF_MAX_BYTES, pendingHandoffOf } from "./lib/pending-handoff";
 import { savedSessionFor } from "./lib/reattach";
 import { sessionOfThread } from "./lib/sessions";
@@ -265,6 +269,14 @@ const nativePlanFor = async (
         return undefined;
     }
 
+    // A session from before a context reset (`/clear`) holds the turns that were cleared: loading it would bring them back,
+    // so the switch hands over what follows the reset instead.
+    const reset = await resetForTip(ctx, thread, leaf);
+
+    if (reset && saved._creationTime < reset._creationTime) {
+        return undefined;
+    }
+
     // The agent's session just ended, with nobody else having run since: it has seen everything.
     if (sameAgent(current.agent, to)) {
         return (await receivedItsHandoff(ctx, { agent: to, lastSeen: leaf, sessions: earlier, threadId: thread._id }))
@@ -410,6 +422,8 @@ const answerRepeatedClick = async (
 };
 
 export interface HostSwitchArgs extends SwitchArgs {
+    /** The caller's verified active organization, unset in the personal space. */
+    organizationId?: string;
     unlockProof?: string;
 }
 
@@ -480,6 +494,13 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
         });
     }
 
+    // A switch to a coding agent starts one on a computer: the organization that caps the chat must allow that.
+    const refused = toHost ? await hostOrganizationRefusal(ctx, hostOrganizationOf(thread, args.organizationId), args.userId) : null;
+
+    if (refused) {
+        throw new LunoraError("FORBIDDEN", refused);
+    }
+
     const target = await resolveTarget(ctx, args, thread, now);
     const to: SwitchAgentRef = target.kind === "host" ? hostRefOf(target.device._id as string, target.offer) : { kind: "model", model: target.model };
 
@@ -517,7 +538,19 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
     const native = await nativePlanFor(ctx, { current, leaf, target, thread, to });
     const handoff = await handoffFor(ctx, thread, leaf, target, { lenient: native !== undefined });
     const taintedBy = target.kind === "host" ? await takeoverTaint(ctx, { current, fromHost, leaf, thread }) : [];
-    const result = await write(ctx, { clientId: args.clientId, current, handoff, leaf, native, now, taintedBy, target, thread, to, userId: args.userId });
+    const result = await write(ctx, {
+        clientId: args.clientId,
+        current,
+        handoff,
+        leaf,
+        native,
+        now,
+        taintedBy,
+        target,
+        thread,
+        to,
+        userId: args.userId,
+    });
 
     if (!(await claimOnce(ctx, "switch", claimKey, AGENT_SWITCH_CLAIM_TTL_MS, args.userId))) {
         // Another click took it between the check and here: this transaction's writes go with the throw.
@@ -647,6 +680,9 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
         return { agent: to, coldStartCostly: false, messageId, switched: true };
     }
 
+    // The mode a cloud thread taking over from this one inherits (`modeInheritedFrom`): this thread's own, or for a computer's thread the
+    // cloud thread it was switched from, so a round trip keeps the owner's mode. Read only when a cloud thread is made.
+    const inheritedMode = target.kind === "host" ? null : await modeInheritedFrom(ctx, thread, userId);
     // Across the runner: a new thread that takes over, linked to this one, which stays exactly as it was.
     const forkId =
         target.kind === "host"
@@ -656,6 +692,9 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
                   model: target.offer.agentKey,
                   ...(thread.projectId && { projectId: thread.projectId }),
                   ...(thread.organizationId && { organizationId: thread.organizationId }),
+                  // An unfiled chat keeps the organization that caps it (`capOrganizationId`); a personal one stays capped by the
+                  // space it is used from, so the caller's space is not stamped on it.
+                  ...(!thread.organizationId && thread.capOrganizationId && { capOrganizationId: thread.capOrganizationId }),
                   ...(thread.teamId && { teamId: thread.teamId }),
                   runner: "host",
                   status: "active",
@@ -667,6 +706,8 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
             : await insertThread(ctx.db, {
                   activeAgent: { kind: "model", model: target.model },
                   createdBy: userId,
+                  // A handoff to a cloud agent keeps the mode it inherits (a computer's thread has none, so the cloud chat it came from).
+                  ...(inheritedMode && { permissionMode: inheritedMode }),
                   // A thread that took over from a coding agent is marked even when the agent said nothing in words: what it read
                   // and ran is in none of this thread's rows (`threadHandoffTaint`).
                   ...((handoff || current.agent.kind === "host") && { hasHandoff: true }),
@@ -674,6 +715,8 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
                   model: target.model,
                   ...(thread.projectId && { projectId: thread.projectId }),
                   ...(thread.organizationId && { organizationId: thread.organizationId }),
+                  // An unfiled chat keeps the organization that caps it, so a later switch back to a computer is checked against it.
+                  ...(!thread.organizationId && thread.capOrganizationId && { capOrganizationId: thread.capOrganizationId }),
                   ...(thread.teamId && { teamId: thread.teamId }),
                   status: "active",
                   tags: ["chat"],
@@ -706,6 +749,147 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
     return { agent: to, coldStartCostly: false, forkedThreadId: forkId as string, messageId: null, switched: true };
 };
 
+/**
+ * `/clear` on a coding agent's thread: the agent gets a new session in the same thread, on the same computer, folder and
+ * agent, and the session it ran in ends. Nothing is handed over: `acp/lib/pending-handoff.ts` stops at the reset row.
+ * Not a switch, so it does not go through `commitHostSwitchHandler`, which refuses the same agent on purpose.
+ */
+export const clearHostSessionHandler = async (
+    ctx: MutationCtx,
+    args: { clientId: string; organizationId?: string; threadId: Id<"threads">; unlockProof?: string; userId: string },
+): Promise<{ messageId: string }> => {
+    const now = Date.now();
+    const { thread } = await requireThreadPermission(ctx, args.threadId, args.userId, "write", args.unlockProof);
+
+    if (thread.userId !== args.userId) {
+        throw new LunoraError("FORBIDDEN", "Only the owner of a chat can clear its context");
+    }
+
+    if (!isHostRunThread(thread)) {
+        throw new LunoraError("BAD_REQUEST", "This chat does not run on a coding agent");
+    }
+
+    if (await isWorkerThread(ctx, thread._id)) {
+        throw new LunoraError("BAD_REQUEST", "A worker's chat takes its messages from its lead");
+    }
+
+    // The new session runs on a computer as the user: the chat must pass the rule a switch to a computer is held to.
+    if (!(await loadEligibleThread(ctx, thread._id, args.userId))) {
+        throw new LunoraError("BAD_REQUEST", "A shared, public or group chat cannot be handed to a computer");
+    }
+
+    const leaf = await leafRowOf(ctx, thread);
+    const current = leaf ? await currentAgent(ctx, thread, leaf) : null;
+
+    if (!leaf || !current || current.agent.kind !== "host") {
+        throw new LunoraError("BAD_REQUEST", "There is no coding agent session to clear");
+    }
+
+    if (await liveHostStream(ctx, thread._id)) {
+        throw new LunoraError("CONFLICT", "Wait for the reply to finish, or stop it, before clearing the context", {
+            data: { code: CONTEXT_CLEAR_CONFLICT.replyRunning },
+        });
+    }
+
+    // A session still opening, or a turn the computer has not reported back, is not a place to leave from.
+    if (current.session?.status === "starting" || current.session?.status === "busy") {
+        throw new LunoraError("CONFLICT", "Wait for the agent to be ready before clearing the context", {
+            data: { code: CONTEXT_CLEAR_CONFLICT.agentStarting },
+        });
+    }
+
+    // A click already answered stays answered, whatever the cap has become since.
+    if (await hasClaim(ctx, "switch", claimKeyOf(args))) {
+        throw new LunoraError("CONFLICT", "This clear was already made", { data: { code: CONTEXT_CLEAR_CONFLICT.alreadyMade } });
+    }
+
+    // A clear opens a new session on the computer, so it is held to the organization's cap as a start is.
+    const refused = await hostOrganizationRefusalCode(ctx, hostOrganizationOf(thread, args.organizationId), args.userId);
+
+    if (refused) {
+        throw new LunoraError("FORBIDDEN", "Your organization does not allow a new agent session for this chat", {
+            data: { code: CONTEXT_CLEAR_ORGANIZATION[refused] },
+        });
+    }
+
+    if (!(await claimOnce(ctx, "switch", claimKeyOf(args), AGENT_SWITCH_CLAIM_TTL_MS, args.userId))) {
+        throw new LunoraError("CONFLICT", "This clear was already made", { data: { code: CONTEXT_CLEAR_CONFLICT.alreadyMade } });
+    }
+
+    const limited = await checkRateLimit(ctx, "hosts/start:free", { key: args.userId });
+
+    if (!limited.ok) {
+        throw new LunoraError("TOO_MANY_REQUESTS", "Too many coding agents were started in a short while. Try again in a minute.");
+    }
+
+    // The same agent, folder and computer as the session being cleared.
+    const target = await resolveTarget(
+        ctx,
+        {
+            clientId: args.clientId,
+            target: { agentKey: current.agent.agentKey, folderId: current.agent.folderId, hostId: current.agent.hostId as Id<"devices">, kind: "host" },
+            threadId: args.threadId,
+            unlockProof: args.unlockProof,
+            userId: args.userId,
+        },
+        thread,
+        now,
+    );
+
+    if (target.kind !== "host") {
+        throw new LunoraError("BAD_REQUEST", "This chat does not run on a coding agent");
+    }
+
+    const taintedBy = await takeoverTaint(ctx, { current, fromHost: true, leaf, thread });
+
+    // The reset row goes in BEFORE the new session: a session created after it is the clear's own, which a later switch
+    // back may reload (`nativePlanFor` reloads only sessions newer than the newest reset).
+    const last = await getMaxMessage(ctx, thread._id);
+    const messageId = await insertContextResetRow(ctx.db, {
+        order: (last?.order ?? -1) + 1,
+        ...(thread.activeLeafMessageId && { parentMessageId: leaf._id }),
+        threadId: thread._id,
+        userId: args.userId,
+    });
+
+    await patchThread(ctx.db, thread._id, {
+        contextResetMessageId: messageId,
+        hasContextReset: true,
+        ...(thread.activeLeafMessageId && { activeLeafMessageId: messageId }),
+        updatedAt: now,
+    });
+
+    await startOn(ctx, {
+        clientId: args.clientId,
+        device: target.device,
+        now,
+        offer: target.offer,
+        sourceThreadId: thread._id,
+        taintedBy,
+        threadId: thread._id,
+        userId: args.userId,
+    });
+
+    if (current.session && current.session.status !== "ended") {
+        await ctx.db.patch("acpSessions", current.session._id, { status: "ended", updatedAt: now });
+    }
+
+    ctx.log.event("acp.clear_context", { threadId: thread._id });
+
+    return { messageId };
+};
+
+export const clearHostSession = internalMutation
+    .input({
+        clientId: v.string().max(MAX_LENGTH.id),
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
+        threadId: v.id("threads"),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.object({ messageId: v.string() }))
+    .mutation(async ({ args, ctx }) => await clearHostSessionHandler(ctx, args));
+
 /** Whether a switch of this thread is the host switch's: the thread runs on a computer. A fact about the thread, not a permission. */
 export const isHostSwitchSource = internalQuery
     .input({ threadId: v.id("threads") })
@@ -715,6 +899,7 @@ export const isHostSwitchSource = internalQuery
 export const commitHostSwitch = internalMutation
     .input({
         clientId: v.string().max(MAX_LENGTH.id),
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         target: vSwitchTarget,
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),

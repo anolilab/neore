@@ -17,6 +17,7 @@ import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { isThreadLocked } from "../lib/thread-lock";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import {
     CLAIM_PREFIX_BATCH,
@@ -35,13 +36,16 @@ import type { PayloadFilter } from "./filters";
 import { assertValidFilters, evaluateFilters, MAX_FILTER_VALUE_LENGTH, MAX_FILTERS, MAX_PATH_LENGTH, MAX_WEBHOOK_BODY_BYTES } from "./filters";
 import type { WebhookPreset } from "./presets";
 import { compileWebhookPreset } from "./presets";
+import { webhookTemplateProblem } from "./webhook-template";
 import { canBeQuiet } from "./quiet";
 import { resolveTimeZone } from "../memory/reflection-logic";
 import { findNextCronTime, isHourlyOrSlowerCronExpression } from "./schedule";
 import { deleteShardRoute, setShardRoute } from "../lib/shard-routes";
-import { noteShardDue } from "../lib/shard-housekeeping";
+import { noteShardActivity, noteShardDue } from "../lib/shard-housekeeping";
 import { notifyQuietly } from "../notifications/notify";
 import { MAX_LENGTH } from "../lib/validators";
+import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
+import { LEFT_ORGANIZATION_MESSAGE } from "../auth/lib/organization-policy";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
 import { advanceStreak, modelUnavailableMessage, pausedNoticeBody, runOutcome } from "./failure-streak";
@@ -382,6 +386,18 @@ const cleanPromptField = <T extends string | undefined>(value: T, label: string)
     return text as T;
 };
 
+/**
+ * A webhook's Input Template is its prompt. A template that could render past the prompt limit with long values would
+ * refuse those deliveries, so it is refused when it is saved (`longestWebhookPrompt` in `webhook-template.ts`).
+ */
+const assertWebhookTemplateFits = (type: string, template: string | undefined): void => {
+    const problem = type === "webhook" && template !== undefined ? webhookTemplateProblem(template) : undefined;
+
+    if (problem !== undefined) {
+        throw new LunoraError("BAD_REQUEST", problem);
+    }
+};
+
 export const createTrigger = authMutation
     .use(rateLimit("triggers/create"))
     .input({
@@ -465,6 +481,11 @@ export const createTrigger = authMutation
         const { filters, webhookSignatureScheme } = webhookSetup(args, triggerType);
         const eventSource = await checkedEventSource(context, args.eventSource, triggerType, userId, now);
 
+        // Checked as stored: removing hidden characters can join a placeholder (`{{pay\u{200B}load}}`) that was not one before.
+        const inputTemplate = cleanPromptField(args.inputTemplate, "The input");
+
+        assertWebhookTemplateFits(triggerType, inputTemplate);
+
         const inserted = await context.db.insert("triggers", {
             botComputer: args.botComputer === true ? true : undefined,
             botId: args.botId as Id<"bots"> | undefined,
@@ -474,9 +495,12 @@ export const createTrigger = authMutation
             enabled: false, // Start disabled — user must explicitly enable
             eventSource,
             filters,
-            inputTemplate: cleanPromptField(args.inputTemplate, "The input"),
+            inputTemplate,
             model: args.model,
             name: args.name,
+            // The creator's verified active organization caps the runs' tools. Triggers created before this column was written have
+            // none and run in the personal space.
+            organizationId: context.user.activeOrganization?.id,
             quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
             searchMode: args.searchMode,
             systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),
@@ -648,7 +672,15 @@ export const updateTrigger = authMutation
             patch.timezone = requestedZone;
         }
 
-        if (args.inputTemplate !== undefined) patch.inputTemplate = cleanPromptField(args.inputTemplate, "The input");
+        if (args.inputTemplate !== undefined) {
+            patch.inputTemplate = cleanPromptField(args.inputTemplate, "The input");
+
+            // The settings form sends the stored template back with every edit: one saved before the fit check is
+            // judged only once it is changed, so the trigger can still be renamed or otherwise edited.
+            if (patch.inputTemplate !== trigger.inputTemplate) {
+                assertWebhookTemplateFits(trigger.type, patch.inputTemplate);
+            }
+        }
 
         // Clearing the bot clears its computer and quiet flags too: a routine without a bot has neither.
         const botCleared = args.botId === null;
@@ -682,6 +714,8 @@ export const updateTrigger = authMutation
             ...withoutUndefined(patch),
             // `null` removes the description.
             ...(args.description === null && { description: undefined }),
+            // An empty template removes the stored one; `undefined` leaves it as it is.
+            ...(args.inputTemplate !== undefined && args.inputTemplate.trim() === "" && { inputTemplate: undefined }),
             // `undefined` removes a stale time; enabling recomputes it (`firstRunOf`).
             // Also clears a time a non-schedule trigger stored before this check existed.
             // An event trigger's next check is its own and is never touched here.
@@ -861,6 +895,7 @@ const vGetTriggerExecutionsOutput = v.array(
         _id: v.string(),
         completedAt: v.union(v.number(), v.null()),
         error: v.union(v.string(), v.null()),
+        prompt: v.union(v.string(), v.null()),
         startedAt: v.number(),
         status: v.string(),
         threadId: v.union(v.string(), v.null()),
@@ -904,11 +939,25 @@ export const getTriggerExecutions = authQuery
             return keep;
         });
 
-        return visible.slice(0, args.limit ?? 20).map((entry) => {
+        const shown = visible.slice(0, args.limit ?? 20);
+        // A run's prompt is its thread's first message, so it is hidden while that thread is locked, read at the moment of use.
+        const promptThreads = [...new Set(shown.flatMap((entry) => (entry.prompt && entry.threadId ? [entry.threadId] : [])))];
+        const threads = await Promise.all(promptThreads.map(async (threadId) => await context.db.get("threads", threadId as Id<"threads">)));
+        const lockedThreads = new Set(
+            promptThreads.filter((_, index) => {
+                const thread = threads[index];
+
+                // A thread that is gone may have been a locked one deleted without its passcode: its prompt stays hidden.
+                return thread === null || thread === undefined || isThreadLocked(thread);
+            }),
+        );
+
+        return shown.map((entry) => {
             return {
                 _id: entry._id as string,
                 completedAt: entry.completedAt ?? null,
                 error: entry.error ?? null,
+                prompt: entry.threadId && lockedThreads.has(entry.threadId) ? null : (entry.prompt ?? null),
                 startedAt: entry.startedAt,
                 status: entry.status as string,
                 threadId: entry.threadId ?? null,
@@ -936,11 +985,8 @@ export const testRunTrigger = authAction
         }
 
         const wasEnabled = trigger.enabled === true;
-        // A schedule's or a watcher's input is its template, so only a payload the user typed overrides it (`executeTrigger`).
-        const payload =
-            trigger.type === "schedule" || trigger.type === "event"
-                ? args.testPayload
-                : args.testPayload || trigger.inputTemplate || "Manual test run triggered.";
+        // Every trigger type takes only a payload the user typed: without one, `executeTrigger` builds the input from the template.
+        const payload = args.testPayload;
 
         // The run reads the trigger only when it starts, after this action has returned, so it is told to run a disabled one.
         // `manual`: a quiet routine posts a run the user asked for, whatever the workspace holds.
@@ -1250,6 +1296,12 @@ export const admitTriggerRun = internalMutation
             return await refused(problem ?? "Your account no longer exists.");
         }
 
+        // An owner who left the trigger's organization cannot run it (`runHeadlessAgent` refuses too): refused before the
+        // charge, as tasks, evals and sub-agents are, and the caller pauses the trigger at once (`isLeftOrganizationRefusal`).
+        if (trigger.organizationId && !(await getMemberByOrganizationAndUser(ctx, trigger.organizationId, trigger.userId, "primary"))) {
+            return await refused(LEFT_ORGANIZATION_MESSAGE);
+        }
+
         const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
         // The model the run uses (`execute.ts`): a bot's current model first, so the check and the run agree.
         const bot = trigger.botId ? await ctx.db.get("bots", trigger.botId) : null;
@@ -1298,6 +1350,25 @@ export const createExecution = internalMutation
         });
 
         return insertedId as Id<"triggerExecutions">;
+    });
+
+/**
+ * A webhook delivery the route refused: the Input Template could not be rendered for it (422), or it was too large to
+ * schedule (413). It is no run, so only the trigger's `lastError` says it, where the owner sees it on the trigger, with
+ * what to change. A run that has already recorded a later `lastTriggeredAt` is newer news: the refusal is not written
+ * over it. A run still going when the refusal lands writes its own outcome when it ends.
+ */
+export const recordRefusedDelivery = internalMutation
+    .input({ reason: v.string().max(MAX_LENGTH.short), refusedAt: v.number(), triggerId: v.id("triggers") })
+    .output(v.null())
+    .mutation(async ({ args: { reason, refusedAt, triggerId }, ctx }) => {
+        const trigger = await ctx.db.get("triggers", triggerId);
+
+        if (trigger && (trigger.lastTriggeredAt ?? -Infinity) <= refusedAt) {
+            await patchRow(ctx.db, "triggers", trigger, { lastError: reason, updatedAt: ctx.now });
+        }
+
+        return null;
     });
 
 /**
@@ -1360,21 +1431,64 @@ const settleFailureStreak = async (ctx: MutationCtx, trigger: Doc<"triggers">, s
 };
 
 /**
+ * How long a run keeps its saved prompt after it settles. The run row, its status and its thread stay; only the prompt
+ * text goes. Shorter than the housekeeping horizon (`HOUSEKEEPING_HORIZON_MS`, 30 days) by more than one idle sweep
+ * interval, so a shard that goes quiet after its last run is still swept once after that run's prompt has expired.
+ */
+export const RUN_PROMPT_RETENTION_MS = 28 * 24 * 60 * 60 * 1000;
+
+/**
+ * The most runs one housekeeping pass rewrites. A run row can hold a webhook body of up to 1 MiB, and a pass reads and
+ * rewrites each row inside one transaction, so the batch is sized for the largest rows; a larger backlog is worked off
+ * over later passes.
+ */
+const PRUNE_RUN_PROMPTS_BATCH = 16;
+
+/**
+ * Housekeeping sweep (`shardSweeps()`): clears the saved prompt of each run past its expiry. Rows without an expiry are in
+ * the index too, so the range starts above zero, as `reapLapsedClaims` does; otherwise they would fill every batch.
+ */
+export const pruneExpiredRunPrompts = internalMutation
+    .input({})
+    .output(v.null())
+    .mutation(async ({ ctx }) => {
+        const expired = await ctx.db
+            .query("triggerExecutions")
+            .withIndex("by_promptExpiresAt", (q) => q.gt("promptExpiresAt", 0).lt("promptExpiresAt", ctx.now))
+            .take(PRUNE_RUN_PROMPTS_BATCH);
+
+        for (const row of expired) {
+            await patchRow(ctx.db, "triggerExecutions", row, { prompt: undefined, promptExpiresAt: undefined });
+        }
+
+        // A full batch may leave more expired prompts: sweep again at once, so a backlog drains within this pass.
+        if (expired.length === PRUNE_RUN_PROMPTS_BATCH) {
+            await ctx.scheduler.runAfter(0, internal.triggers.functions.pruneExpiredRunPrompts, {});
+        }
+
+        return null;
+    });
+
+/**
  * Closes an execution and tells the owner. A run is counted toward the trigger's failure
  * streak once, on the `running` to settled transition of its own execution row: a
  * redelivered call finds it already settled. `userFixable` marks a failure only the owner
- * can cure; any other failure leaves the streak where it was.
+ * can cure, and `permanent` one no later run can cure, which pauses the trigger at once;
+ * any other failure leaves the streak where it was.
  */
 export const updateExecution = internalMutation
     .input({
         error: v.optional(v.string()),
         executionId: v.id("triggerExecutions"),
+        permanent: v.optional(v.boolean()),
+        // The prompt the run was given, for the run log. Written only by the settle that changes the row.
+        prompt: v.optional(v.string().max(MAX_LENGTH.long)),
         status: v.string(),
         threadId: v.optional(v.string()),
         userFixable: v.optional(v.boolean()),
     })
     .output(v.null())
-    .mutation(async ({ args: { error, executionId, status, threadId, userFixable }, ctx }) => {
+    .mutation(async ({ args: { error, executionId, permanent, prompt, status, threadId, userFixable }, ctx }) => {
         const execution = await ctx.db.get("triggerExecutions", executionId);
 
         if (!execution) {
@@ -1390,8 +1504,15 @@ export const updateExecution = internalMutation
                 status,
                 ...(threadId && { threadId }),
                 ...(error && { error }),
+                ...(prompt !== undefined && { prompt, promptExpiresAt: ctx.now + RUN_PROMPT_RETENTION_MS }),
                 completedAt: ctx.now,
             });
+
+            // A saved prompt is cleared by this shard's housekeeping, which visits only shards active in the last 30 days:
+            // a routine that keeps running for an owner who no longer signs in must keep its shard in that set.
+            if (prompt !== undefined) {
+                await noteShardActivity(ctx);
+            }
         }
 
         if (settled.status !== "completed" && settled.status !== "failed") {
@@ -1404,14 +1525,23 @@ export const updateExecution = internalMutation
             return null;
         }
 
-        // The streak moves on the first settlement only; `pausedTrigger` remembers it so a redelivery can say the same thing.
+        // The streak moves on the first settlement only; `pausedTrigger` and `pausedPermanently` remember it, so a redelivery
+        // (which may not repeat `permanent`) says the same thing.
         let paused = execution.pausedTrigger === true;
+        let pausedPermanently = execution.pausedPermanently === true;
 
         if (settling) {
-            paused = await settleFailureStreak(ctx, trigger, execution.startedAt, runOutcome(settled.status, userFixable));
+            paused = await settleFailureStreak(ctx, trigger, execution.startedAt, runOutcome(settled.status, userFixable, permanent));
+            pausedPermanently = paused && permanent === true;
 
             if (paused) {
-                await ctx.db.patch("triggerExecutions", executionId, { pausedTrigger: true });
+                await ctx.db.patch("triggerExecutions", executionId, { pausedTrigger: true, ...(pausedPermanently && { pausedPermanently: true }) });
+            }
+
+            // A permanent pause names its cause on the trigger in this same write, so the trigger list cannot show the pause
+            // without it, whatever happens to the caller's later bookkeeping.
+            if (pausedPermanently && settled.error) {
+                await ctx.db.patch("triggers", trigger._id, { lastError: settled.error });
             }
         }
 
@@ -1431,7 +1561,7 @@ export const updateExecution = internalMutation
             title: trigger.name,
             type: "trigger",
             userId: trigger.userId,
-            ...(paused ? { body: pausedNoticeBody(settled.error) } : settled.error && { body: settled.error }),
+            ...(paused ? { body: pausedNoticeBody(settled.error, pausedPermanently) } : settled.error && { body: settled.error }),
         });
 
         return null;

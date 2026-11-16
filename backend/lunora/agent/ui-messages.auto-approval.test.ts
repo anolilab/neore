@@ -35,7 +35,8 @@ describe("toUIMessages: auto-approved tool calls", () => {
             } as never,
         ]);
         const part = message?.parts.find((candidate) => candidate.type === "tool-mcp_Weather__get_forecast") as
-            { callProviderMetadata?: { neore?: Record<string, unknown> } } | undefined;
+            | { callProviderMetadata?: { neore?: Record<string, unknown> } }
+            | undefined;
 
         expect(part?.callProviderMetadata?.neore).toStrictEqual({ autoApproval: stamp, mcpServerName: "Weather", mcpToolName: "get_forecast" });
     });

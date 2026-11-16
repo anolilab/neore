@@ -27,11 +27,14 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { enqueueJob } from "../lib/job-queue";
-import { notifyQuietly } from "../notifications/notify";
+import { notify, notifyQuietly } from "../notifications/notify";
+import { noteShardDue } from "../lib/shard-housekeeping";
 import { patchById, withoutUndefined } from "../lib/patch";
 import type { SkillContext } from "../skills/executor";
 import { prepareSkillInvocation } from "../skills/executor";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
+import { LEFT_ORGANIZATION_MESSAGE } from "../auth/lib/organization-policy";
+import { readOrganizationPermissionCap } from "../auth/lib/permission-cap-read";
 import { canReadSkill } from "../skills/access";
 import { vSkillConfig } from "../skills/validators";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "./account";
@@ -51,6 +54,12 @@ import {
     isPassingFallback,
     pickRunThread,
     recurrenceSkipReason,
+    firstStuckCheckAt,
+    nextStuckCheckAt,
+    STUCK_CHECK_STATUSES,
+    STUCK_OWNER_RECHECK_MS,
+    STUCK_RETRY_MS,
+    stuckNoticeDue,
 } from "./logic";
 import { vTaskRunNoticeReason, vTaskRunOrigin, vVerdict } from "./validators";
 import { vCodingAgentAssignment } from "../coding-agents/validators";
@@ -122,7 +131,13 @@ export const startTask = async (
     }
 
     if (target === "blocked") {
-        await patchById(ctx.db, "tasks", task._id, { activeCycle: undefined, status: "blocked", updatedAt: now });
+        await patchById(ctx.db, "tasks", task._id, {
+            activeCycle: undefined,
+            status: "blocked",
+            stuckCheckAt: firstStuckCheckAt(now),
+            updatedAt: now,
+        });
+        await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
 
         return "blocked";
     }
@@ -144,8 +159,157 @@ export const promoteDependents = async (ctx: MutationCtx, completed: Doc<"tasks"
     for (const task of tasks) {
         if (unblocked.has(task._id as string)) {
             await queueCycle(ctx, task, "dependency", now);
+        } else if (task.status === "blocked" && task.dependsOn.includes(completed._id)) {
+            // Still waiting on another dependency, but this one moved: progress, so the stuck clock restarts.
+            await patchById(ctx.db, "tasks", task._id, { stuckCheckAt: firstStuckCheckAt(now), updatedAt: now });
+            await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
         }
     }
+};
+
+/** Most tasks read when following a blocked task's dependencies to what it waits on. */
+const WAIT_SCAN_MAX = 20;
+
+/**
+ * What a blocked task waits on, followed through its dependencies and the blocked tasks between them (at most
+ * `WAIT_SCAN_MAX` tasks are read). `owner` when the chain ends in a `needs_review` task or a failed task that nothing
+ * retries; `slot` when it ends in a failed recurring task, which the schedule runs again at that time.
+ */
+const waitOf = async (ctx: MutationCtx, dependsOn: ReadonlyArray<string>): Promise<{ owner: boolean; slot?: number }> => {
+    const seen = new Set<string>();
+    const queue = [...dependsOn];
+    let owner = false;
+    let slot: number | undefined;
+
+    while (queue.length > 0 && seen.size < WAIT_SCAN_MAX) {
+        const id = queue.shift() as string;
+
+        if (seen.has(id)) {
+            continue;
+        }
+
+        seen.add(id);
+
+        const dependency = await ctx.db.get("tasks", id as Id<"tasks">);
+
+        if (!dependency) {
+            continue;
+        }
+
+        switch (dependency.status) {
+            case "blocked": {
+                queue.push(...dependency.dependsOn);
+
+                break;
+            }
+            case "failed": {
+                if (dependency.recurring && dependency.nextRunAt !== undefined) {
+                    slot = Math.max(slot ?? 0, dependency.nextRunAt);
+                } else {
+                    owner = true;
+                }
+
+                break;
+            }
+            case "needs_review": {
+                owner = true;
+
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+
+    // A queued ID already read adds nothing: the chain is unresolved only while an unread ID is left, past the limit.
+    return { owner: owner || queue.some((id) => !seen.has(id)), slot };
+};
+
+/**
+ * Asks the owner, once per level and stuck episode, about a blocked or failed task that has made no progress for 2 or
+ * 7 days (`STUCK_NOTICE_DAYS`). Only tasks whose `stuckCheckAt` has come due are read, so a task whose notices are
+ * out costs nothing until its episode changes. A blocked task waiting, through its dependencies, on the owner's review
+ * or on a failed task is looked at again daily, so the owner is asked once about the task that needs them, not about
+ * every task behind it. Writes the notice state without touching `updatedAt`, so the notice is not progress.
+ */
+const escalateStuckTasks = async (ctx: MutationCtx, now: number): Promise<void> => {
+    for (const status of STUCK_CHECK_STATUSES) {
+        // `gt(0)` leaves out a row with no check armed: an unset `stuckCheckAt` sorts first, and would fill the batch.
+        const due = await ctx.db
+            .query("tasks")
+            .withIndex("by_status_and_stuckCheckAt", (q) => q.eq("status", status).gt("stuckCheckAt", 0).lte("stuckCheckAt", now))
+            .take(SWEEP_BATCH);
+
+        for (const task of due) {
+            // A failed recurring task runs again at its next slot, so the owner has nothing to decide yet: look after that slot.
+            if (task.status === "failed" && task.recurring && task.nextRunAt !== undefined) {
+                await recheckStuckTask(ctx, task, Math.max(task.nextRunAt, now) + STUCK_OWNER_RECHECK_MS);
+
+                continue;
+            }
+
+            if (task.status === "blocked") {
+                const wait = await waitOf(ctx, task.dependsOn);
+
+                if (wait.owner) {
+                    await recheckStuckTask(ctx, task, now + STUCK_OWNER_RECHECK_MS);
+
+                    continue;
+                }
+
+                if (wait.slot !== undefined) {
+                    await recheckStuckTask(ctx, task, Math.max(wait.slot, now) + STUCK_OWNER_RECHECK_MS);
+
+                    continue;
+                }
+            }
+
+            const days = stuckNoticeDue(task, now);
+
+            if (days !== undefined) {
+                // The notice is written before its level is recorded, so a write that fails is sent again, not lost.
+                try {
+                    // The subject only: the notice names the task and carries no instructions, errors or results, so the
+                    // lock screen shows nothing more than the title (`notifications/AGENTS.md`).
+                    await notify(ctx, {
+                        dedupeKey: `task-stuck:${task._id}:${task.updatedAt}:${days}`,
+                        link: "/tasks",
+                        title: task.title,
+                        type: "task_stuck",
+                        userId: task.userId,
+                    });
+                } catch (error) {
+                    ctx.log.event("tasks.stuck_notice_failed", {
+                        days,
+                        error: error instanceof Error ? error.name : "unknown",
+                        reason: error instanceof Error ? error.message : "unknown",
+                        taskId: task._id,
+                    });
+                    await recheckStuckTask(ctx, task, now + STUCK_RETRY_MS);
+
+                    continue;
+                }
+            }
+
+            const next = nextStuckCheckAt(task, days, now);
+
+            await patchById(ctx.db, "tasks", task._id, {
+                stuckCheckAt: next,
+                ...(days !== undefined && { stuckNotice: { days, since: task.updatedAt } }),
+            });
+
+            if (next !== undefined) {
+                await noteShardDue(ctx, next, task.userId);
+            }
+        }
+    }
+};
+
+/** Sets when the sweep next looks at a stuck task, and arms its shard for that moment. */
+const recheckStuckTask = async (ctx: MutationCtx, task: Doc<"tasks">, at: number): Promise<void> => {
+    await patchById(ctx.db, "tasks", task._id, { stuckCheckAt: at });
+    await noteShardDue(ctx, at, task.userId);
 };
 
 const summarise = (answer: string | undefined): string | undefined => {
@@ -171,14 +335,22 @@ const failedTaskPatch = (lastError: string, now: number) => {
         lastError,
         resultSummary: undefined,
         status: "failed" as const,
+        stuckCheckAt: firstStuckCheckAt(now),
         updatedAt: now,
     };
 };
 
-/** Ends a cycle before its round runs, with `lastError` saying why. No `taskRuns` row: nothing ran. */
-const refuseRound = async (ctx: MutationCtx, task: Doc<"tasks">, lastError: string): Promise<void> => {
-    await patchById(ctx.db, "tasks", task._id, failedTaskPatch(lastError, Date.now()));
+/**
+ * Ends a cycle before its round runs, with `lastError` saying why. No `taskRuns` row: nothing ran. `stopsRecurrence`
+ * removes `nextRunAt` too, for a refusal no later round can get past; the schedule itself is kept.
+ */
+const refuseRound = async (ctx: MutationCtx, task: Doc<"tasks">, lastError: string, stopsRecurrence = false): Promise<void> => {
+    await patchById(ctx.db, "tasks", task._id, { ...failedTaskPatch(lastError, Date.now()), ...(stopsRecurrence && { nextRunAt: undefined }) });
+    await noteShardDue(ctx, firstStuckCheckAt(Date.now()), task.userId);
 };
+
+/** Why a coding-agent task cannot start under its organization's cap, which an agent on its own would get past. */
+export const CODING_AGENT_CAPPED_MESSAGE = "Your organization's tool policy does not allow a coding agent to run on its own, so this task cannot start one.";
 
 const vClaim = v.union(
     v.null(),
@@ -217,7 +389,9 @@ const vClaim = v.union(
  *   deletion workflow is about to remove the task, and a run now would write a
  *   thread behind the step that erased the user's threads;
  * - the account is anonymous, the task's model is no longer allowed, or a daily
- *   limit is spent: the task fails with the reason.
+ *   limit is spent: the task fails with the reason;
+ * - the task belongs to an organization its owner has left: it fails and stops
+ *   recurring; or it is a coding-agent task under a cap below `auto`: it fails.
  *
  * The daily limits are charged here, in the claim's transaction, so a retried
  * or duplicate action cannot charge twice and a refused round charges nothing.
@@ -262,6 +436,36 @@ export const claimRound = internalMutation
             return null;
         }
 
+        // The organization's checks come before the model's and the charge, so a refused round costs nothing. An owner who
+        // left the organization stops the task (it fails the same way every time); a cap below `auto` keeps it scheduled,
+        // since the organization may raise it. A coding agent approves its own tools, so only `auto` lets one start.
+        if (task.organizationId) {
+            if (!(await getMemberByOrganizationAndUser(ctx, task.organizationId, task.userId, "primary"))) {
+                await refuseRound(ctx, task, LEFT_ORGANIZATION_MESSAGE, true);
+                // The schedule ends here for good, so the owner is told, as a trigger's pause notice tells them. One per cycle.
+                await notifyQuietly(ctx, {
+                    body: LEFT_ORGANIZATION_MESSAGE,
+                    dedupeKey: `task-left-organization:${task._id}:${cycle}`,
+                    emailOutcome: true,
+                    link: "/tasks",
+                    outcome: "failure",
+                    title: task.title,
+                    type: "task",
+                    userId: task.userId,
+                });
+
+                return null;
+            }
+
+            if (task.codingAgent && (await readOrganizationPermissionCap(ctx, task.organizationId)) !== "auto") {
+                await refuseRound(ctx, task, CODING_AGENT_CAPPED_MESSAGE);
+
+                return null;
+            }
+        }
+
+        // After the organization's checks: an owner who left stops the task for good, which an unavailable model (refused
+        // for this round only) must not hide, or every later slot would try it again.
         if (task.model && !isTaskModelAllowed(task.model, (id) => MODEL_LOOKUP.get(id))) {
             await refuseRound(ctx, task, `The model '${task.model}' is no longer available for tasks. Pick another model and run the task again.`);
 
@@ -477,7 +681,8 @@ export const getTaskForVerification = internalQuery
  *   rounds being spent on a verifier that is down.
  */
 const vRoundOutcome = v.union(
-    v.object({ error: v.string(), kind: v.literal("error") }),
+    // `stopsRecurrence`: no later round can succeed (the owner left the task's organization), so the schedule ends here.
+    v.object({ error: v.string(), kind: v.literal("error"), stopsRecurrence: v.optional(v.literal(true)) }),
     v.object({ finalAnswer: v.string(), kind: v.literal("verified"), verdict: vVerdict }),
     v.object({ finalAnswer: v.string(), kind: v.literal("unverified") }),
 );
@@ -549,7 +754,13 @@ export const completeRound = internalMutation
             const error = outcome.error.slice(0, 2000);
 
             await ctx.db.patch("taskRuns", run._id, { ...runResult, error, status: "error" });
-            await patchById(ctx.db, "tasks", task._id, { ...failedTaskPatch(error, now), lastRunThreadId });
+            await patchById(ctx.db, "tasks", task._id, {
+                ...failedTaskPatch(error, now),
+                lastRunThreadId,
+                // Removing `nextRunAt` takes the task out of the due-recurrence index; its schedule is kept, so it shows what ran.
+                ...(outcome.stopsRecurrence === true && { nextRunAt: undefined }),
+            });
+            await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
             await notifyTaskRound(ctx, task, run, "failure", error, args.threadId ?? run.threadId);
 
             return "failed";
@@ -713,6 +924,7 @@ export const checkDueTasks = internalMutation
             }
 
             await patchById(ctx.db, "tasks", task._id, failedTaskPatch(message, now));
+            await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
             // The inbox keeps the trace: a recurring task's catch-up may start in this same sweep, which clears
             // `lastError`, and a round that never started has no run row to show it.
             await notifyQuietly(ctx, {
@@ -737,6 +949,8 @@ export const checkDueTasks = internalMutation
                 await failStaleTask(task, STALE_MESSAGE[status]);
             }
         }
+
+        await escalateStuckTasks(ctx, now);
 
         const due = pickFairRecurrences(
             await ctx.db

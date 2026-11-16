@@ -12,9 +12,10 @@ export const FREE_SKILL_LIMIT = 5;
 export const VARIABLE_REGEX = /\{\{([a-z_][\w.]*)\}\}/gi;
 
 /**
- * Reserved skill slugs that cannot be used by users
+ * Reserved skill slugs that cannot be used by users. `compact` and `clear` are composer commands: a skill of that name
+ * would insert `/compact` or `/clear`, which runs the command instead of the skill.
  */
-export const RESERVED_SLUGS = ["anthropic", "claude", "compact", "neore", "system", "admin"];
+export const RESERVED_SLUGS = ["anthropic", "claude", "clear", "compact", "neore", "system", "admin"];
 
 /**
  * File size limits in bytes

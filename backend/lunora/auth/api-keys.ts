@@ -17,9 +17,9 @@ import type { ApiKeyAuthApi } from "../public-api/identity";
 import { readApiKeyIdentity } from "../public-api/identity";
 import { API_RESOURCES, scopesFromStrings, scopesToStrings } from "../public-api/scopes";
 import { MAX_LENGTH } from "../lib/validators";
+import { MAX_API_KEYS_PER_USER } from "./api-key-limits";
 
-/** Enough for one key per machine/integration; a runaway script cannot fill the table. */
-export const MAX_API_KEYS_PER_USER = 25;
+export { MAX_API_KEYS_PER_USER } from "./api-key-limits";
 
 const MAX_NAME_LENGTH = 32;
 
@@ -63,6 +63,12 @@ export const createScopedApiKey = authAction
         // today (`public-api/identity.ts`); this holds if that ever changes.
         if (readApiKeyIdentity(await ctx.auth.getIdentity(), ctx.auth.userId)) {
             throw new LunoraError("FORBIDDEN", "API keys cannot create API keys");
+        }
+
+        // A key carries no impersonation mark, so one made while an admin acts as the account would pass every
+        // impersonation guard afterwards (`auth/impersonation-credential-guard.ts`).
+        if (ctx.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "API keys cannot be created while impersonating");
         }
 
         const name = args.name.trim();

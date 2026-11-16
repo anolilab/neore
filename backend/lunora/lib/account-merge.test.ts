@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { deleteMergedGuest } from "../auth/hooks";
 import { requireOwnCollectionId } from "../knowledge/documents-shared";
 import type { MergeReferences, ShardCall } from "./account-merge";
+import { importShardRows, listShardRowIds, MERGE_PAGE_SIZE } from "./account-merge";
 import { GLOBAL_USER_COLUMNS, GLOBAL_USER_TABLES_NOT_REASSIGNED, mergeGuestInto, reassignGlobalRows, rewriteOwner, shardLocalTables } from "./account-merge";
 import { schemaWithShardedTables } from "./test-schema";
 
@@ -218,11 +219,27 @@ describe("reassignGlobalRows", () => {
                 );
             }
 
+            // A guest's project repositories follow the same way, so the new account's export and lookup (by `userId`) find them.
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < rows; index += 1) {
+                    await context.db.insert("projectRepositories", {
+                        createdAt: index,
+                        projectId: `project-${String(index)}`,
+                        url: `u${String(index)}`,
+                        userId: "guest",
+                    });
+                }
+            });
+
             const { reassigned } = await harness.run(async (context: any) => await context.runMutation(reassignGlobalRows, { from: "guest", to: "user" }));
             const left = await harness.run(async (context: any) => await context.db.knowledgeCollections.findMany({ where: { userId: "guest" } }));
+            const leftRepositories = await harness.run(async (context: any) => await context.db.projectRepositories.findMany({ where: { userId: "guest" } }));
+            const movedRepositories = await harness.run(async (context: any) => await context.db.projectRepositories.findMany({ where: { userId: "user" } }));
 
-            expect(reassigned).toBe(rows);
+            expect(reassigned).toBe(rows * 2);
             expect(left.page).toStrictEqual([]);
+            expect(leftRepositories.page).toStrictEqual([]);
+            expect(movedRepositories.page).toHaveLength(rows);
         } finally {
             harness.close();
         }
@@ -307,5 +324,122 @@ describe("deleteMergedGuest", () => {
         } finally {
             harness.close();
         }
+    });
+});
+
+describe("importShardRows for userSettings", () => {
+    const run = async (guestRows: Record<string, unknown>[], seed?: Record<string, unknown>, crowd: Record<string, unknown>[] = []) => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            return await harness.run(async (context: any) => {
+                for (const other of crowd) {
+                    await context.db.insert("userSettings", other);
+                }
+
+                if (seed) {
+                    await context.db.insert("userSettings", seed);
+                }
+
+                await context.runMutation(importShardRows, { from: "guest", rows: guestRows, table: "userSettings", to: "user" });
+
+                const stored = await context.db.query("userSettings").take(MERGE_PAGE_SIZE + 50);
+
+                return stored.filter((row: Record<string, unknown>) => row.userId === "user");
+            });
+        } finally {
+            harness.close();
+        }
+    };
+
+    it("adds a guest's skipped steps to the new account's settings and changes nothing else", async () => {
+        const rows = await run([{ _id: "g1", language: "fr-FR", setupStepsSkipped: ["ssh", "agent"], userId: "guest" }], {
+            language: "de-DE",
+            setupStepsSkipped: ["pair", "ssh"],
+            userId: "user",
+        });
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ language: "de-DE", setupStepsSkipped: ["agent", "pair", "ssh"] });
+    });
+
+    it("keeps the new account's own steps when the merged list passes the cap", async () => {
+        const own = ["o1", "o2", "o3", "o4", "o5", "o6", "o7", "o8"];
+        const rows = await run([{ _id: "g1", setupStepsSkipped: ["g1", "g2", "g3"], userId: "guest" }], { setupStepsSkipped: own, userId: "user" });
+
+        expect(rows[0]?.setupStepsSkipped).toEqual(own);
+    });
+
+    it("takes only the converting guest's own row from a page that holds another user's too", async () => {
+        const rows = await run(
+            [
+                { _id: "o1", setupStepsSkipped: ["pair"], userId: "someone-else" },
+                { _id: "g1", setupStepsSkipped: ["ssh"], userId: "guest" },
+            ],
+            { userId: "user" },
+        );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]?.setupStepsSkipped).toEqual(["ssh"]);
+    });
+
+    it("finds the new account's row among more settings rows than a merge page holds, and adds no second one", async () => {
+        const others = Array.from({ length: MERGE_PAGE_SIZE + 20 }, (_, index) => {
+            return { userId: `other-${index}` };
+        });
+        const rows = await run([{ _id: "g1", setupStepsSkipped: ["agent"], userId: "guest" }], { language: "de-DE", userId: "user" }, others);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ language: "de-DE", setupStepsSkipped: ["agent"] });
+    });
+
+    it("leaves the new account's settings alone when the guest skipped nothing", async () => {
+        const rows = await run([{ _id: "g1", language: "fr-FR", userId: "guest" }], { language: "de-DE", userId: "user" });
+
+        expect(rows[0]).toMatchObject({ language: "de-DE" });
+        expect(rows[0]?.setupStepsSkipped).toBeUndefined();
+    });
+});
+
+describe("clearing the guest's settings", () => {
+    it("lists only the guest's own settings rows, so a shard that also holds the new account's keeps it", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const result = await harness.run(async (context: any) => {
+                const guestId = await context.db.insert("userSettings", { setupStepsSkipped: ["ssh"], userId: "guest" });
+
+                await context.db.insert("userSettings", { language: "de-DE", userId: "user" });
+
+                const ids = await context.runQuery(listShardRowIds, { ownedBy: "guest", table: "userSettings" });
+
+                return { guestId, ids };
+            });
+
+            expect(result.ids).toEqual([result.guestId]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("asks for the guest's rows alone when it clears the tables the new account keeps its own row of", async () => {
+        const { call } = fakeShards({ guest: { userSettings: [{ _id: "g1", userId: "guest" }] } });
+        const listIdCalls: Record<string, unknown>[] = [];
+
+        await mergeGuestInto(
+            async (reference, args, shardKey) => {
+                if (reference.__lunoraRef.endsWith(":listShardRowIds")) {
+                    listIdCalls.push(args);
+                }
+
+                return await call(reference, args, shardKey);
+            },
+            REFERENCES,
+            "guest",
+            "user",
+        );
+
+        expect(listIdCalls.find((args) => args.table === "userSettings")).toEqual({ ownedBy: "guest", table: "userSettings" });
+        expect(listIdCalls.find((args) => args.table === "threads")).toEqual({ table: "threads" });
     });
 });

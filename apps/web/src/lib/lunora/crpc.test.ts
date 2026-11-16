@@ -13,6 +13,7 @@ const harness = vi.hoisted(() => {
         getAuthToken: () => null,
         mutation: vi.fn(),
         onAuthTokenChange: () => () => {},
+        onIdentityChange: () => () => {},
         query: vi.fn(async (_reference: unknown, _args: unknown) => "rpc"),
         setWsToken: () => {},
         subscribe: vi.fn(() => () => {}),

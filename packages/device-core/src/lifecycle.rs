@@ -105,15 +105,50 @@ pub enum Phase {
 #[derive(Debug)]
 pub struct Keep {
     backoff: Backoff,
+    /// Why the last attempt failed (or the link was lost), kept through the waits and attempts after it and dropped
+    /// once the link is seen alive. Capped, so a long message from the server cannot grow the state.
+    last_failure: Option<String>,
     phase: Phase,
+}
+
+/// The longest failure text kept for a server.
+const MAX_FAILURE_CHARS: usize = 300;
+
+fn capped(reason: &str) -> String {
+    cut_to(reason, MAX_FAILURE_CHARS)
+}
+
+/// `text` in at most `max` characters. A longer text keeps its start and its end with "…" between them: the end of a
+/// failure is often what to do about it ("remove the pinned key … and connect again").
+fn cut_to(text: &str, max: usize) -> String {
+    let count = text.chars().count();
+
+    if count <= max || max == 0 {
+        return text.chars().take(max).collect();
+    }
+
+    let head = (max - 1) / 2;
+    let tail = max - 1 - head;
+
+    format!(
+        "{}…{}",
+        text.chars().take(head).collect::<String>(),
+        text.chars().skip(count - tail).collect::<String>()
+    )
 }
 
 impl Keep {
     pub fn connected() -> Self {
         Keep {
             backoff: Backoff::default(),
+            last_failure: None,
             phase: Phase::Connected,
         }
+    }
+
+    /// Why the connection last failed, while it has not been seen alive since.
+    pub fn last_failure(&self) -> Option<&str> {
+        self.last_failure.as_deref()
     }
 
     pub fn phase(&self) -> &Phase {
@@ -123,6 +158,7 @@ impl Keep {
     /// The link was seen alive.
     pub fn up(&mut self) {
         self.backoff.up();
+        self.last_failure = None;
         self.phase = Phase::Connected;
     }
 
@@ -152,6 +188,7 @@ impl Keep {
             return false;
         }
 
+        self.last_failure = Some("the connection was lost".to_owned());
         self.schedule(now, "the connection was lost");
 
         true
@@ -164,7 +201,7 @@ impl Keep {
                 at: now + wait,
             },
             None => Phase::GaveUp {
-                reason: reason.to_owned(),
+                reason: capped(reason),
             },
         };
     }
@@ -191,15 +228,21 @@ impl Keep {
             return;
         }
 
+        self.last_failure = Some(capped(reason));
+
         if retryable {
             self.schedule(now, reason);
 
             if let Phase::GaveUp { reason: stored } = &mut self.phase {
-                *stored = format!("{reason} (gave up after {MAX_ATTEMPTS} attempts)");
+                // The suffix stays whole; the reason before it is cut so the two together keep the cap.
+                let suffix = format!(" (gave up after {MAX_ATTEMPTS} attempts)");
+                let room = MAX_FAILURE_CHARS.saturating_sub(suffix.chars().count());
+
+                *stored = format!("{}{suffix}", cut_to(stored, room));
             }
         } else {
             self.phase = Phase::GaveUp {
-                reason: reason.to_owned(),
+                reason: capped(reason),
             };
         }
     }
@@ -256,11 +299,18 @@ mod tests {
 
             assert_eq!(keep.due(now), Some(number));
 
-            keep.failed(now, true, "no route");
+            // The last failure is far past the cap, as ssh can print: the give-up reason must still fit it.
+            let reason = if number == MAX_ATTEMPTS {
+                format!("no route{}", "x".repeat(400))
+            } else {
+                "no route".to_owned()
+            };
+
+            keep.failed(now, true, &reason);
         }
 
         assert!(
-            matches!(keep.phase(), Phase::GaveUp { reason } if reason.contains("no route") && reason.contains("5 attempts")),
+            matches!(keep.phase(), Phase::GaveUp { reason } if reason.starts_with("no route") && reason.ends_with("5 attempts)") && reason.chars().count() == MAX_FAILURE_CHARS),
             "{:?}",
             keep.phase()
         );
@@ -390,5 +440,90 @@ mod tests {
 
         assert_eq!(launches.len(), MAX_LAUNCHES);
         assert_eq!(launches.last().unwrap(), &format!("id{}", MAX_LAUNCHES + 2));
+    }
+
+    #[test]
+    fn a_failure_is_kept_through_the_waits_and_dropped_when_the_link_is_up() {
+        let (mut keep, now) = (Keep::connected(), Instant::now());
+
+        assert_eq!(keep.last_failure(), None);
+
+        keep.lost(now);
+
+        assert_eq!(keep.last_failure(), Some("the connection was lost"));
+
+        let Phase::Waiting { attempt, at } = keep.phase().clone() else {
+            panic!("not waiting: {:?}", keep.phase());
+        };
+
+        assert_eq!(keep.due(at), Some(attempt));
+        assert_eq!(
+            keep.last_failure(),
+            Some("the connection was lost"),
+            "kept while connecting"
+        );
+
+        keep.failed(at, true, "Connection timed out");
+
+        assert!(matches!(keep.phase(), Phase::Waiting { .. }));
+        assert_eq!(
+            keep.last_failure(),
+            Some("Connection timed out"),
+            "kept across the next wait"
+        );
+
+        keep.up();
+
+        assert_eq!(keep.last_failure(), None);
+    }
+
+    #[test]
+    fn a_long_failure_text_is_cut() {
+        let (mut keep, now) = (Keep::connected(), Instant::now());
+
+        keep.lost(now);
+
+        let Phase::Waiting { at, .. } = keep.phase().clone() else {
+            panic!("not waiting");
+        };
+
+        keep.due(at);
+        keep.failed(at, true, &"x".repeat(10_000));
+
+        assert_eq!(
+            keep.last_failure().map(|text| text.chars().count()),
+            Some(MAX_FAILURE_CHARS)
+        );
+
+        // A reason the server gives up with is cut the same way.
+        let mut stopped = Keep::connected();
+
+        stopped.lost(now);
+
+        let Phase::Waiting { at, .. } = stopped.phase().clone() else {
+            panic!("not waiting");
+        };
+
+        stopped.due(at);
+        stopped.failed(at, false, &"y".repeat(10_000));
+
+        let Phase::GaveUp { reason } = stopped.phase() else {
+            panic!("did not give up");
+        };
+
+        assert_eq!(reason.chars().count(), MAX_FAILURE_CHARS);
+
+        // The end of a long failure is often what to do about it, so it survives the cut.
+        let advice = format!(
+            "{} remove the pinned key and connect again",
+            "SHA256:x ".repeat(60)
+        );
+        let cut = capped(&advice);
+
+        assert_eq!(cut.chars().count(), MAX_FAILURE_CHARS);
+        assert!(
+            cut.ends_with("remove the pinned key and connect again"),
+            "{cut}"
+        );
     }
 }

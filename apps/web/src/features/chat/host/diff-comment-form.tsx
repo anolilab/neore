@@ -65,6 +65,7 @@ const DiffCommentForm: FC<DiffCommentFormProps> = ({ full, label, onCancel, onSu
                 onKeyDown={onKeyDown}
                 placeholder={t`What should the agent change?`}
                 ref={field}
+                spellCheck
                 value={text}
             />
             {(full || refused) && (

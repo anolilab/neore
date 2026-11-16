@@ -19,6 +19,7 @@ vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await 
 
 const OWNER = "user-owner";
 const DAY_MS = 24 * 60 * 60 * 1000;
+const STORED_CHAT_FILE_REF = /^storage:agent-files\/[\da-f]{64}$/u;
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -151,5 +152,135 @@ describe("tool-result files", () => {
         await saveToolResult({ text: `see storage:${foreignKey}` });
 
         expect(await fileRow(fileId)).toMatchObject({ refcount: 0 });
+    });
+});
+
+describe("inline media in a tool result", () => {
+    /** A browser screenshot the size of a real one: 1.5 MB of PNG bytes, 2 MB as base64 (a shard row holds at most 2 MB). */
+    const SCREENSHOT = Buffer.alloc(1.5 * 1024 * 1024, 7).toString("base64");
+
+    /** One step whose tool results are `outputs`, all from `toolName`, saved the way the agent saves a step. */
+    const saveSteps = async (outputs: unknown[], toolName: string) => {
+        const { serializeStepContent } = await import("./mapping");
+        const { addMessages } = await import("./messages");
+        const { messageFileIds, partContent } = await serializeStepContent(
+            actionContext() as never,
+            outputs.map((output, index) => {
+                return { input: {}, output, toolCallId: `call-${String(index)}`, toolName, type: "tool-result" };
+            }) as never,
+            { threadId, userId: OWNER },
+        );
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(addMessages, {
+                    messages: [{ fileIds: messageFileIds, message: { content: partContent, role: "tool" } }],
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        const rows = await harness.run(
+            async (ctx: any) =>
+                await ctx.db
+                    .query("messages")
+                    .withIndex("threadId_status_tool_order_stepOrder", (q: any) => q.eq("threadId", threadId))
+                    .collect(),
+        );
+
+        return rows.at(-1);
+    };
+
+    const saveStep = async (output: unknown, toolName = "browser") => await saveSteps([output], toolName);
+
+    /** The row as a later turn reads it: references signed for the message's owner only. */
+    const readBack = async (row: any) => {
+        const { resolveDocsStoredMedia } = await import("./stored-media");
+        const { ownedStorageKeys } = await import("../lib/storage-ownership");
+
+        // The owner saved on the row, not one the test supplies: a row saved without one must fail here.
+        expect(row.userId).toBe(OWNER);
+
+        const [doc] = await resolveDocsStoredMedia([{ fileIds: row.fileIds, message: row.message, userId: row.userId }], {
+            lookupKeys: async () => new Map(),
+            lookupOwnedKeys: async (userId, keys) => await harness.run(async (ctx: any) => await ownedStorageKeys(ctx.db, userId, keys)),
+            origins: [],
+            sign: async (key) => `https://signed.example/${key}?sig=x`,
+        });
+
+        return doc!.message!.content as { output: { value: Record<string, unknown> } }[];
+    };
+
+    it("is saved as a reference to a counted file and comes back as a signed URL", async () => {
+        const row = await saveStep({ screenshot: SCREENSHOT, screenshotFormat: "png", success: true, title: "Page" });
+        const saved = row.message.content[0].output.value;
+
+        expect(saved.screenshot).toBeUndefined();
+        expect(saved.screenshotUrl).toMatch(STORED_CHAT_FILE_REF);
+        expect(JSON.stringify(row.message).length).toBeLessThan(1024);
+        expect(row.fileIds).toHaveLength(1);
+        expect(await fileRow(row.fileIds[0])).toMatchObject({ refcount: 1 });
+
+        const [part] = await readBack(row);
+
+        expect(part!.output.value).toMatchObject({
+            screenshotFormat: "png",
+            screenshotUrl: `https://signed.example/${saved.screenshotUrl.slice("storage:".length)}?sig=x`,
+            title: "Page",
+        });
+    });
+
+    it("stores identical media from parallel tool results once, so its file is released with the message", async () => {
+        const { deleteAllForThreadIdAsync } = await import("./threads");
+        const output = { content: [{ data: SCREENSHOT, mimeType: "image/png", type: "image" }] };
+        // Two results of one step serialize at the same time.
+        const row = await saveSteps([output, output], "mcp_files__render");
+        const [first, second] = row.message.content.map((part: any) => part.output.value.content[0].data);
+
+        expect(first).toMatch(STORED_CHAT_FILE_REF);
+        expect(second).toBe(first);
+        expect(new Set(row.fileIds).size).toBe(1);
+        expect(await fileRow(row.fileIds[0])).toMatchObject({ refcount: 1 });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(deleteAllForThreadIdAsync, { threadId }));
+
+        expect(await fileRow(row.fileIds[0])).toMatchObject({ refcount: 0 });
+    });
+
+    it("does not count a file a racing store added first", async () => {
+        const { addFile } = await import("./files");
+        const add = async () =>
+            (await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(addFile, {
+                        filename: "x.png",
+                        hash: "d".repeat(64),
+                        mediaType: "image/png",
+                        storageId: `agent-files/${"d".repeat(64)}`,
+                        userId: OWNER,
+                    }),
+            )) as { fileId: string };
+
+        const { fileId } = await add();
+        const racing = await add();
+
+        expect(racing.fileId).toBe(fileId);
+        expect(await fileRow(fileId)).toMatchObject({ refcount: 0 });
+    });
+
+    it("never resolves a look-alike reference to another user's real file", async () => {
+        // A file that exists, owned by someone else: only the owner rule keeps it out.
+        const { file: foreign } = await storeFile(actionContext() as never, new Blob(["their chart"], { type: "image/png" }), {
+            filename: "theirs.png",
+            userId: "someone-else",
+        });
+        const row = await saveStep({ content: [{ data: `storage:${foreign.storageId}`, mimeType: "image/png", type: "image" }] }, "mcp_files__render");
+
+        expect(row.fileIds ?? []).toHaveLength(0);
+        expect(await fileRow(foreign.fileId)).toMatchObject({ refcount: 0 });
+
+        const [part] = await readBack(row);
+
+        expect(part!.output.value).toStrictEqual({ content: [{ data: "", mimeType: "image/png", type: "image" }] });
     });
 });

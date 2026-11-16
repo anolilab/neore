@@ -130,7 +130,7 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
                 isContextExceededDetected = true;
                 // Don't fail the call yet — the retry will handle it.
                 // Still notify the streamer so the client sees the retry happening.
-                await streamer?.fail("Context exceeded — retrying with compression...");
+                await streamer?.fail("Context exceeded — retrying with compression...", { failed: false });
 
                 return streamTextArgs.onError?.(error);
             }

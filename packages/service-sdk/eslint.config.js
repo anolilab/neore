@@ -5,7 +5,7 @@ import { createConfig } from "@anolilab/eslint-config";
  * repo-root `eslint.config.mjs`, which registers no TypeScript parser — every
  * `.ts` file failed to parse and no rule ever ran here.
  *
- * `src/generated/` is excluded for the same reason `.prettierignore` excludes
+ * `src/generated/` is excluded for the same reason the root `.prettierignore` excludes
  * it: it is emitted from the service schemas, and linting a generator's output
  * only produces findings nobody can act on.
  *

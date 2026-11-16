@@ -30,14 +30,15 @@ export const useUsageBackfill = (): { backfilling: boolean } => {
 export const BACKFILL_REFETCH_MS = 5000;
 
 /** Re-reads once more when the backfill finishes, so the last step's rows show. */
-export const useRefetchAfterBackfill = (backfilling: boolean, refetch: () => Promise<unknown>): void => {
+export const useRefetchAfterBackfill = (backfilling: boolean, refetch: () => Promise<unknown>, ready = true): void => {
     const wasBackfilling = useRef(backfilling);
 
     useEffect(() => {
-        if (wasBackfilling.current && !backfilling) {
+        // A query still waiting for its inputs (`ready` false) reads fresh once they arrive; a refetch now would fail it.
+        if (wasBackfilling.current && !backfilling && ready) {
             void refetch();
         }
 
         wasBackfilling.current = backfilling;
-    }, [backfilling, refetch]);
+    }, [backfilling, ready, refetch]);
 };

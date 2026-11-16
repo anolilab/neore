@@ -1,5 +1,5 @@
 import { closestCorners, DndContext, KeyboardSensor, PointerSensor, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { plural } from "@lingui/core/macro";
 import { Plural, useLingui } from "@lingui/react/macro";
@@ -10,9 +10,10 @@ import { useNavigate } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Loader2, Trash2, X } from "lucide-react";
 import type { FC, ReactNode } from "react";
-import { lazy, memo, startTransition, Suspense, useCallback, useId, useMemo, useRef, useState } from "react";
+import { lazy, memo, startTransition, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
+import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { PullRequestCountsProvider } from "@/features/develop/components/pull-request-counts";
 import {
     useDeleteProject,
@@ -24,20 +25,30 @@ import {
 } from "@/features/projects/hooks/use-projects";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { useCRPC } from "@/lib/lunora/crpc";
+import settle from "@/lib/settle";
 import { showError, showInfo } from "@/lib/toast";
 
+import applyDragEnd from "./apply-drag-end";
 import ThreadGroupRenderer from "./components/thread-group-renderer";
+import { KeyboardSelectionProvider } from "./contexts/keyboard-selection-context";
+import { SearchQueryContext } from "./contexts/search-query-context";
 import GroupHeader from "./group-header";
 import useKeyboardNavigation from "./hooks/use-keyboard-navigation";
+import useStableCallback from "./hooks/use-stable-callback";
 import useThreadGroups from "./hooks/use-thread-groups";
 import useThreadHandlers from "./hooks/use-thread-handlers";
 import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
+import { renameFocusTarget } from "./rename-focus-target";
+import RenameThreadDialog from "./rename-thread-dialog";
+import SnoozeUntilDialog from "./snooze-until-dialog";
 import SortableThreadItem from "./sortable-thread-item";
+import { useThreadListUIStore } from "./stores/thread-list-ui-store";
+import { isThreadLocked } from "./thread-lock";
 import type { BranchNode, GroupType, HierarchicalThreadListProperties, MinimalThreadRelationship, ThreadGroup } from "./types";
 import type { ThreadDateRange } from "./utilities";
 import { getGroupType, isDragBlocked, isGroupFullySelected, selectThreadIdsByDate } from "./utilities";
 
-// Lazy: it pulls `lucide-react/dynamic`'s import map of every icon (~190KB) for its icon picker.
+// Lazy: a dialog opened on demand, with its icon picker and project panels.
 const ProjectFormDialog = lazy(() => import("@/features/projects/components/project-form-dialog"));
 
 // ============================================================================
@@ -55,6 +66,8 @@ const SelectionToolbar: FC<{
     selectedCount: number;
 }> = memo(({ isAllSelected, onClearSelection, onDeleteSelected, onDone, onSelectAll, onSelectByDate, selectedCount }) => {
     const { t } = useLingui();
+    // An admin acting as the owner may not delete their chats: the server refuses it.
+    const isImpersonating = useImpersonating();
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
     const [dateRange, setDateRange] = useState<ThreadDateRange>({ from: "", to: "" });
@@ -94,7 +107,7 @@ const SelectionToolbar: FC<{
                     >
                         {t`Select by date`}
                     </Button>
-                    {selectedCount > 0 && (
+                    {selectedCount > 0 && !isImpersonating && (
                         <Button className="text-destructive hover:bg-destructive/20 h-6 px-2 text-xs" onClick={handleDeleteClick} size="sm" variant="ghost">
                             <Trash2 className="mr-1 h-3 w-3" />
                             {t`Delete`}
@@ -209,8 +222,10 @@ const ProjectGroupContainer: FC<{ children: ReactNode; isProjectGroup: boolean; 
     );
 };
 
+/** One object for the list's life: new sensor options make new activators, and the drag context then re-renders every sortable row. */
+const KEYBOARD_SENSOR_OPTIONS = { coordinateGetter: sortableKeyboardCoordinates };
+
 const VirtualizedThreadList: FC<{
-    currentThreadId: string | undefined;
     expandedThreads: Set<string>;
     flattenedThreads: BranchNode[];
     getGroupThreadIds: (group: ThreadGroup) => string[];
@@ -225,13 +240,10 @@ const VirtualizedThreadList: FC<{
     handlePinThread: (threadId: string) => void;
     handleThreadToggle: (threadId: string, index: number, isShiftClick: boolean) => void;
     handleUnpinThread: (threadId: string) => void;
-    isKeyboardNavigating: boolean;
     isSelectionMode: boolean;
     loadingStates: any;
     projectsMap: Map<string, any>;
-    searchQuery: string;
     selectedThreadIds: Set<string>;
-    selectedThreadIndex: number;
     toggleExpanded: (threadId: string) => void;
     toggleGroupCollapsed: (groupType: GroupType, projectId?: string) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
@@ -335,7 +347,6 @@ const VirtualizedThreadList: FC<{
                                 })()
                             ) : (
                                 <SortableThreadItem
-                                    currentThreadId={props.currentThreadId}
                                     expandedThreads={props.expandedThreads}
                                     handleCreateBranch={props.handleCreateBranch}
                                     handleDeleteThread={props.handleDeleteThread}
@@ -345,16 +356,12 @@ const VirtualizedThreadList: FC<{
                                     handleThreadToggle={props.handleThreadToggle}
                                     handleUnpinThread={props.handleUnpinThread}
                                     index={item.index}
-                                    isKeyboardNavigating={props.isKeyboardNavigating}
-                                    isKeyboardSelected={props.isKeyboardNavigating && item.index === props.selectedThreadIndex}
                                     isSelected={props.selectedThreadIds.has(item.thread.threadId)}
                                     isSelectionMode={props.isSelectionMode}
                                     key={item.thread.threadId}
                                     loadingStates={props.loadingStates}
                                     node={item.thread}
-                                    searchQuery={props.searchQuery}
                                     selectedThreadIds={props.selectedThreadIds}
-                                    selectedThreadIndex={props.selectedThreadIndex}
                                     toggleExpanded={props.toggleExpanded}
                                     updateThread={props.updateThread}
                                 />
@@ -376,6 +383,7 @@ const HierarchicalThreadList: FC<
     collapsedProjects,
     currentThreadId,
     expandedThreads,
+    isSearchError = false,
     isSearchLoading,
     isSelectionMode,
     lastSelectedIndex,
@@ -422,8 +430,15 @@ const HierarchicalThreadList: FC<
     const { mutateAsync: moveThreadToProject } = useMoveThreadToProject();
     const { mutateAsync: updateProjectOrderMutation } = useUpdateProjectOrder();
 
-    const { handleBulkDeleteThreads, handleCreateBranch, handleDeleteThread, handleDownloadThread, handlePinThread, handleUnpinThread, updateThread } =
-        useThreadHandlers(setLoadingStates, currentThreadId);
+    const threadHandlers = useThreadHandlers(setLoadingStates, currentThreadId);
+    const { handleBulkDeleteThreads } = threadHandlers;
+    // Every row gets these: kept stable, so their closures changing (with the open thread, or the thread data) re-renders no row.
+    const handleCreateBranch = useStableCallback(threadHandlers.handleCreateBranch);
+    const handleDeleteThread = useStableCallback(threadHandlers.handleDeleteThread);
+    const handleDownloadThread = useStableCallback(threadHandlers.handleDownloadThread);
+    const handlePinThread = useStableCallback(threadHandlers.handlePinThread);
+    const handleUnpinThread = useStableCallback(threadHandlers.handleUnpinThread);
+    const updateThread = useStableCallback(threadHandlers.updateThread);
 
     const { isPlaceholderData, threadGroups, threadsData } = useThreadGroups(
         collapsedGroups,
@@ -477,26 +492,30 @@ const HierarchicalThreadList: FC<
 
         setIsDeletingProject(true);
 
-        try {
-            // Ids in this component travel as plain strings (dnd-kit `active.id`/`over.id`,
-            // `BranchNode`/`ThreadGroup` fields, local dialog state) but always originate
-            // from documents returned by the backend, so the brand is re-applied here.
-            await deleteProject({ projectId: projectToDelete.id as Id<"projects"> });
-            setProjectToDelete(null);
-        } catch (error) {
-            console.error("Failed to delete project:", error);
-            showError(t`Failed to delete project`);
-        } finally {
-            setIsDeletingProject(false);
-        }
+        await settle(
+            async () => {
+                try {
+                    // Ids in this component travel as plain strings (dnd-kit `active.id`/`over.id`,
+                    // `BranchNode`/`ThreadGroup` fields, local dialog state) but always originate
+                    // from documents returned by the backend, so the brand is re-applied here.
+                    await deleteProject({ projectId: projectToDelete.id as Id<"projects"> });
+                    setProjectToDelete(null);
+                } catch (error) {
+                    console.error("Failed to delete project:", error);
+                    showError(t`Failed to delete project`);
+                }
+            },
+            () => setIsDeletingProject(false),
+        );
     }, [deleteProject, projectToDelete, t]);
 
     const handlePinProject = useCallback(
         async (projectId: string, isPinned: boolean) => {
-            try {
-                const brandedProjectId = projectId as Id<"projects">;
+            // Chosen outside the `try`: the React Compiler cannot lower a conditional inside one.
+            const togglePin = isPinned ? unpinProject : pinProject;
 
-                await (isPinned ? unpinProject({ projectId: brandedProjectId }) : pinProject({ projectId: brandedProjectId }));
+            try {
+                await togglePin({ projectId: projectId as Id<"projects"> });
             } catch (error) {
                 console.error("Failed to pin/unpin project:", error);
             }
@@ -604,6 +623,8 @@ const HierarchicalThreadList: FC<
         handleArrowUp,
         handleEnter,
         handleEscape: handleKeyboardEscape,
+        handleOpenSelectedMenu,
+        handleRenameSelected,
         isKeyboardNavigating,
         resetNavigation,
         selectedThreadIndex,
@@ -739,12 +760,7 @@ const HierarchicalThreadList: FC<
     );
 
     // Drag and drop sensors
-    const sensors = useSensors(
-        useSensor(PointerSensor),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        }),
-    );
+    const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, KEYBOARD_SENSOR_OPTIONS));
 
     // Handle drag end - implement thread reordering and moving to projects
     const handleDragEnd = useCallback(
@@ -765,240 +781,18 @@ const HierarchicalThreadList: FC<
             });
 
             try {
-                // Check if we're reordering project groups
-                const activeId = active.id as string;
-                const isProjectGroupDrag = activeId.startsWith("project-group-");
-
-                // If dragging a project group, only handle project group reordering
-                // Don't fall through to thread handling
-                if (isProjectGroupDrag) {
-                    const activeProjectId = activeId.replace("project-group-", "");
-                    const overId = over.id as string;
-
-                    // Check if dropping on another project group (could be project-group-{id} or project-{id})
-                    let overProjectId: string | undefined;
-
-                    if (overId.startsWith("project-group-")) {
-                        overProjectId = overId.replace("project-group-", "");
-                    } else if (overId.startsWith("project-") && !overId.startsWith("project-group-")) {
-                        // Dropping on ProjectGroupContainer (but not a project-group- ID)
-                        overProjectId = overId.replace("project-", "");
-                    } else if (over.data?.current?.type === "project-container" && over.data.current.projectId) {
-                        // Dropping on project container via data
-                        overProjectId = over.data.current.projectId;
-                    }
-
-                    // Only reorder if we found a valid target project and it's different from the source
-                    if (overProjectId && overProjectId !== activeProjectId) {
-                        // Find project groups in threadGroups (maintain current order from threadGroups)
-                        const projectGroups = threadGroups.filter((g) => g.projectId);
-                        const activeIndex = projectGroups.findIndex((g) => g.projectId === activeProjectId);
-                        const overIndex = projectGroups.findIndex((g) => g.projectId === overProjectId);
-
-                        if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
-                            const reorderedProjects = arrayMove(projectGroups, activeIndex, overIndex);
-
-                            // Update project orders
-                            const projectOrders = reorderedProjects.map((group, index) => {
-                                return {
-                                    order: index,
-                                    projectId: group.projectId!,
-                                };
-                            });
-
-                            await updateProjectOrderMutation({
-                                projectOrders,
-                            });
-                        } else {
-                            // If indices not found or same, still clear loading state
-                            setLoadingStates((previous) => {
-                                return { ...previous, reordering: false };
-                            });
-
-                            return;
-                        }
-                    } else {
-                        // No valid drop target or same project - just clear loading
-                        setLoadingStates((previous) => {
-                            return { ...previous, reordering: false };
-                        });
-
-                        return;
-                    }
-
-                    // Always return early for project group drags - don't handle as thread
-                    setLoadingStates((previous) => {
-                        return { ...previous, reordering: false };
-                    });
-
-                    return;
-                }
-
-                // Only handle thread drags from here on
-                const threadId = active.id as Id<"threads">;
-
-                // Ensure we're not accidentally treating a project group ID as a thread ID
-                if (threadId.startsWith("project-group-")) {
-                    setLoadingStates((previous) => {
-                        return { ...previous, reordering: false };
-                    });
-
-                    return;
-                }
-
-                // First, check if we're dropping on a project container (highest priority)
-                // Check both the ID and the data type to ensure we catch project container drops
-                const isProjectContainerDrop =
-                    (typeof over.id === "string" && over.id.startsWith("project-")) || over.data?.current?.type === "project-container";
-
-                if (isProjectContainerDrop) {
-                    let targetProjectId: string | undefined;
-
-                    if (typeof over.id === "string" && over.id.startsWith("project-")) {
-                        targetProjectId = over.id.replace("project-", "");
-                    } else if (over.data?.current?.projectId) {
-                        targetProjectId = over.data.current.projectId;
-                    }
-
-                    // Find which project the thread currently belongs to
-                    let currentProjectId: string | undefined;
-
-                    for (const group of threadGroups) {
-                        if (group.threads.some((candidate) => candidate.threadId === threadId)) {
-                            currentProjectId = group.projectId;
-                            break;
-                        }
-                    }
-
-                    // Only move if it's a different project
-                    if (currentProjectId !== targetProjectId) {
-                        await moveThreadToProject({
-                            projectId: (targetProjectId || undefined) as Id<"projects"> | undefined,
-                            threadId,
-                        });
-                    }
-
-                    setLoadingStates((previous) => {
-                        return { ...previous, reordering: false };
-                    });
-
-                    return;
-                }
-
-                // Find which group the active and over items belong to
-                let activeGroup: ThreadGroup | null = null;
-                let overGroup: ThreadGroup | null = null;
-                let activeIndex = -1;
-                let overIndex = -1;
-
-                for (const group of threadGroups) {
-                    const activeThreadIndex = group.threads.findIndex((candidate) => candidate.threadId === active.id);
-                    const overThreadIndex = group.threads.findIndex((candidate) => candidate.threadId === over.id);
-
-                    if (activeThreadIndex !== -1) {
-                        activeGroup = group;
-                        activeIndex = activeThreadIndex;
-                    }
-
-                    if (overThreadIndex !== -1) {
-                        overGroup = group;
-                        overIndex = overThreadIndex;
-                    }
-                }
-
-                // If we couldn't find the groups, check if over.id is a thread ID that belongs to a project
-                // This handles the case where we drop on a thread inside a project container
-                if (!overGroup && typeof over.id === "string") {
-                    for (const group of threadGroups) {
-                        if (group.threads.some((candidate) => candidate.threadId === over.id)) {
-                            overGroup = group;
-                            overIndex = group.threads.findIndex((candidate) => candidate.threadId === over.id);
-                            break;
-                        }
-                    }
-                }
-
-                // Check if we're moving between different groups (including project groups)
-                if (activeGroup && overGroup && activeGroup !== overGroup) {
-                    // If moving from one project to another, use project move
-                    if (activeGroup.projectId && overGroup.projectId && activeGroup.projectId !== overGroup.projectId) {
-                        await moveThreadToProject({
-                            projectId: overGroup.projectId as Id<"projects">,
-                            threadId,
-                        });
-                        setLoadingStates((previous) => {
-                            return { ...previous, reordering: false };
-                        });
-
-                        return;
-                    }
-
-                    // If moving from project to non-project group, remove from project
-                    if (activeGroup.projectId && !overGroup.projectId) {
-                        await moveThreadToProject({
-                            projectId: undefined,
-                            threadId,
-                        });
-                        setLoadingStates((previous) => {
-                            return { ...previous, reordering: false };
-                        });
-
-                        return;
-                    }
-
-                    // If moving from non-project to project group, add to project
-                    if (!activeGroup.projectId && overGroup.projectId) {
-                        await moveThreadToProject({
-                            projectId: overGroup.projectId as Id<"projects">,
-                            threadId,
-                        });
-                        setLoadingStates((previous) => {
-                            return { ...previous, reordering: false };
-                        });
-
-                        return;
-                    }
-
-                    // If moving between any different groups (not same group), don't reorder
-                    setLoadingStates((previous) => {
-                        return { ...previous, reordering: false };
-                    });
-
-                    return;
-                }
-
-                // Only allow reordering within the same group
-                if (!activeGroup || !overGroup || activeGroup.title !== overGroup.title) {
-                    setLoadingStates((previous) => {
-                        return { ...previous, reordering: false };
-                    });
-
-                    return;
-                }
-
-                // Reorder threads within the group
-                const reorderedThreads = arrayMove(activeGroup.threads, activeIndex, overIndex);
-
-                // Update the order in the database
-                const threadOrders = reorderedThreads.map((thread, index) => {
-                    return {
-                        order: index,
-                        threadId: thread.threadId,
-                    };
-                });
-
-                await updateThreadOrderMutation({
-                    threadOrders,
-                });
-                setLoadingStates((previous) => {
-                    return { ...previous, reordering: false };
+                await applyDragEnd(active, over, threadGroups, {
+                    moveThreadToProject,
+                    updateProjectOrder: updateProjectOrderMutation,
+                    updateThreadOrder: updateThreadOrderMutation,
                 });
             } catch {
                 showError(t`Failed to move thread`);
-                setLoadingStates((previous) => {
-                    return { ...previous, reordering: false };
-                });
             }
+
+            setLoadingStates((previous) => {
+                return { ...previous, reordering: false };
+            });
         },
         [setLoadingStates, updateThreadOrderMutation, updateProjectOrderMutation, threadGroups, isPlaceholderData, moveThreadToProject, t],
     );
@@ -1009,6 +803,8 @@ const HierarchicalThreadList: FC<
         handleArrowUp,
         handleEnter,
         handleKeyboardEscape,
+        handleOpenSelectedMenu,
+        handleRenameSelected,
         handleSelectAll,
         isKeyboardNavigating,
         isSelectionMode,
@@ -1018,12 +814,11 @@ const HierarchicalThreadList: FC<
         setShowKeyboardHelp,
     });
 
-    // Reset keyboard navigation on mouse interaction
-    const handleMouseEnter = useCallback(() => {
-        if (isKeyboardNavigating) {
-            resetNavigation();
-        }
-    }, [isKeyboardNavigating, resetNavigation]);
+    // Reset keyboard navigation on mouse interaction. Every row gets this, so it does not change when navigation starts or stops:
+    // resetting when nothing is selected sets the state it already has, which renders nothing.
+    const handleMouseEnter = resetNavigation;
+    // The arrow keys' row, by id: the flat index matches no row's own index (those restart in each group), and child rows need it too.
+    const keyboardThreadId = isKeyboardNavigating ? flattenedThreads[selectedThreadIndex]?.threadId : undefined;
 
     // Flatten all visible items for virtualization (groups + threads)
     const virtualItems = useMemo(() => {
@@ -1046,6 +841,49 @@ const HierarchicalThreadList: FC<
 
     // Note: useVirtualizer is incompatible with React Compiler
     // The virtualized rendering is handled in renderThreadGroups below
+
+    // The rename dialog and the open options menu live here, not in a row: a row can unmount while one is open
+    // (virtualization, a filter). Each closes with its thread: when the thread leaves the list, or a rename's thread is locked.
+    // The list root: rename returns focus here when the thread's row has unmounted.
+    const listRootReference = useRef<HTMLDivElement>(null);
+    const renameThreadId = useThreadListUIStore((state) => state.renameThreadId);
+    const setRenameThreadId = useThreadListUIStore((state) => state.setRenameThreadId);
+    const optionsMenuThreadId = useThreadListUIStore((state) => state.optionsMenuThreadId);
+    const setOptionsMenuThreadId = useThreadListUIStore((state) => state.setOptionsMenuThreadId);
+    const renameThread = renameThreadId === null ? undefined : flattenedThreads.find((node) => node.threadId === renameThreadId);
+    const optionsMenuThread = optionsMenuThreadId === null ? undefined : flattenedThreads.find((node) => node.threadId === optionsMenuThreadId);
+    const snoozeThreadId = useThreadListUIStore((state) => state.snoozeThreadId);
+    const setSnoozeThreadId = useThreadListUIStore((state) => state.setSnoozeThreadId);
+    const snoozeThread = snoozeThreadId === null ? undefined : flattenedThreads.find((node) => node.threadId === snoozeThreadId);
+
+    // Like rename: the snooze dialog closes with its thread, so it cannot reopen when the thread comes back.
+    useEffect(() => {
+        if (snoozeThreadId !== null && snoozeThread === undefined) {
+            setSnoozeThreadId(null);
+        }
+    }, [snoozeThread, snoozeThreadId, setSnoozeThreadId]);
+
+    useEffect(() => {
+        if (renameThreadId !== null && (renameThread === undefined || isThreadLocked(renameThread.lockedAt))) {
+            setRenameThreadId(null);
+        }
+    }, [renameThread, renameThreadId, setRenameThreadId]);
+
+    useEffect(() => {
+        if (optionsMenuThreadId !== null && (optionsMenuThread === undefined || isThreadLocked(optionsMenuThread.lockedAt))) {
+            setOptionsMenuThreadId(null);
+        }
+    }, [optionsMenuThread, optionsMenuThreadId, setOptionsMenuThreadId]);
+
+    // The targets live in the store, which outlives the list: leaving the list clears them, so none reopens on return.
+    useEffect(
+        () => () => {
+            setRenameThreadId(null);
+            setOptionsMenuThreadId(null);
+            setSnoozeThreadId(null);
+        },
+        [setRenameThreadId, setOptionsMenuThreadId, setSnoozeThreadId],
+    );
 
     // Show loading state if threads are still loading
     if (!threadsData) {
@@ -1071,6 +909,15 @@ const HierarchicalThreadList: FC<
     }
 
     // Show empty state for search results
+    if (threadGroups.length === 0 && searchQuery.trim() && isSearchError) {
+        return (
+            <div className="text-muted-foreground px-3 py-8 text-center text-sm">
+                <p role="alert">{t`Search failed for "${searchQuery}". Try again.`}</p>
+                <p className="mt-2 text-xs opacity-70">{t`Press ? for keyboard shortcuts`}</p>
+            </div>
+        );
+    }
+
     if (threadGroups.length === 0 && searchQuery.trim()) {
         const message = searchType === "threads" ? t`No threads found for` : t`No messages found for`;
 
@@ -1115,7 +962,6 @@ const HierarchicalThreadList: FC<
                 return (
                     <ProjectGroupContainer isProjectGroup={isProjectGroup} key={group.title} projectId={group.projectId}>
                         <ThreadGroupRenderer
-                            currentThreadId={currentThreadId}
                             expandedThreads={expandedThreads}
                             flattenedThreads={flattenedThreads}
                             getGroupThreadIds={getGroupThreadIds}
@@ -1131,13 +977,10 @@ const HierarchicalThreadList: FC<
                             handlePinThread={handlePinThread}
                             handleThreadToggle={handleThreadToggle}
                             handleUnpinThread={handleUnpinThread}
-                            isKeyboardNavigating={isKeyboardNavigating}
                             isSelectionMode={isSelectionMode}
                             loadingStates={loadingStates}
                             projectPinnedAt={project?.pinnedAt}
-                            searchQuery={searchQuery}
                             selectedThreadIds={selectedThreadIds}
-                            selectedThreadIndex={selectedThreadIndex}
                             toggleExpanded={toggleExpanded}
                             toggleGroupCollapsed={toggleGroupCollapsed}
                             updateThread={updateThread}
@@ -1161,7 +1004,6 @@ const HierarchicalThreadList: FC<
                                         {(dragListeners) => (
                                             <ProjectGroupContainer isProjectGroup={isProjectGroup} projectId={group.projectId}>
                                                 <ThreadGroupRenderer
-                                                    currentThreadId={currentThreadId}
                                                     dragListeners={dragListeners}
                                                     expandedThreads={expandedThreads}
                                                     flattenedThreads={flattenedThreads}
@@ -1178,14 +1020,11 @@ const HierarchicalThreadList: FC<
                                                     handlePinThread={handlePinThread}
                                                     handleThreadToggle={handleThreadToggle}
                                                     handleUnpinThread={handleUnpinThread}
-                                                    isKeyboardNavigating={isKeyboardNavigating}
                                                     isReordering={loadingStates.reordering}
                                                     isSelectionMode={isSelectionMode}
                                                     loadingStates={loadingStates}
                                                     projectPinnedAt={project?.pinnedAt}
-                                                    searchQuery={searchQuery}
                                                     selectedThreadIds={selectedThreadIds}
-                                                    selectedThreadIndex={selectedThreadIndex}
                                                     toggleExpanded={toggleExpanded}
                                                     toggleGroupCollapsed={toggleGroupCollapsed}
                                                     updateThread={updateThread}
@@ -1207,7 +1046,6 @@ const HierarchicalThreadList: FC<
         // Extract to separate component to isolate useVirtualizer from React Compiler
         return (
             <VirtualizedThreadList
-                currentThreadId={currentThreadId}
                 expandedThreads={expandedThreads}
                 flattenedThreads={flattenedThreads}
                 getGroupThreadIds={getGroupThreadIds}
@@ -1222,13 +1060,10 @@ const HierarchicalThreadList: FC<
                 handlePinThread={handlePinThread}
                 handleThreadToggle={handleThreadToggle}
                 handleUnpinThread={handleUnpinThread}
-                isKeyboardNavigating={isKeyboardNavigating}
                 isSelectionMode={isSelectionMode}
                 loadingStates={loadingStates}
                 projectsMap={projectsMap}
-                searchQuery={searchQuery}
                 selectedThreadIds={selectedThreadIds}
-                selectedThreadIndex={selectedThreadIndex}
                 toggleExpanded={toggleExpanded}
                 toggleGroupCollapsed={toggleGroupCollapsed}
                 updateThread={updateThread}
@@ -1239,41 +1074,82 @@ const HierarchicalThreadList: FC<
 
     // Regular rendering with groups
     return (
+        // The list root stays mounted while the list is, so it is the fallback focus target when a row unmounts during a rename.
+        // Focused as the fallback when a rename's row has unmounted: its ring is the only focus cue there, so it stays visible.
         <PullRequestCountsProvider threadIds={visibleThreadIds}>
-            <div className="relative flex flex-col gap-2">
-                {isSelectionMode && (
-                    <SelectionToolbar
-                        isAllSelected={isAllSelected}
-                        onClearSelection={handleClearSelection}
-                        onDeleteSelected={handleBulkDelete}
-                        onDone={onExitSelectionMode}
-                        onSelectAll={handleSelectAll}
-                        onSelectByDate={handleSelectByDate}
-                        selectedCount={selectedThreadIds.size}
-                    />
-                )}
-                <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd} sensors={sensors}>
-                    {renderThreadGroups()}
-                </DndContext>
-                {hasOpenedProjectForm && (
-                    <Suspense fallback={null}>
-                        <ProjectFormDialog editingProject={editingProject} onClose={() => setShowProjectFormDialog(false)} open={showProjectFormDialog} />
-                    </Suspense>
-                )}
-                <DeleteConfirmationDialog
-                    description={t`This will permanently delete the project and all associated threads. This action cannot be undone.`}
-                    isDeleting={isDeletingProject}
-                    itemName={projectToDelete?.name}
-                    onConfirm={handleConfirmDeleteProject}
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setProjectToDelete(null);
-                        }
-                    }}
-                    open={!!projectToDelete}
-                    title={t`Delete Project`}
-                />
-            </div>
+            <KeyboardSelectionProvider threadId={keyboardThreadId}>
+                <SearchQueryContext value={searchQuery}>
+                    <div
+                        className="focus-visible:ring-ring/50 relative flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2"
+                        ref={listRootReference}
+                        tabIndex={-1}
+                    >
+                        {isSelectionMode && (
+                            <SelectionToolbar
+                                isAllSelected={isAllSelected}
+                                onClearSelection={handleClearSelection}
+                                onDeleteSelected={handleBulkDelete}
+                                onDone={onExitSelectionMode}
+                                onSelectAll={handleSelectAll}
+                                onSelectByDate={handleSelectByDate}
+                                selectedCount={selectedThreadIds.size}
+                            />
+                        )}
+                        <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd} sensors={sensors}>
+                            {renderThreadGroups()}
+                        </DndContext>
+                        {hasOpenedProjectForm && (
+                            <Suspense fallback={null}>
+                                <ProjectFormDialog
+                                    editingProject={editingProject}
+                                    onClose={() => setShowProjectFormDialog(false)}
+                                    open={showProjectFormDialog}
+                                />
+                            </Suspense>
+                        )}
+                        <DeleteConfirmationDialog
+                            description={t`This will permanently delete the project and all associated threads. This action cannot be undone.`}
+                            isDeleting={isDeletingProject}
+                            itemName={projectToDelete?.name}
+                            onConfirm={handleConfirmDeleteProject}
+                            onOpenChange={(open) => {
+                                if (!open) {
+                                    setProjectToDelete(null);
+                                }
+                            }}
+                            open={!!projectToDelete}
+                            title={t`Delete Project`}
+                        />
+                        {snoozeThread && (
+                            <SnoozeUntilDialog
+                                key={snoozeThread.threadId}
+                                onOpenChange={(open) => {
+                                    if (!open) {
+                                        setSnoozeThreadId(null);
+                                    }
+                                }}
+                                open
+                                previousUntil={snoozeThread.snoozedUntil}
+                                restoreFocus={() => renameFocusTarget(listRootReference.current, snoozeThread.threadId)}
+                                threadId={snoozeThread.threadId}
+                            />
+                        )}
+                        {renameThread && !isThreadLocked(renameThread.lockedAt) && (
+                            <RenameThreadDialog
+                                onOpenChange={(open) => {
+                                    if (!open) {
+                                        setRenameThreadId(null);
+                                    }
+                                }}
+                                open
+                                restoreFocus={() => renameFocusTarget(listRootReference.current, renameThread.threadId)}
+                                storedTitle={renameThread.storedTitle ?? renameThread.title}
+                                threadId={renameThread.threadId}
+                            />
+                        )}
+                    </div>
+                </SearchQueryContext>
+            </KeyboardSelectionProvider>
         </PullRequestCountsProvider>
     );
 };

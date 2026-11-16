@@ -2,6 +2,7 @@
 
 import { Plural, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { useUnlockProof } from "@neore/client-runtime";
 import { Alert, AlertDescription, AlertTitle } from "@neore/ui/components/alert";
 import { Button } from "@neore/ui/components/button";
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPopup, DialogTitle } from "@neore/ui/components/dialog";
@@ -41,8 +42,9 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
     const dialogId = useId();
     const ready = useAfterFirstPaint();
     const crpc = useCRPC();
+    const unlockProof = useUnlockProof(threadId);
     const access = useQuery(
-        crpc.chat.sharing.getThreadAccess.queryOptions(ready && threadId !== undefined ? { threadId: threadId as Id<"threads"> } : skipToken),
+        crpc.chat.sharing.getThreadAccess.queryOptions(ready && threadId !== undefined ? { threadId: threadId as Id<"threads">, unlockProof } : skipToken),
     );
     const links = useThreadPullRequests(ready ? threadId : undefined);
     const attach = useAttachPullRequests();

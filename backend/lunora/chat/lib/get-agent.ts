@@ -190,6 +190,17 @@ const resolveProviderKey = (provider: string, userProviderKeys: Record<string, s
     return keyName ? userProviderKeys?.[keyName] || undefined : undefined;
 };
 
+/**
+ * The name {@link getAgent} gives the agent for `model`, without building one: the model itself when it has an agent or
+ * names a custom endpoint, else the default it falls back to. A prompt saved without an agent client is stamped with it.
+ */
+export const agentNameFor = async (model: string): Promise<string> => {
+    const agents = await getAgents();
+    const { parseCustomModelId } = await import("@neore/ai/models");
+
+    return agents[model] || parseCustomModelId(model) ? model : defaultModelUnderRules(DEFAULT_CHAT_MODEL, undefined, readsImagesAndCallsTools);
+};
+
 const getAgent = async (model: AgentModel | string, options: GetAgentOptions): Promise<Agent> => {
     const agents = await getAgents();
     let agent = agents[model as string];

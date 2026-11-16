@@ -33,7 +33,7 @@ import { Eye, EyeOff, KeyRound, X } from "lucide-react";
 import type { FC, FormEvent } from "react";
 import { useId, useRef, useState } from "react";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useChatThread } from "@/features/chat/core/context/chat-context";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -99,8 +99,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const { thread, threadId } = useChatThread();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const headingId = useId();
     const fieldId = useId();
     const saveErrorId = useId();
@@ -352,7 +351,7 @@ const RequestSecretPrompt: FC<{ part: ToolPart }> = ({ part }) => {
             tabIndex={-1}
         >
             <div className="flex items-start gap-2">
-                <KeyRound aria-hidden="true" className="text-primary mt-0.5 size-4 shrink-0" />
+                <KeyRound aria-hidden="true" className="text-primary-text mt-0.5 size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium" id={headingId}>
                         {label || t`The assistant needs a secret`}

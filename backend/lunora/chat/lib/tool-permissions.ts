@@ -17,8 +17,9 @@
  *
  * Headless callers (triggers, messenger, workflows) pass `headless: true`: nobody
  * is there to answer an approval request, so `ask` degrades to `off` rather than
- * being silently auto-approved. The one exception is a consent the run INHERITS
- * (`headlessApproved`, see {@link resolveToolPermission}).
+ * being silently auto-approved. The exceptions are a consent the run INHERITS
+ * (`headlessApproved`, see {@link resolveToolPermission}) and a run that pauses
+ * for its owner's answer instead (`headlessCanAsk`, a sub-agent child).
  *
  * Device tools (`device-tools.ts`) run on the user's own computer and are
  * approved THERE, in the desktop shell's local window — so their chat-side
@@ -31,6 +32,8 @@ import type { LowRiskCheck } from "./low-risk-approval";
 import { lowRiskIneligibleReason } from "./low-risk-approval";
 import type { ToolPermissionGrants } from "./tool-permission-grants";
 import { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
+import type { ThreadPermissionMode } from "./thread-permission-mode";
+import { BUILTIN_TOOLS_READ_ONLY } from "./thread-permission-mode";
 import { grantExpiryFor } from "./tool-permission-grants";
 
 export type ToolPermissionMode = "auto" | "ask" | "off";
@@ -60,6 +63,11 @@ export const TOOL_PERMISSION_MODES: ReadonlyArray<ToolPermissionMode> = ["auto",
 export const isToolPermissionMode = (value: unknown): value is ToolPermissionMode =>
     typeof value === "string" && (TOOL_PERMISSION_MODES as ReadonlyArray<string>).includes(value);
 
+const MODE_RANK: Record<ToolPermissionMode, number> = { ask: 1, auto: 2, off: 0 };
+
+/** The lower of a mode and a cap, in the order `off` < `ask` < `auto`. */
+export const clampToolPermission = (mode: ToolPermissionMode, cap: ToolPermissionMode): ToolPermissionMode => (MODE_RANK[mode] <= MODE_RANK[cap] ? mode : cap);
+
 /**
  * Stable preference key for a tool.
  *
@@ -80,7 +88,8 @@ export const toolPermissionKey = (source: ToolSource, toolName: string, owner?: 
  * Built-ins that default to `ask`. `delegateToCodingAgent` spends the user's
  * own provider key on a long sandbox run and can push to their GitHub;
  * `delegateToSubAgent` and `messageWorker` start a background run charged to their task quota —
- * so the user sees the task before anything starts. Headless callers lose them
+ * so the user sees the task before anything starts. `replyToReviewComment` and `rerunFailedChecks` act on a pull request
+ * as the user (`mergePullRequest` asks every time: it needs a person). Headless callers lose them
  * (`ask` degrades to `off`), which is intended — except a sub-agent's own
  * delegation, which inherits the consent its parent call was given
  * (`sub-agents/execute.ts`).
@@ -89,8 +98,11 @@ export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set([
     "askUser",
     "delegateToCodingAgent",
     "delegateToSubAgent",
+    "mergePullRequest",
     "messageWorker",
+    "replyToReviewComment",
     "requestSecret",
+    "rerunFailedChecks",
 ]);
 
 const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "messageWorker"]);
@@ -138,6 +150,12 @@ export interface ToolPermissionOptions {
      */
     headlessApproved?: ReadonlySet<string>;
     /**
+     * Headless only: an `ask` tool stays (with an approval request) instead of being removed, because the run pauses
+     * and its owner answers in a conversation (a sub-agent child, `sub-agents/execute.ts`). Device tools and the tools
+     * that need a person's own input are still removed.
+     */
+    headlessCanAsk?: boolean;
+    /**
      * The user's opt-in quick check (`low-risk-approval.ts`). Given, an `ask` tool that is eligible for it asks the check
      * before pausing: `true` runs the call unasked, anything else pauses as before. Omitted (the setting is off, or the
      * run is not one a person is in), every `ask` tool pauses exactly as it always did.
@@ -147,6 +165,17 @@ export interface ToolPermissionOptions {
     lowRiskTrusted?: ReadonlySet<string>;
     /** The instant the grants are judged at. Defaults to the clock. */
     now?: number;
+    /**
+     * The broadest mode any run in this organization may give a tool (`org-policy.md` §6a). Absent: no cap (`auto`).
+     * A tool above it is held at it. Below `auto` nothing lifts an `ask` (a grant, the quick check, a headless
+     * inheritance), and device tools are removed: their approvals live on the member's computer.
+     */
+    permissionCap?: ToolPermissionMode;
+    /**
+     * The thread's permission mode (`thread-permission-mode.ts`). Absent is `auto`, today's behaviour. Ignored by a headless run.
+     * See {@link threadModeDefault} for what each value does.
+     */
+    threadMode?: ThreadPermissionMode;
     /**
      * The user's time-boxed allows (`tool-permission-grants.ts`). They turn an `ask` into an `auto` for an interactive run only: a
      * headless run inherits nothing, and `off` stays off.
@@ -161,7 +190,45 @@ export interface ResolvedToolPermission {
 }
 
 /**
- * Effective mode for one tool: override, else default, then the headless clamp.
+ * The tool's default as the thread's mode moves it. Applied to the DEFAULT only (see {@link resolveToolPermissionWithGrant}).
+ *
+ * - `supervised`: a tool that would run asks, unless it is a built-in read-only lookup. A third-party tool's read-only hint is
+ *   the server's own word, so it asks too.
+ * - `full`: a tool that would ask runs, unless it waits for a person.
+ * - `auto` / absent: the default unchanged.
+ * Device tools are approved on the device itself and keep their default in every mode. Only built-ins are classed read-only
+ * by name; a third-party tool that defaults to `auto` already declared itself read-only.
+ */
+const threadModeDefault = (
+    chosen: ToolPermissionMode,
+    descriptor: ToolDescriptor,
+    builtinName: string | undefined,
+    threadMode: ThreadPermissionMode | undefined,
+): ToolPermissionMode => {
+    if (descriptor.source === "device" || threadMode === undefined || threadMode === "auto") {
+        return chosen;
+    }
+
+    if (threadMode === "full") {
+        const needsPerson = builtinName !== undefined && BUILTIN_TOOLS_NEEDING_A_PERSON.has(builtinName);
+
+        return chosen === "ask" && !needsPerson ? "auto" : chosen;
+    }
+
+    if (chosen !== "auto") {
+        return chosen;
+    }
+
+    // A third-party tool's read-only hint is the server's own word, so under supervised it asks like any other tool.
+    if (builtinName === undefined) {
+        return "ask";
+    }
+
+    return BUILTIN_TOOLS_READ_ONLY.has(builtinName) ? chosen : "ask";
+};
+
+/**
+ * Effective mode for one tool: override, else default (moved by the thread's mode), then the headless clamp.
  */
 export const resolveToolPermission = (
     descriptor: ToolDescriptor,
@@ -175,18 +242,34 @@ export const resolveToolPermissionWithGrant = (
     overrides: ToolPermissionOverrides | null | undefined,
     options: ToolPermissionOptions = {},
 ): ResolvedToolPermission => {
+    const cap = options.permissionCap ?? "auto";
     const override = overrides?.[descriptor.key];
     const builtinName = descriptor.source === "builtin" ? descriptor.key.slice("builtin:".length) : undefined;
-    let chosen = isToolPermissionMode(override) ? override : defaultToolPermission(descriptor.source, descriptor.annotations, builtinName);
+    // Precedence: a mode the user set for THIS tool wins over the thread's mode in both directions ("Always allow" is not
+    // taken back by `supervised`, a chosen `ask` is not lifted by `full`); the thread's mode moves only the default. A
+    // headless run ignores it: nobody is there, and its own clamp below decides. The organization's cap then clamps
+    // whichever was chosen, so neither an override nor `full` lifts a tool above it, and everything below (grants,
+    // headless, the origin clamp) reads the clamped mode.
+    const modeForDefault = options.headless ? undefined : options.threadMode;
+    let chosen = clampToolPermission(
+        isToolPermissionMode(override)
+            ? override
+            : threadModeDefault(defaultToolPermission(descriptor.source, descriptor.annotations, builtinName), descriptor, builtinName, modeForDefault),
+        cap,
+    );
     let timedUntil: number | undefined;
 
-    // Before the origin clamp below, so an outside agent's grant-lifted tool is still `ask`.
-    if (chosen === "ask" && !options.headless && descriptor.source !== "device") {
+    // Before the origin clamp below, so an outside agent's grant-lifted tool is still `ask`. A grant lifts to `auto`, so it needs `auto` under the cap.
+    if (chosen === "ask" && cap === "auto" && !options.headless && descriptor.source !== "device") {
         timedUntil = grantExpiryFor(options.timedGrants, descriptor.key, options.now ?? Date.now());
 
         if (timedUntil !== undefined) {
             chosen = "auto";
         }
+    }
+
+    if (cap !== "auto" && descriptor.source === "device") {
+        return { mode: "off" };
     }
 
     if (options.apiKeyOrigin && descriptor.source === "device") {
@@ -214,7 +297,12 @@ export const resolveToolPermissionWithGrant = (
     }
 
     if (mode === "ask") {
-        return { mode: builtinName !== undefined && options.headlessApproved?.has(builtinName) ? "auto" : "off" };
+        // An inherited consent lifts to `auto`, so it needs `auto` under the cap.
+        if (cap === "auto" && builtinName !== undefined && options.headlessApproved?.has(builtinName)) {
+            return { mode: "auto" };
+        }
+
+        return { mode: options.headlessCanAsk ? "ask" : "off" };
     }
 
     return { mode };
@@ -300,8 +388,11 @@ export const applyToolPermissions = (
         }
 
         // Only a tool the user left at its default `ask` can be put to the quick check; the rules are in `low-risk-approval.ts`.
+        // The quick check is an automatic approval, so it runs only where `auto` is allowed at all.
         const check =
-            options.lowRiskCheck && lowRiskIneligibleReason(descriptor, isToolPermissionMode(overrides?.[descriptor.key]), options) === null
+            options.lowRiskCheck &&
+            (options.permissionCap ?? "auto") === "auto" &&
+            lowRiskIneligibleReason(descriptor, isToolPermissionMode(overrides?.[descriptor.key]), options) === null
                 ? options.lowRiskCheck
                 : undefined;
 

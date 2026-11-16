@@ -2,42 +2,51 @@ import { Link } from "expo-router";
 import { useState } from "react";
 import { AccessibilityInfo, FlatList, Pressable, Text, TextInput, View } from "react-native";
 
+import { withFinally } from "@/lib/guarded";
 import { getClient } from "@/lib/lunora";
+import { useOffline, useWriteControl } from "@/offline/offline-context";
 import { createProject, isWriteBlocked, writeErrorMessage } from "@/projects/projects-api";
-import { useIsOffline, useProjects } from "@/projects/use-projects";
+import { useProjects } from "@/projects/use-projects";
 
 const ProjectsScreen = () => {
     const { error: loadError, rows } = useProjects();
-    const isOffline = useIsOffline();
+    const { isOffline } = useOffline();
+    // Off while offline and while the first token mint is out: the write carries the token and would be refused without one.
+    const createControl = useWriteControl("create");
     const [name, setName] = useState("");
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const create = async () => {
-        if (isWriteBlocked({ busy: creating, offline: isOffline })) {
+        if (isWriteBlocked({ busy: creating, offline: createControl.disabled })) {
             return;
         }
 
         setCreating(true);
         setError(null);
 
-        try {
-            const created = await createProject(getClient(), name);
+        const attempt = async () => {
+            try {
+                const created = await createProject(getClient(), name);
 
-            setName("");
-            // The live list delivers the row itself; this tells a screen reader the tap did something.
-            AccessibilityInfo.announceForAccessibility(`Project ${created.title} created`);
-        } catch (error_: unknown) {
-            const message = writeErrorMessage(error_);
+                setName("");
+                // The live list delivers the row itself; this tells a screen reader the tap did something.
+                AccessibilityInfo.announceForAccessibility(`Project ${created.title} created`);
+            } catch (error_: unknown) {
+                const message = writeErrorMessage(error_);
 
-            setError(message);
-            AccessibilityInfo.announceForAccessibility(message);
-        } finally {
+                setError(message);
+                AccessibilityInfo.announceForAccessibility(message);
+            }
+        };
+
+        // `withFinally`, not `try … finally`: the React Compiler skips a component that holds a `finally`.
+        await withFinally(attempt, () => {
             setCreating(false);
-        }
+        });
     };
 
-    const blocked = isWriteBlocked({ busy: creating, offline: isOffline });
+    const blocked = isWriteBlocked({ busy: creating, offline: createControl.disabled });
     const shownError = error ?? loadError;
 
     return (
@@ -76,6 +85,7 @@ const ProjectsScreen = () => {
                     {isOffline
                         ? <Text accessibilityRole="alert">You are offline. Creating a project needs a connection.</Text>
                         : null}
+                    {!isOffline && createControl.reason ? <Text accessibilityRole="alert">{createControl.reason}</Text> : null}
                     {shownError
                         ? <Text accessibilityRole="alert" style={{ color: "#b00020" }}>{shownError}</Text>
                         : null}

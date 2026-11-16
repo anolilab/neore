@@ -2,7 +2,7 @@
  * Who may start a checkout and open the customer portal.
  *
  * The handlers run directly against a hand-built action context: `ctx.payments`
- * (the Creem adapter) is a recording fake, `ctx.runQuery` answers the billing
+ * (the facade) and `./provider` (the portal) are recording fakes, `ctx.runQuery` answers the billing
  * subject from a map, and the session is whatever the test sets. Nothing here
  * reaches Creem.
  */
@@ -53,6 +53,18 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
 });
 
+const portalCalls = vi.hoisted(() => {
+    return { createPortalSession: undefined as unknown as (input: Record<string, unknown>) => Promise<{ url: string }> };
+});
+
+vi.mock("./provider", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("./provider")>()),
+        portalLink: async (referenceId: string, customerId: string, returnUrl: string) =>
+            await portalCalls.createPortalSession({ customerId, referenceId, returnUrl }),
+    };
+});
+
 const { createCheckout, getBillingSubject, openCustomerPortal } = await import("./checkout");
 
 interface Subject {
@@ -94,12 +106,14 @@ const createPortalSession = vi.fn(async (_input: Record<string, unknown>) => {
     return { url: "https://portal.example.com/p1" };
 });
 
+portalCalls.createPortalSession = createPortalSession;
+
 const context = (userId: string) => {
     return {
         auth: { getIdentity: async () => null, userId },
         db: {},
         log: { event: vi.fn() },
-        payments: { adapter: { createCheckout: createCheckoutSession, createPortalSession } },
+        payments: { createCheckout: createCheckoutSession },
         runQuery: vi.fn(async (_reference: unknown, { id, kind }: { id: string; kind: string }) => subjects.get(`${kind}:${id}`) ?? subject({ exists: false })),
     };
 };
@@ -129,6 +143,7 @@ describe("createCheckout", () => {
         await expect(checkout(OWNER, { plan: "pro" })).resolves.toStrictEqual({ url: "https://checkout.example.com/c1" });
 
         expect(createCheckoutSession).toHaveBeenCalledExactlyOnceWith({
+            email: `${OWNER}@example.com`,
             metadata: { purchaserId: OWNER },
             mode: "subscription",
             priceId: "prod_pro",

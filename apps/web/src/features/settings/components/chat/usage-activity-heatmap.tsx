@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neor
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
 import cn from "@neore/ui/utils/cn";
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { CalendarDays } from "lucide-react";
 import type { FC, KeyboardEvent } from "react";
 import { useId, useState } from "react";
@@ -12,6 +12,7 @@ import { useId, useState } from "react";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill } from "../../hooks/use-usage-backfill";
+import { keepAcrossDayTurn, useUsageToday } from "../../hooks/use-usage-today";
 import type { HeatmapCell, HeatmapLevel, HeatmapMetric } from "../../lib/usage-activity";
 import { addDays, buildHeatmap, dayKeyToDate, daysBetween, formatUsd, HEATMAP_WEEKS, localDayKey, stepDay } from "../../lib/usage-activity";
 
@@ -62,20 +63,25 @@ const UsageActivityHeatmap: FC<UsageActivityHeatmapProps> = ({ backfilling }) =>
     const crpc = useCRPC();
     const titleId = useId();
     const summaryId = useId();
-    const [today] = useState(() => localDayKey(new Date()));
+    const { failed: zoneFailed, today, zone } = useUsageToday();
     const [metric, setMetric] = useState<HeatmapMetric>("replies");
     const [activeDate, setActiveDate] = useState<string | null>(null);
 
     // One-shot: a year of aggregates would otherwise re-run on every reply. While
     // the backfill adds earlier replies it is re-read now and then instead.
-    const { data, isError, isPending, refetch } = useQuery({
-        ...crpc.usage.activity.getActivityHeatmap.queryOptions({ toDate: today }, { live: false }),
+    const heatmapQuery = crpc.usage.activity.getActivityHeatmap.queryOptions(today === undefined ? skipToken : { toDate: today }, { live: false });
+    const query = useQuery({
+        ...keepAcrossDayTurn(heatmapQuery, `heatmap:${zone}`),
         refetchInterval: backfilling ? BACKFILL_REFETCH_MS : false,
     });
 
-    useRefetchAfterBackfill(backfilling, refetch);
+    useRefetchAfterBackfill(backfilling, query.refetch, today !== undefined);
 
-    const model = buildHeatmap(data?.days ?? [], today, metric);
+    const { data } = query;
+    const isError = query.isError || zoneFailed;
+    const isPending = query.isPending && !zoneFailed;
+    // Drawn only once `today` is known; until then the grid is a skeleton and this day is never shown.
+    const model = buildHeatmap(data?.days ?? [], today ?? localDayKey(new Date()), metric);
     const locale = i18n.locale || "en";
     const dayFormat = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" });
     const monthFormat = new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" });

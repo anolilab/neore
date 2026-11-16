@@ -279,7 +279,7 @@ const DataTableSortItem = ({ columnLabels, columns, dir, onSortRemove, onSortUpd
                 open={showDirectionSelector}
                 value={sort.desc ? "desc" : "asc"}
             >
-                <SelectTrigger aria-controls={directionListboxId} className="w-24 rounded" size="sm">
+                <SelectTrigger aria-controls={directionListboxId} aria-label={t`Sort direction`} className="w-24 rounded" size="sm">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="min-w-(--radix-select-trigger-width)" id={directionListboxId}>
@@ -301,6 +301,7 @@ const DataTableSortItem = ({ columnLabels, columns, dir, onSortRemove, onSortUpd
                 <Trash2 aria-hidden="true" />
             </Button>
             <SortableItemHandle
+                aria-controls={sortItemId}
                 render={
                     <Button aria-label={t`Reorder sort`} className="size-8 shrink-0 rounded" size="icon" variant="outline">
                         <GripVertical aria-hidden="true" />

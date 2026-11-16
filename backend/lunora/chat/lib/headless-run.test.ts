@@ -6,7 +6,7 @@
  */
 import { MODEL_REGISTRY, requiresPaidPlan } from "@neore/ai/models";
 import { getSystemPrompt } from "@neore/ai/prompts";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mappedReferences } from "../../../test/registered-api";
 
@@ -20,14 +20,19 @@ const seen = vi.hoisted(() => {
         buildOptions: [] as unknown[],
         callOptions: [] as unknown[],
         created: [] as unknown[],
-        failAt: undefined as "generate" | "keys" | "thread" | undefined,
+        failAt: undefined as "generate" | "keys" | "round" | "thread" | undefined,
         filterRules: undefined as Record<string, string[]> | undefined,
         filters: [] as unknown[],
         met: [] as boolean[],
+        /** The owner has left the run's organization. */
+        notMember: false,
         prepareSteps: [] as unknown[],
         prompts: [] as (string | undefined)[],
         providerOptions: [] as unknown[],
         replies: [] as string[],
+        // Extra fields of the next generation's result (its prompt's order, its steps).
+        result: {} as Record<string, unknown>,
+        saved: [] as unknown[][],
         system: [] as string[],
         tools: [] as string[][],
     };
@@ -62,13 +67,14 @@ vi.mock("./get-agent", () => {
                     seen.providerOptions.push(args.providerOptions);
                     seen.callOptions.push(callOptions);
 
-                    if (seen.failAt === "generate") {
+                    // "round": the first generation answers, a goal's later round fails.
+                    if (seen.failAt === "generate" || (seen.failAt === "round" && seen.prompts.length > 1)) {
                         throw new Error("model call failed");
                     }
 
                     seen.system.push(args.system ?? instructions);
 
-                    return { text: seen.replies.shift() ?? "reply" };
+                    return { ...seen.result, savedMessages: seen.saved.shift() ?? [], text: seen.replies.shift() ?? "reply" };
                 },
             };
 
@@ -99,7 +105,12 @@ vi.mock("../goals/review", () => {
     };
 });
 
-vi.mock("./agent-tools", () => {
+vi.mock("./agent-tools", async () => {
+    const { default: z } = await import("zod/v4");
+    const { createTool } = await import("../../agent/client/create-tool");
+    // A real tool, as every built-in is: it carries a `needsApproval` function, which never asks.
+    const webSearch = createTool({ description: "Search the web", execute: async () => "results", inputSchema: z.object({}) });
+
     return {
         buildAgentTools: async (_ctx: unknown, options: unknown) => {
             seen.buildOptions.push(options);
@@ -107,7 +118,13 @@ vi.mock("./agent-tools", () => {
             return {
                 mcpClients: [],
                 mcpLabels: { mcp_notes_search: { serverName: "notes", toolName: "search" } },
-                tools: { browser: {}, dateTime: {}, imageGeneration: {}, mcp_notes_search: {}, webSearch: {} },
+                mcpServerNames: ["notes"],
+                // A tool the allowlist drops keeps no fingerprint in the snapshot.
+                mcpToolFingerprints: { mcp_notes_other: "fp-other", mcp_notes_search: "fp-search" },
+                permissionKeys: { browser: "builtin:browser", mcp_notes_search: "mcp:notes:search", webSearch: "builtin:webSearch" },
+                // The notes search is set to `ask`, a tool kept for a run that may pause.
+                requiresApproval: ["mcp_notes_search"],
+                tools: { browser: {}, dateTime: {}, imageGeneration: {}, mcp_notes_search: { needsApproval: true }, webSearch },
             };
         },
     };
@@ -141,6 +158,10 @@ const fakeCtx = (prefs: typeof PREFS = PREFS) =>
                 return { modelFilterRules: seen.filterRules };
             }
 
+            if (reference === "auth_organization_policy:isOrganizationMemberQuery") {
+                return !seen.notMember;
+            }
+
             if (reference === "auth_functions:getDecryptedProviderKeysQuery") {
                 if (seen.failAt === "keys") {
                     throw new Error("provider keys unavailable");
@@ -151,7 +172,7 @@ const fakeCtx = (prefs: typeof PREFS = PREFS) =>
 
             throw new Error(`unexpected query ${reference}`);
         }),
-        scheduler: { runAfter: vi.fn() },
+        scheduler: { runAfter: vi.fn(async () => {}) },
     }) as never;
 
 const SECRETS = ["SECRET-ABOUT-ME", "SECRET-NICKNAME", "SECRET-PROFESSION", "SECRET-INSTRUCTIONS", "SECRET-LOCATION"];
@@ -166,6 +187,7 @@ describe("runHeadlessAgent personalization", () => {
             maxSteps: 3,
             memory: false,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             thread: { threadId: "thread-1" },
@@ -184,6 +206,7 @@ describe("runHeadlessAgent personalization", () => {
         await runHeadlessAgent(fakeCtx(), {
             memory: false,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "full",
             prompt: "Do the thing",
@@ -203,6 +226,7 @@ describe("runHeadlessAgent hidden characters", () => {
         runHeadlessAgent(fakeCtx(), {
             memory: false,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt,
@@ -252,6 +276,7 @@ describe("runHeadlessAgent backup model", () => {
         await runHeadlessAgent(ctx as never, {
             memory: false,
             model: PRIMARY,
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt: "Do the thing",
@@ -335,6 +360,7 @@ describe("runHeadlessAgent context sizing for a backup", () => {
             maxSteps: 5,
             memory: false,
             model: PRIMARY,
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt: "go",
@@ -361,12 +387,14 @@ describe("runHeadlessAgent context sizing for a backup", () => {
 describe("runHeadlessAgent thread tags", () => {
     beforeEach(() => {
         seen.created = [];
+        seen.notMember = false;
     });
 
     const run = async (ctx: unknown, extra: Partial<Parameters<typeof runHeadlessAgent>[1]> = {}) =>
         await runHeadlessAgent(ctx as never, {
             memory: false,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt: "Do the thing",
@@ -399,6 +427,38 @@ describe("runHeadlessAgent thread tags", () => {
 
         expect(patches[0]).toEqual({ botId: "bot-1" });
     });
+
+    it("creates a new thread with the run's organization, so no linked thread exists without it", async () => {
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await run(ctx, { organizationId: "org-a" });
+
+        expect(seen.created).toEqual([{ organizationId: "org-a", tags: ["trigger"], title: "Trigger: x", userId: "owner" }]);
+
+        const patches = ctx.runMutation.mock.calls.map(([, args]) => (args as { patch?: object }).patch);
+
+        expect(patches.some((patch) => patch && "organizationId" in patch)).toBe(false);
+    });
+
+    it("refuses a run whose owner left its organization, filing no thread under it", async () => {
+        const ctx = fakeCtx();
+
+        seen.notMember = true;
+
+        // The run's own kind, so a trigger or task stops instead of failing on every later run.
+        await expect(run(ctx, { organizationId: "org-left" })).rejects.toMatchObject({ kind: "left-organization", name: "AgentRunError" });
+        expect(seen.created).toEqual([]);
+    });
+
+    it("never moves an existing thread into another organization", async () => {
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await run(ctx, { organizationId: "org-b", thread: { threadId: "thread-1" } });
+
+        const patches = ctx.runMutation.mock.calls.map(([, args]) => (args as { patch?: object }).patch);
+
+        expect(patches.some((patch) => patch && "organizationId" in patch)).toBe(false);
+    });
 });
 
 describe("runHeadlessAgent fresh context and reasoning effort", () => {
@@ -429,6 +489,7 @@ describe("runHeadlessAgent fresh context and reasoning effort", () => {
         await runHeadlessAgent(paidCtx() as never, {
             memory: false,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt: "Run the report",
@@ -479,6 +540,7 @@ describe("runHeadlessAgent tool allowlist", () => {
             maxSteps: 5,
             memory: false,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             thread: { threadId: "thread-1" },
@@ -486,6 +548,12 @@ describe("runHeadlessAgent tool allowlist", () => {
             userId: "owner",
             ...extra,
         });
+
+    it("builds its tools under the run's organization, whose cap the tool assembly reads", async () => {
+        await run({ organizationId: "org-a" });
+
+        expect(seen.buildOptions).toMatchObject([{ headless: true, organizationId: "org-a" }]);
+    });
 
     it("narrows to the allowlist and drops MCP tools unless told to keep them", async () => {
         await run({ toolAllowlist: ["webSearch", "imageGeneration"] });
@@ -510,6 +578,7 @@ describe("runHeadlessAgent onGenerationStart", () => {
             memory: false,
             model: "test-model",
             onGenerationStart,
+            organizationId: null,
             origin: "lead",
             personalization: "full",
             prompt: "Do the thing",
@@ -576,6 +645,7 @@ describe("runHeadlessAgent with a goal and memory", () => {
             goal: { text: "Ship it" },
             memory: true,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt: "Do the thing",
@@ -596,6 +666,7 @@ describe("runHeadlessAgent with a goal and memory", () => {
         await runHeadlessAgent(ctx, {
             memory: true,
             model: "test-model",
+            organizationId: null,
             origin: "lead",
             personalization: "none",
             prompt: "Do the thing",
@@ -605,5 +676,248 @@ describe("runHeadlessAgent with a goal and memory", () => {
         });
 
         expect(extractions(ctx as never)).toEqual(["only answer"]);
+    });
+});
+
+describe("runHeadlessAgent failure on a thread it continues", () => {
+    beforeEach(() => {
+        seen.prompts = [];
+    });
+
+    afterEach(() => {
+        seen.failAt = undefined;
+    });
+
+    // A snoozed thread wakes when a run on it fails, whichever generation fails; the run's own error is still thrown.
+    it.each([
+        ["the first generation", "generate"],
+        ["a goal's later round", "round"],
+    ] as const)("wakes the thread when %s fails", async (_label, failAt) => {
+        seen.failAt = failAt;
+        seen.met = [false];
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await expect(
+            runHeadlessAgent(ctx as never, {
+                goal: { text: "Ship it" },
+                memory: false,
+                model: "test-model",
+                organizationId: null,
+                origin: "lead",
+                personalization: "none",
+                prompt: "Run the report",
+                thread: { threadId: "thread-1" },
+                tools: "none",
+                userId: "owner",
+            }),
+        ).rejects.toThrow("model call failed");
+        expect(ctx.runMutation).toHaveBeenCalledWith("agent_threads:updateThread", { failed: true, patch: {}, threadId: "thread-1" });
+    });
+});
+
+const GOAL_REFUSED = /cannot have a goal/u;
+
+describe("runHeadlessAgent pauseForApproval", () => {
+    beforeEach(() => {
+        seen.buildOptions = [];
+        seen.result = {};
+        seen.saved = [];
+    });
+
+    const RUN_ID = "run-1" as never;
+    const approvalRequest = [
+        {
+            _id: "row-1",
+            message: {
+                content: [
+                    { input: { query: "x" }, toolCallId: "call-1", toolName: "mcp_notes_search", type: "tool-call" },
+                    { approvalId: "approval-1", toolCallId: "call-1", type: "tool-approval-request" },
+                ],
+                role: "assistant",
+            },
+        },
+    ];
+
+    const run = async (ctx: unknown, extra: Partial<Parameters<typeof runHeadlessAgent>[1]> = {}) =>
+        await runHeadlessAgent(ctx as never, {
+            memory: false,
+            model: "test-model",
+            organizationId: null,
+            origin: "lead",
+            personalization: "full",
+            prompt: "Do the thing",
+            system: "SUB-AGENT RULES",
+            thread: { threadId: "child-1" },
+            toolAllowlist: ["mcp_notes_search", "webSearch"],
+            toolAllowlistKeepsMcp: false,
+            tools: "headless",
+            userId: "owner",
+            ...extra,
+        });
+
+    const calls = (ctx: unknown, reference: string) =>
+        (ctx as { runMutation: ReturnType<typeof vi.fn> }).runMutation.mock.calls.filter(([ref]) => ref === reference).map(([, args]) => args);
+
+    it("keeps ask tools only for a run that may pause, so triggers and tasks still lose them", async () => {
+        await run(fakeCtx());
+        await run(fakeCtx(), { pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        expect(seen.buildOptions[0]).not.toHaveProperty("headlessCanAsk");
+        expect(seen.buildOptions[1]).toMatchObject({ headless: true, headlessCanAsk: true });
+    });
+
+    it("stops on an approval request: records the run's snapshot on its thread and answers paused, not with text", async () => {
+        seen.saved = [approvalRequest];
+
+        const ctx = fakeCtx();
+        const result = await run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        expect(result).toMatchObject({ paused: true, threadId: "child-1" });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as {
+            approvalIds: string[];
+            config: Record<string, unknown>;
+            threadId: string;
+            userId: string;
+        }[];
+
+        // The thread is marked awaiting in the same write as the request.
+        expect(recorded).toMatchObject({ approvalIds: ["approval-1"], awaitingInput: "approval", threadId: "child-1", userId: "owner" });
+        // The snapshot is the run as it was: the allowlisted tools, their permission keys (so "Always allow" can write
+        // one), their fingerprints (so a tool changed meanwhile is refused), the servers, the final system prompt and the run.
+        expect(recorded!.config).toMatchObject({
+            mcpServerNames: ["notes"],
+            mcpToolFingerprints: { mcp_notes_search: "fp-search" },
+            subAgentRunId: RUN_ID,
+            toolNames: ["mcp_notes_search", "webSearch"],
+            toolPermissionKeys: { mcp_notes_search: "mcp:notes:search", webSearch: "builtin:webSearch" },
+        });
+        expect(recorded!.config.instructions).toContain("SUB-AGENT RULES");
+
+        const patches = calls(ctx, "agent_threads:updateThread").map((args) => (args as { patch: Record<string, unknown> }).patch);
+
+        expect(patches.at(-1)).toMatchObject({ status: "active" });
+        expect(patches.at(-1)).not.toHaveProperty("lastReplyAt");
+    });
+
+    it("saves what started the run and its chain, so a task's child resumes dispatching as before, within the task's limit", async () => {
+        seen.saved = [approvalRequest];
+
+        const ctx = fakeCtx();
+
+        await run(ctx, { chainSource: "task:t1", origin: "trigger", pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+        expect(recorded!.config).toMatchObject({ chainSource: "task:t1", dispatchOrigin: "trigger" });
+    });
+
+    it("saves the run's organization, whose cap the continuation reads when the thread has none", async () => {
+        seen.saved = [approvalRequest];
+
+        const ctx = fakeCtx();
+
+        await run(ctx, { organizationId: "org-a", pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+        expect(recorded!.config.organizationId).toBe("org-a");
+    });
+
+    it("labels the saved MCP calls with their real server before recording the request, as an interactive pause does", async () => {
+        seen.saved = [approvalRequest];
+
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        await run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const order = ctx.runMutation.mock.calls.map(([reference]) => reference);
+
+        expect(order.indexOf("chat_mcp_tool_labels:labelToolCalls")).toBeGreaterThan(-1);
+        expect(order.indexOf("chat_mcp_tool_labels:labelToolCalls")).toBeLessThan(order.indexOf("chat_tool_permissions:recordPendingToolApprovals"));
+    });
+
+    it("schedules the paid generation's usage even when the pause write fails, and fails the run", async () => {
+        seen.saved = [approvalRequest];
+
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn>; scheduler: { runAfter: ReturnType<typeof vi.fn> } };
+
+        ctx.runMutation.mockImplementation(async (reference: string) => {
+            if (reference === "chat_tool_permissions:recordPendingToolApprovals") {
+                throw new Error("write failed");
+            }
+
+            return null;
+        });
+
+        await expect(run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID } })).rejects.toThrow("write failed");
+        expect(ctx.scheduler.runAfter.mock.calls.map(([, reference]) => reference)).toContain("usage_activity:recordReplyUsage");
+    });
+
+    it("saves the steps left of the run's budget and a fresh-context run's own prompt order", async () => {
+        seen.saved = [approvalRequest];
+        seen.result = { order: 4, steps: [{}] };
+
+        const ctx = fakeCtx();
+
+        await run(ctx, { freshContext: true, maxSteps: 3, pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+        expect(recorded!.config).toMatchObject({ contextFromOrder: 4, stepsLeft: 2 });
+    });
+
+    it("saves no context boundary for a run that read the thread's usual window", async () => {
+        seen.saved = [approvalRequest];
+        seen.result = { order: 4, steps: [{}] };
+
+        const ctx = fakeCtx();
+
+        await run(ctx, { pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+        expect(recorded!.config).not.toHaveProperty("contextFromOrder");
+    });
+
+    it("records no pause for a request made on the run's last step, which no step is left to answer", async () => {
+        seen.saved = [approvalRequest];
+        seen.result = { steps: [{}] };
+
+        const ctx = fakeCtx();
+        const result = await run(ctx, { maxSteps: 1, pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        expect(result.paused).toBeUndefined();
+        expect(calls(ctx, "chat_tool_permissions:recordPendingToolApprovals")).toHaveLength(0);
+    });
+
+    it("offers no ask tool on the run's last step, so a run with a budget of one never asks", async () => {
+        const lastStepTools = async (maxSteps: number, stepNumber: number) => {
+            await run(fakeCtx(), { maxSteps, pauseForApproval: { subAgentRunId: RUN_ID } });
+
+            const prepare = seen.prepareSteps.at(-1) as (step: { messages: unknown[]; stepNumber: number }) => Promise<{ activeTools?: string[] } | undefined>;
+
+            const prepared = await prepare({ messages: [], stepNumber });
+
+            return prepared?.activeTools;
+        };
+
+        expect(await lastStepTools(3, 1)).toBeUndefined();
+        expect(await lastStepTools(3, 2)).toStrictEqual(["webSearch"]);
+        expect(await lastStepTools(1, 0)).toStrictEqual(["webSearch"]);
+    });
+
+    it("refuses a goal, whose later rounds are not checked for a request", async () => {
+        await expect(run(fakeCtx(), { goal: { text: "Ship it" }, pauseForApproval: { subAgentRunId: RUN_ID } })).rejects.toThrow(GOAL_REFUSED);
+    });
+
+    it("never records a pause for a run without the option", async () => {
+        seen.saved = [approvalRequest];
+
+        const ctx = fakeCtx();
+        const result = await run(ctx);
+
+        expect(result.paused).toBeUndefined();
+        expect(calls(ctx, "chat_tool_permissions:recordPendingToolApprovals")).toHaveLength(0);
     });
 });

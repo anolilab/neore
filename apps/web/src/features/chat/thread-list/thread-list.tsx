@@ -2,12 +2,13 @@ import { LUNORA_ID_SOURCE } from "@neore/client-runtime";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useLocation } from "@tanstack/react-router";
 import type { FC } from "react";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthActiveOrganization } from "@/features/auth/hooks/use-auth-session";
 import { THREAD_LIST_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import ManageThreadTagsDialog from "@/features/chat/tags/manage-thread-tags-dialog";
+import useDebouncedValue from "@/hooks/use-debounced-value";
 import { useHasOpened } from "@/hooks/use-has-opened";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
@@ -18,16 +19,32 @@ import { useThreadListPlaceholder } from "./hooks/use-thread-list-cache";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
 import type { GroupType, LoadingStates } from "./types";
 
-// Lazy: it pulls `lucide-react/dynamic`'s import map of every icon (~190KB) for its icon picker.
+// Lazy: a dialog opened on demand, with its icon picker and project panels.
 const ProjectFormDialog = lazy(() => import("@/features/projects/components/project-form-dialog"));
 
 const CHAT_THREAD_PATH_RE = new RegExp(`^/chat/(${LUNORA_ID_SOURCE})$`);
 
+/** How long typing pauses before the sidebar searches: one query per pause, not one per keystroke. */
+const SEARCH_DEBOUNCE_MS = 250;
+
+/** A cleared search box clears the search at once; typing again starts a fresh pause. */
+const isClearedQuery = (query: string): boolean => query === "";
+
+/** The search answer the list shows, with the search it answers: its query, its type and the organization it was asked in. */
+interface ShownAnswer {
+    data: unknown;
+    organizationId: string | null;
+    query: string;
+    type: "threads" | "messages";
+}
+
+const sameMembers = (left: ReadonlySet<string>, right: ReadonlySet<string>): boolean =>
+    left.size === right.size && [...left].every((member) => right.has(member));
+
 const ThreadList: FC = () => {
     const crpc = useCRPC();
     const { isAuthenticated, isLoading: isAuthLoading } = useLunoraAuth();
-    const { hooks } = useAuth();
-    const { data: activeOrganization } = hooks.useActiveOrganization();
+    const { data: activeOrganization } = useAuthActiveOrganization();
     const organizationId = activeOrganization?.id ?? null;
     const isAuthReady = isAuthenticated && !isAuthLoading;
     const [expandedThreads, setExpandedThreads] = useState<Set<string>>(() => new Set());
@@ -81,33 +98,62 @@ const ThreadList: FC = () => {
     const showManageTagsDialog = useThreadListUIStore((state) => state.showManageTagsDialog);
     const setShowManageTagsDialog = useThreadListUIStore((state) => state.setShowManageTagsDialog);
 
-    // Search threads when there's a search query and search type is "threads".
+    // The box shows every keystroke; the server is asked once typing pauses.
     // An EMPTY query must not run: it used to fire on every first paint of
     // /chat (the default type is "threads"), for results nothing shows.
-    const hasSearchQuery = searchQuery.trim() !== "";
-    const { data: threadSearchResults } = useQuery(
+    const typedQuery = searchQuery.trim();
+    // A cleared box clears at once, and its pending query with it: the full list must not wait for the pause.
+    const askedQuery = useDebouncedValue(typedQuery, SEARCH_DEBOUNCE_MS, isClearedQuery);
+
+    const threadSearch = useQuery(
         crpc.chat.functions.searchThreads.queryOptions(
-            hasSearchQuery && searchType === "threads"
+            askedQuery !== "" && searchType === "threads"
                 ? {
                       organizationId,
                       paginationOpts: THREAD_LIST_PAGINATION_OPTS,
-                      searchQuery: searchQuery.trim(),
+                      searchQuery: askedQuery,
                   }
                 : skipToken,
         ),
     );
 
-    // Search messages when there's a search query and search type is "messages"
-    const { data: messageSearchResults } = useQuery(
+    const messageSearch = useQuery(
         crpc.chat.functions.searchMessages.queryOptions(
-            hasSearchQuery && searchType === "messages"
+            askedQuery !== "" && searchType === "messages"
                 ? {
                       paginationOpts: THREAD_LIST_PAGINATION_OPTS,
-                      searchQuery: searchQuery.trim(),
+                      searchQuery: askedQuery,
                   }
                 : skipToken,
         ),
     );
+
+    // Each answer stays on screen, with the search it answers, until the next one arrives: the list never empties while a new
+    // query runs, and rows and their match snippets always come from the same query. Adjusted during render, as `previousInputs`
+    // below, so the answer and the list change together.
+    const askedSearch = searchType === "threads" ? threadSearch : messageSearch;
+    const [shownAnswer, setShownAnswer] = useState<ShownAnswer | null>(null);
+
+    if (typedQuery === "") {
+        // A cleared box forgets the answer: typing again shows every thread until the new query's own answer arrives.
+        if (shownAnswer !== null) {
+            setShownAnswer(null);
+        }
+    } else if (askedQuery !== "" && askedSearch.data !== undefined && askedSearch.data !== shownAnswer?.data) {
+        setShownAnswer({ data: askedSearch.data, organizationId, query: askedQuery, type: searchType });
+    }
+
+    // An answer for another search type is never shown, nor a thread search from another organization (thread search is asked per
+    // organization; message search is the person's own, so its hits stay across a switch): until this one's first answer, every
+    // thread is.
+    const isAnswerForThisSearch =
+        shownAnswer !== null && shownAnswer.type === searchType && (shownAnswer.type === "messages" || shownAnswer.organizationId === organizationId);
+    const visibleAnswer = typedQuery !== "" && isAnswerForThisSearch ? shownAnswer : null;
+    // A search that failed shows that it failed, not the full list as if no search ran.
+    const isSearchError = typedQuery !== "" && askedQuery !== "" && askedSearch.isError;
+    const shownQuery = isSearchError ? askedQuery : (visibleAnswer?.query ?? "");
+    const threadSearchResults = !isSearchError && visibleAnswer?.type === "threads" ? visibleAnswer.data : undefined;
+    const messageSearchResults = !isSearchError && visibleAnswer?.type === "messages" ? visibleAnswer.data : undefined;
 
     // Get current thread ID from URL
     const location = useLocation();
@@ -156,16 +202,16 @@ const ThreadList: FC = () => {
                 cursor = parent;
             }
 
-            setExpandedThreads(ancestors);
+            // The same ancestors keep the same set: a new one would re-render every row for nothing.
+            setExpandedThreads((previous) => (sameMembers(previous, ancestors) ? previous : ancestors));
         }
     }
 
-    // Check if search is loading
-    const isSearchLoading = Boolean(
-        searchQuery.trim() && ((searchType === "threads" && !threadSearchResults) || (searchType === "messages" && !messageSearchResults)),
-    );
+    // Searching while typing has not paused yet, or while the asked query's answer is on its way.
+    const isSearchLoading = typedQuery !== "" && (typedQuery !== askedQuery || askedSearch.isFetching);
 
-    const toggleExpanded = (threadId: string) => {
+    // Every row gets this: one function for the list's whole life.
+    const toggleExpanded = useCallback((threadId: string) => {
         setExpandedThreads((previous) => {
             const next = new Set(previous);
 
@@ -177,7 +223,7 @@ const ThreadList: FC = () => {
 
             return next;
         });
-    };
+    }, []);
 
     const toggleGroupCollapsed = (groupType: GroupType, projectId?: string) => {
         if (groupType === "project" && projectId) {
@@ -216,13 +262,14 @@ const ThreadList: FC = () => {
                     collapsedProjects={collapsedProjects}
                     currentThreadId={currentThreadId}
                     expandedThreads={expandedThreads}
+                    isSearchError={isSearchError}
                     isSearchLoading={isSearchLoading}
                     isSelectionMode={isSelectionMode}
                     lastSelectedIndex={lastSelectedIndex}
                     loadingStates={loadingStates}
                     messageSearchResults={messageSearchResults}
                     onExitSelectionMode={exitSelectionMode}
-                    searchQuery={searchQuery}
+                    searchQuery={shownQuery}
                     searchType={searchType}
                     selectedCategory={selectedCategory}
                     selectedThreadIds={selectedThreadIds}

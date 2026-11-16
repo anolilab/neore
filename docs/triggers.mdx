@@ -62,8 +62,14 @@ Receive HTTP POST requests from external services (Stripe, GitHub, Zapier, etc.)
 - **Rotating the secret**: the key button on a webhook trigger issues a new secret, shown once. The old secret stops working at once; tick "Keep accepting the old secret for 24 hours" to update the sender without a gap. The webhook URL does not change
 
 **Payload handling:**
-- The webhook body is passed to the AI as context
-- You can define a **payload template** to transform or filter the incoming data before it reaches the AI
+- The webhook body is passed to the AI as context, inside a frame it reads as data
+- The **Input template** is the prompt each delivery runs with. It can place parts of the delivery:
+  - `{{payload}}` — the whole body
+  - `{{body.a.b.0}}` — a value of the JSON body (a number indexes an array)
+  - `{{header.name}}` and `{{query.name}}` — a request header or query parameter. A repeated header reads as its values joined by `, `; a repeated query parameter reads as its first value. These are not covered by the signature, and a name that looks like a credential is never read
+- Each value is inserted as quoted data. A template that places neither `{{payload}}` nor a body field that the delivery has gets the whole body appended after it
+- A template with a header or query placeholder whose name looks like a credential (for example `authorization`, `token`, `author`) is refused when you save it: such a name is never read. Read the value from the signed body instead
+- With every value at its longest (10,000 characters for the body, 2,000 for a field), a template must fit in 20,000 characters
 
 #### Provider presets
 
@@ -117,7 +123,7 @@ A few details:
    - For Webhook: the URL and secret are generated automatically
 5. Optionally configure the agent:
    - **System prompt** — custom instructions for the AI when this trigger fires
-   - **Input template** — the initial message sent to the AI (for schedules)
+   - **Input template** — the initial message sent to the AI; for a webhook, the prompt each delivery runs with (see above)
    - **Model** — override the default model
    - **Search mode** — set the search mode for tool calls
 6. Click **Create Trigger**

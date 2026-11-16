@@ -13,12 +13,14 @@ import * as z from "zod";
 import type { SettingsCardProperties } from "@/components/settings/settings-card";
 import SettingsCard from "@/components/settings/settings-card";
 import { useSession } from "@/features/auth/hooks/session-user-management";
+import useCredentialChangeBlock from "@/features/auth/hooks/use-credential-change-block";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import emailSchema from "@/features/auth/validators/email-schema";
 
 const ChangeEmailCard = ({ className, classNames, ...properties }: SettingsCardProperties) => {
     const { authClient, emailVerification, toast } = useAuth();
     const { t } = useLingui();
+    const credentialBlock = useCredentialChangeBlock();
     const location = useLocation();
 
     const formSchema = z.strictObject({
@@ -134,7 +136,8 @@ const ChangeEmailCard = ({ className, classNames, ...properties }: SettingsCardP
                         className={className}
                         classNames={classNames}
                         description={t`Update your account email address`}
-                        instructions={t`Enter your new email address below`}
+                        disabled={credentialBlock.blocked}
+                        instructions={credentialBlock.reason ?? t`Enter your new email address below`}
                         isPending={isPending}
                         title={t`Email Address`}
                         {...properties}

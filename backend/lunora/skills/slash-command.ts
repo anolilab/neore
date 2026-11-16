@@ -2,6 +2,7 @@
  * Pure helpers that turn a chat message and a resolved skill into the run's
  * settings. No Lunora imports, so they are unit-tested directly.
  */
+import { isGuestTextPart } from "../lib/guest-text";
 import { MAX_SLUG_LENGTH, SLUG_REGEX } from "./constants";
 
 const WHITESPACE_RE = /\s/;
@@ -71,7 +72,7 @@ export const resolveSkillModel = (
 };
 
 /** A persisted user message's content: plain text or AI SDK parts. */
-type MessageContent = string | ReadonlyArray<{ text?: unknown; type?: unknown }> | null | undefined;
+type MessageContent = string | ReadonlyArray<{ providerOptions?: unknown; text?: unknown; type?: unknown }> | null | undefined;
 
 /**
  * Find the skill command in what the user TYPED. `message.text` is not that:
@@ -81,6 +82,7 @@ type MessageContent = string | ReadonlyArray<{ text?: unknown; type?: unknown }>
  * 1. the raw composer text from the start payload, when the run has it;
  * 2. the message's text parts — attachment parts always open with a
  *    `[Document: …]` label, so only the typed part can start with `/<slug>`;
+ *    a part marked as a guest's words is skipped;
  * 3. the concatenated text, for a message with neither.
  */
 export const findSkillCommand = (typedPrompt: string | undefined, content: MessageContent, fallbackText: string): SkillCommand | null => {
@@ -94,7 +96,7 @@ export const findSkillCommand = (typedPrompt: string | undefined, content: Messa
 
     if (Array.isArray(content)) {
         for (const part of content) {
-            const command = part.type === "text" && typeof part.text === "string" ? parseSkillCommand(part.text) : null;
+            const command = part.type === "text" && typeof part.text === "string" && !isGuestTextPart(part) ? parseSkillCommand(part.text) : null;
 
             if (command) {
                 return command;

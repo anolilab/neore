@@ -214,7 +214,7 @@ Consent is managed via the `c15t` React library, which provides:
 
 **UI Component:** `app/src/features/settings/components/privacy/consent-preferences.tsx`
 
-**Configuration:** `app/src/routes/__root.tsx` (ConsentManagerProvider)
+**Configuration:** `app/src/routes/__root.tsx` (`ConsentProvider`)
 
 ### Audit Logging
 

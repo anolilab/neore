@@ -398,7 +398,7 @@ const SnappySliderHeader = ({ className, ref, ...props }: React.HTMLAttributes<H
 SnappySliderHeader.displayName = "SnappySliderHeader";
 
 const SnappySliderLabel = ({ className, ref, ...props }: React.LabelHTMLAttributes<HTMLLabelElement> & { ref?: React.Ref<HTMLLabelElement> }) => (
-    <label className={cn("text-primary/50 text-xs font-medium", className)} ref={ref} {...props} />
+    <label className={cn("text-primary-text/50 text-xs font-medium", className)} ref={ref} {...props} />
 );
 
 SnappySliderLabel.displayName = "SnappySliderLabel";
@@ -465,12 +465,12 @@ const SnappySliderValue = ({
             className="group bg-primary/5 focus-within:ring-primary inline-flex w-20 cursor-text items-center rounded px-0.5 focus-within:ring-1"
             htmlFor={inputId}
         >
-            {prefix && <span className="text-primary/75 shrink-0 text-xs select-none">{prefix}</span>}
+            {prefix && <span className="text-primary-text/75 shrink-0 text-xs select-none">{prefix}</span>}
             <input
                 className={cn(
                     "w-full min-w-0 border-none bg-transparent text-right text-xs focus:outline-none",
                     "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-                    "text-primary tabular-nums",
+                    "text-primary-text tabular-nums",
                     className,
                 )}
                 id={inputId}
@@ -480,7 +480,7 @@ const SnappySliderValue = ({
                 type="number"
                 {...props}
             />
-            {suffix && <span className="text-primary/75 shrink-0 text-xs select-none">{suffix}</span>}
+            {suffix && <span className="text-primary-text/75 shrink-0 text-xs select-none">{suffix}</span>}
         </label>
     );
 };

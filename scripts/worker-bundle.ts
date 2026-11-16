@@ -12,6 +12,7 @@
  * `pnpm lint:types:deploy` only type-checks it, so this module is where the
  * options live and `backend/deploy-bundle.test.ts` is what pins their values.
  */
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 /** The slice of rolldown's plugin API used here, so this file needs no rolldown import. */
@@ -132,3 +133,93 @@ export const WEB_UPLOAD_RULES = [
 
 /** The file extensions {@link WEB_UPLOAD_RULES} uploads. */
 export const WEB_UPLOAD_EXTENSIONS = [".js", ".mjs", ".wasm", ".txt", ".html", ".sql", ".bin"] as const;
+
+/** Where `lunora codegen` writes Studio's documents, relative to the repository root (`.lunora/studio-assets` from `backend/`). */
+const BACKEND_STUDIO_ASSETS = "./backend/.lunora/studio-assets";
+
+/**
+ * The backend's Studio documents, as Workers Static Assets (anolilab/lunora#1499, anolilab/neore#494).
+ *
+ * `lunora codegen` writes the architecture manifest and the OpenAPI and OpenRPC specs to
+ * `backend/.lunora/studio-assets/_lunora/studio/<name>.json`, and the generated app reads
+ * them through an `ASSETS` binding (`loadStudioDocument`) on Studio's admin routes only, after
+ * the admin-token check. `lunora deploy` gets the binding from the `assets` block reconcile
+ * writes into `wrangler.jsonc`; Alchemy ignores that file, so `alchemy.run.ts` binds it here.
+ *
+ * `runWorkerFirst` is the literal `true`, never a path list: every request reaches the Worker
+ * before the asset layer, so the files are served only through the binding. A path list
+ * would leave `/_lunora/studio/*` assets-first and make the documents, which describe the whole
+ * app, public. Alchemy names the binding `ASSETS` itself.
+ *
+ * The binding follows the generated app, not the directory: it exists exactly when
+ * `_generated/app.ts` reads a document through `loadStudioDocument`. The directory is
+ * git-ignored and codegen does not remove it when it goes back to bundling the documents,
+ * so a directory left from an earlier codegen is not bound. A Lunora release without #1499
+ * deploys with no binding. {@link backendStudioAssetsProblem} refuses a generated app whose
+ * documents are not all on disk.
+ *
+ * `root` is the repository root; `alchemy.run.ts` passes `"."`, as Alchemy resolves the
+ * relative `directory` against the working directory too.
+ */
+export const backendStudioAssets = (root: string): { directory: string; runWorkerFirst: true } | undefined => {
+    const directory = path.join(root, BACKEND_STUDIO_ASSETS);
+
+    return studioDocumentsRead(root) !== undefined && existsSync(directory) ? { directory, runWorkerFirst: true } : undefined;
+};
+
+/**
+ * A `loadStudioDocument(<binding>, "<name>")` call in the generated app. The binding argument is an expression
+ * (Lunora writes `(env as Record<string, unknown>)["ASSETS"]`), so the name is the quoted string that closes the call.
+ */
+const STUDIO_DOCUMENT_CALL = /loadStudioDocument\([^;\n]*?,\s*(["'`])([^"'`]+)\1\s*\)/gu;
+
+/** The start of a `loadStudioDocument` call (the import names it without a parenthesis). */
+const STUDIO_DOCUMENT_CALL_START = /loadStudioDocument\(/gu;
+
+/**
+ * The names of the documents the generated app reads from `ASSETS`, or `undefined` when it reads none (bundled
+ * documents) or there is no generated app (a destroy after `clean`).
+ */
+const studioDocumentsRead = (root: string): ReadonlyArray<string> | undefined => {
+    const appFile = path.join(root, "backend/lunora/_generated/app.ts");
+
+    if (!existsSync(appFile)) {
+        return undefined;
+    }
+
+    const generatedApp = readFileSync(appFile, "utf8");
+
+    if (!generatedApp.includes("loadStudioDocument")) {
+        return undefined;
+    }
+
+    const names = Array.from(generatedApp.matchAll(STUDIO_DOCUMENT_CALL), (match) => match[2] ?? "").filter(Boolean);
+
+    // A call the pattern cannot read would leave its document unchecked, so it counts as no inventory at all.
+    return names.length === generatedApp.match(STUDIO_DOCUMENT_CALL_START)?.length ? [...new Set(names)] : [];
+};
+
+/**
+ * A generated app that reads Studio's documents from `ASSETS` when one of them is not on disk:
+ * Studio would show empty documents without an error anywhere, so the deploy refuses it.
+ */
+export const backendStudioAssetsProblem = (root: string): string | undefined => {
+    const names = studioDocumentsRead(root);
+
+    if (names === undefined) {
+        return undefined;
+    }
+
+    if (names.length === 0) {
+        return "backend/lunora/_generated/app.ts calls loadStudioDocument in a form whose document name cannot be read, so the deploy cannot check that Studio's documents are on disk. Update STUDIO_DOCUMENT_CALL in scripts/worker-bundle.ts to the generated call.";
+    }
+
+    const directory = path.join(root, BACKEND_STUDIO_ASSETS);
+    const missing = existsSync(directory)
+        ? names.map((name) => `_lunora/studio/${name}.json`).filter((file) => !existsSync(path.join(directory, file)))
+        : ["the directory"];
+
+    return missing.length === 0
+        ? undefined
+        : `backend/lunora/_generated/app.ts reads Studio's documents from the ASSETS binding, but backend/.lunora/studio-assets is missing ${missing.join(", ")}. Run \`pnpm --filter @neore/backend run codegen\` first.`;
+};

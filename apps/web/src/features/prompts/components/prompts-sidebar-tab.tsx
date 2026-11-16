@@ -4,6 +4,7 @@ import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Doc, Id } from "@neore/backend/dataModel";
+import { useUnlockProof } from "@neore/client-runtime";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
@@ -16,7 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useCheckout from "@/features/billing/hooks/use-checkout";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
@@ -52,9 +53,8 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
     const setComposerText = useChatUIStore((state) => state.setComposerText);
 
     // Get current user context for auto-populated variables
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
-    const { data: activeOrganization } = hooks.useActiveOrganization();
+    const { data: sessionData } = useAuthSession();
+    const { data: activeOrganization } = useAuthActiveOrganization();
 
     // Model store for applying settings
     const setSelectedModel = useModelStore((state) => state.setSelectedModel);
@@ -100,7 +100,11 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
 
     // Query resolved variables (includes user defaults + thread overrides).
     // `threadId` is the `/chat/$threadId` route param, passed down as a plain string.
-    const { data: resolvedVariables } = useQuery(crpc.prompts.functions.getResolvedVariables.queryOptions({ threadId: threadId as Id<"threads"> | undefined }));
+    // A locked chat's own variable values come back only with its unlock proof.
+    const unlockProof = useUnlockProof(threadId);
+    const { data: resolvedVariables } = useQuery(
+        crpc.prompts.functions.getResolvedVariables.queryOptions({ threadId: threadId as Id<"threads"> | undefined, unlockProof }),
+    );
 
     // Build a map of variable values including auto-populated ones
     const variableValues = useMemo(() => {

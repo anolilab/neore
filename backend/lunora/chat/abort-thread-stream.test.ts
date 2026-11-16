@@ -283,3 +283,42 @@ describe("abortStreamByMessageId", () => {
         expect(await fieldOf(streamId, "status")).toBe("done");
     });
 });
+
+describe("a legacy stream that ends early", () => {
+    let threadId: string;
+    let streamId: string;
+
+    beforeEach(async () => {
+        harness = lunoraTest(schema as never);
+        threadId = await run(async (context) => await context.db.insert("threads", { snoozedUntil: 9_000_000_000_000, status: "running", userId: OWNER }));
+        streamId = await run(
+            async (context) =>
+                await context.db.insert("streamingMessages", {
+                    format: "UIMessageChunk",
+                    order: 1,
+                    state: { kind: "streaming", lastHeartbeat: Date.now() },
+                    stateKind: "streaming",
+                    stepOrder: 0,
+                    threadId,
+                    userId: OWNER,
+                }),
+        );
+    });
+
+    afterEach(() => {
+        harness.close();
+    });
+
+    // An edit or a regenerate fails through this stream alone: its failure wakes a snoozed thread, a stop does not.
+    it.each([
+        ["a failed generation wakes the snoozed thread", true, undefined],
+        ["a stop keeps the snooze", undefined, 9_000_000_000_000],
+    ])("%s", async (_name, failed, snoozedUntil) => {
+        await run(
+            async (context) =>
+                await context.runMutation(registry.get("agent_streams:abort") as never, { ...(failed && { failed }), reason: "ended", streamId } as never),
+        );
+
+        expect(await fieldOf(threadId, "snoozedUntil")).toBe(snoozedUntil);
+    });
+});

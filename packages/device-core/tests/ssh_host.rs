@@ -804,7 +804,9 @@ fn executables_under(root: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
 
     files_under(root, &mut files);
-    files.retain(|file| fs::metadata(file).unwrap().permissions().mode() & 0o111 != 0);
+    // The server's cleanup can remove a temporary upload between the listing and this check; a file that is gone is not executable.
+    files
+        .retain(|file| fs::metadata(file).is_ok_and(|meta| meta.permissions().mode() & 0o111 != 0));
 
     files
 }

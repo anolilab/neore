@@ -16,6 +16,8 @@ interface InlineEditProps extends React.HTMLAttributes<HTMLDivElement> {
     ref?: React.Ref<HTMLDivElement>;
     renderInput?: (props: any) => React.ReactNode;
     showControls?: boolean;
+    /** Set on the input itself (both paths), for prose such as a title: the desktop shell turns spellcheck off page-wide. */
+    spellCheck?: boolean;
     submitOnEnter?: boolean;
     value?: string;
 }
@@ -30,6 +32,7 @@ const InlineEdit = ({
     ref,
     renderInput,
     showControls = true,
+    spellCheck,
     submitOnEnter = true,
     value: controlledValue,
     ...props
@@ -96,10 +99,18 @@ const InlineEdit = ({
                         autoFocus: true,
                         onChange: (e: any) => setTempValue(e.target.value),
                         onKeyDown: handleKeyDown,
+                        spellCheck,
                         value: tempValue,
                     })
                 ) : (
-                    <Input disabled={disabled} onChange={(e) => setTempValue(e.target.value)} onKeyDown={handleKeyDown} ref={inputRef} value={tempValue} />
+                    <Input
+                        disabled={disabled}
+                        onChange={(e) => setTempValue(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        ref={inputRef}
+                        spellCheck={spellCheck}
+                        value={tempValue}
+                    />
                 )}
                 {showControls && (
                     <div className="flex items-center gap-1">

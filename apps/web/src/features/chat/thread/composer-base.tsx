@@ -21,6 +21,8 @@ export interface ComposerBaseRef {
 }
 
 export interface ComposerBaseProps {
+    /** Plays the entrance (fade and slide in) when the composer mounts. Off for a composer that moves between split-view panes. */
+    animateEntrance?: boolean;
     /** Content to render in the bottom toolbar */
     bottomToolbar?: ReactNode;
     /** The input area content (textarea, buttons, etc.) */
@@ -68,6 +70,7 @@ const MODE_STYLES = {
  * Container component that provides the composer structure.
  */
 const ComposerBase = ({
+    animateEntrance = true,
     bottomToolbar,
     children,
     className,
@@ -125,13 +128,14 @@ const ComposerBase = ({
     }, []);
 
     const prefersReducedMotion = useReducedMotion();
+    const skipEntrance = prefersReducedMotion || !animateEntrance;
 
     return (
         <motion.div
             animate={{ opacity: 1, scale: 1, y: 0 }}
             className={cn("relative w-full", className)}
             data-dragging={isDragging}
-            initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.98, y: 20 }}
+            initial={skipEntrance ? false : { opacity: 0, scale: 0.98, y: 20 }}
             onDragEnter={onDragEnter}
             onDragLeave={onDragLeave}
             onDragOver={onDragOver}
@@ -148,7 +152,8 @@ const ComposerBase = ({
             <motion.div
                 className={clsx(
                     "bg-card/70 w-full overflow-hidden rounded-xl backdrop-blur-xl",
-                    "border transition-[border-color,box-shadow] duration-300",
+                    // The border colour follows the theme once it is read after mount; a composer that should not animate on mount skips that.
+                    animateEntrance ? "border transition-[border-color,box-shadow] duration-300" : "border transition-[box-shadow] duration-300",
                     "data-[dragging=true]:border-ring data-[dragging=true]:bg-accent/50 data-[dragging=true]:border-dashed",
                     "relative z-10",
                 )}
@@ -170,7 +175,7 @@ const ComposerBase = ({
                                 animate={{ height: "auto", opacity: 1 }}
                                 className="flex flex-row items-center justify-between gap-2 overflow-hidden px-3 pt-2 pb-0"
                                 exit={{ height: 0, opacity: 0 }}
-                                initial={prefersReducedMotion ? false : { height: 0, opacity: 0 }}
+                                initial={skipEntrance ? false : { height: 0, opacity: 0 }}
                                 key="mode-settings"
                                 transition={{ duration: 0.15, ease: "easeOut" }}
                             >
@@ -203,9 +208,9 @@ const ComposerBase = ({
                         {bottomToolbar && !compact && (
                             <motion.div
                                 animate={{ height: "auto", opacity: 1 }}
-                                className="flex w-full flex-row items-center gap-1 px-2 pb-1"
+                                className="flex w-full flex-row flex-wrap items-center gap-1 px-2 pb-1"
                                 exit={{ height: 0, opacity: 0 }}
-                                initial={prefersReducedMotion ? false : { height: 0, opacity: 0 }}
+                                initial={skipEntrance ? false : { height: 0, opacity: 0 }}
                                 style={{ borderTopColor: borderColor }}
                                 transition={{ duration: 0.15, ease: "easeOut" }}
                             >

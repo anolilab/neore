@@ -20,7 +20,7 @@ const DpoContact: FC = () => {
                     <p className="font-medium">{dpoName}</p>
                     <p className="text-muted-foreground text-sm">
                         {t`Email:`}{" "}
-                        <a className="text-primary hover:underline" href={`mailto:${DPO_EMAIL}`}>
+                        <a className="text-primary-text hover:underline" href={`mailto:${DPO_EMAIL}`}>
                             {DPO_EMAIL}
                         </a>
                     </p>

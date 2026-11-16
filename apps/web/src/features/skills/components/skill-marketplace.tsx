@@ -60,7 +60,7 @@ const MarketplaceCard = ({ onOpen, skill }: { onOpen: (id: Id<"skills">) => void
             <Card className="focus-within:ring-ring relative h-full transition-shadow focus-within:shadow-md focus-within:ring-2 hover:shadow-md">
                 <CardHeader className="space-y-2 pb-3">
                     <div className="flex items-center gap-2">
-                        <div aria-hidden="true" className="bg-primary/10 text-primary flex size-8 shrink-0 items-center justify-center rounded-md">
+                        <div aria-hidden="true" className="bg-primary/10 text-primary-text flex size-8 shrink-0 items-center justify-center rounded-md">
                             {skill.icon || <Zap className="size-4" />}
                         </div>
                         <div className="min-w-0">

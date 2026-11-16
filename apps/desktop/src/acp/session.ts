@@ -30,8 +30,9 @@ import type { PermissionGate, PermissionOutcome } from "./permission";
 import { describePermission, offeredOptions } from "./permission";
 import type { AgentProcess } from "./process";
 import type { Handshake } from "./protocol";
-import { initialize, loadSession, METHOD, openNewSession, promptParams, setConfigOption, setMode } from "./protocol";
+import { forkSession, initialize, loadSession, METHOD, openNewSession, promptParams, setConfigOption, setMode } from "./protocol";
 import { INVALID_PARAMS, METHOD_NOT_FOUND, RpcError } from "./rpc-error";
+import { AgentSignedOutError } from "./signed-out";
 import { Turn } from "./turn";
 import type { SessionSnapshot, SessionStatus, SessionSummary, StopReason, ToolState, ToolStatus } from "./types";
 
@@ -141,11 +142,19 @@ export interface SessionOptions {
     appVersion: string;
     cancelGraceMs?: number;
     cancelSettleMs?: number;
+
     /** Says what this agent reports it can do. Defaults to the handshake's own (`capabilities.ts`); tests stand in for an agent that reports more. */
     capabilityReport?: (handshake: Handshake) => CapabilityReport;
     folder: string;
     /** The folder is on another machine: this computer's own files say nothing about what the agent changed there, so none are read. */
     folderIsRemote?: boolean;
+
+    /**
+     * The agent's own id of a session to fork into this one, when the backend started this session as a fork of a
+     * thread (`acp_start`). Forked only if the agent advertised it; otherwise, or when the fork fails, a new session opens
+     * and the backend is told why (`fork` on the session it hears opened). The source session is never written to.
+     */
+    forkSessionId?: string;
     gate: PermissionGate;
     /** What the backend shows for this session (labels only). With `observer`, opening the session makes its thread. */
     hostInfo?: HostSessionInfo;
@@ -246,6 +255,9 @@ export class AgentSession {
     /** What happened to the saved session the backend asked to load; unset when it asked for none. */
     private reattach: HostSessionInfo["reattach"];
 
+    /** What happened to the session the backend asked to fork; unset when it asked for none. */
+    private fork: HostSessionInfo["fork"];
+
     /** The agent's own children, by the tool call that spawned each (§4.7). */
     private readonly children: ChildLedger;
 
@@ -312,6 +324,12 @@ export class AgentSession {
             this.end(message);
             await this.stopping;
 
+            // The sign-out answer keeps its type (callers tell it from other failures). Its text is `endReason`, which
+            // `end` masked: `message` itself is not, and can quote the agent's stderr.
+            if (error instanceof AgentSignedOutError) {
+                throw new AgentSignedOutError(this.endReason ?? message);
+            }
+
             // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error, which can quote its environment
             throw new Error(this.endReason ?? message);
         }
@@ -326,8 +344,9 @@ export class AgentSession {
             const opened = {
                 ...hostInfo,
                 nativeSessionId: this.agentSessionId,
-                ...this.report !== undefined && { capabilities: this.report },
-                ...this.reattach !== undefined && { reattach: this.reattach },
+                ...(this.report !== undefined && { capabilities: this.report }),
+                ...(this.fork !== undefined && { fork: this.fork }),
+                ...(this.reattach !== undefined && { reattach: this.reattach }),
             };
 
             this.observe((observer) => observer.sessionOpened(this.id, opened, this.options.threadId));
@@ -540,6 +559,16 @@ export class AgentSession {
         await this.stopping;
     }
 
+    /** The agent's pid on this computer while the session is live; undefined for a server's agent or an ended session. */
+    public get agentPid(): number | undefined {
+        return this.status === "ended" ? undefined : this.options.process.pid;
+    }
+
+    /** The thread a session the backend started runs in; `undefined` for one started on this computer. */
+    public get threadId(): string | undefined {
+        return this.options.threadId;
+    }
+
     public summary(): SessionSummary {
         return {
             agentKey: this.options.agentKey,
@@ -603,7 +632,11 @@ export class AgentSession {
 
     /** The agent's session: the saved one when asked for and loadable, else a new one (`reattach` says which, and why not). */
     private async openAgentSession(): Promise<string> {
-        const { folder, resumeSessionId, startupTimeoutMs } = this.options;
+        const { folder, forkSessionId, resumeSessionId, startupTimeoutMs } = this.options;
+
+        if (forkSessionId !== undefined) {
+            return await this.forkAgentSession(forkSessionId);
+        }
 
         if (resumeSessionId === undefined) {
             return await this.openFresh(folder, startupTimeoutMs);
@@ -636,7 +669,11 @@ export class AgentSession {
     private async openFresh(folder: string, timeoutMs?: number): Promise<string> {
         const { response, sessionId } = await openNewSession(this.connection, folder, timeoutMs);
 
-        // What the agent sent for this session before its answer is older than the answer, which wins below.
+        return this.adoptOpened(sessionId, response);
+    }
+
+    /** A fresh or forked session's answer: its options, with what the agent sent for the session before the answer (older, so the answer wins). */
+    private adoptOpened(sessionId: string, answer: Record<string, unknown>): string {
         const reads = this.startupReads.get(sessionId) ?? [];
 
         this.startupReads.clear();
@@ -645,9 +682,37 @@ export class AgentSession {
             this.applyStartupRead(sessionId, read);
         }
 
-        this.offered = { ...this.offered, ...optionsOf(response, this.options.process.scrub) };
+        this.offered = { ...this.offered, ...optionsOf(answer, this.options.process.scrub) };
 
         return sessionId;
+    }
+
+    /** A fork of the agent's session `source` when it said it forks them, else a new session (`fork` says which, and why not). */
+    private async forkAgentSession(source: string): Promise<string> {
+        const { folder, startupTimeoutMs } = this.options;
+
+        // No `session/fork` frame goes to an agent that did not say it forks them.
+        if (isAvailable(capabilityOf(this.report, "sessions.fork"))) {
+            try {
+                const forked = await forkSession(this.connection, source, folder);
+
+                // An answer naming the source is not a fork: prompting it would write into the session the fork must leave alone.
+                if (forked.sessionId === source) {
+                    throw new Error("the agent did not fork the session");
+                }
+
+                this.fork = { forked: true };
+
+                return this.adoptOpened(forked.sessionId, forked.answer);
+            } catch {
+                // The agent's own error can quote its environment: the backend is told that it failed (a code), not its text.
+                this.fork = { forked: false, reason: "fork_failed" };
+            }
+        } else {
+            this.fork = { forked: false, reason: "fork_unsupported" };
+        }
+
+        return await this.openFresh(folder, startupTimeoutMs);
     }
 
     /** Applies one update startup kept: an option list or mode is taken now, and the newest valid usage report is kept for `start` to report. */
@@ -951,7 +1016,7 @@ export class AgentSession {
         const delta = scrubbed.slice(sent[field], end);
 
         sent[field] = end;
-        this.observe((observer) => field === "text" ? observer.text(this.id, turn.id, delta) : observer.thought(this.id, turn.id, delta));
+        this.observe((observer) => (field === "text" ? observer.text(this.id, turn.id, delta) : observer.thought(this.id, turn.id, delta)));
     }
 
     private observeTool(tool: ToolState): void {
@@ -1033,9 +1098,9 @@ export class AgentSession {
                 requestId,
                 tool: described.tool,
                 // The label the user chose for the folder, never its path.
-                ...this.options.hostInfo !== undefined && { folder: this.options.hostInfo.folderLabel },
-                ...described.command !== undefined && { command: described.command },
-                ...described.target !== undefined && { target: described.target },
+                ...(this.options.hostInfo !== undefined && { folder: this.options.hostInfo.folderLabel }),
+                ...(described.command !== undefined && { command: described.command }),
+                ...(described.target !== undefined && { target: described.target }),
             }),
         );
     }

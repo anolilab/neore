@@ -191,7 +191,7 @@ export const getAllCommonVariables = (i18n: I18n): PromptVariable[] =>
 export const highlightVariables = (content: string): string =>
     content.replaceAll(
         VARIABLE_REGEX,
-        '<span class="!text-primary bg-primary/20 rounded px-1 font-mono text-sm" style="color: hsl(var(--primary)) !important;">{{$1}}</span>',
+        '<span class="!text-primary-text bg-primary/20 rounded px-1 font-mono text-sm" style="color: hsl(var(--primary)) !important;">{{$1}}</span>',
     );
 
 /**

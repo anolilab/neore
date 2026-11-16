@@ -24,8 +24,8 @@ import type { FC, ReactNode } from "react";
 import React, { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useModelNicknames from "@/features/chat/core/hooks/use-model-nicknames";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useBlockedCreators, withCreatorHidden, withoutCreator } from "@/hooks/use-model-filter-rules";
@@ -118,10 +118,8 @@ export interface ModelPickerProps {
 }
 
 interface ModelItem {
-    icon?: ReactNode;
     label: string;
     model: GatewayModel;
-    onSelect: () => void;
     value: string;
 }
 
@@ -130,6 +128,63 @@ interface ModelGroup {
     items: ModelItem[];
     value: string;
 }
+
+// ─── Stable rows ──────────────────────────────────────────────────────────────
+// A search keystroke rebuilds the filtered list. The row and group objects are reused for a model (and a group with
+// the same rows) that is still there, so the memoized groups and rows below re-render only where a match changed.
+
+const itemsByModel = new WeakMap<GatewayModel, ModelItem>();
+
+/** The row for a model, reused while its label (which a nickname can change) is the same. */
+const stableModelItem = (model: GatewayModel, label: string): ModelItem => {
+    const previous = itemsByModel.get(model);
+
+    if (previous?.label === label) {
+        return previous;
+    }
+
+    const item: ModelItem = { label, model, value: model.id };
+
+    itemsByModel.set(model, item);
+
+    return item;
+};
+
+/**
+ * The last group built with each first row, per picker: a group is reused while its label, kind and rows are the
+ * same. Complete and search-filtered groups keep separate caches, as do separate pickers: a search rebuilds the
+ * complete groups too, and a shared entry would let one group evict an unchanged one that starts with the same row.
+ * Renders only read the caches; a layout effect records what was committed.
+ */
+type GroupCache = WeakMap<ModelItem, ModelGroup>;
+
+const stableModelGroup = (groupsByFirstItem: GroupCache, value: string, items: ModelItem[], isFavorite: boolean): ModelGroup => {
+    const [first] = items;
+    const previous = first ? groupsByFirstItem.get(first) : undefined;
+
+    if (
+        previous &&
+        previous.value === value &&
+        Boolean(previous.isFavorite) === isFavorite &&
+        previous.items.length === items.length &&
+        previous.items.every((item: ModelItem, index: number) => item === items[index])
+    ) {
+        return previous;
+    }
+
+    return isFavorite ? { isFavorite: true, items, value } : { items, value };
+};
+
+/** Records the groups a committed render showed; a render React abandons leaves the cache as it was. */
+const rememberGroups = (groupsByFirstItem: GroupCache, groups: ModelGroup[]): void => {
+    for (const group of groups) {
+        const [first] = group.items;
+
+        if (first) {
+            groupsByFirstItem.set(first, group);
+        }
+    }
+};
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 
@@ -156,14 +211,14 @@ const ModelDetailPanel = memo<{ displayName: string; model: GatewayModel }>(({ d
                 <ProviderIcon className="size-8 shrink-0" provider={model.provider || model.displayProvider || ""} providerIcon={creatorSlug} />
                 <div className="min-w-0">
                     <p className="text-foreground truncate text-[13px] leading-snug font-semibold">{displayName}</p>
-                    <p className="text-muted-foreground/50 text-[11px]">{developerDisplay}</p>
+                    <p className="text-muted-foreground text-[11px]">{developerDisplay}</p>
                 </div>
             </div>
 
             {/* Description */}
             {model.desc ? (
                 <div className="border-border/40 border-t px-4 py-3">
-                    <p className="text-muted-foreground/40 mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
+                    <p className="text-muted-foreground mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
                         <Trans>Description</Trans>
                     </p>
                     <p className="text-muted-foreground text-[11.5px] leading-relaxed">
@@ -175,7 +230,7 @@ const ModelDetailPanel = memo<{ displayName: string; model: GatewayModel }>(({ d
             {/* Features */}
             {capabilities.length > 0 ? (
                 <div className="border-border/40 border-t px-4 py-3">
-                    <p className="text-muted-foreground/40 mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
+                    <p className="text-muted-foreground mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
                         <Trans>Features</Trans>
                     </p>
                     <div className="flex flex-wrap gap-1">
@@ -194,7 +249,7 @@ const ModelDetailPanel = memo<{ displayName: string; model: GatewayModel }>(({ d
             {/* Pricing — absent means unknown, not free */}
             {model.pricing ? (
                 <div className="border-border/40 border-t px-4 py-3">
-                    <p className="text-muted-foreground/40 mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
+                    <p className="text-muted-foreground mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
                         <Trans>Price per 1M tokens</Trans>
                     </p>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11.5px]">
@@ -224,13 +279,13 @@ const ModelDetailPanel = memo<{ displayName: string; model: GatewayModel }>(({ d
             <div className="border-border/40 border-t px-4 py-3">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                     <div>
-                        <p className="text-muted-foreground/40 mb-0.5 text-[9px] font-semibold tracking-widest uppercase">
+                        <p className="text-muted-foreground mb-0.5 text-[9px] font-semibold tracking-widest uppercase">
                             <Trans>Provider</Trans>
                         </p>
                         <p className="text-foreground text-[11.5px] font-medium">{providerDisplay}</p>
                     </div>
                     <div>
-                        <p className="text-muted-foreground/40 mb-0.5 text-[9px] font-semibold tracking-widest uppercase">
+                        <p className="text-muted-foreground mb-0.5 text-[9px] font-semibold tracking-widest uppercase">
                             <Trans>Developer</Trans>
                         </p>
                         <p className="text-foreground text-[11.5px] font-medium">{developerDisplay}</p>
@@ -251,18 +306,19 @@ const ProviderSidebarButton = memo<{
     showBorder?: boolean;
 }>(({ icon, isSelected, label, onClick, showBorder = false }) => (
     <button
-        aria-label={label}
         className={cn(
             "relative flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors duration-150",
             showBorder && "mb-0.5 border-b pb-2",
             isSelected
                 ? "text-foreground before:bg-primary-text before:absolute before:inset-y-1.5 before:left-0 before:w-[2px] before:rounded-full"
-                : "text-muted-foreground/70 hover:text-foreground",
+                : "text-muted-foreground hover:text-foreground",
         )}
         onClick={onClick}
         type="button"
     >
-        <span className="flex size-4 shrink-0 items-center justify-center">{icon}</span>
+        <span aria-hidden="true" className="flex size-4 shrink-0 items-center justify-center">
+            {icon}
+        </span>
         <span className={cn("truncate text-[12px]", isSelected ? "font-medium" : "font-normal")}>{label}</span>
     </button>
 ));
@@ -287,20 +343,11 @@ const ProviderSidebarItem = memo<{
 // ─── Model Row ────────────────────────────────────────────────────────────────
 
 const ModelItemContent = memo<{
-    /** Only set while the starred order can be changed; the buttons are hidden otherwise. */
-    canMoveDown?: boolean;
-    canMoveUp?: boolean;
-    isFavorite: boolean;
-    isInfoActive: boolean;
     isSelected: boolean;
     label: string;
     model: GatewayModel;
-    onInfo: (modelId: string) => void;
-    onInfoLeave: () => void;
-    onMove?: (delta: -1 | 1) => void;
-    onToggleFavorite: (modelId: string, setFavorite: boolean) => void;
     selectionMode: ModelPickerSelectionMode;
-}>(({ canMoveDown, canMoveUp, isFavorite, isInfoActive, isSelected, label, model, onInfo, onInfoLeave, onMove, onToggleFavorite, selectionMode }) => {
+}>(({ isSelected, label, model, selectionMode }) => {
     const { i18n, t } = useLingui();
     const costMultiplier = getCostMultiplier(model.pricing?.input_per_million);
 
@@ -311,110 +358,256 @@ const ModelItemContent = memo<{
                 <div className="flex min-w-0 items-baseline gap-1.5">
                     <span className="truncate text-[13px] leading-none font-medium">{label}</span>
                     {model.isPremium ? (
-                        <span className="shrink-0 rounded-[3px] bg-amber-500/15 px-1 py-0 text-[9px] font-semibold tracking-wide text-amber-600 uppercase dark:bg-amber-400/15 dark:text-amber-400">
+                        <span className="shrink-0 rounded-[3px] bg-amber-500/15 px-1 py-0 text-[9px] font-semibold tracking-wide text-amber-800 uppercase dark:bg-amber-400/15 dark:text-amber-400">
                             <Trans>Pro</Trans>
                         </span>
                     ) : null}
                     {costMultiplier && model.pricing ? (
                         <span
-                            className="text-muted-foreground/40 shrink-0 text-[10px] tabular-nums"
+                            className="text-muted-foreground shrink-0 text-[10px] tabular-nums"
                             title={t`${formatPricePerMillion(model.pricing.input_per_million)} input, ${formatPricePerMillion(model.pricing.output_per_million)} output per 1M tokens`}
                         >
                             {costMultiplier}
                         </span>
                     ) : null}
                     {model.isNew ? (
-                        <span className="shrink-0 rounded-[3px] bg-emerald-500/12 px-1 py-0 text-[9px] font-semibold tracking-wide text-emerald-600 uppercase dark:bg-emerald-400/15 dark:text-emerald-400">
+                        <span className="shrink-0 rounded-[3px] bg-emerald-500/12 px-1 py-0 text-[9px] font-semibold tracking-wide text-emerald-800 uppercase dark:bg-emerald-400/15 dark:text-emerald-400">
                             <Trans>New</Trans>
                         </span>
                     ) : null}
                 </div>
                 {model.desc ? (
-                    <span className="text-muted-foreground/50 truncate text-[11px] leading-none">
+                    <span className="text-muted-foreground truncate text-[11px] leading-none">
                         {localizeModelDescription(model.desc, (descriptor) => i18n._(descriptor))}
                     </span>
                 ) : null}
             </div>
 
-            {/* Actions — reveal on hover */}
-            <div className="flex shrink-0 items-center gap-0.5">
-                <button
-                    aria-label={isFavorite ? t`Remove from starred` : t`Add to starred`}
-                    className={cn(
-                        "rounded p-1 transition-all duration-100",
-                        isFavorite ? "text-amber-400 opacity-100" : "text-muted-foreground/30 opacity-0 group-hover/row:opacity-100 hover:text-amber-400",
-                    )}
-                    onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onToggleFavorite(model.id, !isFavorite);
-                    }}
-                    type="button"
-                >
-                    <Star className={cn("size-3.5", isFavorite && "fill-current")} />
-                </button>
-                {onMove ? (
-                    <>
-                        <button
-                            aria-label={t`Move ${label} up in starred`}
-                            className="text-muted-foreground/50 hover:text-foreground rounded p-1 disabled:opacity-30"
-                            data-move-delta={-1}
-                            data-move-id={model.id}
-                            disabled={!canMoveUp}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onMove(-1);
-                            }}
-                            type="button"
-                        >
-                            <ArrowUp aria-hidden="true" className="size-3.5" />
-                        </button>
-                        <button
-                            aria-label={t`Move ${label} down in starred`}
-                            className="text-muted-foreground/50 hover:text-foreground rounded p-1 disabled:opacity-30"
-                            data-move-delta={1}
-                            data-move-id={model.id}
-                            disabled={!canMoveDown}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onMove(1);
-                            }}
-                            type="button"
-                        >
-                            <ArrowDown aria-hidden="true" className="size-3.5" />
-                        </button>
-                    </>
-                ) : null}
-                <button
-                    aria-label={t`Model info`}
-                    className={cn(
-                        "rounded p-1 transition-all duration-100",
-                        isInfoActive
-                            ? "text-foreground opacity-100"
-                            : "text-muted-foreground/40 hover:text-foreground opacity-40 group-hover/row:opacity-70 hover:!opacity-100",
-                    )}
-                    onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onInfo(model.id);
-                    }}
-                    onMouseEnter={() => onInfo(model.id)}
-                    onMouseLeave={onInfoLeave}
-                    type="button"
-                >
-                    <Info className="size-3.5" />
-                </button>
-                {selectionMode === "single" ? (
-                    <span className="ml-0.5 flex size-3.5 shrink-0 items-center justify-center">
-                        {isSelected ? <CheckIcon className="text-primary-text size-3.5" /> : null}
-                    </span>
-                ) : null}
-            </div>
+            {selectionMode === "single" ? (
+                <span className="ml-0.5 flex size-3.5 shrink-0 items-center justify-center">
+                    {isSelected ? <CheckIcon className="text-primary-text size-3.5" /> : null}
+                </span>
+            ) : null}
         </div>
     );
 });
+
+// ─── Model Item Actions ───────────────────────────────────────────────────────
+// Rendered beside the option, not inside it, and hidden from assistive technology: a listbox may only own options, so
+// these pointer controls cannot be part of its accessibility tree. Keyboard and screen-reader users reach the same
+// actions through the shortcuts on the search field (see `handleActionShortcut` in ModelPicker).
+
+const ModelItemActions = memo<{
+    /** Only set while the starred order can be changed; the buttons are hidden otherwise. */
+    canMoveDown?: boolean;
+    canMoveUp?: boolean;
+    isFavorite: boolean;
+    isInfoActive: boolean;
+    label: string;
+    modelId: string;
+    onInfo: (modelId: string) => void;
+    onInfoLeave: () => void;
+    onMove?: (modelId: string, delta: -1 | 1) => void;
+    onToggleFavorite: (modelId: string, setFavorite: boolean) => void;
+}>(({ canMoveDown, canMoveUp, isFavorite, isInfoActive, label, modelId, onInfo, onInfoLeave, onMove, onToggleFavorite }) => {
+    const { t } = useLingui();
+
+    return (
+        <div aria-hidden="true" className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-0.5">
+            <button
+                aria-label={isFavorite ? t`Remove from starred` : t`Add to starred`}
+                className={cn(
+                    "rounded p-1 transition-all duration-100",
+                    isFavorite ? "text-amber-400 opacity-100" : "text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-amber-400",
+                )}
+                onClick={() => onToggleFavorite(modelId, !isFavorite)}
+                tabIndex={-1}
+                type="button"
+            >
+                <Star className={cn("size-3.5", isFavorite && "fill-current")} />
+            </button>
+            {onMove ? (
+                <>
+                    <button
+                        aria-label={t`Move ${label} up in starred`}
+                        className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-30"
+                        data-move-delta={-1}
+                        data-move-id={modelId}
+                        disabled={!canMoveUp}
+                        onClick={() => onMove(modelId, -1)}
+                        tabIndex={-1}
+                        type="button"
+                    >
+                        <ArrowUp aria-hidden="true" className="size-3.5" />
+                    </button>
+                    <button
+                        aria-label={t`Move ${label} down in starred`}
+                        className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-30"
+                        data-move-delta={1}
+                        data-move-id={modelId}
+                        disabled={!canMoveDown}
+                        onClick={() => onMove(modelId, 1)}
+                        tabIndex={-1}
+                        type="button"
+                    >
+                        <ArrowDown aria-hidden="true" className="size-3.5" />
+                    </button>
+                </>
+            ) : null}
+            <button
+                aria-label={t`Model info`}
+                className={cn(
+                    "rounded p-1 transition-all duration-100",
+                    isInfoActive ? "text-foreground opacity-100" : "text-muted-foreground hover:text-foreground hover:!opacity-100",
+                )}
+                onClick={() => onInfo(modelId)}
+                onMouseEnter={() => onInfo(modelId)}
+                onMouseLeave={onInfoLeave}
+                tabIndex={-1}
+                type="button"
+            >
+                <Info className="size-3.5" />
+            </button>
+        </div>
+    );
+});
+
+// ─── Model Row ────────────────────────────────────────────────────────────────
+// Memoized on the (stable) row object and its own flags: a search keystroke re-renders only rows whose state changed.
+
+const ModelRow = memo<{
+    anchorMode: string | null;
+    canMoveDown: boolean;
+    canMoveUp: boolean;
+    canSignUp: boolean;
+    isFavorite: boolean;
+    isInfoActive: boolean;
+    isLockedForAnonymous: boolean;
+    isParallelSelected: boolean;
+    isSelected: boolean;
+    item: ModelItem;
+    onInfo: (modelId: string) => void;
+    onInfoLeave: () => void;
+    /** Only set while this row's place in the starred order can be changed. */
+    onMove?: (modelId: string, delta: -1 | 1) => void;
+    onSelectModel: (modelId: string) => void;
+    parallelMaxReached: boolean;
+    selectionMode: ModelPickerSelectionMode;
+    showProviderIcon: boolean;
+    toggleFavorite: (id: string, isFavorite: boolean) => void;
+}>(
+    ({
+        anchorMode,
+        canMoveDown,
+        canMoveUp,
+        canSignUp,
+        isFavorite,
+        isInfoActive,
+        isLockedForAnonymous,
+        isParallelSelected,
+        isSelected,
+        item,
+        onInfo,
+        onInfoLeave,
+        onMove,
+        onSelectModel,
+        parallelMaxReached,
+        selectionMode,
+        showProviderIcon,
+        toggleFavorite,
+    }) => {
+        const { t } = useLingui();
+        // A model is type-locked when a different mode is already anchored via the first selection
+        const isTypeMismatch = selectionMode === "parallel" && anchorMode !== null && getModelMode(item.model) !== anchorMode && !isParallelSelected;
+        const isDisabled = isLockedForAnonymous || (selectionMode === "parallel" && ((parallelMaxReached && !isParallelSelected) || isTypeMismatch));
+
+        let stateClassName = "";
+        let lockedTitle: string | undefined;
+
+        if (isLockedForAnonymous) {
+            stateClassName = "cursor-not-allowed opacity-40";
+            lockedTitle = canSignUp ? t`Sign up to unlock all models` : t`Sign in to unlock all models`;
+        } else if (isTypeMismatch) {
+            stateClassName = "cursor-not-allowed opacity-25";
+            lockedTitle = t`Only ${getModelModeName(anchorMode!)} models can be compared. Clear selection to switch types.`;
+        } else if (isDisabled) {
+            stateClassName = "cursor-not-allowed opacity-40";
+        }
+
+        let parallelIndicator: ReactNode;
+
+        if (isTypeMismatch) {
+            parallelIndicator = <Lock className="text-muted-foreground size-4" />;
+        } else if (isParallelSelected) {
+            parallelIndicator = <CheckSquare2 className="text-primary-text size-4" />;
+        } else {
+            parallelIndicator = <Square className={cn("size-4", isDisabled ? "text-muted-foreground/20" : "text-muted-foreground")} />;
+        }
+
+        return (
+            <div className={cn("group/row relative mx-1.5", stateClassName)}>
+                <CommandItem
+                    aria-disabled={isDisabled || undefined}
+                    className={cn(
+                        "flex-row !items-center rounded-md py-2 pl-2 transition-colors duration-100",
+                        onMove ? "pr-26" : "pr-14",
+                        isSelected && selectionMode === "single" ? "bg-accent/60" : "",
+                        isParallelSelected && selectionMode === "parallel" ? "bg-accent/40" : "",
+                    )}
+                    data-model-id={item.model.id}
+                    onClick={(e: React.MouseEvent & { preventBaseUIHandler?: () => void }) => {
+                        e.preventBaseUIHandler?.();
+
+                        if (isLockedForAnonymous) {
+                            trackEvent("signup_wall_shown", { trigger: "model_picker" });
+                        }
+
+                        if (!isDisabled) {
+                            onSelectModel(item.model.id);
+                        }
+                    }}
+                    title={lockedTitle}
+                    value={item.value}
+                >
+                    {/* Anonymous lock icon */}
+                    {isLockedForAnonymous ? (
+                        <span className="mr-2 flex shrink-0 items-center justify-center">
+                            <Lock className="text-muted-foreground size-4" />
+                        </span>
+                    ) : null}
+
+                    {/* Parallel checkbox / lock */}
+                    {!isLockedForAnonymous && selectionMode === "parallel" ? (
+                        <span className="mr-2 flex shrink-0 items-center justify-center">{parallelIndicator}</span>
+                    ) : null}
+
+                    {/* Provider icon — only shown on starred tab */}
+                    {showProviderIcon ? (
+                        <ProviderIcon
+                            className="mr-2 size-5 shrink-0"
+                            provider={item.model.provider || item.model.displayProvider || ""}
+                            providerIcon={item.model.id.split("/", 1)[0] || item.model.displayProvider || ""}
+                        />
+                    ) : null}
+
+                    <ModelItemContent isSelected={isSelected} label={item.label} model={item.model} selectionMode={selectionMode} />
+                </CommandItem>
+                <ModelItemActions
+                    canMoveDown={canMoveDown}
+                    canMoveUp={canMoveUp}
+                    isFavorite={isFavorite}
+                    isInfoActive={isInfoActive}
+                    label={item.label}
+                    modelId={item.model.id}
+                    onInfo={onInfo}
+                    onInfoLeave={onInfoLeave}
+                    onMove={onMove}
+                    onToggleFavorite={toggleFavorite}
+                />
+            </div>
+        );
+    },
+);
 
 // ─── Model Group ──────────────────────────────────────────────────────────────
 
@@ -428,6 +621,7 @@ const ModelGroupRenderer = memo<{
     isFavorite: (id: string) => boolean;
     onInfo: (modelId: string) => void;
     onInfoLeave: () => void;
+    onSelectModel: (modelId: string) => void;
     parallelMaxReached: boolean;
     parallelSelectedIds: Set<string>;
     /** The starred list in screen order, and how to move one favorite. Unset when the order is not editable. */
@@ -447,6 +641,7 @@ const ModelGroupRenderer = memo<{
         isFavorite,
         onInfo,
         onInfoLeave,
+        onSelectModel,
         parallelMaxReached,
         parallelSelectedIds,
         reorder,
@@ -455,116 +650,45 @@ const ModelGroupRenderer = memo<{
         showGroupLabel = true,
         showProviderIcon = false,
         toggleFavorite,
-    }) => {
-        const { t } = useLingui();
+    }) => (
+        <CommandGroup items={group.items}>
+            {showGroupLabel ? (
+                <CommandGroupLabel className="text-muted-foreground px-3 pt-3 pb-0.5 text-[10px] font-semibold tracking-widest uppercase">
+                    {group.value}
+                </CommandGroupLabel>
+            ) : null}
+            <CommandCollection>
+                {(item: ModelItem) => {
+                    const isParallelSelected = parallelSelectedIds.has(item.model.id);
+                    const position = reorder ? reorder.ids.indexOf(item.model.id) : -1;
 
-        return (
-            <CommandGroup items={group.items}>
-                {showGroupLabel ? (
-                    <CommandGroupLabel className="text-muted-foreground/40 px-3 pt-3 pb-0.5 text-[10px] font-semibold tracking-widest uppercase">
-                        {group.value}
-                    </CommandGroupLabel>
-                ) : null}
-                <CommandCollection>
-                    {(item: ModelItem) => {
-                        const isParallelSelected = parallelSelectedIds.has(item.model.id);
-                        const isSelected = selectionMode === "parallel" ? isParallelSelected : selectedModelId === item.value;
-                        const position = reorder ? reorder.ids.indexOf(item.model.id) : -1;
-                        // A model is type-locked when a different mode is already anchored via the first selection
-                        const isTypeMismatch =
-                            selectionMode === "parallel" && anchorMode !== null && getModelMode(item.model) !== anchorMode && !isParallelSelected;
-                        const isLockedForAnonymous = isAnonymous && item.model.id !== selectedModelId;
-                        const isDisabled =
-                            isLockedForAnonymous || (selectionMode === "parallel" && ((parallelMaxReached && !isParallelSelected) || isTypeMismatch));
-
-                        let stateClassName = "";
-                        let lockedTitle: string | undefined;
-
-                        if (isLockedForAnonymous) {
-                            stateClassName = "cursor-not-allowed opacity-40";
-                            lockedTitle = canSignUp ? t`Sign up to unlock all models` : t`Sign in to unlock all models`;
-                        } else if (isTypeMismatch) {
-                            stateClassName = "cursor-not-allowed opacity-25";
-                            lockedTitle = t`Only ${getModelModeName(anchorMode!)} models can be compared. Clear selection to switch types.`;
-                        } else if (isDisabled) {
-                            stateClassName = "cursor-not-allowed opacity-40";
-                        }
-
-                        let parallelIndicator: ReactNode;
-
-                        if (isTypeMismatch) {
-                            parallelIndicator = <Lock className="text-muted-foreground/30 size-4" />;
-                        } else if (isParallelSelected) {
-                            parallelIndicator = <CheckSquare2 className="text-primary-text size-4" />;
-                        } else {
-                            parallelIndicator = <Square className={cn("size-4", isDisabled ? "text-muted-foreground/20" : "text-muted-foreground/30")} />;
-                        }
-
-                        return (
-                            <CommandItem
-                                className={cn(
-                                    "group/row mx-1.5 flex-row !items-center rounded-md px-2 py-2 transition-colors duration-100",
-                                    isSelected && selectionMode === "single" ? "bg-accent/60" : "",
-                                    isParallelSelected && selectionMode === "parallel" ? "bg-accent/40" : "",
-                                    stateClassName,
-                                )}
-                                key={item.value}
-                                onClick={(e: React.MouseEvent & { preventBaseUIHandler?: () => void }) => {
-                                    e.preventBaseUIHandler?.();
-
-                                    if (isLockedForAnonymous) {
-                                        trackEvent("signup_wall_shown", { trigger: "model_picker" });
-                                    }
-
-                                    if (!isDisabled) {
-                                        item.onSelect();
-                                    }
-                                }}
-                                title={lockedTitle}
-                                value={item.value}
-                            >
-                                {/* Anonymous lock icon */}
-                                {isLockedForAnonymous ? (
-                                    <span className="mr-2 flex shrink-0 items-center justify-center">
-                                        <Lock className="text-muted-foreground/30 size-4" />
-                                    </span>
-                                ) : null}
-
-                                {/* Parallel checkbox / lock */}
-                                {!isLockedForAnonymous && selectionMode === "parallel" ? (
-                                    <span className="mr-2 flex shrink-0 items-center justify-center">{parallelIndicator}</span>
-                                ) : null}
-
-                                {/* Provider icon — only shown on starred tab */}
-                                {showProviderIcon ? (
-                                    <ProviderIcon
-                                        className="mr-2 size-5 shrink-0"
-                                        provider={item.model.provider || item.model.displayProvider || ""}
-                                        providerIcon={item.model.id.split("/", 1)[0] || item.model.displayProvider || ""}
-                                    />
-                                ) : null}
-
-                                <ModelItemContent
-                                    canMoveDown={position !== -1 && position < (reorder?.ids.length ?? 0) - 1}
-                                    canMoveUp={position > 0}
-                                    isFavorite={isFavorite(item.model.id)}
-                                    isInfoActive={infoModelId === item.model.id}
-                                    isSelected={isSelected}
-                                    label={item.label}
-                                    model={item.model}
-                                    onInfo={onInfo}
-                                    onInfoLeave={onInfoLeave}
-                                    onMove={reorder && position !== -1 ? (delta) => reorder.move(item.model.id, delta) : undefined}
-                                    onToggleFavorite={toggleFavorite}
-                                    selectionMode={selectionMode}
-                                />
-                            </CommandItem>
-                        );
-                    }}
-                </CommandCollection>
-            </CommandGroup>
-        );
-    },
+                    return (
+                        <ModelRow
+                            anchorMode={anchorMode}
+                            canMoveDown={position !== -1 && position < (reorder?.ids.length ?? 0) - 1}
+                            canMoveUp={position > 0}
+                            canSignUp={canSignUp}
+                            isFavorite={isFavorite(item.model.id)}
+                            isInfoActive={infoModelId === item.model.id}
+                            isLockedForAnonymous={isAnonymous && item.model.id !== selectedModelId}
+                            isParallelSelected={isParallelSelected}
+                            isSelected={selectionMode === "parallel" ? isParallelSelected : selectedModelId === item.value}
+                            item={item}
+                            key={item.value}
+                            onInfo={onInfo}
+                            onInfoLeave={onInfoLeave}
+                            onMove={reorder && position !== -1 ? reorder.move : undefined}
+                            onSelectModel={onSelectModel}
+                            parallelMaxReached={parallelMaxReached}
+                            selectionMode={selectionMode}
+                            showProviderIcon={showProviderIcon}
+                            toggleFavorite={toggleFavorite}
+                        />
+                    );
+                }}
+            </CommandCollection>
+        </CommandGroup>
+    ),
 );
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -602,8 +726,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const featureFlaggedModels = useFeatureFlaggedModels({ applyUserOverrides: true });
     const { blockedCreators, isLoaded: isRulesLoaded, setBlockedCreators } = useBlockedCreators();
     const { nicknames } = useModelNicknames();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     // Hiding writes the account's filter rules, so it is offered to signed-in users only.
     const isSignedIn = Boolean(sessionData?.user?.id);
     const sourceModels = useMemo(
@@ -631,6 +754,9 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const [selectedModelId, setSelectedModelId] = useState<string | undefined>(initialModelId);
     const [parallelSelectedIds, setParallelSelectedIds] = useState<Set<string>>(() => new Set(initialModelIds));
     const [searchQuery, setSearchQuery] = useState("");
+    const [groupCaches] = useState(() => {
+        return { complete: new WeakMap() as GroupCache, filtered: new WeakMap() as GroupCache };
+    });
     // Read out after a starred move, so a screen-reader user hears the result and the model's new place.
     const [moveAnnouncement, setMoveAnnouncement] = useState("");
     const [activeTab, setActiveTab] = useState<ModelPickerTab>(defaultTab);
@@ -798,30 +924,18 @@ const ModelPicker: FC<ModelPickerProps> = ({
         };
     }, [favoriteModelIds, selectedProvider, searchQuery, activeTab, sourceModels, modeFilter]);
 
-    const createModelItems = useCallback(
-        (models: GatewayModel[]): ModelItem[] =>
-            models.map((model) => {
-                return {
-                    icon: undefined,
-                    label: getModelLabel(model, nicknames),
-                    model,
-                    onSelect: () => handleModelSelect(model.id),
-                    value: model.id,
-                };
-            }),
-        [handleModelSelect, nicknames],
-    );
-
     const groupedItems = useMemo(() => {
+        const itemsFor = (models: GatewayModel[]): ModelItem[] => models.map((model: GatewayModel) => stableModelItem(model, getModelLabel(model, nicknames)));
+
         if (sort !== "default") {
             const listed = activeTab === "starred" ? favoriteModels : [...favoriteModels, ...regularModels];
 
-            return [{ items: createModelItems(sortModels(listed, sort, nicknames)), value: sort }];
+            return [stableModelGroup(groupCaches.complete, sort, itemsFor(sortModels(listed, sort, nicknames)), false)];
         }
 
         if (activeTab === "starred") {
             // One group in the user's own order; grouping by creator would split it.
-            return [{ isFavorite: true, items: createModelItems(favoriteModels), value: "starred" }];
+            return [stableModelGroup(groupCaches.complete, "starred", itemsFor(favoriteModels), true)];
         }
 
         const groups: ModelGroup[] = [];
@@ -829,11 +943,11 @@ const ModelPicker: FC<ModelPickerProps> = ({
         const grouped = groupModelsByCreator(allModels);
 
         for (const [creator, creatorModels] of grouped.entries()) {
-            groups.push({ items: createModelItems(creatorModels), value: creator });
+            groups.push(stableModelGroup(groupCaches.complete, creator, itemsFor(creatorModels), false));
         }
 
         return groups;
-    }, [favoriteModels, regularModels, activeTab, createModelItems, sort, nicknames]);
+    }, [favoriteModels, regularModels, activeTab, sort, nicknames, groupCaches]);
 
     // One search text per model per locale (`i18n` is a new object on every
     // locale change), so a keystroke only runs `includes` over prebuilt strings.
@@ -863,12 +977,17 @@ const ModelPicker: FC<ModelPickerProps> = ({
             const filteredItems = filterModelsByQuery(group.items, searchQuery, searchTexts);
 
             if (filteredItems.length > 0) {
-                filtered.push({ ...group, items: filteredItems });
+                filtered.push(stableModelGroup(groupCaches.filtered, group.value, filteredItems, Boolean(group.isFavorite)));
             }
         }
 
         return filtered;
-    }, [groupedItems, searchQuery, searchTexts]);
+    }, [groupedItems, searchQuery, searchTexts, groupCaches]);
+
+    useLayoutEffect(() => {
+        rememberGroups(groupCaches.complete, groupedItems);
+        rememberGroups(groupCaches.filtered, filteredGroupedItems);
+    }, [groupCaches, groupedItems, filteredGroupedItems]);
 
     const infoModel = useMemo(() => {
         if (!infoModelId) {
@@ -884,8 +1003,9 @@ const ModelPicker: FC<ModelPickerProps> = ({
     const isShowGroupLabels = activeTab !== "starred" && sort === "default";
 
     // Moves a starred model one place and remembers which arrow did it, so focus can follow the row (see the effect below).
+    // A move from the keyboard shortcut keeps focus in the search field instead.
     const moveFavorite = useCallback(
-        (modelId: string, delta: -1 | 1) => {
+        (modelId: string, delta: -1 | 1, followFocus = true) => {
             if (!onMoveFavorite) {
                 return;
             }
@@ -899,7 +1019,9 @@ const ModelPicker: FC<ModelPickerProps> = ({
 
             const saved = onMoveFavorite(modelId, target);
 
-            setPendingMoveFocus({ before: ids.join("\u{0}"), delta, modelId });
+            if (followFocus) {
+                setPendingMoveFocus({ before: ids.join("\u{0}"), delta, modelId });
+            }
 
             // The swap puts the model one place along, so its new position is its old index plus the step.
             const model = favoriteModels.find((entry) => entry.id === modelId);
@@ -948,6 +1070,43 @@ const ModelPicker: FC<ModelPickerProps> = ({
         setPendingMoveFocus(undefined);
     }, [orderKey, pendingMoveFocus]);
 
+    // The row buttons for star, move and info are pointer-only (they cannot live inside the listbox), so the same
+    // actions are bound to Alt+S, Alt+Arrow and Alt+I on the highlighted row, from the search field.
+    const handleActionShortcut = useCallback(
+        (event: React.KeyboardEvent & { preventBaseUIHandler?: () => void }) => {
+            if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+                return;
+            }
+
+            const modelId = pickerRef.current?.querySelector<HTMLElement>("[data-model-id][data-highlighted]")?.dataset.modelId;
+
+            if (!modelId) {
+                return;
+            }
+
+            if (event.code === "KeyS") {
+                const isStarred = isFavorite(modelId);
+                const model = sourceModels.find((entry) => entry.id === modelId);
+                const label = model ? getModelLabel(model, nicknames) : modelId;
+
+                toggleFavorite(modelId, !isStarred);
+                setMoveAnnouncement(isStarred ? t`${label} removed from starred` : t`${label} added to starred`);
+            } else if (event.code === "KeyI") {
+                handleInfo(modelId);
+            } else if ((event.code === "ArrowUp" || event.code === "ArrowDown") && reorder?.ids.includes(modelId)) {
+                moveFavorite(modelId, event.code === "ArrowUp" ? -1 : 1, false);
+            } else {
+                return;
+            }
+
+            // Base UI's list navigation runs on the same ArrowUp/ArrowDown keydown; it would move the highlight to a neighbour.
+            event.preventBaseUIHandler?.();
+            event.preventDefault();
+            event.stopPropagation();
+        },
+        [handleInfo, isFavorite, moveFavorite, nicknames, reorder, sourceModels, t, toggleFavorite],
+    );
+
     // Derive the "anchor" mode from the first selected model in parallel mode.
     // All other types are locked out once a selection is made.
     const anchorMode = useMemo(() => {
@@ -992,7 +1151,11 @@ const ModelPicker: FC<ModelPickerProps> = ({
                             </p>
                         </div>
                     )}
-                    <CommandInput placeholder={t`Search models...`} />
+                    <CommandInput
+                        aria-keyshortcuts="Alt+S Alt+I Alt+ArrowUp Alt+ArrowDown"
+                        onKeyDown={handleActionShortcut}
+                        placeholder={t`Search models...`}
+                    />
 
                     {/* Tab bar */}
                     <div className="flex items-center border-t">
@@ -1002,7 +1165,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     "flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[12.5px] font-medium transition-colors duration-150",
                                     activeTab === "starred"
                                         ? "text-foreground border-foreground -mb-px"
-                                        : "text-muted-foreground/60 hover:text-foreground border-transparent",
+                                        : "text-muted-foreground hover:text-foreground border-transparent",
                                 )}
                                 onClick={() => handleTabChange("starred")}
                                 type="button"
@@ -1015,7 +1178,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     "flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[12.5px] font-medium transition-colors duration-150",
                                     activeTab === "all"
                                         ? "text-foreground border-foreground -mb-px"
-                                        : "text-muted-foreground/60 hover:text-foreground border-transparent",
+                                        : "text-muted-foreground hover:text-foreground border-transparent",
                                 )}
                                 onClick={() => handleTabChange("all")}
                                 type="button"
@@ -1034,7 +1197,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                             "rounded-[5px] px-2.5 py-1 text-[11.5px] font-medium transition-all duration-150",
                                             selectionMode === "single"
                                                 ? "bg-background text-foreground shadow-sm"
-                                                : "text-muted-foreground/50 hover:text-muted-foreground",
+                                                : "text-muted-foreground hover:text-muted-foreground",
                                         )}
                                         onClick={() => handleSelectionModeChange("single")}
                                         type="button"
@@ -1046,7 +1209,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                             "rounded-[5px] px-2.5 py-1 text-[11.5px] font-medium transition-all duration-150",
                                             selectionMode === "parallel"
                                                 ? "bg-background text-foreground shadow-sm"
-                                                : "text-muted-foreground/50 hover:text-muted-foreground",
+                                                : "text-muted-foreground hover:text-muted-foreground",
                                         )}
                                         onClick={() => handleSelectionModeChange("parallel")}
                                         type="button"
@@ -1062,13 +1225,13 @@ const ModelPicker: FC<ModelPickerProps> = ({
                     <div className="flex items-center gap-1 border-t px-2 py-1.5">
                         {!hideModeFilter && (
                             <>
-                                <span className="text-muted-foreground/50 mr-1 text-[10px] font-medium tracking-wider uppercase">{t`Type`}</span>
+                                <span className="text-muted-foreground mr-1 text-[10px] font-medium tracking-wider uppercase">{t`Type`}</span>
                                 <button
                                     className={cn(
                                         "rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === null
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter(null)}
                                     type="button"
@@ -1080,7 +1243,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "text"
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("text")}
                                     type="button"
@@ -1093,7 +1256,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "image"
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("image")}
                                     type="button"
@@ -1106,7 +1269,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "video"
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("video")}
                                     type="button"
@@ -1119,7 +1282,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "speech-to-text"
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                                     )}
                                     onClick={() => setModeFilter("speech-to-text")}
                                     type="button"
@@ -1175,46 +1338,47 @@ const ModelPicker: FC<ModelPickerProps> = ({
 
                         {/* Model list */}
                         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                            {isStarredEmpty ? (
-                                <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-                                    <div className="border-border/30 flex size-10 items-center justify-center rounded-xl border">
-                                        <Star className="text-muted-foreground/30 size-4" />
+                            <CommandEmpty className="not-empty:size-full">
+                                {isStarredEmpty ? (
+                                    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+                                        <div className="border-border/30 flex size-10 items-center justify-center rounded-xl border">
+                                            <Star className="text-muted-foreground size-4" />
+                                        </div>
+                                        <div>
+                                            <p className="text-foreground/80 text-sm font-medium">{t`No starred models`}</p>
+                                            <p className="text-muted-foreground mt-1 text-[11.5px] leading-relaxed">
+                                                {t`Click ★ on any model in All models to add it here.`}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-foreground/80 text-sm font-medium">{t`No starred models`}</p>
-                                        <p className="text-muted-foreground/40 mt-1 text-[11.5px] leading-relaxed">
-                                            {t`Click ★ on any model in All models to add it here.`}
-                                        </p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <>
-                                    <CommandEmpty className="not-empty:size-full">{t`No models found.`}</CommandEmpty>
-                                    <CommandList className="py-1.5">
-                                        {filteredGroupedItems.map((group) => (
-                                            <ModelGroupRenderer
-                                                anchorMode={selectionMode === "parallel" ? anchorMode : null}
-                                                canSignUp={canSignUp}
-                                                group={group}
-                                                infoModelId={infoModelId}
-                                                isAnonymous={isAnonymous}
-                                                isFavorite={isFavorite}
-                                                key={`${activeTab}-${group.value}`}
-                                                onInfo={handleInfo}
-                                                onInfoLeave={scheduleInfoClose}
-                                                parallelMaxReached={isParallelMaxReached}
-                                                parallelSelectedIds={parallelSelectedIds}
-                                                reorder={reorder}
-                                                selectedModelId={selectedModelId}
-                                                selectionMode={selectionMode}
-                                                showGroupLabel={isShowGroupLabels}
-                                                showProviderIcon={activeTab === "starred" || sort !== "default"}
-                                                toggleFavorite={toggleFavorite}
-                                            />
-                                        ))}
-                                    </CommandList>
-                                </>
-                            )}
+                                ) : (
+                                    t`No models found.`
+                                )}
+                            </CommandEmpty>
+                            <CommandList className="py-1.5">
+                                {filteredGroupedItems.map((group) => (
+                                    <ModelGroupRenderer
+                                        anchorMode={selectionMode === "parallel" ? anchorMode : null}
+                                        canSignUp={canSignUp}
+                                        group={group}
+                                        infoModelId={infoModelId}
+                                        isAnonymous={isAnonymous}
+                                        isFavorite={isFavorite}
+                                        key={`${activeTab}-${group.value}`}
+                                        onInfo={handleInfo}
+                                        onInfoLeave={scheduleInfoClose}
+                                        onSelectModel={handleModelSelect}
+                                        parallelMaxReached={isParallelMaxReached}
+                                        parallelSelectedIds={parallelSelectedIds}
+                                        reorder={reorder}
+                                        selectedModelId={selectedModelId}
+                                        selectionMode={selectionMode}
+                                        showGroupLabel={isShowGroupLabels}
+                                        showProviderIcon={activeTab === "starred" || sort !== "default"}
+                                        toggleFavorite={toggleFavorite}
+                                    />
+                                ))}
+                            </CommandList>
                         </div>
                     </CommandPanel>
 
@@ -1222,13 +1386,13 @@ const ModelPicker: FC<ModelPickerProps> = ({
                     {selectionMode === "parallel" ? (
                         <div className="border-border/40 flex items-center justify-between border-t px-3 py-2">
                             <div className="flex flex-col gap-0.5">
-                                <span className={cn("text-[11.5px]", isParallelMaxReached ? "text-amber-500 dark:text-amber-400" : "text-muted-foreground/50")}>
+                                <span className={cn("text-[11.5px]", isParallelMaxReached ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
                                     {isParallelMaxReached
                                         ? t`Maximum ${MAX_PARALLEL} models reached`
                                         : t`${parallelSelectedIds.size} of ${MAX_PARALLEL} selected`}
                                 </span>
                                 {anchorMode ? (
-                                    <span className="text-muted-foreground/40 flex items-center gap-1 text-[10px]">
+                                    <span className="text-muted-foreground flex items-center gap-1 text-[10px]">
                                         <Lock className="size-2.5" />
                                         {t`Locked to ${getModelModeName(anchorMode)} models`}
                                     </span>
@@ -1239,7 +1403,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                     "rounded-md px-3 py-1 text-[12px] font-medium transition-colors duration-100",
                                     parallelSelectedIds.size > 0
                                         ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                                        : "text-muted-foreground/30 cursor-not-allowed",
+                                        : "text-muted-foreground cursor-not-allowed",
                                 )}
                                 disabled={parallelSelectedIds.size === 0}
                                 onClick={() => {
@@ -1261,6 +1425,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                 <PopoverPrimitive.Positioner align="start" anchor={pickerRef} className="isolate z-50" side="right" sideOffset={8}>
                     <PopoverPrimitive.Popup
                         className="bg-popover text-popover-foreground ring-foreground/10 data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=right]:slide-in-from-left-2 w-64 origin-(--transform-origin) overflow-hidden rounded-lg shadow-md ring-1 outline-hidden duration-100"
+                        data-slot="popover-content"
                         onMouseEnter={cancelInfoClose}
                         onMouseLeave={scheduleInfoClose}
                     >

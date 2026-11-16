@@ -132,7 +132,7 @@ const SlideCard: FC<{
             type="button"
         >
             <div className="mb-1 flex items-center gap-2">
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t`Slide ${slideNumber}`}</span>
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{t`Slide ${slideNumber}`}</span>
             </div>
             {slide.texts.length > 0 ? (
                 <div className="space-y-1">
@@ -141,10 +141,10 @@ const SlideCard: FC<{
                             {text}
                         </p>
                     ))}
-                    {slide.texts.length > 5 && <p className="text-xs text-gray-400">{t`+${moreLines} more lines`}</p>}
+                    {slide.texts.length > 5 && <p className="text-xs text-gray-600 dark:text-gray-400">{t`+${moreLines} more lines`}</p>}
                 </div>
             ) : (
-                <p className="text-sm text-gray-400 italic">{t`No text content`}</p>
+                <p className="text-sm text-gray-600 italic dark:text-gray-400">{t`No text content`}</p>
             )}
         </button>
     );
@@ -170,7 +170,7 @@ const SlideView: FC<{ slide: SlideContent }> = memo(({ slide }) => {
                     ))}
                 </div>
             ) : (
-                <div className="flex flex-col items-center justify-center text-gray-400">
+                <div className="flex flex-col items-center justify-center text-gray-600 dark:text-gray-400">
                     <FileIcon aria-hidden="true" className="mb-2 h-12 w-12" />
                     <p>{t`No text content on this slide`}</p>
                 </div>
@@ -234,14 +234,14 @@ const PptxPreview: FC<PptxPreviewProps> = memo(({ className, data, fileName }) =
     if (loading) {
         return (
             <div aria-live="polite" className={`flex items-center justify-center p-8 ${className ?? ""}`} role="status">
-                <div className="animate-pulse text-gray-400">{t`Loading presentation…`}</div>
+                <div className="animate-pulse text-gray-600 dark:text-gray-400">{t`Loading presentation…`}</div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className={`flex items-center justify-center p-8 text-red-500 ${className ?? ""}`}>
+            <div className={`flex items-center justify-center p-8 text-red-700 dark:text-red-400 ${className ?? ""}`}>
                 <p>{t`Error: ${error}`}</p>
             </div>
         );
@@ -249,7 +249,7 @@ const PptxPreview: FC<PptxPreviewProps> = memo(({ className, data, fileName }) =
 
     if (slides.length === 0) {
         return (
-            <div className={`flex items-center justify-center p-8 text-gray-400 ${className ?? ""}`}>
+            <div className={`flex items-center justify-center p-8 text-gray-600 dark:text-gray-400 ${className ?? ""}`}>
                 <p>{t`No slides found in this presentation.`}</p>
             </div>
         );
@@ -262,7 +262,7 @@ const PptxPreview: FC<PptxPreviewProps> = memo(({ className, data, fileName }) =
                 <div className="flex items-center gap-2">
                     <FileIcon aria-hidden="true" className="h-4 w-4 text-orange-500" />
                     <span className="text-sm font-medium">{fileName ?? t`Presentation`}</span>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">
                         (<Plural one="# slide" other="# slides" value={slides.length} />)
                     </span>
                 </div>
@@ -276,7 +276,7 @@ const PptxPreview: FC<PptxPreviewProps> = memo(({ className, data, fileName }) =
                     >
                         <ChevronLeftIcon aria-hidden="true" className="h-4 w-4" />
                     </button>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">
                         {activeSlide + 1} / {slides.length}
                     </span>
                     <button

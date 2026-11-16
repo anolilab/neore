@@ -336,14 +336,14 @@ impl DeviceState {
                 max_attempts: MAX_ATTEMPTS,
                 next_attempt_at: Some(epoch + at.saturating_duration_since(now).as_millis() as u64),
                 phase: "waiting",
-                reason: None,
+                reason: keep.last_failure().map(str::to_owned),
             }),
             Phase::Connecting { attempt } => Some(ReconnectView {
                 attempt: (*attempt > 0).then_some(*attempt),
                 max_attempts: MAX_ATTEMPTS,
                 next_attempt_at: None,
                 phase: "connecting",
-                reason: None,
+                reason: keep.last_failure().map(str::to_owned),
             }),
             Phase::GaveUp { reason } => Some(ReconnectView {
                 attempt: None,

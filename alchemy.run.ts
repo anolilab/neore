@@ -12,7 +12,15 @@ import { encryptionKeyProblem, OPTIONAL_ENV_KEYS, REQUIRED_ENV_KEYS } from "./ba
 import { JOBS_QUEUE_CONSUMER } from "./backend/lunora/lib/job-queue-config";
 import { jobs, jobsDeadLetters } from "./backend/lunora/queues";
 import { GATEWAY_CRONS } from "./services/llm-gateway/src/crons";
-import { BACKEND_BUILD, RUST_WORKER_OUTPUT, RUST_WORKER_UPLOAD, WEB_UPLOAD_RULES, WORKER_BUILD } from "./scripts/worker-bundle";
+import {
+    BACKEND_BUILD,
+    backendStudioAssets,
+    backendStudioAssetsProblem,
+    RUST_WORKER_OUTPUT,
+    RUST_WORKER_UPLOAD,
+    WEB_UPLOAD_RULES,
+    WORKER_BUILD,
+} from "./scripts/worker-bundle";
 
 // ---------------------------------------------------------------------------
 // Stage resolution
@@ -110,6 +118,15 @@ if (!existsSync("./apps/web/dist/server/index.js") && !destroying) {
     throw new Error("Cannot deploy: apps/web/dist/server/index.js is missing. Run `pnpm build` in apps/web first.");
 }
 
+// Codegen writes Studio's documents to backend/.lunora/studio-assets, and the generated app
+// then reads them through the backend's `ASSETS` binding (Lunora #1499).
+const studioAssets = backendStudioAssets(".");
+const studioAssetsProblem = destroying ? undefined : backendStudioAssetsProblem(".");
+
+if (studioAssetsProblem !== undefined) {
+    throw new Error(`Cannot deploy: ${studioAssetsProblem}`);
+}
+
 const requireEnv = (name: (typeof REQUIRED_DEPLOY_ENV)[number]): string => process.env[name]?.trim() ?? "";
 
 /**
@@ -162,6 +179,7 @@ const customDomain = (origin: string, name: (typeof REQUIRED_DEPLOY_ENV)[number]
  */
 const PLAIN_ENV_KEYS = new Set([
     "AMADEUS_CLIENT_ID",
+    "ANDROID_DATA_ONLY_PUSH",
     "APP_NAME",
     "AUTH_GITHUB_CLIENT_ID",
     "BROWSERBASE_PROJECT_ID",
@@ -676,6 +694,21 @@ export const Website = Cloudflare.Worker("website", {
 });
 
 // ---------------------------------------------------------------------------
+// Storybook – the static build of apps/web's Storybook, on preview stages only
+// ---------------------------------------------------------------------------
+//
+// The build runs in the deploy workflow's `build-storybook` job, which holds no secrets, and the
+// output is in `outdir` before Alchemy starts. The command is a no-op, so no Storybook code, addon
+// or story module runs in the job that holds the deploy secrets.
+const Storybook = Cloudflare.Website.StaticSite("storybook", {
+    command: "true",
+    compatibility: { date: COMPATIBILITY_DATE },
+    name: named("neore-storybook"),
+    observability: WORKER_OBSERVABILITY,
+    outdir: "./apps/web/storybook-static",
+});
+
+// ---------------------------------------------------------------------------
 // LLM Gateway service – Hono on Cloudflare Workers
 // ---------------------------------------------------------------------------
 // Proxies all LLM API calls with token counting, cost tracking,
@@ -782,6 +815,7 @@ export default Alchemy.Stack(
     },
     Effect.gen(function* () {
         const website = yield* Website;
+        const storybook = stage === "production" ? undefined : yield* Storybook;
 
         const gateway = yield* Cloudflare.Worker("llm-gateway", {
             build: WORKER_BUILD,
@@ -876,6 +910,9 @@ export default Alchemy.Stack(
         }
 
         const backend = yield* Cloudflare.Worker("neore-backend", {
+            // Studio's documents (OpenAPI, OpenRPC, architecture) behind the `ASSETS` binding, with
+            // every request going to the Worker first. None before Lunora #1499; see `backendStudioAssets`.
+            ...(studioAssets ? { assets: studioAssets } : {}),
             // Minified, React production builds, English-only zod locales — see
             // scripts/worker-bundle.ts. `wrangler.jsonc`'s `minify` does not reach this.
             build: BACKEND_BUILD,
@@ -998,6 +1035,7 @@ export default Alchemy.Stack(
             backend: backend.url,
             llmGateway: gateway.url,
             stage,
+            storybook: storybook?.url,
             website: website.url,
         };
     }),

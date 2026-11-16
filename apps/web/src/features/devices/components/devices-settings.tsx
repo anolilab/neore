@@ -10,11 +10,12 @@ import { formatDateTime } from "@neore/ui/utils/locale-format";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { FC } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import SetupChecklist from "@/features/onboarding/components/setup-checklist";
 import { useCRPC } from "@/lib/lunora/crpc";
 import type { NativeDevicePlatform, NativeDeviceStatus, NativeHostReconnect, NativeHostSpec } from "@/lib/native/bridge";
 import {
@@ -26,8 +27,9 @@ import {
     pairNativeDevice,
     pairNativeHost,
     probeNativeHost,
-} from "@/lib/native/bridge";
+} from "@/lib/native/device-bridge";
 
+import { buildDeviceDiagnostics, routeOf } from "../lib/device-diagnostics";
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
 import { isDeviceOnline } from "../lib/device-relay";
 import DeviceScope from "./device-scope";
@@ -36,6 +38,8 @@ interface DeviceView {
     _id: string;
     /** The (agent, folder) pairs the user approved on the computer; each can be started from here. */
     acpOffers?: { agentKey: string; agentLabel: string; folderId: string; folderLabel: string }[];
+    /** The desktop app version the computer last reported; unset when it never did. */
+    appVersion?: string;
     createdAt: number;
     lastSeenAt?: number;
     name: string;
@@ -44,7 +48,7 @@ interface DeviceView {
     projectIds?: string[];
     toolNames: string[];
     /** `ssh`: a server this desktop reaches over SSH and speaks for. */
-    transport?: "ssh";
+    transport?: "headless" | "ssh";
     /** The computer reported a protocol older than the backend serves: it gets no calls until it is updated. */
     updateRequired?: boolean;
     viaDeviceId?: string;
@@ -114,15 +118,111 @@ export const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ devic
     );
 };
 
-const DeviceRow: FC<{
+/** The phrases the device core writes in its own words (`packages/device-core/src/lifecycle.rs`). */
+const CONNECTION_LOST = "the connection was lost";
+const GAVE_UP = / \(gave up after (\d+) attempts\)$/u;
+
+/** The longest failure a row or a toast shows, as the device core caps its own (`lifecycle.rs`). */
+const MAX_FAILURE_CHARS = 300;
+
+/** `text` cut to {@link MAX_FAILURE_CHARS} in the middle, so its start and the advice at its end both stay. */
+const cutFailure = (text: string): string => {
+    const characters = [...text];
+
+    if (characters.length <= MAX_FAILURE_CHARS) {
+        return text;
+    }
+
+    const head = Math.floor((MAX_FAILURE_CHARS - 1) / 2);
+
+    return `${characters.slice(0, head).join("")}…${characters.slice(characters.length - (MAX_FAILURE_CHARS - 1 - head)).join("")}`;
+};
+
+export const DeviceRow: FC<{
     connected?: boolean;
     device: DeviceView;
     isThisComputer: boolean;
     now: number;
     onConnectionChange: () => void;
     reconnect?: NativeHostReconnect;
-}> = ({ connected, device, isThisComputer, now, onConnectionChange, reconnect }) => {
-    const { t } = useLingui();
+    /** The name of the paired computer that holds this device, when it is an SSH server. */
+    viaName?: string;
+}> = ({ connected, device, isThisComputer, now, onConnectionChange, reconnect, viaName }) => {
+    const { i18n, t } = useLingui();
+
+    /** A failure as the row shows it: the device core's own phrases translated, ssh's text as it came. */
+    const failureText = (message: string): string => {
+        const gaveUp = GAVE_UP.exec(message);
+        const base = gaveUp ? message.slice(0, gaveUp.index) : message;
+        const text = base === CONNECTION_LOST ? t`The connection was lost.` : base;
+        const attempts = gaveUp?.[1] ?? "";
+
+        return gaveUp ? t`${text} (gave up after ${attempts} attempts)` : text;
+    };
+
+    // The failure of the person's latest Connect or Retry on this row; the next action replaces it.
+    // `coreReason`: the core's reason when it failed, so the core moving on to a newer reason replaces it on the row.
+    const [actionFailure, setActionFailure] = useState<{ coreReason: string | null; message: string } | undefined>();
+    const latestAction = useRef(0);
+    // The core's reason as of the latest render, read when an action fails.
+    const reconnectReason = useRef<string | null>(null);
+
+    useEffect(() => {
+        reconnectReason.current = reconnect?.reason ?? null;
+    }, [reconnect?.reason]);
+
+    // A connection made since (here or elsewhere) means the earlier failure explains nothing any more.
+    if (connected && actionFailure !== undefined) {
+        setActionFailure(undefined);
+    }
+
+    // What the row explains, decided as it renders: the device core's reason while it keeps the server (it drops the
+    // reason once the link is up or the server is let go), otherwise the latest action's failure while the server is
+    // neither connected nor kept.
+    let failure: string | undefined;
+
+    if (!connected) {
+        const coreReason = reconnect?.reason ?? null;
+
+        // The person's own latest failure, until the core reports a newer reason of its own (a refused Retry leaves the
+        // core's view as it was, so it would otherwise stay hidden behind the older reason).
+        failure = actionFailure !== undefined && actionFailure.coreReason === coreReason ? actionFailure.message : (coreReason ?? undefined);
+    }
+
+    const errorId = `device-error-${device._id}`;
+    const copyDiagnostics = (): void => {
+        // Only what the row shows; its failure is reduced to a category, never copied as it came.
+        const text = buildDeviceDiagnostics(
+            {
+                clientAgent: navigator.userAgent,
+                failure,
+                lastSeenAt: device.lastSeenAt,
+                name: device.name,
+                route: routeOf(device.transport, isThisComputer),
+                viaName,
+            },
+            i18n,
+        );
+        const { clipboard }: { clipboard?: Clipboard } = navigator;
+        const failed = (): void => {
+            toast.error(t`Could not copy to the clipboard`);
+        };
+
+        if (!clipboard) {
+            failed();
+
+            return;
+        }
+
+        clipboard
+            .writeText(text)
+            .then(() => {
+                toast.success(t`Diagnostics copied`);
+
+                return undefined;
+            })
+            .catch(failed);
+    };
     const crpc = useCRPC();
     const [name, setName] = useState(device.name);
     const [confirming, setConfirming] = useState(false);
@@ -141,11 +241,25 @@ const DeviceRow: FC<{
     }
 
     const connection = (action: () => Promise<unknown>) => {
+        latestAction.current += 1;
+
+        const mine = latestAction.current;
+        // The core's reason as the action starts: a newer one the core reports meanwhile replaces this action's failure.
+        const coreReasonAtStart = reconnectReason.current;
+
+        setActionFailure(undefined);
+
         void (async () => {
             try {
                 await action();
             } catch (error) {
-                toast.error(error instanceof Error ? error.message : t`Could not connect to the server.`);
+                const message = cutFailure(error instanceof Error ? error.message : t`Could not connect to the server.`);
+
+                if (mine === latestAction.current) {
+                    setActionFailure({ coreReason: coreReasonAtStart, message });
+                }
+
+                toast.error(failureText(message));
             } finally {
                 onConnectionChange();
             }
@@ -176,13 +290,23 @@ const DeviceRow: FC<{
                 <p className="text-muted-foreground text-xs">
                     {device.toolNames.length > 0 ? t`${device.toolNames.length} tools: ${device.toolNames.join(", ")}` : t`No tools shared yet`}
                 </p>
+                {/* A server over SSH runs the host software, not the desktop app, so it has no app version to report. */}
+                {device.transport !== "ssh" && (
+                    <p className="text-muted-foreground text-xs text-pretty tabular-nums">
+                        {device.appVersion === undefined ? t`Neore version not reported` : t`Neore ${device.appVersion}`}
+                    </p>
+                )}
+                {/* Always in the accessibility tree, so the first failure is announced too. `ph-no-capture`: ssh text can carry anything. */}
+                <p className="ph-no-capture text-destructive text-xs" id={errorId} role="status">
+                    {failure === undefined ? null : failureText(failure)}
+                </p>
                 {device.updateRequired === true && (
                     <p className="text-destructive text-xs" id={updateNoticeId(device._id)} role="status">
                         {t`Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on.`}
                     </p>
                 )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
                 {isThisComputer && <Badge variant="outline">{t`This computer`}</Badge>}
                 {device.transport === "ssh" && <Badge variant="outline">{t`Server over SSH`}</Badge>}
                 <Badge variant={online ? "default" : "secondary"}>{online ? t`Online` : t`Offline`}</Badge>
@@ -190,6 +314,7 @@ const DeviceRow: FC<{
                 {(reconnect?.phase === "waiting" || reconnect?.phase === "connecting") && <Badge variant="secondary">{t`Reconnecting`}</Badge>}
                 {connected !== undefined && (
                     <Button
+                        aria-describedby={failure === undefined ? undefined : errorId}
                         onClick={() => connection(() => (stoppable ? disconnectNativeHost(device._id) : connectNativeHost(device._id)))}
                         size="sm"
                         variant="outline"
@@ -202,6 +327,9 @@ const DeviceRow: FC<{
                         {t`Dismiss`}
                     </Button>
                 )}
+                <Button aria-label={t`Copy diagnostics for ${device.name}`} onClick={copyDiagnostics} size="sm" variant="outline">
+                    {t`Copy diagnostics`}
+                </Button>
                 <Button onClick={() => setConfirming(true)} size="sm" variant="outline">
                     {t`Remove`}
                 </Button>
@@ -443,8 +571,10 @@ const DevicesSettings: FC = () => {
 
     return (
         <div className="space-y-6">
+            <SetupChecklist serverFormShown={pairedHere !== undefined && Boolean(native?.deviceId)} />
             <SettingsCard
                 description={t`Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks.`}
+                id="devices-pairing"
                 title={t`Devices`}
             >
                 <CardContent className="space-y-4">
@@ -492,6 +622,7 @@ const DevicesSettings: FC = () => {
                                     now={now}
                                     onConnectionChange={refreshNative}
                                     reconnect={native?.hosts?.find((host) => host.deviceId === device._id)?.reconnect}
+                                    viaName={devices.find((other) => other._id === device.viaDeviceId)?.name}
                                 />
                             ))}
                         </ul>
@@ -503,6 +634,7 @@ const DevicesSettings: FC = () => {
             {pairedHere !== undefined && native?.deviceId && (
                 <SettingsCard
                     description={t`Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours.`}
+                    id="devices-ssh"
                     title={t`Servers over SSH`}
                 >
                     <CardContent>

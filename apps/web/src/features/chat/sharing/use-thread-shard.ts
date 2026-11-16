@@ -6,11 +6,16 @@ import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
-/** Whether `threadId` is in a thread list page already in the cache — then it is the caller's own. */
-const isListedThread = (queryClient: QueryClient, threadId: string): boolean =>
+interface ThreadListPages {
+    temporaryThreads?: { page?: { _id: string }[] };
+    threads?: { page?: { _id: string }[] };
+}
+
+/** Whether `threadId` is in a thread list page already in the cache — its own or its temporary chats — then it is the caller's own. */
+export const isListedThread = (queryClient: QueryClient, threadId: string): boolean =>
     queryClient
-        .getQueriesData<{ threads?: { page?: { _id: string }[] } }>({ queryKey: ["lunora", "chat_composite:getThreadListData"] })
-        .some(([, data]) => data?.threads?.page?.some((thread) => thread._id === threadId) ?? false);
+        .getQueriesData<ThreadListPages>({ queryKey: ["lunora", "chat_composite:getThreadListData"] })
+        .some(([, data]) => [...(data?.threads?.page ?? []), ...(data?.temporaryThreads?.page ?? [])].some((thread) => thread._id === threadId));
 
 /**
  * Settle which shard `threadId` lives on before anything queries it:

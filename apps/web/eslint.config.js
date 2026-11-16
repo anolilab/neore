@@ -16,13 +16,16 @@ export default createConfig(
             "./e2e/.results/**",
             // The shared test user's saved session (`e2e/auth.setup.ts`), also gitignored.
             "./e2e/.auth/**",
-            // Lingui-generated message catalogs. Already in `.prettierignore`;
+            // Lingui-generated message catalogs. Already in the root `.prettierignore`;
             // every finding in them is `unicorn/no-abusive-eslint-disable` on a
             // blanket disable the generator writes.
             "./src/locales/**",
             // Written by the TanStack Router generator. Its blanket
             // `eslint-disable` header and its formatting are not ours to fix.
             "./src/routeTree.gen.ts",
+            // Written by `msw` on install (`package.json#msw.workerDirectory`), not by us.
+            "./.storybook/public/**",
+            "./storybook-static/**",
             // ...globs
         ],
         typescript: {
@@ -273,9 +276,9 @@ export default createConfig(
     },
     {
         /**
-         * Prettier owns formatting, and it wants trailing commas in `.jsonc`
+         * oxfmt owns formatting, and it wants trailing commas in `.jsonc`
          * where `jsonc/comma-dangle` forbids them. Verified by letting eslint
-         * fix `wrangler.jsonc` and watching `prettier --check` reject the
+         * fix `wrangler.jsonc` and watching the format check reject the
          * result — the two disagree about the same 7 lines, so neither state is
          * reachable while both run.
          *
@@ -393,9 +396,10 @@ export default createConfig(
          * `use-layers` (21): a cascade layer would LOWER these declarations'
          * precedence, so obeying the rule breaks what the file is for.
          * `packages/ui/src/global.css` does use `@layer base` — design system
-         * CSS is the case layers are for.
+         * CSS is the case layers are for. Storybook's `preview.css` only imports
+         * `styles.css`, for the same reason.
          */
-        files: ["**/styles.css"],
+        files: ["**/styles.css", ".storybook/preview.css"],
         rules: {
             "css/no-important": "off",
             "css/use-layers": "off",
@@ -430,9 +434,9 @@ export default createConfig(
             "unicorn/prefer-iterator-to-array": "off",
 
             /**
-             * Fights Prettier: it wants every call argument on its own line,
-             * and Prettier's last-argument hugging collapses them straight back.
-             * Its autofix produces `}),);`, which Prettier then rejects.
+             * Fights the formatter: it wants every call argument on its own line,
+             * and oxfmt's last-argument hugging collapses them straight back.
+             * Its autofix produces `}),);`, which oxfmt then rejects.
              * Formatting yields to the formatter.
              */
             "antfu/consistent-list-newline": "off",
@@ -621,12 +625,13 @@ export default createConfig(
             "sonarjs/redundant-type-aliases": "off",
 
             /**
-             * Nine findings, one cause: `const { hooks } = useAuth();
-             * hooks.useSession()` — dynamically dispatched hooks. `hooks` is
-             * composed at runtime in `auth-ui-provider-tanstack.tsx` and is the
-             * auth feature's deliberate injection seam. Clearing this means
-             * deleting the override point and importing concrete hooks, which
-             * is an architectural decision rather than a lint fix.
+             * Its findings were `const { hooks } = useAuth(); hooks.useSession()`
+             * — dynamically dispatched hooks, `hooks` being the auth feature's
+             * injection seam (`auth-ui-provider-tanstack.tsx`). Components now
+             * call `useAuthSession` & co. (`features/auth/hooks/use-auth-session.ts`),
+             * which keep that seam in one place, and
+             * `scripts/react-compiler-bailouts.test.ts` fails when a chat
+             * component is skipped by the compiler again.
              */
             "react-compiler/react-compiler": "off",
 
@@ -776,6 +781,28 @@ export default createConfig(
         rules: {
             "jsx-a11y/click-events-have-key-events": "off",
             "jsx-a11y/no-noninteractive-element-interactions": "off",
+        },
+    },
+    {
+        /**
+         * Storybook: the stories, their mocks and fixtures (`src/storybook`), and its config.
+         * None of it ships, so dev dependencies are its dependencies. `.storybook/` starts the
+         * mock worker and sets the env at module scope on purpose (`msw.ts`, `vite.config.ts`),
+         * and the console is how a story says which fixture it is missing. A `play` function
+         * runs once, so a regex in a query is not worth hoisting.
+         */
+        files: [".storybook/**/*.{ts,tsx}", "src/storybook/**/*.{ts,tsx}", "**/*.stories.tsx", "vitest.storybook.config.ts"],
+        rules: {
+            "e18e/prefer-static-regex": "off",
+            "import/no-extraneous-dependencies": ["error", { devDependencies: true }],
+            "no-console": "off",
+        },
+    },
+    {
+        files: [".storybook/**/*.{ts,tsx}"],
+        rules: {
+            "unicorn/no-this-outside-of-class": "off",
+            "unicorn/no-top-level-side-effects": "off",
         },
     },
 );

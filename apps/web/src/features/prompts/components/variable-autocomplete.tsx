@@ -159,7 +159,7 @@ const VariableList = ({ items, onSelect, query }: VariableListProps): JSX.Elemen
                             }}
                             value={variable.name}
                         >
-                            <code className="text-primary shrink-0 font-mono text-sm">{`{{${variable.name}}}`}</code>
+                            <code className="text-primary-text shrink-0 font-mono text-sm">{`{{${variable.name}}}`}</code>
                             {variable.description && (
                                 <span className="text-muted-foreground data-highlighted:text-accent-foreground/70 ml-2 truncate text-xs">
                                     {variable.description}
@@ -199,7 +199,7 @@ const VariableList = ({ items, onSelect, query }: VariableListProps): JSX.Elemen
                                 }}
                                 value={variable.name}
                             >
-                                <code className="text-primary shrink-0 font-mono text-sm">{`{{${variable.name}}}`}</code>
+                                <code className="text-primary-text shrink-0 font-mono text-sm">{`{{${variable.name}}}`}</code>
                                 {variable.description && (
                                     <span className="text-muted-foreground data-highlighted:text-accent-foreground/70 ml-2 truncate text-xs">
                                         {variable.description}

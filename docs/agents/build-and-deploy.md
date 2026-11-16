@@ -81,10 +81,9 @@ Write`; without them the deploy fails, hence the switch.
   cap. Cloudflare's error names no file, only "exceeded the uncompressed size limit", and
   every Worker that depends on the website fails with the same message.
 - **Held back on purpose**, each with a
-  comment in `pnpm-workspace.yaml`: `typescript` 6.0.3 (packem's dts build cannot import TS 7),
-  `@vercel/og` 1.0.1 (1.0.2 and 1.0.3 break `generate-og.mjs` with "Dynamic require of fs") and
-  `@c15t/*` 2.3 (3.0 renames the provider, a migration). `alchemy` stays at beta.81 until a newer
-  beta is a day old and a deploy has passed on it. The source of truth for Lunora versions is the
+  comment in `pnpm-workspace.yaml`: `typescript` 6.0.3 (packem's dts build cannot import TS 7) and
+  `@vercel/og` 1.0.1 (1.0.2 and 1.0.3 break `generate-og.mjs` with "Dynamic require of fs").
+  `alchemy` stays at beta.81 until a newer beta is a day old and a deploy has passed on it. The source of truth for Lunora versions is the
   catalog in `pnpm-workspace.yaml`, aligned to the cluster the meta-packages pin rather than the
   newest tags. The branded packages (`client`, `workflow`, `auth`) must resolve to one version
   each; a non-branded package may keep two copies when the meta-packages pin different versions,
@@ -132,9 +131,10 @@ check startup` profiles `lunora build`'s esbuild bundle, which is NOT what deplo
   `deploy.yml` keeps (also when the deploy fails) and run `pnpm exec tsx
 scripts/profile-worker-startup.ts <dir> <main>`. Local profiles swing ~100 ms (mostly GC): take
   the best of several.
-  The generated app already loads `@lunora/auth` and the
-  OpenAPI/OpenRPC/architecture documents on the first event (`_generated/authModule.ts`), not at
-  startup; an evaluation error there now 500s the first request instead of failing the upload.
+  The generated app already loads `@lunora/auth` on the first event (`_generated/authModule.ts`),
+  not at startup; an evaluation error there now 500s the first request instead of failing the
+  upload. The OpenAPI/OpenRPC/architecture documents load only on Studio's admin routes (see
+  "Studio's documents are static assets" below).
   Lazy function mode (`codegen.lazyFunctions`, see "Functions load lazily" in `backend/AGENTS.md`) also defers the
   queue registry, workflow and agent entrypoints (upstream measured -31 % on its synthetic app).
   The Creem SDK is loaded on first use in `src/server.ts`, not at startup, for the same reason.
@@ -149,6 +149,21 @@ scripts/profile-worker-startup.ts <dir> <main>`. Local profiles swing ~100 ms (m
   into the `dev` script is a trap: the dev manifest carries the **dev origin**,
   so it would overwrite the deploy input with localhost values.
   `backend/deploy-bindings.test.ts` guards the contract.
+- **Studio's documents are static assets of the backend, behind `ASSETS`** (anolilab/lunora#1499,
+  #494). From that Lunora release, `lunora codegen` writes the architecture manifest and the
+  OpenAPI and OpenRPC specs to `backend/.lunora/studio-assets/_lunora/studio/<name>.json`
+  (git-ignored with `.lunora/`) instead of into the bundle, and the generated app reads them
+  through an `ASSETS` binding on Studio's admin routes, after the admin-token check.
+  `lunora deploy` gets the binding from the `assets` block reconcile writes into
+  `wrangler.jsonc`; Alchemy ignores that file, so `backendStudioAssets` in
+  `scripts/worker-bundle.ts` gives the `neore-backend` Worker `assets: { directory,
+  runWorkerFirst: true }` (Alchemy names the binding `ASSETS` itself). `runWorkerFirst` must
+  stay `true`, never a path list: otherwise the asset layer answers `/_lunora/studio/*` before
+  the Worker, and the documents, which describe the whole app, are public. The binding exists
+  only when the generated `app.ts` calls `loadStudioDocument` (a directory left from an earlier codegen is
+  not bound), and the deploy fails when one of the documents it reads is not on disk, because Studio would
+  otherwise show empty documents with no error. `deploy.yml`'s codegen step writes the
+  directory; `backend/deploy-bundle.test.ts` pins all three cases.
 - **Cloudflare enforces the UNCOMPRESSED Worker size: 64 MiB.** There is
   no gzip limit (the old 3 MB Free / 10 MB Paid gzip caps
   are gone), so a gzip figure a build prints is informational. `"minify": true`

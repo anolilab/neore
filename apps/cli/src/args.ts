@@ -13,6 +13,7 @@ export const OPTIONS = {
     criteria: { type: "string" },
     cron: { type: "string" },
     cursor: { type: "string" },
+    device: { type: "boolean" },
     help: { short: "h", type: "boolean" },
     input: { short: "i", type: "string" },
     instructions: { type: "string" },
@@ -27,6 +28,7 @@ export const OPTIONS = {
     title: { type: "string" },
     type: { type: "string" },
     version: { short: "v", type: "boolean" },
+    wait: { type: "boolean" },
     yes: { short: "y", type: "boolean" },
 } as const;
 
@@ -39,6 +41,7 @@ export const GROUPS = {
     kb: ["upload", "search", "ls"],
     skills: ["ls", "run"],
     tasks: ["ls", "create", "run", "status"],
+    thread: ["start", "send"],
     threads: ["ls", "show", "rm"],
 } as const;
 
@@ -61,7 +64,25 @@ export class UsageError extends Error {
 
 const isGroup = (value: string): value is keyof typeof GROUPS => Object.hasOwn(GROUPS, value);
 
+/** The commands `--wait` blocks; every flag is shared, so any other command would silently drop it. */
+const WAIT_COMMANDS: ReadonlySet<string> = new Set(["thread send", "thread start"]);
+
+/** The blocking flag of a command that has one instead of `--wait`. */
+const WAIT_INSTEAD: Readonly<Record<string, string>> = { chat: "--no-stream", "skills run": "--no-stream", "tasks run": "`neore tasks status <id>`" };
+
 export const parseCommand = (argv: ReadonlyArray<string>): ParsedCommand => {
+    const parsed = parseWords(argv);
+
+    if (parsed.flags.wait && !parsed.flags.help && !WAIT_COMMANDS.has(parsed.command)) {
+        const instead = WAIT_INSTEAD[parsed.command];
+
+        throw new UsageError(`\`${parsed.command}\` has no --wait${instead ? `: use ${instead}` : ""}. It is for \`thread start\` and \`thread send\`.`);
+    }
+
+    return parsed;
+};
+
+const parseWords = (argv: ReadonlyArray<string>): ParsedCommand => {
     let parsed: ReturnType<typeof parseArgs<{ allowPositionals: true; args: string[]; options: typeof OPTIONS; strict: true }>>;
 
     try {
@@ -81,6 +102,14 @@ export const parseCommand = (argv: ReadonlyArray<string>): ParsedCommand => {
         const [sub, ...args] = rest;
 
         if (!sub) {
+            if (flags.help) {
+                return { args: [], command: "help", flags };
+            }
+
+            if (!(GROUPS[head] as ReadonlyArray<string>).includes("ls")) {
+                throw new UsageError(`Missing subcommand. Try: ${GROUPS[head].map((name) => `${head} ${name}`).join(", ")}.`);
+            }
+
             // `neore threads` alone lists, like `ls`.
             return { args: [], command: `${head} ls`, flags };
         }

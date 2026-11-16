@@ -509,6 +509,74 @@ describe("passkeys", { timeout: 30_000 }, () => {
     });
 });
 
+describe("credentials while impersonating", { timeout: 30_000 }, () => {
+    beforeEach(() => {
+        vi.resetModules();
+        vi.stubEnv("SITE_URL", SITE);
+        vi.stubEnv("SIGNUP_INVITE_ONLY", "false");
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    /** A signed-in account's cookie, its session marked as an admin's impersonation when asked. */
+    const signedIn = async (impersonatedBy: string | null) => {
+        const { auth, db } = await createTestAuth();
+        const signUp = await auth.handler(
+            new Request(`${SITE}/api/auth/sign-up/email`, {
+                body: JSON.stringify({ email: EMAIL, name: "Member", password: "a-long-enough-password" }), // secret-scanner:allow
+                headers: { "content-type": "application/json", origin: SITE },
+                method: "POST",
+            }),
+        );
+
+        db.session![0]!.impersonatedBy = impersonatedBy;
+
+        const cookie = signUp.headers
+            .getSetCookie()
+            .map((value) => value.split(";", 1)[0])
+            .join("; ");
+
+        return { auth, cookie, db };
+    };
+
+    const createKey = async ({ auth, cookie }: Awaited<ReturnType<typeof signedIn>>) =>
+        await auth.handler(
+            new Request(`${SITE}/api/auth/api-key/create`, {
+                body: JSON.stringify({ name: "CI" }),
+                headers: { "content-type": "application/json", cookie, origin: SITE },
+                method: "POST",
+            }),
+        );
+
+    it("refuses an API key and a passkey to an impersonated session", async () => {
+        expect.assertions(3);
+
+        const account = await signedIn("admin-1");
+        const created = await createKey(account);
+
+        expect(created.status).toBe(403);
+        expect(account.db.apikey).toStrictEqual([]);
+
+        const register = await account.auth.handler(
+            new Request(`${SITE}/api/auth/passkey/generate-register-options`, { headers: { cookie: account.cookie, origin: SITE } }),
+        );
+
+        expect(register.status).toBe(403);
+    });
+
+    it("still mints a key for the account's own session", async () => {
+        expect.assertions(2);
+
+        const account = await signedIn(null);
+        const created = await createKey(account);
+
+        expect(created.status).toBe(200);
+        expect(account.db.apikey).toHaveLength(1);
+    });
+});
+
 describe("email verification where mail is delivered", { timeout: 30_000 }, () => {
     const PASSWORD = "a-long-enough-password"; // secret-scanner:allow
     const OWNER_PASSWORD = "the-real-owners-password"; // secret-scanner:allow

@@ -119,6 +119,30 @@ describe("KeyboardShortcutsManager", () => {
         expect(notPrevented).toBe(true);
     });
 
+    it.each([
+        ["archiveThread", { code: "KeyA", ctrlKey: true, key: "A", shiftKey: true }],
+        ["deleteThread", { code: "Backspace", ctrlKey: true, key: "Backspace", shiftKey: true }],
+    ] as const)("never runs the %s chord from a text field, though it is a modifier chord", (action, keys) => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ archiveThread: "ctrl+shift+a", deleteThread: "ctrl+shift+backspace" }}>
+                <textarea aria-label="composer" />
+                <div aria-label="editor" contentEditable role="textbox" suppressContentEditableWarning tabIndex={0} />
+            </KeyboardShortcutsManager>,
+        );
+
+        fireEvent.keyDown(screen.getByLabelText("composer"), keys);
+        fireEvent.keyDown(screen.getByLabelText("editor"), keys);
+
+        expect(onShortcut).not.toHaveBeenCalledWith(action, expect.anything());
+
+        // Outside a field the same chord runs.
+        fireEvent.keyDown(document.body, keys);
+
+        expect(onShortcut).toHaveBeenCalledWith(action, expect.anything());
+    });
+
     it("still runs a modifier chord copy binding from the composer", () => {
         const onShortcut = vi.fn();
 
@@ -132,6 +156,36 @@ describe("KeyboardShortcutsManager", () => {
 
         expect(onShortcut).toHaveBeenCalledWith("copyLastCodeBlock", expect.anything());
         expect(notPrevented).toBe(false);
+    });
+
+    it("still runs a modifier chord jump binding from the composer", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ jumpToLastMessage: "ctrl+shift+j" }}>
+                <textarea aria-label="composer" />
+            </KeyboardShortcutsManager>,
+        );
+
+        const notPrevented = fireEvent.keyDown(screen.getByLabelText("composer"), { code: "KeyJ", ctrlKey: true, key: "J", shiftKey: true });
+
+        expect(onShortcut).toHaveBeenCalledWith("jumpToLastMessage", expect.anything());
+        expect(notPrevented).toBe(false);
+    });
+
+    it("leaves a bare-key jump binding to the field it is typed into", () => {
+        const onShortcut = vi.fn();
+
+        render(
+            <KeyboardShortcutsManager onShortcut={onShortcut} shortcuts={{ jumpToLastMessage: "j" }}>
+                <textarea aria-label="composer" />
+            </KeyboardShortcutsManager>,
+        );
+
+        const notPrevented = fireEvent.keyDown(screen.getByLabelText("composer"), { code: "KeyJ", key: "j" });
+
+        expect(onShortcut).not.toHaveBeenCalledWith("jumpToLastMessage", expect.anything());
+        expect(notPrevented).toBe(true);
     });
 
     it("opens the model picker from the composer on a modifier chord", () => {
@@ -303,5 +357,88 @@ describe("KeyboardShortcutsManager", () => {
             expect(pressChord("ctrlKey")).toHaveBeenCalledWith("increaseEffort", expect.anything());
             expect(pressChord("metaKey")).not.toHaveBeenCalled();
         });
+    });
+});
+
+describe("F6 between screen areas", () => {
+    const mounted: HTMLElement[] = [];
+
+    // jsdom has no layout: an area counts as shown only once it has a box.
+    const shownArea = (role?: string): HTMLElement => {
+        const element = document.createElement("section");
+
+        element.dataset.focusArea = "";
+        element.tabIndex = 0;
+
+        if (role) {
+            element.setAttribute("role", role);
+            element.setAttribute("aria-modal", "true");
+        }
+
+        Object.assign(element, {
+            getBoundingClientRect: () => {
+                return { bottom: 10, height: 10, left: 0, right: 10, top: 0, width: 10 };
+            },
+            getClientRects: () => [{}],
+        });
+        document.body.appendChild(element);
+        mounted.push(element);
+
+        return element;
+    };
+
+    afterEach(() => {
+        for (const element of mounted) {
+            element.remove();
+        }
+
+        mounted.length = 0;
+    });
+
+    it("moves focus and cancels the key when another area can take it", () => {
+        const first = shownArea();
+        const second = shownArea();
+
+        render(
+            <KeyboardShortcutsManager>
+                <span />
+            </KeyboardShortcutsManager>,
+        );
+        first.focus();
+
+        // fireEvent returns false when the handler cancelled the key.
+        expect(fireEvent.keyDown(first, { code: "F6", key: "F6" })).toBe(false);
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+        expect(document.activeElement).toBe(second);
+    });
+
+    it("leaves F6 to the browser when the only area already holds the focus", () => {
+        const only = shownArea();
+
+        render(
+            <KeyboardShortcutsManager>
+                <span />
+            </KeyboardShortcutsManager>,
+        );
+        only.focus();
+
+        expect(fireEvent.keyDown(only, { code: "F6", key: "F6" })).toBe(true);
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+        expect(document.activeElement).toBe(only);
+    });
+
+    it("leaves F6 to the browser when the mobile sidebar sheet is the only area and holds the focus", () => {
+        const sheet = shownArea("dialog");
+
+        render(
+            <KeyboardShortcutsManager>
+                <span />
+            </KeyboardShortcutsManager>,
+        );
+        sheet.focus();
+
+        expect(fireEvent.keyDown(sheet, { code: "F6", key: "F6" })).toBe(true);
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
+        expect(document.activeElement).toBe(sheet);
     });
 });

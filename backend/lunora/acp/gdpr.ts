@@ -91,6 +91,18 @@ const vExportSession = v.object({
     threadId: v.string(),
 });
 
+/**
+ * The report without the agent's list of models: it is the agent's offer, not the person's data, and up to 64 entries of a
+ * few hundred bytes would push a page past what a workflow step may keep. The model the session ran is in its agent state.
+ */
+const withoutModelList = (report: Infer<typeof vCapabilityReport>): Infer<typeof vCapabilityReport> => {
+    if (report.groups.identity?.models === undefined) {
+        return report;
+    }
+
+    return { ...report, groups: { ...report.groups, identity: { ...report.groups.identity, models: undefined } } };
+};
+
 /** Where the next page starts: in the sessions (`page` is the table cursor), or in the host streams' events (`page` is the stream cursor, `seq` the last chunk already read). */
 const vExportCursor = v.object({
     // The last session of this page already exported, by id: the next page starts after it, wherever it now sits.
@@ -168,7 +180,7 @@ export const collectAcpSessionsForExport = internalQuery
                             threadId: threadId as string,
                             ...(agentState !== undefined && { agentState: exportedAgentState(agentState) }),
                             ...(agentStateAt !== undefined && { agentStateAt }),
-                            ...(capabilities !== undefined && { capabilities }),
+                            ...(capabilities !== undefined && { capabilities: withoutModelList(capabilities) }),
                             ...(importedTurns !== undefined && { importedTurns }),
                             ...(importState !== undefined && { importState }),
                             ...(lastEventAt !== undefined && { lastEventAt }),

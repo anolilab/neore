@@ -7,8 +7,16 @@ describe("composerEditorAttributes", () => {
         const attributes = composerEditorAttributes();
 
         expect(attributes.dir).toBe("auto");
+        expect(attributes.spellcheck).toBe("true");
         expect(attributes).not.toHaveProperty("aria-describedby");
         expect(attributes).not.toHaveProperty("aria-invalid");
+    });
+
+    it("names the field when given a label", () => {
+        const attributes = composerEditorAttributes({ label: "Message" });
+
+        expect(attributes["aria-label"]).toBe("Message");
+        expect(attributes["aria-multiline"]).toBe("true");
     });
 
     it("names the notice and flags the field invalid", () => {

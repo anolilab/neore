@@ -38,9 +38,13 @@ export type HostCapabilityGroups = {
         create?: Capability;
         description?: Capability;
         diff?: Capability;
+        /** Changes the title and description. */
+        edit?: Capability;
         files?: Capability;
         /** An AI guide that walks the change in reading order. */
         guide?: Capability;
+        /** Opens a pull request that reverts a merged one. */
+        revert?: Capability;
     };
     review?: {
         batchedSubmit?: Capability;
@@ -52,6 +56,10 @@ export type HostCapabilityGroups = {
         verdictRequestChanges?: Capability;
         /** Viewed marks the host keeps, so they follow the user to the host's own page. */
         viewedMarks?: Capability;
+    };
+    reviewers?: {
+        /** Adds reviewers by login; the ones already requested stay. */
+        request?: Capability;
     };
 };
 

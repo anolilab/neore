@@ -19,7 +19,7 @@ interface DataGridPasteDialogProps<TData extends RowData> {
 // must nest a real `input` for the association to be visible to a reader.
 const radioItemClassName = cn(
     "border-input bg-background relative size-4 shrink-0 appearance-none rounded-full border shadow-xs transition-[color,box-shadow] outline-none",
-    "text-primary focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+    "text-primary-text focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
     "disabled:cursor-not-allowed disabled:opacity-50",
     "checked:before:bg-primary checked:before:absolute checked:before:start-1/2 checked:before:top-1/2 checked:before:size-2 checked:before:-translate-x-1/2 checked:before:-translate-y-1/2 checked:before:rounded-full checked:before:content-['']",
     "dark:bg-input/30",

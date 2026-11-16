@@ -3,7 +3,8 @@
     "version": "0.0.0",
     "private": true,
     "sideEffects": [
-        "**/*.css"
+        "**/*.css",
+        "**/pdf-worker.ts"
     ],
     "type": "module",
     "exports": {
@@ -21,9 +22,8 @@
         "clean": "rimraf node_modules dist .eslintcache",
         "lint:eslint": "eslint . --cache --cache-location .eslint.cache.json",
         "lint:eslint:fix": "eslint . --fix --cache --cache-location .eslint.cache.json",
-        "lint:prettier": "prettier --check . --ignore-path ../../.prettierignore --ignore-path .prettierignore",
-        "lint:prettier:fix": "prettier --write . --ignore-path ../../.prettierignore --ignore-path .prettierignore",
         "lint:types": "tsc --noEmit",
+        "lint:types:fast": "tsrs --noEmit",
         "test": "vitest run",
         "test:coverage": "vitest run --coverage --coverage.reporter=lcov --coverage.reporter=text-summary",
         "test:watch": "vitest"
@@ -99,6 +99,7 @@
         "fabric": "catalog:ui",
         "facehash": "catalog:ui",
         "fuse.js": "catalog:utils",
+        "hast-util-to-jsx-runtime": "catalog:markdown",
         "hls.js": "catalog:file-renderers",
         "input-otp": "catalog:ui",
         "jsonfile": "catalog:utils",
@@ -125,6 +126,7 @@
         "remark-gfm": "catalog:markdown",
         "remark-html": "catalog:markdown",
         "remark-parse": "catalog:markdown",
+        "remark-rehype": "catalog:markdown",
         "remark-stringify": "catalog:markdown",
         "rooks": "catalog:utils",
         "rxjs": "catalog:canvas-spreadsheet",
@@ -144,15 +146,18 @@
         "@anolilab/eslint-config": "catalog:lint",
         "@anolilab/prettier-config": "catalog:lint",
         "@lingui/babel-plugin-lingui-macro": "catalog:i18n",
+        "@storybook/react-vite": "catalog:storybook",
         "@types/papaparse": "catalog:types",
         "@types/react": "catalog:types",
         "@types/react-dom": "catalog:types",
         "eslint": "catalog:lint",
+        "eslint-plugin-storybook": "catalog:storybook",
         "prettier": "catalog:lint",
         "prettier-plugin-tailwindcss": "catalog:lint",
         "react": "catalog:react",
         "react-dom": "catalog:react",
         "rimraf": "catalog:node",
+        "storybook": "catalog:storybook",
         "typescript": "catalog:tsc",
         "vitest": "catalog:test"
     },

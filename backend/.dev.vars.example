@@ -26,6 +26,9 @@ E2E_SEED_TOKEN=
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 VAPID_SUBJECT=
+# Phone push (optional; off until set): an Expo access token, with push security
+# ("enhanced security") enabled on the Expo project.
+EXPO_ACCESS_TOKEN=
 ENVIRONMENT=development
 # Dev-only loopback origins. Kept out of wrangler.jsonc because `lunora build`
 # blocks on loopback addresses there; scripts/dev-setup.js writes both.

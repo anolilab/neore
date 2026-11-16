@@ -57,11 +57,11 @@ const MessageList = memo(
             return (
                 <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
                     <div className="flex size-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
-                        <Bot aria-hidden="true" className="size-6 text-gray-400 dark:text-gray-500" />
+                        <Bot aria-hidden="true" className="size-6 text-gray-600 dark:text-gray-400" />
                     </div>
                     <div className="flex flex-col gap-1">
                         <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{t`Start a conversation`}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">{t`Send a message to begin`}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">{t`Send a message to begin`}</p>
                     </div>
                 </div>
             );
@@ -76,7 +76,7 @@ const MessageList = memo(
                             <button
                                 className={cn(
                                     "rounded-lg px-3 py-1.5 text-xs font-medium",
-                                    "text-gray-500 hover:bg-gray-100 hover:text-gray-700",
+                                    "text-gray-600 hover:bg-gray-100 hover:text-gray-700",
                                     "dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200",
                                     "focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none",
                                     "transition-colors",

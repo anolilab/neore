@@ -125,7 +125,7 @@ const NotificationBell: FC<{ className?: string }> = ({ className }) => {
                         />
                     </ScrollArea>
                     <div className="border-t px-3 py-2 text-right">
-                        <Link className="text-primary text-xs font-medium hover:underline" onClick={() => setOpen(false)} to="/dashboard">
+                        <Link className="text-primary-text text-xs font-medium hover:underline" onClick={() => setOpen(false)} to="/dashboard">
                             {t`Open home`}
                         </Link>
                     </div>

@@ -26,7 +26,8 @@ const Popover = ({ onOpenChange, onOpenChangeWithDetails, ...props }: PopoverPro
 
 const PopoverTrigger = ({ children, render, ...props }: PopoverPrimitive.Trigger.Props & { render?: React.ReactElement }) => {
     if (render) {
-        return <PopoverPrimitive.Trigger data-slot="popover-trigger" render={render} {...props} />;
+        // Children go to the rendered element too; passing `children: undefined` would wipe the element's own children.
+        return <PopoverPrimitive.Trigger data-slot="popover-trigger" render={render} {...props} {...(children === undefined ? {} : { children })} />;
     }
 
     return (

@@ -7,7 +7,6 @@ import ThreadNode from "./thread-node";
 import type { BranchNode } from "./types";
 
 interface SortableThreadItemProperties {
-    currentThreadId: string | undefined;
     expandedThreads: Set<string>;
     handleCreateBranch: (threadId: string) => void;
     handleDeleteThread: (threadId: string) => void;
@@ -17,21 +16,16 @@ interface SortableThreadItemProperties {
     handleThreadToggle: (threadId: string, index: number, isShiftClick: boolean) => void;
     handleUnpinThread: (threadId: string) => void;
     index?: number;
-    isKeyboardNavigating: boolean;
-    isKeyboardSelected: boolean;
     isSelected: boolean;
     isSelectionMode: boolean;
     loadingStates: import("./types").LoadingStates;
     node: BranchNode;
-    searchQuery: string;
     selectedThreadIds: Set<string>;
-    selectedThreadIndex: number;
     toggleExpanded: (threadId: string) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
 }
 
 const SortableThreadItem: FC<SortableThreadItemProperties> = ({
-    currentThreadId,
     expandedThreads,
     handleCreateBranch,
     handleDeleteThread,
@@ -41,12 +35,10 @@ const SortableThreadItem: FC<SortableThreadItemProperties> = ({
     handleThreadToggle,
     handleUnpinThread,
     index,
-    isKeyboardSelected,
     isSelected,
     isSelectionMode,
     loadingStates,
     node,
-    searchQuery,
     selectedThreadIds,
     toggleExpanded,
     updateThread,
@@ -60,9 +52,10 @@ const SortableThreadItem: FC<SortableThreadItemProperties> = ({
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} onMouseEnter={handleMouseEnter}>
+        <div onMouseEnter={handleMouseEnter} ref={setNodeRef} style={style}>
             <ThreadNode
-                currentThreadId={currentThreadId}
+                // The drag handle is the only focusable part of the sortable item: the row holds buttons and a link.
+                dragAttributes={attributes}
                 dragListeners={listeners}
                 expandedThreads={expandedThreads}
                 handleCreateBranch={handleCreateBranch}
@@ -72,12 +65,10 @@ const SortableThreadItem: FC<SortableThreadItemProperties> = ({
                 handleThreadToggle={handleThreadToggle}
                 handleUnpinThread={handleUnpinThread}
                 index={index}
-                isKeyboardSelected={isKeyboardSelected}
                 isSelected={isSelected}
                 isSelectionMode={isSelectionMode}
                 loadingStates={loadingStates}
                 node={node}
-                searchQuery={searchQuery}
                 selectedThreadIds={selectedThreadIds}
                 toggleExpanded={toggleExpanded}
                 updateThread={updateThread}

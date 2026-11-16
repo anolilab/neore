@@ -99,7 +99,7 @@ const ChangelogPanel: FC = () => {
             <SheetContent className="flex flex-col gap-0 p-0 sm:max-w-md" showCloseButton side="right">
                 <SheetHeader className="border-b px-4 py-3">
                     <div className="flex items-center gap-2">
-                        <Sparkles className="text-primary size-4" strokeWidth={1.5} />
+                        <Sparkles className="text-primary-text size-4" strokeWidth={1.5} />
                         <SheetTitle className="text-sm font-semibold">{t`What's New`}</SheetTitle>
                     </div>
                 </SheetHeader>

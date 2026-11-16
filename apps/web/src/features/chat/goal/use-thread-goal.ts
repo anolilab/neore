@@ -1,9 +1,6 @@
-import type { Id } from "@neore/backend/dataModel";
-import { skipToken, useQuery } from "@tanstack/react-query";
-
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
-import { useCRPC } from "@/lib/lunora/crpc";
 
+import { useThreadPaneState } from "../thread/use-thread-pane-state";
 import type { GoalVerdictView } from "./goal-view";
 
 export interface ThreadGoalView {
@@ -25,11 +22,8 @@ export interface ThreadGoalView {
  * paint (the thread draws without it), and only for a real thread.
  */
 export const useThreadGoal = (threadId: string | undefined): ThreadGoalView | null => {
-    const crpc = useCRPC();
     const ready = useAfterFirstPaint();
-    const { data } = useQuery(
-        crpc.chat.goals.functions.getThreadGoal.queryOptions(threadId && threadId !== "default" && ready ? { threadId: threadId as Id<"threads"> } : skipToken),
-    );
+    const { data } = useThreadPaneState(threadId, { enabled: threadId !== "default" && ready });
 
-    return data ?? null;
+    return data?.goal ?? null;
 };

@@ -92,13 +92,18 @@ const messageText = (message: Message, stored: StoredMessagePayload | undefined)
         .map((part) => part.text)
         .join("\n");
 
+/** What a `/clear` divider says in an export, where the transcript shows "New context". */
+export const CONTEXT_RESET_NOTE = "New context: the messages above were not sent to the model after this point";
+
 /**
- * The line a divider row stands for: an agent switch ("Switched from X to Y"), or the start of a task run that was
- * sent none of the earlier turns. `undefined` for any other row.
+ * The line a divider row stands for: an agent switch ("Switched from X to Y"), the start of a task run that was sent
+ * none of the earlier turns, or a `/clear`. `undefined` for any other row.
  */
 const switchNote = (message: Message): string | undefined => {
-    if (contextResetOf(message)) {
-        return "New task run · earlier messages were not sent to the model";
+    const reset = contextResetOf(message);
+
+    if (reset) {
+        return reset.reason === "clear" ? CONTEXT_RESET_NOTE : "New task run · earlier messages were not sent to the model";
     }
 
     const part = readAgentSwitch(message);

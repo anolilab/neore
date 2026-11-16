@@ -49,7 +49,7 @@ const mentionCompletion = (labels: ReadonlyArray<string>) => (context: MentionCo
     };
 };
 
-const mentionMark = Decoration.mark({ class: "rounded bg-primary/15 px-0.5 font-medium text-primary" });
+const mentionMark = Decoration.mark({ class: "rounded bg-primary/15 px-0.5 font-medium text-primary-text" });
 
 const highlightMentions = (labels: ReadonlyArray<string>): Extension => {
     const matcher = new MatchDecorator({ decoration: mentionMark, regexp: mentionPattern(labels) });

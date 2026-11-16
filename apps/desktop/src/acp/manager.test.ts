@@ -10,8 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AcpManager } from "./manager";
 import { spawnAgent } from "./process";
+import { openNewSession } from "./protocol";
+import { AgentSignedOutError } from "./signed-out";
 import { alive, expectGone, Scratch } from "./testing/harness";
-import type { SessionSnapshot, SpawnPlan } from "./types";
+import type { AcpUpdate, SessionSnapshot, SpawnPlan } from "./types";
 
 const SENTINEL = "sentinel-secret-7f3a";
 const PID_PREFIX = /^pid:\d+/u;
@@ -24,22 +26,26 @@ let scratch: Scratch;
 let manager: AcpManager;
 const plans: { env: Record<string, string>; folder: string | null; key: string }[] = [];
 
-const make = (env: Record<string, string> = {}, options: { cancelGraceMs?: number; plan?: (key: string, folder: string | null) => SpawnPlan } = {}): AcpManager => new AcpManager({
-    appVersion: "9.9.9",
-    cancelGraceMs: options.cancelGraceMs ?? 400,
-    onChange: () => {},
-    plan:
-            options.plan
-            ?? ((key, folder) => {
+const make = (
+    env: Record<string, string> = {},
+    options: { cancelGraceMs?: number; plan?: (key: string, folder: string | null) => SpawnPlan } = {},
+): AcpManager =>
+    new AcpManager({
+        appVersion: "9.9.9",
+        cancelGraceMs: options.cancelGraceMs ?? 400,
+        onChange: () => {},
+        plan:
+            options.plan ??
+            ((key, folder) => {
                 const plan = scratch.plan(env, folder);
 
                 plans.push({ env: plan.env, folder, key });
 
                 return plan;
             }),
-    spawn: spawnAgent,
-    startupTimeoutMs: 8000,
-});
+        spawn: spawnAgent,
+        startupTimeoutMs: 8000,
+    });
 
 const start = (target: AcpManager = manager): Promise<string> => target.startSession("fake", "Fake", scratch.work);
 
@@ -68,9 +74,30 @@ afterEach(() => {
     manager.killAll();
     scratch.dispose();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
 });
 
 describe("a session", () => {
+    it("closes the session it still runs for a thread when the backend starts the next one in that thread", async () => {
+        // The thread's session and one in another thread start together; the next start in the thread then sees both.
+        const [first, other] = await Promise.all([
+            manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-1", threadId: "thread-1" }),
+            manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-3", threadId: "thread-2" }),
+        ]);
+
+        await idle(first);
+        await idle(other);
+
+        const second = await manager.startSession("fake", "Fake", scratch.work, { sessionId: "session-2", threadId: "thread-1" });
+
+        await idle(second);
+
+        expect(snapshot(first).status).toBe("ended");
+        // Only the thread's own earlier session is closed.
+        expect(snapshot(other).status).toBe("idle");
+        expect(scratch.violations()).toEqual([]);
+    });
+
     it("answers a prompt", async () => {
         const id = await start();
 
@@ -82,7 +109,10 @@ describe("a session", () => {
         // The host advertises no file system and no terminal.
         const init = scratch.log().find((entry) => entry.received?.method === "initialize");
 
-        expect(init?.received?.params).toMatchObject({ clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false }, protocolVersion: 1 });
+        expect(init?.received?.params).toMatchObject({
+            clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
+            protocolVersion: 1,
+        });
         expect(scratch.log().find((entry) => entry.sessionNew !== undefined)?.sessionNew).toEqual({ cwd: scratch.work, mcpServers: [] });
     });
 
@@ -96,7 +126,7 @@ describe("a session", () => {
         await idle(id);
 
         expect(snapshot(id).turns.map((turn) => turn.text)).toEqual(["working", "second", "third"]);
-        expect(scratch.log().flatMap((entry) => entry.prompt === undefined ? [] : [entry.prompt])).toEqual(["slow", "echo second", "echo third"]);
+        expect(scratch.log().flatMap((entry) => (entry.prompt === undefined ? [] : [entry.prompt]))).toEqual(["slow", "echo second", "echo third"]);
         expect(scratch.violations()).toEqual([]);
     });
 
@@ -134,7 +164,7 @@ describe("a session", () => {
         // The agent sent `in_progress` for the call after the cancel: it stays cancelled.
         expect(finished.turns[0].tools.map((tool) => tool.status)).toEqual(["cancelled"]);
         // Stop released nothing later.
-        expect(scratch.log().flatMap((entry) => entry.prompt === undefined ? [] : [entry.prompt])).toEqual(["tool"]);
+        expect(scratch.log().flatMap((entry) => (entry.prompt === undefined ? [] : [entry.prompt]))).toEqual(["tool"]);
         expect(scratch.log().filter((entry) => entry.cancel !== undefined)).toHaveLength(1);
         expect(scratch.violations()).toEqual([]);
         target.killAll();
@@ -207,8 +237,12 @@ describe("an agent that answers a prompt with an error", () => {
 describe("an approval that is taken away", () => {
     const view = (consents: { agentKey: string; folderPath: string }[], agents = ["fake"]) => {
         return {
-            agents: agents.map((key) => { return { args: [], command: "x", envNames: [], install: null, key, label: key }; }),
-            consents: consents.map((consent) => { return { ...consent, folderId: "f", folderLabel: "work" }; }),
+            agents: agents.map((key) => {
+                return { args: [], command: "x", envNames: [], install: null, key, label: key };
+            }),
+            consents: consents.map((consent) => {
+                return { ...consent, folderId: "f", folderLabel: "work" };
+            }),
         };
     };
 
@@ -282,15 +316,21 @@ describe("a version probe", () => {
 
     it("tells the user to sign in with the agent's own tool when the agent asks for a login", async () => {
         const target = make({ FAKE_AGENT_AUTH: "1" });
+        const failure = start(target);
 
-        await expect(start(target)).rejects.toThrow("sign in");
+        await expect(failure).rejects.toThrow("Sign in with the agent's own login command");
+        // Callers tell "not signed in" from other failures by the type, after a session start and after `withAgent`.
+        await expect(failure).rejects.toBeInstanceOf(AgentSignedOutError);
+        await expect(target.withAgent("fake", scratch.work, {}, async ({ connection }) => await openNewSession(connection, scratch.work))).rejects.toBeInstanceOf(
+            AgentSignedOutError,
+        );
         target.killAll();
     });
 
     it("keeps the capability report of an agent whose start failed after the handshake", async () => {
         const target = make({ FAKE_AGENT_AUTH: "1" });
 
-        await expect(start(target)).rejects.toThrow("sign in");
+        await expect(start(target)).rejects.toThrow("Sign in with the agent's own login command");
         expect(Object.keys(target.allReports())).toEqual(["fake"]);
         target.killAll();
     });
@@ -334,6 +374,7 @@ describe("the environment", () => {
     it("is exactly the plan's: nothing is inherited from the app", async () => {
         vi.stubEnv("NEORE_LEAK", "from-the-app");
         vi.stubEnv("ELECTRON_RUN_AS_NODE", "1");
+        vi.stubEnv("SHLVL", "41");
 
         const target = make({ ONLY_FOR_THIS_AGENT: "yes" });
         const id = await start(target);
@@ -341,13 +382,14 @@ describe("the environment", () => {
         target.send(id, "env");
         await idle(id, target);
 
-        // macOS adds one and the launching shell adds SHLVL to every process they start; neither is the app's.
-        const names = Object.keys(JSON.parse(snapshot(id, target).turns[0].text) as Record<string, string>)
-            .filter((name) => name !== "__CF_USER_TEXT_ENCODING" && name !== "SHLVL")
-            ;
+        const env = JSON.parse(snapshot(id, target).turns[0].text) as Record<string, string>;
+        // macOS adds __CF_USER_TEXT_ENCODING to every process it starts, and bash as the Linux launch `sh` (Arch, Fedora;
+        // not dash) exports its own SHLVL, re-set on `exec`; neither is the app's.
+        const names = Object.keys(env).filter((name) => name !== "__CF_USER_TEXT_ENCODING" && name !== "SHLVL");
 
         expect(new Set(names)).toEqual(new Set(["FAKE_AGENT_LOG", "ONLY_FOR_THIS_AGENT", "PATH"]));
-        vi.unstubAllEnvs();
+        // The shell's own count starts from nothing (0, or 1 for a bash that counts itself); the app's 41 would read 41 or 42.
+        expect(["0", "1"]).toContain(env.SHLVL ?? "0");
         target.killAll();
     });
 });
@@ -358,20 +400,21 @@ describe("secrets in variables", () => {
         const stdout = vi.spyOn(process.stdout, "write");
         const stderr = vi.spyOn(process.stderr, "write");
         const target = make({ API_KEY: SENTINEL });
-        const failures: string[] = [];
-
         // A start that fails while the agent echoes its environment to stderr.
         const crashing = make({ API_KEY: SENTINEL, FAKE_AGENT_FAIL_INIT: "1" });
 
-        failures.push(await messageOf(crashing.startSession("fake", "Fake", scratch.work)), await messageOf(crashing.probe("fake")));
+        // The failing start, the failing probe and the session that will crash are independent: they start together.
+        const [startFailure, probeFailure, id] = await Promise.all([
+            messageOf(crashing.startSession("fake", "Fake", scratch.work)),
+            messageOf(crashing.probe("fake")),
+            start(target),
+        ]);
+        const failures = [startFailure, probeFailure];
 
-        // A crash in the middle of a turn, then a normal exit.
-        const id = await start(target);
-
+        // A crash in the middle of a turn, while the session that will exit normally starts.
         target.send(id, "die");
-        await expect.poll(() => snapshot(id, target).status, { timeout: 8000 }).toBe("ended");
 
-        const normal = await start(target);
+        const [normal] = await Promise.all([start(target), expect.poll(() => snapshot(id, target).status, { timeout: 8000 }).toBe("ended")]);
 
         target.send(normal, "hello");
         await idle(normal, target);
@@ -400,7 +443,7 @@ describe("an agent that echoes its environment in a reply", () => {
         const { text } = snapshot(id, target).turns[0];
 
         expect(text).not.toContain(SENTINEL);
-        expect(text).toContain("\"API_KEY\":\"***\"");
+        expect(text).toContain('"API_KEY":"***"');
         expect(text).toContain(JSON.stringify(scratch.logFile).slice(1, -1));
         target.killAll();
     });
@@ -438,5 +481,70 @@ describe("unsupported platforms and missing commands", () => {
         );
 
         await expect(target.probe("missing")).rejects.toThrow(MISSING_COMMAND);
+    });
+});
+
+/** A promise that stays pending until `open` is called. */
+const gate = (): { open: () => void; opened: Promise<void> } => {
+    let open: () => void = () => {};
+    const opened = new Promise<void>((resolve) => {
+        open = () => {
+            resolve();
+        };
+    });
+
+    return { open, opened };
+};
+
+describe("a sign-out of an agent", () => {
+    it("waits for an import of that agent that is running, and refuses a new one meanwhile", async () => {
+        const target = make({});
+        const finish = gate();
+        const running = target.usingAgent("fake", async () => await finish.opened);
+        let signedOut = false;
+        const hold = target.holdingAgent("fake", async () => {
+            signedOut = true;
+        });
+
+        // The sign-out has begun: it must not run while the import still holds the agent's connection.
+        await Promise.resolve();
+        expect(await messageOf(target.usingAgent("fake", async () => {}))).toContain("being signed out");
+        expect(signedOut).toBe(false);
+
+        finish.open();
+        await running;
+        await hold;
+
+        expect(signedOut).toBe(true);
+        target.killAll();
+    });
+
+    it("refuses only the updates that would change the account being signed out", async () => {
+        const target = make({});
+        const finish = gate();
+        const hold = target.holdingAgent("fake", async () => await finish.opened);
+        const refused = (update: AcpUpdate): string => {
+            try {
+                target.refuseUpdateWhileSigningOut(update);
+
+                return "";
+            } catch (error) {
+                return (error as Error).message;
+            }
+        };
+
+        expect(refused({ agentKey: "fake", folder: "/work", op: "grant" })).toBe("");
+        expect(refused({ agentKey: "fake", folderId: "f1", op: "revoke" })).toBe("");
+        expect(refused({ agentKey: "other", name: "TOKEN", op: "setEnv", value: "v" })).toBe("");
+        expect(refused({ key: "other", op: "removeAgent" })).toBe("");
+        expect(refused({ args: [], command: "x", key: "fake", label: "Fake", op: "saveAgent" })).toContain("being signed out");
+        expect(refused({ agentKey: "fake", name: "TOKEN", op: "removeEnv" })).toContain("being signed out");
+        expect(refused({ name: "TOKEN", op: "setEnv", value: "v" })).toContain("being signed out");
+        // The core reads a `null` key as "all agents".
+        expect(refused({ agentKey: null, name: "TOKEN", op: "setEnv", value: "v" } as unknown as AcpUpdate)).toContain("being signed out");
+
+        finish.open();
+        await hold;
+        target.killAll();
     });
 });

@@ -25,6 +25,18 @@ import type { Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { clearAwaitingInput } from "../../agent/table-writes";
 
+/**
+ * Closes an unanswered request that nothing will answer now (its run ended, or the person walked away): denied, with who
+ * closed it. The one write of such a denial, for every module that ends a run holding requests.
+ */
+export const denyToolApprovalRun = async (
+    ctx: Pick<MutationCtx, "db">,
+    id: Id<"toolApprovalRuns">,
+    closed: { now: number; resolvedBy: string },
+): Promise<void> => {
+    await ctx.db.patch("toolApprovalRuns", id, { resolvedAt: closed.now, resolvedBy: closed.resolvedBy, status: "denied" });
+};
+
 export const RESOLVED_APPROVAL_TTL_MS = 24 * 60 * 60 * 1000;
 export const PENDING_APPROVAL_TTL_MS = 7 * RESOLVED_APPROVAL_TTL_MS;
 

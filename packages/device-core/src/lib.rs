@@ -16,6 +16,8 @@ pub mod acp;
 pub mod acp_call;
 #[cfg(feature = "keychain")]
 pub mod acp_install;
+#[cfg(feature = "keychain")]
+pub mod acp_install_npm;
 pub mod acp_permission;
 pub mod actions;
 pub mod agent_env;
@@ -30,6 +32,8 @@ pub mod engine;
 pub mod envelope;
 pub mod frame;
 pub mod fs;
+#[cfg(feature = "headless")]
+pub mod headless;
 #[cfg(feature = "keychain")]
 pub mod hmac;
 pub mod host;

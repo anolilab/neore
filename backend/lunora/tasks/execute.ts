@@ -24,9 +24,10 @@ import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { wrapUntrusted } from "../coding-agents/agent-output";
+import { chainSourceKey } from "../sub-agents/logic";
 import type { VerifierVerdict } from "./logic";
 import { buildTaskPrompt, buildVerifierPrompt, isPassingFallback, parseVerifierOutput, resolveTaskModel, VERIFIER_SYSTEM_PROMPT } from "./logic";
-import { TaskRunError, taskErrorMessage } from "./run-error";
+import { stopsRecurrence, TaskRunError, taskErrorMessage } from "./run-error";
 import { vTaskRunOrigin } from "./validators";
 
 const VERIFIER_TIMEOUT_MS = 60_000;
@@ -160,6 +161,7 @@ const runAgent = async (
 
     const { text, threadId } = await runHeadlessAgent(ctx, {
         beforeThread: ensureAccountLive,
+        chainSource: chainSourceKey("task", round.taskId),
         ...(claim.freshContext && "threadId" in thread && { freshContext: true }),
         memory: false,
         model,
@@ -175,6 +177,7 @@ const runAgent = async (
                     .catch((error: unknown) => console.warn(`[Tasks] Could not file thread ${id} in project ${project.projectId}:`, error));
             }
         },
+        organizationId: claim.organizationId ?? null,
         origin: "trigger",
         personalization: "full",
         prompt: buildTaskPrompt({ ...claim, repair: repairFor(claim.repair, "threadId" in thread && !claim.freshContext) }),
@@ -198,7 +201,8 @@ const runAgent = async (
  * STARTS it: the round stays `running`, and `finishCodingAgentRound` completes
  * it when the run ends. A task is explicit consent, so the chat tool's `ask`
  * default does not apply; the run's own admission checks (one at a time, rate
- * limit, BYOK key) do.
+ * limit, BYOK key) do. The organization's checks (membership, a cap of `auto`)
+ * were made by `claimRound`, before the round was charged.
  */
 const startCodingAgentRound = async (
     ctx: ActionCtx,
@@ -364,7 +368,7 @@ export const runTaskRound = internalAction
             console.error(`[Tasks] Round ${String(args.round)} of task ${args.taskId} failed:`, error);
             await ctx.runMutation(internal.tasks.internal.completeRound, {
                 ...(place.keepLastThread && { keepLastThread: true }),
-                outcome: { error: taskErrorMessage(error, model), kind: "error" },
+                outcome: { error: taskErrorMessage(error, model), kind: "error", ...(stopsRecurrence(error) && { stopsRecurrence: true as const }) },
                 runId: claim.runId,
                 threadId,
             });

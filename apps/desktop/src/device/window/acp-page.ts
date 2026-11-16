@@ -7,6 +7,7 @@ import type { CapabilityReport } from "@neore/ai/capabilities";
 
 import type { HooksView } from "../../acp/hooks/types";
 import type { RegistryListing } from "../../acp/registry";
+import type { SignInStatus } from "../../acp/sign-in";
 import type { AcpView, ImportSummary, NativeSessionView, PermissionView, SessionSnapshot, SessionSummary, ToolStatus } from "../../acp/types";
 import { HooksPanelModel } from "./hooks-panel";
 import { canImportSessions } from "./import-control";
@@ -52,8 +53,16 @@ const state: {
     selected?: string;
     sessions: SessionSummary[];
     signature: string;
+
+    /**
+     * Each agent's last sign-in answer, by key, with the agent's configuration when it was asked (`agentConfig`). An answer
+     * for a configuration that changed since (another command, a removed and re-added key) is not shown.
+     */
+    signIn: Record<string, { config: string; status: SignInStatus }>;
+    /** The sign-in request running for an agent, by key: one at a time (`askSignIn`). */
+    signInPending: Map<string, SignInRequest>;
     view: AcpView;
-} = { listings: [], reports: {}, requests: [], searchSerial: 0, sessions: [], signature: "", view: { agents: [], consents: [], envNames: [] } };
+} = { listings: [], reports: {}, requests: [], searchSerial: 0, sessions: [], signature: "", signIn: {}, signInPending: new Map(), view: { agents: [], consents: [], envNames: [] } };
 
 const showError = (error: unknown): void => {
     $("acp-error").textContent = String(error instanceof Error ? error.message : error).replace(IPC_PREFIX, "");
@@ -133,7 +142,7 @@ const startIn = (key: string, folder: string) =>
     guarded(async () => {
         const id = await globalThis.neoreDevice.acpStart(key, folder);
 
-        state.selected = id;
+        selectSession(id);
         await refreshSessions();
     });
 
@@ -150,7 +159,7 @@ const approveFolder = (key: string) =>
         );
 
         if (confirmed) {
-            state.view = await globalThis.neoreDevice.acpUpdate({ agentKey: key, folder, op: "grant" });
+            state.view = await savedView({ agentKey: key, folder, op: "grant" });
             renderAgents();
         }
     });
@@ -161,6 +170,173 @@ const probe = (key: string) =>
 
         await refreshReports();
         $("acp-notice").textContent = `${agentLabel(key)}: ${result.agentName || "agent"} ${result.agentVersion}, protocol ${String(result.protocolVersion)}. No session was opened.${canImportSessions(state.reports[key]) ? " Its saved sessions can be imported." : ""}`;
+    });
+
+// ─── Signing in to the agent's own account ──────────────────────────────────
+
+type SignInRequest = "check" | "signOut";
+
+const SIGN_IN_TEXT: Record<SignInStatus["state"], string> = {
+    signed_in: "signed in",
+    signed_out: "not signed in. Sign in with the agent's own login command on this computer",
+    unknown: "could not tell",
+};
+
+const signInText = (status: SignInStatus | undefined): string => {
+    if (status === undefined) {
+        return "not checked";
+    }
+
+    return status.detail === "" ? SIGN_IN_TEXT[status.state] : `${SIGN_IN_TEXT[status.state]}: ${status.detail}`;
+};
+
+const canSignOut = (status: SignInStatus | undefined): boolean => status?.state === "signed_in" && status.canSignOut;
+
+/**
+ * Bumped by every saved change: an agent's variable can change its value without changing its names, so a sign-in
+ * answer given before a save is not trusted after it.
+ */
+const saves: { count: number; queue: Promise<unknown> } = { count: 0, queue: Promise.resolve() };
+
+/** What the window asks the core to save: the same request the bridge takes. */
+type SavedUpdate = Parameters<typeof globalThis.neoreDevice.acpUpdate>[0];
+
+/** A view the window saved: the answers given before it are no longer about the configuration it left. */
+const savedView = async (update: SavedUpdate): Promise<AcpView> => {
+    // Saves go one at a time, in the order they were made: an older answer cannot land after a newer one.
+    const previous = saves.queue;
+    let finish: () => void = () => {};
+
+    saves.queue = new Promise<void>((resolve) => {
+        finish = () => {
+            resolve();
+        };
+    });
+
+    await previous;
+
+    try {
+        const view = await globalThis.neoreDevice.acpUpdate(update);
+
+        saves.count += 1;
+
+        return view;
+    } finally {
+        finish();
+    }
+};
+
+/** The account line of an agent's row: a polite live region, so a sign-in answer or request is announced to screen readers. */
+const accountItem = (key: string, ...actions: HTMLElement[]): HTMLLIElement => {
+    const row = item(`↳ Account: ${accountText(key)}`, ...actions);
+
+    row.firstElementChild?.setAttribute("role", "status");
+
+    return row;
+};
+
+/** What decides which account an agent reaches: its program, its variables, and every change saved since. */
+const agentConfig = (key: string): string => {
+    const agent = state.view.agents.find((candidate) => candidate.key === key);
+
+    return JSON.stringify([saves.count, agent?.command, agent?.args, agent?.install, agent?.envNames, state.view.envNames]);
+};
+
+const accountText = (key: string): string => {
+    const pending = state.signInPending.get(key);
+
+    return pending === undefined ? signInText(signInOf(key)) : SIGN_IN_PENDING[pending];
+};
+
+/** The agent's last sign-in answer, if it was given for the agent as it is configured now. */
+const signInOf = (key: string): SignInStatus | undefined => {
+    const known = state.signIn[key];
+
+    return known?.config === agentConfig(key) ? known.status : undefined;
+};
+
+/** How the row names a request that is running. */
+const SIGN_IN_PENDING: Record<SignInRequest, string> = {
+    check: "checking…",
+    signOut: "signing out…",
+};
+
+/**
+ * Asks the main process about an agent's account, one request per agent at a time: a second would start another agent
+ * process, and a check answered from before a sign-out could replace its result. The row says what runs meanwhile.
+ */
+const askSignIn = async (key: string, request: SignInRequest, ask: () => Promise<SignInStatus>): Promise<void> => {
+    const config = agentConfig(key);
+    // The rows are rebuilt while the request runs; the control the person used gets its focus back after each rebuild.
+    const focused = focusedAgentControl();
+
+    state.signInPending.set(key, request);
+    renderAgents();
+    restoreAgentFocus(focused, key);
+
+    try {
+        state.signIn[key] = { config, status: await ask() };
+    } finally {
+        // Read again: the person can have moved on to another field while the request ran.
+        const stillFocused = focusedAgentControl();
+
+        state.signInPending.delete(key);
+        renderAgents();
+        restoreAgentFocus(stillFocused, key);
+    }
+};
+
+/** The label of the agent-list control that has focus, if one does: rebuilding the rows would drop it. */
+const focusedAgentControl = (): string | undefined => {
+    const active = document.activeElement;
+
+    return active instanceof HTMLButtonElement && $("acp-agents").contains(active) ? (active.getAttribute("aria-label") ?? undefined) : undefined;
+};
+
+/**
+ * Puts focus back on the control with `label` after the rows are rebuilt. A control that is hidden meanwhile (Sign out,
+ * during a request) falls back to the agent's own check, so keyboard focus never drops to the page.
+ */
+const restoreAgentFocus = (label: string | undefined, key: string): void => {
+    if (label === undefined) {
+        return;
+    }
+
+    const controls = [...$("acp-agents").querySelectorAll("button")];
+    const target = controls.find((control) => control.getAttribute("aria-label") === label)
+        ?? controls.find((control) => control.getAttribute("aria-label") === `Check whether ${agentLabel(key)} is signed in`);
+
+    target?.focus();
+};
+
+/** A sign-in request for `key` is running; its row says which, so a click meanwhile does nothing. */
+const signInBusy = (key: string): boolean => state.signInPending.has(key);
+
+const checkSignIn = (key: string) =>
+    guarded(async () => {
+        if (!signInBusy(key)) {
+            await askSignIn(key, "check", () => globalThis.neoreDevice.acpSignInStatus(key));
+        }
+    });
+
+const signOut = (key: string) =>
+    guarded(async () => {
+        if (signInBusy(key)) {
+            return;
+        }
+
+        const open = state.sessions.filter((session) => session.agentKey === key && session.status !== "ended").length;
+        const sessions = open === 1 ? "session" : "sessions";
+        const ending = open === 0 ? "" : ` Its ${String(open)} open ${sessions} on this computer end first.`;
+
+        if (!await globalThis.neoreDevice.confirm(`Sign ${agentLabel(key)} out of its account?${ending}`)) {
+            return;
+        }
+
+        // Checked again: a request could have started while this one's dialog was open.
+        if (!signInBusy(key)) {
+            await askSignIn(key, "signOut", () => globalThis.neoreDevice.acpSignOut(key));
+        }
     });
 
 // ─── Importing saved sessions ───────────────────────────────────────────────
@@ -242,6 +418,7 @@ const renderAgents = (): void => {
                         ? `${agent.label}: ${[agent.command, ...agent.args].join(" ")}`
                         : `${agent.label} ${agent.install.version} from the registry, by ${agent.install.publisher} (pinned, checksum ${agent.install.sha256.slice(0, 12)}…)`,
                     button("Check version", `Check the version of ${agent.label}`, () => probe(agent.key)),
+                    button("Check sign-in", `Check whether ${agent.label} is signed in`, () => checkSignIn(agent.key)),
                     button("Approve a folder…", `Approve a folder for ${agent.label}`, () => approveFolder(agent.key)),
                     button("Remove", `Remove ${agent.label}`, () => {
                         guarded(async () => {
@@ -249,10 +426,14 @@ const renderAgents = (): void => {
                                 return;
                             }
 
-                            state.view = await globalThis.neoreDevice.acpUpdate({ key: agent.key, op: "removeAgent" });
+                            state.view = await savedView({ key: agent.key, op: "removeAgent" });
                             renderAgents();
                         });
                     }),
+                ),
+                accountItem(
+                    agent.key,
+                    ...!state.signInPending.has(agent.key) && canSignOut(signInOf(agent.key)) ? [button("Sign out", `Sign ${agent.label} out of its account`, () => signOut(agent.key))] : [],
                 ),
                 ...view.consents
                     .filter((consent) => consent.agentKey === agent.key)
@@ -266,7 +447,7 @@ const renderAgents = (): void => {
                                 : [],
                             button("Stop approving", `Stop approving ${agent.label} in ${consent.folderPath}`, () => {
                                 guarded(async () => {
-                                    state.view = await globalThis.neoreDevice.acpUpdate({ agentKey: agent.key, folderId: consent.folderId, op: "revoke" });
+                                    state.view = await savedView({ agentKey: agent.key, folderId: consent.folderId, op: "revoke" });
                                     renderAgents();
                                 });
                             }),
@@ -299,7 +480,7 @@ const renderAgents = (): void => {
                     `${owner}: ${name} = ••••••••`,
                     button("Remove", `Remove ${name} for ${owner}`, () => {
                         guarded(async () => {
-                            state.view = await globalThis.neoreDevice.acpUpdate({ agentKey, name, op: "removeEnv" });
+                            state.view = await savedView({ agentKey, name, op: "removeEnv" });
                             renderAgents();
                         });
                     }),
@@ -717,11 +898,235 @@ const renderHooks = async (snapshot: SessionSnapshot, force = false, review = fa
     }
 };
 
-const refreshSessions = async (): Promise<void> => {
-    state.sessions = await globalThis.neoreDevice.acpSessions();
+/** How often the open session's listening ports are read again; a server can start without any session event. */
+const PORTS_POLL_MS = 5000;
+const MAX_QUIET_SKIPS = 5;
 
-    if (state.selected !== undefined && state.sessions.every((session) => session.id !== state.selected)) {
-        state.selected = undefined;
+/** The newest port read. A read that finishes after a newer one is dropped, so an older answer never replaces a newer one. */
+const portsRead = { busy: false, latest: 0, quiet: 0, shown: undefined as string | undefined, skip: 0 };
+
+/**
+ * The one place the open session changes. The previous session's ports must not stay on screen under the new one:
+ * pending reads are dropped, the rows go, and the new session's ports are read at once.
+ */
+const selectSession = (id: string | undefined): void => {
+    state.selected = id;
+    portsRead.latest += 1;
+    portsRead.quiet = 0;
+    portsRead.shown = undefined;
+    portsRead.skip = 0;
+    $("acp-ports-status").textContent = id === undefined ? "" : "Loading ports…";
+    $("acp-ports-list").replaceChildren(...id === undefined ? [item("None.")] : []);
+
+    if (id === undefined) {
+        portsRead.busy = false;
+    } else {
+        refreshPorts();
+    }
+};
+
+/** Writes the ports status only when its words change, so the live region does not announce the same text again. */
+const setPortsStatus = (text: string): void => {
+    const status = $("acp-ports-status");
+
+    if (status.textContent !== text) {
+        status.textContent = text;
+    }
+};
+
+/** One more read with nothing to show: the next reads are spaced out, up to every 30 s. A server or an Open starts over. */
+const portsQuiet = (quiet: boolean): void => {
+    portsRead.quiet = quiet ? portsRead.quiet + 1 : 0;
+    portsRead.skip = Math.min(portsRead.quiet, MAX_QUIET_SKIPS);
+};
+
+const showPorts = (selected: string | undefined, ports: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPorts>>): void => {
+    portsQuiet(ports.length === 0);
+
+    // The same ports for the same session are already on screen: leave the rows and the status alone.
+    const shownKey = JSON.stringify([selected, ports]);
+
+    if (shownKey === portsRead.shown) {
+        return;
+    }
+
+    portsRead.shown = shownKey;
+    // The status region is polite and live, so a server that starts or stops is announced, once per change.
+    const servers = ports.length === 1 ? "1 server listening." : `${String(ports.length)} servers listening.`;
+
+    setPortsStatus(ports.length === 0 ? "No servers listening." : servers);
+    $("acp-ports-list").replaceChildren(
+        ...ports.length === 0
+            ? [item("None.")]
+            : ports.map((port) => {
+                const label = `Port ${String(port.port)} on ${port.address} — ${port.name} (process ${String(port.pid)})`;
+
+                // The agent's own server ends with the session, not from here.
+                return port.agent
+                    ? item(`${label}, the agent itself`)
+                    : item(
+                        label,
+                        button("Stop", `Stop ${port.name} (process ${String(port.pid)}) on port ${String(port.port)}, address ${port.address}`, () => {
+                            guarded(() => stopPort(selected, port, $("acp-ports-list").contains(document.activeElement)));
+                        }),
+                    );
+            }),
+    );
+};
+
+/** The processes a stop is running for, until the list is read again: a repeat click on the same row is ignored meanwhile. */
+const stopping = new Map<string, string>();
+
+/** Ends one listed server, then reads the list again; a stop that did not end says why in the ports status line. */
+const stopPort = async (
+    selected: string | undefined,
+    port: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPorts>>[number],
+    hadFocus: boolean,
+): Promise<void> => {
+    // The row was drawn for another session: its pid may mean nothing here, so nothing is stopped.
+    if (selected === undefined || state.selected !== selected) {
+        return;
+    }
+
+    const key = JSON.stringify([selected, port.pid, port.startedAt, port.name]);
+
+    if (stopping.has(key)) {
+        return;
+    }
+
+    const label = `Stopping ${port.name} on port ${String(port.port)}…`;
+
+    stopping.set(key, label);
+    // A stop can take the whole grace period: say it started. Reads of an unchanged list leave this up until it answers.
+    setPortsStatus(label);
+
+    try {
+        let result: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPortStop>>;
+
+        try {
+            result = await globalThis.neoreDevice.acpPortStop(selected, { name: port.name, pid: port.pid, startedAt: port.startedAt });
+        } catch (error) {
+            // Another session was opened during the stop: its window is not the place for this error.
+            if (state.selected !== selected) {
+                return;
+            }
+
+            // The error is shown on its own; the count comes back in place of "Stopping…".
+            portsRead.shown = undefined;
+            refreshPorts();
+
+            throw error;
+        }
+
+        // Another session was opened during the stop: its own list is on screen now.
+        if (state.selected !== selected) {
+            return;
+        }
+
+        portsRead.quiet = 0;
+
+        // An ended stop brings the count back; one that did not end writes its reason below, over "Stopping…" alone.
+        if (result.ended) {
+            portsRead.shown = undefined;
+        }
+
+        await refreshPorts();
+
+        // An ended session's servers are already cleared: neither a late reason nor a "Stopping…" may come back over that.
+        const sessionEnded = state.sessions.find((session) => session.id === selected)?.status === "ended";
+        // Another stop in this session is still running: its "Stopping…" comes back over the count this one brought.
+        const other = [...stopping].find(([entry]) => entry !== key && (JSON.parse(entry) as unknown[])[0] === selected);
+
+        if (other !== undefined && !sessionEnded && result.ended && state.selected === selected) {
+            setPortsStatus(other[1]);
+        }
+
+        // The redrawn list no longer has the button that was pressed: focus that fell to the page goes to the list.
+        if (hadFocus && (document.activeElement === null || document.activeElement === document.body)) {
+            $("acp-ports-list").focus();
+        }
+
+        if (!sessionEnded && !result.ended && state.selected === selected) {
+            setPortsStatus(`${port.name} on port ${String(port.port)} did not end: ${result.reason}.`);
+            // The next read redraws the list, which brings the count back instead of leaving this reason up.
+            portsRead.shown = undefined;
+        }
+    } finally {
+        stopping.delete(key);
+    }
+};
+
+/**
+ * A read that fails (a tool missing, a timeout) is said where the list is. It backs off like an empty read, so a
+ * computer without the tools is not re-read every 5 s, and the same failure is not announced again.
+ */
+const showPortsFailure = (error: unknown): void => {
+    portsQuiet(true);
+    setPortsStatus(`Ports cannot be read: ${error instanceof Error ? error.message : String(error)}`);
+    portsRead.shown = undefined;
+    $("acp-ports-list").replaceChildren();
+};
+
+const refreshPorts = async (): Promise<void> => {
+    const { selected } = state;
+
+    portsRead.latest += 1;
+    portsRead.busy = true;
+    const read = portsRead.latest;
+    let outcome: { error: unknown } | { ports: Awaited<ReturnType<typeof globalThis.neoreDevice.acpPorts>> };
+
+    try {
+        outcome = { ports: selected === undefined ? [] : await globalThis.neoreDevice.acpPorts(selected) };
+    } catch (error: unknown) {
+        outcome = { error };
+    }
+
+    // A newer read started, or another session was opened while this one was read: its answer is dropped.
+    if (read !== portsRead.latest) {
+        return;
+    }
+
+    portsRead.busy = false;
+
+    if (state.selected !== selected) {
+        return;
+    }
+
+    if ("ports" in outcome) {
+        showPorts(selected, outcome.ports);
+    } else {
+        showPortsFailure(outcome.error);
+    }
+};
+
+/** Counts session-list reads, so an older answer never replaces a newer one. */
+const sessionsRead = { latest: 0 };
+
+const refreshSessions = async (): Promise<void> => {
+    sessionsRead.latest += 1;
+
+    const read = sessionsRead.latest;
+    const selectedAtStart = state.selected;
+    const sessions = await globalThis.neoreDevice.acpSessions();
+
+    // A newer read started meanwhile: its answer is the one to show.
+    if (read !== sessionsRead.latest) {
+        return;
+    }
+
+    state.sessions = sessions;
+
+    // Only the session that was open when this list was read can be missing from it; one opened since is newer.
+    if (state.selected !== undefined && state.selected === selectedAtStart && state.sessions.every((session) => session.id !== state.selected)) {
+        selectSession(undefined);
+    }
+
+    // An ended session has no processes left, so its servers go at once rather than at the next (possibly backed-off) read.
+    if (state.sessions.find((session) => session.id === state.selected)?.status === "ended") {
+        // A read still in flight was taken while the agent ran: it must not bring its servers back.
+        portsRead.latest += 1;
+        portsRead.busy = false;
+        showPorts(state.selected, []);
     }
 
     $("acp-sessions").replaceChildren(
@@ -733,7 +1138,7 @@ const refreshSessions = async (): Promise<void> => {
                 return item(
                     label,
                     button(state.selected === session.id ? "Showing" : "Open", `Open the session with ${session.agentLabel} in ${session.folder}`, () => {
-                        state.selected = session.id;
+                        selectSession(session.id);
                         refreshSessions();
                     }),
                 );
@@ -795,7 +1200,7 @@ export const initAcp = async (): Promise<void> => {
                 return;
             }
 
-            state.view = await globalThis.neoreDevice.acpUpdate({ args, command, key: slug(label), label, op: "saveAgent" });
+            state.view = await savedView({ args, command, key: slug(label), label, op: "saveAgent" });
             ($("acp-agent-form") as HTMLFormElement).reset();
             renderAgents();
         });
@@ -825,7 +1230,7 @@ export const initAcp = async (): Promise<void> => {
         guarded(async () => {
             const agentKey = $<HTMLSelectElement>("acp-env-scope").value || undefined;
 
-            state.view = await globalThis.neoreDevice.acpUpdate({ agentKey, name: field("acp-env-name").trim(), op: "setEnv", value: field("acp-env-value") });
+            state.view = await savedView({ agentKey, name: field("acp-env-name").trim(), op: "setEnv", value: field("acp-env-value") });
             // The value is not kept anywhere in the page once it is saved.
             ($("acp-env-form") as HTMLFormElement).reset();
             renderAgents();
@@ -860,6 +1265,19 @@ export const initAcp = async (): Promise<void> => {
         state.importing = undefined;
         renderImport();
     });
+
+    setInterval(() => {
+        // A slow read is let finish: a new one every poll would supersede it each time and nothing would ever show.
+        if (portsRead.skip > 0) {
+            portsRead.skip -= 1;
+
+            return;
+        }
+
+        if (state.selected !== undefined && !document.hidden && !portsRead.busy) {
+            refreshPorts();
+        }
+    }, PORTS_POLL_MS);
 
     globalThis.neoreDevice.onAcpChanged(async () => {
         try {

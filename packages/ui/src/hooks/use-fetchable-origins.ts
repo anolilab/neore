@@ -31,12 +31,19 @@ export const originsOf = (...urls: ReadonlyArray<string | undefined>): ReadonlyA
 
 export const useFetchableOrigins = (): ReadonlyArray<string> => use(FetchableOriginsContext);
 
+const LOOPBACK_IPV4 = /^127(?:\.\d{1,3}){3}$/;
+
+const isLoopbackHost = (hostname: string): boolean =>
+    hostname === "localhost" || hostname.endsWith(".localhost") || hostname === "[::1]" || LOOPBACK_IPV4.test(hostname);
+
 /**
  * Whether a preview may read `url`: a `data:` or `blob:` URL, or an http(s) one
- * on the page's own origin or one of `allowedOrigins` (exact origins, e.g.
- * `https://api.example.com`). Anything else, a relative URL with no page to
- * resolve against included, is refused without a request, so a file part cannot
- * point the browser at an arbitrary host or at a loopback service.
+ * on one of `allowedOrigins` (exact origins, e.g. `https://api.example.com`), or
+ * on the page's own origin unless that is a loopback host. Anything else, a
+ * relative URL with no page to resolve against included, is refused without a
+ * request, so a file part cannot point the browser at an arbitrary host or at a
+ * loopback service. A loopback origin the app configured (a local backend) is
+ * allowed: that is the app's own choice.
  */
 export const isFetchableUrl = (url: string, allowedOrigins: ReadonlyArray<string>): boolean => {
     const selfOrigin = globalThis.location?.origin;
@@ -56,5 +63,9 @@ export const isFetchableUrl = (url: string, allowedOrigins: ReadonlyArray<string
         return false;
     }
 
-    return parsed.origin === selfOrigin || allowedOrigins.includes(parsed.origin);
+    if (allowedOrigins.includes(parsed.origin)) {
+        return true;
+    }
+
+    return parsed.origin === selfOrigin && !isLoopbackHost(parsed.hostname);
 };

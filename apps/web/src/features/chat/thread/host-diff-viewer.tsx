@@ -13,7 +13,7 @@ import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
 import { MessageSquarePlusIcon } from "lucide-react";
 import type { FC, KeyboardEvent, MouseEvent } from "react";
-import { useMemo, useRef, useState } from "react";
+import { memo, useMemo, useRef, useState } from "react";
 
 import DiffCommentForm from "@/features/chat/host/diff-comment-form";
 import type { DiffFile, DiffLine } from "@/features/chat/host/diff-comments";
@@ -65,12 +65,13 @@ interface DiffFileViewProps {
     file: DiffFile;
     fileIndex: number;
     messageId: string;
+    /** The selection, when it is in this file; every other file gets `undefined`, so selecting lines draws only this file again. */
     selection: Selection | undefined;
     setSelection: (next: Selection | undefined) => void;
     threadId: string;
 }
 
-const DiffFileView: FC<DiffFileViewProps> = ({ commented, file, fileIndex, messageId, selection, setSelection, threadId }) => {
+const DiffFileView = memo(({ commented, file, fileIndex, messageId, selection, setSelection, threadId }: DiffFileViewProps) => {
     const { t } = useLingui();
     const mine = selection?.file === fileIndex ? selection : undefined;
     const [stop, setStop] = useState(() => selectableAt(file, 0, 1) ?? 0);
@@ -294,7 +295,9 @@ const DiffFileView: FC<DiffFileViewProps> = ({ commented, file, fileIndex, messa
             )}
         </section>
     );
-};
+});
+
+DiffFileView.displayName = "DiffFileView";
 
 const PlainPatch: FC<{ patch: string }> = ({ patch }) => (
     <pre className="overflow-x-auto font-mono text-xs leading-5" data-testid="host-changes-patch">
@@ -341,7 +344,7 @@ const CommentableDiff: FC<{ messageId: string; patch: string; threadId: string }
                     fileIndex={index}
                     key={`${String(index)}:${file.path}`}
                     messageId={messageId}
-                    selection={selection}
+                    selection={selection?.file === index ? selection : undefined}
                     setSelection={setSelection}
                     threadId={threadId}
                 />

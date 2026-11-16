@@ -15,6 +15,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchById, patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
@@ -35,6 +36,7 @@ import {
     MAX_RECURRING_TASKS_PER_USER,
     MAX_REPAIR_ROUNDS_LIMIT,
     MAX_TASKS_PER_USER,
+    firstStuckCheckAt,
     nextRecurrenceAt,
     TASK_CRITERIA_MAX,
     TASK_EFFORT_MAX,
@@ -605,7 +607,8 @@ export const deleteGoal = authMutation
             .take(MAX_TASKS_PER_USER);
         const { now } = ctx;
 
-        await Promise.all(tasks.map((task) => patchRow(ctx.db, "tasks", task, { goalId: undefined, updatedAt: now })));
+        await Promise.all(tasks.map((task) => patchRow(ctx.db, "tasks", task, { goalId: undefined, stuckCheckAt: firstStuckCheckAt(now), updatedAt: now })));
+        await noteShardDue(ctx, firstStuckCheckAt(now), userId);
         await ctx.db.delete("goals", args.goalId);
 
         ctx.log.event("tasks.delete_goal", { detachedTaskCount: tasks.length, goalId: args.goalId });
@@ -697,7 +700,11 @@ export const updateTask = authMutation
         }
 
         const tasks = await loadUserTasks(ctx, userId);
-        const definition = await resolveDefinition(ctx, { organizationId: ctx.user.activeOrganization?.id, userId }, args, tasks, args.taskId);
+        // The task keeps the organization it was created under, so an edit from another space cannot move its skill scope or
+        // its cap. A skill is authorized against that organization only while the editor is still a member, as a run checks it.
+        const membership = task.organizationId ? await getMemberByOrganizationAndUser(ctx, task.organizationId, userId, "primary") : null;
+        const skillOrganizationId = membership ? (task.organizationId ?? undefined) : undefined;
+        const definition = await resolveDefinition(ctx, { organizationId: skillOrganizationId, userId }, args, tasks, args.taskId);
         const { now } = ctx;
         let nextRunAt: number | undefined;
 
@@ -720,17 +727,21 @@ export const updateTask = authMutation
             maxRepairRounds: definition.maxRepairRounds,
             model: definition.model,
             nextRunAt,
-            organizationId: definition.organizationId,
+            organizationId: task.organizationId ?? undefined,
             parentTaskId: definition.parentTaskId,
             projectId: definition.projectId,
             reasoningEffort: definition.reasoningEffort,
             recurring: definition.recurring,
             runDestination: definition.runDestination,
             skillId: definition.skillId,
+            stuckCheckAt: firstStuckCheckAt(now),
             successCriteria: definition.successCriteria,
             title: definition.title,
             updatedAt: now,
         });
+
+        // An edit restarts the stuck clock, so an idle shard must wake for the new check.
+        await noteShardDue(ctx, firstStuckCheckAt(now), userId);
 
         if (nextRunAt !== undefined) {
             await noteShardDue(ctx, nextRunAt, userId);
@@ -787,7 +798,8 @@ export const deleteTask = authMutation
                 continue;
             }
 
-            await patchRow(ctx.db, "tasks", other, { ...patch, updatedAt: now });
+            await patchRow(ctx.db, "tasks", other, { ...patch, stuckCheckAt: firstStuckCheckAt(now), updatedAt: now });
+            await noteShardDue(ctx, firstStuckCheckAt(now), other.userId);
 
             if (patch.dependsOn && other.status === "blocked" && areDependenciesDone(patch.dependsOn, statusById)) {
                 await queueCycle(ctx, other, "dependency", now);
@@ -854,6 +866,20 @@ export const cancelTask = authMutation
     });
 
 /**
+ * A review decision (reject or retry) on `task` ends the wait of the blocked tasks that depend on it. Their stuck clock
+ * restarts here, so the time spent awaiting the owner's decision is not counted as idle time (`tasks/AGENTS.md`).
+ */
+const restartDependentsClock = async (ctx: MutationCtx, task: Doc<"tasks">, now: number): Promise<void> => {
+    const owned = await loadUserTasks(ctx, task.userId);
+    const dependents = owned.filter((other) => other.status === "blocked" && other.dependsOn.includes(task._id));
+
+    for (const dependent of dependents) {
+        await patchRow(ctx.db, "tasks", dependent, { stuckCheckAt: firstStuckCheckAt(now), updatedAt: now });
+        await noteShardDue(ctx, firstStuckCheckAt(now), dependent.userId);
+    }
+};
+
+/**
  * The human in the loop, for a task the verifier would not pass:
  * approve (done — and dependents unblock), reject (failed), or retry with a
  * note the next run is given.
@@ -886,7 +912,15 @@ export const reviewTask = authMutation
         }
 
         if (args.decision === "reject") {
-            await ctx.db.patch("tasks", task._id, { lastError: "Rejected in review", status: "failed", updatedAt: now });
+            await ctx.db.patch("tasks", task._id, {
+                lastError: "Rejected in review",
+                status: "failed",
+                stuckCheckAt: firstStuckCheckAt(now),
+                updatedAt: now,
+            });
+            await noteShardDue(ctx, firstStuckCheckAt(now), task.userId);
+
+            await restartDependentsClock(ctx, task, now);
 
             ctx.log.event("tasks.review_task", { decision: args.decision, taskId: task._id });
 
@@ -900,6 +934,8 @@ export const reviewTask = authMutation
         await patchById(ctx.db, "tasks", task._id, { reviewNote });
 
         const landed = await startTask(ctx, task, "retry", statusMap(await loadUserTasks(ctx, userId)), now);
+
+        await restartDependentsClock(ctx, task, now);
 
         ctx.log.event("tasks.review_task", { decision: args.decision, taskId: task._id });
 

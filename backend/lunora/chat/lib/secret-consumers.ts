@@ -36,7 +36,9 @@ interface ConsumeArgs {
 }
 
 export type ConsumeResult =
-    { header: string; server: string; status: "saved" } | { message: string; status: SecretFailure } | { provider: string; status: "saved" };
+    | { header: string; server: string; status: "saved" }
+    | { message: string; status: SecretFailure }
+    | { provider: string; status: "saved" };
 
 const failure = (status: SecretFailure): ConsumeResult => {
     return { message: SECRET_FAILURE_MESSAGES[status], status };

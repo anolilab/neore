@@ -18,9 +18,11 @@ import {
     tasksList,
     tasksRun,
     tasksStatus,
+    threadSend,
     threadsList,
     threadsRm,
     threadsShow,
+    threadStart,
     whoami,
 } from "./commands";
 
@@ -32,6 +34,8 @@ Usage: neore <command> [options]
 
 Account
   login [--api-url URL] [--key KEY]   Save an API key (prompted, or piped on stdin)
+  login --device [--api-url URL]      Sign in by code: shows a URL and a code to approve in the
+                                      web app (works over SSH, opens no browser)
   logout                              Forget the saved key
   whoami                              Show the key's user and scopes
   doctor                              Check config, connectivity and the key
@@ -43,6 +47,15 @@ Chat
   models                              List models
 
 Threads
+  thread start [prompt] [-m MODEL] [--wait]
+  thread send <thread-id> [prompt] [-m MODEL] [--wait]
+                                      The prompt is read from stdin when piped. Without
+                                      --wait: print the thread id and exit; the run
+                                      continues on the server. With --wait: block (up to 5
+                                      minutes), print the reply (or JSON with --json).
+                                      Exit 0 reply, 1 the run failed, 2 usage or other error,
+                                      or no finished reply yet (read it later: threads show
+                                      <id>); 3-6 as below.
   threads ls [--limit N] [--cursor C] [--all]
   threads show <thread-id>
   threads rm <thread-id> [--yes]
@@ -72,9 +85,14 @@ Global options
 Prefer the prompt or stdin over --key: flags end up in shell history.
 
 Exit codes: 0 ok, 1 error, 2 usage, 3 auth/scope, 4 not found, 5 rate/daily limit, 6 network.
+"login --device" exits 1 when the code is denied, expired or already used (the message says which).
 `;
 
-type Handler = (context: Context, command: ParsedCommand) => Promise<boolean | void>;
+/** A number is the exit code itself; `false` is exit 1. */
+type Handler = (context: Context, command: ParsedCommand) => Promise<boolean | number | void>;
+
+/** Commands whose generic errors exit 2 instead of 1, so 1 can mean only "the run failed". */
+const RUN_FAILED_EXIT: ReadonlySet<string> = new Set(["thread send", "thread start"]);
 
 const HANDLERS: Record<string, Handler> = {
     chat,
@@ -91,9 +109,11 @@ const HANDLERS: Record<string, Handler> = {
     "tasks ls": tasksList,
     "tasks run": tasksRun,
     "tasks status": tasksStatus,
+    "thread send": threadSend,
     "threads ls": threadsList,
     "threads rm": threadsRm,
     "threads show": threadsShow,
+    "thread start": threadStart,
     whoami,
 };
 
@@ -132,6 +152,10 @@ export const run = async (argv: ReadonlyArray<string>, context: Context): Promis
     try {
         const result = await handler(context, command);
 
+        if (typeof result === "number") {
+            return result;
+        }
+
         return result === false ? EXIT.error : EXIT.ok;
     } catch (error) {
         if (command.flags.json && !(error instanceof UsageError)) {
@@ -144,6 +168,12 @@ export const run = async (argv: ReadonlyArray<string>, context: Context): Promis
 
         reportError(context, error);
 
-        return error instanceof UsageError ? EXIT.usage : exitCodeFor(error);
+        if (error instanceof UsageError) {
+            return EXIT.usage;
+        }
+
+        const code = exitCodeFor(error);
+
+        return code === EXIT.error && RUN_FAILED_EXIT.has(command.command) ? EXIT.usage : code;
     }
 };

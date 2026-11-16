@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { listActivePathPage } from "../agent/branches";
 import { createTemporaryThread } from "../agent/threads";
 import schema from "../schema";
+import { guestTextPart } from "./lib/attached-text";
 import { saveLocalTurnHandler } from "./local-models";
 
 // The harness cannot run a generated `internal` reference (it has no `kind`), so the one the temporary
@@ -266,6 +267,27 @@ describe("regenerate and edit on the local path", () => {
             { branch: "2/2", role: "user", text: "hello instead" },
             { branch: undefined, role: "assistant", text: "edited answer" },
         ]);
+    });
+
+    it("keeps the guest mark and the note's id on an edit of a guest's note the owner sent on", async () => {
+        await seedEndpoint(OWNER, "local-browser");
+
+        const first = await save(OWNER, { prompt: "hi", reply: "first answer" });
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.patch("messages", first.userMessageId, { message: { content: [guestTextPart("a guest's words", "note-1")], role: "user" } }),
+        );
+
+        const edited = await save(OWNER, {
+            branch: { kind: "edit", messageId: first.userMessageId },
+            prompt: "reworded",
+            reply: "ok",
+            threadId: first.threadId,
+        });
+        const row = await harness.run(async (ctx: any) => await ctx.db.get("messages", edited.userMessageId));
+
+        expect(row.message.content).toStrictEqual([guestTextPart("reworded", "note-1")]);
     });
 
     it.each([

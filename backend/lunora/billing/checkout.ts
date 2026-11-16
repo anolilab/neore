@@ -5,14 +5,15 @@
  * an organization owner for their active organization (reference =
  * the organization id, one seat per member). `billing/plans.ts` says why.
  *
- * Both go to the Creem ADAPTER (`ctx.payments.adapter`), not the facade's
- * `createCheckout` / `createPortalSession`: the facade authorizes with Lunora's
- * default rule (reference = the caller's own user id, `src/server.ts`), which a
- * Team reference — an organization — never meets. The checks here are the gate
- * instead (`billingOrganizationOf`, `portalCustomerFor`). Creem attaches the
- * checkout to the customer by e-mail, and the webhook stores the customer id
- * (and, for Team, the purchaser) on the user or organization row, which is
- * where the portal reads it.
+ * Checkout goes through the facade (`ctx.payments.createCheckout`), whose
+ * `authorize` admits the caller's own user id and organizations they own
+ * (`src/server.ts`); `billingOrganizationOf` still runs first for its messages.
+ * The facade finds or creates the Creem customer for the reference by the
+ * buyer's e-mail, and the webhook stores the customer id (and, for Team, the
+ * purchaser) on the user or organization row, which is where the portal reads it.
+ *
+ * The portal goes through `./provider.ts` behind `portalCustomerFor`: only the
+ * purchaser opens it, on the customer billing recorded for the subject.
  */
 import { LunoraError, v } from "lunorash/server";
 
@@ -23,6 +24,7 @@ import { CREEM_API_KEY, SITE_URL } from "../env";
 import { authAction, authQuery, rateLimit } from "../lib/crpc";
 import { billingOrganizationOf, portalCustomerFor, productFor } from "./plans";
 import { checkoutProducts } from "./products";
+import { portalLink } from "./provider";
 
 const TRAILING_SLASH = /\/$/u;
 
@@ -153,7 +155,9 @@ export const createCheckout = authAction
         }
 
         // The opening seat count; `billing/seats.ts` keeps it in step with membership after.
-        const { url } = await ctx.payments.adapter.createCheckout({
+        const { url } = await ctx.payments.createCheckout({
+            // The facade finds or creates the reference's Creem customer by it; without one Creem refuses the customer.
+            email: ctx.user.email,
             // Read back by the webhook (`subscriptionEventOf`) as the organization's purchaser.
             metadata: { purchaserId: ctx.user.userId },
             mode: "subscription",
@@ -184,11 +188,7 @@ export const openCustomerPortal = authAction
         const id = kind === "user" ? ctx.user.userId : billingOrganizationOf(ctx.user);
         const { creemCustomerId, creemPurchaserId } = await ctx.runQuery(internal.billing.checkout.getBillingSubject, { id, kind });
 
-        const session = await ctx.payments.adapter.createPortalSession({
-            customerId: portalCustomerFor(ctx.user.userId, { creemCustomerId, creemPurchaserId }),
-            referenceId: id,
-            returnUrl: billingPageUrl(),
-        });
+        const session = await portalLink(id, portalCustomerFor(ctx.user.userId, { creemCustomerId, creemPurchaserId }), billingPageUrl());
 
         ctx.log.event("billing.open_customer_portal", { subject: kind });
 

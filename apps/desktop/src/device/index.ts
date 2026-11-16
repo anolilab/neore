@@ -29,7 +29,8 @@ import { acpSupported, spawnAgent } from "../acp/process";
 import { AgentRegistry } from "../acp/registry";
 import { RemoteAgents } from "../acp/remote-process";
 import { ServerAgents } from "../acp/servers";
-import type { AcpView, PermissionView, SpawnPlan } from "../acp/types";
+import { AgentSignIn } from "../acp/sign-in";
+import type { AcpUpdate, AcpView, PermissionView, SpawnPlan } from "../acp/types";
 import { backendOrigin } from "../site";
 import type { TerminalOpener } from "../terminal/index";
 import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
@@ -52,6 +53,7 @@ import {
     readOptionalDeviceId,
     readOptionId,
     readPairing,
+    readPortTarget,
     readPrompt,
     readPromptAnswer,
     readRequestId,
@@ -80,7 +82,7 @@ const LOCAL_PAGE = path.join(WINDOW_DIR, "device.html");
 const LOCAL_PRELOAD = path.join(WINDOW_DIR, "preload.cjs");
 
 /** The folder with the `neore-host` binaries and checksums this build ships: in the app's resources once packaged. */
-const hostBundleDirectory = (): string | undefined => app.isPackaged ? path.join(process.resourcesPath, "neore-host") : process.env.NEORE_HOST_BUNDLE;
+const hostBundleDirectory = (): string | undefined => (app.isPackaged ? path.join(process.resourcesPath, "neore-host") : process.env.NEORE_HOST_BUNDLE);
 
 /**
  * Registers the device handlers. Returns whether the core loaded: the shell advertises `device` only then
@@ -100,6 +102,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         registry?: AgentRegistry;
         remote?: RemoteAgents;
         servers?: ServerAgents;
+        signIn?: AgentSignIn;
         transport?: HostTransport;
     } = {};
     /** Every site window that has made a trusted relay call and is still open: progress and changes go to each. */
@@ -191,12 +194,12 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const win = state.local;
 
         return (
-            win !== undefined
-            && !win.isDestroyed()
-            && event.sender === win.webContents
-            && event.senderFrame !== null
-            && event.senderFrame === win.webContents.mainFrame
-            && event.senderFrame.url === localUrl
+            win !== undefined &&
+            !win.isDestroyed() &&
+            event.sender === win.webContents &&
+            event.senderFrame !== null &&
+            event.senderFrame === win.webContents.mainFrame &&
+            event.senderFrame.url === localUrl
         );
     };
 
@@ -414,7 +417,10 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             log: (message) => console.error(message),
             onChange: () => send(state.local?.webContents, LOCAL_EVENT.acp),
             remote: state.remote,
-            servers: () => (JSON.parse(core.settingsGet()) as SettingsView).hosts.map((host) => { return { acpAgents: host.acpAgents, acpConsents: host.acpConsents, deviceId: host.deviceId, name: host.name }; }),
+            servers: () =>
+                (JSON.parse(core.settingsGet()) as SettingsView).hosts.map((host) => {
+                    return { acpAgents: host.acpAgents, acpConsents: host.acpConsents, deviceId: host.deviceId, name: host.name };
+                }),
             userData: app.getPath("userData"),
         });
 
@@ -436,7 +442,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     ): Promise<void> => {
         try {
             const sessionId = await (server?.acp ?? requireAcp()).startSession(command.agentKey, command.agentLabel, command.folderPath, {
-                ...command.nativeSessionId !== undefined && { nativeSessionId: command.nativeSessionId },
+                ...(command.forkSessionId !== undefined && { forkSessionId: command.forkSessionId }),
+                ...(command.nativeSessionId !== undefined && { nativeSessionId: command.nativeSessionId }),
                 sessionId: command.sessionId,
                 threadId: command.threadId,
             });
@@ -587,7 +594,14 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         return pairAndOpenSessions(deviceId, secret, accountLabel);
     });
 
-    relay(DEVICE_CHANNEL.manifest, async (_event, deviceId) => requireTransport().manifest(readOptionalDeviceId(deviceId)));
+    relay(DEVICE_CHANNEL.manifest, async (_event, deviceId) => {
+        const target = readOptionalDeviceId(deviceId);
+        const signed = await requireTransport().manifest(target);
+
+        // This computer's app version rides beside its own manifest, unsigned and display-only, so it does not drive the update notice.
+        // A server's manifest is signed here for software running there, so it carries none.
+        return target === undefined ? { ...signed, appVersion: app.getVersion() } : signed;
+    });
 
     // The servers this computer speaks for. The page asks; the connection itself, the host key, the passphrase and the pairing are each
     // decided by the person at the local window, so a page can connect nowhere on its own.
@@ -653,7 +667,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     // The file tree of a connected server. Local window only, and nothing here reaches the agent: what a server
     // lists or holds is its own word, shown as text.
     local(LOCAL_CHANNEL.hostFilesList, async (deviceId, folder, after) =>
-        requireTransport().hostFilesList(readDeviceId(deviceId), readServerPath(folder), readAfter(after)));
+        requireTransport().hostFilesList(readDeviceId(deviceId), readServerPath(folder), readAfter(after)),
+    );
 
     // The coding agents of a server and the folders each may work in: approved here, in the local window, and nowhere else.
     local(LOCAL_CHANNEL.hostAcpUpdate, async (deviceId, update) => {
@@ -716,7 +731,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const parent = liveLocal();
         const result = parent === undefined ? await dialog.showOpenDialog(dialogOptions) : await dialog.showOpenDialog(parent, dialogOptions);
 
-        return result.canceled ? null : result.filePaths[0] ?? null;
+        return result.canceled ? null : (result.filePaths[0] ?? null);
     });
 
     // A native dialog, so the page cannot draw a confirmation that looks like one.
@@ -740,8 +755,13 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     local(LOCAL_CHANNEL.acpView, () => JSON.parse(requireCore().acpView()) as AcpView);
 
     const updateAcp = async (update: string): Promise<AcpView> => {
+        const parsed = JSON.parse(update) as AcpUpdate;
+        const { key, op } = parsed as { key?: string; op?: string };
+
+        // Refused before anything is saved: a sign-out is checking the account on the command or variables it would change.
+        state.acp?.refuseUpdateWhileSigningOut(parsed);
+
         const view = JSON.parse(requireCore().acpUpdate(update)) as AcpView;
-        const { key, op } = JSON.parse(update) as { key?: string; op?: string };
 
         // What an agent reported says nothing about a different program.
         if (key !== undefined && (op === "saveAgent" || op === "removeAgent")) {
@@ -784,7 +804,11 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         });
 
         const key = readAgentKey(id);
-        const view = await state.installer.install(key, readAgentVersion(version));
+        const { installer } = state;
+        const install = async (): Promise<AcpView | null> => await installer.install(key, readAgentVersion(version));
+        // An install changes the program a sign-out checks the account of: refused during one, and one waits for it. Always
+        // through the manager, even before anything else made it, or a sign-out started meanwhile would not see the install.
+        const view = await requireAcp().usingAgent(key, install);
 
         if (view !== null) {
             state.acp?.forgetReport(key);
@@ -799,12 +823,23 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     local(LOCAL_CHANNEL.acpProbe, (agentKey) => requireAcp().probe(readAgentKey(agentKey)));
 
+    const requireSignIn = (): AgentSignIn => {
+        state.signIn ??= new AgentSignIn({ agents: requireAcp(), folder: path.join(app.getPath("userData"), "acp-sign-in") });
+
+        return state.signIn;
+    };
+
+    local(LOCAL_CHANNEL.acpSignInStatus, (agentKey) => requireSignIn().status(readAgentKey(agentKey)));
+
+    local(LOCAL_CHANNEL.acpSignOut, (agentKey) => requireSignIn().signOut(readAgentKey(agentKey)));
+
     local(LOCAL_CHANNEL.acpReports, () => requireAcp().allReports());
 
     local(LOCAL_CHANNEL.acpImportList, (agentKey, folder) => requireImporter().list(readAgentKey(agentKey), readFolder(folder)));
 
     local(LOCAL_CHANNEL.acpImport, (agentKey, folder, nativeSessionId, title) =>
-        requireImporter().import(readAgentKey(agentKey), readFolder(folder), readNativeSessionId(nativeSessionId), readSessionTitle(title)));
+        requireImporter().import(readAgentKey(agentKey), readFolder(folder), readNativeSessionId(nativeSessionId), readSessionTitle(title)),
+    );
 
     local(LOCAL_CHANNEL.acpStart, async (agentKey, folder) => {
         const key = readAgentKey(agentKey);
@@ -828,6 +863,11 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     local(LOCAL_CHANNEL.acpPermissionAnswerBatch, (ids) => requireCore().acpPermissionAnswerBatch(readRequestIds(ids)));
 
     local(LOCAL_CHANNEL.acpSessions, () => requireAcp().summaries());
+
+    // Local window only, like the approvals: no page, backend call or ACP command can list or stop a session's servers.
+    local(LOCAL_CHANNEL.acpPorts, (id) => requireAcp().ports(readSessionId(id)));
+
+    local(LOCAL_CHANNEL.acpPortStop, (id, pid, startedAt, name) => requireAcp().stopPort(readSessionId(id), readPortTarget(pid, startedAt, name)));
 
     local(LOCAL_CHANNEL.acpSession, (id) => requireAcp().snapshot(readSessionId(id)));
 
@@ -867,7 +907,15 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     // The text goes to the clipboard only from this window, built from an allow-list (see diagnostics.ts).
     local(LOCAL_CHANNEL.copyDiagnostics, (deviceId) => {
         const view = requireTransport().settingsGet();
-        const context = { appVersion: app.getVersion(), arch: arch(), electronVersion: process.versions.electron, home: homedir(), now: new Date(), osRelease: release(), platform: platform() };
+        const context = {
+            appVersion: app.getVersion(),
+            arch: arch(),
+            electronVersion: process.versions.electron,
+            home: homedir(),
+            now: new Date(),
+            osRelease: release(),
+            platform: platform(),
+        };
         const text = deviceId === undefined ? deviceDiagnostics(view, context) : serverDiagnostics(view, readDeviceId(deviceId), context);
 
         if (text === null) {
@@ -887,8 +935,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         const id = readDeviceId(deviceId);
         const host = requireTransport()
             .settingsGet()
-            .hosts
-            .find((candidate) => candidate.deviceId === id);
+            .hosts.find((candidate) => candidate.deviceId === id);
 
         if (host === undefined) {
             throw new Error("device: that server is not paired with this computer");

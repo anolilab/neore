@@ -35,7 +35,7 @@ const formatToolName = (name: string): string => {
 
 const TOOL_STATUS_ICONS: Record<AutoContinueToolCall["status"], ReactElement> = {
     complete: <CheckCircle2 aria-hidden="true" className="size-3 text-green-500" />,
-    error: <X aria-hidden="true" className="size-3 text-red-500" />,
+    error: <X aria-hidden="true" className="size-3 text-red-700 dark:text-red-400" />,
     running: <Loader2 aria-hidden="true" className="size-3 animate-spin" />,
 };
 
@@ -74,8 +74,8 @@ const AutoContinueStatus = memo(({ className, onCancel, state }: AutoContinueSta
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Zap aria-hidden="true" className="size-3.5 fill-amber-500 text-amber-500" />
-                    <span className="text-xs font-medium text-amber-700 dark:text-amber-400">{STATUS_LABELS[state.status]}</span>
-                    <span className="text-[11px] text-amber-600/70 dark:text-amber-400/60">
+                    <span className="text-xs font-medium text-amber-800 dark:text-amber-400">{STATUS_LABELS[state.status]}</span>
+                    <span className="text-[11px] text-amber-800 dark:text-amber-400">
                         {t`Iteration`} {state.iteration}/{state.maxIterations}
                         {totalTools > 0 && ` \u{B7} ${completedTools}/${totalTools} tools`}
                     </span>
@@ -86,7 +86,7 @@ const AutoContinueStatus = memo(({ className, onCancel, state }: AutoContinueSta
                         aria-label={t`Cancel deep work`}
                         className={cn(
                             "flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium",
-                            "text-amber-600 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/40",
+                            "text-amber-800 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/40",
                             "focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none",
                             "transition-colors",
                         )}
@@ -103,7 +103,7 @@ const AutoContinueStatus = memo(({ className, onCancel, state }: AutoContinueSta
             {state.toolCalls.length > 0 && (
                 <ul className="mt-1.5 space-y-0.5">
                     {recentToolCalls.map((tool) => (
-                        <li className="flex items-center gap-1.5 text-[11px] text-amber-600/80 dark:text-amber-400/70" key={tool.key}>
+                        <li className="flex items-center gap-1.5 text-[11px] text-amber-800 dark:text-amber-400" key={tool.key}>
                             {TOOL_STATUS_ICONS[tool.status]}
                             <span className="truncate">{formatToolName(tool.toolName)}</span>
                         </li>

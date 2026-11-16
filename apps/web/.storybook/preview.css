@@ -1,0 +1,4 @@
+@import "../src/styles.css";
+
+/* `styles.css` scans `packages/ui` and the app (Vite root); chat-ui's classes come in here. */
+@source "../../../packages/chat-ui/src";

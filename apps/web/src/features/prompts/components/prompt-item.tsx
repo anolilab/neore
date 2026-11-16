@@ -103,7 +103,7 @@ const PromptItem = ({
         return content.split(/(\{\{[a-z_][\w.]*\}\})/gi).map((part, index) => {
             if (VARIABLE_TOKEN_RE.test(part)) {
                 return (
-                    <code className="bg-primary/10 text-primary rounded px-1 text-xs" key={index}>
+                    <code className="bg-primary/10 text-primary-text rounded px-1 text-xs" key={index}>
                         {part}
                     </code>
                 );

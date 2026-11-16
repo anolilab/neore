@@ -31,7 +31,7 @@ const FailureNotice = ({ label, status }: { label: string; status: ReadFailureSt
                 {needsConnection && (
                     <>
                         {" "}
-                        <Link className="text-primary font-medium underline" to="/dashboard/settings/connectors">
+                        <Link className="text-primary-text font-medium underline" to="/dashboard/settings/connectors">
                             {t`Open connectors`}
                         </Link>
                     </>

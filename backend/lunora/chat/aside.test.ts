@@ -10,16 +10,17 @@ import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { internal } from "../_generated/internal";
 import { internalQuery } from "../_generated/server";
 import { MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./lib/model-filter-rules";
 
-const { generateText, getAgent, getUtilityModel, registry, scheduleReplyUsage, sessionFrom, users } = vi.hoisted(() => {
+const { generateText, getAgent, getUtilityModel, registry, runAfterOnShard, sessionFrom, users } = vi.hoisted(() => {
     return {
         generateText: vi.fn(),
         getAgent: vi.fn(),
         getUtilityModel: vi.fn(),
         registry: new Map<string, unknown>(),
-        scheduleReplyUsage: vi.fn(),
+        runAfterOnShard: vi.fn(),
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId
                 ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, plan: null, role: null, userId: context.auth.userId }
@@ -35,8 +36,13 @@ vi.mock("ai", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("ai")>()), generateText };
 });
 
-vi.mock("../usage/schedule", () => {
-    return { scheduleReplyUsage };
+// The real booking, watched: the side question's usage record is booked through it.
+vi.mock("../lib/shard-scheduler", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../lib/shard-scheduler")>();
+
+    runAfterOnShard.mockImplementation(actual.runAfterOnShard);
+
+    return { ...actual, runAfterOnShard };
 });
 
 vi.mock("../lib/utility-model", async (importOriginal) => {
@@ -80,11 +86,14 @@ beforeAll(async () => {
     registerModule(registry, "chat_custom_providers", await import("./custom-providers"));
     registerModule(registry, "chat_aside", await import("./aside"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "usage_activity", await import("../usage/activity"));
     registerModule(registry, "chat_streaming_persistent_library", await import("./streaming/persistent/library"));
 });
 
 // eslint-disable-next-line import/first -- the mocks above must be hoisted before these load
-import { addMessagesHandler } from "../agent/messages";
+import { contextResetRowContent } from "../agent/context-reset-shape";
+// eslint-disable-next-line import/first
+import { addMessagesHandler, getMaxMessage } from "../agent/messages";
 // eslint-disable-next-line import/first
 import { createRatelimit } from "../lib/rate-limiter";
 // eslint-disable-next-line import/first
@@ -231,7 +240,7 @@ afterEach(() => {
     generateText.mockReset();
     getAgent.mockReset();
     getUtilityModel.mockReset();
-    scheduleReplyUsage.mockReset();
+    runAfterOnShard.mockClear();
     delete process.env.STORAGE_SIGNING_SECRET;
 });
 
@@ -249,6 +258,35 @@ describe("askAside", () => {
         expect(call.prompt).toContain("Working on the importer now.");
         expect(call.prompt).toContain("What does idempotent mean?");
         expect(call).not.toHaveProperty("tools");
+    });
+
+    it("sends no turn from before a /clear, only the turns after it", async () => {
+        await harness.run(async (ctx: any) => {
+            const last = await getMaxMessage(ctx, threadId as never);
+
+            await ctx.db.insert("messages", {
+                ...contextResetRowContent(),
+                order: (last?.order ?? 0) + 1,
+                status: "success",
+                stepOrder: 0,
+                threadId,
+                tool: false,
+                userId: OWNER,
+            });
+        });
+        await harness.run(
+            async (ctx: any) =>
+                await addMessagesHandler(ctx, {
+                    messages: [{ message: { content: "a fresh start", role: "user" } }],
+                    threadId,
+                    userId: OWNER,
+                } as never),
+        );
+
+        await ask();
+
+        expect(promptOfCall()).toContain("a fresh start");
+        expect(promptOfCall()).not.toContain("refactor the importer");
     });
 
     it("asks the model the question without tag or bidi characters, and refuses one that was only those", async () => {
@@ -389,11 +427,29 @@ describe("askAside", () => {
         expect(await errorCode(ask())).toBe("INTERNAL");
     });
 
-    it("records an aside on the thread's own model in the usage rollup, once, under its own key", async () => {
+    it("records an aside on the thread's own model once, under its own key, through the thread's shard", async () => {
         await ask();
 
-        expect(scheduleReplyUsage).toHaveBeenCalledOnce();
-        expect(scheduleReplyUsage.mock.calls[0]![1]).toMatchObject({ replyKey: `aside:${lastEntryId()}`, skillKey: "__assistant__", userId: OWNER });
+        expect(runAfterOnShard).toHaveBeenCalledOnce();
+
+        const [, delay, target, args, shard] = runAfterOnShard.mock.calls[0]!;
+
+        expect([delay, target, shard]).toStrictEqual([0, internal.usage.activity.forwardReplyUsage, OWNER]);
+        expect(args).toMatchObject({ replyKey: `aside:${lastEntryId()}`, skillKey: "__assistant__", threadId, userId: OWNER });
+    });
+
+    it("books a collaborator's record on the owner's shard, which reads the project there", async () => {
+        await grantRead();
+        await ask(QUESTION, OTHER);
+
+        expect(generateText).toHaveBeenCalledOnce();
+
+        const call = runAfterOnShard.mock.calls[0]!;
+        const args = call[3];
+
+        expect([call[2], call[4]]).toStrictEqual([internal.usage.activity.forwardReplyUsage, OWNER]);
+        expect(args).not.toHaveProperty("threadAttribution");
+        expect(args).toMatchObject({ threadId, userId: OTHER });
     });
 
     it("records nothing for an aside on the utility model", async () => {
@@ -401,7 +457,7 @@ describe("askAside", () => {
         await ask();
 
         expect(generateText).toHaveBeenCalledOnce();
-        expect(scheduleReplyUsage).not.toHaveBeenCalled();
+        expect(runAfterOnShard).not.toHaveBeenCalled();
     });
 
     it("records nothing for a coding agent's thread", async () => {
@@ -409,7 +465,7 @@ describe("askAside", () => {
         await ask();
 
         expect(generateText).toHaveBeenCalledOnce();
-        expect(scheduleReplyUsage).not.toHaveBeenCalled();
+        expect(runAfterOnShard).not.toHaveBeenCalled();
     });
 
     it("sends only the question to the utility model on a coding agent's thread", async () => {

@@ -2,7 +2,7 @@
 
 ## INVARIANTS
 
-- **Native shell** (`apps/desktop`, Electron 44) loads the deployed app from a
+- **Native shell** (`apps/desktop`, Electron 45) loads the deployed app from a
   BUILD-TIME `NEORE_SITE_URL` and exposes `window.neoreNative` only on that
   origin, through a sandboxed preload; every IPC handler checks the sender's
   origin in the main process. Device execution sits behind `packages/device-core`. The web side is `apps/web/src/lib/native/bridge.ts`,
@@ -50,3 +50,27 @@
   hangs in a sandboxed shell and on a Mac without a usable audio service**, so the e2e feeds audio through the page's own
   preload bridge; `NEORE_E2E_MICROPHONE=1` uses the (fake) microphone, and `NEORE_WHISPER_CLI` / `_MODEL` / `_CLIP` run
   a real recogniser.
+
+- **Agent sign-in** (`apps/desktop/src/acp/sign-in.ts`): Neore keeps no agent credential. The
+  state is the agent's answer to `session/new` on a short-lived connection with no prompt (`AUTH_REQUIRED` = signed out),
+  opened in ONE stable folder per agent under `<userData>/acp-sign-in/`: some agents keep a record per folder, so a fresh
+  folder per check would add one each time. Sign-out is the agent's own `logout`, after its open sessions end. Never
+  sign a real account in or out in a test: Claude keeps its credential in the macOS Keychain, so an empty HOME isolates nothing.
+
+- **Offline cold start** is the SITE's service worker, not the shell: `apps/web/public/offline-shell-sw.js` keeps
+  `/offline-shell` (root route only, rendered for nobody: the root `beforeLoad` never reads the session on that path,
+  `apps/web/src/lib/root-before-load.ts`) per build revision, revalidated every 30 min of online use, and answers an
+  Electron GET navigation the network FAILED with it (a 5xx is passed through), else `offline.html`: never an older
+  revision's shell, whose precached chunks are gone. Only `activate` prunes other revisions. The cached response keeps
+  its own CSP header, whose nonce matches its HTML. It only helps after one online run, and only for route chunks that
+  run loaded (`bundle-assets`). Detection is `Electron/` in the worker's user agent: keep the default user agent. The recovery page stays for a first run.
+
+- **Window look** (`appearance.ts`, `app-menu.ts`, `menu-delivery.ts`; the event order is in their headers): site windows
+  start hidden. Never a bare `show()` on an unrevealed window (`maximize()` shows one on Windows and Linux): reveal through
+  `bringForward`, which applies the saved maximized state. A window closed before its reveal stays hidden until
+  `bringForward`. An unrequested reveal (main window at launch) uses `showInactive`; a window the user opened is shown with
+  `focusOnReveal`. A failed load reveals at the recovery page's `did-finish-load` (`ready-to-show` fires once).
+  Vibrancy needs a fully transparent `backgroundColor`. The live accent event is `accent-color-changed` on Windows and
+  Linux; macOS needs `subscribeNotification("AppleColorPreferencesChangedNotification")`. The pre-paint fill follows
+  `<userData>/appearance.json`. Menu commands wait for the page's `menu-commands-ready` (per document); 2 s after a load
+  without it, New Chat opens a NEW site window and the rest is dropped. ⌘N is `registerAccelerator: false`: the site binds it.

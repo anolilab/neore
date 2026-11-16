@@ -1,0 +1,24 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Introduction" />
+
+# Neore Storybook
+
+Every component and page of the web app, `packages/ui` and `packages/chat-ui`, in the states it can be in, on fake data.
+
+## Toolbar
+
+- **Theme**, **Accent** and **Direction** set `class="dark"`, `data-accent` and `dir` on `<html>`, as the app does.
+- **Locale** switches the Lingui catalog (all nine languages).
+- **Persona** decides who is signed in: pro, free, guest, admin, organization member, or nobody. A story can fix it with `parameters.persona`.
+- **Viewport** has phone, tablet and desktop sizes.
+
+## Where the data comes from
+
+Nothing in the app is stubbed for a story. The backend, the gateway and better-auth are answered by MSW, from fixtures typed against the generated Lunora API, so a fixture that has drifted from the backend fails the type check. The clock is pinned to 5 November 2026, 12:00 UTC.
+
+The rules for writing stories, fixtures and page stories are in `apps/web/src/storybook/AGENTS.md`.
+
+## Accessibility
+
+Every story is checked by axe in CI, in light, dark with the violet accent, on a phone, and right to left. A story that cannot pass yet is marked `todo` in its file, with the reason, and shows the violations in the Accessibility panel.

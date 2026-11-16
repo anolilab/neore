@@ -8,6 +8,7 @@ import cn from "@neore/ui/utils/cn";
 import type { SettingsCardClassNames } from "@/components/settings/settings-card";
 import SettingsCard from "@/components/settings/settings-card";
 import { useListAccounts } from "@/features/auth/hooks/account-management";
+import useCredentialChangeBlock from "@/features/auth/hooks/use-credential-change-block";
 import useSignInMethods from "@/features/auth/hooks/use-sign-in-methods";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
@@ -29,6 +30,8 @@ const ProvidersCardContent = ({ accounts, className, classNames, isPending, refe
     const { genericOAuth } = useAuth();
     const { findProvider, socialProviders } = useSignInMethods();
     const { t } = useLingui();
+    // Linking is refused while an admin acts as this account; unlinking adds nothing and stays.
+    const credentialBlock = useCredentialChangeBlock();
 
     return (
         <SettingsCard
@@ -55,6 +58,8 @@ const ProvidersCardContent = ({ accounts, className, classNames, isPending, refe
                     ))
                 ) : (
                     <>
+                        {credentialBlock.reason && <p className="text-muted-foreground text-sm">{credentialBlock.reason}</p>}
+
                         {socialProviders.map((provider) => {
                             const socialProvider = findProvider(provider);
 
@@ -67,6 +72,7 @@ const ProvidersCardContent = ({ accounts, className, classNames, isPending, refe
                                     account={accounts?.find((accumulator) => accumulator.providerId === provider)}
                                     classNames={classNames}
                                     key={provider}
+                                    linkDisabled={credentialBlock.blocked}
                                     provider={socialProvider}
                                     refetch={refetch}
                                 />
@@ -78,6 +84,7 @@ const ProvidersCardContent = ({ accounts, className, classNames, isPending, refe
                                 account={accounts?.find((accumulator) => accumulator.providerId === provider.provider)}
                                 classNames={classNames}
                                 key={provider.provider}
+                                linkDisabled={credentialBlock.blocked}
                                 other
                                 provider={provider}
                                 refetch={refetch}

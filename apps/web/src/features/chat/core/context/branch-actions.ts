@@ -9,7 +9,7 @@ import { trackEvent } from "@/lib/analytics";
 import { fetchWithDeadline } from "../lib/fetch-with-deadline";
 import { useModelStore } from "../stores/model-store";
 import type { ChangedSettings, ChatActionBase } from "./chat-action-shared";
-import { localModelError, unhiding, withoutMessage } from "./chat-action-shared";
+import { afterLastContextReset, localModelError, unhiding, withoutMessage } from "./chat-action-shared";
 import type { ThreadData, ThreadRow } from "./chat-context-types";
 import type { GatewayErrorBody, GatewayInfo } from "./chat-gateway";
 import { CHAT_EDIT_URL, CHAT_STREAM_URL, gatewayError, validateGatewayUrl } from "./chat-gateway";
@@ -117,7 +117,7 @@ export const runReloadMessage = async (env: ReloadMessageEnv, messageId: string)
     if (localTarget) {
         await sendLocalTurn({
             branch: { kind: "regenerate", messageId: userMessage.id },
-            history: currentMessages.slice(0, userMessageIndex),
+            history: afterLastContextReset(currentMessages.slice(0, userMessageIndex)),
             onNotSaved: (message) => {
                 setHiddenMessageIds(unhiding(messagesToHide));
 
@@ -302,7 +302,7 @@ export const runEditMessage = async (env: EditMessageEnv, messageId: string, raw
 
         await sendLocalTurn({
             branch: { kind: "edit", messageId },
-            history: currentMessages.slice(0, messageIndex),
+            history: afterLastContextReset(currentMessages.slice(0, messageIndex)),
             onNotSaved: (notSaved) => {
                 setOptimisticMessages(withoutMessage(optimisticId));
                 setHiddenMessageIds(unhiding(messagesToHide));

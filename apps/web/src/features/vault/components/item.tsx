@@ -68,7 +68,7 @@ const VaultItem = ({ data, small }: Properties) => {
             </div>
 
             <div className="mt-auto flex flex-col gap-1">
-                <h2 className="text-primary line-clamp-1 text-sm">{data.fileName}</h2>
+                <h2 className="text-primary-text line-clamp-1 text-sm">{data.fileName}</h2>
                 <p className="text-muted-foreground text-xs">{formatFileSize(data.fileSize)}</p>
             </div>
         </div>

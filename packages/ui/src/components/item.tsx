@@ -10,7 +10,6 @@ const ItemGroup = ({ className, ...props }: React.ComponentProps<"div">) => (
     <div
         className={cn("group/item-group flex w-full flex-col gap-4 has-[[data-size=sm]]:gap-2.5 has-[[data-size=xs]]:gap-2", className)}
         data-slot="item-group"
-        role="list"
         {...props}
     />
 );
@@ -100,7 +99,7 @@ const ItemTitle = ({ className, ...props }: React.ComponentProps<"div">) => (
 const ItemDescription = ({ className, ...props }: React.ComponentProps<"p">) => (
     <p
         className={cn(
-            "text-muted-foreground [&>a:hover]:text-primary line-clamp-2 text-left text-xs/relaxed font-normal [&>a]:underline [&>a]:underline-offset-4",
+            "text-muted-foreground [&>a:hover]:text-primary-text line-clamp-2 text-left text-xs/relaxed font-normal [&>a]:underline [&>a]:underline-offset-4",
             className,
         )}
         data-slot="item-description"

@@ -173,6 +173,28 @@ describe("getHomeOverview", () => {
         expect(tasks.join("\n")).not.toContain("Child task");
     });
 
+    it("lists a sub-agent waiting on its owner's approval among the runs that go", async () => {
+        await harness.run(async (ctx: any) => {
+            const now = Date.now();
+            const threadId = await ctx.db.insert("threads", { status: "regular", title: "Lead", userId: USER });
+
+            await ctx.db.insert("subAgentRuns", {
+                createdAt: now,
+                depth: 1,
+                parentThreadId: threadId,
+                reapAt: now + 60_000,
+                status: "awaiting",
+                task: "Delete the old files",
+                updatedAt: now,
+                userId: USER,
+            });
+        });
+
+        const result = await overview(USER);
+
+        expect(result.subAgents).toContainEqual(expect.objectContaining({ status: "awaiting", task: "Delete the old files" }));
+    });
+
     it("shows nothing of another user's", async () => {
         await seed(OTHER);
 
