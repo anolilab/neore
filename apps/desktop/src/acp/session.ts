@@ -647,8 +647,9 @@ export class AgentSession {
 
         if (isAvailable(capabilityOf(this.report, "sessions.load"))) {
             try {
-                // What the agent sent while it loaded is older than its answer: the answer's fields win.
-                this.offered = { ...this.offered, ...optionsOf(await loadSession(this.connection, resumeSessionId, folder), this.options.process.scrub) };
+                // The answer is the agent's current state. What it sent while the session loaded is the history it replayed, so it
+                // is not carried over: an option the answer does not name is not offered.
+                this.offered = optionsOf(await loadSession(this.connection, resumeSessionId, folder), this.options.process.scrub);
                 this.reattach = { loaded: true };
 
                 return resumeSessionId;

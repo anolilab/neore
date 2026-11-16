@@ -342,6 +342,14 @@ const handle = async (message) => {
         }
         update(state.sessionId, { sessionUpdate: "tool_call", toolCallId: "h1", title: "Read", kind: "read", status: "completed" });
 
+        // FAKE_AGENT_LOAD_REPLAYS_OPTIONS=1: the history replays a model option the answer below does not name.
+        if (process.env.FAKE_AGENT_LOAD_REPLAYS_OPTIONS === "1") {
+            update(state.sessionId, {
+                sessionUpdate: "config_option_update",
+                configOptions: [{ category: "model", currentValue: "fast", id: "model", name: "Model", options: [{ name: "Fast", value: "fast" }], type: "select" }],
+            });
+        }
+
         return send({ id: message.id, result: {} });
     }
 
