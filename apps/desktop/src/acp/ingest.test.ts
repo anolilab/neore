@@ -1773,6 +1773,24 @@ describe("what the agent reports about itself", () => {
         expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ configOptions: [option], usage: usage(12) });
     });
 
+    it("sends held options when the next usage repeats a value from a refused report, since the backend never stored that refused value", async () => {
+        const host = poster();
+        const option = { category: "model", choices: [{ name: "Fast", value: "fast" }], currentValue: "fast", id: "model", name: "Model" };
+
+        await open(host);
+        backend.failNext.push(400);
+        host.sessionState("s1", { configOptions: [option], usage: usage(10) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(1);
+
+        // The same usage as the refused report: the backend does not hold it, so this report is not a repeat and goes out with the options.
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(2);
+        expect(statePosts()[1]?.post.events[0]).toMatchObject({ configOptions: [option], usage: usage(10) });
+    });
+
     it("does not keep the options a second refusal refuses, so they cannot hold back the usage after them", async () => {
         const host = poster();
         const option = { category: "model", choices: [{ name: "Fast", value: "fast" }], currentValue: "fast", id: "model", name: "Model" };

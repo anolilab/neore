@@ -598,8 +598,15 @@ export class HostPoster implements SessionObserver {
         return sent !== undefined && values.size > 0 && [...values].every(([key, value]) => sent.get(key) === value);
     }
 
-    /** Records the values a post carried as the ones the backend now holds for this session. */
-    private rememberSent(sessionId: string, report: PendingState): void {
+    /**
+     * Records the values a post carried as the ones the backend now holds for this session. Only an accepted post stores them: a
+     * refused one leaves them unrecorded, so a later report repeating them is sent.
+     */
+    private rememberSent(sessionId: string, report: PendingState, result: PostResult): void {
+        if (result.kind !== "ok") {
+            return;
+        }
+
         const sent = this.sentValues.get(sessionId) ?? new Map<string, string>();
 
         for (const [key, value] of valuesOf(report)) {
@@ -816,8 +823,8 @@ export class HostPoster implements SessionObserver {
             } else {
                 this.stateRetryAt.delete(sessionId);
                 this.stateAttempts.delete(sessionId);
-                this.rememberSent(sessionId, pending);
 
+                this.rememberSent(sessionId, pending, result);
                 this.settleOptionsOf(sessionId, result, pending);
             }
         } finally {
