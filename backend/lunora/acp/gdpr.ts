@@ -117,8 +117,17 @@ const vExportCursor = v.object({
 type ExportCursor = Infer<typeof vExportCursor>;
 
 /** Sessions are paged in creation order, the id breaking a tie in the creation time, so the key of a session is total. */
-const compareSessionKeys = (a: { _creationTime: number; _id: string }, b: { _creationTime: number; _id: string }): number =>
-    a._creationTime - b._creationTime || (a._id < b._id ? -1 : a._id > b._id ? 1 : 0);
+const compareSessionKeys = (a: { _creationTime: number; _id: string }, b: { _creationTime: number; _id: string }): number => {
+    if (a._creationTime !== b._creationTime) {
+        return a._creationTime - b._creationTime;
+    }
+
+    if (a._id === b._id) {
+        return 0;
+    }
+
+    return a._id < b._id ? -1 : 1;
+};
 
 /** Whether a session comes after the key (creation time, then id) of the last one exported. */
 const isAfterKey = (row: { _creationTime: number; _id: string }, at: number, id: string): boolean =>
