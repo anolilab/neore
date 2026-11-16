@@ -232,6 +232,7 @@ const endTurn = async (lastEndReason = "finished") => {
     harness.data = {
         ...harness.data,
         "acp.functions.getHostSession": {
+            _id: "session-1",
             lastEndedReason: lastEndReason,
             lastEndReason,
             lastEndStreamId: running?.streamId ?? `ended-${harness.calls.length}-${Math.random().toString(36).slice(2)}`,
@@ -249,7 +250,7 @@ const session = (fields: Record<string, unknown> = {}) => {
             ? { lastEndedReason: fields.lastEndReason, lastEndStreamId: "stream-before" }
             : {};
 
-    return { "acp.functions.getHostSession": { status: "idle", ...ended, ...fields } };
+    return { "acp.functions.getHostSession": { _id: "session-1", status: "idle", ...ended, ...fields } };
 };
 
 beforeEach(() => {
@@ -753,7 +754,13 @@ describe("the coding-agent composer", () => {
         // The turn fails while the stop is still in flight, and only then does the stop answer that no turn was live.
         harness.data = {
             ...harness.data,
-            "acp.functions.getHostSession": { lastEndReason: "failed", lastEndedReason: "failed", lastEndStreamId: "stream-1", status: "idle" },
+            "acp.functions.getHostSession": {
+                _id: "session-1",
+                lastEndReason: "failed",
+                lastEndedReason: "failed",
+                lastEndStreamId: "stream-1",
+                status: "idle",
+            },
             "chat.streaming.getActiveStreamForThread": null,
         };
         await harness.client?.invalidateQueries();
@@ -1062,7 +1069,7 @@ describe("the coding-agent composer", () => {
 
         harness.gate = promise;
         harness.hold = ["acp.functions.getHostSession", "chat.streaming.getActiveStreamForThread"];
-        mount({ "acp.functions.getHostSession": { status: "idle" }, "chat.streaming.getActiveStreamForThread": null });
+        mount({ "acp.functions.getHostSession": { _id: "session-1", status: "idle" }, "chat.streaming.getActiveStreamForThread": null });
 
         expect(await screen.findByText("waiting")).toBeTruthy();
         expect(sendCalls()).toHaveLength(0);
@@ -1244,11 +1251,7 @@ describe("the coding-agent composer", () => {
         // The failed turn ended and a replacement turn is running: the session's last reason is the replacement's, not the failure.
         harness.data = {
             ...harness.data,
-            "acp.functions.getHostSession": {
-                lastEndedReason: "failed",
-                lastEndStreamId: "stream-9",
-                status: "busy",
-            },
+            "acp.functions.getHostSession": { _id: "session-1", lastEndedReason: "failed", lastEndStreamId: "stream-9", status: "busy" },
             "chat.streaming.getActiveStreamForThread": { streamId: "stream-2" },
         };
         await harness.client?.invalidateQueries();
@@ -1360,7 +1363,7 @@ describe("the coding-agent composer", () => {
         harness.gate = promise;
         harness.hold = ["acp.functions.getHostSession"];
         mount({
-            "acp.functions.getHostSession": { lastEndReason: "failed", status: "starting" },
+            "acp.functions.getHostSession": { _id: "session-1", lastEndReason: "failed", status: "starting" },
             "chat.streaming.getActiveStreamForThread": null,
         });
 
@@ -1369,7 +1372,7 @@ describe("the coding-agent composer", () => {
         release();
         await waitFor(() => expect(usePromptQueueStore.getState().queues["thread-1"]?.items).toHaveLength(1));
 
-        harness.data = { ...harness.data, "acp.functions.getHostSession": { lastEndReason: "failed", status: "idle" } };
+        harness.data = { ...harness.data, "acp.functions.getHostSession": { _id: "session-1", lastEndReason: "failed", status: "idle" } };
         await harness.client?.invalidateQueries();
 
         await waitFor(() => expect(sendCalls()).toHaveLength(1));
@@ -1480,7 +1483,13 @@ describe("the coding-agent composer", () => {
         // The turn started and failed without the composer ever seeing it running: only the end stream changed.
         harness.data = {
             ...harness.data,
-            "acp.functions.getHostSession": { lastEndReason: "failed", lastEndedReason: "failed", lastEndStreamId: "stream-1", status: "idle" },
+            "acp.functions.getHostSession": {
+                _id: "session-1",
+                lastEndReason: "failed",
+                lastEndedReason: "failed",
+                lastEndStreamId: "stream-1",
+                status: "idle",
+            },
             "chat.streaming.getActiveStreamForThread": null,
         };
         await harness.client?.invalidateQueries();
@@ -1719,7 +1728,7 @@ describe("the coding-agent composer", () => {
         // A newer turn starts first; the session reports no reason while it runs.
         harness.data = {
             ...harness.data,
-            "acp.functions.getHostSession": { status: "busy" },
+            "acp.functions.getHostSession": { _id: "session-1", status: "busy" },
             "chat.streaming.getActiveStreamForThread": { streamId: "stream-2" },
         };
         await harness.client?.invalidateQueries();
@@ -1748,7 +1757,13 @@ describe("the coding-agent composer", () => {
         // The stream clears and the session reports this composer's own stop, with its new end stream, in one update.
         harness.data = {
             ...harness.data,
-            "acp.functions.getHostSession": { lastEndedReason: "stopped", lastEndReason: "stopped", lastEndStreamId: "stream-1", status: "idle" },
+            "acp.functions.getHostSession": {
+                _id: "session-1",
+                lastEndedReason: "stopped",
+                lastEndReason: "stopped",
+                lastEndStreamId: "stream-1",
+                status: "idle",
+            },
             "chat.streaming.getActiveStreamForThread": null,
         };
         await harness.client?.invalidateQueries();
@@ -1810,7 +1825,13 @@ describe("the coding-agent composer", () => {
             harness.onSend = undefined;
             harness.data = {
                 ...harness.data,
-                "acp.functions.getHostSession": { lastEndedReason: "stopped", lastEndReason: "stopped", lastEndStreamId: "stream-2", status: "idle" },
+                "acp.functions.getHostSession": {
+                    _id: "session-1",
+                    lastEndedReason: "stopped",
+                    lastEndReason: "stopped",
+                    lastEndStreamId: "stream-2",
+                    status: "idle",
+                },
             };
         };
         await endTurn("stopped");
@@ -1835,7 +1856,7 @@ describe("the coding-agent composer", () => {
         expect(await screen.findByText("next turn")).toBeTruthy();
 
         // Mid-turn the session moves on and reports no reason, so the reason the turn started under is stale.
-        harness.data = { ...harness.data, "acp.functions.getHostSession": { status: "idle" } };
+        harness.data = { ...harness.data, "acp.functions.getHostSession": { _id: "session-1", status: "idle" } };
         await harness.client?.invalidateQueries();
         // Let React render the session's new state before the turn ends, so the intermediate reason is seen.
         await new Promise((resolve) => {
@@ -1909,7 +1930,13 @@ describe("the coding-agent composer", () => {
         // The session reports stream-1's end; the stream read lags and still names it.
         harness.data = {
             ...harness.data,
-            "acp.functions.getHostSession": { lastEndedReason: "finished", lastEndReason: "finished", lastEndStreamId: "stream-1", status: "idle" },
+            "acp.functions.getHostSession": {
+                _id: "session-1",
+                lastEndedReason: "finished",
+                lastEndReason: "finished",
+                lastEndStreamId: "stream-1",
+                status: "idle",
+            },
         };
         await harness.client?.invalidateQueries({ queryKey: ["acp.functions.getHostSession"] });
 
@@ -2327,7 +2354,7 @@ describe("the options the agent offers", () => {
         await pickOption(user, model, "deep");
 
         await waitFor(() => expect(mutations()).toHaveLength(1));
-        expect(mutations()[0]?.[1]).toEqual({ optionId: "model", threadId: "thread-1", valueId: "deep" });
+        expect(mutations()[0]?.[1]).toEqual({ optionId: "model", sessionId: "session-1", threadId: "thread-1", valueId: "deep" });
         await waitFor(() => expect(model.disabled).toBe(true));
         expect((screen.getByLabelText("Reasoning effort") as unknown as HTMLSelectElement).disabled).toBe(true);
         expectShown(screen.getByText("Waiting for the agent to change Model to Deep."));
@@ -2345,6 +2372,7 @@ describe("the options the agent offers", () => {
         harness.data = {
             ...harness.data,
             "acp.functions.getHostSession": {
+                _id: "session-1",
                 agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
                 optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
                 status: "idle",
@@ -2370,6 +2398,7 @@ describe("the options the agent offers", () => {
         harness.data = {
             ...harness.data,
             "acp.functions.getHostSession": {
+                _id: "session-1",
                 agentState: { configOptions: [MODEL] },
                 optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
                 status: "idle",
@@ -2384,6 +2413,7 @@ describe("the options the agent offers", () => {
         harness.data = {
             ...harness.data,
             "acp.functions.getHostSession": {
+                _id: "session-1",
                 agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
                 optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
                 status: "idle",
@@ -2408,6 +2438,7 @@ describe("the options the agent offers", () => {
         harness.data = {
             ...harness.data,
             "acp.functions.getHostSession": {
+                _id: "session-1",
                 agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
                 optionResult: { callId: "call-1", optionId: "model", outcome: "refused", reason: "the agent did not answer", valueId: "deep" },
                 status: "idle",
@@ -2436,6 +2467,7 @@ describe("the options the agent offers", () => {
             harness.data = {
                 ...harness.data,
                 "acp.functions.getHostSession": {
+                    _id: "session-1",
                     agentState: { configOptions: [MODEL] },
                     optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
                     status: "idle",
@@ -2472,6 +2504,7 @@ describe("the options the agent offers", () => {
         harness.data = {
             ...harness.data,
             "acp.functions.getHostSession": {
+                _id: "session-1",
                 agentState: { configOptions: [MODEL] },
                 optionResult: { callId: "call-1", optionId: "model", outcome: "refused", reason: "the agent did not accept the change", valueId: "deep" },
                 status: "idle",

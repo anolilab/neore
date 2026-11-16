@@ -35,6 +35,26 @@ describe("dropAgentOptionFields", () => {
         expect(migrated).not.toHaveProperty("agentOptions");
     });
 
+    it("fills the options a usage-only agent state lacks from the legacy fields, and keeps the fields the state reports, empty lists included", () => {
+        const migrated = up({
+            _id: "s4",
+            agentOptions: { configOptions: [option], modes: { available: [{ name: "Ask", value: "ask" }], current: "ask" } },
+            agentOptionsAt: 1,
+            agentState: { usage: { size: 100, used: 10 } },
+            agentStateAt: 9,
+            threadId: "t4",
+        });
+
+        expect(migrated).toMatchObject({
+            agentState: { configOptions: [option], modes: { available: [{ id: "ask", name: "Ask" }], current: "ask" }, usage: { size: 100, used: 10 } },
+            agentStateAt: 9,
+        });
+
+        const reported = up({ _id: "s5", agentOptions: { configOptions: [option] }, agentState: { configOptions: [] }, threadId: "t5" });
+
+        expect(reported).toMatchObject({ agentState: { configOptions: [] } });
+    });
+
     it("leaves a row without legacy options as it is, apart from the fields the schema no longer declares", () => {
         expect(up({ _id: "s3", threadId: "t3" })).toEqual({ _id: "s3", threadId: "t3" });
     });

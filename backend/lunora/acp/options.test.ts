@@ -146,8 +146,12 @@ const readySession = async (state: Row) => {
     return { device, threadId: opened.threadId as string };
 };
 
-const setOption = async (threadId: string, args: { optionId?: string; valueId: string }, userId = ownerId) =>
-    await as(userId).mutation(remote.setHostOption as never, { threadId, ...args } as never);
+/** The thread's current session row, as the web names it: a change is made against the session the person saw. */
+const setOption = async (threadId: string, args: { optionId?: string; sessionId?: string; valueId: string }, userId = ownerId) => {
+    const [session] = await rows("acpSessions", { threadId });
+
+    return await as(userId).mutation(remote.setHostOption as never, { sessionId: String(session?._id), threadId, ...args } as never);
+};
 
 const complete = async (device: Device, callId: string, fields: Record<string, unknown> = {}) => {
     await as(ownerId).mutation(devices.claimDeviceCall as never, { callId, deviceId: device.deviceId } as never);
@@ -191,6 +195,16 @@ describe("setHostOption", () => {
         expect(call?._id).toBe(result.callId);
         expect(envelope).toMatchObject({ deviceId: device.deviceId, tool: "acp_set_config" });
         expect(envelope.input).toEqual({ optionId: "model", sessionId: "host-s1", valueId: "deep" });
+    });
+
+    it("refuses a change made against a session the thread no longer has, and queues nothing", async () => {
+        const { threadId } = await readySession({ configOptions: [MODEL] });
+
+        await expect(setOption(threadId, { optionId: "model", sessionId: "replaced-session", valueId: "deep" })).resolves.toMatchObject({
+            reason: "ended",
+            sent: false,
+        });
+        expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(0);
     });
 
     it("refuses an option or a value the agent did not list, and queues nothing", async () => {

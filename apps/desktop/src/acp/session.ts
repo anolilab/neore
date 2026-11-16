@@ -230,12 +230,13 @@ export class AgentSession {
     private offered: RawOptions = {};
 
     /**
-     * Bumped whenever the agent sends its own list of options (`configOptions`) or of modes, so an answer older than that list does
-     * not replace it. The two are counted apart: a mode update says nothing about a model answer, and must not refuse it.
+     * The count of observed changes so far, and the count at which each option (or the legacy mode state) last changed. A change
+     * request is superseded only by a change of its own option, so an unrelated update does not refuse its answer, and an answer
+     * does not put back a value another option has since changed.
      */
-    private configVersion = 0;
+    private observed = 0;
 
-    private modeVersion = 0;
+    private readonly changedAt = new Map<string, number>();
 
     /** Counts the changes asked for, by option (the legacy mode state is one): a late answer to an earlier change of an option does not replace a later one of it. */
     private readonly optionRequests = new Map<string, number>();
@@ -387,7 +388,7 @@ export class AgentSession {
         }
 
         let answer: unknown;
-        const versionAtRequest = this.versionOf(optionId);
+        const since = this.observed;
 
         const key = optionId === undefined ? "mode" : `option:${optionId}`;
         const request = (this.optionRequests.get(key) ?? 0) + 1;
@@ -399,11 +400,11 @@ export class AgentSession {
         const onLate = (late: unknown): void => {
             // An answer older than a list the agent has sent since, or than a later change of this option, is not applied: that is what is
             // true now.
-            if (this.status === "ended" || this.versionOf(optionId) !== versionAtRequest || request !== this.optionRequests.get(key)) {
+            if (this.status === "ended" || this.changedSince(key, since) || request !== this.optionRequests.get(key)) {
                 return;
             }
 
-            this.applyOptionAnswer(optionId, valueId, late);
+            this.applyOptionAnswer(optionId, valueId, late, since);
             this.reportOptions();
         };
 
@@ -423,9 +424,9 @@ export class AgentSession {
             throw new Error("the agent did not apply the change");
         }
 
-        // The agent sent its own list while this was outstanding, and that list is newer than the answer: it stands. It must show the
-        // value asked for, or the change was not made.
-        if (this.versionOf(optionId) !== versionAtRequest) {
+        // The agent sent its own value for this option while the change was outstanding, and that value is newer than the answer: it
+        // stands. It must show the value asked for, or the change was not made.
+        if (this.changedSince(key, since)) {
             this.reportOptions();
 
             if (!this.showsValue(optionId, valueId)) {
@@ -436,7 +437,7 @@ export class AgentSession {
         }
 
         // The agent's list is what is true now; if it still shows another value, the change was not made.
-        if (!this.applyOptionAnswer(optionId, valueId, answer)) {
+        if (!this.applyOptionAnswer(optionId, valueId, answer, since)) {
             this.reportOptions();
 
             throw new Error("the agent did not apply the change");
@@ -594,13 +595,37 @@ export class AgentSession {
         };
     }
 
-    /** The version of the list a change to `optionId` is answered against: the modes for the legacy mode state, else the options. */
-    private versionOf(optionId: string | undefined): number {
-        return optionId === undefined ? this.modeVersion : this.configVersion;
+    /** Whether the option (`key`) changed after the count `since`, which a change request took when it was asked for. */
+    private changedSince(key: string, since: number): boolean {
+        return (this.changedAt.get(key) ?? 0) > since;
     }
 
-    /** Applies the agent's answer to a change to what the session offers. False when the answer still shows another value. */
-    private applyOptionAnswer(optionId: string | undefined, valueId: string, answer: unknown): boolean {
+    /** Counts a change of the option (`key`), so a request asked for before it knows it was superseded. */
+    private markChanged(key: string): void {
+        this.observed += 1;
+        this.changedAt.set(key, this.observed);
+    }
+
+    /** Counts a change for each option whose value differs between two lists, an option added or removed included. */
+    private markConfigChanges(previous: AgentOption[] | undefined, next: AgentOption[] | undefined): void {
+        const before = new Map((previous ?? []).map((option) => [option.id, option.currentValue]));
+        const after = new Map((next ?? []).map((option) => [option.id, option.currentValue]));
+
+        const ids = new Set([...before.keys(), ...after.keys()]);
+
+        for (const id of ids) {
+            if (before.get(id) !== after.get(id)) {
+                this.markChanged(`option:${id}`);
+            }
+        }
+    }
+
+    /**
+     * Applies the agent's answer to a change to what the session offers. False when the answer still shows another value. The answer
+     * lists every option, but a value another option changed after `since` is newer than the answer's copy of it (a late answer can
+     * arrive after the agent's own update), so that value stays.
+     */
+    private applyOptionAnswer(optionId: string | undefined, valueId: string, answer: unknown, since: number): boolean {
         if (optionId === undefined) {
             this.offered = withCurrentMode(this.offered, valueId, this.options.process.scrub);
 
@@ -616,7 +641,21 @@ export class AgentSession {
             return false;
         }
 
-        this.offered = listed === undefined ? withOptionValue(this.offered, optionId, valueId) : { ...this.offered, configOptions: listed };
+        const previous = this.offered.configOptions;
+        // The requested option takes the answer. Another option that changed after the request was asked for keeps its newer value.
+        const fresher = (option: AgentOption): AgentOption => {
+            const current = previous?.find((entry) => entry.id === option.id);
+
+            if (current === undefined || option.id === optionId || !this.changedSince(`option:${option.id}`, since)) {
+                return option;
+            }
+
+            return current;
+        };
+        const next = listed === undefined ? withOptionValue(this.offered, optionId, valueId).configOptions : listed.map((option) => fresher(option));
+
+        this.markConfigChanges(previous, next);
+        this.offered = { ...this.offered, ...next !== undefined && { configOptions: next } };
 
         return listed === undefined || listed.find((option) => option.id === optionId)?.currentValue === valueId;
     }
@@ -723,7 +762,10 @@ export class AgentSession {
         } else if (read.kind === "mode") {
             this.offered = withCurrentMode(this.offered, read.modeId, this.options.process.scrub);
         } else {
-            this.startupUsage = { sessionId, update: { sessionUpdate: "usage_update", ...read.usage } };
+            // The cost is cumulative: a report that leaves it out keeps the cost the buffered report carried, as `retainStartupRead` does.
+            const cost: unknown = read.usage.cost ?? this.startupUsage?.update.cost;
+
+            this.startupUsage = { sessionId, update: { sessionUpdate: "usage_update", ...read.usage, ...(cost !== undefined && { cost }) } };
         }
     }
 
@@ -1173,8 +1215,8 @@ export class AgentSession {
                 const configOptions = configOptionsOf(update.configOptions, this.options.process.scrub);
 
                 if (configOptions !== undefined) {
+                    this.markConfigChanges(this.offered.configOptions, configOptions);
                     this.offered = { ...this.offered, configOptions };
-                    this.configVersion += 1;
                     this.reportOptions();
                 }
 
@@ -1186,7 +1228,7 @@ export class AgentSession {
                 // A mode id the agent did not name validly changes nothing, so it does not supersede a change in flight.
                 if (offered !== this.offered) {
                     this.offered = offered;
-                    this.modeVersion += 1;
+                    this.markChanged("mode");
                     this.reportOptions();
                 }
 

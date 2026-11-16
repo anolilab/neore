@@ -124,9 +124,10 @@ const rowsOf = (state: HostAgentState | undefined, labels: { mode: string; model
 
 const nameOfValue = (row: Row | undefined, value: string): string => row?.choices.find((choice) => choice.value === value)?.name ?? value;
 
-const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: HostAgentState; threadId: string }> = ({
+const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; sessionId: string; state?: HostAgentState; threadId: string }> = ({
     ended,
     optionResult,
+    sessionId,
     state,
     threadId,
 }) => {
@@ -247,8 +248,9 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
 
         setFailure(undefined);
         setChange({ name: row.name, rowId: row.id, valueId, valueName: nameOfValue(row, valueId) });
+        // The session the person chose against: a change queued offline is refused if a newer session has replaced it by the time it runs.
         set.mutate(
-            { threadId: threadId as Id<"threads">, valueId, ...(row.optionId !== undefined && { optionId: row.optionId }) },
+            { sessionId, threadId: threadId as Id<"threads">, valueId, ...(row.optionId !== undefined && { optionId: row.optionId }) },
             {
                 onError: () => {
                     setFailure(t`Could not send the change.`);

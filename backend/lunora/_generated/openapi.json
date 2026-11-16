@@ -5951,6 +5951,9 @@
                       "optionId": {
                         "type": "string"
                       },
+                      "sessionId": {
+                        "type": "string"
+                      },
                       "threadId": {
                         "description": "Id<\"threads\">",
                         "type": "string",
@@ -5961,6 +5964,7 @@
                       }
                     },
                     "required": [
+                      "sessionId",
                       "threadId",
                       "valueId"
                     ],

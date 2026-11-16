@@ -196,8 +196,9 @@ describe("setOption", () => {
 
         // The current mode again, and a mode the agent does not list: neither is a change, so neither is reported.
         await player.play(steps.slice(1, 3));
+        // The in-memory stream hands the updates over within this turn of the event loop, so after it none is still in flight.
         await new Promise<void>((resolve) => {
-            setTimeout(resolve, 20);
+            setImmediate(resolve);
         });
         expect(states).toHaveLength(reported);
 
@@ -223,6 +224,29 @@ describe("setOption", () => {
 
         // The newer change stands: the older answer, which came last, did not put its value back.
         expect(states.at(-1)?.configOptions?.find((option) => option.id === "model")?.currentValue).toBe("mid");
+    });
+
+    it("confirms a change the agent answers when an update changed another option, not this one, while it was in flight", async () => {
+        const { player, session, states, steps } = await start("options-other-update-during-change");
+        const change = session.setOption("model", "deep");
+
+        await player.play(steps);
+        await expect(change).resolves.toBeUndefined();
+        expect(states.at(-1)?.configOptions?.find((option) => option.id === "model")?.currentValue).toBe("deep");
+        expect(states.at(-1)?.configOptions?.find((option) => option.id === "effort")?.currentValue).toBe("high");
+    });
+
+    it("does not put back a value another option's newer answer confirmed, when a late answer for a different option arrives after it", async () => {
+        const { player, session, states, steps } = await start("options-answers-of-two-options");
+        const model = session.setOption("model", "deep");
+        const effort = session.setOption("effort", "high");
+
+        await player.play(steps);
+        await expect(effort).resolves.toBeUndefined();
+        await expect(model).resolves.toBeUndefined();
+
+        expect(states.at(-1)?.configOptions?.find((option) => option.id === "model")?.currentValue).toBe("deep");
+        expect(states.at(-1)?.configOptions?.find((option) => option.id === "effort")?.currentValue).toBe("high");
     });
 
     it("sends nothing for a value the agent did not offer", async () => {
@@ -291,5 +315,33 @@ describe("what the agent sends while the session opens, and what it takes away",
         await player.play(steps);
         await expect.poll(() => states.length).toBe(2);
         expect(states.at(-1)).toEqual({ configOptions: [] });
+    });
+});
+
+describe("the usage an agent reports while a saved session loads", () => {
+    it("keeps the cost an earlier report carried when a later report leaves it out", async () => {
+        const agent = memoryAgent();
+        const states: SessionStatePatch[] = [];
+        const observer = {
+            sessionState: (_id: string, patch: SessionStatePatch) => {
+                states.push(patch);
+            },
+        } as SessionObserver;
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer,
+            onChange: () => {},
+            process: agent.process,
+            resumeSessionId: "sess_1",
+        });
+
+        await Promise.all([session.start(), transcriptPlayer(agent).play(readTranscript("usage-during-load"))]);
+
+        expect(states.at(-1)?.usage).toEqual({ cost: { amount: 0.5, currency: "USD" }, size: 100, used: 12 });
     });
 });

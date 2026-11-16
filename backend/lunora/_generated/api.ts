@@ -17,7 +17,7 @@ export interface ApiTypes {
             answerHostPermission: FunctionReference<"mutation", { optionId: string; requestId: string; threadId: Id<"threads"> }, { reason?: "busy" | "not_waiting" | "offline" | "outdated"; sent: boolean }>;
             cancelHostTurn: FunctionReference<"mutation", { streamId?: Id<"persistentStreams">; threadId: Id<"threads"> }, { cancelled: boolean; delivered?: boolean; reason?: "no_turn" | "other_turn" }>;
             getHostPendingPermissions: FunctionReference<"query", { threadId: Id<"threads"> }, Array<{ command?: string; folder?: string; incomplete?: boolean; options: Array<{ kind: string; name: string; optionId: string }>; requestId: string; target?: string; tool: string }>>;
-            setHostOption: FunctionReference<"mutation", { optionId?: string; threadId: Id<"threads">; valueId: string }, { callId?: string; reason?: "busy" | "ended" | "offline" | "outdated" | "unpaired"; sent: boolean }>;
+            setHostOption: FunctionReference<"mutation", { optionId?: string; sessionId: string; threadId: Id<"threads">; valueId: string }, { callId?: string; reason?: "busy" | "ended" | "offline" | "outdated" | "unpaired"; sent: boolean }>;
             startHostSession: FunctionReference<"mutation", { agentKey: string; clientId: string; deviceId: Id<"devices">; folderId: string }, { started: boolean; threadId?: string }>;
         };
     };

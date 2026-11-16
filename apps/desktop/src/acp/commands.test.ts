@@ -675,16 +675,18 @@ describe("an option change", () => {
 
     it("waits for the agent's answer before it is signed", async () => {
         let answer: (outcome: string) => void = () => {};
+        // Set once `apply` has installed its answer callback: the receipt being readable does not mean that yet.
+        let waiting = false;
         const commands = make([], {
             apply: async () =>
-                // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- not in this package's Node range
                 await new Promise<string>((resolve) => {
                     answer = resolve;
+                    waiting = true;
                 }),
         });
         const delivery = commands.execute(change("c3"), "sig");
 
-        await vi.waitFor(() => expect(open()).toContain("c3"), { timeout: 20_000 });
+        await vi.waitFor(() => expect(waiting).toBe(true), { timeout: 20_000 });
         answer("accepted");
         expect(outcomeOf(await delivery)).toBe("accepted");
     });

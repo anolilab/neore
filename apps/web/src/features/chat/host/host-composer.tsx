@@ -963,6 +963,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                 ended={blocked}
                 key={`${threadId}:${session?._id ?? ""}`}
                 optionResult={session?.optionResult}
+                sessionId={session?._id ?? ""}
                 state={session?.agentState}
                 threadId={threadId}
             />

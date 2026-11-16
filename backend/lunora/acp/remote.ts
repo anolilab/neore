@@ -354,12 +354,14 @@ export const answerHostPermission = authMutation
  * alone, and only for a value the agent itself listed in the state it reported (`acpSessions.agentState`): the option
  * and the value are read back from that state, so neither can be invented here. Queues `acp_set_config`; the computer
  * asks the agent and the session row records the answer (`optionResult`, `acp/lib/calls.ts`). A mode is never changed from here:
- * a call with no `optionId` (the legacy mode state) or naming a mode option is refused.
+ * a call with no `optionId` (the legacy mode state) or naming a mode option is refused. `sessionId` is the session row the
+ * person was choosing against: a change queued while that session was replaced by a newer one is not applied to the new one.
  */
 export const setHostOption = authMutation
     .use(rateLimit("hosts/answer"))
     .input({
         optionId: v.optional(v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" })),
+        sessionId: v.string().min(1).check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
         threadId: v.id("threads"),
         valueId: v.string().min(1).check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
     })
@@ -379,7 +381,7 @@ export const setHostOption = authMutation
 
         const session = await sessionOfThread(ctx, args.threadId);
 
-        if (!session || session.status === "ended") {
+        if (!session || session.status === "ended" || String(session._id) !== args.sessionId) {
             return { reason: "ended" as const, sent: false };
         }
 

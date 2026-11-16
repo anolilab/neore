@@ -96,9 +96,9 @@ interface LegacyAgentOptions {
 
 /**
  * The agent's options moved to the state the session row holds now (`agentState`, `optionResult`). A row that stored
- * `agentOptions` keeps them: they become its `agentState` (its `agentOptionsAt` the state's time), unless it already has an
- * `agentState`, which is newer. Then `agentOptions` and `agentOptionsAt` are dropped, since the schema no longer declares
- * them.
+ * `agentOptions` keeps them: they fill the fields its `agentState` lacks (its `agentOptionsAt` the state's time, when it has
+ * no `agentStateAt`). A field the state already holds is newer and stands, empty lists included. Then `agentOptions` and
+ * `agentOptionsAt` are dropped, since the schema no longer declares them.
  */
 export const dropAgentOptionFields = defineMigration({
     id: "drop-agent-option-fields",
@@ -107,8 +107,8 @@ export const dropAgentOptionFields = defineMigration({
         const row: Record<string, unknown> = { ...document };
         const legacy = row.agentOptions as LegacyAgentOptions | undefined;
 
-        if (legacy !== undefined && row.agentState === undefined) {
-            const agentState = {
+        if (legacy !== undefined) {
+            const legacyState = {
                 ...(legacy.configOptions !== undefined && { configOptions: legacy.configOptions }),
                 ...(legacy.modes !== undefined && {
                     modes: {
@@ -119,6 +119,8 @@ export const dropAgentOptionFields = defineMigration({
                     },
                 }),
             };
+            // A usage-only state keeps no options, so the legacy ones are its only copy: they fill only the fields it lacks.
+            const agentState = { ...legacyState, ...(row.agentState as Record<string, unknown> | undefined) };
 
             if (Object.keys(agentState).length > 0) {
                 row.agentState = agentState;
