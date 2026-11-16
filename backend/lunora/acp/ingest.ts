@@ -36,7 +36,7 @@ import { patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
-import { mergeAgentState, sameOptionFields } from "./lib/agent-state";
+import { confirmedOf, mergeAgentState, sameOptionFields, settledBy, WATERMARK_STALE_MS } from "./lib/agent-state";
 import { MAX_EVENTS_PER_POST } from "./lib/constants";
 import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
@@ -231,17 +231,29 @@ const applySessionState = async (
     // A usage report that leaves the cost out keeps the cost reported before: the agent's cost is cumulative.
     const usage = event.usage === undefined ? undefined : withKeptCost(event.usage, session.agentState?.usage);
     const usageChanged = usage !== undefined && !sameUsage(usage, session.agentState?.usage);
+    const changed = usageChanged || !sameOptionFields(session.agentState, event);
 
-    if (usageChanged || !sameOptionFields(session.agentState, event)) {
+    // An option change refused without a known outcome is settled by the agent's own report of its value (a late answer, or a
+    // restart before the answer was recorded): the record then says it was confirmed.
+    const stored = session.optionResult;
+    const settled = stored !== undefined && settledBy(stored, event);
+
+    // The ordering watermark moves when the stored values change, when this report settles an option, or, for a report that
+    // repeats the stored values, once the stored watermark is a minute old. A repeat writes nothing else: a usage report repeats
+    // its values on every tick, and the row is read by every open client. A report without a sequence number (an older desktop)
+    // moves the watermark whenever it is newer, as before.
+    const watermarkDue =
+        event.seq === undefined
+            ? session.agentStateAt === undefined || at > session.agentStateAt
+            : session.agentStateAt === undefined || at - session.agentStateAt >= WATERMARK_STALE_MS;
+
+    if (changed || settled || watermarkDue) {
         await ctx.db.patch("acpSessions", session._id, {
-            agentState: mergeAgentState(session.agentState, { ...event, ...(usage !== undefined && { usage }) }),
+            ...(changed && { agentState: mergeAgentState(session.agentState, { ...event, ...(usage !== undefined && { usage }) }) }),
             agentStateAt: at,
             ...ordering,
+            ...(settled && stored !== undefined && { optionResult: confirmedOf(stored) }),
         });
-    } else if (event.seq !== undefined || session.agentStateAt === undefined || at > session.agentStateAt) {
-        // A newer report that repeats the stored values (or leaves them out) still moves the ordering, so an older report that
-        // arrives later cannot overwrite the newest observation. A sequenced report always moves it: the next older one is dropped.
-        await ctx.db.patch("acpSessions", session._id, { agentStateAt: at, ...ordering });
     }
 
     return { ended: false, next: 0, outcome: "applied" };

@@ -2480,6 +2480,64 @@ describe("what the agent reports about itself", () => {
         expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(11) }, agentStateSeq: 2 });
     });
 
+    it("does not rewrite the stored row for a report that repeats its values within the minute", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const at = Date.now() - 2000;
+
+        await report(device, at, { seq: 1, usage: usage(10) });
+        await report(device, at + 500, { seq: 2, usage: usage(10) });
+
+        // The repeat is not written: the watermark stays at the report that changed the value.
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(10) }, agentStateSeq: 1 });
+    });
+
+    it("moves the watermark on a repeat once the stored one is a minute old", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, Date.now() - 120_000, { seq: 1, usage: usage(10) });
+        await report(device, Date.now() - 1000, { seq: 2, usage: usage(10) });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentStateSeq: 2 });
+    });
+
+    it("confirms a refused option change once the agent reports the value it asked for, and not a refusal it gave", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const option = { category: "model", choices: [{ name: "Deep", value: "deep" }], currentValue: "deep", id: "model", name: "Model" };
+        const refusedBy = async (reason: string) => {
+            const session = await rowOf(threadId);
+
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("acpSessions", session._id, {
+                    optionResult: { at: 1, callId: "c1", optionId: "model", outcome: "refused", reason, valueId: "deep" },
+                });
+            });
+        };
+        const resultOf = async () => {
+            const session = await rowOf(threadId);
+
+            return session.optionResult;
+        };
+
+        // A late answer: the desktop had given up on the change, the agent applied it.
+        await refusedBy("the agent did not answer");
+        await report(device, Date.now(), { configOptions: [option], seq: 1 });
+        expect(await resultOf()).toMatchObject({ callId: "c1", outcome: "confirmed", valueId: "deep" });
+        expect(await resultOf()).not.toHaveProperty("reason");
+
+        // A restart before the answer was recorded: the same report settles it.
+        await refusedBy("the app restarted before the agent answered, so the change may or may not have been made");
+        await report(device, Date.now(), { configOptions: [option], seq: 2 });
+        expect(await resultOf()).toMatchObject({ outcome: "confirmed" });
+
+        // A refusal the agent gave is not settled by a report that happens to show the value.
+        await refusedBy("the agent did not accept the change");
+        await report(device, Date.now(), { configOptions: [option], seq: 3 });
+        expect(await resultOf()).toMatchObject({ outcome: "refused" });
+    });
+
     it("refuses a report for a session the device does not hold", async () => {
         const device = await pair(ownerId);
 
