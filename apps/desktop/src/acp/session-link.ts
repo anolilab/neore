@@ -113,7 +113,8 @@ export class SessionLink {
 
     /** Posts `session_open` until the backend answers with the thread. */
     public async open(): Promise<void> {
-        if (this.opening || this.closed) {
+        // Once the poster has stopped, nothing opens again: a retry answered after the stop must not schedule one.
+        if (this.opening || this.closed || this.halted) {
             return;
         }
 
@@ -172,7 +173,7 @@ export class SessionLink {
     }
 
     private retryLater(): void {
-        if (this.closed) {
+        if (this.closed || this.halted) {
             return;
         }
 
