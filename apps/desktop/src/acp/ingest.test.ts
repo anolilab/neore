@@ -1292,7 +1292,7 @@ describe("what the agent reports about itself", () => {
         expect(statePosts()[0]?.post).not.toHaveProperty("threadId");
         expect(statePosts()[0]?.post).not.toHaveProperty("turnId");
         // `at` is when the value was observed, not when it was sent: the backend orders reports by it.
-        expect(statePosts()[0]?.post.events).toEqual([{ at: observedAt, kind: "session_state", seq: 2, usage: usage(20) }]);
+        expect(statePosts()[0]?.post.events).toEqual([{ at: observedAt, kind: "session_state", seq: expect.any(Number), usage: usage(20) }]);
         expect(statePosts()[0]?.signature).toMatch(SIGNED);
     });
 
@@ -1310,8 +1310,28 @@ describe("what the agent reports about itself", () => {
 
         const sent = statePosts().map((entry) => entry.post.events[0] as unknown as { at: number; seq?: number; usage?: unknown });
 
-        expect(sent.map((event) => event.seq)).toEqual([1, 2]);
+        expect(sent[1]?.seq).toBe((sent[0]?.seq ?? 0) + 1);
         expect(sent[1]?.at).toBeLessThan(sent[0]?.at ?? 0);
+    });
+
+    it("numbers a restarted desktop's reports above the ones the earlier process sent for the same session", async () => {
+        const earlier = poster();
+
+        await open(earlier);
+        earlier.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        const before = (statePosts().at(-1)?.post.events[0] as { seq?: number } | undefined)?.seq ?? 0;
+
+        // The desktop restarts a minute later and reopens the session the backend already holds.
+        await settle(60_000);
+        const restarted = poster();
+
+        await open(restarted);
+        restarted.sessionState("s1", { usage: usage(11) });
+        await settle(2000);
+
+        expect((statePosts().at(-1)?.post.events[0] as { seq?: number } | undefined)?.seq ?? 0).toBeGreaterThan(before);
     });
 
     it("sends the newest value of each field once, however many updates arrive inside the window", async () => {
@@ -1652,7 +1672,7 @@ describe("what the agent reports about itself", () => {
         await settle(2000);
 
         expect(statePosts()).toHaveLength(1);
-        expect(statePosts()[0]?.post.events).toEqual([{ at: observed, configOptions: [option("deep")], kind: "session_state", modes, seq: 3, usage: usage(1) }]);
+        expect(statePosts()[0]?.post.events).toEqual([{ at: observed, configOptions: [option("deep")], kind: "session_state", modes, seq: expect.any(Number), usage: usage(1) }]);
     });
 
     it("retries the newer observation when the clock moved back while a failed send was in flight", async () => {
@@ -1698,7 +1718,7 @@ describe("what the agent reports about itself", () => {
         await settleInSteps(40_000);
 
         // The retry carries the newer observation (the later sequence number), not the failed older one.
-        expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ seq: 2, usage: usage(11) });
+        expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ usage: usage(11) });
     });
 
     it("drops a report the backend refuses, and the session keeps going", async () => {

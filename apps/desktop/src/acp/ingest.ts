@@ -171,6 +171,9 @@ export class HostPoster implements SessionObserver {
      */
     private readonly stateSeq = new Map<string, number>();
 
+    /** Where this process's sequence numbers start: the clock when it first numbers a report (`nextStateSeq`). */
+    private stateSeqBase: number | undefined;
+
     /** When a session last posted its report: its next one waits out `STATE_DEBOUNCE_MS` from it, whichever pass runs. */
     private readonly stateSentAt = new Map<string, number>();
 
@@ -552,9 +555,15 @@ export class HostPoster implements SessionObserver {
         this.forgetStateOf(sessionId);
     }
 
-    /** The next sequence number of a session's reports, in the order they are observed. */
+    /**
+     * The next sequence number of a session's reports, in the order they are observed. The numbers of a process start from the
+     * clock, not from 1: a desktop restarted with a session the backend already holds numbers above the reports the earlier
+     * process sent, which the backend keeps (it drops a report at or below the newest one it has).
+     */
     private nextStateSeq(sessionId: string): number {
-        const next = (this.stateSeq.get(sessionId) ?? 0) + 1;
+        this.stateSeqBase ??= this.now();
+
+        const next = Math.max(this.stateSeq.get(sessionId) ?? 0, this.stateSeqBase) + 1;
 
         this.stateSeq.set(sessionId, next);
 
