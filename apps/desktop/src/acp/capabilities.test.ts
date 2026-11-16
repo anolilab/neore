@@ -84,6 +84,16 @@ describe("withOptionCapabilities", () => {
         expect(capabilityOf(casedReport, "identity.reasoningEffort")).toEqual({ degradation: "none", supported: true });
     });
 
+    it("lists the models of every model option, each once, when the agent files more than one under the model category", () => {
+        const second = { category: "model", choices: [{ name: "Mini", value: "mini" }, { name: "Fast", value: "fast" }], currentValue: "mini", id: "m2", name: "Small" };
+
+        expect(groups({ configOptions: [model, second] }).identity?.models).toEqual([
+            { id: "fast", name: "Fast" },
+            { id: "deep", name: "Deep" },
+            { id: "mini", name: "Mini" },
+        ]);
+    });
+
     it("does not report a mode option as a permission mode: the session's modes are not the runner's", () => {
         expect(groups({ configOptions: [mode] }).permissions?.modes ?? []).toEqual([]);
     });

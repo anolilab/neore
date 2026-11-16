@@ -48,12 +48,23 @@ const optionIn = (options: SessionStatePatch, category: string) => options.confi
  * so they are not reported as `permissions.modes`. Read from the option's category, never from the agent's or a model's name.
  */
 export const withOptionCapabilities = (report: CapabilityReport, options: SessionStatePatch): CapabilityReport => {
-    const model = optionIn(options, "model");
-    const models = model === undefined
-        ? []
-        : model.choices.map((choice) => {
-            return { id: choice.value, name: choice.name };
-        });
+    // Every model option's choices, each model once: an agent may file more than one option under `model`.
+    const choices = new Map<string, string>();
+    const configOptions = options.configOptions ?? [];
+
+    for (const option of configOptions) {
+        if (option.category?.toLowerCase() === "model") {
+            for (const choice of option.choices) {
+                if (!choices.has(choice.value)) {
+                    choices.set(choice.value, choice.name);
+                }
+            }
+        }
+    }
+
+    const models = [...choices].map(([id, name]) => {
+        return { id, name };
+    });
 
     return {
         ...report,
