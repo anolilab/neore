@@ -648,7 +648,8 @@ overrides:
   "@grpc/grpc-js@<1.14.5": ">=1.14.5"
   "@hono/node-server@<1.19.10": ">=1.19.10"
   "@hono/node-server@<2.0.0": ">=2.0.10"
-  # GHSA-qv5m-9pm6-hqp3, GHSA-jpvv-r467-5p4w: backslash path parsing, patched in 2.1.6. The 2.x range only, so 1.x is untouched.
+  # GHSA-qv5m-9pm6-hqp3, GHSA-jpvv-r467-5p4w: backslash path parsing, patched in 2.1.6. Covers 2.0.0 to 2.1.5, which the
+  # `<2.0.0` rule above no longer catches. That rule still moves any 1.x spec to 2.0.10 or later, as it did before.
   "@hono/node-server@>=2.0.0 <2.1.6": ">=2.1.6"
   "@humanfs/node@<0.16.8": ">=0.16.8"
   "@langchain/core@<0.3.80": ">=0.3.80"
