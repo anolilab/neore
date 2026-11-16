@@ -169,6 +169,8 @@ export const schema = defineSchema({
         agentState: v.optional(vAcpAgentState),
         // The `at` of the newest report applied to `agentState`; an older report is dropped.
         agentStateAt: v.optional(v.number()),
+        // The desktop's sequence number of the newest report applied to `agentState`. Unset until a report carries one.
+        agentStateSeq: v.optional(v.number()),
         capabilities: v.optional(vCapabilityReport),
         createdAt: v.number(),
         deviceId: v.id("devices"),

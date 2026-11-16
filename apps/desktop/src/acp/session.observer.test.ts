@@ -96,13 +96,19 @@ describe("a session's observer", () => {
                 reported.push(patch);
             },
         };
-        const { player, session, steps } = await start(refuse, watched, undefined, undefined, "usage-and-prompt");
+        const { agent, player, session, steps } = await start(refuse, watched, undefined, undefined, "usage-and-prompt");
 
         session.send("say hi");
         await player.play(steps.slice(4));
         await expect.poll(() => session.snapshot().status).toBe("idle");
 
         expect(reported).toEqual([{ usage: { cost: { amount: 0.42, currency: "USD" }, size: 200_000, used: 12_345 } }]);
+
+        // A usage report after the turn has ended is still told: the observer is not limited to the current turn.
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "usage_update", size: 200_000, used: 20_000 } } });
+        await expect.poll(() => reported.length).toBe(2);
+
+        expect(reported[1]).toMatchObject({ usage: { size: 200_000, used: 20_000 } });
     });
 
     it("is told the session opened, the turn, its text and its end, in order", async () => {
@@ -644,6 +650,30 @@ describe("a change asked for from the web or the phone", () => {
 
         // The legacy mode state (no option id) is a mode, refused before the session's own checks.
         await expect(session.setRemoteOption(undefined, "code")).rejects.toThrow("a mode is changed on the computer");
+        expect(agent.written).toEqual([]);
+    });
+
+    it("refuses an option filed under no category, and an id the legacy mode state lists, as a mode", async () => {
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: recorder().observer,
+            onChange: () => {},
+            process: agent.process,
+        });
+        const offered = session as unknown as { offered: unknown };
+
+        offered.offered = { configOptions: [{ choices: [{ name: "High", value: "high" }], currentValue: "high", id: "effort", name: "Effort" }] };
+        await expect(session.setRemoteOption("effort", "low")).rejects.toThrow("a mode is changed on the computer");
+
+        offered.offered = { modes: { available: [{ id: "code", name: "Code" }], current: "ask" } };
+        await expect(session.setRemoteOption("code", "low")).rejects.toThrow("a mode is changed on the computer");
+
         expect(agent.written).toEqual([]);
     });
 });

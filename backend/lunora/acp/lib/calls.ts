@@ -95,7 +95,7 @@ const OPTION_REASONS: ReadonlySet<string> = new Set([
     "the agent did not answer",
     "the agent did not apply the change",
     "the agent does not offer that choice",
-    "the app restarted before the agent answered",
+    "the app restarted before the agent answered, so the change may or may not have been made",
     "the device was removed",
     "this session is not open",
 ]);

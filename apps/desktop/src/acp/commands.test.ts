@@ -698,7 +698,7 @@ describe("an option change", () => {
         const applied: AcpCommand[] = [];
         const again = await make(applied).execute(change("c5"), "sig");
 
-        expect(outcomeOf(again)).toBe("the app restarted before the agent answered");
+        expect(outcomeOf(again)).toBe("the app restarted before the agent answered, so the change may or may not have been made");
         expect(applied).toEqual([]);
     });
 

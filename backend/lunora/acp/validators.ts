@@ -179,6 +179,9 @@ export const vHostEvent = v.union(
                 current: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
             }),
         ),
+        // The desktop's count of its reports for this session, in the order it observed them. The newest one wins whatever the two
+        // clocks say (`applySessionState`); a desktop that sends none is ordered by `at`.
+        seq: v.optional(v.number().check((seq) => Number.isSafeInteger(seq) && seq >= 1, { message: "Invalid sequence number" })),
         usage: v.optional(vAgentUsage),
     }),
     v.object({ kind: v.literal("turn_start"), text: v.string().max(100_000) }),

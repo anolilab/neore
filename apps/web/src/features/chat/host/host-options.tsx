@@ -228,7 +228,10 @@ const HostOptions: FC<{ ended: boolean; optionResult?: OptionResult; state?: Hos
         ["the agent did not answer", t`the agent did not answer`],
         ["the agent did not apply the change", t`the agent did not apply the change`],
         ["the agent does not offer that choice", t`the agent does not offer that choice`],
-        ["the app restarted before the agent answered", t`the app restarted before the agent answered`],
+        [
+            "the app restarted before the agent answered, so the change may or may not have been made",
+            t`the app restarted before the agent answered, so the change may or may not have been made`,
+        ],
         ["the device was removed", t`the device was removed`],
         ["The host did not answer.", t`the host did not answer`],
         ["The host did not change the option.", t`the host did not change the option`],

@@ -69,7 +69,7 @@
   the saved message; a switch across the runner makes a new thread linked by a `continuation` relationship.
     - **Agent-reported state** (`session_state`, a turn-less post like `session_open`):
         - Usage (`usage_update`) is stored on `acpSessions.agentState` with `agentStateAt`; each field present replaces the stored one, and a usage report without a cost keeps the stored cost.
-        - A report older than `agentStateAt` is dropped; a repeated value still moves `agentStateAt`.
+        - Order: a report with the desktop's `seq` (counted per session in observation order) is dropped when `seq` is not newer than `agentStateSeq`, so a desktop clock ahead cannot let an older report win. A report without `seq` (an older desktop) is dropped when its time is older than `agentStateAt`. The stored time is capped to the server clock.
         - The desktop coalesces it to one post per session every 2 s (`HostPoster.flushState`).
         - A failed post backs off 30 s, unless a fresh report is waiting; a report failed `MAX_STATE_ATTEMPTS` times with nothing newer is dropped.
 

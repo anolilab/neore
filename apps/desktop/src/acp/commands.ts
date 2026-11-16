@@ -111,7 +111,7 @@ export interface CommandOptions {
 
 export const ACCEPTED = "accepted";
 /** What a redelivered option change is refused with when the app went down before the agent answered it. */
-const INTERRUPTED = "the app restarted before the agent answered";
+const INTERRUPTED = "the app restarted before the agent answered, so the change may or may not have been made";
 
 export const HELD: Held = { held: true };
 

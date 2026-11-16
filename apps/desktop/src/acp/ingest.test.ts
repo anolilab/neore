@@ -1292,8 +1292,26 @@ describe("what the agent reports about itself", () => {
         expect(statePosts()[0]?.post).not.toHaveProperty("threadId");
         expect(statePosts()[0]?.post).not.toHaveProperty("turnId");
         // `at` is when the value was observed, not when it was sent: the backend orders reports by it.
-        expect(statePosts()[0]?.post.events).toEqual([{ at: observedAt, kind: "session_state", usage: usage(20) }]);
+        expect(statePosts()[0]?.post.events).toEqual([{ at: observedAt, kind: "session_state", seq: 2, usage: usage(20) }]);
         expect(statePosts()[0]?.signature).toMatch(SIGNED);
+    });
+
+    it("numbers each report in the order it was observed, so a report observed later carries the higher number whatever the clock says", async () => {
+        const host = poster();
+
+        await open(host);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        // The desktop clock moves back between the two observations: the number still rises, so the backend keeps the newer one.
+        clock -= 60_000;
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(2000);
+
+        const sent = statePosts().map((entry) => entry.post.events[0] as unknown as { at: number; seq?: number; usage?: unknown });
+
+        expect(sent.map((event) => event.seq)).toEqual([1, 2]);
+        expect(sent[1]?.at).toBeLessThan(sent[0]?.at ?? 0);
     });
 
     it("sends the newest value of each field once, however many updates arrive inside the window", async () => {
@@ -1634,7 +1652,7 @@ describe("what the agent reports about itself", () => {
         await settle(2000);
 
         expect(statePosts()).toHaveLength(1);
-        expect(statePosts()[0]?.post.events).toEqual([{ at: observed, configOptions: [option("deep")], kind: "session_state", modes, usage: usage(1) }]);
+        expect(statePosts()[0]?.post.events).toEqual([{ at: observed, configOptions: [option("deep")], kind: "session_state", modes, seq: 3, usage: usage(1) }]);
     });
 
     it("drops a report the backend refuses, and the session keeps going", async () => {
@@ -1696,15 +1714,15 @@ describe("what the agent reports about itself", () => {
 describe("a retry that finds a newer report waiting", () => {
     it("keeps the cost of a failed send when the newer report carries only counts", () => {
         const cost = { amount: 0.4, currency: "USD" };
-        const failed = { at: 1000, usage: { cost, size: 10, used: 1 } };
-        const waiting = { at: 2000, usage: { size: 10, used: 2 } };
+        const failed = { at: 1000, seq: 1, usage: { cost, size: 10, used: 1 } };
+        const waiting = { at: 2000, seq: 2, usage: { size: 10, used: 2 } };
 
-        expect(newerPending(failed, waiting)).toEqual({ at: 2000, usage: { cost, size: 10, used: 2 } });
+        expect(newerPending(failed, waiting)).toEqual({ at: 2000, seq: 2, usage: { cost, size: 10, used: 2 } });
     });
 
     it("keeps the newer observation for each field when the older send failed last", () => {
-        const failed = { at: 1000, usage: { size: 10, used: 1 } };
-        const waiting = { at: 2000, usage: { size: 10, used: 2 } };
+        const failed = { at: 1000, seq: 1, usage: { size: 10, used: 1 } };
+        const waiting = { at: 2000, seq: 2, usage: { size: 10, used: 2 } };
 
         expect(newerPending(failed, waiting)).toEqual(waiting);
         expect(newerPending(waiting, failed)).toEqual(waiting);

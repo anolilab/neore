@@ -180,6 +180,46 @@ describe("the export of coding-agent sessions and events", () => {
         expect(exported).toEqual(expect.arrayContaining(threads.slice(1)));
     });
 
+    it("exports the agent's usage and each option's current value, without the choices it offered", async () => {
+        const device = await insertDevice(A);
+        const threadId = await insertSession(A, device, 0);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+            await ctx.db.patch("acpSessions", row._id, {
+                agentState: {
+                    configOptions: [
+                        {
+                            category: "model",
+                            choices: [
+                                { name: "Deep", value: "deep" },
+                                { name: "Fast", value: "fast" },
+                            ],
+                            currentValue: "deep",
+                            id: "model",
+                            name: "Model",
+                        },
+                    ],
+                    models: { available: [{ id: "m1", name: "M1" }], current: "m1" },
+                    usage: { size: 200_000, used: 12_345 },
+                },
+            });
+        });
+
+        const pages = await collectAll(A);
+        const [first] = pages.flatMap((page) => page.sessions);
+
+        expect(first).toMatchObject({
+            agentState: {
+                configOptions: [{ category: "model", currentValue: "deep", id: "model", name: "Model" }],
+                usage: { size: 200_000, used: 12_345 },
+            },
+        });
+        expect(first?.agentState).not.toHaveProperty("models");
+        expect(JSON.stringify(first)).not.toContain("Fast");
+    });
+
     it("includes the last option change the person made on a session", async () => {
         const device = await insertDevice(A);
         const threadId = await insertSession(A, device, 0);

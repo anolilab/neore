@@ -59,6 +59,8 @@ export const MAX_STATE_ATTEMPTS = 10;
  */
 interface PendingState extends SessionStatePatch {
     at: number;
+    /** The report's place in this session's observation order (`stateSeq`): the backend keeps the newest one, whatever the clocks say. */
+    seq: number;
 }
 
 /**
@@ -73,7 +75,7 @@ export const newerPending = (failed: PendingState, waiting: PendingState | undef
     const [older, newer] = waiting.at < failed.at ? [waiting, failed] : [failed, waiting];
     const usage = mergeUsage(older.usage, newer.usage);
 
-    return { ...older, ...newer, ...usage !== undefined && { usage }, at: newer.at };
+    return { ...older, ...newer, ...usage !== undefined && { usage }, at: newer.at, seq: Math.max(older.seq, newer.seq) };
 };
 
 /** A usage report's counts are the newer ones; the cost is the newer one when it has one, otherwise the older one (a running total). */
@@ -162,6 +164,12 @@ export class HostPoster implements SessionObserver {
     /** Failed posts of a session's current report, reset by a fresh report or a success (`MAX_STATE_ATTEMPTS`). */
     private readonly stateAttempts = new Map<string, number>();
 
+    /**
+     * The newest sequence number handed out per session. Kept for the life of the process, not forgotten with the post bookkeeping:
+     * a report after the session ended must still count above the ones before it, or the backend would drop it as older.
+     */
+    private readonly stateSeq = new Map<string, number>();
+
     /** When a session last posted its report: its next one waits out `STATE_DEBOUNCE_MS` from it, whichever pass runs. */
     private readonly stateSentAt = new Map<string, number>();
 
@@ -246,7 +254,7 @@ export class HostPoster implements SessionObserver {
         const held = this.heldOptions.get(sessionId);
 
         this.heldOptions.delete(sessionId);
-        this.pendingState.set(sessionId, { ...held, ...pending, ...patch, ...usage !== undefined && { usage }, at: this.now() });
+        this.pendingState.set(sessionId, { ...held, ...pending, ...patch, ...usage !== undefined && { usage }, at: this.now(), seq: this.nextStateSeq(sessionId) });
         // A fresh report is the newest value, so it does not wait out its own session's backoff: the next flush sends it.
         this.stateRetryAt.delete(sessionId);
         this.stateAttempts.delete(sessionId);
@@ -543,6 +551,15 @@ export class HostPoster implements SessionObserver {
         this.forgetStateOf(sessionId);
     }
 
+    /** The next sequence number of a session's reports, in the order they are observed. */
+    private nextStateSeq(sessionId: string): number {
+        const next = (this.stateSeq.get(sessionId) ?? 0) + 1;
+
+        this.stateSeq.set(sessionId, next);
+
+        return next;
+    }
+
     /**
      * Forgets a session's post bookkeeping once the session has ended and nothing of it is pending or in flight. Without this,
      * the per-session maps keep every session that ever posted a report for the life of the process.
@@ -704,8 +721,8 @@ export class HostPoster implements SessionObserver {
 
         try {
             const now = this.now();
-            const { at, ...fields } = pending;
-            const payload = JSON.stringify({ deviceId, events: [{ ...fields, at, kind: "session_state" }], issuedAt: now, kind: "turn", sessionId, v: 1 });
+            const { at, seq, ...fields } = pending;
+            const payload = JSON.stringify({ deviceId, events: [{ ...fields, at, kind: "session_state", seq }], issuedAt: now, kind: "turn", sessionId, v: 1 });
             let result: PostResult;
 
             try {

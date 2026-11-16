@@ -18,6 +18,7 @@ import {
     MAX_DEVICE_INPUT_BYTES,
     MAX_OPEN_ACP_CALLS_PER_DEVICE,
     MAX_OPEN_ACP_CANCELS_PER_DEVICE,
+    MAX_OPEN_ACP_SET_CONFIGS_PER_DEVICE,
 } from "./constants";
 import { signDevicePayload, utf8Length } from "./signing";
 import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated } from "./state";
@@ -30,6 +31,15 @@ export type AcpCallResult = { callId: string } | { error: "busy" | "ineligible" 
 
 /** Slack past a window, so the check that enforces it runs after the window rather than a tick before. */
 const CHECK_SLACK_MS = 1000;
+
+/** How many open calls of this kind's budget the device may hold: Stop and an option change have budgets of their own. */
+const openBudgetOf = (kind: AcpCallKind): number => {
+    if (kind === "acp_cancel") {
+        return MAX_OPEN_ACP_CANCELS_PER_DEVICE;
+    }
+
+    return kind === "acp_set_config" ? MAX_OPEN_ACP_SET_CONFIGS_PER_DEVICE : MAX_OPEN_ACP_CALLS_PER_DEVICE;
+};
 
 export const createAcpCall = async (
     ctx: Pick<MutationCtx, "db" | "scheduler">,
@@ -69,18 +79,20 @@ export const createAcpCall = async (
     }
 
     // A pending call past its claim window can no longer be claimed (it expires on its own): it must not block a cancel.
-    // Stop has a budget of its own: three answers waiting to be delivered must not be able to swallow it.
+    // Stop and an option change have budgets of their own, so three answers waiting to be delivered cannot swallow either.
+    const limit = openBudgetOf(kind);
+    const budgetOf = (name: string): string => (name === "acp_cancel" || name === "acp_set_config" ? name : "other");
     const open = await countOpenCalls(
         ctx,
         deviceId,
         (call) =>
             isAcpTool(call.toolName) &&
             !(call.status === "pending" && now - call.createdAt > ACP_CLAIM_WINDOW_MS) &&
-            (call.toolName === "acp_cancel") === (kind === "acp_cancel"),
-        MAX_OPEN_ACP_CALLS_PER_DEVICE,
+            budgetOf(call.toolName) === budgetOf(kind),
+        limit,
     );
 
-    if (open >= (kind === "acp_cancel" ? MAX_OPEN_ACP_CANCELS_PER_DEVICE : MAX_OPEN_ACP_CALLS_PER_DEVICE)) {
+    if (open >= limit) {
         return { error: "busy" };
     }
 

@@ -14,7 +14,8 @@ import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { vCapabilityReport } from "../lib/capability-report";
-import { vAcpAgentState, vAcpOptionResult, vAcpSessionStatus, vHostEvent } from "./validators";
+import type { AgentState } from "./lib/agent-state";
+import { vAcpOptionResult, vAcpSessionStatus, vAgentUsage, vHostEvent } from "./validators";
 
 const BATCH = 200;
 
@@ -61,11 +62,20 @@ const CHUNK_PAGE = 200;
 const SCAN_BUDGET = 1000;
 const EVENT_BYTES_BUDGET = 400_000;
 
+/**
+ * What the export keeps of the agent's state: its usage, and each option's current value. The choices are left out: a list of
+ * models can be large enough to fail an export that otherwise fits (`SESSION_PAGE_BYTES`, the export limit).
+ */
+const vExportAgentState = v.object({
+    configOptions: v.optional(v.array(v.object({ category: v.optional(v.string()), currentValue: v.string(), id: v.string(), name: v.string() }))),
+    usage: v.optional(vAgentUsage),
+});
+
 const vExportSession = v.object({
     agentKey: v.string(),
     agentLabel: v.string(),
     // What the agent reported about its own context use and cost (`session_state`), as the thread's context meter showed it.
-    agentState: v.optional(vAcpAgentState),
+    agentState: v.optional(vExportAgentState),
     // When the agent's report was observed: the time the stored values are dated by.
     agentStateAt: v.optional(v.number()),
     capabilities: v.optional(vCapabilityReport),
@@ -94,6 +104,18 @@ const vExportCursor = v.object({
 });
 
 type ExportCursor = Infer<typeof vExportCursor>;
+
+/** The export's share of an agent state (`vExportAgentState`): usage and each option's current value, without its choices. */
+const exportedAgentState = (state: AgentState): Infer<typeof vExportAgentState> => {
+    return {
+        ...(state.configOptions !== undefined && {
+            configOptions: state.configOptions.map(({ category, currentValue, id, name }) => {
+                return { ...(category !== undefined && { category }), currentValue, id, name };
+            }),
+        }),
+        ...(state.usage !== undefined && { usage: state.usage }),
+    };
+};
 
 /**
  * One page of a user's coding-agent export: sessions first, then the tool, permission and turn-end events of their
@@ -144,7 +166,7 @@ export const collectAcpSessionsForExport = internalQuery
                             folderLabel,
                             status,
                             threadId: threadId as string,
-                            ...(agentState !== undefined && { agentState }),
+                            ...(agentState !== undefined && { agentState: exportedAgentState(agentState) }),
                             ...(agentStateAt !== undefined && { agentStateAt }),
                             ...(capabilities !== undefined && { capabilities }),
                             ...(importedTurns !== undefined && { importedTurns }),

@@ -195,8 +195,9 @@ const sameUsage = (a: Usage | undefined, b: Usage | undefined): boolean =>
 
 /**
  * A `session_state` report: each field present replaces the stored one, an absent field keeps it. A report older than the
- * one applied is dropped, and one whose values are already stored writes nothing. Answered "applied" either way, so the
- * desktop does not resend it. Not claim-once: writing the same values twice changes nothing.
+ * one applied is dropped. One whose values are already stored writes only its ordering (`agentStateAt`, `agentStateSeq`), so a
+ * later older report cannot overwrite it. Answered "applied" either way, so the desktop does not resend it. Not claim-once:
+ * writing the same values twice changes nothing.
  */
 const applySessionState = async (
     ctx: MutationCtx,
@@ -211,14 +212,21 @@ const applySessionState = async (
         return REFUSED;
     }
 
-    // A desktop clock running ahead cannot park the ordering watermark in the future: a report stamped later than the server
-    // clock is ordered at the server's time. The ordering time is the observation time, so a report still arriving after
-    // the session closed is stored too: a debounced report can outlive its close, and its usage is the final one.
+    // The time is capped to the server clock, which is what the stored `agentStateAt` shows. A desktop clock running ahead cannot
+    // order a report by its own time: a report that carries the desktop's sequence number is ordered by it (the newest observation
+    // wins whatever the clocks say), and only a report without one (an older desktop) is ordered by its time, as before.
+    // The report is stored even after the session closed: a debounced report can outlive its close, and its usage is the final one.
     const at = Math.min(event.at, now);
+    const older =
+        event.seq === undefined
+            ? session.agentStateAt !== undefined && at < session.agentStateAt
+            : session.agentStateSeq !== undefined && event.seq <= session.agentStateSeq;
 
-    if (session.agentStateAt !== undefined && at < session.agentStateAt) {
+    if (older) {
         return { ended: false, next: 0, outcome: "applied" };
     }
+
+    const ordering = event.seq === undefined ? {} : { agentStateSeq: event.seq };
 
     // A usage report that leaves the cost out keeps the cost reported before: the agent's cost is cumulative.
     const usage = event.usage === undefined ? undefined : withKeptCost(event.usage, session.agentState?.usage);
@@ -228,11 +236,12 @@ const applySessionState = async (
         await ctx.db.patch("acpSessions", session._id, {
             agentState: mergeAgentState(session.agentState, { ...event, ...(usage !== undefined && { usage }) }),
             agentStateAt: at,
+            ...ordering,
         });
-    } else if (session.agentStateAt === undefined || at > session.agentStateAt) {
-        // A newer report that repeats the stored values (or leaves them out) still moves the watermark, so an older report that
-        // arrives later cannot overwrite the newest observation.
-        await ctx.db.patch("acpSessions", session._id, { agentStateAt: at });
+    } else if (event.seq !== undefined || session.agentStateAt === undefined || at > session.agentStateAt) {
+        // A newer report that repeats the stored values (or leaves them out) still moves the ordering, so an older report that
+        // arrives later cannot overwrite the newest observation. A sequenced report always moves it: the next older one is dropped.
+        await ctx.db.patch("acpSessions", session._id, { agentStateAt: at, ...ordering });
     }
 
     return { ended: false, next: 0, outcome: "applied" };

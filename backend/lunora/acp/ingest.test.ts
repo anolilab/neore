@@ -2449,6 +2449,19 @@ describe("what the agent reports about itself", () => {
         expect(stored).toMatchObject({ agentState: { usage: usage(11) } });
     });
 
+    it("keeps the newer report by its sequence number when a clock ahead has capped the time of the older one", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        // The desktop's clock runs ahead: both reports are stamped past the server clock, so both are capped to now. The newer one
+        // (sequence 2) arrives first, and the older one (sequence 1) after it: the older one must not replace it.
+        await report(device, Date.now() + 600_000, { seq: 2, usage: usage(11) });
+        const older = await report(device, Date.now() + 500_000, { seq: 1, usage: usage(10) });
+
+        expect(older.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(11) }, agentStateSeq: 2 });
+    });
+
     it("refuses a report for a session the device does not hold", async () => {
         const device = await pair(ownerId);
 

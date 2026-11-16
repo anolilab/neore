@@ -338,12 +338,15 @@ export class AgentSession {
 
     /**
      * A change asked for from the web or the phone. A mode can grant standing permissions, so it is changed on the computer only:
-     * the legacy mode state (no option id) and an option the agent reports as a mode are refused here, whatever the backend checked.
+     * the legacy mode state (no option id), an id the legacy mode state lists, and an option the agent reports as a mode are refused
+     * here, whatever the backend checked. An option filed under no category cannot be shown to be something else, so it is refused too.
      */
     public async setRemoteOption(optionId: string | undefined, valueId: string): Promise<void> {
-        const category = optionId === undefined ? "mode" : this.offered.configOptions?.find((option) => option.id === optionId)?.category;
+        const option = this.offered.configOptions?.find((candidate) => candidate.id === optionId);
+        const legacyMode = optionId !== undefined && this.offered.modes?.available.some((mode) => mode.id === optionId) === true;
+        const mode = option !== undefined && (option.category === undefined || option.category.toLowerCase() === "mode");
 
-        if (category?.toLowerCase() === "mode") {
+        if (optionId === undefined || legacyMode || mode) {
             throw new Error("a mode is changed on the computer, not from here");
         }
 

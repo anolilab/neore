@@ -5,6 +5,7 @@
 
 import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -260,6 +261,11 @@ beforeEach(() => {
 afterEach(() => {
     harness.data = {};
 });
+
+/** Picks a value of a native select the way the person does, through user-event. */
+const pickOption = async (user: ReturnType<typeof userEvent.setup>, select: HTMLSelectElement, value: string): Promise<void> => {
+    await user.selectOptions(select, value);
+};
 
 describe("the coding-agent composer", () => {
     it("sends the message under one request id and clears the box", async () => {
@@ -1982,7 +1988,9 @@ describe("the options the agent offers", () => {
         const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
 
-        fireEvent.change(model, { target: { value: "deep" } });
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
         await waitFor(() => expect(mutations()).toHaveLength(1));
 
         const key = ["acp.functions.getHostSession", { threadId: "thread-1" }];
@@ -2011,7 +2019,9 @@ describe("the options the agent offers", () => {
         const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
 
-        fireEvent.change(model, { target: { value: "deep" } });
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
         await waitFor(() => expect(mutations()).toHaveLength(1));
 
         client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], {
@@ -2028,7 +2038,9 @@ describe("the options the agent offers", () => {
         const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
 
-        fireEvent.change(model, { target: { value: "deep" } });
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
         await waitFor(() => expect(mutations()).toHaveLength(1));
 
         // Still waiting for its answer when the agent's list loses the option.
@@ -2052,7 +2064,9 @@ describe("the options the agent offers", () => {
         const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
 
-        fireEvent.change(model, { target: { value: "deep" } });
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
         await waitFor(() => expect(mutations()).toHaveLength(1));
 
         // The agent's list no longer has the model, and the session holds its confirmed answer for that change.
@@ -2070,7 +2084,9 @@ describe("the options the agent offers", () => {
         const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
 
-        fireEvent.change(model, { target: { value: "deep" } });
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
         await waitFor(() => expect(model.disabled).toBe(true));
 
         // The thread's newest session is another one: the old session's answer never comes, so its wait must not carry over.
@@ -2091,7 +2107,9 @@ describe("the options the agent offers", () => {
         onlineManager.setOnline(false);
 
         try {
-            fireEvent.change(model, { target: { value: "deep" } });
+            const user = userEvent.setup();
+
+            await pickOption(user, model, "deep");
 
             // The mutation is not paused by the offline state: the client receives it, and queues it.
             await waitFor(() => expect(mutations()).toHaveLength(1));
@@ -2124,7 +2142,9 @@ describe("the options the agent offers", () => {
 
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
 
-        fireEvent.change(model, { target: { value: "deep" } });
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
 
         await waitFor(() => expect(mutations()).toHaveLength(1));
         expect(mutations()[0]?.[1]).toEqual({ optionId: "model", threadId: "thread-1", valueId: "deep" });
@@ -2137,7 +2157,9 @@ describe("the options the agent offers", () => {
         const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
 
-        fireEvent.change(model, { target: { value: "deep" } });
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
         await waitFor(() => expect(model.disabled).toBe(true));
 
         harness.data = {
@@ -2159,7 +2181,9 @@ describe("the options the agent offers", () => {
         const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
 
-        fireEvent.change(model, { target: { value: "deep" } });
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
         await waitFor(() => expect(model.disabled).toBe(true));
 
         // The agent's answer is in, but the options it changed have not arrived yet.
@@ -2195,7 +2219,9 @@ describe("the options the agent offers", () => {
         const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
 
-        fireEvent.change(model, { target: { value: "deep" } });
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
         await waitFor(() => expect(model.disabled).toBe(true));
 
         // The page's call failed at the agent's timeout, and the agent's late answer has since changed the option.
@@ -2217,7 +2243,9 @@ describe("the options the agent offers", () => {
         const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
 
-        fireEvent.change(model, { target: { value: "deep" } });
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
         await waitFor(() => expect(model.disabled).toBe(true));
 
         // The page's wait for the value to show is a timer of CATCH_UP_MS: the clock is driven past it, not waited out.
@@ -2256,7 +2284,9 @@ describe("the options the agent offers", () => {
         const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
 
-        fireEvent.change(model, { target: { value: "deep" } });
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
         await waitFor(() => expect(model.disabled).toBe(true));
 
         harness.data = {
@@ -2279,7 +2309,9 @@ describe("the options the agent offers", () => {
 
         const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
 
-        fireEvent.change(model, { target: { value: "deep" } });
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
 
         expect(await screen.findByText("Your computer is offline. Open Neore on it and try again.")).toBeTruthy();
         expect(model.disabled).toBe(false);
