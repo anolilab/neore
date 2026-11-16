@@ -587,7 +587,7 @@ msgstr "{0} z {1} (tylko najnowsze wiadomości)"
 #. placeholder {2}: formatPercent(percentage, i18n.locale)
 #: src/features/chat/thread/context-usage-meter.tsx:118
 msgid "{0} of {1} {usedTokens, plural, one {token used} other {tokens used}} ({2}%)"
-msgstr ""
+msgstr "{0} z {1} {usedTokens, plural, one {token użyty} few {tokeny użyte} many {tokenów użytych} other {tokenów użytych}} ({2}%)"
 
 #. placeholder {0}: String(run.nextIndex)
 #. placeholder {1}: String(run.caseCount)

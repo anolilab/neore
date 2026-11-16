@@ -587,7 +587,7 @@ msgstr "{0} di {1} (solo ultimi messaggi)"
 #. placeholder {2}: formatPercent(percentage, i18n.locale)
 #: src/features/chat/thread/context-usage-meter.tsx:118
 msgid "{0} of {1} {usedTokens, plural, one {token used} other {tokens used}} ({2}%)"
-msgstr ""
+msgstr "{0} di {1} {usedTokens, plural, one {token usato} other {token usati}} ({2}%)"
 
 #. placeholder {0}: String(run.nextIndex)
 #. placeholder {1}: String(run.caseCount)
