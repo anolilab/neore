@@ -312,6 +312,24 @@ describe("session_open", () => {
         expect(sessions[0]).toMatchObject({ agentKey: "claude", folderLabel: "neore", status: "idle", threadId });
     });
 
+    it("accepts a session open an older desktop sends with its options, opens the session, and stores none of the options", async () => {
+        const device = await pair(ownerId);
+        const options = {
+            configOptions: [{ category: "model", choices: [{ name: "Deep", value: "deep" }], currentValue: "deep", id: "model", name: "Model" }],
+        };
+        const result = await ingest(device, { events: [SESSION_OPEN, { kind: "session_options", options }] });
+
+        expect(result.status).toBe(200);
+
+        const threadId = result.json.threadId as string;
+        const session = await harness.run(async (ctx: any) => await ctx.db.acpSessions.findFirst({ where: { threadId } }));
+
+        expect(await row(threadId)).toMatchObject({ runner: "host", status: "active", userId: ownerId });
+        expect(session).toMatchObject({ status: "idle", userId: ownerId });
+        expect(session.agentState).toBeUndefined();
+        expect(session.agentOptions).toBeUndefined();
+    });
+
     it("reads back to the owner only", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);

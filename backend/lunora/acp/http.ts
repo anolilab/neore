@@ -236,6 +236,13 @@ const readPost = (payload: Record<string, unknown>, deviceId: string): Post | nu
     const logged = { done: false };
 
     for (const raw of payload.events) {
+        // A desktop released before the options moved to `session_state` posts a `session_options` event after its
+        // `session_open`. It is accepted and dropped here, before the schema: the post is not refused, and the options are
+        // never stored from this event (the report that follows carries them).
+        if (typeof raw === "object" && raw !== null && (raw as { kind?: unknown }).kind === "session_options") {
+            continue;
+        }
+
         const parsed = vHostEvent.safeParse(withValidReport(raw, deviceId, logged));
 
         if (!parsed.ok) {
