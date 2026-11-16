@@ -63,8 +63,11 @@ export const resolveProjectLocation = async (
     return { machineId, path };
 };
 
-/** Projects one scheduled run clears; a run that clears a full batch schedules the next (`clearDeviceProjects`). */
-export const MACHINE_CLEAR_BATCH = 100;
+/**
+ * Projects one scheduled run clears; a run that clears a full batch schedules the next (`clearDeviceProjects`).
+ * Each project is one D1 write, so 20 keeps a run within the free plan's per-invocation query limit.
+ */
+export const MACHINE_CLEAR_BATCH = 20;
 
 /**
  * Removes the machine and folder from up to one batch of the user's projects that live on `machineId`; the projects stay.
