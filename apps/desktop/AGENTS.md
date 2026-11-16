@@ -65,6 +65,11 @@
   its own CSP header, whose nonce matches its HTML. It only helps after one online run, and only for route chunks that
   run loaded (`bundle-assets`). Detection is `Electron/` in the worker's user agent: keep the default user agent. The recovery page stays for a first run.
 
+- **Keep-awake during host turns** (`acp/keep-awake.ts`): one `powerSaveBlocker` (`prevent-app-suspension`: the system stays
+  awake, the display may sleep) is held while any host session of this app is `busy`, on this computer and on every SSH
+  server. Each `AcpManager` reports through the one `SleepLock` from its session change callback (not the debounced timer)
+  and in `killAll`; a blocker that throws is logged and never fails a turn.
+
 - **Window look** (`appearance.ts`, `app-menu.ts`, `menu-delivery.ts`; the event order is in their headers): site windows
   start hidden. Never a bare `show()` on an unrevealed window (`maximize()` shows one on Windows and Linux): reveal through
   `bringForward`, which applies the saved maximized state. A window closed before its reveal stays hidden until

@@ -17,6 +17,7 @@ import { HookRunner } from "./hooks/runner";
 import type { HooksView } from "./hooks/types";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
+import type { SleepLock } from "./keep-awake";
 import type { PermissionGate } from "./permission";
 import { declineGate } from "./permission";
 import type { PortView, StopResult, StopTarget } from "./ports/ports";
@@ -71,6 +72,8 @@ export interface ManagerOptions {
     onChange: () => void;
     /** `device-core`'s `acpSpawnPlan`, parsed. Throws when the agent or folder is not allowed. */
     plan: (agentKey: string, folder: string | null) => SpawnPlan;
+    /** Held while any of this manager's turns runs, so the computer does not sleep mid-turn (`keep-awake.ts`). */
+    sleepLock?: SleepLock;
     spawn: Spawner;
     startupTimeoutMs?: number;
 }
@@ -267,7 +270,7 @@ export class AcpManager {
                     ? undefined
                     : { ended: () => runner?.stop(), turnEnded: () => runner?.turnEnded(), turnStarted: () => runner?.turnStarted() },
             log: this.options.log,
-            onChange: () => this.changed(),
+            onChange: () => this.sessionChanged(),
             process: child,
             startupTimeoutMs: this.options.startupTimeoutMs,
             ...remoteFields,
@@ -521,6 +524,9 @@ export class AcpManager {
                 // One group that cannot be signalled must not spare the others.
             }
         }
+
+        // The turns die with their agents, so this manager no longer keeps the computer awake.
+        this.options.sleepLock?.report(this, false);
     }
 
     private refuseHeld(agentKey: string): void {
@@ -575,6 +581,15 @@ export class AcpManager {
             this.changeTimer = undefined;
             this.options.onChange();
         }, CHANGE_INTERVAL_MS);
+    }
+
+    /**
+     * A session's status changed. The sleep lock is set now, not on the coalesced timer: a turn that starts must hold the
+     * computer awake before it can be put to sleep, and the release must not wait either.
+     */
+    private sessionChanged(): void {
+        this.changed();
+        this.options.sleepLock?.report(this, this.summaries().some((summary) => summary.status === "busy"));
     }
 
     private spawn(plan: SpawnPlan, agentKey: string): AgentProcess {

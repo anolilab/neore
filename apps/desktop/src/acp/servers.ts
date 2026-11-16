@@ -15,6 +15,7 @@ import path from "node:path";
 import { EarlySends } from "./early-sends";
 import type { RunningTurn } from "./ingest";
 import { HostPoster } from "./ingest";
+import type { SleepLock } from "./keep-awake";
 import { AcpManager } from "./manager";
 import type { PermissionGate } from "./permission";
 import type { RemoteAgents } from "./remote-process";
@@ -42,6 +43,8 @@ export interface ServerAgentsOptions {
     remote: RemoteAgents;
     /** The paired servers. */
     servers: () => ServerRecord[];
+    /** The one sleep lock the computer's managers share (`keep-awake.ts`): a server's turn keeps the computer awake too. */
+    sleepLock?: SleepLock;
     /** Where the posters keep the turns that are running. */
     userData: string;
 }
@@ -251,6 +254,7 @@ export class ServerAgents {
 
                 return JSON.parse(options.core.acpHostSpawnPlan(deviceId, agentKey, folder)) as SpawnPlan;
             },
+            sleepLock: options.sleepLock,
             spawn: options.remote.spawner(deviceId),
         });
         const early = new EarlySends({

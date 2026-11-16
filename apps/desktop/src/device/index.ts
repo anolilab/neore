@@ -14,7 +14,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { BrowserWindow as BrowserWindowInstance, IpcMainInvokeEvent, WebContents } from "electron";
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, powerSaveBlocker } from "electron";
 
 import type { AcpCommand, AppliedCall } from "../acp/commands";
 import { HELD, HostCommands, isAcpEnvelope } from "../acp/commands";
@@ -23,6 +23,7 @@ import { HookApprovals } from "../acp/hooks/approvals";
 import { AcpImporter } from "../acp/import";
 import { HostPoster } from "../acp/ingest";
 import { AgentInstaller } from "../acp/install";
+import { SleepLock } from "../acp/keep-awake";
 import { AcpManager } from "../acp/manager";
 import { coreGate } from "../acp/permission";
 import { acpSupported, spawnAgent } from "../acp/process";
@@ -345,6 +346,18 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         return consent === undefined ? undefined : { folderId: consent.folderId, folderLabel: consent.folderLabel };
     };
 
+    /** One sleep lock for every manager on this computer and its servers: a turn anywhere keeps the computer awake. */
+    const sleepLock = new SleepLock(
+        {
+            isStarted: (id) => powerSaveBlocker.isStarted(id),
+            start: () => powerSaveBlocker.start("prevent-app-suspension"),
+            stop: (id) => {
+                powerSaveBlocker.stop(id);
+            },
+        },
+        (message) => console.error(message),
+    );
+
     const requireAcp = (): AcpManager => {
         const core = requireCore();
 
@@ -362,6 +375,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             observer: host,
             onChange: () => send(state.local?.webContents, LOCAL_EVENT.acp),
             plan: (agentKey, folder) => JSON.parse(core.acpSpawnPlan(agentKey, folder)) as SpawnPlan,
+            sleepLock,
             spawn: spawnAgent,
         });
 
@@ -421,6 +435,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
                 (JSON.parse(core.settingsGet()) as SettingsView).hosts.map((host) => {
                     return { acpAgents: host.acpAgents, acpConsents: host.acpConsents, deviceId: host.deviceId, name: host.name };
                 }),
+            sleepLock,
             userData: app.getPath("userData"),
         });
 
@@ -567,6 +582,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         // Synchronous: `will-quit` cannot await, and an agent left behind would outlive the app.
         state.acp?.killAll();
         state.servers?.killAll();
+        sleepLock.release();
         state.host?.stop();
         state.servers?.stop();
         state.transport?.stop();
