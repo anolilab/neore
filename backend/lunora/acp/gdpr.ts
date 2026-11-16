@@ -63,11 +63,14 @@ const SCAN_BUDGET = 1000;
 const EVENT_BYTES_BUDGET = 400_000;
 
 /**
- * What the export keeps of the agent's state: its usage, and each option's current value. The choices are left out: a list of
- * models can be large enough to fail an export that otherwise fits (`SESSION_PAGE_BYTES`, the export limit).
+ * What the export keeps of the agent's state: its usage, and the current value of each option and of the legacy model and
+ * mode states. The choices are left out: a list of models can be large enough to fail an export that otherwise fits
+ * (`SESSION_PAGE_BYTES`, the export limit).
  */
 const vExportAgentState = v.object({
     configOptions: v.optional(v.array(v.object({ category: v.optional(v.string()), currentValue: v.string(), id: v.string(), name: v.string() }))),
+    models: v.optional(v.object({ current: v.string() })),
+    modes: v.optional(v.object({ current: v.string() })),
     usage: v.optional(vAgentUsage),
 });
 
@@ -141,6 +144,8 @@ const exportedAgentState = (state: AgentState): Infer<typeof vExportAgentState> 
                 return { ...(category !== undefined && { category }), currentValue, id, name };
             }),
         }),
+        ...(state.models !== undefined && { models: { current: state.models.current } }),
+        ...(state.modes !== undefined && { modes: { current: state.modes.current } }),
         ...(state.usage !== undefined && { usage: state.usage }),
     };
 };

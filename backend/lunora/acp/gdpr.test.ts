@@ -235,6 +235,34 @@ describe("the export of coding-agent sessions and events", () => {
         expect(new Set(exported)).toEqual(new Set(threads));
     });
 
+    it("exports a legacy mode and model state's current value, without the choices it offered", async () => {
+        const device = await insertDevice(A);
+        const threadId = await insertSession(A, device, 0);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+            await ctx.db.patch("acpSessions", row._id, {
+                agentState: {
+                    models: { available: [{ id: "m1", name: "M1" }], current: "m1" },
+                    modes: {
+                        available: [
+                            { id: "ask", name: "Ask" },
+                            { id: "code", name: "Code" },
+                        ],
+                        current: "code",
+                    },
+                },
+            });
+        });
+
+        const pages = await collectAll(A);
+        const [first] = pages.flatMap((page) => page.sessions);
+
+        // The mode the session ran in is kept; its list of modes, like a list of models, is not exported.
+        expect(first?.agentState).toEqual({ models: { current: "m1" }, modes: { current: "code" } });
+    });
+
     it("exports the agent's usage and each option's current value, without the choices it offered", async () => {
         const device = await insertDevice(A);
         const threadId = await insertSession(A, device, 0);
@@ -271,7 +299,8 @@ describe("the export of coding-agent sessions and events", () => {
                 usage: { size: 200_000, used: 12_345 },
             },
         });
-        expect(first?.agentState).not.toHaveProperty("models");
+        // The legacy model's current value is kept; its list of models is not.
+        expect(first?.agentState?.models).toEqual({ current: "m1" });
         expect(JSON.stringify(first)).not.toContain("Fast");
     });
 
