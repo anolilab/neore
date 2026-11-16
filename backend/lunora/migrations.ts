@@ -88,16 +88,46 @@ export const addApprovalChainSource = defineMigration({
     up: () => undefined,
 });
 
+/** The options a row stored under `agentOptions` (the read path that is retired), in its own shape. */
+interface LegacyAgentOptions {
+    configOptions?: { category?: string; choices: { name: string; value: string }[]; currentValue: string; id: string; name: string }[];
+    modes?: { available: { name: string; value: string }[]; current: string };
+}
+
 /**
- * The agent's options moved to the state the session row holds now (`agentState`, `optionResult`). The `agentOptions` and
- * `agentOptionsAt` fields are gone from the schema, so a row written with them drops them, and no stored row keeps a field the
- * schema does not declare.
+ * The agent's options moved to the state the session row holds now (`agentState`, `optionResult`). A row that stored
+ * `agentOptions` keeps them: they become its `agentState` (its `agentOptionsAt` the state's time), unless it already has an
+ * `agentState`, which is newer. Then `agentOptions` and `agentOptionsAt` are dropped, since the schema no longer declares
+ * them.
  */
 export const dropAgentOptionFields = defineMigration({
     id: "drop-agent-option-fields",
     table: "acpSessions",
     up: (document) => {
         const row: Record<string, unknown> = { ...document };
+        const legacy = row.agentOptions as LegacyAgentOptions | undefined;
+
+        if (legacy !== undefined && row.agentState === undefined) {
+            const agentState = {
+                ...(legacy.configOptions !== undefined && { configOptions: legacy.configOptions }),
+                ...(legacy.modes !== undefined && {
+                    modes: {
+                        available: legacy.modes.available.map((mode) => {
+                            return { id: mode.value, name: mode.name };
+                        }),
+                        current: legacy.modes.current,
+                    },
+                }),
+            };
+
+            if (Object.keys(agentState).length > 0) {
+                row.agentState = agentState;
+
+                if (row.agentStateAt === undefined && typeof row.agentOptionsAt === "number") {
+                    row.agentStateAt = row.agentOptionsAt;
+                }
+            }
+        }
 
         delete row.agentOptions;
         delete row.agentOptionsAt;
