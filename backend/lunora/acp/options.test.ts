@@ -224,6 +224,20 @@ describe("setHostOption", () => {
         expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(0);
     });
 
+    it("refuses an option filed under no category, and an option whose id the legacy mode state lists, as the computer does", async () => {
+        const uncategorized = { choices: MODEL.choices, currentValue: "fast", id: "effort", name: "Effort" };
+        const listedAsMode = { category: "model", choices: MODEL.choices, currentValue: "fast", id: "ask", name: "Ask" };
+        const { threadId } = await readySession({ configOptions: [uncategorized, listedAsMode, MODEL], modes: MODES });
+
+        await expect(setOption(threadId, { optionId: "effort", valueId: "deep" })).rejects.toThrow(MODE_REFUSAL);
+        await expect(setOption(threadId, { optionId: "ask", valueId: "deep" })).rejects.toThrow(MODE_REFUSAL);
+        expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(0);
+
+        // A categorized model option still goes out: the set refused is the computer's set, no wider.
+        await expect(setOption(threadId, { optionId: "model", valueId: "deep" })).resolves.toMatchObject({ sent: true });
+        expect(await rows("deviceCalls", { toolName: "acp_set_config" })).toHaveLength(1);
+    });
+
     it("refuses a legacy mode while the agent sends options, and a session that reported nothing", async () => {
         const both = await readySession({ configOptions: [MODEL], modes: MODES });
 

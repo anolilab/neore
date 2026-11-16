@@ -388,10 +388,14 @@ export const setHostOption = authMutation
         }
 
         // A mode can grant standing permissions (edits, every tool, without asking), and a remote answer may only allow once or
-        // decline: so a mode is changed on the computer, where the person sees what it grants. Only other options change from here.
+        // decline: so a mode is changed on the computer, where the person sees what it grants. This is the set the desktop
+        // refuses too (`setRemoteOption` in apps/desktop/src/acp/session.ts): a mode, an option filed under no category (it
+        // cannot be shown not to be a mode), and an id the legacy mode state lists. Only other options change from here.
         const option = args.optionId === undefined ? undefined : session.agentState?.configOptions?.find((entry) => entry.id === args.optionId);
+        const legacyMode = args.optionId !== undefined && session.agentState?.modes?.available.some((mode) => mode.id === args.optionId) === true;
+        const isMode = option !== undefined && (option.category === undefined || option.category.toLowerCase() === "mode");
 
-        if (args.optionId === undefined || option?.category?.toLowerCase() === "mode") {
+        if (args.optionId === undefined || legacyMode || isMode) {
             throw new LunoraError("BAD_REQUEST", "A mode is changed on the computer, not from here.");
         }
 
