@@ -647,9 +647,13 @@ overrides:
   "@eslint/plugin-kit@<0.3.3": ">=0.5.0"
   "@grpc/grpc-js@<1.14.5": ">=1.14.5"
   "@hono/node-server@<1.19.10": ">=1.19.10"
-  "@hono/node-server@<2.0.10": ">=2.0.10"
+  "@hono/node-server@<2.0.0": ">=2.0.10"
   # GHSA-qv5m-9pm6-hqp3, GHSA-jpvv-r467-5p4w: backslash path parsing, patched in 2.1.6. The 2.x range only, so 1.x is untouched.
   "@hono/node-server@>=2.0.0 <2.1.6": ">=2.1.6"
+  # Keeps the lint tooling on 0.9.22. Re-resolving the hono override also re-resolves react-doctor's peers, and that
+  # moved both packages to 0.9.23 with no change of ours. Remove these two lines once 0.9.23 is wanted on purpose.
+  oxlint-plugin-react-doctor: 0.9.22
+  react-doctor: 0.9.22
   "@humanfs/node@<0.16.8": ">=0.16.8"
   "@langchain/core@<0.3.80": ">=0.3.80"
   # @lunora/auth@alpha.63 peer-depends on better-auth 1.7.0-rc.2; the catalog now
