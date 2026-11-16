@@ -438,7 +438,10 @@ const GatewayCacheKv = Cloudflare.KV.Namespace("llm-gateway-cache", { title: sta
 // `.shardBy()` tables from the schema, and `.global()` tables are created on first
 // access. The schema-drift gate runs in `pnpm build` (`lunora build`), before this
 // deploy. Only a data backfill (`defineMigration`) needs `lunora migrate up --prod
-// --yes --url <worker>` after the deploy; none exists yet.
+// --yes --url <worker>` after the deploy. The agent-options backfills in
+// `backend/lunora/migrations.ts` (`drop-agent-option-fields`, `session-options-to-session-state`)
+// are such a backfill: that command must run after the deploy that ships them, or stored sessions
+// keep the removed `agentOptions` fields and stored chunks keep the removed `session_options` event.
 const BackendDatabase = Cloudflare.D1.Database("neore-backend-db", { jurisdiction: dataJurisdiction, name: named("neore-backend") });
 
 const BackendFiles = Cloudflare.R2.Bucket("neore-backend-files", {
