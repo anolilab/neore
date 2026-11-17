@@ -125,9 +125,9 @@ export const readMachinePath = (value: unknown, local: boolean, allowEmpty = fal
         throw new Error("device: path is invalid");
     }
 
-    // On Windows `isAbsolute` also accepts UNC and device paths (`\\host\share`, `\\?\`), which name network or device targets.
-    // Any mix of the two separators at the start (`\\`, `//`, `\/`, `/\`) starts one.
-    const networkOrDevice = local && NETWORK_OR_DEVICE_PATH.test(folder);
+    // On Windows `isAbsolute` also accepts UNC and device paths (`\\host\share`, `\\?\`), which name network or device targets,
+    // and any mix of the two separators at the start (`\\`, `//`, `\/`, `/\`) starts one. On POSIX those are ordinary path characters.
+    const networkOrDevice = local && path.sep === "\\" && NETWORK_OR_DEVICE_PATH.test(folder);
 
     if (networkOrDevice || !(local ? path.isAbsolute(folder) : folder.startsWith("/"))) {
         throw new Error("device: path must be absolute");

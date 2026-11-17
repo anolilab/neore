@@ -29,6 +29,8 @@ interface Block {
     /** The `Host` patterns of the block; the block before the first `Host` line holds `*`, as ssh applies it to every host. */
     patterns: string[];
     port: number | null;
+    /** The first ProxyJump or ProxyCommand value: `none` connects directly, any other is unsupported. */
+    proxy: "direct" | "unsupported" | null;
     reason: string | null;
     user: string | null;
 }
@@ -37,15 +39,15 @@ interface Block {
 const WILDCARD = /[*?]/u;
 const GLOB_SPECIAL = /[$()+.\\[\]^{|}]/gu;
 const KEY_END = /[\s=]/u;
-const WORD = /"([^"]*)"|(\S+)/gu;
 const LINE_BREAK = /\r?\n/u;
 const DIGITS = /^\d+$/u;
 const SPACE = /\s/u;
 
-const EMPTY: Block = { hostName: null, identityCount: 0, identityFile: null, patterns: [], port: null, reason: null, user: null };
+const EMPTY: Block = { hostName: null, identityCount: 0, identityFile: null, patterns: [], port: null, proxy: null, reason: null, user: null };
 
 const MULTIPLE_IDENTITIES = "This host has more than one IdentityFile in ~/.ssh/config, which Neore does not support.";
 const RELATIVE_IDENTITY = "This host has a relative IdentityFile in ~/.ssh/config, which Neore does not support.";
+const PROXY = "This host uses ProxyJump or ProxyCommand in ~/.ssh/config, which Neore does not support.";
 const MATCH_RULE = "This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate.";
 
 /** Drops a trailing `# comment`: a `#` that starts the text or follows a space, outside quotes. */
@@ -65,7 +67,38 @@ const stripComment = (value: string): string => {
     return value;
 };
 
-const words = (value: string): string[] => Array.from(stripComment(value).matchAll(WORD), (match) => match[1] ?? match[2] ?? "");
+/** Splits a value into words as ssh does: spaces separate, double quotes group, and outside quotes a backslash makes the next character literal. */
+const words = (value: string): string[] => {
+    const text = stripComment(value);
+    const found: string[] = [];
+    let word: string | null = null;
+    let quoted = false;
+
+    for (let index = 0; index < text.length; index += 1) {
+        const char = text.charAt(index);
+
+        if (char === '"') {
+            quoted = !quoted;
+            word = word ?? "";
+        } else if (!quoted && char === "\\" && index + 1 < text.length) {
+            index += 1;
+            word = (word ?? "") + text.charAt(index);
+        } else if (!quoted && SPACE.test(char)) {
+            if (word !== null) {
+                found.push(word);
+                word = null;
+            }
+        } else {
+            word = (word ?? "") + char;
+        }
+    }
+
+    if (word !== null) {
+        found.push(word);
+    }
+
+    return found;
+};
 
 const firstWord = (value: string): string | null => words(value)[0] ?? null;
 
@@ -115,7 +148,8 @@ const settingOf = (key: string, value: string, home: string): Partial<Block> => 
                 return {};
             }
 
-            if (file.includes("%")) {
+            // `~user/...` names another user's home, which the reader does not expand; ssh's own `~` is the only one handled.
+            if (file.includes("%") || (file.startsWith("~") && file !== "~" && !file.startsWith("~/"))) {
                 return { reason: unsupported(key) };
             }
 
@@ -124,10 +158,13 @@ const settingOf = (key: string, value: string, home: string): Partial<Block> => 
             // A relative key is resolved by ssh against a place this reader does not know, so the host is disabled rather than guessed at.
             return path.isAbsolute(expanded) ? { identityCount: 1, identityFile: expanded } : { identityCount: 1, reason: RELATIVE_IDENTITY };
         }
-        case "include":
+        case "include": {
+            return { reason: unsupported(key) };
+        }
         case "proxycommand":
         case "proxyjump": {
-            return { reason: unsupported(key) };
+            // `none` turns proxying off, so the host connects directly; any other value needs a jump or command the transport cannot make.
+            return { proxy: firstWord(value)?.toLowerCase() === "none" ? "direct" : "unsupported" };
         }
         case "port": {
             const port = parsePort(firstWord(value) ?? "");
@@ -153,6 +190,7 @@ const mergeFirst = (block: Block, patch: Partial<Block>): Block => {
         identityCount: block.identityCount + (patch.identityCount ?? 0),
         identityFile: block.identityFile ?? patch.identityFile ?? null,
         port: block.port ?? patch.port ?? null,
+        proxy: block.proxy ?? patch.proxy ?? null,
         reason: block.reason ?? patch.reason ?? null,
         user: block.user ?? patch.user ?? null,
     };
@@ -295,7 +333,7 @@ export const parseSshConfig = (text: string, home: string): SshHost[] => {
 
         hosts.push({
             alias,
-            disabledReason: effective.reason ?? (effective.identityCount > 1 ? MULTIPLE_IDENTITIES : null) ?? (usesMatch ? MATCH_RULE : null),
+            disabledReason: effective.reason ?? (effective.proxy === "unsupported" ? PROXY : null) ?? (effective.identityCount > 1 ? MULTIPLE_IDENTITIES : null) ?? (usesMatch ? MATCH_RULE : null),
             hostName: effective.hostName,
             identityFile: effective.identityFile,
             port: effective.port === 0 ? null : effective.port,

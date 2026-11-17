@@ -56,6 +56,20 @@ describe("parseSshConfig", () => {
         expect(host).toMatchObject({ alias: "box", port: null });
     });
 
+    it("reads an escaped space as part of an unquoted IdentityFile", () => {
+        expect(parse("Host a\n  IdentityFile /home/me/keys/work\\ key\n")[0]).toMatchObject({ disabledReason: null, identityFile: "/home/me/keys/work key" });
+    });
+
+    it("disables a host whose IdentityFile names another user's home, which the reader does not expand", () => {
+        expect(parse("Host a\n  IdentityFile ~alice/.ssh/id\n")[0]?.disabledReason).toMatch(/IdentityFile/u);
+    });
+
+    it("connects directly for ProxyJump none, and honours the first ProxyJump value in file order", () => {
+        expect(parse("Host a\n  ProxyJump none\n")[0]?.disabledReason).toBeNull();
+        expect(parse("Host a\n  ProxyJump none\nHost *\n  ProxyJump bastion\n")[0]?.disabledReason).toBeNull();
+        expect(parse("Host *\n  ProxyJump bastion\nHost a\n  ProxyJump none\n")[0]?.disabledReason).toMatch(/ProxyJump/u);
+    });
+
     it("disables a host that uses Include, ProxyJump or ProxyCommand, with a reason", () => {
         const hosts = parse("Host a\n  ProxyJump bastion\nHost b\n  Include extra\nHost c\n  ProxyCommand nc %h %p\nHost d\n  HostName d.example.com\n");
 
