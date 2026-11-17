@@ -58,16 +58,18 @@ export const looksSensitive = (line: string): boolean => SENSITIVE_RES.some((re)
 /** Two lines that differ only in case or spacing are the same fact. */
 export const importDedupKey = (line: string): string => line.toLowerCase().replaceAll(WHITESPACE_RE, " ");
 
-/** One line as stored: wrapping removed, whitespace collapsed, capped. Empty when nothing is left. */
+/** Prompt tags removed until none is left: one removal can join the text around it into a new tag. */
+const stripDataTags = (text: string): string => {
+    const stripped = text.replaceAll(DATA_TAG_RE, "");
+
+    return stripped === text ? text : stripDataTags(stripped);
+};
+
+/** One line as stored: wrapping removed, whitespace collapsed, capped. Empty when nothing is left. Tags go last, after every step that could form one. */
 export const cleanImportLine = (raw: string): string =>
-    raw
-        .trim()
-        .replace(LINE_PREFIX_RE, "")
-        .replaceAll(DATA_TAG_RE, "")
-        .replaceAll(EMPHASIS_RE, "")
-        .replaceAll(WHITESPACE_RE, " ")
-        .trim()
-        .slice(0, IMPORT_MAX_FACT_CHARS);
+    stripDataTags(
+        raw.trim().replace(LINE_PREFIX_RE, "").replaceAll(EMPHASIS_RE, "").replaceAll(WHITESPACE_RE, " ").trim().slice(0, IMPORT_MAX_FACT_CHARS),
+    ).trim();
 
 /**
  * The paste as candidate facts: one per line, cleaned, without repeats, short lines or
