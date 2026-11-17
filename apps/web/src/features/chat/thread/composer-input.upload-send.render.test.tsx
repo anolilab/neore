@@ -1,0 +1,281 @@
+/**
+ * A send pressed while an upload runs waits for it. It goes out once every upload completes, with the finished files.
+ * A failed upload stops it with a message, and a file removed while waiting cancels it, so an unfinished attachment is
+ * never sent.
+ */
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode, Ref } from "react";
+import { useImperativeHandle } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+
+import type { ComposerInputAreaRef } from "./composer-input-area";
+
+const harness = vi.hoisted(() => {
+    return {
+        sendMessage: vi.fn(async () => undefined),
+        showError: vi.fn(),
+        showInfo: vi.fn(),
+    };
+});
+
+vi.mock("@/features/connection/hooks/use-connection", () => {
+    return { useConnectionView: () => "online" };
+});
+
+vi.mock("@lingui/react/macro", () => {
+    return {
+        Trans: ({ children }: { children: ReactNode }) => children,
+        useLingui: () => {
+            return {
+                i18n: { _: (descriptor: { id: string }) => descriptor.id, locale: "en" },
+                t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values),
+            };
+        },
+    };
+});
+
+vi.mock("@/features/auth/hooks/use-invite-only", () => {
+    return {
+        default: () => {
+            return { canSignUp: false, inviteOnly: false, mustSignIn: false, signUpHref: "/auth/sign-in" };
+        },
+    };
+});
+
+vi.mock("@/features/chat/core/hooks/use-pending-send", async (importOriginal) => {
+    const original = await importOriginal<typeof import("@/features/chat/core/hooks/use-pending-send")>();
+
+    return { ...original, default: () => undefined };
+});
+
+vi.mock("@/features/chat/core/context/chat-context", () => {
+    return {
+        useChatActions: () => {
+            return { cancelStream: vi.fn(), jwtToken: "", sendMessage: harness.sendMessage };
+        },
+        useChatIsStreaming: () => {
+            return { isStreaming: false, sseStreamState: null };
+        },
+        useChatLunora: () => {
+            return {};
+        },
+        useChatMessages: () => {
+            return { isStreaming: false, messages: [], messagesStatus: "loaded" };
+        },
+        useChatThread: () => {
+            return { isNewThread: true, threadId: undefined };
+        },
+    };
+});
+
+vi.mock("@/features/layout/hooks/use-ui-state", () => {
+    return {
+        useUserPreferences: () => {
+            return { sendBehavior: "enter" };
+        },
+    };
+});
+
+vi.mock("@/features/chat/core/hooks/use-comparison-chat", () => {
+    return {
+        default: () => {
+            return { isLoading: false, sendComparisonMessage: vi.fn(async () => undefined) };
+        },
+    };
+});
+
+vi.mock("@/features/chat/core/hooks/use-runner-capabilities", () => {
+    return { default: () => null };
+});
+
+// The upload path reads `VITE_LUNORA_URL` at import time, and CI runs without one.
+vi.mock("@/lib/auth/server-functions", () => {
+    return { default: vi.fn() };
+});
+
+vi.mock("@/lib/toast", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("@/lib/toast")>()), showError: harness.showError, showInfo: harness.showInfo };
+});
+
+vi.mock("@/lib/env", () => {
+    return { default: { VITE_LUNORA_URL: "http://localhost:8788" } };
+});
+
+vi.mock("@/lib/lunora/crpc", () => {
+    const proxy: unknown = new Proxy(() => undefined, {
+        apply: () => {
+            return { mutationFn: async () => undefined };
+        },
+        get: () => proxy,
+    });
+
+    return {
+        useCRPC: () => proxy,
+        useLunoraActionOptions: () => {
+            return { mutationFn: async () => undefined };
+        },
+    };
+});
+
+vi.mock("./composer-tiptap/use-composer-autocomplete", () => {
+    return { default: () => undefined };
+});
+
+// The input row stands in with its contract: a send control, and whether a send is waiting on uploads.
+const InputArea = ({ isSendWaiting, onSubmit, ref }: { isSendWaiting?: boolean; onSubmit: () => void; ref?: Ref<ComposerInputAreaRef> }) => {
+    useImperativeHandle(ref, () => {
+        return { blur: () => undefined, focus: () => undefined, getEditor: () => null };
+    });
+
+    return (
+        <div>
+            <output aria-label="Send state">{isSendWaiting ? "waiting" : "ready"}</output>
+            <button onClick={onSubmit} type="button">
+                Send
+            </button>
+        </div>
+    );
+};
+
+vi.mock("./composer-input-area", () => {
+    return { default: InputArea };
+});
+
+for (const path of [
+    "@/features/chat/voice-mode/auto-read-replies",
+    "@/features/chat/voice-mode/voice-mode-button",
+    "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button",
+    "@/features/chat/components/reference-picker/reference-strip",
+    "./completion-sound",
+    "./composer-prompt-queue",
+    "./reply-complete-announcement",
+    "./turn-step-announcement",
+    "./composer-long-text-prompt",
+]) {
+    vi.doMock(path, () => {
+        return { default: () => null };
+    });
+}
+
+const { default: ComposerInput } = await import("./composer-input");
+
+const renderComposer = () =>
+    render(
+        <QueryClientProvider client={new QueryClient()}>
+            <ComposerInput />
+        </QueryClientProvider>,
+    );
+
+/** A file in the draft at the given upload status, as the composer's upload handler leaves it. */
+const addUpload = (status: "error" | "uploading"): string => {
+    const { addAttachment, updateAttachment } = useChatUIStore.getState();
+    const id = addAttachment(new File(["notes"], "notes.txt", { type: "text/plain" }));
+
+    updateAttachment(id, { error: status === "error" ? "boom" : undefined, status });
+
+    return id;
+};
+
+const pressSend = () => {
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+};
+
+const sendState = () => screen.getByLabelText("Send state").textContent;
+
+describe("ComposerInput send during an upload", () => {
+    beforeEach(() => {
+        useChatUIStore.getState().setComposerText("see notes");
+    });
+
+    afterEach(() => {
+        useChatUIStore.getState().clearComposer();
+        useChatUIStore.getState().setIsSubmitting(false);
+        vi.clearAllMocks();
+    });
+
+    it("waits for the upload instead of sending, and shows the send as pending", () => {
+        addUpload("uploading");
+        renderComposer();
+        pressSend();
+
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+        expect(sendState()).toBe("waiting");
+        expect(useChatUIStore.getState().composerText).toBe("see notes");
+    });
+
+    it("sends once the upload completes, with the finished file", async () => {
+        const id = addUpload("uploading");
+
+        renderComposer();
+        pressSend();
+
+        useChatUIStore.getState().updateAttachment(id, { fileId: "file-1", progress: 100, status: "complete" });
+
+        await waitFor(() => {
+            expect(harness.sendMessage).toHaveBeenCalledWith("see notes", [expect.objectContaining({ fileId: "file-1", id, status: "complete" })]);
+        });
+        expect(sendState()).toBe("ready");
+    });
+
+    it("sends only once, however often send is pressed while waiting", async () => {
+        const id = addUpload("uploading");
+
+        renderComposer();
+        pressSend();
+        pressSend();
+
+        useChatUIStore.getState().updateAttachment(id, { fileId: "file-1", status: "complete" });
+
+        await waitFor(() => {
+            expect(harness.sendMessage).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    it("does not send when an upload fails, and tells the user to remove the file", async () => {
+        const id = addUpload("uploading");
+
+        renderComposer();
+        pressSend();
+
+        useChatUIStore.getState().updateAttachment(id, { error: "boom", status: "error" });
+
+        await waitFor(() => {
+            expect(harness.showError).toHaveBeenCalledWith('"notes.txt" could not be uploaded. Remove it to send.');
+        });
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+        expect(sendState()).toBe("ready");
+    });
+
+    it("sends the text once the failed file is removed and send is pressed again", () => {
+        const id = addUpload("error");
+
+        renderComposer();
+        pressSend();
+
+        expect(harness.showError).toHaveBeenCalledWith('"notes.txt" could not be uploaded. Remove it to send.');
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+
+        useChatUIStore.getState().removeAttachment(id);
+        pressSend();
+
+        expect(harness.sendMessage).toHaveBeenCalledWith("see notes", []);
+    });
+
+    it("cancels the wait when a file still uploading is removed, so nothing goes out", async () => {
+        const id = addUpload("uploading");
+
+        renderComposer();
+        pressSend();
+
+        useChatUIStore.getState().removeAttachment(id);
+
+        await waitFor(() => {
+            expect(sendState()).toBe("ready");
+        });
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+        expect(useChatUIStore.getState().composerText).toBe("see notes");
+    });
+});

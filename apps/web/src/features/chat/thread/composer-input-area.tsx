@@ -82,9 +82,11 @@ interface ComposerInputAreaProps {
     hiddenRemoved?: number;
     /** Whether a recalled prompt is showing, see `ComposerTiptapEditor` */
     isHistoryRecalled?: () => boolean;
+    /** A send was pressed while uploads run and waits for them: the send button shows the pending state */
+    isSendWaiting?: boolean;
     /** Whether streaming is active (shows stop button) */
     isStreaming?: boolean;
-    /** Whether file uploads are in progress (disables send with upload tooltip) */
+    /** Whether file uploads are in progress (the send stays enabled and goes out once they finish) */
     isUploading?: boolean;
     /** Max rows for editor */
     maxRows?: number;
@@ -151,6 +153,7 @@ const ComposerInputArea = ({
     hiddenRemoved = 0,
     hasCompletedAttachments = false,
     isStreaming = false,
+    isSendWaiting = false,
     isUploading = false,
     maxRows = 5,
     onAddAttachment,
@@ -196,6 +199,9 @@ const ComposerInputArea = ({
     const isEmpty = !value.trim();
     // A draft with only a finished attachment is sendable, so it needs the send control as much as typed text does.
     const canSend = !isEmpty || hasCompletedAttachments;
+    // A send pressed during an upload waits for it, and the button says so until the send goes out.
+    const uploadingSendLabel = isUploading ? t`Send when uploads finish` : t`Send message`;
+    const sendLabel = isSendWaiting ? t`Sending once uploads finish…` : uploadingSendLabel;
     // Over the cap the handlers refuse to send; the buttons say so instead of doing nothing.
     const isOverCap = value.length > MAX_PROMPT_CHARS;
     const lengthNoticeId = useId();
@@ -418,21 +424,21 @@ const ComposerInputArea = ({
                                     render={
                                         <button
                                             aria-describedby={overCapDescription}
-                                            aria-label={isUploading ? t`Waiting for uploads to complete…` : t`Send message`}
+                                            aria-label={sendLabel}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "default" }),
                                                 "my-2 size-[34px]",
                                                 compact && "my-1.5 size-[30px]",
                                             )}
-                                            disabled={disabled || isUploading || isOverCap}
+                                            disabled={disabled || isOverCap}
                                             onClick={onSubmit}
                                             type="button"
                                         >
-                                            {isUploading ? <Loader2Icon className="size-4 animate-spin" /> : <SendIcon className="size-4" />}
+                                            {isSendWaiting ? <Loader2Icon className="size-4 animate-spin" /> : <SendIcon className="size-4" />}
                                         </button>
                                     }
                                 />
-                                <TooltipContent side="bottom">{isUploading ? t`Waiting for uploads to complete…` : sendTooltip}</TooltipContent>
+                                <TooltipContent side="bottom">{isUploading ? sendLabel : sendTooltip}</TooltipContent>
                             </Tooltip>
                         )}
                     </>

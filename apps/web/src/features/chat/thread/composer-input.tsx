@@ -86,6 +86,8 @@ import interruptAndSend from "./interrupt-and-send";
 import { readChatMessages } from "./read-chat-messages";
 import ReplyCompleteAnnouncement from "./reply-complete-announcement";
 import TurnStepAnnouncement from "./turn-step-announcement";
+import type { UploadWait } from "./upload-send-wait";
+import { settleUploadWait, uploadWaitIds } from "./upload-send-wait";
 import { useAttachmentExtraction } from "./use-attachment-extraction";
 import { usePasteGuard } from "./use-paste-guard";
 import { PromptHistorySource, usePromptHistory } from "./use-prompt-history";
@@ -578,6 +580,8 @@ const ComposerInput = ({
 
     // True while any attachment is still uploading — blocks send and shows spinner on button
     const hasUploadingAttachments = attachments.some((a) => a.status === "pending" || a.status === "uploading");
+    // A send pressed while uploads run waits for them here; `settleUploadWait` decides when it goes out or stops.
+    const [uploadWait, setUploadWait] = useState<UploadWait | null>(null);
     // bannedContent is subscribed because it drives render output (word highlights + error message).
     // isSubmitting / setIsSubmitting / setComposerBannedContent are only read inside callbacks
     // so we access them via getState() to avoid unnecessary re-renders (rerender-defer-reads).
@@ -1134,6 +1138,13 @@ const ComposerInput = ({
             .finally(() => clearTimeout(unanswered));
     }, [canSteer, cancelStream, clear, isOffline, disabled, followUp, promptHistory, sseStreamState, steerRun, t, text, threadId]);
 
+    const notifyFailedUpload = useCallback(
+        (fileName: string) => {
+            showError(t`"${fileName}" could not be uploaded. Remove it to send.`);
+        },
+        [t],
+    );
+
     // Handle submit — fully synchronous, fire-and-forget network call.
     // Optimistic state (user message + Thinking...) is shown immediately inside
     // sendMessage before the first await. The network request runs in the background.
@@ -1161,6 +1172,19 @@ const ComposerInput = ({
         const pendingAttachments = draftAttachments.filter((a) => a.status !== "complete");
 
         if (pendingAttachments.length > 0) {
+            const failed = pendingAttachments.find((a) => a.status === "error");
+
+            if (failed) {
+                notifyFailedUpload(failed.name);
+
+                return;
+            }
+
+            // Not sent yet: it waits for the uploads and goes out once they finish (see the effect after the auto-submit).
+            setUploadWait((current) => {
+                return { attachmentIds: uploadWaitIds(draftAttachments, current), threadId };
+            });
+
             return;
         }
 
@@ -1285,6 +1309,7 @@ const ComposerInput = ({
         compactThread,
         clearThreadContext,
         setText,
+        notifyFailedUpload,
     ]);
 
     // "Send as a new chat" from outside the chat UI (the native shell's Quick
@@ -1341,6 +1366,28 @@ const ComposerInput = ({
         autoSubmitTextRef.current = null;
         handleSubmit();
     }, [autoSubmitRequest, disabled, handleSubmit, isStreaming, text]);
+
+    // A send that waited for uploads settles as they change: it goes out once they all complete, while a failed or removed
+    // upload stops it, so an unfinished attachment is never sent.
+    useEffect(() => {
+        if (uploadWait === null) {
+            return;
+        }
+
+        const outcome = settleUploadWait(uploadWait, attachments, threadId);
+
+        if (outcome.kind === "waiting") {
+            return;
+        }
+
+        setUploadWait(null);
+
+        if (outcome.kind === "failed") {
+            notifyFailedUpload(outcome.name);
+        } else if (outcome.kind === "send") {
+            handleSubmit();
+        }
+    }, [attachments, handleSubmit, notifyFailedUpload, threadId, uploadWait]);
 
     // Handle cancel/stop
     // A manual stop pauses the queue: the chips stay, nothing auto-sends.
@@ -1736,6 +1783,7 @@ const ComposerInput = ({
                 hasCompletedAttachments={hasCompletedAttachments}
                 hiddenRemoved={hiddenRemoved}
                 isHistoryRecalled={isThreadComposer ? promptHistory.isRecalled : undefined}
+                isSendWaiting={uploadWait !== null}
                 isStreaming={isSSEStreaming || isComparisonLoading}
                 isUploading={hasUploadingAttachments}
                 maxRows={maxRows}
