@@ -241,13 +241,13 @@ const BotsSettings = () => {
                 {!isLoading && bots.length === 0 && <p className="text-muted-foreground text-sm">{t`No bots yet.`}</p>}
                 <ul className="divide-border divide-y">
                     {bots.map((bot) => (
-                        <li className="flex items-center justify-between gap-4 py-3" key={bot._id}>
+                        <li className="flex flex-wrap items-center justify-between gap-4 py-3" key={bot._id}>
                             <div className="min-w-0">
                                 <p className="truncate font-medium">{bot.name}</p>
                                 {bot.description && <p className="text-muted-foreground truncate text-sm">{bot.description}</p>}
                                 {bot.computerEnabled && <p className="text-muted-foreground text-xs">{t`Has a computer`}</p>}
                             </div>
-                            <div className="flex shrink-0 items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <PermissionModeSelect
                                     aria-label={t`Permission mode for ${bot.name}`}
                                     disabled={updateMutation.isPending}

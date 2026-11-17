@@ -19,6 +19,7 @@ const seen = vi.hoisted(() => {
         backups: [] as (string | undefined)[],
         /** The bot's permission mode `bots_functions:getBotPermissionModeForRun` answers, and the arguments it was asked with. */
         botMode: null as "auto" | "full" | "supervised" | null,
+        botModeFails: false,
         botModeReads: [] as unknown[],
         buildOptions: [] as unknown[],
         callOptions: [] as unknown[],
@@ -159,6 +160,10 @@ const fakeCtx = (prefs: typeof PREFS = PREFS) =>
 
             if (reference === "bots_functions:getBotPermissionModeForRun") {
                 seen.botModeReads.push(args);
+
+                if (seen.botModeFails) {
+                    throw new Error("bot unavailable");
+                }
 
                 return seen.botMode;
             }
@@ -606,6 +611,32 @@ describe("runHeadlessAgent tool allowlist", () => {
 
         expect(seen.botModeReads).toStrictEqual([{ botId: undefined, threadId: "thread-1", userId: "owner" }]);
         expect(seen.buildOptions[0]).toMatchObject({ headless: true, unattendedMode: "supervised" });
+    });
+
+    it("builds its tools supervised when the bot's mode cannot be read, and leaves a new thread's mode alone", async () => {
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        seen.botModeFails = true;
+
+        try {
+            await runHeadlessAgent(ctx as never, {
+                botId: "bot-1",
+                maxSteps: 5,
+                memory: false,
+                model: "test-model",
+                organizationId: null,
+                origin: "lead",
+                personalization: "none",
+                thread: { title: "Chat" },
+                tools: "headless",
+                userId: "owner",
+            });
+        } finally {
+            seen.botModeFails = false;
+        }
+
+        expect(seen.buildOptions[0]).toMatchObject({ headless: true, unattendedMode: "supervised" });
+        expect(ctx.runMutation.mock.calls.some(([reference]) => reference === "chat_thread_state:copyThreadPermissionMode")).toBe(false);
     });
 
     it("offers extra built-ins to the tool builder as candidates, headless", async () => {

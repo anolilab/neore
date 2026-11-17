@@ -400,7 +400,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         ...(trusted && { lowRiskTrusted: trusted }),
         ...(headlessCanAsk && { headlessCanAsk: true }),
         ...(threadMode && { threadMode }),
-        ...(headless && unattendedMode && { unattendedMode }),
+        ...(unattendedMode && { unattendedMode }),
         timedGrants,
     });
 
