@@ -59,7 +59,7 @@ export const Sent: Story = {
     },
 };
 
-/** The server refused (rate limited): the dialog stays open with the text kept. */
+/** The server refused (rate limited): the dialog says so, stays open and keeps the text. */
 export const Refused: Story = {
     parameters: {
         msw: {
@@ -70,7 +70,7 @@ export const Refused: Story = {
         await userEvent.type(await screen.findByRole("textbox", { name: "Your feedback" }), "Hello");
         await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
-        await expect(await screen.findByRole("alert")).toHaveTextContent("Your feedback could not be sent. Please try again.");
+        await expect(await screen.findByRole("alert")).toHaveTextContent("You have sent a lot of feedback recently. Please try again in an hour.");
         await expect(args.onOpenChange).not.toHaveBeenCalledWith(false);
         await expect(screen.getByRole("textbox", { name: "Your feedback" })).toHaveValue("Hello");
     },
