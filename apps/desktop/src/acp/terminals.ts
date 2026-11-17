@@ -375,7 +375,12 @@ export class SessionTerminals {
             }
 
             terminal.cancelled = true;
-            this.host.kill(terminal.handle);
+
+            try {
+                this.host.kill(terminal.handle);
+            } catch {
+                // The core forgot it already (it was stopped): nothing is left to end, and the rest of the cancel must still run.
+            }
         }
     }
 
