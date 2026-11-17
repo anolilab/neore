@@ -617,10 +617,20 @@ export const getStreamText = internalQuery
         let hostActivity: HostActivity | undefined;
 
         if (stream.status !== "pending") {
-            const { page: allChunks } = await ctx.db.persistentChunks.findMany({
-                orderBy: [{ seq: "asc" }],
-                where: { streamId: args.streamId },
-            });
+            // Every page: a long turn writes more chunks than one page holds, and the activity of its later steps is in them.
+            const allChunks: Doc<"persistentChunks">[] = [];
+            let cursor: string | undefined;
+
+            do {
+                const page = await ctx.db.persistentChunks.findMany({
+                    cursor,
+                    orderBy: [{ seq: "asc" }],
+                    where: { streamId: args.streamId },
+                });
+
+                allChunks.push(...page.page);
+                cursor = page.isDone ? undefined : (page.continueCursor ?? undefined);
+            } while (cursor);
             // In a group turn, earlier participants' replies are already saved
             // messages; only the current speaker's text is still "streaming".
             // Likewise the text before a steered message (`restart`).
