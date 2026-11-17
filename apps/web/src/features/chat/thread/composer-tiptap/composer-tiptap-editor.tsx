@@ -631,8 +631,10 @@ const ComposerTiptapEditor = ({
     const requestCompletionRef = useRef(requestCompletion);
     const lastAnnouncedAtRef = useRef<number | null>(null);
     const hasCompletionSource = Boolean(requestCompletion);
-    // A shortcode being typed counts as a popup, open or not yet, so the ghost does not finish it while it is typed.
-    const isPopupOpen = Boolean(slashMatch || fileMentionMatch || variableMatch || emojiOpen || (suggestions && emojiMatchState));
+    // A shortcode being typed counts as a popup, open or not yet, so the ghost does not finish it while it is typed. A bare
+    // colon, or the colon that closes a finished `:dog:`, has an empty query and is not typing one.
+    const emojiTyping = suggestions && emojiMatchState !== null && emojiMatchState.query !== "";
+    const isPopupOpen = Boolean(slashMatch || fileMentionMatch || variableMatch || emojiOpen || emojiTyping);
     const ghostAnnouncementText = t`Suggestion available, press Right Arrow to accept`;
 
     useEffect(() => {
