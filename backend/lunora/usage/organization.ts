@@ -329,8 +329,9 @@ export const getOrganizationProjectUsage = authAction
             let index = 0;
 
             while (index < batch.length && !stopped) {
-                // The member shards one walk asks, all of them: a Free Worker allows 50 subrequests, and the scope reads come on top.
-                const size = Math.min(SHARD_CONCURRENCY, MAX_MEMBER_CALLS - walked.length);
+                // The member shards one walk asks, all of them: a Free Worker allows 50 subrequests, and the scope reads come on top. A chunk
+                // stops at the call's member limit, so no member past it is read and then thrown away.
+                const size = Math.min(SHARD_CONCURRENCY, MAX_MEMBER_CALLS - walked.length, MAX_MEMBERS_PER_CALL - walked.length);
 
                 if (size <= 0) {
                     stopped = true;
