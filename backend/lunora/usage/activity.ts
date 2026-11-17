@@ -213,8 +213,10 @@ const bookContributor = async (ctx: MutationCtx, reply: { at: number; organizati
     let listed: unknown;
 
     try {
-        // Not the primary: a stale miss only schedules a reconcile, which reads the primary and changes nothing when the entry is there.
+        // The primary: a stale hit on an entry pruning just removed would skip the reconcile that restores it, and the row would stay out of
+        // the view until the member's next reply.
         listed = await ctx.db.usageOrganizationContributors.findFirst({
+            consistency: "primary",
             where: { organizationId: reply.organizationId, userId: reply.userId },
         });
     } catch (error) {
