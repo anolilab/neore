@@ -123,13 +123,14 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
 
     const toSave: { embedding: number[] | null; fact: ImportedFact; supersedes: Id<"memories"> | undefined }[] = [];
     const toConfirm: Id<"memories">[] = [];
-    // New facts join the dedup list, so two near-identical lines in one paste save once.
+    // New facts join the dedup list, so two near-identical lines in one paste save once. Only a
+    // near-exact repeat is dropped: the user checked both, so a merely similar one is kept.
     const added: { _id: string; memory: string }[] = [];
 
     let revisions = 0;
 
     for (const [index, fact] of facts.entries()) {
-        if (findSimilarMemoryByJaccard(fact.memory, added)) {
+        if ((findSimilarMemoryByJaccard(fact.memory, added)?.score ?? 0) >= 0.95) {
             result.alreadyKnown += 1;
             continue;
         }
@@ -171,7 +172,12 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
                 memoryId: similar.id,
             });
             // The merged text needs its own vector, or a repeat import matches the old one and revises again.
-            await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: similar.id, userId: args.userId });
+            // Never fatal: the merge is saved, and the rest of the paste still has to be.
+            try {
+                await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: similar.id, userId: args.userId });
+            } catch (error) {
+                console.error("[memory/import] Scheduling the re-embed failed:", error);
+            }
 
             if (match) {
                 match.memory = memory;

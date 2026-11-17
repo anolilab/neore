@@ -6,12 +6,13 @@ import { api } from "@neore/backend/api";
 import { Button } from "@neore/ui/components/button";
 import { Checkbox } from "@neore/ui/components/checkbox";
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle, DialogTrigger } from "@neore/ui/components/dialog";
+import { Label } from "@neore/ui/components/label";
 import { Textarea } from "@neore/ui/components/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
 import { useMutation } from "@tanstack/react-query";
 import { CopyIcon, DownloadIcon } from "lucide-react";
 import type { FC } from "react";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
@@ -63,13 +64,23 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
     const [preview, setPreview] = useState<Preview | undefined>(undefined);
     const [unchecked, setUnchecked] = useState<ReadonlySet<number>>(new Set());
     const [isEnabling, setIsEnabling] = useState(false);
+    const focusPasteOnEnable = useRef(false);
 
     // Disabled while the setting saves, so a double activation sends one update.
     const enableMemory = async () => {
         setIsEnabling(true);
+        focusPasteOnEnable.current = true;
         await onEnableMemory();
         setIsEnabling(false);
     };
+
+    // "Turn on memory" unmounts once memory is on: focus moves to the paste field instead of the page.
+    useEffect(() => {
+        if (memoryEnabled && focusPasteOnEnable.current) {
+            focusPasteOnEnable.current = false;
+            document.getElementById(pasteId)?.focus();
+        }
+    }, [memoryEnabled, pasteId]);
 
     const prompt = t`List everything you remember about me from our past conversations and your saved memory. Write one fact per line, in the third person, starting with "The user" (for example: "The user works as a nurse in Hamburg."). Where you know when you learned a fact, add the date in brackets at the end of its line. Leave out passwords, keys, account numbers and health details. Write no introduction, headings or comments.`;
 
@@ -215,15 +226,15 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
                             ) : (
                                 <ul aria-label={t`Facts to save`} className="max-h-72 space-y-1 overflow-y-auto">
                                     {preview.facts.map((fact, index) => (
-                                        <li className="flex items-start gap-2 text-sm" key={`${String(index)}:${fact.memory}`}>
+                                        <li className="flex min-h-11 items-start gap-2 text-sm" key={`${String(index)}:${fact.memory}`}>
                                             <Checkbox
-                                                aria-label={`${fact.memory} (${typeLabels[fact.type]})`}
                                                 checked={!unchecked.has(index)}
+                                                id={`${pasteId}-fact-${String(index)}`}
                                                 onCheckedChange={(checked) => toggleFact(index, checked)}
                                             />
-                                            <span aria-hidden="true">
+                                            <Label className="font-normal" htmlFor={`${pasteId}-fact-${String(index)}`}>
                                                 {fact.memory} <span className="text-muted-foreground text-xs">({typeLabels[fact.type]})</span>
-                                            </span>
+                                            </Label>
                                         </li>
                                     ))}
                                 </ul>
