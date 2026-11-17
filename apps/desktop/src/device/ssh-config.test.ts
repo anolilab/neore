@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { parseSshConfig, readSshConfig } from "./ssh-config";
@@ -36,7 +38,7 @@ describe("parseSshConfig", () => {
     it("expands a leading ~ in IdentityFile", () => {
         const [host] = parse("Host box\n  IdentityFile ~/.ssh/id_box\n");
 
-        expect(host?.identityFile).toBe("/home/me/.ssh/id_box");
+        expect(host?.identityFile).toBe(join(HOME, ".ssh", "id_box"));
     });
 
     it("ignores comments and an invalid port", () => {

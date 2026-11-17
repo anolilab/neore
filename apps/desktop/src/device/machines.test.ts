@@ -387,7 +387,7 @@ describe("pairing identity", () => {
     });
 
     it("shares nothing when the paired server changes while the share confirmation is open", async () => {
-        const { deps, machines, state } = setup({ ssh: [ssh("build", { user: null })] });
+        const { deps, machines, state } = setup({ ssh: [ssh("build")] });
 
         deps.confirm.mockImplementationOnce(async () => {
             state.hosts = [server({ user: "me" })];
@@ -396,6 +396,7 @@ describe("pairing identity", () => {
         });
 
         await expect(machines.shareFolder("srv-1", "/data/proj")).rejects.toThrow();
+        expect(deps.confirm).toHaveBeenCalled();
         expect(deps.setRoots).not.toHaveBeenCalled();
     });
 });
@@ -417,6 +418,8 @@ describe("validators", () => {
         expect(() => readMachinePath(String.raw`\\host\share\dir`, true)).toThrow("must be absolute");
         expect(() => readMachinePath(String.raw`\\?\C:\dir`, true)).toThrow("must be absolute");
         expect(() => readMachinePath("//host/share", true)).toThrow("must be absolute");
+        expect(() => readMachinePath(String.raw`\/host\share`, true)).toThrow("must be absolute");
+        expect(() => readMachinePath(String.raw`/\host\share`, true)).toThrow("must be absolute");
         expect(readMachinePath("/home/me/app", true)).toBe("/home/me/app");
     });
 

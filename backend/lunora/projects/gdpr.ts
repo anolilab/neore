@@ -291,6 +291,7 @@ export const collectOwnedProjectsForExport = internalQuery
     )
     .query(async ({ args: { cursor, userId }, ctx }) => {
         const result = await ctx.db.projects.findMany({
+            consistency: "primary",
             cursor: cursor ?? null,
             limit: PROJECTS_PER_DETAILS_READ,
             orderBy: [{ _creationTime: "asc" }],

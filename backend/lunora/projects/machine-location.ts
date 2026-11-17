@@ -74,7 +74,8 @@ export const MACHINE_CLEAR_BATCH = 20;
  * Resolves to `true` when the batch was full, so projects may remain. Idempotent: a repeated run finds fewer rows or none.
  */
 export const clearMachineFromProjects = async (ctx: Pick<MutationCtx, "db">, userId: string, machineId: Id<"devices">): Promise<boolean> => {
-    const { page } = await ctx.db.projects.findMany({ limit: MACHINE_CLEAR_BATCH, where: { machineId, userId } });
+    // Primary: a replica that lags could miss a project written just before the revoke, leaving it on the deleted machine.
+    const { page } = await ctx.db.projects.findMany({ consistency: "primary", limit: MACHINE_CLEAR_BATCH, where: { machineId, userId } });
 
     for (const project of page) {
         await patchRow(ctx.db, "projects", project, { machineId: undefined, path: undefined });

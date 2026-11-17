@@ -930,12 +930,9 @@ fn browse_dirs_with_home(
             return Err(format!("{raw}: too many entries to browse"));
         }
 
-        let Ok(entry) = entry else {
-            continue;
-        };
-        let Ok(kind) = entry.file_type() else {
-            continue;
-        };
+        // A failed read of the folder is an error, not an empty folder: the person must see it, not a short list.
+        let entry = entry.map_err(|error| error.to_string())?;
+        let kind = entry.file_type().map_err(|error| error.to_string())?;
 
         if !kind.is_dir() {
             continue;
