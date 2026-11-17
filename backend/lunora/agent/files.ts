@@ -237,7 +237,10 @@ export const gatedFileIdsOnCallerShard = async (
 ): Promise<Id<"chatFiles">[]> => {
     const gated: Id<"chatFiles">[] = [];
 
-    for (const fileId of fileIds) {
+    // A repeated id is checked once: each check reads the caller's locked chats again.
+    const distinctFileIds = [...new Set(fileIds)];
+
+    for (const fileId of distinctFileIds) {
         if (await fileGatedByLockedChat(context, { fileId, threadId, unlockProof, userId })) {
             gated.push(fileId);
         }

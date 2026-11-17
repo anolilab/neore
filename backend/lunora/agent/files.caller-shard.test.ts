@@ -140,6 +140,10 @@ describe("a collaborator's attach is checked on the collaborator's own shard", (
         await expect(gatedOnCallerShard(COLLAB, [secretFileId])).resolves.toEqual([secretFileId]);
     });
 
+    it("reports a repeated gated id once", async () => {
+        await expect(gatedOnCallerShard(COLLAB, [secretFileId, secretFileId], { threadId: ownerSharedId })).resolves.toEqual([secretFileId]);
+    });
+
     it("serves the collaborator's unlocked file into the owner's shared chat (positive)", async () => {
         await expect(gatedOnCallerShard(COLLAB, [collabOpenFileId], { threadId: ownerSharedId })).resolves.toEqual([]);
     });
