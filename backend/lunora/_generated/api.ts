@@ -30,7 +30,7 @@ export interface ApiTypes {
         cleanup: {
             executeCleanup: FunctionReference<"action", { dryRun?: boolean }, { deletedCount: number; durationMs: number; eligibleCount: number }>;
             getCleanupConfig: FunctionReference<"query", {}, { batchSize: number; isEnabled: boolean; thresholdDays: number }>;
-            getShardFootprint: FunctionReference<"action", { cursor?: string }, { approxBytes: number; continueCursor: string | null; incompleteShards: number; isDone: boolean; messageRows: number; shards: number; threads: number }>;
+            getShardFootprint: FunctionReference<"action", { cursor?: string }, { approxBytes: number; continueCursor: string | null; incompleteShards: number; isDone: boolean; messageRows: number; pendingShards: number; shards: number; threads: number }>;
             listCleanupLogs: FunctionReference<"query", { cursor?: string | null; limit?: number }, { continueCursor?: string | null; isDone: boolean; logs: Array<{ _creationTime: number; _id: string; deletedCount: number; durationMs: number; eligibleCount: number; mode: "dry_run" | "execute"; runAt: number; triggeredBy: string }> }>;
             previewCleanup: FunctionReference<"query", { now: number }, { eligibleCount: number; thresholdDays: number }>;
             updateCleanupConfig: FunctionReference<"mutation", { batchSize?: number; isEnabled?: boolean; thresholdDays?: number }, null>;

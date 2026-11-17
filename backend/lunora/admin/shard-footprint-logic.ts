@@ -5,12 +5,23 @@
  * (`by_threadId_order_stepOrder`), so one thread's rows are contiguous: the scan carries
  * the thread it is in and that thread's running row count, and keeps only the largest
  * threads it has finished. The state a call returns is bounded however large the shard.
+ *
+ * An admin call measures several shards at once, one page of each per round, and stops
+ * when its call budget is spent. A shard that is not finished carries its state in the
+ * census cursor, so the next call continues it.
  */
 
 /** Rows per page: a call reads at most this many threads or message rows. */
 export const FOOTPRINT_PAGE_SIZE = 500;
 /** Threads kept in the largest list. */
 export const LARGEST_THREAD_COUNT = 20;
+/** Shards an admin call holds at once (carried over plus newly read from the census). */
+export const SHARDS_PER_CALL = 10;
+/**
+ * Cross-shard calls one admin call may make. The Free-plan Worker allows 50 subrequests per
+ * invocation; this leaves room for the census queries and anything else the action does.
+ */
+export const MAX_SHARD_CALLS_PER_ACTION = 40;
 
 export interface LargestThread {
     rows: number;
@@ -29,6 +40,21 @@ export interface FootprintState {
     threads: number;
 }
 
+/** A shard the census has handed out but that has not finished measuring, with its scan state. */
+export interface PendingShard {
+    shardKey: string;
+    state: FootprintState;
+}
+
+/** Where an admin measurement is: the census position and the shards still being measured. */
+export interface CensusCursor {
+    /** The census's own cursor; `null` before the first page. */
+    census: string | null;
+    /** True once the census has been read to its end. */
+    censusDone: boolean;
+    pending: PendingShard[];
+}
+
 export const startFootprint = (): FootprintState => {
     return {
         approxBytes: 0,
@@ -40,6 +66,22 @@ export const startFootprint = (): FootprintState => {
         phase: "threads",
         threads: 0,
     };
+};
+
+export const startCensus = (): CensusCursor => {
+    return { census: null, censusDone: false, pending: [] };
+};
+
+/**
+ * The census for a collapsed (development, `SHARD_ROUTING=off`) stack: every shard key reaches
+ * the same root shard, so the root is measured once and the user census is not read.
+ */
+export const rootOnlyCensus = (carried: CensusCursor, rootShardKey: string): CensusCursor => {
+    if (carried.censusDone) {
+        return carried;
+    }
+
+    return { census: null, censusDone: true, pending: [...carried.pending, { shardKey: rootShardKey, state: startFootprint() }] };
 };
 
 /** The row's JSON encoding in UTF-8 bytes. An estimate: the stored form is not JSON. */
@@ -74,4 +116,51 @@ export const addMessageRow = (state: FootprintState, threadId: string, bytes: nu
         currentThreadId: threadId,
         messageRows: base.messageRows + 1,
     };
+};
+
+/** One shard in a round-based scan: its state so far, and whether it is still being read. */
+export interface ScanEntry {
+    shardKey: string;
+    state: FootprintState;
+    status: "active" | "done" | "failed";
+}
+
+/**
+ * Reads the active shards one page each per round, until none is active or `maxCalls` pages
+ * have been read. A round that cannot fit every active shard reads the first ones in order.
+ * A shard whose read throws is marked `failed` and is not read again. Returns the calls made.
+ */
+export const runScanRounds = async (
+    entries: ScanEntry[],
+    readPage: (entry: ScanEntry) => Promise<{ done: boolean; state: FootprintState }>,
+    maxCalls: number,
+): Promise<number> => {
+    let remaining = maxCalls;
+
+    while (remaining > 0) {
+        const active = entries.filter((entry) => entry.status === "active");
+
+        if (active.length === 0) {
+            break;
+        }
+
+        const round = active.slice(0, remaining);
+
+        remaining -= round.length;
+
+        await Promise.all(
+            round.map(async (entry) => {
+                try {
+                    const result = await readPage(entry);
+
+                    entry.state = result.state;
+                    entry.status = result.done ? "done" : "active";
+                } catch {
+                    entry.status = "failed";
+                }
+            }),
+        );
+    }
+
+    return maxCalls - remaining;
 };

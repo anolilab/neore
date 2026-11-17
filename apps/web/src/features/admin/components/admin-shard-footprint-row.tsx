@@ -107,6 +107,11 @@ const AdminShardFootprintRow = () => {
                         <dd className="text-2xl font-semibold">{formatBytes(totals.approxBytes, i18n.locale)}</dd>
                     </div>
                 </dl>
+                {page.data !== undefined && page.data.pendingShards > 0 ? (
+                    <p className="text-muted-foreground text-sm">
+                        {t`Shards still being measured: ${formatNumber(page.data.pendingShards, i18n.locale)}. Measure more shards to finish them.`}
+                    </p>
+                ) : null}
                 {totals.incompleteShards > 0 ? (
                     <p className="text-muted-foreground text-sm">{t`Some shards were only partly measured; their counts are lower bounds.`}</p>
                 ) : null}

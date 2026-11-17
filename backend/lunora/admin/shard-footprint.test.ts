@@ -1,13 +1,25 @@
 /**
  * The shard footprint scan: the 10,000-row thread is the largest, a call reads at most one page,
- * and the largest list stays capped at {@link LARGEST_THREAD_COUNT}.
+ * the largest list stays capped at {@link LARGEST_THREAD_COUNT}, a call stays within its shard-call
+ * budget, and an unfinished shard resumes from its carried state.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { addMessageRow, FOOTPRINT_PAGE_SIZE, LARGEST_THREAD_COUNT, startFootprint } from "./shard-footprint-logic";
-import { measureShardPage } from "./cleanup";
+import { decodeCensusCursor, encodeCensusCursor, measureShardPage } from "./cleanup";
+import {
+    addMessageRow,
+    type CensusCursor,
+    FOOTPRINT_PAGE_SIZE,
+    LARGEST_THREAD_COUNT,
+    MAX_SHARD_CALLS_PER_ACTION,
+    rootOnlyCensus,
+    runScanRounds,
+    type ScanEntry,
+    startCensus,
+    startFootprint,
+} from "./shard-footprint-logic";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -157,5 +169,74 @@ describe("scan state", () => {
         expect(state.approxBytes).toBe(25);
         expect(state.largest).toEqual([{ rows: 2, threadId: "thread-a" }]);
         expect(state.currentThreadId).toBe("thread-b");
+    });
+});
+
+/** Shards that each need {@link PAGES_NEEDED} pages; `state.threads` counts the pages read so far. */
+const PAGES_NEEDED = 5;
+
+const fakeEntries = (count: number): ScanEntry[] =>
+    Array.from({ length: count }, (_, index) => {
+        return { shardKey: `shard-${index}`, state: startFootprint(), status: "active" };
+    });
+
+const fakePage = async (entry: ScanEntry) => {
+    const pages = entry.state.threads + 1;
+
+    return { done: pages >= PAGES_NEEDED, state: { ...entry.state, threads: pages } };
+};
+
+describe("census scheduling", () => {
+    it("stops at the call budget and resumes unfinished shards from their carried state", async () => {
+        const entries = fakeEntries(10);
+
+        // 10 shards of 5 pages each would need 50 calls; the budget is 40, so 4 pages each are read.
+        const first = await runScanRounds(entries, fakePage, MAX_SHARD_CALLS_PER_ACTION);
+
+        expect(first).toBe(MAX_SHARD_CALLS_PER_ACTION);
+        expect(entries.every((entry) => entry.status === "active")).toBe(true);
+        expect(entries.every((entry) => entry.state.threads === 4)).toBe(true);
+
+        // The next call continues the same shards: one more page each finishes them.
+        const second = await runScanRounds(entries, fakePage, MAX_SHARD_CALLS_PER_ACTION);
+
+        expect(second).toBe(entries.length);
+        expect(entries.every((entry) => entry.status === "done")).toBe(true);
+    });
+
+    it("marks a shard whose read throws as failed and does not read it again", async () => {
+        const entries = fakeEntries(3);
+        const readPage = async (entry: ScanEntry) => {
+            if (entry.shardKey === "shard-1") {
+                throw new Error("shard unavailable");
+            }
+
+            return await fakePage(entry);
+        };
+
+        const calls = await runScanRounds(entries, readPage, MAX_SHARD_CALLS_PER_ACTION);
+
+        expect(entries.map((entry) => entry.status)).toEqual(["done", "failed", "done"]);
+        // One round of 3 calls, then 4 more rounds of the 2 healthy shards.
+        expect(calls).toBe(3 + 2 * (PAGES_NEEDED - 1));
+    });
+
+    it("round-trips the census cursor through its opaque encoding and rejects anything else", () => {
+        const cursor: CensusCursor = {
+            census: "census-cursor",
+            censusDone: false,
+            pending: [{ shardKey: "user-1", state: { ...startFootprint(), largest: [{ rows: 2, threadId: "thread-1" }], threads: 3 } }],
+        };
+
+        expect(decodeCensusCursor(encodeCensusCursor(cursor))).toEqual(cursor);
+        expect(decodeCensusCursor("not a cursor!")).toBeUndefined();
+        expect(decodeCensusCursor(btoa(JSON.stringify({ census: 1 })))).toBeUndefined();
+    });
+
+    it("measures the root shard once when routing is collapsed, however often it is asked", () => {
+        const once = rootOnlyCensus(startCensus(), "__root__");
+
+        expect(once).toEqual({ census: null, censusDone: true, pending: [{ shardKey: "__root__", state: startFootprint() }] });
+        expect(rootOnlyCensus(once, "__root__")).toEqual(once);
     });
 });

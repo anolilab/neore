@@ -6557,6 +6557,9 @@
                     "messageRows": {
                       "type": "number"
                     },
+                    "pendingShards": {
+                      "type": "number"
+                    },
                     "shards": {
                       "type": "number"
                     },
@@ -6570,6 +6573,7 @@
                     "incompleteShards",
                     "isDone",
                     "messageRows",
+                    "pendingShards",
                     "shards",
                     "threads"
                   ],

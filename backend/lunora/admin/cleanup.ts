@@ -6,7 +6,8 @@
  *
  * All public functions require admin role.
  */
-import { v } from "lunorash/server";
+import { env } from "cloudflare:workers";
+import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -15,8 +16,24 @@ import { adminAction, adminMutation, adminQuery, rateLimit } from "../lib/crpc";
 import { withoutUndefined } from "../lib/patch";
 import { callOnShard } from "../lib/cross-shard";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
+import { isShardRoutingEnabled } from "../lib/shard-namespace";
 import { MAX_LENGTH } from "../lib/validators";
-import { addMessageRow, approxRowBytes, FOOTPRINT_PAGE_SIZE, finishCurrentThread, type FootprintState, startFootprint } from "./shard-footprint-logic";
+import {
+    addMessageRow,
+    approxRowBytes,
+    type CensusCursor,
+    FOOTPRINT_PAGE_SIZE,
+    finishCurrentThread,
+    type FootprintState,
+    MAX_SHARD_CALLS_PER_ACTION,
+    type PendingShard,
+    rootOnlyCensus,
+    type ScanEntry,
+    SHARDS_PER_CALL,
+    startCensus,
+    startFootprint,
+    runScanRounds,
+} from "./shard-footprint-logic";
 
 const DEFAULT_THRESHOLD_DAYS = 30;
 const DEFAULT_BATCH_SIZE = 100;
@@ -315,11 +332,6 @@ export const writeCleanupLog = internalMutation
 // until `done`. `getShardFootprint` drives a page of the shard census and returns totals only:
 // no thread ids leave the admin path. Counts are approximate under concurrent writes.
 
-/** Census rows (shards) an admin call measures. Shards within a call run side by side. */
-const SHARDS_PER_CALL = 10;
-/** Pages one shard may take in one admin call. A shard past it is reported as incomplete. */
-const MAX_PAGES_PER_SHARD = 40;
-
 /** The scan state's fields, spread into each validator that carries it. */
 const footprintFields = {
     approxBytes: v.number(),
@@ -379,12 +391,15 @@ export const measureShardPage = internalQuery
         return { done: false, pageRows: page.page.length, state: { ...next, cursor: page.continueCursor } };
     });
 
-/** One page of the shard census: the keys of the shards in it, minus the root shard. */
+/**
+ * One page of the census: the users, in `_id` order. A user's shard is keyed by its id. Users are the
+ * census, not `shardActivity`, because the activity rows are a best-effort hint and can be missing.
+ */
 export const listShardKeysPage = internalQuery
     .input({ cursor: v.optional(v.string()), limit: v.number() })
     .output(v.object({ continueCursor: v.union(v.string(), v.null()), isDone: v.boolean(), shardKeys: v.array(v.string()) }))
     .query(async ({ args, ctx }) => {
-        const page = await ctx.db.shardActivity.findMany({
+        const page = await ctx.db.user.findMany({
             cursor: args.cursor ?? null,
             limit: args.limit,
             orderBy: [{ _id: "asc" }],
@@ -393,39 +408,73 @@ export const listShardKeysPage = internalQuery
         return {
             continueCursor: page.continueCursor,
             isDone: page.isDone,
-            shardKeys: page.page.map((row) => row.shardKey).filter((shardKey) => shardKey !== ROOT_SHARD_KEY),
+            shardKeys: page.page.map((user) => String(user._id)).filter((shardKey) => shardKey !== ROOT_SHARD_KEY),
         };
     });
 
-interface ShardMeasure {
-    complete: boolean;
-    state: FootprintState;
-}
+/** The census cursor an admin call carries: the census position and the shards still being measured. */
+const censusCursorValidator = v.object({
+    census: v.union(v.string(), v.null()),
+    censusDone: v.boolean(),
+    pending: v.array(v.object({ shardKey: v.string(), state: v.object({ ...footprintFields }) })),
+});
 
-/** Reads one shard to its end, one page per call, within the page budget. */
-const measureShard = async (shardKey: string): Promise<ShardMeasure> => {
-    let state: FootprintState | undefined;
+/** The opaque string an admin call returns and takes back. Callers never read it. */
+export const encodeCensusCursor = (cursor: CensusCursor): string => {
+    const bytes = new TextEncoder().encode(JSON.stringify(cursor));
+    let binary = "";
 
-    try {
-        for (let pages = 0; pages < MAX_PAGES_PER_SHARD; pages += 1) {
-            const result = await callOnShard(internal.admin.cleanup.measureShardPage, state ? { state } : {}, { shardKey });
-
-            state = result.state;
-
-            if (result.done) {
-                return { complete: true, state };
-            }
-        }
-    } catch {
-        // A shard that fails counts as incomplete, so one bad shard does not drop the other totals on its page.
+    for (const byte of bytes) {
+        binary += String.fromCodePoint(byte);
     }
 
-    return { complete: false, state: state ?? startFootprint() };
+    return btoa(binary);
+};
+
+/** The census cursor an encoded string holds, or `undefined` when the string is not one this module wrote. */
+export const decodeCensusCursor = (encoded: string): CensusCursor | undefined => {
+    let json: unknown;
+
+    try {
+        const binary = atob(encoded);
+        const text = new TextDecoder().decode(Uint8Array.from(binary, (character) => character.codePointAt(0) ?? 0));
+
+        json = JSON.parse(text);
+    } catch {
+        return undefined;
+    }
+
+    const parsed = censusCursorValidator.safeParse(json);
+
+    return parsed.ok ? parsed.value : undefined;
+};
+
+/** The census cursor after `page` of the census: the page's shards join the ones still pending. */
+const addCensusPage = (carried: CensusCursor, page: { continueCursor: string | null; isDone: boolean; shardKeys: string[] }): CensusCursor => {
+    return {
+        census: page.isDone ? null : page.continueCursor,
+        censusDone: page.isDone,
+        pending: [
+            ...carried.pending,
+            ...page.shardKeys.map((shardKey): PendingShard => {
+                return { shardKey, state: startFootprint() };
+            }),
+        ],
+    };
+};
+
+/** Reads one page of a shard. A failure is thrown, so the scan can count the shard as incomplete. */
+const readShardPage = async (entry: ScanEntry): Promise<{ done: boolean; state: FootprintState }> => {
+    const result = await callOnShard(internal.admin.cleanup.measureShardPage, { state: entry.state }, { shardKey: entry.shardKey });
+
+    return { done: result.done, state: result.state };
 };
 
 /**
- * Totals for one page of the shard census. Continue with `continueCursor` until `isDone`.
- * An incomplete shard's counts are lower bounds and are counted in `incompleteShards`.
+ * Totals for the shards this call finished. A shard that is not finished yet is `pendingShards`: its
+ * state travels in `continueCursor`, and its counts join the totals once a later call finishes it, so
+ * no shard is counted twice. A shard that errors is `incompleteShards` and its counts are left out.
+ * Continue with `continueCursor` until it is `null`.
  */
 export const getShardFootprint = adminAction
     .use(rateLimit("admin/read"))
@@ -437,37 +486,71 @@ export const getShardFootprint = adminAction
             incompleteShards: v.number(),
             isDone: v.boolean(),
             messageRows: v.number(),
+            pendingShards: v.number(),
             shards: v.number(),
             threads: v.number(),
         }),
     )
     .action(async ({ args, ctx }) => {
-        const census = await ctx.runQuery(internal.admin.cleanup.listShardKeysPage, { cursor: args.cursor, limit: SHARDS_PER_CALL });
-        const measures = await Promise.all(census.shardKeys.map((shardKey) => measureShard(shardKey)));
+        const carried: CensusCursor | undefined = args.cursor === undefined ? startCensus() : decodeCensusCursor(args.cursor);
+
+        if (carried === undefined) {
+            throw new LunoraError("INVALID_INPUT", "The footprint cursor is not valid. Start the measurement again without a cursor.");
+        }
+
+        // With routing collapsed (development) every census key reaches the root shard, so the root is measured once.
+        let cursor = carried;
+
+        if (!isShardRoutingEnabled(env)) {
+            cursor = rootOnlyCensus(carried, ROOT_SHARD_KEY);
+        } else if (!carried.censusDone && carried.pending.length < SHARDS_PER_CALL) {
+            const page = await ctx.runQuery(internal.admin.cleanup.listShardKeysPage, {
+                cursor: carried.census ?? undefined,
+                limit: SHARDS_PER_CALL - carried.pending.length,
+            });
+
+            cursor = addCensusPage(carried, page);
+        }
+
+        const entries: ScanEntry[] = cursor.pending.map(({ shardKey, state }) => {
+            return { shardKey, state, status: "active" };
+        });
+
+        await runScanRounds(entries, readShardPage, MAX_SHARD_CALLS_PER_ACTION);
 
         const totals = {
             approxBytes: 0,
-            continueCursor: census.continueCursor,
+            continueCursor: null as string | null,
             incompleteShards: 0,
-            isDone: census.isDone,
+            isDone: false,
             messageRows: 0,
-            shards: measures.length,
+            pendingShards: 0,
+            shards: 0,
             threads: 0,
         };
+        const stillPending: PendingShard[] = [];
 
-        for (const { complete, state } of measures) {
-            totals.approxBytes += state.approxBytes;
-            totals.messageRows += state.messageRows;
-            totals.threads += state.threads;
-
-            if (!complete) {
+        for (const entry of entries) {
+            if (entry.status === "done") {
+                totals.shards += 1;
+                totals.approxBytes += entry.state.approxBytes;
+                totals.messageRows += entry.state.messageRows;
+                totals.threads += entry.state.threads;
+            } else if (entry.status === "failed") {
                 totals.incompleteShards += 1;
+            } else {
+                stillPending.push({ shardKey: entry.shardKey, state: entry.state });
             }
         }
+
+        totals.pendingShards = stillPending.length;
+        totals.isDone = cursor.censusDone && stillPending.length === 0;
+        totals.continueCursor = totals.isDone ? null : encodeCensusCursor({ census: cursor.census, censusDone: cursor.censusDone, pending: stillPending });
 
         ctx.log.event("admin.shard_footprint_measured", {
             incompleteShards: totals.incompleteShards,
             isDone: totals.isDone,
+            pendingShards: totals.pendingShards,
             shards: totals.shards,
         });
 
