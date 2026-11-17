@@ -23,11 +23,14 @@ import {
     applyImportLabels,
     buildImportLabelPrompt,
     IMPORT_LABEL_SYSTEM_PROMPT,
+    cleanImportLine,
     IMPORT_MAX_FACT_CHARS,
     IMPORT_MAX_FACTS,
     IMPORT_MAX_INPUT_CHARS,
+    IMPORT_MIN_FACT_CHARS,
     type ImportApp,
     type ImportedFact,
+    looksSensitive,
     sanitizeImportedFacts,
     splitImportedText,
 } from "./import-logic";
@@ -140,31 +143,34 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
 
         similar ??= findSimilarMemoryByJaccard(fact.memory, existing);
 
+        // Later facts compare against the row as this save leaves it: merged text, or gone once superseded.
+        const match = similar ? existing.find((row) => row._id === similar.id) : undefined;
         let action: "ADD" | "IGNORE" | "SUPERSEDE" | "UPDATE" = "ADD";
-        let mergedMemory: string | undefined;
+        let memory = "";
 
         if (similar && similar.score >= 0.95) {
             action = "IGNORE";
-        } else if (similar && revisions < IMPORT_MAX_REVISIONS) {
+        } else if (similar && revisions < IMPORT_MAX_REVISIONS && !match?.pinned) {
+            // A pinned row is never reworded or replaced by an import; the fact is saved beside it.
             revisions += 1;
 
             try {
                 model ??= await utilityModelFor(ctx, args.userId, rules);
-                ({ action, mergedMemory } = await runBeliefRevision(model, similar.memory, fact.memory, REVISION_MAX_OUTPUT_TOKENS));
+
+                const revision = await runBeliefRevision(model, similar.memory, fact.memory, REVISION_MAX_OUTPUT_TOKENS);
+
+                // The merged text is model output over pasted text: held to the paste's rules, or the fact is saved as new.
+                memory = cleanImportLine(revision.mergedMemory ?? "");
+                action = revision.action === "UPDATE" && (memory.length < IMPORT_MIN_FACT_CHARS || looksSensitive(memory)) ? "ADD" : revision.action;
             } catch (error) {
                 console.error("[memory/import] Belief revision failed, saving as new:", error);
             }
         }
 
-        // Later facts compare against the row as this save leaves it: merged text, or gone once superseded.
-        const match = similar ? existing.find((row) => row._id === similar.id) : undefined;
-
         if (similar && action === "IGNORE") {
             toConfirm.push(similar.id);
             result.alreadyKnown += 1;
-        } else if (similar && action === "UPDATE" && mergedMemory) {
-            const memory = mergedMemory.slice(0, IMPORT_MAX_FACT_CHARS);
-
+        } else if (similar && action === "UPDATE") {
             await ctx.runMutation(internal.memory.functions.updateMemoryInternal, {
                 confidence: Math.max(IMPORTED_CONFIDENCE, similar.confidence ?? 50),
                 lastConfirmedAt: Date.now(),
@@ -185,7 +191,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
             }
 
             result.updated += 1;
-        } else if (action !== "UPDATE") {
+        } else {
             toSave.push({ embedding, fact, supersedes: action === "SUPERSEDE" ? similar?.id : undefined });
             added.push({ _id: String(index), memory: fact.memory });
 

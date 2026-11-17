@@ -58,31 +58,34 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
     const typeLabels = useMemoryTypeLabels();
     const appLabelId = useId();
     const pasteId = useId();
+    const factsHeadingId = useId();
     const [open, setOpen] = useState(false);
     const [app, setApp] = useState<ImportApp>("chatgpt");
     const [text, setText] = useState("");
     const [preview, setPreview] = useState<Preview | undefined>(undefined);
     const [unchecked, setUnchecked] = useState<ReadonlySet<number>>(new Set());
     const [isEnabling, setIsEnabling] = useState(false);
-    const focusPasteOnEnable = useRef(false);
+    // Where focus goes once the step it belongs to has rendered: the control that moved there just unmounted.
+    const focusNext = useRef<string | undefined>(undefined);
 
     // Disabled while the setting saves, so a double activation sends one update.
     const enableMemory = async () => {
         setIsEnabling(true);
-        focusPasteOnEnable.current = true;
+        focusNext.current = pasteId;
         await onEnableMemory();
         setIsEnabling(false);
     };
 
-    // "Turn on memory" unmounts once memory is on: focus moves to the paste field instead of the page.
     useEffect(() => {
-        if (!memoryEnabled || !focusPasteOnEnable.current) {
+        const target = focusNext.current ? document.querySelector<HTMLElement>(`#${CSS.escape(focusNext.current)}`) : null;
+
+        if (!target) {
             return;
         }
 
-        focusPasteOnEnable.current = false;
-        document.querySelector<HTMLTextAreaElement>(`#${CSS.escape(pasteId)}`)?.focus();
-    }, [memoryEnabled, pasteId]);
+        focusNext.current = undefined;
+        target.focus();
+    }, [memoryEnabled, preview]);
 
     const prompt = t`List everything you remember about me from our past conversations and your saved memory. Write one fact per line, in the third person, starting with "The user" (for example: "The user works as a nurse in Hamburg."). Where you know when you learned a fact, add the date in brackets at the end of its line. Leave out passwords, keys, account numbers and health details. Write no introduction, headings or comments.`;
 
@@ -93,6 +96,7 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
         },
         onSuccess: (result: Preview) => {
             setUnchecked(new Set());
+            focusNext.current = factsHeadingId;
             setPreview(result);
         },
     });
@@ -209,7 +213,9 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
 
                     {memoryEnabled && preview && (
                         <div className="space-y-2">
-                            <p className="text-sm font-medium">{t`4. Choose what to keep`}</p>
+                            <p className="text-sm font-medium outline-none" id={factsHeadingId} tabIndex={-1}>
+                                {t`4. Choose what to keep`}
+                            </p>
                             <div className="text-muted-foreground space-y-0.5 text-xs" role="status">
                                 {preview.dropped > 0 && (
                                     <p>
@@ -248,7 +254,15 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
                     <DialogFooter>
                         {preview ? (
                             <>
-                                <Button onClick={() => setPreview(undefined)} variant="ghost">{t`Back`}</Button>
+                                <Button
+                                    onClick={() => {
+                                        focusNext.current = pasteId;
+                                        setPreview(undefined);
+                                    }}
+                                    variant="ghost"
+                                >
+                                    {t`Back`}
+                                </Button>
                                 <Button disabled={isSaving || kept.length === 0} onClick={() => runSave({ app, facts: kept })}>
                                     {plural(kept.length, { one: "Save # memory", other: "Save # memories" })}
                                 </Button>

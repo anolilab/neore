@@ -508,9 +508,19 @@ export const saveImportedMemoryBatch = internalMutation
         const active = await ctx.db
             .query("memories")
             .withIndex("by_userId_supersededBy", (q) => q.eq("userId", args.userId).eq("supersededBy", null as never))
+            .order("desc")
             .take(IMPORT_EXACT_CHECK_ROWS);
-        const byText = new Map(active.filter((row) => !row.botId).map((row) => [importDedupKey(row.memory), row._id]));
+        const textOf = new Map(active.filter((row) => !row.botId).map((row) => [row._id, importDedupKey(row.memory)]));
+        const byText = new Map([...textOf].map(([memoryId, key]) => [key, memoryId]));
         const memoryIds: (Id<"memories"> | null)[] = [];
+        // A superseded row is no longer a match for a later fact of this batch.
+        const retire = (memoryId: Id<"memories"> | undefined) => {
+            const key = memoryId ? textOf.get(memoryId) : undefined;
+
+            if (key !== undefined && byText.get(key) === memoryId) {
+                byText.delete(key);
+            }
+        };
 
         for (const mem of args.memories) {
             const key = importDedupKey(mem.memory);
@@ -518,10 +528,18 @@ export const saveImportedMemoryBatch = internalMutation
 
             if (known) {
                 await ctx.db.patch("memories", known, { lastConfirmedAt: now });
+
+                // The fact still contradicts the row the action matched: that row ends, in favour of the one found here.
+                if (mem.supersedes && mem.supersedes !== known) {
+                    await ctx.db.patch("memories", mem.supersedes, { supersededBy: known, updatedAt: now });
+                    retire(mem.supersedes);
+                }
+
                 memoryIds.push(null);
             } else {
                 const memoryId = await insertMemory(ctx, { ...mem, userId: args.userId }, now);
 
+                retire(mem.supersedes);
                 byText.set(key, memoryId);
                 memoryIds.push(memoryId);
             }

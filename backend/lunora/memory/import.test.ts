@@ -155,6 +155,106 @@ describe("importing another assistant's memory", () => {
         expect(await memories()).toHaveLength(1001);
     });
 
+    it("supersedes the row a fact contradicts even when its exact text is found past the window", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+
+        const { contradicted, known } = await harness.run(async (ctx: any) => {
+            const kept = await ctx.db.insert("memories", { memory: "The user lives in Lisbon near the old harbour", type: "activity", userId: USER });
+
+            for (let index = 0; index < 999; index += 1) {
+                await ctx.db.insert("memories", { memory: `Preference number ${String(index)} of the user`, type: "preference", userId: USER });
+            }
+
+            return {
+                contradicted: await ctx.db.insert("memories", {
+                    memory: "The user lives in Lisbon near the old harbour today",
+                    type: "preference",
+                    userId: USER,
+                }),
+                known: kept,
+            };
+        });
+
+        generateText.mockResolvedValueOnce({ output: { action: "SUPERSEDE" } });
+
+        expect(await save([{ memory: "The user lives in Lisbon near the old harbour", type: "context" }])).toStrictEqual({
+            added: 0,
+            alreadyKnown: 1,
+            updated: 0,
+        });
+        const row: { supersededBy?: string } = await harness.run(async (ctx: any) => await ctx.db.get("memories", contradicted));
+
+        expect(row.supersededBy).toBe(known);
+    });
+
+    it("saves a fact whose text matches a row the same save superseded", async () => {
+        expect.assertions(1);
+
+        await setMemoryEnabled(true);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user works at the harbour office in Porto", type: "context", userId: USER });
+        });
+        generateText.mockResolvedValueOnce({ output: { action: "SUPERSEDE" } });
+
+        await save([
+            { memory: "The user works at the harbour office in Porto now", type: "context" },
+            { memory: "The user works at the harbour office in Porto", type: "context" },
+        ]);
+
+        const rows: { memory: string; supersededBy?: string }[] = await memories();
+        const active = rows.filter((row) => !row.supersededBy).map((row) => row.memory);
+
+        expect(active.toSorted((a, b) => a.localeCompare(b))).toStrictEqual([
+            "The user works at the harbour office in Porto",
+            "The user works at the harbour office in Porto now",
+        ]);
+    });
+
+    it("never rewrites a pinned row, and saves a fact as new when the merge looks sensitive", async () => {
+        expect.assertions(3);
+
+        await setMemoryEnabled(true);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden", pinned: true, type: "context", userId: USER });
+            await ctx.db.insert("memories", { memory: "The user banks with a small cooperative bank in Bremen", type: "context", userId: USER });
+        });
+        generateText.mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: "The user banks in Bremen, password: hunter22" } });
+
+        expect(
+            await save([
+                { memory: "The user lives in Berlin near the river with a garden now", type: "context" },
+                { memory: "The user banks with a small cooperative bank in Bremen now", type: "context" },
+            ]),
+        ).toStrictEqual({ added: 2, alreadyKnown: 0, updated: 0 });
+        expect(generateText).toHaveBeenCalledOnce();
+        const rows: { memory: string }[] = await memories();
+
+        expect(rows.some((row) => row.memory.includes("hunter22"))).toBe(false);
+    });
+
+    it("does not count a bot's memory as the user's own", async () => {
+        expect.assertions(1);
+
+        await setMemoryEnabled(true);
+        await harness.run(async (ctx: any) => {
+            const botId = await ctx.db.insert("bots", {
+                computerEnabled: false,
+                createdAt: 1,
+                instructions: "",
+                model: "m",
+                name: "Ada",
+                updatedAt: 1,
+                userId: USER,
+            });
+
+            await ctx.db.insert("memories", { botId, memory: "The user is a nurse in Hamburg", type: "identity", userId: USER });
+        });
+
+        expect(await save([{ memory: "The user is a nurse in Hamburg", type: "identity" }])).toStrictEqual({ added: 1, alreadyKnown: 0, updated: 0 });
+    });
+
     it("saves a paste once when two saves of it run at the same time", async () => {
         expect.assertions(1);
 

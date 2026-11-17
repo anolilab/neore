@@ -29,8 +29,8 @@ export interface ImportedFact {
 
 /** Bullets, numbering ("1." but not "1.5"), checkboxes and markdown emphasis that wrap a line, stacked or not. */
 const LINE_PREFIX_RE = /^(?:(?:[-*•·–>#]+|\d{1,3}[.)](?=\s)|\[[ x]\])\s*)+/iu;
-/** A forged data tag inside the paste: removed so it cannot close the block it sits in. */
-const DATA_TAG_RE = /<\/?pasted_memories\b[^>]*>/giu;
+/** A forged data tag of the labelling or the belief-revision prompt: removed so it cannot close the block it sits in. */
+const DATA_TAG_RE = /<\/?(?:pasted_memories|existing_memory|new_fact)\b[^>]*>/giu;
 const EMPHASIS_RE = /\*\*|__|`/g;
 const WHITESPACE_RE = /\s+/g;
 const LINE_BREAK_RE = /\r?\n/;
@@ -60,7 +60,14 @@ export const importDedupKey = (line: string): string => line.toLowerCase().repla
 
 /** One line as stored: wrapping removed, whitespace collapsed, capped. Empty when nothing is left. */
 export const cleanImportLine = (raw: string): string =>
-    raw.trim().replace(LINE_PREFIX_RE, "").replaceAll(EMPHASIS_RE, "").replaceAll(WHITESPACE_RE, " ").trim().slice(0, IMPORT_MAX_FACT_CHARS);
+    raw
+        .trim()
+        .replace(LINE_PREFIX_RE, "")
+        .replaceAll(DATA_TAG_RE, "")
+        .replaceAll(EMPHASIS_RE, "")
+        .replaceAll(WHITESPACE_RE, " ")
+        .trim()
+        .slice(0, IMPORT_MAX_FACT_CHARS);
 
 /**
  * The paste as candidate facts: one per line, cleaned, without repeats, short lines or

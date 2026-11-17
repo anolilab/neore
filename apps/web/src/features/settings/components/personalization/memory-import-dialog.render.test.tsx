@@ -111,6 +111,10 @@ describe("memory import dialog", () => {
         fireEvent.click(screen.getByRole("button", { name: "Preview" }));
 
         fireEvent.click(await screen.findByRole("checkbox", { name: LIKES_TEA_RE }));
+
+        // The Preview button unmounted: focus lands on the step it opened, not the page.
+        expect(document.activeElement?.textContent).toBe("4. Choose what to keep");
+
         fireEvent.click(screen.getByRole("button", { name: "Save 1 memory" }));
 
         await waitFor(() => expect(calls.save).toHaveBeenCalledOnce());
