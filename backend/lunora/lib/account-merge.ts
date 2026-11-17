@@ -35,6 +35,7 @@ import { callOnShard } from "./cross-shard";
 import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
 import { mergeThreadFollowsPage } from "../chat/follows/follow-writes";
+import { copyMergedRunWebhooks } from "../run-webhooks/table-writes";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
@@ -180,35 +181,6 @@ const carrySetupSteps = async (ctx: { db: unknown }, guestRows: Record<string, u
     }
 };
 
-/**
- * The run webhook is one row per account, and its settings page reads only one. The new account keeps its own row when it
- * has one; the guest's is copied only when it has none, so a second row never sits beside it.
- */
-const importRunWebhookOnce = async (ctx: { db: unknown }, rows: Record<string, unknown>[], from: string, to: string): Promise<number> => {
-    const webhooks = (ctx.db as unknown as { runWebhooks: { findMany: (o: { limit: number; where: { userId: string } }) => Promise<{ page: unknown[] }> } })
-        .runWebhooks;
-    const db = rawDb(ctx);
-    let imported = 0;
-
-    for (const row of rows) {
-        if (row.userId !== from) {
-            continue;
-        }
-
-        // Checked per row, through the index: a redelivered job finds the row it copied the first time and stops here.
-        const { page } = await webhooks.findMany({ limit: 1, where: { userId: to } });
-
-        if (page.length > 0) {
-            break;
-        }
-
-        await db.insert("runWebhooks", rewriteOwner(row, from, to), { allowExplicitId: true });
-        imported += 1;
-    }
-
-    return imported;
-};
-
 /** On the NEW user's shard: insert `rows` of `table` under their own ids, re-owned. */
 export const importShardRows = internalMutation
     .input({ from: v.string(), rows: v.array(v.any()), table: v.string(), to: v.string() })
@@ -223,7 +195,15 @@ export const importShardRows = internalMutation
         }
 
         if (args.table === "runWebhooks") {
-            return { imported: await importRunWebhookOnce(ctx, args.rows as Record<string, unknown>[], args.from, args.to) };
+            const guestRows = (args.rows as Record<string, unknown>[]).filter((row) => row.userId === args.from);
+
+            return {
+                imported: await copyMergedRunWebhooks(
+                    ctx,
+                    guestRows.map((row) => rewriteOwner(row, args.from, args.to)),
+                    args.to,
+                ),
+            };
         }
 
         if (KEEP_NEW_USERS.has(args.table)) {
