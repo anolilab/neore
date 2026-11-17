@@ -10,6 +10,7 @@ import { ArrowUp, Bot, ListChecks, MessageSquare, ShieldQuestion, Sparkles, Work
 import type { FC, FormEvent, ReactNode } from "react";
 import { useId, useState } from "react";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
 import NotificationList from "@/features/notifications/components/notification-list";
 import useNotificationInbox from "@/features/notifications/hooks/use-notification-inbox";
@@ -115,6 +116,7 @@ const HomePage: FC = () => {
         return status === "awaiting" ? t`Waiting for your approval` : t`Running`;
     };
     const crpc = useCRPC();
+    const { data: session } = useAuthSession();
     const { data: overview, isError, isFetching, isLoading, refetch } = useQuery(crpc.home.overview.getHomeOverview.queryOptions({}));
     const { markRead } = useNotificationInbox({ enabled: false });
     const ago = (timestamp: number) => formatRelativeTime(timestamp, i18n.locale);
@@ -154,7 +156,8 @@ const HomePage: FC = () => {
                 </div>
             )}
 
-            {overview && <DailyBriefOffer offered={overview.dailyBriefOffer} />}
+            {/* An account switch happens in place: a fresh card, so one account's answer never shows on another's home. */}
+            {overview && <DailyBriefOffer key={session?.user.id} offered={overview.dailyBriefOffer} />}
 
             {overview && (
                 <div className="grid gap-4 md:grid-cols-2">

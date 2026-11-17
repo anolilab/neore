@@ -13,7 +13,7 @@ import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const calls = vi.hoisted(() => {
-    return { dismiss: [] as unknown[], enable: [] as unknown[] };
+    return { dismiss: [] as unknown[], enable: [] as unknown[], refuseEnable: false };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -34,6 +34,10 @@ vi.mock("@/lib/lunora/crpc", () => {
             return {
                 mutationFn: async (args: unknown) => {
                     calls.enable.push(args);
+
+                    if (calls.refuseEnable) {
+                        throw Object.assign(new Error("Managed by the organization"), { code: "FORBIDDEN" });
+                    }
 
                     return { nextBriefAt: Date.UTC(2026, 10, 18, 6, 12), timeZone: "Europe/Berlin" };
                 },
@@ -70,13 +74,14 @@ const { default: DailyBriefOffer } = await import("./daily-brief-offer");
 const DISMISSED = /we won't ask again/u;
 const TURNED_ON = /Daily Brief is on/u;
 
-const client = new QueryClient();
+const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
 const tree = (offered: boolean) => createElement(QueryClientProvider, { client }, createElement(DailyBriefOffer, { offered }));
 const mount = (offered: boolean) => render(tree(offered));
 
 afterEach(() => {
     calls.dismiss.length = 0;
     calls.enable.length = 0;
+    calls.refuseEnable = false;
 });
 
 describe("daily brief offer", () => {
@@ -117,5 +122,19 @@ describe("daily brief offer", () => {
         expect(document.activeElement).toBe(confirmation);
         expect(screen.getByRole("link", { name: "Change it in settings" }).getAttribute("href")).toBe("/dashboard/settings/auth/account#daily-brief");
         expect(screen.queryByRole("button", { name: "Turn it on" })).toBeNull();
+    });
+
+    it("keeps a refusal readable after the overview withdrew the offer", async () => {
+        calls.refuseEnable = true;
+
+        const { rerender } = mount(true);
+
+        fireEvent.click(screen.getByRole("button", { name: "Turn it on" }));
+        // An organization lock withdraws the offer while the write is refused.
+        rerender(tree(false));
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("Your organization manages the Daily Brief.");
     });
 });

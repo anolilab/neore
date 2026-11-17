@@ -34,6 +34,8 @@ const TITLE_MAX = 160;
 
 /** Live chats a user has before the Daily Brief is offered, so the offer does not crowd the first run. */
 export const BRIEF_OFFER_MIN_THREADS = 3;
+/** Thread rows read for the offer when temporary chats fill {@link THREAD_SCAN}: a fixed ceiling, not every thread. */
+const BRIEF_OFFER_THREAD_SCAN = 100;
 
 const clip = (text: string): string => (text.length > TITLE_MAX ? `${text.slice(0, TITLE_MAX - 1)}…` : text);
 
@@ -88,17 +90,35 @@ export type HomeOverview = Infer<typeof vHomeOverview>;
  * it for them (a default or a lock is the organization's decision). Never a
  * guest: an anonymous account gets no brief, has no settings switch for it, and
  * its answer would not survive sign-up. The user and the policy are read only
- * when everything else says yes.
+ * when everything else says yes. `scannedLive` counts the live chats in the
+ * recent-thread scan; when temporary chats fill that scan, the user's live
+ * chats are counted on their own.
  */
 const shouldOfferBrief = async (
     ctx: Pick<QueryCtx, "db">,
     userId: string,
     settings: { dailyBriefEnabled?: boolean; dailyBriefOfferDismissedAt?: number } | null,
-    liveThreadCount: number,
+    scannedLive: { count: number; scanFull: boolean },
     organizationId: string | null,
 ): Promise<boolean> => {
-    if (settings?.dailyBriefEnabled !== undefined || settings?.dailyBriefOfferDismissedAt !== undefined || liveThreadCount < BRIEF_OFFER_MIN_THREADS) {
+    if (settings?.dailyBriefEnabled !== undefined || settings?.dailyBriefOfferDismissedAt !== undefined) {
         return false;
+    }
+
+    if (scannedLive.count < BRIEF_OFFER_MIN_THREADS) {
+        if (!scannedLive.scanFull) {
+            return false;
+        }
+
+        const wider = await ctx.db.threads.findMany({
+            limit: BRIEF_OFFER_THREAD_SCAN,
+            orderBy: [{ updatedAt: "desc" }, { _creationTime: "desc" }],
+            where: { OR: [{ deleted: { isNull: true } }, { deleted: false }], userId },
+        });
+
+        if (wider.page.filter((thread) => thread.isTemporary !== true).length < BRIEF_OFFER_MIN_THREADS) {
+            return false;
+        }
     }
 
     const user = await getUser(ctx, userId);
@@ -197,7 +217,15 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
             };
         }),
         dailyBriefEnabled: settings?.dailyBriefEnabled === true,
-        dailyBriefOffer: offer ? await shouldOfferBrief(ctx, userId, settings, liveThreads.length, offer.organizationId) : false,
+        dailyBriefOffer: offer
+            ? await shouldOfferBrief(
+                  ctx,
+                  userId,
+                  settings,
+                  { count: liveThreads.length, scanFull: threadRows.page.length === THREAD_SCAN },
+                  offer.organizationId,
+              )
+            : false,
         notifications: await toRedactedNotificationViews(ctx.db, unread.slice(0, HOME_NOTIFICATIONS)),
         recentThreads: liveThreads.slice(0, RECENT_THREADS).map((thread) => {
             return {

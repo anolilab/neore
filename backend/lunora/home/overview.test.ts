@@ -260,6 +260,23 @@ describe("the one-time Daily Brief offer", () => {
         expect(await offered()).toBe(true);
     });
 
+    it("counts chats that newer temporary chats push out of the recent list, and only those", async () => {
+        await seedThreads(BRIEF_OFFER_MIN_THREADS - 1);
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 25; index += 1) {
+                await ctx.db.insert("threads", { isTemporary: true, status: "regular", updatedAt: Date.now() + 1000 + index, userId: USER });
+            }
+        });
+
+        expect(await offered()).toBe(false);
+
+        await harness.run(
+            async (ctx: any) => await ctx.db.insert("threads", { status: "regular", title: "Older chat", updatedAt: Date.now() - 1000, userId: USER }),
+        );
+
+        expect(await offered()).toBe(true);
+    });
+
     it("is never shown to someone who already turned it on or off", async () => {
         await seedThreads(BRIEF_OFFER_MIN_THREADS);
 

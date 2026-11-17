@@ -11,7 +11,7 @@ import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => {
-    return { overview: null as unknown, overviewCalls: 0, shouldFail: true };
+    return { overview: null as unknown, overviewCalls: 0, shouldFail: true, userId: "user-a" };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -74,6 +74,14 @@ vi.mock("@/features/notifications/hooks/use-notification-inbox", () => {
     };
 });
 
+vi.mock("@/features/auth/hooks/use-auth-session", () => {
+    return {
+        useAuthSession: () => {
+            return { data: { user: { id: harness.userId } } };
+        },
+    };
+});
+
 vi.mock("@/features/notifications/components/notification-list", () => {
     return { default: () => null };
 });
@@ -82,16 +90,20 @@ const { default: HomePage } = await import("./home-page");
 
 const mount = () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = () => createElement(QueryClientProvider, { client: queryClient }, createElement(HomePage));
+    const view = render(tree());
 
-    return render(createElement(QueryClientProvider, { client: queryClient }, createElement(HomePage)));
+    return { ...view, rerenderPage: () => view.rerender(tree()) };
 };
 
 afterEach(() => {
     harness.overview = null;
     harness.overviewCalls = 0;
     harness.shouldFail = true;
+    harness.userId = "user-a";
 });
 
+const DISMISSED = /we won't ask again/u;
 const WAITING_ROW = /Delete the old files/u;
 const RUNNING_ROW = /Sort the inbox/u;
 
@@ -121,6 +133,35 @@ describe("home page sub-agents", () => {
         // The approval is answered in the sub-agent's own thread; a running one is followed from its parent's.
         expect(waiting.getAttribute("href")).toBe("/chat/child-1");
         expect(screen.getByRole("link", { name: RUNNING_ROW }).getAttribute("href")).toBe("/chat/thread-2");
+    });
+});
+
+describe("home page Daily Brief offer", () => {
+    it("starts over for another account after an in-place switch", async () => {
+        harness.shouldFail = false;
+        harness.overview = {
+            approvals: [],
+            codingAgents: [],
+            dailyBriefEnabled: false,
+            dailyBriefOffer: true,
+            notifications: [],
+            recentThreads: [],
+            reviews: [],
+            runningTasks: [],
+            subAgents: [],
+            unreadCount: 0,
+        };
+
+        const { rerenderPage } = mount();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Not now" }));
+        await screen.findByText(DISMISSED);
+
+        harness.userId = "user-b";
+        rerenderPage();
+
+        expect(screen.queryByText(DISMISSED)).toBeNull();
+        expect(screen.getByRole("button", { name: "Not now" })).toBeTruthy();
     });
 });
 

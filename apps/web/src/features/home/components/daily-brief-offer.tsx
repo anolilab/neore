@@ -34,6 +34,8 @@ const isManagedRefusal = (error: unknown): boolean => {
  * makes the live overview stop offering it, possibly before the mutation
  * returns, so the card stays mounted from the click on (pending counts) and
  * confirms the answer, focused, inside a live region that was already there.
+ * Its answer belongs to one account: the home page keys it by the signed-in
+ * user, so an in-place account switch starts it over.
  */
 const DailyBriefOffer: FC<{ offered: boolean }> = ({ offered }) => {
     const { i18n, t } = useLingui();
@@ -59,8 +61,11 @@ const DailyBriefOffer: FC<{ offered: boolean }> = ({ offered }) => {
     }, [answered]);
 
     const busy = enable.isPending || dismiss.isPending;
+    // An organization lock withdraws the offer and refuses the write, so that refusal stays readable. Any other failure
+    // after a withdrawal may be a lost reply to a saved answer: the card goes, rather than asking to try again.
+    const managed = enable.isError && isManagedRefusal(enable.error);
 
-    if (!offered && !answered && !busy) {
+    if (!offered && !answered && !busy && !managed) {
         return null;
     }
 
