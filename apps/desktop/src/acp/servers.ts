@@ -108,11 +108,18 @@ export class ServerAgents {
     }
 
     /**
-     * The poster that ends a held turn of a server, which must still post while the server is being removed (the removal
-     * refuses commands, not the end of a turn already held). It never makes a runtime: a server with none gets the refusal.
+     * The poster that ends a held turn of a server. While the server is being removed, its runtime is still here and the end
+     * is posted through it (the removal refuses commands, not the end of a turn already held). It never makes a runtime: once
+     * the removal has dropped it, a late end is refused rather than sent on a runtime nothing will ever stop.
      */
     public posterForEnd(deviceId: string): HostPoster {
-        return this.runtimes.get(deviceId)?.poster ?? this.get(deviceId).poster;
+        const runtime = this.runtimes.get(deviceId);
+
+        if (runtime === undefined) {
+            throw new Error("that server's runtime has ended");
+        }
+
+        return runtime.poster;
     }
 
     /** Ends the sessions the person's approvals for a server no longer cover. */

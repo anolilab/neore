@@ -329,15 +329,17 @@ describe("coding agents on a server", () => {
         expect(runtime.acp.summaries()[0]?.status).toBe("ended");
     });
 
-    it("hands the end of a held turn the poster of a server being removed, and never makes a runtime for a server without one", async () => {
+    it("hands the end of a held turn the poster of a server being removed, and never makes a runtime once the removal has dropped it", async () => {
         const { servers } = setup();
         const runtime = servers.get(SERVER);
         const removal = servers.remove(SERVER);
 
         expect(servers.posterForEnd(SERVER)).toBe(runtime.poster);
-        expect(() => servers.posterForEnd("someone-else")).toThrow("not paired");
 
         await removal;
-        secretGone = true;
+
+        // The server is still paired here (the core drops it after this), yet a late end must not build a new runtime.
+        expect(() => servers.posterForEnd(SERVER)).toThrow("has ended");
+        expect(() => servers.posterForEnd("someone-else")).toThrow("has ended");
     });
 });
