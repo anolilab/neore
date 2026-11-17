@@ -593,6 +593,8 @@ export const generateExportFile = internalAction
         // Review drafts on pull requests (`source-control/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         reviewDrafts: v.optional(v.any()),
+        // The outbound run webhook's URL and switch, never its secret (`run-webhooks/gdpr.ts`). Optional for the same reason.
+        runWebhooks: v.optional(v.any()),
         settings: v.any(),
         // Goals and tasks with their run history (`tasks/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
@@ -713,6 +715,7 @@ export const generateExportFile = internalAction
             pullRequestGuides: args.pullRequestGuides ?? { guides: [] },
             pullRequestThreads: args.pullRequestThreads ?? { links: [] },
             reviewDrafts: args.reviewDrafts ?? { drafts: [] },
+            runWebhooks: args.runWebhooks ?? { runWebhooks: [] },
             settings: args.settings,
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
