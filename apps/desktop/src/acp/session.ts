@@ -1750,10 +1750,11 @@ export class AgentSession {
                 return {};
             }
             case METHOD.terminalOutput: {
-                const before = terminals.printed(params.terminalId as string)?.output;
+                const before = terminals.printed(params.terminalId as string);
                 const { exitStatus, output, truncated } = terminals.output(params.terminalId as string);
 
-                if (output !== before) {
+                // The row shows the text and the truncation marker, so a change to either is a change to what it shows.
+                if (output !== before?.output || truncated !== before?.truncated) {
                     this.onTerminalPrinted(params.terminalId as string);
                 }
 
