@@ -294,4 +294,16 @@ describe("coding agents on a server", () => {
 
         expect(runtime.acp.summaries()[0]?.status).toBe("ended");
     });
+
+    it("refuses a start on a removed server's manager, so a start that held the runtime cannot spawn after the removal", async () => {
+        const { servers } = setup();
+        const runtime = servers.get(SERVER);
+
+        await servers.remove(SERVER);
+        secretGone = true;
+
+        await expect(runtime.acp.startSession("fake", "Fake on build-box", scratch.work, { sessionId: "session-6", threadId: "thread-6" })).rejects.toThrow(
+            "being removed",
+        );
+    });
 });

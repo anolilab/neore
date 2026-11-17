@@ -139,7 +139,7 @@ export class ServerAgents {
             await runtime.poster.persisted();
             runtime.poster.stop();
             // Nothing may still run on the runtime being dropped: this also releases its sleep-lock source.
-            runtime.acp.killAll();
+            runtime.acp.retire();
             this.runtimes.delete(deviceId);
         } finally {
             this.removing.delete(deviceId);

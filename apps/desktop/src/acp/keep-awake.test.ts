@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { SleepBlocker } from "./keep-awake";
 import { SleepLock } from "./keep-awake";
@@ -138,6 +138,97 @@ describe("the sleep lock", () => {
         lock.report(source, false);
 
         expect(live.size).toBe(0);
+    });
+
+    it("retries a stop that failed at the end of the last turn on its own, once the pause is over", () => {
+        vi.useFakeTimers();
+
+        try {
+            const live = new Set<number>();
+            let starts = 0;
+            let stopFailures = 1;
+            const lock = new SleepLock(
+                {
+                    isStarted: (id) => live.has(id),
+                    start: () => {
+                        starts += 1;
+                        live.add(starts);
+
+                        return starts;
+                    },
+                    stop: (id) => {
+                        if (stopFailures > 0) {
+                            stopFailures -= 1;
+
+                            throw new Error("busy");
+                        }
+
+                        live.delete(id);
+                    },
+                },
+                () => undefined,
+                5000,
+            );
+            const source = {};
+
+            lock.report(source, true);
+            lock.report(source, false);
+
+            expect(live.size).toBe(1);
+
+            vi.advanceTimersByTime(5000);
+
+            expect(live.size).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("does not ask the platform during the pause after a failed start, and asks again once it is over", () => {
+        vi.useFakeTimers();
+
+        try {
+            const live = new Set<number>();
+            let attempts = 0;
+            const lock = new SleepLock(
+                {
+                    isStarted: (id) => live.has(id),
+                    start: () => {
+                        attempts += 1;
+
+                        if (attempts === 1) {
+                            throw new Error("no power service");
+                        }
+
+                        live.add(attempts);
+
+                        return attempts;
+                    },
+                    stop: (id) => {
+                        live.delete(id);
+                    },
+                },
+                () => undefined,
+                5000,
+            );
+            const source = {};
+
+            lock.report(source, true);
+
+            expect(attempts).toBe(1);
+
+            // An output update during the pause changes nothing and asks nobody.
+            lock.report(source, true);
+
+            expect(attempts).toBe(1);
+
+            vi.advanceTimersByTime(5000);
+
+            expect(attempts).toBe(2);
+            expect(live.size).toBe(1);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("logs a blocker that cannot start and never throws into the turn", () => {

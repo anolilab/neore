@@ -100,6 +100,9 @@ export class AcpManager {
 
     private readonly processes = new Set<AgentProcess>();
 
+    /** Set when the manager is dropped with its server: no start may spawn on it from then on. */
+    private retired = false;
+
     /** The hook runner of each session that has one; it lives and dies with the session. */
     private readonly runners = new Map<string, HookRunner>();
 
@@ -529,6 +532,15 @@ export class AcpManager {
         this.options.sleepLock?.report(this, false);
     }
 
+    /**
+     * The manager is being dropped with its server: nothing may start on it from now on, and what runs is killed. A start
+     * that was already awaiting when this is called is refused when it resumes (`refuseStart` runs after its last wait).
+     */
+    public retire(): void {
+        this.retired = true;
+        this.killAll();
+    }
+
     private refuseHeld(agentKey: string): void {
         if (this.held.has(agentKey)) {
             throw new Error("that agent is being signed out; start it again once that ends");
@@ -539,6 +551,10 @@ export class AcpManager {
     private refuseStart(agentKey: string): void {
         // Again: a sign-out can have begun while the superseded sessions were closing.
         this.refuseHeld(agentKey);
+
+        if (this.retired) {
+            throw new Error("that server is being removed");
+        }
 
         if (this.summaries().filter((session) => session.status !== "ended").length >= MAX_SESSIONS) {
             throw new Error(`at most ${String(MAX_SESSIONS)} agents at once; close one first`);
