@@ -37746,7 +37746,24 @@
                         "type": "number"
                       },
                       "importedFrom": {
-                        "type": "string"
+                        "anyOf": [
+                          {
+                            "const": "chatgpt",
+                            "type": "string"
+                          },
+                          {
+                            "const": "claude",
+                            "type": "string"
+                          },
+                          {
+                            "const": "gemini",
+                            "type": "string"
+                          },
+                          {
+                            "const": "other",
+                            "type": "string"
+                          }
+                        ]
                       },
                       "lastConfirmedAt": {
                         "type": "number"

@@ -3,7 +3,7 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { memoryLogger } from "../lib/logger";
@@ -16,6 +16,20 @@ import { requireOwnedThread } from "../agent/thread-read-access";
 import { getVectorIdInfo, type VectorTableId, type VectorTableName } from "../agent/vector/tables";
 import { parentKeyOf } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
+
+/**
+ * Whether the user turned memory on. OPT-IN: absent means off. Memory extraction reads every
+ * conversation and derives statements about the user, so it must not start because nobody
+ * has visited the setting yet. Enabling it is a deliberate act.
+ */
+export const readMemoryEnabled = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<boolean> => {
+    const settings = await ctx.db
+        .query("userSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+
+    return settings?.memoryEnabled === true;
+};
 
 /** Most memories one user-facing read looks at. */
 const MEMORY_READ_CAP = 2000;
@@ -77,7 +91,7 @@ export const listUserMemories = authQuery
                 confidence: v.optional(v.number()),
                 createdAt: v.number(),
                 importance: v.optional(v.number()),
-                importedFrom: v.optional(v.string()),
+                importedFrom: v.optional(v.union(v.literal("chatgpt"), v.literal("claude"), v.literal("gemini"), v.literal("other"))),
                 lastConfirmedAt: v.number(),
                 memory: v.string(),
                 pinned: v.boolean(),
@@ -495,26 +509,57 @@ export const saveMemoryBatch = internalMutation
 const IMPORT_EXACT_CHECK_ROWS = 5000;
 
 /**
- * Imported rows, minus any whose text the user already has (that row is confirmed and its
- * place is `null`). It runs in the mutation because one shard's mutations run one at a time:
- * a second save of the same paste sees what the first wrote, a repeat past the action's
- * dedup window is still found, and memory switched off meanwhile stops the write.
+ * Every write of one import, applied together after the memory setting is re-checked, so
+ * memory switched off meanwhile leaves the user's rows untouched. In order:
+ * - a planned merge (`merge`) rewords its row while that is still the user's own, active and
+ *   unpinned; otherwise the fact is saved as new;
+ * - `confirms` are marked confirmed;
+ * - the other facts are inserted, minus any whose text the user already has (that row is
+ *   confirmed instead). It runs in the mutation because one shard's mutations run one at a
+ *   time: a second save of the same paste sees what the first wrote, and a repeat past the
+ *   action's dedup window is still found.
  */
 export const saveImportedMemoryBatch = internalMutation
-    .input({ memories: v.array(v.object({ ...vMemoryInsertFields })), userId: v.string() })
-    .output(v.array(v.union(v.id("memories"), v.null())))
+    .input({
+        confirms: v.array(v.id("memories")),
+        memories: v.array(
+            v.object({
+                ...vMemoryInsertFields,
+                merge: v.optional(v.object({ confidence: v.number(), memory: v.string(), memoryId: v.id("memories") })),
+            }),
+        ),
+        userId: v.string(),
+    })
+    .output(v.array(v.object({ memoryId: v.id("memories"), status: v.union(v.literal("added"), v.literal("known"), v.literal("updated")) })))
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
-        const settings = await ctx.db
-            .query("userSettings")
-            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
-            .unique();
 
-        if (settings?.memoryEnabled !== true) {
+        if (!(await readMemoryEnabled(ctx, args.userId))) {
             throw new LunoraError("FORBIDDEN", IMPORT_MEMORY_OFF_MESSAGE);
         }
 
-        // The user's own active rows, newest first: a bot's rows and superseded history never use up the read.
+        const ownActive = (row: Doc<"memories"> | null): row is Doc<"memories"> => row?.userId === args.userId && !row.botId && !row.supersededBy;
+        const outcomes: ({ memoryId: Id<"memories">; status: "added" | "known" | "updated" } | undefined)[] = args.memories.map(() => undefined);
+
+        for (const [index, { merge }] of args.memories.entries()) {
+            const target = merge ? await ctx.db.get("memories", merge.memoryId) : null;
+
+            if (merge && ownActive(target) && target.pinned !== true) {
+                await ctx.db.patch("memories", target._id, { confidence: merge.confidence, lastConfirmedAt: now, memory: merge.memory, updatedAt: now });
+                // The merged text needs its own vector, or a repeat import matches the old one and revises again.
+                await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: target._id, userId: args.userId });
+                outcomes[index] = { memoryId: target._id, status: "updated" };
+            }
+        }
+
+        for (const memoryId of args.confirms) {
+            if (ownActive(await ctx.db.get("memories", memoryId))) {
+                await ctx.db.patch("memories", memoryId, { lastConfirmedAt: now });
+            }
+        }
+
+        // Read after the merges, so the exact check sees merged texts. The user's own active rows,
+        // newest first: a bot's rows and superseded history never use up the read.
         const { page: own } = await ctx.db.memories.findMany({
             limit: IMPORT_EXACT_CHECK_ROWS,
             orderBy: [{ _creationTime: "desc" }],
@@ -522,7 +567,6 @@ export const saveImportedMemoryBatch = internalMutation
         });
         const textOf = new Map(own.map((row) => [row._id, importDedupKey(row.memory)]));
         const byText = new Map([...textOf].map(([memoryId, key]) => [key, memoryId]));
-        const memoryIds: (Id<"memories"> | null)[] = [];
         // A superseded row is no longer a match for a later fact of this batch.
         const retire = (memoryId: Id<"memories"> | undefined) => {
             const key = memoryId ? textOf.get(memoryId) : undefined;
@@ -532,14 +576,19 @@ export const saveImportedMemoryBatch = internalMutation
             }
         };
 
-        for (const mem of args.memories) {
+        for (const [index, mem] of args.memories.entries()) {
+            const done = outcomes[index];
+
+            if (done) {
+                continue;
+            }
+
             const key = importDedupKey(mem.memory);
             const known = byText.get(key);
             // The row the action planned to supersede ends only while it is still the user's own active row:
             // another save may have ended or removed it meanwhile.
             const planned = mem.supersedes ? await ctx.db.get("memories", mem.supersedes) : null;
-            const supersedes =
-                planned && planned._id !== known && !planned.supersededBy && !planned.botId && planned.userId === args.userId ? planned._id : undefined;
+            const supersedes = ownActive(planned) && planned._id !== known ? planned._id : undefined;
 
             if (known) {
                 await ctx.db.patch("memories", known, { lastConfirmedAt: now });
@@ -548,18 +597,18 @@ export const saveImportedMemoryBatch = internalMutation
                     await ctx.db.patch("memories", supersedes, { supersededBy: known, updatedAt: now });
                 }
 
-                memoryIds.push(null);
+                outcomes[index] = { memoryId: known, status: "known" };
             } else {
                 const memoryId = await insertMemory(ctx, { ...mem, supersedes, userId: args.userId }, now);
 
                 byText.set(key, memoryId);
-                memoryIds.push(memoryId);
+                outcomes[index] = { memoryId, status: "added" };
             }
 
             retire(supersedes);
         }
 
-        return memoryIds;
+        return outcomes.filter((outcome) => outcome !== undefined);
     });
 
 export const updateMemoryInternal = internalMutation
@@ -783,17 +832,7 @@ export const recordRetrievedMemories = internalMutation
 export const isMemoryEnabled = internalQuery
     .input({ userId: v.string() })
     .output(v.boolean())
-    .query(async ({ args: { userId }, ctx }) => {
-        const settings = await ctx.db
-            .query("userSettings")
-            .withIndex("by_userId", (q) => q.eq("userId", userId))
-            .unique();
-
-        // OPT-IN. Absent means off: memory extraction reads every conversation and
-        // derives statements about the user, so it must not start because nobody
-        // has visited the setting yet. Enabling it is a deliberate act.
-        return settings?.memoryEnabled ?? false;
-    });
+    .query(async ({ args: { userId }, ctx }) => readMemoryEnabled(ctx, userId));
 
 /**
  * Whether a thread is a temporary chat. Temporary chats are meant to leave no

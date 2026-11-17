@@ -16,7 +16,7 @@ import { searchVectors } from "../agent/vector/index";
 import { validateVectorDimension, type VectorDimension } from "../agent/vector/tables";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
-import { getMemoryEmbeddingModel, MEMORY_EMBEDDING_MODEL_NAME } from "./extract";
+import { getMemoryEmbeddingModel, MEMORY_EMBEDDING_MODEL_NAME } from "./dedup";
 
 const WHITESPACE_RE = /\s+/;
 // ============================================================================

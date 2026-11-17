@@ -322,6 +322,39 @@ describe("importing another assistant's memory", () => {
         expect(await memories()).toHaveLength(0);
     });
 
+    it("leaves merges and confirmations unwritten when memory is turned off while the save runs", async () => {
+        expect.assertions(3);
+
+        await setMemoryEnabled(true);
+
+        const [known, merged] = await harness.run(async (ctx: any) => [
+            await ctx.db.insert("memories", { memory: "The user is a nurse in Hamburg", type: "identity", userId: USER }),
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER }),
+        ]);
+
+        generateText.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => {
+                const settings = await ctx.db.query("userSettings").first();
+
+                await ctx.db.patch("userSettings", settings._id, { memoryEnabled: false });
+            });
+
+            return { output: { action: "UPDATE", mergedMemory: "The user lives in Berlin near the river with a garden and bikes daily" } };
+        });
+
+        await expect(
+            save([
+                { memory: "The user is a nurse in Hamburg", type: "identity" },
+                { memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" },
+            ]),
+        ).rejects.toThrow(MEMORY_OFF_RE);
+
+        const rows = await memories();
+
+        expect(rows.find((row: { _id: string }) => row._id === known)?.lastConfirmedAt).toBeUndefined();
+        expect(rows.find((row: { _id: string }) => row._id === merged)?.memory).toBe("The user lives in Berlin near the river with a garden and bikes");
+    });
+
     it("saves the fact when the row it would supersede is gone by the time of the save", async () => {
         expect.assertions(1);
 

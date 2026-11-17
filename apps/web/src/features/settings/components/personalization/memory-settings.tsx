@@ -134,27 +134,21 @@ const MemorySettings: FC = () => {
         },
     });
 
-    const handleToggleMemory = useCallback(async () => {
-        const isNewValue = !memoryEnabled;
-        const successMessage = isNewValue ? t`Memory enabled` : t`Memory disabled`;
+    const setMemoryEnabled = useCallback(
+        async (enabled: boolean) => {
+            try {
+                await updateSettingsMutation.mutateAsync({ memoryEnabled: enabled });
+                trackEvent("memory_toggled", { enabled });
+                toast.success(enabled ? t`Memory enabled` : t`Memory disabled`);
+            } catch {
+                toast.error(t`Failed to update setting`);
+            }
+        },
+        [updateSettingsMutation, t],
+    );
 
-        try {
-            await updateSettingsMutation.mutateAsync({ memoryEnabled: isNewValue });
-            trackEvent("memory_toggled", { enabled: isNewValue });
-            toast.success(successMessage);
-        } catch {
-            toast.error(t`Failed to update setting`);
-        }
-    }, [memoryEnabled, updateSettingsMutation, t]);
-
-    const handleEnableMemory = useCallback(async () => {
-        try {
-            await updateSettingsMutation.mutateAsync({ memoryEnabled: true });
-            trackEvent("memory_toggled", { enabled: true });
-        } catch {
-            toast.error(t`Failed to update setting`);
-        }
-    }, [updateSettingsMutation, t]);
+    const handleToggleMemory = useCallback(async () => setMemoryEnabled(!memoryEnabled), [memoryEnabled, setMemoryEnabled]);
+    const handleEnableMemory = useCallback(async () => setMemoryEnabled(true), [setMemoryEnabled]);
 
     const visible = (memories ?? []).filter((memory) => typeFilter === "all" || memory.type === typeFilter);
     const busy = isDeleting || isUpdating || isPinning;

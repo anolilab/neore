@@ -10,14 +10,15 @@ import { CheckIcon, ExternalLinkIcon, PencilIcon, PinIcon, PinOffIcon, Trash2Ico
 import type { FC } from "react";
 import { useId, useState } from "react";
 
-import { isImportApp, useImportAppLabels } from "./memory-import-dialog";
+import type { ImportApp } from "./memory-import-apps";
+import { useImportAppLabels } from "./memory-import-apps";
 import type { MemoryType } from "./memory-types";
 import { isMemoryType, MEMORY_TYPE_COLORS, MEMORY_TYPES, useMemoryTypeLabels } from "./memory-types";
 
 export interface MemoryItemData {
     _id: string;
     createdAt: number;
-    importedFrom?: string;
+    importedFrom?: ImportApp;
     lastConfirmedAt: number;
     memory: string;
     pinned: boolean;
@@ -44,7 +45,7 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
     const { t } = useLingui();
     const typeLabels = useMemoryTypeLabels();
     const appLabels = useImportAppLabels();
-    const importedFromLabel = appLabels[isImportApp(memory.importedFrom) ? memory.importedFrom : "other"];
+    const importedFromLabel = appLabels[memory.importedFrom ?? "other"];
     const [isEditing, setIsEditing] = useState(false);
     const [draft, setDraft] = useState(memory.memory);
     const textareaId = useId();

@@ -25,7 +25,6 @@ import z from "zod/v4";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { type ActionCtx as ActionContext, internalAction } from "../_generated/server";
-import { searchVectors } from "../agent/vector/index";
 import { validateVectorDimension, type VectorDimension } from "../agent/vector/tables";
 import { cacheKeyFor } from "../lib/action-cache";
 import {
@@ -42,39 +41,16 @@ import {
 import { loadModelFilterRules, ModelFilterRulesUnavailableError } from "../chat/lib/model-filter-rules";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
 import { getUtilityModel, NoAllowedUtilityModelError } from "../lib/utility-model";
+import {
+    embedMemoryFacts,
+    findSimilarMemoryByJaccard,
+    findSimilarMemoryByVector,
+    getMemoryEmbeddingModel,
+    MEMORY_EMBEDDING_MODEL_NAME,
+    saveMemoryVectors,
+    type SimilarMemoryResult,
+} from "./dedup";
 import { MEMORY_TYPE_GUIDE, MEMORY_TYPES, type MemoryType } from "./taxonomy";
-
-const WHITESPACE_RE = /\s+/;
-// ============================================================================
-// Constants
-// ============================================================================
-
-/**
- * Model name string stored in the vector table for memory embeddings.
- * Must be consistent between extraction and retrieval.
- *
- * The LLM Gateway routes to Workers AI bge-m3 (1024-dim vectors).
- */
-export const MEMORY_EMBEDDING_MODEL_NAME = "bge-m3";
-
-// ============================================================================
-// Embedding Model Factory
-// ============================================================================
-
-/**
- * Create an embedding model instance via the LLM Gateway.
- *
- * The gateway is mandatory — produces 1024-dimensional vectors
- * (bge-m3) for compatibility with the vector table. `gateway` is
- * the calling action's binding, `gatewayFetch(ctx)`; the gateway refuses the
- * model when the user's `modelFilterRules` exclude it, and callers fall back
- * (Jaccard dedup, keyword retrieval) as on any embedding failure.
- */
-export const getMemoryEmbeddingModel = async (gateway: ServiceFetch, modelFilterRules: ModelFilterRules) => {
-    const { createGatewayEmbeddingModel } = await import("../chat/lib/gateway-embedding-model");
-
-    return createGatewayEmbeddingModel(gateway, { modelFilterRules });
-};
 
 // ============================================================================
 // Prompts
@@ -383,30 +359,14 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
 
         const now = Date.now();
 
-        // 4. Generate embeddings for all extracted facts upfront (for vector dedup)
-        let factEmbeddings: (number[] | null)[] = extractedFacts.map(() => null);
-
-        // Rules that refuse the embedding model (`embeddingModelAllowed`) go straight to Jaccard dedup: the gateway would refuse the call.
-        try {
-            const { embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
-
-            if (embeddingModelAllowed(rules)) {
-                const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx), rules);
-                const { embedMany } = await import("../agent/client/search");
-
-                const factTexts = extractedFacts.map((f) => f.memory);
-                const { embeddings } = await embedMany(ctx, {
-                    embeddingModel,
-                    threadId: undefined,
-                    userId: args.userId,
-                    values: factTexts,
-                });
-
-                factEmbeddings = embeddings;
-            }
-        } catch (error) {
-            console.warn("[memory/extract] Fact embedding generation failed, falling back to Jaccard dedup:", error);
-        }
+        // 4. Embeddings for all extracted facts upfront (for vector dedup); nulls fall back to Jaccard.
+        const factEmbeddings = await embedMemoryFacts(
+            ctx,
+            args.userId,
+            rules,
+            extractedFacts.map((fact) => fact.memory),
+            "[memory/extract]",
+        );
 
         // 5. Deduplicate and apply belief revision for each extracted fact
         // Every key present, value possibly undefined — this mirrors what
@@ -452,7 +412,12 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
 
             if (factEmbedding) {
                 try {
-                    similarMemory = await findSimilarMemoryByVector(ctx, args.userId, factEmbedding, existingMemories);
+                    similarMemory = await findSimilarMemoryByVector(ctx, {
+                        botId: args.botId,
+                        embedding: factEmbedding,
+                        existing: existingMemories,
+                        userId: args.userId,
+                    });
                 } catch (error) {
                     console.warn("[memory/extract] Vector dedup search failed, falling back to Jaccard:", error);
                 }
@@ -562,58 +527,14 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                 memories: memoriesToSave,
             });
 
-            // Save embeddings for memories that have them
-            try {
-                const toEmbed: { idx: number; text: string }[] = [];
-
-                for (let i = 0; i < savedIds.length; i += 1) {
-                    if (factEmbeddingsToSave[i]) {
-                        toEmbed.push({ idx: i, text: memoriesToSave[i]!.memory });
-                    }
-                }
-
-                if (toEmbed.length > 0) {
-                    // We already have the embeddings — save them directly
-                    const nonNullEmbeddings = factEmbeddingsToSave.filter((embedding): embedding is number[] => embedding !== null);
-                    const savedNonNullIds = savedIds.filter((_, i) => factEmbeddingsToSave[i] !== null);
-
-                    if (nonNullEmbeddings.length > 0 && nonNullEmbeddings[0]!.length > 0) {
-                        const dimension = nonNullEmbeddings[0]!.length;
-
-                        validateVectorDimension(dimension);
-
-                        const embeddingIds = await ctx.runMutation(internal.agent.vector.insertBatch, {
-                            vectorDimension: dimension as VectorDimension,
-                            // `threadId` / `messageId` are `v.optional(...)`, but the
-                            // generated reference renders them `T | undefined` rather
-                            // than `key?: T` — so the KEY is required even though the
-                            // value may be undefined. Passing them explicitly; this can
-                            // go once that is fixed.
-                            vectors: nonNullEmbeddings.map((vector) => {
-                                return {
-                                    messageId: undefined,
-                                    model: MEMORY_EMBEDDING_MODEL_NAME,
-                                    table: "memories",
-                                    threadId: undefined,
-                                    userId: args.userId,
-                                    vector,
-                                };
-                            }),
-                        });
-
-                        for (const [i, savedNonNullId] of savedNonNullIds.entries()) {
-                            if (embeddingIds[i]) {
-                                await ctx.runMutation(internal.memory.functions.updateMemoryInternal, {
-                                    embeddingId: embeddingIds[i] as string,
-                                    memoryId: savedNonNullId!,
-                                });
-                            }
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error("[memory/extract] Embedding save failed:", error);
-            }
+            await saveMemoryVectors(
+                ctx,
+                args.userId,
+                savedIds.map((memoryId, index) => {
+                    return { memoryId, vector: factEmbeddingsToSave[index] ?? null };
+                }),
+                "[memory/extract]",
+            );
         }
 
         // 7. Apply updates to existing memories
@@ -738,127 +659,6 @@ export const regenerateMemoryEmbedding = internalAction
             console.error("[memory/extract] Embedding regeneration failed:", error);
         }
     });
-
-// ============================================================================
-// Deduplication Helpers
-// ============================================================================
-
-interface SimilarMemoryResult {
-    confidence: number | undefined;
-    id: Id<"memories">;
-    memory: string;
-    score: number;
-}
-
-/**
- * Find similar memory using vector cosine similarity.
- * Returns the best match if cosine score >= 0.85.
- */
-const findSimilarMemoryByVector = async (
-    context: ActionContext,
-    userId: string,
-    factEmbedding: number[],
-    existingMemories: { _id: string; confidence?: number | null; embeddingId?: string; memory: string }[],
-): Promise<SimilarMemoryResult | null> => {
-    if (existingMemories.length === 0 || factEmbedding.length === 0) {
-        return null;
-    }
-
-    const dimension = factEmbedding.length;
-
-    validateVectorDimension(dimension);
-
-    const vectorResults = await searchVectors(context, factEmbedding, {
-        dimension: dimension as VectorDimension,
-        limit: 5,
-        model: MEMORY_EMBEDDING_MODEL_NAME,
-        searchAllMessagesForUserId: userId,
-        table: "memories",
-    });
-
-    if (vectorResults.length === 0) {
-        return null;
-    }
-
-    const bestResult = vectorResults[0]!;
-
-    if (bestResult._score < 0.85) {
-        return null;
-    }
-
-    // Match the embedding result back to an existing memory record
-    const embeddingId = bestResult._id as string;
-    const matchedMemory = existingMemories.find((m) => m.embeddingId === embeddingId);
-
-    if (!matchedMemory) {
-        return null;
-    }
-
-    return {
-        confidence: matchedMemory.confidence ?? undefined,
-        id: matchedMemory._id as Id<"memories">,
-        memory: matchedMemory.memory,
-        score: bestResult._score,
-    };
-};
-
-/**
- * Find the most similar existing memory using Jaccard similarity on word sets.
- * Fast fallback when no embedding is available.
- */
-export const findSimilarMemoryByJaccard = (
-    newFact: string,
-    existingMemories: { _id: string; confidence?: number | null; memory: string }[],
-): SimilarMemoryResult | null => {
-    if (existingMemories.length === 0) {
-        return null;
-    }
-
-    let bestMatch: SimilarMemoryResult | null = null;
-    let bestScore = 0;
-
-    for (const existing of existingMemories) {
-        const score = textSimilarity(newFact.toLowerCase(), existing.memory.toLowerCase());
-
-        if (score > bestScore && score >= 0.85) {
-            bestScore = score;
-            bestMatch = {
-                confidence: existing.confidence ?? undefined,
-                id: existing._id as Id<"memories">,
-                memory: existing.memory,
-                score,
-            };
-        }
-    }
-
-    return bestMatch;
-};
-
-/**
- * Simple text similarity using Jaccard similarity on word sets.
- */
-const textSimilarity = (a: string, b: string): number => {
-    const wordsA = new Set(a.split(WHITESPACE_RE).filter(Boolean));
-    const wordsB = new Set(b.split(WHITESPACE_RE).filter(Boolean));
-
-    if (wordsA.size === 0 && wordsB.size === 0) {
-        return 1;
-    }
-
-    if (wordsA.size === 0 || wordsB.size === 0) {
-        return 0;
-    }
-
-    let intersection = 0;
-
-    for (const word of wordsA) {
-        if (wordsB.has(word)) intersection += 1;
-    }
-
-    const union = wordsA.size + wordsB.size - intersection;
-
-    return union === 0 ? 0 : intersection / union;
-};
 
 /**
  * Run belief revision LLM call to decide how to handle a conflicting memory.

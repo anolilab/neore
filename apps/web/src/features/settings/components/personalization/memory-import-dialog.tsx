@@ -17,24 +17,13 @@ import { toast } from "sonner";
 
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
+import type { ImportApp } from "./memory-import-apps";
+import { IMPORT_APPS, isImportApp, useImportAppLabels } from "./memory-import-apps";
 import type { MemoryType } from "./memory-types";
 import { useMemoryTypeLabels } from "./memory-types";
 
-export const IMPORT_APPS = ["chatgpt", "claude", "gemini", "other"] as const;
-
-export type ImportApp = (typeof IMPORT_APPS)[number];
-
-export const isImportApp = (value: unknown): value is ImportApp => typeof value === "string" && (IMPORT_APPS as ReadonlyArray<string>).includes(value);
-
 /** Mirrors `IMPORT_MAX_INPUT_CHARS` in `backend/lunora/memory/import-logic.ts`. */
 const MAX_PASTE_CHARS = 20_000;
-
-/** Product names stay untranslated; "other" is the only label that needs a translation. */
-export const useImportAppLabels = (): Record<ImportApp, string> => {
-    const { t } = useLingui();
-
-    return { chatgpt: "ChatGPT", claude: "Claude", gemini: "Gemini", other: t`Another assistant` };
-};
 
 interface Preview {
     cut: number;
