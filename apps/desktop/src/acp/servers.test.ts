@@ -307,7 +307,7 @@ describe("coding agents on a server", () => {
         );
     });
 
-    it("drops the runtime of a removal that fails, so a later start for the still-paired server gets one that can start", async () => {
+    it("keeps the runtime of a removal that fails, and lets the server start turns again", async () => {
         const { servers } = setup();
         const runtime = servers.get(SERVER);
 
@@ -315,10 +315,9 @@ describe("coding agents on a server", () => {
 
         await expect(servers.remove(SERVER)).rejects.toThrow("close failed");
 
-        const fresh = servers.get(SERVER);
-
-        expect(fresh).not.toBe(runtime);
-        await fresh.acp.startSession("fake", "Fake on build-box", scratch.work, { sessionId: "session-9", threadId: "thread-9" });
+        // Same runtime, same poster and turn file; a start is accepted again.
+        expect(servers.get(SERVER)).toBe(runtime);
+        await runtime.acp.startSession("fake", "Fake on build-box", scratch.work, { sessionId: "session-9", threadId: "thread-9" });
         servers.killAll();
     });
 

@@ -537,6 +537,11 @@ export class AcpManager {
         this.retired = true;
     }
 
+    /** Lets starts through again, for a removal that failed and kept the runtime. */
+    public reopen(): void {
+        this.retired = false;
+    }
+
     /** Refuses new starts and ends everything still running: the runtime is being dropped. */
     public retire(): void {
         this.refuse();

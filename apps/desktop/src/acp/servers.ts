@@ -246,15 +246,21 @@ export class ServerAgents {
                 // eslint-disable-next-line no-await-in-loop -- the state is persisted again after each wait
                 await runtime.poster.persisted();
             }
+        } catch (error) {
+            // The removal failed: the runtime is kept with its poster and its unfinished turns, and starts are allowed again, so
+            // the server works as before and a later removal can run.
+            runtime.acp.reopen();
+
+            throw error;
         } finally {
-            // Whatever failed above, the runtime is dropped. The stop follows the loop's last check of `busy` with no await in
-            // between, so no end can be queued in between. Nothing may still run on the dropped runtime (this also releases its
-            // sleep-lock source), and a later start for the server gets a new runtime, not this one.
-            runtime.poster.stop();
-            runtime.acp.retire();
-            this.runtimes.delete(deviceId);
             this.removing.delete(deviceId);
         }
+
+        // No await from the loop's last check of `busy` to here: nothing can be queued in between. Nothing may still run on the
+        // dropped runtime (this also releases its sleep-lock source), and a later start for the server gets a new runtime.
+        runtime.poster.stop();
+        runtime.acp.retire();
+        this.runtimes.delete(deviceId);
     }
 
     private record(deviceId: string): ServerRecord {
