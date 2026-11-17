@@ -446,7 +446,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     const posterFor = (deviceId: string | undefined): HostPoster => {
         const servers = requireServers();
 
-        return deviceId !== undefined && servers.isServer(deviceId) ? servers.posterForEnd(deviceId) : requireHost(requireCore());
+        return deviceId !== undefined && servers.isServer(deviceId) ? servers.get(deviceId).poster : requireHost(requireCore());
     };
 
     /**

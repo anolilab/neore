@@ -107,21 +107,6 @@ export class ServerAgents {
         return this.options.servers().some((server) => server.deviceId === deviceId);
     }
 
-    /**
-     * The poster that ends a held turn of a server. While the server is being removed, its runtime is still here and the end
-     * is posted through it (the removal refuses commands, not the end of a turn already held). It never makes a runtime: once
-     * the removal has dropped it, a late end is refused rather than sent on a runtime nothing will ever stop.
-     */
-    public posterForEnd(deviceId: string): HostPoster {
-        const runtime = this.runtimes.get(deviceId);
-
-        if (runtime === undefined) {
-            throw new Error("that server's runtime has ended");
-        }
-
-        return runtime.poster;
-    }
-
     /** Ends the sessions the person's approvals for a server no longer cover. */
     public async closeUnapproved(deviceId: string, view: Pick<AcpView, "agents" | "consents">): Promise<void> {
         await this.runtimes.get(deviceId)?.acp.closeUnapproved(view);
