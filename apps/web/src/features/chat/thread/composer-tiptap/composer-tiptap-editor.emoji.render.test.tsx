@@ -128,6 +128,8 @@ describe("composer emoji shortcodes", () => {
         expect(editableWhileOpen().getAttribute("aria-controls")).toBe(listbox().id);
         expect(editableWhileOpen().getAttribute("aria-expanded")).toBe("true");
         expect(screen.getByRole("status").textContent).toMatch(EMOJI_FOUND);
+        // The first row's shortcode joins the count, so a new query with the same count still changes what is announced.
+        expect(screen.getByRole("status").textContent).toContain(`:${expected[0]!.shortcode}:`);
         // A combobox takes no aria-multiline; the label stays.
         expect(editableWhileOpen().getAttribute("aria-multiline")).toBeNull();
         expect(editableWhileOpen().getAttribute("aria-label")).toBe("Message");

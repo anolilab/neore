@@ -37,10 +37,9 @@ export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmo
     // The shortcode Escape closed. Typing on from it keeps it closed; a different shortcode, even at the same place, opens.
     const [dismissed, setDismissed] = useState<{ from: number; query: string } | null>(null);
     const query = match?.query;
-    const hasMatch = match !== null;
 
-    // The index loads once per page, started as soon as the composer can show the list. A failed load is retried when a
-    // shortcode starts, so the retry follows the person's typing rather than running in a loop.
+    // The index loads once per page, started as soon as the composer can show the list. A failed load is retried as the
+    // person types: each key changes the query, and a load still in flight is shared rather than started again.
     useEffect(() => {
         if (!enabled || index !== undefined) {
             return undefined;
@@ -65,7 +64,7 @@ export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmo
         return () => {
             cancelled = true;
         };
-    }, [enabled, hasMatch, index]);
+    }, [enabled, query, index]);
 
     // Derived state, adjusted during render: a new query starts at the top of the list, and a finished shortcode forgets
     // that it was dismissed, so the next one opens.
@@ -146,7 +145,11 @@ export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmo
     let announcement = "";
 
     if (index !== undefined && showing) {
-        announcement = suggestions.length === 0 ? t`No emoji found` : t`${plural(suggestions.length, { one: "# emoji", other: "# emoji" })} found`;
+        const count = suggestions.length === 0 ? t`No emoji found` : t`${plural(suggestions.length, { one: "# emoji", other: "# emoji" })} found`;
+        const [first] = suggestions;
+
+        // The first row's shortcode follows the count, so a new query with the same count is announced too.
+        announcement = first ? `${count}: :${first.shortcode}:` : count;
     }
 
     return {
