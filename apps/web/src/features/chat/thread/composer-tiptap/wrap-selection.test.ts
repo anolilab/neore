@@ -171,6 +171,87 @@ describe("WrapSelection with vim mode", () => {
     });
 });
 
+describe("wrapSelection edge cases", () => {
+    afterEach(() => {
+        for (const editor of editors) {
+            editor.destroy();
+        }
+
+        editors.length = 0;
+    });
+
+    it("leaves a select-all over several paragraphs alone, so their breaks are kept", () => {
+        const editor = editorWith("<p>hello</p><p>world</p>");
+
+        expect(wrapSelectionOnTextInput(editor.view, 0, editor.state.doc.content.size, "*")).toBe(false);
+        expect(text(editor)).toBe("hello\nworld");
+    });
+
+    it("leaves a select-all of one paragraph alone, as it replaces the whole draft", () => {
+        const editor = editorWith("<p>hello world</p>");
+
+        expect(wrapSelectionOnTextInput(editor.view, 0, editor.state.doc.content.size, "*")).toBe(false);
+        expect(text(editor)).toBe("hello world");
+    });
+
+    it("keeps the spaces at the edges of the selection outside the bold, so Markdown still renders it", () => {
+        const editor = editorWith("<p>hello world and</p>");
+
+        select(editor, 7, 13);
+        wrapSelectionOnTextInput(editor.view, 7, 13, "*");
+
+        expect(text(editor)).toBe("hello **world** and");
+        expect(selectedText(editor)).toBe("world");
+    });
+
+    it("keeps leading spaces outside the delimiters too", () => {
+        const editor = editorWith("<p>hello world</p>");
+
+        select(editor, 6, 12);
+        wrapSelectionOnTextInput(editor.view, 6, 12, "_");
+
+        expect(text(editor)).toBe("hello _world_");
+    });
+
+    it("leaves a selection of only spaces alone", () => {
+        const editor = editorWith("<p>hello world</p>");
+
+        select(editor, 6, 7);
+
+        expect(wrapSelectionOnTextInput(editor.view, 6, 7, "*")).toBe(false);
+        expect(text(editor)).toBe("hello world");
+    });
+
+    it("uses a longer backtick fence when the selected code already has backticks", () => {
+        const editor = editorWith("<p>x a`b y</p>");
+
+        select(editor, 3, 6);
+        wrapSelectionOnTextInput(editor.view, 3, 6, "`");
+
+        expect(text(editor)).toBe("x ``a`b`` y");
+    });
+
+    it("pads the code span with a space when the selected code starts with a backtick", () => {
+        const editor = editorWith("<p>x `ab y</p>");
+
+        select(editor, 3, 6);
+        wrapSelectionOnTextInput(editor.view, 3, 6, "`");
+
+        expect(text(editor)).toBe("x `` `ab `` y");
+    });
+
+    it("keeps a backward selection backward after the wrap", () => {
+        const editor = editorWith("<p>hello world</p>");
+
+        editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 12, 7)));
+        wrapSelectionOnTextInput(editor.view, 7, 12, "*");
+
+        expect(editor.state.selection.anchor).toBe(14);
+        expect(editor.state.selection.head).toBe(9);
+        expect(selectedText(editor)).toBe("world");
+    });
+});
+
 describe("wrapSelection", () => {
     afterEach(() => {
         for (const editor of editors) {

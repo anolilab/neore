@@ -77,3 +77,5 @@ Tabs: `"summary"` | `"prompts"` | `"variables"` | `"pins"` (and any future tabs 
 - Don't create chat components without proper TypeScript types
 - Don't import `@tiptap/extension-emoji` statically in the composer: its data is ~64 KB gzipped. Load it through
   `thread/composer-tiptap/emoji-shortcode/emoji-index.ts`, which the composer starts once the list can open.
+- A composer text-input rule must be a plugin registered after `VimMode`, not an editor prop: editor props are asked
+  before plugins, so a props handler runs ahead of vim's normal mode (`composer-tiptap/wrap-selection.ts`).
