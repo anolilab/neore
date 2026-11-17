@@ -1350,7 +1350,7 @@ export interface InternalApiTypes {
         organization: {
             collectOrganizationRepliesForExport: FunctionReference<"query", { cursor: string | null; userId: string }, { cursor: string | null; rows: Array<{ at: number; costMicrodollars: number; organizationId: string; projectKey: string; tokens: number }> }>;
             memberProjectUsage: FunctionReference<"query", { organizationId: string; projectIds: Array<string>; projectsListed: boolean; since: number; userId: string }, { active: boolean; projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string }>; removed?: { costMicrodollars: number; replies: number; tokens: number }; truncated: boolean }>;
-            organizationUsageScope: FunctionReference<"query", { afterUserId?: string; organizationId: string; userId: string; withProjects?: boolean }, null | { memberIds: Array<string>; more: boolean; projects: Array<{ projectId: string; title: string }>; truncated: boolean }>;
+            organizationUsageScope: FunctionReference<"query", { afterCohort?: number; afterUserId?: string; organizationId: string; userId: string; withProjects?: boolean }, null | { members: Array<{ cohort: number; userId: string }>; more: boolean; projects: Array<{ projectId: string; title: string }>; truncated: boolean }>;
             reconcileOrganizationContributor: FunctionReference<"mutation", { organizationId: string; userId: string }, null>;
         };
     };

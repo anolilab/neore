@@ -731,6 +731,15 @@ export const twoFactor = sqliteTable("twoFactor", {
     userId: index("userId").on(t.userId),
 }));
 
+export const usageOrganizationCohorts = sqliteTable("usageOrganizationCohorts", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    booked: real("booked").notNull(),
+    organizationId: text("organizationId").notNull(),
+}, (t) => ({
+    by_organization: uniqueIndex("by_organization").on(t.organizationId),
+}));
+
 export const usageOrganizationContributors = sqliteTable("usageOrganizationContributors", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
@@ -742,15 +751,6 @@ export const usageOrganizationContributors = sqliteTable("usageOrganizationContr
     by_organization_and_user: index("by_organization_and_user").on(t.organizationId, t.userId),
     by_organization_and_cohort: index("by_organization_and_cohort").on(t.organizationId, t.cohort, t.userId),
     by_user: index("by_user").on(t.userId),
-}));
-
-export const usageOrganizationCohorts = sqliteTable("usageOrganizationCohorts", {
-    _id: text("_id").primaryKey(),
-    _creationTime: integer("_creationTime").notNull(),
-    booked: real("booked").notNull(),
-    organizationId: text("organizationId").notNull(),
-}, (t) => ({
-    by_organization: uniqueIndex("by_organization").on(t.organizationId),
 }));
 
 export const user = sqliteTable("user", {
