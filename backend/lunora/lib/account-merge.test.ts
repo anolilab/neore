@@ -401,6 +401,49 @@ describe("importShardRows for userSettings", () => {
     });
 });
 
+describe("importShardRows for runWebhooks", () => {
+    const webhook = (fields: Record<string, unknown>) => {
+        return { createdAt: 1, enabled: true, secretCiphertext: "v1:cipher", updatedAt: 1, url: "https://example.com/hook", ...fields };
+    };
+
+    const run = async (guestRows: Record<string, unknown>[], seed?: Record<string, unknown>) => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            return await harness.run(async (context: any) => {
+                if (seed) {
+                    await context.db.insert("runWebhooks", seed);
+                }
+
+                await context.runMutation(importShardRows, { from: "guest", rows: guestRows, table: "runWebhooks", to: "user" });
+
+                const stored = await context.db.query("runWebhooks").take(MERGE_PAGE_SIZE);
+
+                return stored.filter((row: Record<string, unknown>) => row.userId === "user");
+            });
+        } finally {
+            harness.close();
+        }
+    };
+
+    it("copies the guest's webhook across when the new account has none", async () => {
+        const rows = await run([webhook({ _id: "g1", url: "https://example.com/guest", userId: "guest" })]);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ url: "https://example.com/guest", userId: "user" });
+    });
+
+    it("keeps the new account's own webhook and copies no second one beside it", async () => {
+        const rows = await run(
+            [webhook({ _id: "g1", url: "https://example.com/guest", userId: "guest" })],
+            webhook({ url: "https://example.com/own", userId: "user" }),
+        );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ url: "https://example.com/own" });
+    });
+});
+
 describe("clearing the guest's settings", () => {
     it("lists only the guest's own settings rows, so a shard that also holds the new account's keeps it", async () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
