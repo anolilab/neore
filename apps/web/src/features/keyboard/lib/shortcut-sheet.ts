@@ -1,3 +1,4 @@
+import type { SendBehavior } from "@/features/chat/thread/composer-tiptap/send-behavior";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
 export type ShortcutGroupId = "chat" | "composer" | "navigation" | "threadList";
@@ -121,4 +122,37 @@ export const matchesShortcutQuery = (query: string, label: string, groupLabel: s
     }
 
     return [label, groupLabel, keys.join(" "), keys.join("+")].some((text) => text.toLowerCase().includes(needle));
+};
+
+export type ComposerSendRowId = "composerNewline" | "sendAnywhere" | "sendMessage";
+
+export interface ComposerSendRow {
+    id: ComposerSendRowId;
+    keys: string[];
+}
+
+/**
+ * The composer's send and new-line chords for the user's send setting, as keycaps. Cmd/Ctrl+Enter always sends, so it
+ * is listed on its own unless it is already the primary chord (button mode).
+ */
+export const composerSendRows = (behavior: SendBehavior, isMac: boolean): ComposerSendRow[] => {
+    const enter = shortcutToKeys("enter", isMac);
+    const shiftEnter = shortcutToKeys("shift+enter", isMac);
+    const modifiedEnter = shortcutToKeys("ctrl+enter", isMac);
+
+    if (behavior === "button") {
+        return [
+            { id: "sendMessage", keys: modifiedEnter },
+            { id: "composerNewline", keys: enter },
+        ];
+    }
+
+    const primary = behavior === "enter" ? enter : shiftEnter;
+    const newline = behavior === "enter" ? shiftEnter : enter;
+
+    return [
+        { id: "sendMessage", keys: primary },
+        { id: "composerNewline", keys: newline },
+        { id: "sendAnywhere", keys: modifiedEnter },
+    ];
 };
