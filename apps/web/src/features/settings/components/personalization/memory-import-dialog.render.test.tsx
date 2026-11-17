@@ -12,6 +12,12 @@ const calls = vi.hoisted(() => {
     return { preview: vi.fn(), save: vi.fn() };
 });
 
+vi.mock("@lingui/core/macro", () => {
+    return {
+        plural: (count: number, forms: { one: string; other: string }) => (count === 1 ? forms.one : forms.other).replace("#", () => String(count)),
+    };
+});
+
 vi.mock("@lingui/react/macro", () => {
     return {
         useLingui: () => {
@@ -105,7 +111,7 @@ describe("memory import dialog", () => {
         fireEvent.click(screen.getByRole("button", { name: "Preview" }));
 
         fireEvent.click(await screen.findByRole("checkbox", { name: LIKES_TEA_RE }));
-        fireEvent.click(screen.getByRole("button", { name: "Save 1 memories" }));
+        fireEvent.click(screen.getByRole("button", { name: "Save 1 memory" }));
 
         await waitFor(() => expect(calls.save).toHaveBeenCalledOnce());
 

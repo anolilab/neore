@@ -43,6 +43,13 @@ const IMPORT_DEDUP_WINDOW = 1000;
 const IMPORTED_CONFIDENCE = 80;
 const IMPORTED_IMPORTANCE = 60;
 
+/**
+ * Belief-revision calls one save may make. Past it a near-match is saved as new, as a failed
+ * revision is: the client chooses the facts, so this bounds what one save can spend.
+ */
+const IMPORT_MAX_REVISIONS = 20;
+const REVISION_MAX_OUTPUT_TOKENS = 400;
+
 const requireMemoryEnabled = async (ctx: ActionCtx, userId: string): Promise<void> => {
     if (!(await ctx.runQuery(internal.memory.functions.isMemoryEnabled, { userId }))) {
         throw new LunoraError("FORBIDDEN", "Turn on memory before bringing in memories");
@@ -119,45 +126,65 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
     // New facts join the dedup list, so two near-identical lines in one paste save once.
     const added: { _id: string; memory: string }[] = [];
 
+    let revisions = 0;
+
     for (const [index, fact] of facts.entries()) {
+        if (findSimilarMemoryByJaccard(fact.memory, added)) {
+            result.alreadyKnown += 1;
+            continue;
+        }
+
         const embedding = embeddings[index] ?? null;
         let similar = embedding ? await findSimilarMemoryByVector(ctx, args.userId, embedding, existing).catch(() => null) : null;
 
         similar ??= findSimilarMemoryByJaccard(fact.memory, existing);
-
-        if (!similar && findSimilarMemoryByJaccard(fact.memory, added)) {
-            result.alreadyKnown += 1;
-            continue;
-        }
 
         let action: "ADD" | "IGNORE" | "SUPERSEDE" | "UPDATE" = "ADD";
         let mergedMemory: string | undefined;
 
         if (similar && similar.score >= 0.95) {
             action = "IGNORE";
-        } else if (similar) {
+        } else if (similar && revisions < IMPORT_MAX_REVISIONS) {
+            revisions += 1;
+
             try {
                 model ??= await utilityModelFor(ctx, args.userId, rules);
-                ({ action, mergedMemory } = await runBeliefRevision(model, similar.memory, fact.memory));
+                ({ action, mergedMemory } = await runBeliefRevision(model, similar.memory, fact.memory, REVISION_MAX_OUTPUT_TOKENS));
             } catch (error) {
                 console.error("[memory/import] Belief revision failed, saving as new:", error);
             }
         }
 
+        // Later facts compare against the row as this save leaves it: merged text, or gone once superseded.
+        const match = similar ? existing.find((row) => row._id === similar.id) : undefined;
+
         if (similar && action === "IGNORE") {
             toConfirm.push(similar.id);
             result.alreadyKnown += 1;
         } else if (similar && action === "UPDATE" && mergedMemory) {
+            const memory = mergedMemory.slice(0, IMPORT_MAX_FACT_CHARS);
+
             await ctx.runMutation(internal.memory.functions.updateMemoryInternal, {
                 confidence: Math.max(IMPORTED_CONFIDENCE, similar.confidence ?? 50),
                 lastConfirmedAt: Date.now(),
-                memory: mergedMemory.slice(0, IMPORT_MAX_FACT_CHARS),
+                memory,
                 memoryId: similar.id,
             });
+            // The merged text needs its own vector, or a repeat import matches the old one and revises again.
+            await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: similar.id, userId: args.userId });
+
+            if (match) {
+                match.memory = memory;
+            }
+
             result.updated += 1;
         } else if (action !== "UPDATE") {
             toSave.push({ embedding, fact, supersedes: action === "SUPERSEDE" ? similar?.id : undefined });
             added.push({ _id: String(index), memory: fact.memory });
+
+            if (action === "SUPERSEDE" && match) {
+                existing.splice(existing.indexOf(match), 1);
+            }
         }
     }
 

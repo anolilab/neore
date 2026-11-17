@@ -101,6 +101,28 @@ describe("importing another assistant's memory", () => {
         expect(rows[0]).toMatchObject({ importedFrom: "gemini", memory: "The user is a nurse in Hamburg", source: "imported", type: "identity" });
     });
 
+    it("revises a second fact against the text the first one merged into the same row", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER });
+        });
+        generateText
+            .mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: "The user lives in Berlin near the river with a garden and bikes daily" } })
+            .mockResolvedValueOnce({ output: { action: "IGNORE" } });
+
+        await save([
+            { memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" },
+            { memory: "The user lives in Berlin near the river with a garden and bikes daily often", type: "context" },
+        ]);
+
+        expect(generateText).toHaveBeenCalledTimes(2);
+        expect(generateText.mock.calls[1]?.[0].prompt).toContain(
+            "<existing_memory>The user lives in Berlin near the river with a garden and bikes daily</existing_memory>",
+        );
+    });
+
     it("adds nothing when the same long list is imported again", async () => {
         expect.assertions(3);
 

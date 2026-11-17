@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import { Button } from "@neore/ui/components/button";
@@ -61,6 +62,14 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
     const [text, setText] = useState("");
     const [preview, setPreview] = useState<Preview | undefined>(undefined);
     const [unchecked, setUnchecked] = useState<ReadonlySet<number>>(new Set());
+    const [isEnabling, setIsEnabling] = useState(false);
+
+    // Disabled while the setting saves, so a double activation sends one update.
+    const enableMemory = async () => {
+        setIsEnabling(true);
+        await onEnableMemory();
+        setIsEnabling(false);
+    };
 
     const prompt = t`List everything you remember about me from our past conversations and your saved memory. Write one fact per line, in the third person, starting with "The user" (for example: "The user works as a nurse in Hamburg."). Where you know when you learned a fact, add the date in brackets at the end of its line. Leave out passwords, keys, account numbers and health details. Write no introduction, headings or comments.`;
 
@@ -81,7 +90,9 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
             toast.error(t`Could not save the memories`, { description: error.message });
         },
         onSuccess: (result: { added: number; alreadyKnown: number; updated: number }) => {
-            toast.success(t`Saved ${result.added} new memories, updated ${result.updated}, ${result.alreadyKnown} already known`);
+            toast.success(plural(result.added, { one: "Saved # new memory", other: "Saved # new memories" }), {
+                description: t`Updated: ${result.updated} · Already known: ${result.alreadyKnown}`,
+            });
             setOpen(false);
             setText("");
             setPreview(undefined);
@@ -129,7 +140,9 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
                     {!memoryEnabled && (
                         <div className="space-y-2">
                             <p className="text-sm">{t`Memory is off. Turn it on to bring in memories; nothing is saved while it is off.`}</p>
-                            <Button onClick={onEnableMemory}>{t`Turn on memory`}</Button>
+                            <Button disabled={isEnabling} onClick={enableMemory}>
+                                {t`Turn on memory`}
+                            </Button>
                         </div>
                     )}
 
@@ -184,11 +197,19 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
                     {memoryEnabled && preview && (
                         <div className="space-y-2">
                             <p className="text-sm font-medium">{t`4. Choose what to keep`}</p>
-                            {(preview.dropped > 0 || preview.cut > 0) && (
-                                <p className="text-muted-foreground text-xs" role="status">
-                                    {t`${preview.dropped} lines were left out as not about you or sensitive; ${preview.cut} more were past the limit.`}
-                                </p>
-                            )}
+                            <div className="text-muted-foreground space-y-0.5 text-xs" role="status">
+                                {preview.dropped > 0 && (
+                                    <p>
+                                        {plural(preview.dropped, {
+                                            one: "# line was left out as not about you or sensitive.",
+                                            other: "# lines were left out as not about you or sensitive.",
+                                        })}
+                                    </p>
+                                )}
+                                {preview.cut > 0 && (
+                                    <p>{plural(preview.cut, { one: "# more line was past the limit.", other: "# more lines were past the limit." })}</p>
+                                )}
+                            </div>
                             {preview.facts.length === 0 ? (
                                 <p className="text-muted-foreground text-sm">{t`No facts found in the pasted text.`}</p>
                             ) : (
@@ -216,7 +237,7 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
                             <>
                                 <Button onClick={() => setPreview(undefined)} variant="ghost">{t`Back`}</Button>
                                 <Button disabled={isSaving || kept.length === 0} onClick={() => runSave({ app, facts: kept })}>
-                                    {t`Save ${kept.length} memories`}
+                                    {plural(kept.length, { one: "Save # memory", other: "Save # memories" })}
                                 </Button>
                             </>
                         ) : (
