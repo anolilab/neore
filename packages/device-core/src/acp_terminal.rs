@@ -106,11 +106,7 @@ impl DeviceState {
             return Err("the working folder must be inside the agent's folder".into());
         }
 
-        let line = request.line.trim();
-
-        if line.is_empty() || line.len() > MAX_LINE_BYTES {
-            return Err("the command is empty or too long".into());
-        }
+        let line = command_line(&request.line)?;
 
         if request.env.len() > MAX_ENV {
             return Err("too many variables".into());
@@ -172,6 +168,19 @@ impl DeviceState {
 
         Ok(terminal)
     }
+}
+
+/// The command as it runs: only leading whitespace goes, since a trailing space after a backslash is part of the shell
+/// argument it ends.
+fn command_line(line: &str) -> Result<&str, String> {
+    let line = line.trim_start();
+    let content = line.trim_end();
+
+    if content.is_empty() || content.len() > MAX_LINE_BYTES {
+        return Err("the command is empty or too long".into());
+    }
+
+    Ok(line)
 }
 
 /// The approved folder opened once, and the path the sandbox's writable rule is built from. On Linux that path is the
@@ -305,6 +314,47 @@ fn redact_command(line: &str, known: &[&str]) -> String {
         out.push_str(space);
     }
 
+    redact_url_passwords(&out)
+}
+
+/// `text` with the password of each `scheme://user:password@host` replaced, keeping the scheme, user and host readable.
+fn redact_url_passwords(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+
+    while let Some(at) = rest.find("://") {
+        let scheme = rest[..at]
+            .rsplit(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')))
+            .next()
+            .unwrap_or("");
+        let (head, tail) = rest.split_at(at + "://".len());
+        let word = &tail[..word_end(tail)];
+        let authority = &word[..word.find(['/', '?', '#', '"', '\'']).unwrap_or(word.len())];
+        let password = scheme
+            .starts_with(|c: char| c.is_ascii_alphabetic())
+            .then(|| authority.rfind('@'))
+            .flatten()
+            .and_then(|user_end| {
+                let colon = authority[..user_end].find(':')?;
+
+                (colon + 1 < user_end).then_some((colon + 1, user_end))
+            });
+
+        out.push_str(head);
+
+        match password {
+            Some((start, end)) => {
+                out.push_str(&authority[..start]);
+                out.push_str(REDACTED);
+                out.push_str(&authority[end..]);
+            }
+            None => out.push_str(authority),
+        }
+
+        rest = &tail[authority.len()..];
+    }
+
+    out.push_str(rest);
     out
 }
 
@@ -679,6 +729,72 @@ mod tests {
             redact_command("echo a\\\\ --token s3cr3t", &[]),
             "echo a\\\\ --token [redacted]"
         );
+    }
+
+    #[test]
+    fn redacts_the_password_of_a_url() {
+        // Built from parts so no credential-shaped literal sits in the source: these are fixtures, not secrets.
+        let url = |scheme: &str, user: &str, password: &str, rest: &str| {
+            format!("{scheme}://{user}:{password}@{rest}")
+        };
+
+        for (line, shown) in [
+            (
+                format!(
+                    "git clone {}",
+                    url("https", "alice", "secret", "github.com/org/repo")
+                ),
+                format!(
+                    "git clone {}",
+                    url("https", "alice", "[redacted]", "github.com/org/repo")
+                ),
+            ),
+            (
+                format!("curl -s {} -o out", url("https", "user", "pass", "host/")),
+                format!(
+                    "curl -s {} -o out",
+                    url("https", "user", "[redacted]", "host/")
+                ),
+            ),
+            (
+                format!(
+                    "curl \"{}\" && echo ok",
+                    url("https", "user", "p@ss", "host/x")
+                ),
+                format!(
+                    "curl \"{}\" && echo ok",
+                    url("https", "user", "[redacted]", "host/x")
+                ),
+            ),
+            (
+                format!("git push '{}' main", url("ssh+git", "me", "pw", "host")),
+                format!(
+                    "git push '{}' main",
+                    url("ssh+git", "me", "[redacted]", "host")
+                ),
+            ),
+        ] {
+            assert_eq!(redact_command(&line, &[]), shown);
+        }
+    }
+
+    #[test]
+    fn leaves_a_url_without_a_password_unchanged() {
+        for line in [
+            "curl https://host/x".to_owned(),
+            "curl https://user@host/x".to_owned(),
+            "curl https://host:8080/a@b".to_owned(),
+            format!("echo {}", "://user:pw@host"),
+        ] {
+            assert_eq!(redact_command(&line, &[]), line);
+        }
+    }
+
+    #[test]
+    fn keeps_trailing_whitespace_and_refuses_a_blank_command() {
+        assert_eq!(command_line("  echo a\\ "), Ok("echo a\\ "));
+        assert!(command_line(" \t\n ").is_err());
+        assert!(command_line(&format!("{} ", "x".repeat(MAX_LINE_BYTES))).is_ok());
     }
 
     #[test]

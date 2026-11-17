@@ -42,7 +42,7 @@ describe(createRequestOf, () => {
     });
 
     it("keeps the space after a trailing backslash, which is part of the argument it ends", () => {
-        expect(createRequestOf({ command: "printf foo\\ " }).line).toBe("printf foo\\ ");
+        expect(createRequestOf({ command: String.raw`printf foo\ ` }).line).toBe(String.raw`printf foo\ `);
     });
 
     it("refuses what it cannot run as asked", () => {
