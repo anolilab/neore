@@ -474,8 +474,16 @@ fn processes() -> Vec<(u32, u32, bool)> {
 /// fields are read after its last `)`.
 #[cfg(target_os = "linux")]
 fn process_parent(pid: u32) -> Option<(u32, bool)> {
-    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
-    let mut fields = stat.get(stat.rfind(')')? + 1..)?.split_whitespace();
+    parent_from_stat(&std::fs::read(format!("/proc/{pid}/stat")).ok()?)
+}
+
+/// The parent and liveness from a `/proc/<pid>/stat` line. The name in parentheses may hold any bytes (a process can name
+/// itself with bytes that are not UTF-8), so the line is cut at its last `)`, and only the fields after it are read.
+#[cfg(target_os = "linux")]
+fn parent_from_stat(stat: &[u8]) -> Option<(u32, bool)> {
+    let close = stat.iter().rposition(|&byte| byte == b')')?;
+    let rest = std::str::from_utf8(stat.get(close + 1..)?).ok()?;
+    let mut fields = rest.split_whitespace();
     let state = fields.next()?;
     let parent = fields.next()?.parse().ok()?;
 
@@ -1932,6 +1940,15 @@ mod tests {
             process_gone(written_pid(&shared.join("child.pid"))),
             "the detached descendant outlived the run"
         );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_process_named_with_bytes_that_are_not_utf_8_still_has_its_parent_read() {
+        let stat = b"42 (bad\xff\xfename) S 7 42 42 0 -1 0";
+
+        assert_eq!(parent_from_stat(stat), Some((7, true)));
+        assert_eq!(parent_from_stat(b"42 (x) Z 9 1 1"), Some((9, false)));
     }
 
     #[test]
