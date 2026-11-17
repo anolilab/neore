@@ -114,7 +114,7 @@ const AdminShardFootprintRow = () => {
                     </p>
                 ) : null}
                 {totals.abandonedShards > 0 ? (
-                    <p className="text-muted-foreground text-sm">{t`Some shards were only partly measured; their counts are lower bounds.`}</p>
+                    <p className="text-muted-foreground text-sm">{t`Shards that could not be measured are left out of the totals: ${formatNumber(totals.abandonedShards, i18n.locale)}.`}</p>
                 ) : null}
                 <div className="flex flex-wrap items-center gap-3">
                     {/* Always mounted, so screen readers announce the change when measuring starts and ends. */}

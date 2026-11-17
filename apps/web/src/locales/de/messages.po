@@ -481,7 +481,7 @@ msgid "{0} deleted"
 msgstr "{0} gelöscht"
 
 #. placeholder {0}: formatDuration(elapsedMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:587
+#: src/features/chat/thread/streaming-placeholder.tsx:589
 msgid "{0} elapsed"
 msgstr "{0} vergangen"
 
@@ -672,7 +672,7 @@ msgid "{0} tok/s"
 msgstr "{0} Tokens/s"
 
 #. placeholder {0}: tokPerSec.toFixed(1)
-#: src/features/chat/thread/streaming-placeholder.tsx:577
+#: src/features/chat/thread/streaming-placeholder.tsx:579
 msgid "{0} tokens/s"
 msgstr "{0} Tokens/s"
 
@@ -873,6 +873,22 @@ msgstr "{days} Tage"
 #: src/features/settings/components/chat/api-keys-settings.tsx:290
 msgid "{days}d ago"
 msgstr "vor {days} T."
+
+#: src/features/chat/thread/host-activity.tsx:70
+msgid "{done} of {total} task done"
+msgstr ""
+
+#: src/features/chat/thread/host-activity.tsx:73
+msgid "{done} of {total} task done. In progress: {inProgress}"
+msgstr ""
+
+#: src/features/chat/thread/host-activity.tsx:70
+msgid "{done} of {total} tasks done"
+msgstr ""
+
+#: src/features/chat/thread/host-activity.tsx:73
+msgid "{done} of {total} tasks done. In progress: {inProgress}"
+msgstr ""
 
 #: src/features/chat/thread/composer-prompt-queue.tsx:455
 msgid "{droppedCount, plural, one {# attachment removed on reload} other {# attachments removed on reload}}"
@@ -1231,7 +1247,7 @@ msgid "{name} is installed"
 msgstr "{name} ist installiert"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:241
-#: src/features/chat/thread/streaming-placeholder.tsx:505
+#: src/features/chat/thread/streaming-placeholder.tsx:507
 msgid "{name} is responding"
 msgstr "{name} antwortet"
 
@@ -1416,6 +1432,16 @@ msgstr ""
 msgid "{title} on {siteName} (opens in a new tab)"
 msgstr "{title} auf {siteName} (öffnet in neuem Tab)"
 
+#. placeholder {0}: statusText(status)
+#: src/features/chat/thread/host-activity.tsx:171
+msgid "{title}: {0}"
+msgstr ""
+
+#. placeholder {0}: statusText(status)
+#: src/features/chat/thread/host-activity.tsx:171
+msgid "{title}: {0}. {exitText}"
+msgstr ""
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:522
 msgid "{toolId} API key removed"
 msgstr "{toolId}-API-Schlüssel entfernt"
@@ -1516,7 +1542,7 @@ msgstr "<0>Zeitplan</0> — Nach einem Cron-Zeitplan ausführen (z. B. täglich 
 msgid "<0>Webhook</0> — Receive HTTP POST requests from external services (Stripe, GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected."
 msgstr "<0>Webhook</0> — HTTP-POST-Anfragen von externen Diensten empfangen (Stripe, GitHub, Zapier). Anfragen werden mit einem HMAC mit Zeitstempel signiert und Wiederholungen werden abgelehnt."
 
-#: src/features/chat/thread/streaming-placeholder.tsx:578
+#: src/features/chat/thread/streaming-placeholder.tsx:580
 msgid "~{approxTokenCount} tokens"
 msgstr "~{approxTokenCount} Tokens"
 
@@ -3298,6 +3324,10 @@ msgstr "Alle Rollen"
 msgid "All Servers"
 msgstr "Alle Server"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:134
+msgid "All shards measured."
+msgstr ""
+
 #: src/features/tasks/components/tasks-page.tsx:251
 msgid "All tasks"
 msgstr "Alle Aufgaben"
@@ -3893,6 +3923,10 @@ msgstr "Automatisch genehmigt – geringes Risiko"
 msgid "Approving…"
 msgstr ""
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:107
+msgid "Approximate size"
+msgstr ""
+
 #: src/features/auth/lib/app-sign-in-refusal.ts:23
 msgid "Apps can't be signed in while impersonating. Sign in as yourself to connect one."
 msgstr "Apps können nicht angemeldet werden, während du einen anderen Benutzer imitierst. Melde dich als du selbst an, um eine zu verbinden."
@@ -4176,8 +4210,8 @@ msgid "Assistant replied:"
 msgstr "Assistent antwortete:"
 
 #: src/features/chat/thread/message-item.tsx:209
-#: src/features/chat/thread/streaming-placeholder.tsx:757
-#: src/features/chat/thread/streaming-placeholder.tsx:795
+#: src/features/chat/thread/streaming-placeholder.tsx:760
+#: src/features/chat/thread/streaming-placeholder.tsx:799
 msgid "Assistant Reply:"
 msgstr "Antwort des Assistenten:"
 
@@ -5657,6 +5691,7 @@ msgstr "Auswahl abbrechen"
 #~ msgid "Cancel/escape"
 #~ msgstr "Abbrechen/Escape"
 
+#: src/features/chat/thread/host-activity.tsx:130
 #: src/features/chat/thread/widgets/flight-widget.tsx:56
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:164
 #: src/features/develop/components/checks-tab.tsx:76
@@ -9573,6 +9608,10 @@ msgstr "Einen Fehler debuggen oder meinen Code prüfen..."
 msgid "Decline"
 msgstr "Ablehnen"
 
+#: src/features/chat/thread/host-activity.tsx:136
+msgid "Declined"
+msgstr ""
+
 #: src/features/chat/thread/request-secret-prompt.tsx:332
 msgid "Declined — continuing without it"
 msgstr "Abgelehnt – es geht ohne weiter"
@@ -10798,6 +10837,8 @@ msgstr "Noch kein Konto?"
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:110
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:248
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:118
+#: src/features/chat/thread/host-activity.tsx:78
+#: src/features/chat/thread/host-activity.tsx:133
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:168
 #: src/features/devices/components/devices-settings.tsx:383
 #: src/features/onboarding/components/setup-checklist.tsx:135
@@ -11861,6 +11902,10 @@ msgstr "Endframe-Unterstützung für präzise Kontrolle"
 msgid "End-frame and reference-image conditioning support"
 msgstr "Unterstützung für Endframe- und Referenzbild-Konditionierung"
 
+#: src/features/chat/thread/host-activity.tsx:161
+msgid "Ended by {signal}"
+msgstr ""
+
 #: src/features/settings/components/chat/native-providers-settings.tsx:515
 msgid "Endpoint"
 msgstr "Endpunkt"
@@ -12606,6 +12651,11 @@ msgstr "Beendet mit {0}"
 msgid "Exit fullscreen"
 msgstr "Vollbild beenden"
 
+#. placeholder {0}: formatNumber(code, i18n.locale)
+#: src/features/chat/thread/host-activity.tsx:155
+msgid "Exited with code {0}"
+msgstr ""
+
 #: ../../packages/ui/src/components/sidebar.tsx:432
 #: src/features/workflow/components/nodes/group-node.tsx:216
 msgid "Expand"
@@ -12975,6 +13025,7 @@ msgid "failed"
 msgstr "fehlgeschlagen"
 
 #: src/features/chat/thread-list/thread-status-icon.tsx:88
+#: src/features/chat/thread/host-activity.tsx:139
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:165
 #: src/features/develop/components/checks-tab.tsx:77
 #: src/features/devices/components/devices-settings.tsx:386
@@ -14457,7 +14508,7 @@ msgid "First slide"
 msgstr "Erste Folie"
 
 #. placeholder {0}: formatDuration(ttftMs)
-#: src/features/chat/thread/streaming-placeholder.tsx:579
+#: src/features/chat/thread/streaming-placeholder.tsx:581
 msgid "First token {0}"
 msgstr "Erstes Token {0}"
 
@@ -17084,6 +17135,10 @@ msgstr "in {0} ms"
 
 #: src/features/marketing/use-cases/use-case-data.ts:102
 msgid "In a debate, the pro and contra roles argue for up to three rounds, and a synthesizer role writes the outcome."
+msgstr ""
+
+#: src/features/chat/thread/host-activity.tsx:81
+msgid "In progress"
 msgstr ""
 
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:100
@@ -19781,6 +19836,14 @@ msgstr "MCP-Server stellen zusätzliche Tools bereit, die die KI in Unterhaltung
 msgid "MCP tools"
 msgstr "MCP-Tools"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:126
+msgid "Measure more shards"
+msgstr ""
+
+#: src/features/admin/components/admin-shard-footprint-row.tsx:122
+msgid "Measuring…"
+msgstr ""
+
 #: src/features/develop/components/guide-view.tsx:34
 msgid "Mechanical changes"
 msgstr "Mechanische Änderungen"
@@ -20032,6 +20095,10 @@ msgstr "Nachrichtenverzweigung"
 #: ../../packages/chat-ui/src/chat/composer.tsx:148
 msgid "Message input"
 msgstr "Nachrichteneingabe"
+
+#: src/features/admin/components/admin-shard-footprint-row.tsx:103
+msgid "Message rows"
+msgstr ""
 
 #: src/features/chat/forward/forward-selection-bar.tsx:65
 msgid "Message selection"
@@ -24023,6 +24090,10 @@ msgstr "Die Ausgabe wird in dieser Ansicht nicht geladen."
 msgid "Output Mode"
 msgstr "Ausgabemodus"
 
+#: src/features/chat/thread/host-activity.tsx:220
+msgid "Output of {title}"
+msgstr ""
+
 #: src/features/chat/header/thread-stats-dialog.tsx:75
 #: src/features/chat/thread/message-cost-badge.tsx:60
 msgid "Output tokens"
@@ -24818,6 +24889,10 @@ msgstr "Platzhalter: {PAYLOAD_TOKEN} fügt den gesamten Body ein, als Rohtext ei
 #: src/features/settings/lib/settings-keywords.ts:56
 msgid "plan"
 msgstr "Plan"
+
+#: src/features/chat/thread/host-activity.tsx:90
+msgid "Plan"
+msgstr ""
 
 #: src/features/chat/thread/composer.tsx:272
 msgid "Plan a project or brainstorm ideas..."
@@ -26597,7 +26672,7 @@ msgstr "Verbindung wird wiederhergestellt"
 msgid "Reconnecting to the server…"
 msgstr "Verbindung zum Server wird wiederhergestellt…"
 
-#: src/features/chat/thread/streaming-placeholder.tsx:569
+#: src/features/chat/thread/streaming-placeholder.tsx:571
 msgid "Reconnecting…"
 msgstr "Verbindung wird wiederhergestellt…"
 
@@ -28166,6 +28241,7 @@ msgstr "Workflow ausführen"
 msgid "Run your workflow to see execution history here."
 msgstr "Führe deinen Workflow aus, um hier den Ausführungsverlauf zu sehen."
 
+#: src/features/chat/thread/host-activity.tsx:142
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
 #: src/features/home/components/home-page.tsx:116
@@ -29330,7 +29406,7 @@ msgid "Sending your message and waiting for the reply"
 msgstr "Deine Nachricht wird gesendet, warte auf die Antwort"
 
 #: src/features/chat/guest-links/guest-page.tsx:274
-#: src/features/chat/thread/streaming-placeholder.tsx:617
+#: src/features/chat/thread/streaming-placeholder.tsx:619
 #: src/features/feedback/components/send-feedback-dialog.tsx:379
 #: src/features/feedback/components/send-feedback-dialog.tsx:389
 msgid "Sending…"
@@ -29564,6 +29640,24 @@ msgstr "Shanghai"
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:292
 msgid "Shapes"
 msgstr "Formen"
+
+#: src/features/admin/components/admin-shard-footprint-row.tsx:82
+msgid "Shard footprint"
+msgstr ""
+
+#: src/features/admin/components/admin-shard-footprint-row.tsx:95
+msgid "Shards"
+msgstr ""
+
+#. placeholder {0}: formatNumber(page.data.pendingShards, i18n.locale)
+#: src/features/admin/components/admin-shard-footprint-row.tsx:113
+msgid "Shards still being measured: {0}. Measure more shards to finish them."
+msgstr ""
+
+#. placeholder {0}: formatNumber(totals.abandonedShards, i18n.locale)
+#: src/features/admin/components/admin-shard-footprint-row.tsx:117
+msgid "Shards that could not be measured are left out of the totals: {0}."
+msgstr ""
 
 #: src/features/pages/components/page-view.tsx:459
 msgid "Share"
@@ -31322,6 +31416,10 @@ msgstr "Gestoppt."
 msgid "Stopping…"
 msgstr "Wird gestoppt…"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:84
+msgid "Stored conversation data across user shards: threads, message rows and an estimate of their size. Counts only; no thread is listed."
+msgstr ""
+
 #: src/features/canvas/components/design-preset-selector.tsx:134
 msgid "Story Promo"
 msgstr "Story-Promo"
@@ -32863,6 +32961,14 @@ msgstr "Der Agent hat keine Dateien geändert."
 msgid "The agent on your computer is reading the change…"
 msgstr "Der Agent auf deinem Computer liest die Änderung…"
 
+#: src/features/chat/thread/host-activity.tsx:89
+msgid "The agent's plan"
+msgstr ""
+
+#: src/features/chat/thread/host-activity.tsx:276
+msgid "The agent's tool calls"
+msgstr ""
+
 #: src/features/settings/components/personalization/memory-settings.tsx:155
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "Die KI lernt aus deinen Unterhaltungen, um ihre Antworten zu personalisieren, und reflektiert jede Nacht, was sie gelernt hat. Alles, woran sie sich erinnert, ist hier aufgelistet – bearbeite, ändere den Typ, hefte an oder lösche beliebige Einträge."
@@ -33485,6 +33591,10 @@ msgstr "Der Screenshot konnte nicht gespeichert werden."
 msgid "The server lists no models yet — pull or load one first"
 msgstr "Der Server listet noch keine Modelle – lade zuerst eines herunter oder lade eines in den Speicher"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:90
+msgid "The shard footprint could not be measured."
+msgstr ""
+
 #: src/features/skills/components/skill-import-dialog.tsx:151
 msgid "The skill could not be imported."
 msgstr "Der Skill konnte nicht importiert werden."
@@ -33699,7 +33809,7 @@ msgstr "Vision-Language-Modell mit Denkmodus"
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
 #: ../../packages/chat-ui/src/chat/message-content.tsx:1158
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
-#: src/features/chat/thread/streaming-placeholder.tsx:799
+#: src/features/chat/thread/streaming-placeholder.tsx:803
 msgid "Thinking..."
 msgstr "Denkt nach..."
 
@@ -34477,6 +34587,7 @@ msgstr "Thread-Variablen"
 msgid "Thread will auto-delete in {0}"
 msgstr "Thread wird automatisch in {0} gelöscht"
 
+#: src/features/admin/components/admin-shard-footprint-row.tsx:99
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:35
 #: src/features/chat/thread-list/search-bar.tsx:47
 msgid "Threads"
@@ -34584,6 +34695,7 @@ msgstr "An"
 msgid "to {0}"
 msgstr "bei {0}"
 
+#: src/features/chat/thread/host-activity.tsx:81
 #: src/features/onboarding/components/setup-checklist.tsx:135
 #: src/features/tasks/components/task-status.tsx:21
 msgid "To do"
@@ -35124,6 +35236,7 @@ msgstr "Versuche, deine Suchbegriffe anzupassen."
 
 #: ../../packages/ui/src/components/icon-picker.tsx:454
 #: src/components/error-component.tsx:40
+#: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
 #: src/features/chat/guest-links/guest-page.tsx:269
@@ -37094,6 +37207,7 @@ msgid "Wait for the reply to finish, then try again."
 msgstr "Warte, bis die Antwort fertig ist, und versuche es dann erneut."
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:411
+#: src/features/chat/thread/host-activity.tsx:145
 msgid "Waiting"
 msgstr "Wartet"
 
@@ -37122,7 +37236,7 @@ msgstr "Wartet auf Ausgabe…"
 msgid "Waiting for the agent to change {changeName} to {changeValueName}."
 msgstr ""
 
-#: src/features/chat/thread/streaming-placeholder.tsx:624
+#: src/features/chat/thread/streaming-placeholder.tsx:626
 msgid "Waiting for the agent…"
 msgstr "Warten auf den Agenten…"
 
@@ -37728,7 +37842,7 @@ msgstr "Arbeit am Ziel: Runde {nextRound} von {0}"
 
 #: src/features/auth/components/device-approval.tsx:233
 #: src/features/auth/components/device-approval.tsx:242
-#: src/features/chat/thread/streaming-placeholder.tsx:631
+#: src/features/chat/thread/streaming-placeholder.tsx:633
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:167
 #: src/features/pages/components/page-agent-dialog.tsx:46
 msgid "Working…"

@@ -10,6 +10,7 @@ import schema from "../schema";
 import { decodeCensusCursor, encodeCensusCursor, measureShardPage } from "./cleanup";
 import {
     addMessageRow,
+    approxRowBytes,
     type CensusCursor,
     FOOTPRINT_PAGE_SIZE,
     forCursor,
@@ -194,6 +195,11 @@ describe("scan state", () => {
         expect(willRetry(1)).toBe(true);
         expect(willRetry(MAX_SHARD_FAILURES - 1)).toBe(true);
         expect(willRetry(MAX_SHARD_FAILURES)).toBe(false);
+    });
+
+    it("measures a row with a bigint, and counts the bytes of an inline binary value", () => {
+        expect(approxRowBytes({ count: 1n })).toBe(new TextEncoder().encode('{"count":"1"}').byteLength);
+        expect(approxRowBytes({ data: new Uint8Array(65_536) })).toBeGreaterThanOrEqual(65_536);
     });
 });
 

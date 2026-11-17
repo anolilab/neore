@@ -113,8 +113,28 @@ export const withRootShard = (carried: CensusCursor, rootShardKey: string): Cens
     return { ...carried, pending: [...carried.pending, { shardKey: rootShardKey, state: startFootprint() }] };
 };
 
-/** The row's JSON encoding in UTF-8 bytes. An estimate: the stored form is not JSON. */
-export const approxRowBytes = (row: unknown): number => new TextEncoder().encode(JSON.stringify(row)).byteLength;
+/**
+ * The row's size in UTF-8 bytes, an estimate: its JSON encoding plus the bytes of each binary value in it.
+ * A bigint is encoded as its decimal string, so a row holding one still measures instead of failing.
+ */
+export const approxRowBytes = (row: unknown): number => {
+    let binaryBytes = 0;
+    const json = JSON.stringify(row, (_key: string, value: unknown): unknown => {
+        if (typeof value === "bigint") {
+            return value.toString();
+        }
+
+        if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+            binaryBytes += value.byteLength;
+
+            return null;
+        }
+
+        return value;
+    });
+
+    return new TextEncoder().encode(json).byteLength + binaryBytes;
+};
 
 /** Keeps the {@link LARGEST_THREAD_COUNT} entries with the most rows, largest first. */
 export const keepLargest = (largest: LargestThread[], entry: LargestThread): LargestThread[] =>
