@@ -351,4 +351,58 @@ describe("the sleep lock", () => {
             vi.useRealTimers();
         }
     });
+
+    it("logs a platform error during an output update's check and retries it, without throwing into the turn", () => {
+        vi.useFakeTimers();
+
+        try {
+            const live = new Set<number>();
+            const messages: string[] = [];
+            let starts = 0;
+            let checks = 0;
+            const lock = new SleepLock(
+                {
+                    isStarted: (id) => {
+                        checks += 1;
+
+                        if (checks === 1) {
+                            throw new Error("power service gone");
+                        }
+
+                        return live.has(id);
+                    },
+                    start: () => {
+                        starts += 1;
+                        live.add(starts);
+
+                        return starts;
+                    },
+                    stop: (id) => {
+                        live.delete(id);
+                    },
+                },
+                (message) => {
+                    messages.push(message);
+                },
+                5000,
+            );
+            const source = {};
+
+            lock.report(source, true);
+            vi.advanceTimersByTime(5000);
+
+            expect(() => {
+                lock.report(source, true);
+            }).not.toThrow();
+            expect(messages).toEqual(["[keep-awake] could not hold the sleep lock: power service gone"]);
+
+            // The retry checks again: the inhibitor is still there, so nothing is started a second time.
+            vi.advanceTimersByTime(5000);
+
+            expect(starts).toBe(1);
+            expect(live.size).toBe(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
 });

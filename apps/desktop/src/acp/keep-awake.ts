@@ -72,7 +72,7 @@ export class SleepLock {
 
             this.verifyAt = Date.now() + VERIFY_MS;
 
-            const held = this.blockerId !== undefined && this.blocker.isStarted(this.blockerId);
+            const held = this.stillHeld(wanted);
 
             if (held === wanted) {
                 return;
@@ -111,13 +111,34 @@ export class SleepLock {
                 this.blockerId = undefined;
             }
         } catch (error) {
-            this.log?.(`[keep-awake] could not ${wanted ? "hold" : "release"} the sleep lock: ${(error as Error).message}`);
-            this.failedWanted = wanted;
-            this.retryLater();
+            this.fail(error, wanted);
         }
     }
 
+    /** Whether the inhibitor the lock holds is still started. A platform error is logged and retried, and reads as held. */
+    private stillHeld(wanted: boolean): boolean {
+        if (this.blockerId === undefined) {
+            return false;
+        }
+
+        try {
+            return this.blocker.isStarted(this.blockerId);
+        } catch (error) {
+            this.fail(error, wanted);
+
+            return wanted;
+        }
+    }
+
+    /** Logs a failed platform call, and holds further calls for the same state until the retry. */
+    private fail(error: unknown, wanted: boolean): void {
+        this.log?.(`[keep-awake] could not ${wanted ? "hold" : "release"} the sleep lock: ${(error as Error).message}`);
+        this.failedWanted = wanted;
+        this.retryLater();
+    }
+
     private retryLater(): void {
+        this.cancelRetry();
         this.retryAt = Date.now() + this.retryMs;
         this.retry = setTimeout(() => {
             this.retry = undefined;
