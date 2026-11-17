@@ -74,6 +74,9 @@ export class ServerAgents {
     /** Servers whose removal is under way: no command may start a turn on them until the runtime is gone. */
     private readonly removing = new Set<string>();
 
+    /** The removal of each server that is under way: an overlapping call joins it instead of running a second one. */
+    private readonly removals = new Map<string, Promise<void>>();
+
     public constructor(private readonly options: ServerAgentsOptions) {}
 
     /** The runtime of a paired server; throws for any other device, so no command can conjure one. */
@@ -115,35 +118,18 @@ export class ServerAgents {
      * secret, which is deleted right after). Call BEFORE the core removes the server. An end that cannot reach the
      * backend in time stays in the server's file, which nothing reads once the server is gone.
      */
-    public async remove(deviceId: string): Promise<void> {
-        const runtime = this.runtimes.get(deviceId);
+    public remove(deviceId: string): Promise<void> {
+        const inFlight = this.removals.get(deviceId);
 
-        if (runtime === undefined) {
-            return;
+        if (inFlight !== undefined) {
+            return inFlight;
         }
 
-        this.removing.add(deviceId);
+        const removal = this.runRemoval(deviceId);
 
-        try {
-            await runtime.acp.closeUnapproved({ agents: [], consents: [] });
+        this.removals.set(deviceId, removal);
 
-            const deadline = Date.now() + REMOVAL_FLUSH_MS;
-
-            while (runtime.poster.busy && Date.now() < deadline) {
-                // eslint-disable-next-line no-await-in-loop -- the posts go out on timers of their own; this only waits for them
-                await new Promise((resolve) => {
-                    setTimeout(resolve, REMOVAL_POLL_MS);
-                });
-            }
-
-            await runtime.poster.persisted();
-            runtime.poster.stop();
-            // Nothing may still run on the runtime being dropped: this also releases its sleep-lock source.
-            runtime.acp.retire();
-            this.runtimes.delete(deviceId);
-        } finally {
-            this.removing.delete(deviceId);
-        }
+        return removal;
     }
 
     /** Ends and forgets every server with a runtime: the computer is being unpaired. */
@@ -222,6 +208,46 @@ export class ServerAgents {
     public stop(): void {
         for (const runtime of this.runtimes.values()) {
             runtime.poster.stop();
+        }
+    }
+
+    private async runRemoval(deviceId: string): Promise<void> {
+        try {
+            await this.drop(deviceId);
+        } finally {
+            this.removals.delete(deviceId);
+        }
+    }
+
+    /** One removal of a server: `remove` runs it once and joins it while it is under way. */
+    private async drop(deviceId: string): Promise<void> {
+        const runtime = this.runtimes.get(deviceId);
+
+        if (runtime === undefined) {
+            return;
+        }
+
+        this.removing.add(deviceId);
+
+        try {
+            await runtime.acp.closeUnapproved({ agents: [], consents: [] });
+
+            const deadline = Date.now() + REMOVAL_FLUSH_MS;
+
+            while (runtime.poster.busy && Date.now() < deadline) {
+                // eslint-disable-next-line no-await-in-loop -- the posts go out on timers of their own; this only waits for them
+                await new Promise((resolve) => {
+                    setTimeout(resolve, REMOVAL_POLL_MS);
+                });
+            }
+
+            await runtime.poster.persisted();
+            runtime.poster.stop();
+            // Nothing may still run on the runtime being dropped: this also releases its sleep-lock source.
+            runtime.acp.retire();
+            this.runtimes.delete(deviceId);
+        } finally {
+            this.removing.delete(deviceId);
         }
     }
 

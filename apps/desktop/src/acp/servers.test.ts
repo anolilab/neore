@@ -306,4 +306,26 @@ describe("coding agents on a server", () => {
             "being removed",
         );
     });
+
+    it("joins an overlapping removal of the same server, so one removal runs and its live turn ends once", async () => {
+        const { servers } = setup();
+        const runtime = servers.get(SERVER);
+        const sessionId = await runtime.acp.startSession("fake", "Fake on build-box", scratch.work, { sessionId: "session-7", threadId: "thread-7" });
+
+        runtime.acp.send(sessionId, "tool", "turn-7");
+        await expect.poll(() => posts.some(({ post }) => post.turnId === "turn-7"), { timeout: 8000 }).toBe(true);
+
+        const first = servers.remove(SERVER);
+        const second = servers.remove(SERVER);
+
+        expect(second).toBe(first);
+
+        await Promise.all([first, second]);
+        secretGone = true;
+
+        const ended = posts.filter(({ post }) => post.turnId === "turn-7").flatMap(({ post }) => post.events).filter((event) => event.kind === "turn_end");
+
+        expect(ended).toHaveLength(1);
+        expect(runtime.acp.summaries()[0]?.status).toBe("ended");
+    });
 });
