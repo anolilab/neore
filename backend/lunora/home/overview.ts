@@ -16,6 +16,8 @@ import type { QueryCtx } from "../_generated/server";
 import { repoLabel } from "../coding-agents/repo-label";
 import { vCodingAgentId } from "../coding-agents/validators";
 import { authQuery } from "../lib/crpc";
+import { getUser } from "../auth/lib/better-auth-queries";
+import { readPolicyState } from "../auth/lib/organization-policy";
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { loadUnread, toRedactedNotificationViews, UNREAD_COUNT_CAP } from "../notifications/functions";
 import { vNotificationView } from "../notifications/validators";
@@ -29,6 +31,11 @@ const THREAD_SCAN = 20;
 const HOME_NOTIFICATIONS = 5;
 
 const TITLE_MAX = 160;
+
+/** Live chats a user has before the Daily Brief is offered, so the offer does not crowd the first run. */
+export const BRIEF_OFFER_MIN_THREADS = 3;
+/** Thread rows read for the offer when temporary chats fill {@link THREAD_SCAN}: a fixed ceiling, not every thread. */
+const BRIEF_OFFER_THREAD_SCAN = 100;
 
 const clip = (text: string): string => (text.length > TITLE_MAX ? `${text.slice(0, TITLE_MAX - 1)}…` : text);
 
@@ -53,6 +60,8 @@ export const vHomeOverview = v.object({
         }),
     ),
     dailyBriefEnabled: v.boolean(),
+    // Show the one-time Daily Brief offer: the user never chose on or off, never said "Not now", and has some chats.
+    dailyBriefOffer: v.boolean(),
     notifications: v.array(vNotificationView),
     // `locked` threads carry no title: the list shows the lock, not the name.
     recentThreads: v.array(v.object({ _id: v.string(), locked: v.optional(v.boolean()), title: v.optional(v.string()), updatedAt: v.number() })),
@@ -71,16 +80,77 @@ export const vHomeOverview = v.object({
         }),
     ),
     unreadCount: v.number(),
+    // Whose overview this is: the home page offers the brief only to the account it was computed for.
+    userId: v.string(),
 });
 
 export type HomeOverview = Infer<typeof vHomeOverview>;
+
+/**
+ * Whether to offer the Daily Brief. Only someone who never decided: no value in
+ * their settings (on OR off), no "Not now", and no organization policy setting
+ * it for them (a default or a lock is the organization's decision). Never a
+ * guest: an anonymous account gets no brief, has no settings switch for it, and
+ * its answer would not survive sign-up. The user and the policy are read only
+ * when everything else says yes. `scannedLive` counts the live chats in the
+ * recent-thread scan; when temporary chats fill that scan, the user's live
+ * chats are counted on their own.
+ */
+const shouldOfferBrief = async (
+    ctx: Pick<QueryCtx, "db">,
+    userId: string,
+    settings: { dailyBriefEnabled?: boolean; dailyBriefOfferDismissedAt?: number } | null,
+    scannedLive: { count: number; scanFull: boolean },
+    organizationId: string | null,
+): Promise<boolean> => {
+    if (settings?.dailyBriefEnabled !== undefined || settings?.dailyBriefOfferDismissedAt !== undefined) {
+        return false;
+    }
+
+    if (scannedLive.count < BRIEF_OFFER_MIN_THREADS) {
+        if (!scannedLive.scanFull) {
+            return false;
+        }
+
+        const wider = await ctx.db.threads.findMany({
+            limit: BRIEF_OFFER_THREAD_SCAN,
+            orderBy: [{ updatedAt: "desc" }, { _creationTime: "desc" }],
+            where: { OR: [{ deleted: { isNull: true } }, { deleted: false }], userId },
+        });
+
+        if (wider.page.filter((thread) => thread.isTemporary !== true).length < BRIEF_OFFER_MIN_THREADS) {
+            return false;
+        }
+    }
+
+    const user = await getUser(ctx, userId);
+
+    if (!user || user.isAnonymous === true) {
+        return false;
+    }
+
+    if (organizationId === null) {
+        return true;
+    }
+
+    // From the primary, as `auth/lib/permission-cap-read.ts`: a regional replica can still miss the default or lock an admin just set.
+    const row = await ctx.db.organizationPolicies.findFirst({ consistency: "primary", where: { organizationId } });
+    const state = readPolicyState(row?.document);
+
+    // An unreadable policy fails closed, as the write would.
+    return state.kind === "none" || (state.kind === "policy" && state.policy.settings?.dailyBriefEnabled === undefined);
+};
 
 /**
  * Pending approvals past `PENDING_APPROVAL_TTL_MS` are not filtered here — a
  * query must not read the clock (it re-runs on every relevant write). They are
  * purged on the next pause in that shard, and answering one fails closed.
  */
-export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<HomeOverview> => {
+/**
+ * `offer` is the home page's own: only it computes the Daily Brief offer (and
+ * pays its reads). Other readers of the snapshot get `dailyBriefOffer: false`.
+ */
+export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string, offer?: { organizationId: string | null }): Promise<HomeOverview> => {
     const [approvalRows, reviewRows, taskRows, agentRows, subAgentRows, threadRows, unread, settings] = await Promise.all([
         ctx.db.toolApprovalRuns.findMany({
             limit: HOME_SECTION_LIMIT,
@@ -125,6 +195,8 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
     );
 
     // A run's prompt or task is the text of the chat that started it, so it shows the lock while that chat is locked.
+    const liveThreads = threadRows.page.filter((thread) => thread.deleted !== true && thread.isTemporary !== true);
+
     const lockedRunThreads = await lockedThreadIds(ctx, [
         ...agentRows.page.flatMap((run) => (run.threadId ? [run.threadId] : [])),
         ...subAgentRows.page.flatMap((run) => [run.parentThreadId, ...(run.childThreadId ? [run.childThreadId] : [])]),
@@ -148,17 +220,23 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
             };
         }),
         dailyBriefEnabled: settings?.dailyBriefEnabled === true,
+        dailyBriefOffer: offer
+            ? await shouldOfferBrief(
+                  ctx,
+                  userId,
+                  settings,
+                  { count: liveThreads.length, scanFull: threadRows.page.length === THREAD_SCAN },
+                  offer.organizationId,
+              )
+            : false,
         notifications: await toRedactedNotificationViews(ctx.db, unread.slice(0, HOME_NOTIFICATIONS)),
-        recentThreads: threadRows.page
-            .filter((thread) => thread.deleted !== true && thread.isTemporary !== true)
-            .slice(0, RECENT_THREADS)
-            .map((thread) => {
-                return {
-                    _id: thread._id as string,
-                    updatedAt: thread.updatedAt ?? thread._creationTime,
-                    ...(isThreadLocked(thread) ? { locked: true } : thread.title && { title: clip(thread.title) }),
-                };
-            }),
+        recentThreads: liveThreads.slice(0, RECENT_THREADS).map((thread) => {
+            return {
+                _id: thread._id as string,
+                updatedAt: thread.updatedAt ?? thread._creationTime,
+                ...(isThreadLocked(thread) ? { locked: true } : thread.title && { title: clip(thread.title) }),
+            };
+        }),
         reviews: reviewRows.page.map((task) => {
             return { _id: task._id as string, title: clip(task.title), updatedAt: task.updatedAt };
         }),
@@ -178,10 +256,11 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
             };
         }),
         unreadCount: unread.length,
+        userId,
     };
 };
 
 export const getHomeOverview = authQuery
     .input({})
     .output(vHomeOverview)
-    .query(async ({ ctx }) => await loadHomeOverview(ctx, ctx.user.userId));
+    .query(async ({ ctx }) => await loadHomeOverview(ctx, ctx.user.userId, { organizationId: ctx.user.activeOrganization?.id ?? null }));

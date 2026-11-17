@@ -2245,6 +2245,7 @@ export interface Doc_userSettings {
     contrast?: string;
     customInstructions?: string;
     dailyBriefEnabled?: boolean;
+    dailyBriefOfferDismissedAt?: number;
     density?: string;
     dictationLanguage?: string;
     disableExternalLinkWarning?: boolean;
@@ -5483,6 +5484,7 @@ export interface Insert_userSettings {
     contrast?: string;
     customInstructions?: string;
     dailyBriefEnabled?: boolean;
+    dailyBriefOfferDismissedAt?: number;
     density?: string;
     dictationLanguage?: string;
     disableExternalLinkWarning?: boolean;
