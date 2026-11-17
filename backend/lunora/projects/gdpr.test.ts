@@ -6,8 +6,8 @@ import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { collectAllRepositories } from "./export-pages";
-import { collectProjectDetailsForExport, collectProjectRepositoriesForExport } from "./gdpr";
+import { collectAllOwnedProjects, collectAllRepositories } from "./export-pages";
+import { collectOwnedProjectsForExport, collectProjectDetailsForExport, collectProjectRepositoriesForExport } from "./gdpr";
 
 const A = "user-a";
 const SHARE_TOKENS = /share-token|old-token/u;
@@ -149,5 +149,56 @@ describe("project repositories in the GDPR export", () => {
                 1000,
             ),
         ).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+    });
+});
+
+describe("owned projects in the GDPR export", () => {
+    const ownedFor = async (userId: string, maxBytes = Infinity) => {
+        let pages = 0;
+        const result = await collectAllOwnedProjects(async (cursor) => {
+            pages += 1;
+
+            return await harness.run((async (ctx: any) => await ctx.runQuery(collectOwnedProjectsForExport, { cursor, userId })) as never);
+        }, maxBytes);
+
+        return { ...result, pages };
+    };
+
+    it("exports every project the user owns, with or without a repository, its machine and folder, and never another user's", async () => {
+        await harness.run((async (ctx: any) => {
+            await ctx.db.insert("projects", { createdAt: 1, path: "/home/a/app", title: "with folder", userId: A });
+            await ctx.db.insert("projects", { createdAt: 2, title: "no folder", userId: A });
+            await ctx.db.insert("projects", { createdAt: 3, title: "not mine", userId: B });
+        }) as never);
+
+        const { projects } = await ownedFor(A);
+
+        expect(projects).toMatchObject([
+            { path: "/home/a/app", sharingEnabled: false, title: "with folder" },
+            { sharingEnabled: false, title: "no folder" },
+        ]);
+        expect(projects).toHaveLength(2);
+    });
+
+    it("pages two projects to a query and reports the rows' read cost, the rows counted whole", async () => {
+        await harness.run((async (ctx: any) => {
+            for (let index = 0; index < 5; index += 1) {
+                await ctx.db.insert("projects", { createdAt: index, title: `p${index}`, userId: A });
+            }
+        }) as never);
+
+        const { pages, projects, readBytes } = await ownedFor(A);
+
+        expect(projects).toHaveLength(5);
+        expect(pages).toBe(3);
+        expect(readBytes).toBeGreaterThan(0);
+    });
+
+    it("fails with PAYLOAD_TOO_LARGE once the reads pass the limit, rather than return a cut list", async () => {
+        await harness.run((async (ctx: any) => {
+            await ctx.db.insert("projects", { createdAt: 1, title: "x".repeat(2048), userId: A });
+        }) as never);
+
+        await expect(ownedFor(A, 16)).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
     });
 });

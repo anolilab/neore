@@ -266,3 +266,46 @@ export const collectProjectDetailsForExport = internalQuery
 
         return { projects, readBytes };
     });
+
+/**
+ * One page of the user's projects for the export, the ones without a repository too (`collectAllOwnedProjects`). A project
+ * row is read whole, so the read is counted from the whole row, and a page holds {@link PROJECTS_PER_DETAILS_READ} rows.
+ * Each project carries the machine and folder a computer's project records, which only its owner may see.
+ */
+export const collectOwnedProjectsForExport = internalQuery
+    .input({ cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())), userId: v.string().max(MAX_LENGTH.id) })
+    .output(
+        v.object({
+            cursor: v.union(v.string(), v.null()),
+            projects: v.array(
+                v.object({
+                    machineId: v.optional(v.string()),
+                    path: v.optional(v.string()),
+                    projectId: v.string(),
+                    sharingEnabled: v.boolean(),
+                    title: v.string(),
+                }),
+            ),
+            readBytes: v.number(),
+        }),
+    )
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        const result = await ctx.db.projects.findMany({
+            cursor: cursor ?? null,
+            limit: PROJECTS_PER_DETAILS_READ,
+            orderBy: [{ _creationTime: "asc" }],
+            where: { userId },
+        });
+        const readBytes = result.page.reduce((total, row) => total + new TextEncoder().encode(JSON.stringify(row)).byteLength, 0);
+        const projects = result.page.map((row) => {
+            return {
+                ...(row.machineId !== undefined && { machineId: row.machineId }),
+                ...(row.path !== undefined && { path: row.path }),
+                projectId: row._id,
+                sharingEnabled: row.isPublic === true,
+                title: row.title,
+            };
+        });
+
+        return { cursor: result.isDone ? null : result.continueCursor, projects, readBytes };
+    });

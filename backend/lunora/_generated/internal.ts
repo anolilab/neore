@@ -1079,6 +1079,7 @@ export interface InternalApiTypes {
             restampProjectRepositories: FunctionReference<"mutation", { projectId: Id<"projects">; retry: number }, null>;
         };
         gdpr: {
+            collectOwnedProjectsForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; projects: Array<{ machineId?: string; path?: string; projectId: string; sharingEnabled: boolean; title: string }>; readBytes: number }>;
             collectProjectDetailsForExport: FunctionReference<"query", { projectIds: Array<Id<"projects">>; userId: string }, { projects: Array<{ project: { sharingEnabled: boolean; title: string }; projectId: string }>; readBytes: number }>;
             collectProjectRepositoriesForExport: FunctionReference<"query", { cursor?: string | null; userId: string }, { cursor: string | null; projectRepositories: Array<unknown> }>;
             eraseOrganizationRepositories: FunctionReference<"mutation", { cursor?: string; organizationId: string }, null>;
@@ -2458,6 +2459,7 @@ export const internal: InternalApiTypes = {
             restampProjectRepositories: { __lunoraRef: "projects_functions:restampProjectRepositories" },
         },
         gdpr: {
+            collectOwnedProjectsForExport: { __lunoraRef: "projects_gdpr:collectOwnedProjectsForExport" },
             collectProjectDetailsForExport: { __lunoraRef: "projects_gdpr:collectProjectDetailsForExport" },
             collectProjectRepositoriesForExport: { __lunoraRef: "projects_gdpr:collectProjectRepositoriesForExport" },
             eraseOrganizationRepositories: { __lunoraRef: "projects_gdpr:eraseOrganizationRepositories" },

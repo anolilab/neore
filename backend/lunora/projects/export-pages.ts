@@ -93,3 +93,44 @@ export const collectAllRepositories = async (
         readBytes,
     };
 };
+
+/** One page of `collectOwnedProjectsForExport`: its projects, where the next page starts, and what reading them cost. */
+interface OwnedProjectsPage {
+    cursor?: string | null;
+    projects?: unknown[];
+    readBytes?: number;
+}
+
+/**
+ * Every project the user owns, one page per query, reported only after the last page. Unlike a details read, a project
+ * cannot be left out, so a set past `maxBytes` (what reading the rows cost) fails with PAYLOAD_TOO_LARGE rather than
+ * return a cut list.
+ */
+export const collectAllOwnedProjects = async (
+    readPage: (cursor: string | null) => Promise<unknown>,
+    maxBytes: number,
+): Promise<{ projects: unknown[]; readBytes: number }> => {
+    const projects: unknown[] = [];
+    let cursor: string | null = null;
+    let readBytes = 0;
+
+    for (;;) {
+        const result = (await readPage(cursor)) as OwnedProjectsPage;
+
+        readBytes += result.readBytes ?? 0;
+
+        if (readBytes > maxBytes) {
+            throw new LunoraError("PAYLOAD_TOO_LARGE", "The projects are larger than the export limit");
+        }
+
+        projects.push(...(result.projects ?? []));
+
+        if (!result.cursor) {
+            break;
+        }
+
+        cursor = result.cursor;
+    }
+
+    return { projects, readBytes };
+};
