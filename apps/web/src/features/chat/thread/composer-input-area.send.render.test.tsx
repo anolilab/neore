@@ -59,4 +59,16 @@ describe("send button while attachments upload", () => {
 
         expect(send.disabled).toBe(false);
     });
+
+    it("announces that a send is waiting, in a live region that is always there", () => {
+        renderArea({ isSendWaiting: true, isUploading: true, value: "see the file" });
+
+        expect(screen.getByText("Sending once uploads finish…", { selector: "[role='status']" })).toBeTruthy();
+    });
+
+    it("keeps the live region empty when no send waits", () => {
+        renderArea({ isUploading: true });
+
+        expect(screen.queryByText("Sending once uploads finish…", { selector: "[role='status']" })).toBeNull();
+    });
 });

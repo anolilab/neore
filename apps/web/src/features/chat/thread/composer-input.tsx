@@ -87,7 +87,7 @@ import { readChatMessages } from "./read-chat-messages";
 import ReplyCompleteAnnouncement from "./reply-complete-announcement";
 import TurnStepAnnouncement from "./turn-step-announcement";
 import type { UploadWait } from "./upload-send-wait";
-import { settleUploadWait, uploadWaitIds } from "./upload-send-wait";
+import { settleUploadWait, startUploadWait } from "./upload-send-wait";
 import { useAttachmentExtraction } from "./use-attachment-extraction";
 import { usePasteGuard } from "./use-paste-guard";
 import { PromptHistorySource, usePromptHistory } from "./use-prompt-history";
@@ -1180,10 +1180,9 @@ const ComposerInput = ({
                 return;
             }
 
-            // Not sent yet: it waits for the uploads and goes out once they finish (see the effect after the auto-submit).
-            setUploadWait((current) => {
-                return { attachmentIds: uploadWaitIds(draftAttachments, current), threadId };
-            });
+            // Not sent yet: it waits for these uploads and goes out once they finish, if the draft stays as it is (see the
+            // effect after the auto-submit).
+            setUploadWait(startUploadWait({ attachments: draftAttachments, text: draftText }, threadId));
 
             return;
         }
@@ -1374,7 +1373,7 @@ const ComposerInput = ({
             return;
         }
 
-        const outcome = settleUploadWait(uploadWait, attachments, threadId);
+        const outcome = settleUploadWait(uploadWait, { attachments, text }, threadId);
 
         if (outcome.kind === "waiting") {
             return;
@@ -1382,17 +1381,36 @@ const ComposerInput = ({
 
         setUploadWait(null);
 
-        if (outcome.kind === "failed") {
-            notifyFailedUpload(outcome.name);
-        } else if (outcome.kind === "send") {
-            // A locked composer or a send already in flight cannot take this message now: say so, and keep the draft.
-            if (disabled || useChatUIStore.getState().isSubmitting) {
-                showInfo(t`The uploads finished, but the message was not sent. Press send to send it.`);
-            } else {
-                handleSubmit();
+        switch (outcome.kind) {
+            case "edited": {
+                showInfo(t`Your message changed while the uploads ran, so it was not sent. Press send to send it.`);
+
+                break;
+            }
+
+            case "failed": {
+                notifyFailedUpload(outcome.name);
+
+                break;
+            }
+
+            case "send": {
+                // A locked composer or a send already in flight cannot take this message now: say so, and keep the draft.
+                if (disabled || useChatUIStore.getState().isSubmitting) {
+                    showInfo(t`The uploads finished, but the message was not sent. Press send to send it.`);
+                } else {
+                    handleSubmit();
+                }
+
+                break;
+            }
+
+            default: {
+                // A chat change cancels the wait without a message: the draft belongs to the chat it was typed in.
+                break;
             }
         }
-    }, [attachments, disabled, handleSubmit, notifyFailedUpload, t, threadId, uploadWait]);
+    }, [attachments, disabled, handleSubmit, notifyFailedUpload, t, text, threadId, uploadWait]);
 
     // Handle cancel/stop
     // A manual stop pauses the queue: the chips stay, nothing auto-sends.

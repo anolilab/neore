@@ -185,6 +185,8 @@ const pressSend = () => {
 
 const sendState = () => screen.getByLabelText("Send state").textContent;
 
+const editedMessage = "Your message changed while the uploads ran, so it was not sent. Press send to send it.";
+
 describe("ComposerInput send during an upload", () => {
     beforeEach(() => {
         useChatUIStore.getState().setComposerText("see notes");
@@ -264,7 +266,7 @@ describe("ComposerInput send during an upload", () => {
         expect(harness.sendMessage).toHaveBeenCalledWith("see notes", []);
     });
 
-    it("cancels the wait when a file still uploading is removed, so nothing goes out", async () => {
+    it("ends the wait, sends nothing and says so when a file still uploading is removed", async () => {
         const id = addUpload("uploading");
 
         renderComposer();
@@ -275,8 +277,41 @@ describe("ComposerInput send during an upload", () => {
         await waitFor(() => {
             expect(sendState()).toBe("ready");
         });
+        expect(harness.showInfo).toHaveBeenCalledWith(editedMessage);
         expect(harness.sendMessage).not.toHaveBeenCalled();
         expect(useChatUIStore.getState().composerText).toBe("see notes");
+    });
+
+    it("sends nothing when the text is edited while the uploads run, and says so", async () => {
+        const id = addUpload("uploading");
+
+        renderComposer();
+        pressSend();
+
+        useChatUIStore.getState().setComposerText("see notes, and the other one");
+        useChatUIStore.getState().updateAttachment(id, { fileId: "file-1", status: "complete" });
+
+        await waitFor(() => {
+            expect(harness.showInfo).toHaveBeenCalledWith(editedMessage);
+        });
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+        expect(sendState()).toBe("ready");
+        expect(useChatUIStore.getState().composerText).toBe("see notes, and the other one");
+    });
+
+    it("sends nothing when a file is added while the uploads run, and says so", async () => {
+        const first = addUpload("uploading");
+
+        renderComposer();
+        pressSend();
+
+        addUpload("uploading");
+        useChatUIStore.getState().updateAttachment(first, { fileId: "file-1", status: "complete" });
+
+        await waitFor(() => {
+            expect(harness.showInfo).toHaveBeenCalledWith(editedMessage);
+        });
+        expect(harness.sendMessage).not.toHaveBeenCalled();
     });
 
     it("says so and keeps the draft when the uploads finish while the composer is locked", async () => {
