@@ -32,6 +32,8 @@ interface Block {
     /** The first ProxyJump or ProxyCommand value: `none` connects directly, any other is unsupported. */
     proxy: "direct" | "unsupported" | null;
     reason: string | null;
+    /** The key whose value the reason is about: the reason holds only where that key is the one ssh uses. Null when it holds regardless. */
+    reasonKey: "hostName" | "port" | null;
     user: string | null;
 }
 
@@ -45,7 +47,7 @@ const SPACE = /\s/u;
 /** `~user/...` or `~user`, not `~` or `~/...`: another user's home. */
 const OTHER_USER_HOME = /^~[^/]/u;
 
-const EMPTY: Block = { hostName: null, identityCount: 0, identityFile: null, patterns: [], port: null, proxy: null, reason: null, user: null };
+const EMPTY: Block = { hostName: null, identityCount: 0, identityFile: null, patterns: [], port: null, proxy: null, reason: null, reasonKey: null, user: null };
 
 const MULTIPLE_IDENTITIES = "This host has more than one IdentityFile in ~/.ssh/config, which Neore does not support.";
 const RELATIVE_IDENTITY = "This host has a relative IdentityFile in ~/.ssh/config, which Neore does not support.";
@@ -143,7 +145,7 @@ const settingOf = (key: string, value: string, home: string): Partial<Block> => 
         case "hostname": {
             const name = firstWord(value);
 
-            return name?.includes("%") ? { reason: unsupported(key) } : { hostName: name };
+            return name?.includes("%") ? { reason: unsupported(key), reasonKey: "hostName" } : { hostName: name };
         }
         case "identityfile": {
             const file = firstWord(value);
@@ -174,7 +176,7 @@ const settingOf = (key: string, value: string, home: string): Partial<Block> => 
             const port = parsePort(firstWord(value) ?? "");
 
             // An invalid value is kept as 0 so that no later Port fills it in; the host is disabled.
-            return port === null ? { port: 0, reason: "This host has an invalid Port in ~/.ssh/config." } : { port };
+            return port === null ? { port: 0, reason: "This host has an invalid Port in ~/.ssh/config.", reasonKey: "port" } : { port };
         }
         case "proxycommand":
         case "proxyjump": {
@@ -193,6 +195,10 @@ const settingOf = (key: string, value: string, home: string): Partial<Block> => 
 
 /** The first value of a key wins, as in ssh; the IdentityFile lines are counted, not merged. */
 const mergeFirst = (block: Block, patch: Partial<Block>): Block => {
+    // A patch's reason holds only if its key is the one this block takes: a later block's value that ssh ignores disables nothing.
+    const takesReason =
+        block.reason === null && patch.reason !== null && patch.reason !== undefined && (patch.reasonKey == null || block[patch.reasonKey] === null);
+
     return {
         ...block,
         hostName: block.hostName ?? patch.hostName ?? null,
@@ -200,7 +206,8 @@ const mergeFirst = (block: Block, patch: Partial<Block>): Block => {
         identityFile: block.identityFile ?? patch.identityFile ?? null,
         port: block.port ?? patch.port ?? null,
         proxy: block.proxy ?? patch.proxy ?? null,
-        reason: block.reason ?? patch.reason ?? null,
+        reason: takesReason ? (patch.reason ?? null) : block.reason,
+        reasonKey: takesReason ? (patch.reasonKey ?? null) : block.reasonKey,
         user: block.user ?? patch.user ?? null,
     };
 };

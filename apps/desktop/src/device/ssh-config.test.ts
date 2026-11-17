@@ -198,6 +198,11 @@ describe("parseSshConfig", () => {
         expect(parse("Host build!legacy\n  Port 2200\n").map((host) => [host.alias, host.disabledReason])).toEqual([["build!legacy", null]]);
     });
 
+    it("ignores a later block's HostName reason where ssh keeps the first HostName, and applies it where ssh uses it", () => {
+        expect(parse("Host app\n  HostName 10.0.0.1\nHost *\n  HostName %h.corp.example\n")[0]?.disabledReason).toBeNull();
+        expect(parse("Host *\n  HostName %h.corp.example\nHost app\n  HostName 10.0.0.1\n")[0]?.disabledReason).toContain("HostName");
+    });
+
     it("disables a host whose IdentityFile is none, since the transport cannot suppress its key files", () => {
         expect(parse("Host a\n  IdentityFile none\n")).toMatchObject([{ disabledReason: expect.stringContaining("IdentityFile none") }]);
     });
