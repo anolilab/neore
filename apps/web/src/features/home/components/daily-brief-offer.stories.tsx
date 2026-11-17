@@ -1,6 +1,6 @@
 import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect } from "storybook/test";
+import { expect, waitFor } from "storybook/test";
 
 import { STORY_NOW } from "@/storybook/clock";
 import { userFixtures } from "@/storybook/fixtures/user";
@@ -58,6 +58,21 @@ export const Dismissed: Story = {
 
         await expect(await canvas.findByText(DISMISSED)).toBeVisible();
         await expect(canvas.getByRole("link", { name: "Open settings" })).toBeVisible();
+    },
+};
+
+/** Answered from the keyboard: focus moves to the confirmation, which keeps a visible focus outline (`outline-none` would hide it). */
+export const AnsweredWithKeyboard: Story = {
+    play: async ({ canvas, userEvent }) => {
+        await userEvent.tab();
+        await userEvent.tab();
+        await expect(canvas.getByRole("button", { name: "Not now" })).toHaveFocus();
+        await userEvent.keyboard("{Enter}");
+
+        const confirmation = await canvas.findByText(DISMISSED);
+
+        await waitFor(async () => await expect(confirmation).toHaveFocus());
+        await expect(getComputedStyle(confirmation).outlineStyle).toBe("solid");
     },
 };
 

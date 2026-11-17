@@ -688,7 +688,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} 個のツール: {1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:219
+#: src/features/home/components/home-page.tsx:222
 msgid "{0} unread"
 msgstr "未読 {0} 件"
 
@@ -1750,7 +1750,7 @@ msgstr ""
 msgid "a change is waiting to be read"
 msgstr "読み取り待ちの変更があります"
 
-#: src/features/home/components/home-page.tsx:168
+#: src/features/home/components/home-page.tsx:171
 msgid "A chat is waiting for your answer"
 msgstr "チャットがあなたの回答を待っています"
 
@@ -3184,7 +3184,7 @@ msgstr "すべてのカテゴリ"
 msgid "All changes saved"
 msgstr "すべての変更を保存しました"
 
-#: src/features/home/components/home-page.tsx:239
+#: src/features/home/components/home-page.tsx:242
 msgid "All chats"
 msgstr "すべてのチャット"
 
@@ -4126,7 +4126,7 @@ msgstr "返信を中断せずにサイドクエスチョンをする"
 msgid "Ask all models anything..."
 msgstr "すべてのモデルに何でも質問..."
 
-#: src/features/home/components/home-page.tsx:93
+#: src/features/home/components/home-page.tsx:94
 msgid "Ask anything to start a new chat…"
 msgstr "何でも質問して新しいチャットを始めましょう…"
 
@@ -5836,7 +5836,7 @@ msgstr "変化（ポイント）"
 msgid "Change colors"
 msgstr "色を変更"
 
-#: src/features/home/components/daily-brief-offer.tsx:98
+#: src/features/home/components/daily-brief-offer.tsx:118
 msgid "Change it in settings"
 msgstr "設定で変更"
 
@@ -8662,7 +8662,7 @@ msgstr "要約を保存できなかったため、何も送信されていませ
 msgid "Could not save this. Try again."
 msgstr "保存できませんでした。もう一度お試しください。"
 
-#: src/features/home/components/daily-brief-offer.tsx:82
+#: src/features/home/components/daily-brief-offer.tsx:98
 msgid "Could not save your answer. Try again."
 msgstr "回答を保存できませんでした。もう一度お試しください。"
 
@@ -8742,7 +8742,7 @@ msgstr "モデルを切り替えられませんでした。もう一度お試し
 #~ msgid "Could not turn on the Daily Brief."
 #~ msgstr "Daily Brief をオンにできませんでした。"
 
-#: src/features/home/components/daily-brief-offer.tsx:80
+#: src/features/home/components/daily-brief-offer.tsx:96
 msgid "Could not turn on the Daily Brief. Try again."
 msgstr "Daily Brief をオンにできませんでした。もう一度お試しください。"
 
@@ -9386,7 +9386,7 @@ msgstr "チェコ語（チェコ共和国）"
 msgid "Czech Republic"
 msgstr "チェコ共和国"
 
-#: src/features/home/components/daily-brief-offer.tsx:89
+#: src/features/home/components/daily-brief-offer.tsx:105
 #: src/features/notifications/components/notification-settings.tsx:224
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:57
 msgid "Daily Brief"
@@ -9396,12 +9396,12 @@ msgstr "Daily Brief"
 #~ msgid "Daily Brief is on. It arrives each morning."
 #~ msgstr ""
 
-#: src/features/home/components/daily-brief-offer.tsx:74
+#: src/features/home/components/daily-brief-offer.tsx:90
 msgid "Daily Brief is on. It comes in the morning when there is something to report."
 msgstr "Daily Brief がオンになりました。伝えることがある日の朝に届きます。"
 
 #. placeholder {0}: formatArrival(current.scheduled, i18n.locale)
-#: src/features/home/components/daily-brief-offer.tsx:73
+#: src/features/home/components/daily-brief-offer.tsx:89
 msgid "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
 msgstr "Daily Brief がオンになりました。次回は {0} の予定です。伝えることがない朝は届きません。"
 
@@ -15309,7 +15309,7 @@ msgstr "ドイツ"
 #~ msgid "Get a short summary each morning of what finished, what needs you and what is still running."
 #~ msgstr ""
 
-#: src/features/home/components/daily-brief-offer.tsx:106
+#: src/features/home/components/daily-brief-offer.tsx:126
 msgid "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
 msgstr "毎朝、完了したこと、対応が必要なこと、実行中のことを短くまとめてお届けします。1日の使用量にカウントされます。"
 
@@ -16371,7 +16371,7 @@ msgid "HLS playback is not supported in this browser."
 msgstr "このブラウザーは HLS 再生に対応していません。"
 
 #: src/components/error-boundaries/route-error-boundary.tsx:118
-#: src/features/home/components/home-page.tsx:128
+#: src/features/home/components/home-page.tsx:130
 #: src/features/layout/components/sidebar-shortcut.tsx:71
 #: src/features/layout/lib/dashboard-page-names.ts:24
 msgid "Home"
@@ -19025,7 +19025,7 @@ msgstr "自分のアイテムを読み込み中…"
 msgid "Loading your messages…"
 msgstr "メッセージを読み込んでいます…"
 
-#: src/features/home/components/home-page.tsx:136
+#: src/features/home/components/home-page.tsx:138
 msgid "Loading your overview…"
 msgstr "概要を読み込み中…"
 
@@ -21117,7 +21117,7 @@ msgid "Needs review"
 msgstr "要レビュー"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
-#: src/features/home/components/home-page.tsx:161
+#: src/features/home/components/home-page.tsx:164
 msgid "Needs you"
 msgstr "対応が必要"
 
@@ -21678,7 +21678,7 @@ msgstr "カメラが選択されていません"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "まだケースがありません。手動で追加するか、CSV または JSONL ファイルをインポートするか、チャットのターンを「評価ケースとして保存」で保存してください。"
 
-#: src/features/home/components/home-page.tsx:246
+#: src/features/home/components/home-page.tsx:249
 msgid "No chats yet. Start one above."
 msgstr "まだチャットはありません。上から始めましょう。"
 
@@ -22224,7 +22224,7 @@ msgstr "ツールはありません。"
 msgid "No triggers yet"
 msgstr "トリガーはまだありません"
 
-#: src/features/home/components/home-page.tsx:226
+#: src/features/home/components/home-page.tsx:229
 msgid "No unread notifications."
 msgstr "未読の通知はありません。"
 
@@ -22420,7 +22420,7 @@ msgstr "未測定"
 msgid "Not merged"
 msgstr "未マージ"
 
-#: src/features/home/components/daily-brief-offer.tsx:118
+#: src/features/home/components/daily-brief-offer.tsx:138
 msgid "Not now"
 msgstr "今はしない"
 
@@ -22500,7 +22500,7 @@ msgstr "ここには何もありません。"
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "そのアドレスで待ち受けているサーバーがありません。Ollama または LM Studio のサーバーを起動し、ポートを確認して、URL が /v1 で終わっていることを確認してください。"
 
-#: src/features/home/components/home-page.tsx:182
+#: src/features/home/components/home-page.tsx:185
 msgid "Nothing is running right now."
 msgstr "現在実行中のものはありません。"
 
@@ -22508,7 +22508,7 @@ msgstr "現在実行中のものはありません。"
 msgid "Nothing is saved, installed or enabled until you choose to save."
 msgstr "保存を選択するまで、何も保存、インストール、有効化されません。"
 
-#: src/features/home/components/home-page.tsx:163
+#: src/features/home/components/home-page.tsx:166
 msgid "Nothing is waiting on you."
 msgstr "対応待ちのものはありません。"
 
@@ -22524,7 +22524,7 @@ msgstr "通知"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "通知ワークフロー、チャネル、受信者の設定"
 
-#: src/features/home/components/home-page.tsx:223
+#: src/features/home/components/home-page.tsx:226
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:199
@@ -22688,7 +22688,7 @@ msgstr "オフセット: 0x{hoveredOffsetHex} ({hoveredByte}) = 0x{hoveredValueH
 msgid "Oil Painting"
 msgstr "油絵"
 
-#: src/features/home/components/daily-brief-offer.tsx:69
+#: src/features/home/components/daily-brief-offer.tsx:85
 msgid "Okay, we won't ask again. You can turn it on any time in settings."
 msgstr "わかりました。今後はお尋ねしません。設定からいつでもオンにできます。"
 
@@ -23199,7 +23199,7 @@ msgid "Open search"
 msgstr "検索を開く"
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:203
-#: src/features/home/components/daily-brief-offer.tsx:98
+#: src/features/home/components/daily-brief-offer.tsx:118
 msgid "Open settings"
 msgstr "設定を開く"
 
@@ -25991,9 +25991,9 @@ msgstr "メッセージを待機列に追加"
 msgid "Queue message — sends when the current reply finishes"
 msgstr "メッセージを待機列に追加 — 現在の返信が終わると送信されます"
 
-#: src/features/home/components/home-page.tsx:112
-#: src/features/home/components/home-page.tsx:186
-#: src/features/home/components/home-page.tsx:194
+#: src/features/home/components/home-page.tsx:113
+#: src/features/home/components/home-page.tsx:189
+#: src/features/home/components/home-page.tsx:197
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
 #: src/features/sub-agents/components/worker-list.tsx:83
 #: src/features/sub-agents/components/worker-run-log.tsx:29
@@ -26485,7 +26485,7 @@ msgstr "リベースしてマージ"
 msgid "Recent"
 msgstr "最近"
 
-#: src/features/home/components/home-page.tsx:243
+#: src/features/home/components/home-page.tsx:246
 msgid "Recent chats"
 msgstr "最近のチャット"
 
@@ -27696,7 +27696,7 @@ msgstr "メモを付けて再試行"
 msgid "Retrying now"
 msgstr "再試行中"
 
-#: src/features/home/components/home-page.tsx:152
+#: src/features/home/components/home-page.tsx:154
 msgid "Retrying…"
 msgstr "再試行しています…"
 
@@ -27771,7 +27771,7 @@ msgid "Review submitted"
 msgstr "レビューを送信しました"
 
 #. placeholder {0}: task.title
-#: src/features/home/components/home-page.tsx:173
+#: src/features/home/components/home-page.tsx:176
 msgid "Review task: {0}"
 msgstr "タスクを確認：{0}"
 
@@ -28100,10 +28100,10 @@ msgstr "ワークフローを実行すると、ここに実行履歴が表示さ
 
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
-#: src/features/home/components/home-page.tsx:115
-#: src/features/home/components/home-page.tsx:180
-#: src/features/home/components/home-page.tsx:186
-#: src/features/home/components/home-page.tsx:194
+#: src/features/home/components/home-page.tsx:116
+#: src/features/home/components/home-page.tsx:183
+#: src/features/home/components/home-page.tsx:189
+#: src/features/home/components/home-page.tsx:197
 #: src/features/settings/components/chat/trigger-settings.tsx:184
 #: src/features/tasks/components/task-detail-dialog.tsx:138
 #: src/features/tasks/components/task-status.tsx:20
@@ -30843,7 +30843,7 @@ msgstr "メッセージをピン留めするには会話を始めてください
 msgid "Start a conversation, generate images, write a document in canvas, run code — no tab-switching, no copy-pasting between apps."
 msgstr "会話を始めて、画像を生成し、キャンバスでドキュメントを書き、コードを実行 — タブの切り替えもアプリ間のコピー&ペーストも不要です。"
 
-#: src/features/home/components/home-page.tsx:82
+#: src/features/home/components/home-page.tsx:83
 msgid "Start a new chat"
 msgstr "新しいチャットを開始"
 
@@ -30873,7 +30873,7 @@ msgstr "新しい一時チャットを開始（{0}）"
 msgid "Start building"
 msgstr "構築を始める"
 
-#: src/features/home/components/home-page.tsx:96
+#: src/features/home/components/home-page.tsx:97
 msgid "Start chat"
 msgstr "チャットを開始"
 
@@ -35053,7 +35053,7 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
 #: src/features/develop/components/thread-pull-requests.tsx:169
-#: src/features/home/components/home-page.tsx:152
+#: src/features/home/components/home-page.tsx:154
 #: src/features/projects/components/project-repo-picker.tsx:190
 #: src/features/projects/components/project-repo-picker.tsx:198
 #: src/features/projects/components/project-repositories.tsx:297
@@ -35134,7 +35134,7 @@ msgstr "トルコ語（トルコ）"
 msgid "Turn any GitHub repository into a remote MCP endpoint"
 msgstr "任意の GitHub リポジトリをリモート MCP エンドポイントに変換"
 
-#: src/features/home/components/daily-brief-offer.tsx:115
+#: src/features/home/components/daily-brief-offer.tsx:135
 msgid "Turn it on"
 msgstr "オンにする"
 
@@ -35625,7 +35625,7 @@ msgstr ""
 msgid "Untitled"
 msgstr "無題"
 
-#: src/features/home/components/home-page.tsx:251
+#: src/features/home/components/home-page.tsx:254
 msgid "Untitled chat"
 msgstr "無題のチャット"
 
@@ -37080,14 +37080,14 @@ msgid "Waiting for your answer"
 msgstr "あなたの回答を待っています"
 
 #. placeholder {0}: approval.threadTitle
-#: src/features/home/components/home-page.tsx:168
+#: src/features/home/components/home-page.tsx:171
 msgid "Waiting for your answer in {0}"
 msgstr "{0} であなたの回答を待っています"
 
 #: src/features/chat/thread-list/thread-node.tsx:617
 #: src/features/chat/thread-list/thread-node.tsx:624
 #: src/features/chat/thread/tool-approval.tsx:78
-#: src/features/home/components/home-page.tsx:115
+#: src/features/home/components/home-page.tsx:116
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:57
 msgid "Waiting for your approval"
@@ -37349,7 +37349,7 @@ msgstr "キャンバス機能とは？"
 msgid "What it evaluates"
 msgstr "評価対象"
 
-#: src/features/home/components/home-page.tsx:129
+#: src/features/home/components/home-page.tsx:131
 msgid "What needs you, what's running, and where you left off."
 msgstr "対応が必要なこと、実行中のこと、前回の続き。"
 
@@ -38295,11 +38295,11 @@ msgstr "メッセージを読み込めませんでした。メッセージは残
 msgid "Your organization does not allow agents on your computer."
 msgstr ""
 
-#: src/features/home/components/daily-brief-offer.tsx:80
+#: src/features/home/components/daily-brief-offer.tsx:96
 msgid "Your organization manages the Daily Brief."
 msgstr "Daily Brief は組織によって管理されています。"
 
-#: src/features/home/components/home-page.tsx:142
+#: src/features/home/components/home-page.tsx:144
 msgid "Your overview could not be loaded."
 msgstr "概要を読み込めませんでした。"
 

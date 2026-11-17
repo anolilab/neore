@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import schema from "../schema";
 import { dismissDailyBriefOffer, setDailyBriefEnabled } from "../notifications/daily-brief";
-import { BRIEF_OFFER_MIN_THREADS, getHomeOverview } from "./overview";
+import { BRIEF_OFFER_MIN_THREADS, getHomeOverview, loadHomeOverview } from "./overview";
 
 const { activeOrganization, anonymous, sessionFrom } = vi.hoisted(() => {
     const active = { id: null as string | null };
@@ -335,6 +335,27 @@ describe("the one-time Daily Brief offer", () => {
         });
 
         expect(await offered()).toBe(false);
+    });
+
+    it("reads the organization's policy from the primary, so a default or lock an admin just set holds", async () => {
+        await seedThreads(BRIEF_OFFER_MIN_THREADS);
+
+        const reads: unknown[] = [];
+
+        await harness.run(async (ctx: any) => {
+            const policies = {
+                findFirst: async (options: unknown) => {
+                    reads.push(options);
+
+                    return null;
+                },
+            };
+            const db = new Proxy(ctx.db, { get: (target, key) => (key === "organizationPolicies" ? policies : Reflect.get(target, key, target)) });
+
+            await loadHomeOverview({ db } as never, USER, { organizationId: "org-1" });
+        });
+
+        expect(reads).toStrictEqual([{ consistency: "primary", where: { organizationId: "org-1" } }]);
     });
 
     it('"Turn it on" enables it and says when the first brief arrives', async () => {

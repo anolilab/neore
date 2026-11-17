@@ -688,7 +688,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} outils : {1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:219
+#: src/features/home/components/home-page.tsx:222
 msgid "{0} unread"
 msgstr "{0} non lues"
 
@@ -1750,7 +1750,7 @@ msgstr ""
 msgid "a change is waiting to be read"
 msgstr "une modification attend d’être lue"
 
-#: src/features/home/components/home-page.tsx:168
+#: src/features/home/components/home-page.tsx:171
 msgid "A chat is waiting for your answer"
 msgstr "Une discussion attend votre réponse"
 
@@ -3184,7 +3184,7 @@ msgstr "Toutes les catégories"
 msgid "All changes saved"
 msgstr "Toutes les modifications sont enregistrées"
 
-#: src/features/home/components/home-page.tsx:239
+#: src/features/home/components/home-page.tsx:242
 msgid "All chats"
 msgstr "Toutes les discussions"
 
@@ -4126,7 +4126,7 @@ msgstr "Poser une question annexe sans interrompre la réponse"
 msgid "Ask all models anything..."
 msgstr "Demandez n’importe quoi à tous les modèles..."
 
-#: src/features/home/components/home-page.tsx:93
+#: src/features/home/components/home-page.tsx:94
 msgid "Ask anything to start a new chat…"
 msgstr "Posez une question pour démarrer une discussion…"
 
@@ -5836,7 +5836,7 @@ msgstr "Variation (points)"
 msgid "Change colors"
 msgstr "Changer les couleurs"
 
-#: src/features/home/components/daily-brief-offer.tsx:98
+#: src/features/home/components/daily-brief-offer.tsx:118
 msgid "Change it in settings"
 msgstr "Le modifier dans les paramètres"
 
@@ -8662,7 +8662,7 @@ msgstr "Impossible d’enregistrer le résumé, donc rien n’a été envoyé. R
 msgid "Could not save this. Try again."
 msgstr "Impossible d’enregistrer ceci. Réessayez."
 
-#: src/features/home/components/daily-brief-offer.tsx:82
+#: src/features/home/components/daily-brief-offer.tsx:98
 msgid "Could not save your answer. Try again."
 msgstr "Impossible d’enregistrer ta réponse. Réessaie."
 
@@ -8742,7 +8742,7 @@ msgstr "Impossible de changer de modèle. Veuillez réessayer."
 #~ msgid "Could not turn on the Daily Brief."
 #~ msgstr "Impossible d'activer le Daily Brief."
 
-#: src/features/home/components/daily-brief-offer.tsx:80
+#: src/features/home/components/daily-brief-offer.tsx:96
 msgid "Could not turn on the Daily Brief. Try again."
 msgstr "Impossible d’activer le Daily Brief. Réessaie."
 
@@ -9386,7 +9386,7 @@ msgstr "Tchèque (République tchèque)"
 msgid "Czech Republic"
 msgstr "République tchèque"
 
-#: src/features/home/components/daily-brief-offer.tsx:89
+#: src/features/home/components/daily-brief-offer.tsx:105
 #: src/features/notifications/components/notification-settings.tsx:224
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:57
 msgid "Daily Brief"
@@ -9396,12 +9396,12 @@ msgstr "Daily Brief"
 #~ msgid "Daily Brief is on. It arrives each morning."
 #~ msgstr ""
 
-#: src/features/home/components/daily-brief-offer.tsx:74
+#: src/features/home/components/daily-brief-offer.tsx:90
 msgid "Daily Brief is on. It comes in the morning when there is something to report."
 msgstr "Le Daily Brief est activé. Il arrive le matin quand il y a quelque chose à signaler."
 
 #. placeholder {0}: formatArrival(current.scheduled, i18n.locale)
-#: src/features/home/components/daily-brief-offer.tsx:73
+#: src/features/home/components/daily-brief-offer.tsx:89
 msgid "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
 msgstr "Le Daily Brief est activé. Le prochain est prévu pour {0} ; un matin sans rien à signaler, aucun n’est envoyé."
 
@@ -15309,7 +15309,7 @@ msgstr "Allemagne"
 #~ msgid "Get a short summary each morning of what finished, what needs you and what is still running."
 #~ msgstr ""
 
-#: src/features/home/components/daily-brief-offer.tsx:106
+#: src/features/home/components/daily-brief-offer.tsx:126
 msgid "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
 msgstr "Reçois chaque matin un court résumé de ce qui est terminé, de ce qui t’attend et de ce qui est encore en cours. Cela compte dans ton utilisation quotidienne."
 
@@ -16371,7 +16371,7 @@ msgid "HLS playback is not supported in this browser."
 msgstr "La lecture HLS n’est pas prise en charge par ce navigateur."
 
 #: src/components/error-boundaries/route-error-boundary.tsx:118
-#: src/features/home/components/home-page.tsx:128
+#: src/features/home/components/home-page.tsx:130
 #: src/features/layout/components/sidebar-shortcut.tsx:71
 #: src/features/layout/lib/dashboard-page-names.ts:24
 msgid "Home"
@@ -19025,7 +19025,7 @@ msgstr "Chargement de vos éléments…"
 msgid "Loading your messages…"
 msgstr "Chargement de vos messages…"
 
-#: src/features/home/components/home-page.tsx:136
+#: src/features/home/components/home-page.tsx:138
 msgid "Loading your overview…"
 msgstr "Chargement de votre aperçu…"
 
@@ -21117,7 +21117,7 @@ msgid "Needs review"
 msgstr "À vérifier"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
-#: src/features/home/components/home-page.tsx:161
+#: src/features/home/components/home-page.tsx:164
 msgid "Needs you"
 msgstr "Vous attend"
 
@@ -21678,7 +21678,7 @@ msgstr "Aucune caméra sélectionnée"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "Aucun cas pour l’instant. Ajoutez-en un à la main, importez un fichier CSV ou JSONL, ou enregistrez un échange du chat avec « Enregistrer comme cas d’évaluation »."
 
-#: src/features/home/components/home-page.tsx:246
+#: src/features/home/components/home-page.tsx:249
 msgid "No chats yet. Start one above."
 msgstr "Aucune discussion pour l'instant. Commencez-en une ci-dessus."
 
@@ -22224,7 +22224,7 @@ msgstr "Aucun outil."
 msgid "No triggers yet"
 msgstr "Aucun déclencheur pour l’instant"
 
-#: src/features/home/components/home-page.tsx:226
+#: src/features/home/components/home-page.tsx:229
 msgid "No unread notifications."
 msgstr "Aucune notification non lue."
 
@@ -22420,7 +22420,7 @@ msgstr "non mesuré"
 msgid "Not merged"
 msgstr "Non fusionné"
 
-#: src/features/home/components/daily-brief-offer.tsx:118
+#: src/features/home/components/daily-brief-offer.tsx:138
 msgid "Not now"
 msgstr "Pas maintenant"
 
@@ -22500,7 +22500,7 @@ msgstr "Rien ici."
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "Rien n’écoute à cette adresse. Démarrez le serveur d’Ollama ou de LM Studio, vérifiez le port et assurez-vous que l’URL se termine par /v1."
 
-#: src/features/home/components/home-page.tsx:182
+#: src/features/home/components/home-page.tsx:185
 msgid "Nothing is running right now."
 msgstr "Rien ne tourne pour le moment."
 
@@ -22508,7 +22508,7 @@ msgstr "Rien ne tourne pour le moment."
 msgid "Nothing is saved, installed or enabled until you choose to save."
 msgstr "Rien n’est enregistré, installé ni activé tant que vous n’avez pas choisi d’enregistrer."
 
-#: src/features/home/components/home-page.tsx:163
+#: src/features/home/components/home-page.tsx:166
 msgid "Nothing is waiting on you."
 msgstr "Rien ne vous attend."
 
@@ -22524,7 +22524,7 @@ msgstr "Notification"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "Workflows de notification, canaux et préférences des destinataires"
 
-#: src/features/home/components/home-page.tsx:223
+#: src/features/home/components/home-page.tsx:226
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:199
@@ -22688,7 +22688,7 @@ msgstr "Décalage : 0x{hoveredOffsetHex} ({hoveredByte}) = 0x{hoveredValueHex} (
 msgid "Oil Painting"
 msgstr "Peinture à l’huile"
 
-#: src/features/home/components/daily-brief-offer.tsx:69
+#: src/features/home/components/daily-brief-offer.tsx:85
 msgid "Okay, we won't ask again. You can turn it on any time in settings."
 msgstr "D’accord, nous ne demanderons plus. Tu peux l’activer à tout moment dans les paramètres."
 
@@ -23199,7 +23199,7 @@ msgid "Open search"
 msgstr "Ouvrir la recherche"
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:203
-#: src/features/home/components/daily-brief-offer.tsx:98
+#: src/features/home/components/daily-brief-offer.tsx:118
 msgid "Open settings"
 msgstr "Ouvrir les paramètres"
 
@@ -25991,9 +25991,9 @@ msgstr "Mettre le message en file d’attente"
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Mettre le message en file d’attente — envoi à la fin de la réponse en cours"
 
-#: src/features/home/components/home-page.tsx:112
-#: src/features/home/components/home-page.tsx:186
-#: src/features/home/components/home-page.tsx:194
+#: src/features/home/components/home-page.tsx:113
+#: src/features/home/components/home-page.tsx:189
+#: src/features/home/components/home-page.tsx:197
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
 #: src/features/sub-agents/components/worker-list.tsx:83
 #: src/features/sub-agents/components/worker-run-log.tsx:29
@@ -26485,7 +26485,7 @@ msgstr "Rebaser et fusionner"
 msgid "Recent"
 msgstr "Récents"
 
-#: src/features/home/components/home-page.tsx:243
+#: src/features/home/components/home-page.tsx:246
 msgid "Recent chats"
 msgstr "Discussions récentes"
 
@@ -27696,7 +27696,7 @@ msgstr "Réessayer avec une note"
 msgid "Retrying now"
 msgstr "Nouvelle tentative en cours"
 
-#: src/features/home/components/home-page.tsx:152
+#: src/features/home/components/home-page.tsx:154
 msgid "Retrying…"
 msgstr "Nouvelle tentative…"
 
@@ -27771,7 +27771,7 @@ msgid "Review submitted"
 msgstr "Revue envoyée"
 
 #. placeholder {0}: task.title
-#: src/features/home/components/home-page.tsx:173
+#: src/features/home/components/home-page.tsx:176
 msgid "Review task: {0}"
 msgstr "Examiner la tâche : {0}"
 
@@ -28100,10 +28100,10 @@ msgstr "Exécutez votre workflow pour voir l’historique d’exécution ici."
 
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
-#: src/features/home/components/home-page.tsx:115
-#: src/features/home/components/home-page.tsx:180
-#: src/features/home/components/home-page.tsx:186
-#: src/features/home/components/home-page.tsx:194
+#: src/features/home/components/home-page.tsx:116
+#: src/features/home/components/home-page.tsx:183
+#: src/features/home/components/home-page.tsx:189
+#: src/features/home/components/home-page.tsx:197
 #: src/features/settings/components/chat/trigger-settings.tsx:184
 #: src/features/tasks/components/task-detail-dialog.tsx:138
 #: src/features/tasks/components/task-status.tsx:20
@@ -30843,7 +30843,7 @@ msgstr "Démarrez une conversation pour épingler des messages."
 msgid "Start a conversation, generate images, write a document in canvas, run code — no tab-switching, no copy-pasting between apps."
 msgstr "Démarrez une conversation, générez des images, rédigez un document dans le canevas, exécutez du code — sans changer d’onglet ni copier-coller entre les applications."
 
-#: src/features/home/components/home-page.tsx:82
+#: src/features/home/components/home-page.tsx:83
 msgid "Start a new chat"
 msgstr "Démarrer une nouvelle discussion"
 
@@ -30873,7 +30873,7 @@ msgstr "Démarrer une nouvelle conversation temporaire ({0})"
 msgid "Start building"
 msgstr "Commencer à créer"
 
-#: src/features/home/components/home-page.tsx:96
+#: src/features/home/components/home-page.tsx:97
 msgid "Start chat"
 msgstr "Démarrer la discussion"
 
@@ -35053,7 +35053,7 @@ msgstr "Essayez d’ajuster vos termes de recherche."
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
 #: src/features/develop/components/thread-pull-requests.tsx:169
-#: src/features/home/components/home-page.tsx:152
+#: src/features/home/components/home-page.tsx:154
 #: src/features/projects/components/project-repo-picker.tsx:190
 #: src/features/projects/components/project-repo-picker.tsx:198
 #: src/features/projects/components/project-repositories.tsx:297
@@ -35134,7 +35134,7 @@ msgstr "Turc (Turquie)"
 msgid "Turn any GitHub repository into a remote MCP endpoint"
 msgstr "Transformez n’importe quel dépôt GitHub en point de terminaison MCP distant"
 
-#: src/features/home/components/daily-brief-offer.tsx:115
+#: src/features/home/components/daily-brief-offer.tsx:135
 msgid "Turn it on"
 msgstr "L’activer"
 
@@ -35625,7 +35625,7 @@ msgstr ""
 msgid "Untitled"
 msgstr "Sans titre"
 
-#: src/features/home/components/home-page.tsx:251
+#: src/features/home/components/home-page.tsx:254
 msgid "Untitled chat"
 msgstr "Discussion sans titre"
 
@@ -37080,14 +37080,14 @@ msgid "Waiting for your answer"
 msgstr "En attente de votre réponse"
 
 #. placeholder {0}: approval.threadTitle
-#: src/features/home/components/home-page.tsx:168
+#: src/features/home/components/home-page.tsx:171
 msgid "Waiting for your answer in {0}"
 msgstr "En attente de votre réponse dans {0}"
 
 #: src/features/chat/thread-list/thread-node.tsx:617
 #: src/features/chat/thread-list/thread-node.tsx:624
 #: src/features/chat/thread/tool-approval.tsx:78
-#: src/features/home/components/home-page.tsx:115
+#: src/features/home/components/home-page.tsx:116
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:57
 msgid "Waiting for your approval"
@@ -37349,7 +37349,7 @@ msgstr "Qu’est-ce que la fonctionnalité Canevas ?"
 msgid "What it evaluates"
 msgstr "Ce qui est évalué"
 
-#: src/features/home/components/home-page.tsx:129
+#: src/features/home/components/home-page.tsx:131
 msgid "What needs you, what's running, and where you left off."
 msgstr "Ce qui vous attend, ce qui tourne et où vous en étiez."
 
@@ -38295,11 +38295,11 @@ msgstr "Vos messages n’ont pas pu être chargés. Ils sont toujours là ; rée
 msgid "Your organization does not allow agents on your computer."
 msgstr ""
 
-#: src/features/home/components/daily-brief-offer.tsx:80
+#: src/features/home/components/daily-brief-offer.tsx:96
 msgid "Your organization manages the Daily Brief."
 msgstr "Ton organisation gère le Daily Brief."
 
-#: src/features/home/components/home-page.tsx:142
+#: src/features/home/components/home-page.tsx:144
 msgid "Your overview could not be loaded."
 msgstr "Votre aperçu n’a pas pu être chargé."
 

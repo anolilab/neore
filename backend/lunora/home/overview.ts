@@ -131,7 +131,8 @@ const shouldOfferBrief = async (
         return true;
     }
 
-    const row = await ctx.db.organizationPolicies.findFirst({ where: { organizationId } });
+    // From the primary, as `auth/lib/permission-cap-read.ts`: a regional replica can still miss the default or lock an admin just set.
+    const row = await ctx.db.organizationPolicies.findFirst({ consistency: "primary", where: { organizationId } });
     const state = readPolicyState(row?.document);
 
     // An unreadable policy fails closed, as the write would.

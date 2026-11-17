@@ -107,7 +107,11 @@ const DailyBriefOffer: FC<{ offered: boolean }> = ({ offered }) => {
             <div role="status">
                 {outcome && (
                     <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-                        <p className="outline-none" ref={messageRef} tabIndex={-1}>
+                        <p
+                            className="focus-visible:outline-ring rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+                            ref={messageRef}
+                            tabIndex={-1}
+                        >
                             {confirmation(outcome)}
                         </p>
                         <Link className="text-primary-text text-xs font-medium hover:underline" hash="daily-brief" to="/dashboard/settings/auth/account">
