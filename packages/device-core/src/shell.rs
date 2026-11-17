@@ -4,7 +4,7 @@
 //! (only when the user allowed unsandboxed commands) the approval prompt is the
 //! only control.
 
-use std::io::Read;
+use std::io::{self, Read};
 #[cfg(unix)]
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
@@ -30,20 +30,9 @@ const READER_GRACE: Duration = Duration::from_millis(500);
 /// How long a unix reader waits for output before it checks whether it was told to stop.
 const READER_POLL: Duration = Duration::from_millis(50);
 
-/// Reads a stream to the end (so the child never blocks on a full pipe) and
-/// keeps at most `cap` bytes of it. On unix the read waits in short slices, so
-/// the reader sees `stop` even while a detached child still holds the pipe open.
-#[cfg(unix)]
-fn drain(
-    stream: impl Read + AsRawFd + Send + 'static,
-    buffer: Arc<Mutex<(Vec<u8>, bool)>>,
-    cap: usize,
-    stop: Arc<AtomicBool>,
-) -> thread::JoinHandle<()> {
-    drain_with(stream, buffer, cap, stop, store)
-}
-
-/// [`drain`], keeping what `keep` keeps of each chunk: the head (`store`) or the tail (`store_tail`).
+/// Reads a stream to the end (so the child never blocks on a full pipe), keeping at most `cap` bytes of it: the head
+/// (`store`) or the tail (`store_tail`). On unix the read waits in short slices, so the reader sees `stop` even while a
+/// detached child still holds the pipe open.
 #[cfg(unix)]
 fn drain_with(
     mut stream: impl Read + AsRawFd + Send + 'static,
@@ -51,8 +40,8 @@ fn drain_with(
     cap: usize,
     stop: Arc<AtomicBool>,
     keep: Keep,
-) -> thread::JoinHandle<()> {
-    thread::spawn(move || {
+) -> io::Result<thread::JoinHandle<()>> {
+    thread::Builder::new().spawn(move || {
         let mut chunk = [0u8; 8192];
 
         while !stop.load(Ordering::Relaxed) {
@@ -86,24 +75,14 @@ fn drain_with(
 }
 
 #[cfg(not(unix))]
-fn drain(
-    stream: impl Read + Send + 'static,
-    buffer: Arc<Mutex<(Vec<u8>, bool)>>,
-    cap: usize,
-    stop: Arc<AtomicBool>,
-) -> thread::JoinHandle<()> {
-    drain_with(stream, buffer, cap, stop, store)
-}
-
-#[cfg(not(unix))]
 fn drain_with(
     mut stream: impl Read + Send + 'static,
     buffer: Arc<Mutex<(Vec<u8>, bool)>>,
     cap: usize,
     _stop: Arc<AtomicBool>,
     keep: Keep,
-) -> thread::JoinHandle<()> {
-    thread::spawn(move || {
+) -> io::Result<thread::JoinHandle<()>> {
+    thread::Builder::new().spawn(move || {
         let mut chunk = [0u8; 8192];
 
         while let Ok(read) = stream.read(&mut chunk) {
@@ -788,7 +767,7 @@ fn spawn(
 
 /// Waits out the readers of a command that ended: up to [`READER_GRACE`], since a background child can inherit stdout
 /// and hold the pipe open after the shell exits. Readers still open see `stop` within one poll slice and exit.
-fn finish_readers(readers: [thread::JoinHandle<()>; 2], stop: &AtomicBool) {
+fn finish_readers<const N: usize>(readers: [thread::JoinHandle<()>; N], stop: &AtomicBool) {
     let deadline = Instant::now() + READER_GRACE;
 
     for reader in &readers {
@@ -814,6 +793,47 @@ fn finish_readers(readers: [thread::JoinHandle<()>; 2], stop: &AtomicBool) {
     }
 }
 
+/// Ends a command whose reader or watcher thread could not start, the way an ended one is: its tree is killed, the group
+/// released, the shell reaped and the readers that did start stopped, so nothing is left running.
+fn abandon<const N: usize>(
+    spawned: &mut Spawned,
+    readers: [thread::JoinHandle<()>; N],
+    stop: &AtomicBool,
+) {
+    kill_tree(&mut spawned.child);
+    #[cfg(unix)]
+    drop(spawned.tracked.take());
+    let _ = spawned.child.wait();
+    finish_readers(readers, stop);
+}
+
+/// Starts the readers of a spawned command's stdout and stderr. When one cannot start, the command is ended first.
+fn read_output(
+    spawned: &mut Spawned,
+    buffer: &Arc<Mutex<(Vec<u8>, bool)>>,
+    cap: usize,
+    stop: &Arc<AtomicBool>,
+    keep: Keep,
+) -> Result<[thread::JoinHandle<()>; 2], String> {
+    let stdout = spawned.child.stdout.take().expect("piped");
+    let stdout = match drain_with(stdout, buffer.clone(), cap, stop.clone(), keep) {
+        Ok(reader) => reader,
+        Err(error) => {
+            abandon(spawned, [], stop);
+            return Err(format!("could not start the stdout reader: {error}"));
+        }
+    };
+    let stderr = spawned.child.stderr.take().expect("piped");
+
+    match drain_with(stderr, buffer.clone(), cap, stop.clone(), keep) {
+        Ok(stderr) => Ok([stdout, stderr]),
+        Err(error) => {
+            abandon(spawned, [stdout], stop);
+            Err(format!("could not start the stderr reader: {error}"))
+        }
+    }
+}
+
 /// Runs `line` in `cwd`. With a `sandbox` policy it runs confined or not at
 /// all: a sandbox that cannot be set up fails the call.
 pub fn run(
@@ -826,20 +846,7 @@ pub fn run(
     let mut spawned = spawn(line, cwd, sandbox, &[])?;
     let buffer = Arc::new(Mutex::new((Vec::new(), false)));
     let stop = Arc::new(AtomicBool::new(false));
-    let readers = [
-        drain(
-            spawned.child.stdout.take().expect("piped"),
-            buffer.clone(),
-            cap,
-            stop.clone(),
-        ),
-        drain(
-            spawned.child.stderr.take().expect("piped"),
-            buffer.clone(),
-            cap,
-            stop.clone(),
-        ),
-    ];
+    let readers = read_output(&mut spawned, &buffer, cap, &stop, store)?;
     let started = Instant::now();
     let mut timed_out = false;
 
@@ -998,22 +1005,7 @@ impl Terminal {
         let mut spawned = spawn(line, cwd, Some(sandbox), env)?;
         let buffer = Arc::new(Mutex::new((Vec::new(), false)));
         let stop = Arc::new(AtomicBool::new(false));
-        let readers = [
-            drain_with(
-                spawned.child.stdout.take().expect("piped"),
-                buffer.clone(),
-                cap,
-                stop.clone(),
-                store_tail,
-            ),
-            drain_with(
-                spawned.child.stderr.take().expect("piped"),
-                buffer.clone(),
-                cap,
-                stop.clone(),
-                store_tail,
-            ),
-        ];
+        let readers = read_output(&mut spawned, &buffer, cap, &stop, store_tail)?;
         let shared = Arc::new(TerminalShared {
             buffer,
             changed: std::sync::Condvar::new(),
@@ -1025,8 +1017,16 @@ impl Terminal {
             }),
         });
         let watched = Arc::clone(&shared);
-
-        thread::spawn(move || {
+        // Handed over once the watcher runs: a watcher that cannot start leaves the command here, to be ended.
+        let (hand_over, handed) = std::sync::mpsc::sync_channel::<(
+            Spawned,
+            [thread::JoinHandle<()>; 2],
+            Arc<AtomicBool>,
+        )>(1);
+        let watcher = thread::Builder::new().spawn(move || {
+            let Ok((mut spawned, readers, stop)) = handed.recv() else {
+                return;
+            };
             let started = Instant::now();
             // The leader is observed, not reaped, until its group has been signalled: an unreaped leader keeps its process group id
             // reserved, so the group signal cannot reach a process that took that id after the leader was gone.
@@ -1059,6 +1059,18 @@ impl Terminal {
             watched.state.lock().unwrap().exit = Some(exit);
             watched.changed.notify_all();
         });
+
+        if let Err(error) = watcher {
+            abandon(&mut spawned, readers, &stop);
+            return Err(format!("could not start the terminal watcher: {error}"));
+        }
+
+        if let Err(std::sync::mpsc::SendError((mut spawned, readers, stop))) =
+            hand_over.send((spawned, readers, stop))
+        {
+            abandon(&mut spawned, readers, &stop);
+            return Err("the terminal watcher stopped before it took the command".into());
+        }
 
         Ok(Terminal { shared, cap })
     }
@@ -1164,7 +1176,7 @@ mod tests {
         let (reader, writer) = std::io::pipe().expect("pipe");
         let buffer = Arc::new(Mutex::new((Vec::new(), false)));
         let stop = Arc::new(AtomicBool::new(false));
-        let handle = drain(reader, buffer, 64, stop.clone());
+        let handle = drain_with(reader, buffer, 64, stop.clone(), store).expect("reader");
 
         stop.store(true, Ordering::Relaxed);
 
