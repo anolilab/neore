@@ -32,10 +32,10 @@ export const copyMergedRunWebhooks = async (ctx: { db: unknown }, rows: Record<s
 
         const id = row._id as string;
 
-        if ((await db.get("runWebhooks", id)) !== null) {
-            await db.patch("runWebhooks", id, { userId: to });
-        } else {
+        if ((await db.get("runWebhooks", id)) === null) {
             await db.insert("runWebhooks", row, { allowExplicitId: true });
+        } else {
+            await db.patch("runWebhooks", id, { userId: to });
         }
 
         imported += 1;
