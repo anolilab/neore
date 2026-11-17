@@ -16,7 +16,8 @@ import { useState } from "react";
 import type { AdminFeedbackItem, FeedbackKind } from "../hooks/use-admin";
 import { useAdminFeedback } from "../hooks/use-admin";
 
-const PAGE_SIZE = 20;
+/** One page of the list; the route loader preloads the first with the same size. */
+export const FEEDBACK_PAGE_SIZE = 20;
 
 const KIND_LABELS: Record<FeedbackKind, MessageDescriptor> = {
     idea: msg`Idea`,
@@ -44,8 +45,9 @@ const FeedbackRow = ({ item }: { item: AdminFeedbackItem }) => {
                     <AvatarFallback name={senderName}>{senderName.slice(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="flex min-w-0 flex-col">
-                    <span className="truncate font-medium">{sender.name || t`No name`}</span>
-                    <span className="text-muted-foreground truncate text-sm">{sender.email ?? t`Deleted user`}</span>
+                    {/* No email means no user row: the account is gone, and only its id is left to show. */}
+                    <span className="truncate font-medium">{sender.email === null ? t`Deleted user` : sender.name || t`No name`}</span>
+                    <span className="text-muted-foreground truncate text-sm">{sender.email ?? sender.userId}</span>
                 </div>
                 <Badge variant={KIND_VARIANTS[item.kind]}>{i18n._(KIND_LABELS[item.kind])}</Badge>
                 <time className="text-muted-foreground text-xs" dateTime={new Date(item.createdAt).toISOString()}>
@@ -103,7 +105,7 @@ const FeedbackAdminPage = () => {
     const [cursors, setCursors] = useState<(string | null)[]>([null]);
     const cursor = cursors.at(-1) ?? null;
 
-    const { data, isError, isPending } = useAdminFeedback({ cursor, kind: kind === "all" ? undefined : kind, limit: PAGE_SIZE });
+    const { data, isError, isPending } = useAdminFeedback({ cursor, kind: kind === "all" ? undefined : kind, limit: FEEDBACK_PAGE_SIZE });
 
     const changeKind = (value: FeedbackKind | "all") => {
         setKind(value);
@@ -130,7 +132,7 @@ const FeedbackAdminPage = () => {
             </p>
         );
     } else if (data.page.length === 0) {
-        body = <p className="text-muted-foreground py-8 text-center">{t`No feedback yet`}</p>;
+        body = <p className="text-muted-foreground py-8 text-center">{kind === "all" ? t`No feedback yet` : t`No feedback of this kind`}</p>;
     } else {
         body = (
             <ul aria-label={t`Feedback`} className="space-y-4">

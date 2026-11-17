@@ -3217,7 +3217,7 @@ msgstr "Tutte le icone"
 msgid "All installers"
 msgstr "Tutti i programmi di installazione"
 
-#: src/features/admin/components/feedback-admin-page.tsx:160
+#: src/features/admin/components/feedback-admin-page.tsx:162
 msgid "All kinds"
 msgstr ""
 
@@ -4219,7 +4219,7 @@ msgstr "Immagine allegata"
 #~ msgid "Attached image {0}"
 #~ msgstr ""
 
-#: src/features/admin/components/feedback-admin-page.tsx:67
+#: src/features/admin/components/feedback-admin-page.tsx:69
 msgid "Attached images"
 msgstr ""
 
@@ -10124,7 +10124,7 @@ msgstr "Elimina con i file"
 msgid "Deleted {0, plural, one {# prompt} other {# prompts}}"
 msgstr "{0, plural, one {# prompt eliminato} other {# prompt eliminati}}"
 
-#: src/features/admin/components/feedback-admin-page.tsx:48
+#: src/features/admin/components/feedback-admin-page.tsx:49
 msgid "Deleted user"
 msgstr ""
 
@@ -14133,18 +14133,18 @@ msgstr "Funzionalità: {0}"
 msgid "Feed image"
 msgstr "Immagine per il feed"
 
-#: src/features/admin/components/feedback-admin-page.tsx:136
-#: src/features/admin/components/feedback-admin-page.tsx:151
+#: src/features/admin/components/feedback-admin-page.tsx:138
+#: src/features/admin/components/feedback-admin-page.tsx:153
 #: src/routes/admin/route.tsx:39
 #: src/routes/admin/route.tsx:59
 msgid "Feedback"
 msgstr ""
 
-#: src/features/admin/components/feedback-admin-page.tsx:129
+#: src/features/admin/components/feedback-admin-page.tsx:131
 msgid "Feedback could not be loaded."
 msgstr ""
 
-#: src/features/admin/components/feedback-admin-page.tsx:172
+#: src/features/admin/components/feedback-admin-page.tsx:174
 msgid "Feedback pages"
 msgstr ""
 
@@ -14311,8 +14311,8 @@ msgstr "Filmmaker che creano video cinematografici con una forte attenzione alla
 msgid "Filter by action"
 msgstr "Filtra per azione"
 
-#: src/features/admin/components/feedback-admin-page.tsx:156
-#: src/features/admin/components/feedback-admin-page.tsx:157
+#: src/features/admin/components/feedback-admin-page.tsx:158
+#: src/features/admin/components/feedback-admin-page.tsx:159
 msgid "Filter by kind"
 msgstr ""
 
@@ -16599,7 +16599,7 @@ msgstr "Icona"
 msgid "Icon URL (Optional)"
 msgstr "URL dell'icona (facoltativo)"
 
-#: src/features/admin/components/feedback-admin-page.tsx:22
+#: src/features/admin/components/feedback-admin-page.tsx:23
 #: src/features/feedback/components/send-feedback-dialog.tsx:28
 msgid "Idea"
 msgstr ""
@@ -16612,7 +16612,7 @@ msgstr "Dall'idea al risultato finale, in una sola conversazione"
 msgid "Ideal for simple classification and extraction"
 msgstr "Ideale per classificazioni ed estrazioni semplici"
 
-#: src/features/admin/components/feedback-admin-page.tsx:161
+#: src/features/admin/components/feedback-admin-page.tsx:163
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:69
 msgid "Ideas"
 msgstr "Idee"
@@ -16681,11 +16681,11 @@ msgstr "illustrazione"
 msgid "Image"
 msgstr "Immagine"
 
-#: src/features/admin/components/feedback-admin-page.tsx:82
+#: src/features/admin/components/feedback-admin-page.tsx:84
 msgid "Image {position} could not be loaded"
 msgstr ""
 
-#: src/features/admin/components/feedback-admin-page.tsx:70
+#: src/features/admin/components/feedback-admin-page.tsx:72
 msgid "Image {position} from {senderName}"
 msgstr ""
 
@@ -18895,7 +18895,7 @@ msgstr "Caricamento dell'editor..."
 msgid "Loading editor…"
 msgstr "Caricamento dell'editor…"
 
-#: src/features/admin/components/feedback-admin-page.tsx:117
+#: src/features/admin/components/feedback-admin-page.tsx:119
 msgid "Loading feedback"
 msgstr ""
 
@@ -21528,7 +21528,7 @@ msgstr "Nuove registrazioni di utenti al giorno"
 msgid "New Workflow"
 msgstr "Nuovo workflow"
 
-#: src/features/admin/components/feedback-admin-page.tsx:175
+#: src/features/admin/components/feedback-admin-page.tsx:177
 msgid "Newer"
 msgstr ""
 
@@ -21853,7 +21853,11 @@ msgstr "Nessuna scadenza"
 msgid "No failures in the checks shown."
 msgstr "Nessun errore nei controlli mostrati."
 
-#: src/features/admin/components/feedback-admin-page.tsx:133
+#: src/features/admin/components/feedback-admin-page.tsx:135
+msgid "No feedback of this kind"
+msgstr ""
+
+#: src/features/admin/components/feedback-admin-page.tsx:135
 msgid "No feedback yet"
 msgstr ""
 
@@ -21988,7 +21992,7 @@ msgid "No models installed yet."
 msgstr "Ancora nessun modello installato."
 
 #: src/features/admin/components/admin-dashboard-stats.tsx:246
-#: src/features/admin/components/feedback-admin-page.tsx:47
+#: src/features/admin/components/feedback-admin-page.tsx:49
 #: src/features/admin/components/user-cell.tsx:72
 msgid "No name"
 msgstr "Nessun nome"
@@ -22760,7 +22764,7 @@ msgid "old lines {text}"
 msgstr "vecchie righe {text}"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:45
-#: src/features/admin/components/feedback-admin-page.tsx:187
+#: src/features/admin/components/feedback-admin-page.tsx:189
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:643
 msgid "Older"
 msgstr "Meno recenti"
@@ -23915,8 +23919,8 @@ msgid "Original system prompt"
 msgstr "Prompt di sistema originale"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:171
-#: src/features/admin/components/feedback-admin-page.tsx:23
-#: src/features/admin/components/feedback-admin-page.tsx:163
+#: src/features/admin/components/feedback-admin-page.tsx:24
+#: src/features/admin/components/feedback-admin-page.tsx:165
 #: src/features/feedback/components/send-feedback-dialog.tsx:30
 #: src/features/settings/components/chat/models-settings.tsx:521
 msgid "Other"
@@ -25481,12 +25485,12 @@ msgstr "Pro è il tuo piano personale: tutti i modelli e 1.000 messaggi al giorn
 msgid "Pro models need a Pro plan. On a free plan the run stops before it starts."
 msgstr "I modelli Pro richiedono un piano Pro. Con un piano gratuito l’esecuzione si ferma prima di iniziare."
 
-#: src/features/admin/components/feedback-admin-page.tsx:24
+#: src/features/admin/components/feedback-admin-page.tsx:25
 #: src/features/feedback/components/send-feedback-dialog.tsx:29
 msgid "Problem"
 msgstr ""
 
-#: src/features/admin/components/feedback-admin-page.tsx:162
+#: src/features/admin/components/feedback-admin-page.tsx:164
 msgid "Problems"
 msgstr ""
 
@@ -29366,7 +29370,7 @@ msgstr "Inviato da te"
 #~ msgstr ""
 
 #. placeholder {0}: item.pagePath
-#: src/features/admin/components/feedback-admin-page.tsx:60
+#: src/features/admin/components/feedback-admin-page.tsx:62
 msgid "Sent from <0>{0}</0>"
 msgstr ""
 
@@ -37481,7 +37485,7 @@ msgstr "Cosa inviare e come distinguere una risposta buona da una cattiva."
 msgid "What to watch"
 msgstr "Cosa monitorare"
 
-#: src/features/admin/components/feedback-admin-page.tsx:152
+#: src/features/admin/components/feedback-admin-page.tsx:154
 msgid "What users sent from the app, newest first"
 msgstr ""
 

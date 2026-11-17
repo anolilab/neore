@@ -32,12 +32,24 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     };
 });
 
+// The harness binds no storage: signing is faked, and a key containing "unsignable" fails as a real signer can.
+const trySign = vi.hoisted(() =>
+    vi.fn(async (_source: unknown, key: string, expiresInSeconds: number) =>
+        key.includes("unsignable") ? null : `https://files.example/${key}?exp=${String(expiresInSeconds)}`,
+    ),
+);
+
+vi.mock("../lib/storage-sign", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("../lib/storage-sign")>()), trySign };
+});
+
 const { listFeedback } = await import("./admin");
 
 type Page = {
     continueCursor: string | null;
     isDone: boolean;
     page: {
+        _id: string;
         createdAt: number;
         images: { contentType: string; url: string | null }[];
         kind: string;
@@ -122,38 +134,59 @@ describe("feedback_admin.listFeedback", () => {
         ]);
     });
 
-    it("pages through every row without repeats", async () => {
-        for (let index = 0; index < 7; index += 1) {
-            await insertFeedback(memberId, index, "idea");
-        }
-
-        const seen: number[] = [];
+    const pageAll = async (args: { kind?: string }): Promise<Page["page"]> => {
+        const seen: Page["page"] = [];
         let cursor: string | null = null;
 
         for (let guard = 0; guard < 10; guard += 1) {
-            const result: Page = await list({ cursor, limit: 3 });
+            const result: Page = await list({ ...args, cursor, limit: 3 });
 
-            seen.push(...result.page.map((row) => row.createdAt));
+            seen.push(...result.page);
 
             if (result.isDone) {
-                break;
+                return seen;
             }
 
             cursor = result.continueCursor;
         }
 
-        expect(seen).toEqual([6, 5, 4, 3, 2, 1, 0]);
+        throw new Error("paging did not finish");
+    };
+
+    it("pages through every row without repeats", async () => {
+        for (let index = 0; index < 7; index += 1) {
+            await insertFeedback(memberId, index, "idea");
+        }
+
+        const rows = await pageAll({});
+
+        expect(rows.map((row) => row.createdAt)).toEqual([6, 5, 4, 3, 2, 1, 0]);
     });
 
-    it("never returns an image's storage key", async () => {
-        await insertFeedback(memberId, 1, "problem", [`feedback/${memberId}/secret-key`]);
+    it("pages a filtered list whose rows share a time without skipping or repeating one", async () => {
+        for (let index = 0; index < 8; index += 1) {
+            await insertFeedback(memberId, 100, index % 2 === 0 ? "problem" : "idea");
+        }
+
+        const rows = await pageAll({ kind: "problem" });
+
+        expect(rows).toHaveLength(4);
+        expect(new Set(rows.map((row) => row._id)).size).toBe(4);
+        expect(rows.every((row) => row.kind === "problem")).toBe(true);
+    });
+
+    it("signs each image for display and never returns its storage key", async () => {
+        const key = `feedback/${memberId}/image-1`;
+
+        await insertFeedback(memberId, 1, "problem", [key, `feedback/${memberId}/unsignable`]);
 
         const { page } = await list({});
-        const [image] = page[0]?.images ?? [];
+        const [signed, unsigned] = page[0]?.images ?? [];
 
-        expect(image?.contentType).toBe("image/png");
-        expect(image).not.toHaveProperty("key");
-        // The harness has no storage bound, so nothing can be signed: the image is listed without a URL.
-        expect(image?.url).toBeNull();
+        expect(trySign).toHaveBeenCalledWith(expect.any(Function), key, expect.any(Number));
+        expect(signed?.url).toMatch(new RegExp(String.raw`^https://files\.example/${key}\?exp=\d+$`));
+        expect(signed).not.toHaveProperty("key");
+        // An image that cannot be signed is still listed, without a URL, rather than failing the page.
+        expect(unsigned).toEqual({ contentType: "image/png", url: null });
     });
 });
