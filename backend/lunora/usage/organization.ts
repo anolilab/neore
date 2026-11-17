@@ -117,7 +117,9 @@ const contributorBatch = async (ctx: QueryCtx, organizationId: string, after?: W
     const rows: { cohort: number; userId: string }[] = [];
 
     if (after !== undefined) {
+        // From the primary: a replica that lags a new contributor's entry would drop that member's usage from the totals.
         const { page } = await db.usageOrganizationContributors.findMany({
+            consistency: "primary",
             limit,
             orderBy: [{ userId: "asc" }],
             where: { cohort: after.cohort, organizationId, userId: { gt: after.userId } },
@@ -132,6 +134,7 @@ const contributorBatch = async (ctx: QueryCtx, organizationId: string, after?: W
 
     if (rows.length < limit) {
         const { page } = await db.usageOrganizationContributors.findMany({
+            consistency: "primary",
             limit: limit - rows.length,
             orderBy: [{ cohort: "asc" }, { userId: "asc" }],
             where: { organizationId, ...(after !== undefined && { cohort: { gt: after.cohort } }) },
