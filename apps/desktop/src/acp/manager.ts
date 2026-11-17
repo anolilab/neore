@@ -536,8 +536,14 @@ export class AcpManager {
      * The manager is being dropped with its server: nothing may start on it from now on, and what runs is killed. A start
      * that was already awaiting when this is called is refused when it resumes (`refuseStart` runs after its last wait).
      */
-    public retire(): void {
+    /** Refuses every new start from now on: a start still waiting on a closing session must not spawn once the runtime is dropped. */
+    public refuse(): void {
         this.retired = true;
+    }
+
+    /** Refuses new starts and ends everything still running: the runtime is being dropped. */
+    public retire(): void {
+        this.refuse();
         this.killAll();
     }
 

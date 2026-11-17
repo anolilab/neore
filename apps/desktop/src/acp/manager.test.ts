@@ -635,7 +635,9 @@ describe("keeping the computer awake during a turn", () => {
             expect(live.size).toBe(0);
 
             // The session is idle for the pause after the cancel: a prompt sent now waits for it, and holds the lock at once.
-            awake.send(id, "echo after");
+            const queued = awake.send(id, "echo after");
+
+            expect(queued.status).toBe("queued");
             expect(live.size).toBe(1);
 
             await expect.poll(() => awake.snapshot(id).status, { timeout: 8000 }).toBe("idle");

@@ -227,6 +227,8 @@ export class ServerAgents {
             return;
         }
 
+        // Before the first wait: a start that resumes while the sessions close must already be refused, or it spawns outside the sweep.
+        runtime.acp.refuse();
         this.removing.add(deviceId);
 
         try {
