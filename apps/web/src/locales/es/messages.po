@@ -9403,7 +9403,7 @@ msgstr "El Daily Brief está activado. Llega por la mañana cuando hay algo que 
 #. placeholder {0}: formatArrival(current.scheduled, i18n.locale)
 #: src/features/home/components/daily-brief-offer.tsx:73
 msgid "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
-msgstr "El Daily Brief está activado. El próximo está previsto para {0}; una mañana sin nada que contar no se envía."
+msgstr "El Daily Brief está activado. El próximo está previsto para {0}; cuando no hay nada que contar, no se envía ninguno."
 
 #. placeholder {0}: formatArrival(scheduled, i18n.locale)
 #: src/features/home/components/daily-brief-offer.tsx:65

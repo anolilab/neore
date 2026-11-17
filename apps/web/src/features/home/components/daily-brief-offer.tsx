@@ -6,7 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Sunrise } from "lucide-react";
 import type { FC } from "react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -30,38 +30,49 @@ const isManagedRefusal = (error: unknown): boolean => {
 /**
  * The home page's one-time Daily Brief offer. `offered` comes from the overview
  * (`dailyBriefOffer`): the user never chose on or off, never said "Not now",
- * and has a few chats. Nothing turns on without the click. After either answer
- * the overview stops offering it, but the card stays to confirm the answer
- * (focused, inside a live region that was there from the start) until the
- * user leaves the page.
+ * and has a few chats. Nothing turns on without the click. An answer's write
+ * makes the live overview stop offering it, possibly before the mutation
+ * returns, so the card stays mounted from the click on (pending counts) and
+ * confirms the answer, focused, inside a live region that was already there.
  */
 const DailyBriefOffer: FC<{ offered: boolean }> = ({ offered }) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
     const messageRef = useRef<HTMLParagraphElement>(null);
-    const [outcome, setOutcome] = useState<Outcome | null>(null);
     const enable = useMutation(crpc.notifications.daily_brief.setDailyBriefEnabled.mutationOptions());
     const dismiss = useMutation(crpc.notifications.daily_brief.dismissDailyBriefOffer.mutationOptions());
+    let outcome: Outcome | null = null;
+
+    if (enable.isSuccess) {
+        outcome = { kind: "on", scheduled: enable.data };
+    } else if (dismiss.isSuccess) {
+        outcome = { kind: "dismissed" };
+    }
+
+    const answered = outcome !== null;
 
     useEffect(() => {
-        if (outcome) {
+        if (answered) {
             messageRef.current?.focus();
         }
-    }, [outcome]);
-
-    if (!offered && !outcome) {
-        return null;
-    }
+    }, [answered]);
 
     const busy = enable.isPending || dismiss.isPending;
 
+    if (!offered && !answered && !busy) {
+        return null;
+    }
+
+    // Only the latest attempt's failure is shown.
     const turnOn = () => {
-        enable.mutate({ enabled: true }, { onSuccess: (scheduled) => setOutcome({ kind: "on", scheduled }) });
+        dismiss.reset();
+        enable.mutate({ enabled: true });
     };
 
     const notNow = () => {
-        dismiss.mutate({}, { onSuccess: () => setOutcome({ kind: "dismissed" }) });
+        enable.reset();
+        dismiss.mutate({});
     };
 
     const confirmation = (current: Outcome): string => {

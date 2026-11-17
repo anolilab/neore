@@ -70,7 +70,9 @@ const { default: DailyBriefOffer } = await import("./daily-brief-offer");
 const DISMISSED = /we won't ask again/u;
 const TURNED_ON = /Daily Brief is on/u;
 
-const mount = (offered: boolean) => render(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(DailyBriefOffer, { offered })));
+const client = new QueryClient();
+const tree = (offered: boolean) => createElement(QueryClientProvider, { client }, createElement(DailyBriefOffer, { offered }));
+const mount = (offered: boolean) => render(tree(offered));
 
 afterEach(() => {
     calls.dismiss.length = 0;
@@ -98,8 +100,14 @@ describe("daily brief offer", () => {
     });
 
     it('"Turn it on" says when the first brief arrives in the user\'s zone and links to the setting', async () => {
-        mount(true);
+        const { rerender } = mount(true);
+
         fireEvent.click(screen.getByRole("button", { name: "Turn it on" }));
+        // The live overview stops offering it as soon as the write lands, before the answer returns.
+        rerender(tree(false));
+        // The card, and its live region, stay up while the answer is in flight.
+        expect(screen.getByRole("heading", { name: "Daily Brief" })).toBeTruthy();
+        expect(screen.getByRole("status")).toBeTruthy();
 
         const confirmation = await screen.findByText(TURNED_ON);
 

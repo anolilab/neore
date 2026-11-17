@@ -8744,7 +8744,7 @@ msgstr "无法切换模型。请重试。"
 
 #: src/features/home/components/daily-brief-offer.tsx:80
 msgid "Could not turn on the Daily Brief. Try again."
-msgstr "无法开启 Daily Brief。请重试。"
+msgstr "无法开启每日简报。请重试。"
 
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:50
 msgid "Could not undo. Please try again."
@@ -9398,12 +9398,12 @@ msgstr "每日简报"
 
 #: src/features/home/components/daily-brief-offer.tsx:74
 msgid "Daily Brief is on. It comes in the morning when there is something to report."
-msgstr "Daily Brief 已开启。有内容可报告时会在早上送达。"
+msgstr "每日简报已开启。有内容可报告时会在早上送达。"
 
 #. placeholder {0}: formatArrival(current.scheduled, i18n.locale)
 #: src/features/home/components/daily-brief-offer.tsx:73
 msgid "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
-msgstr "Daily Brief 已开启。下一份计划于 {0} 送达；没有内容可报告的早上不会发送。"
+msgstr "每日简报已开启。下一份计划于 {0} 送达；没有内容可报告的早上不会发送。"
 
 #. placeholder {0}: formatArrival(scheduled, i18n.locale)
 #: src/features/home/components/daily-brief-offer.tsx:65
@@ -38297,7 +38297,7 @@ msgstr ""
 
 #: src/features/home/components/daily-brief-offer.tsx:80
 msgid "Your organization manages the Daily Brief."
-msgstr "Daily Brief 由你的组织管理。"
+msgstr "每日简报由你的组织管理。"
 
 #: src/features/home/components/home-page.tsx:142
 msgid "Your overview could not be loaded."
