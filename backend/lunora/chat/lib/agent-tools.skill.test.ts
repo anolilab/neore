@@ -357,19 +357,18 @@ describe("buildAgentTools MCP permission keys", () => {
     });
 
     it("builds a headless run under its bot's supervised mode, and no wider under full", async () => {
-        const headless = async (unattendedMode?: "full" | "supervised") =>
-            Object.keys(
-                (
-                    await buildAgentTools(fakeCtx(), {
-                        headless: true,
-                        model: "test-model",
-                        organizationId: null,
-                        searchMode: "web",
-                        ...(unattendedMode && { unattendedMode }),
-                        userId: "user",
-                    })
-                ).tools,
-            );
+        const headless = async (unattendedMode?: "full" | "supervised") => {
+            const { tools } = await buildAgentTools(fakeCtx(), {
+                headless: true,
+                model: "test-model",
+                organizationId: null,
+                searchMode: "web",
+                ...(unattendedMode && { unattendedMode }),
+                userId: "user",
+            });
+
+            return Object.keys(tools);
+        };
 
         const plain = await headless();
 

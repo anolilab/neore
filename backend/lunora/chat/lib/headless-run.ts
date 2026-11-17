@@ -268,21 +268,18 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
     const continuedThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
     const buildsTools = options.tools === "headless" && allowTools;
     // The bot's mode: stamped on a new thread of the bot, and the run's tools take it where it asks more. Read for the bot the run
-    // names, else for the bot of the thread it continues. A failed read fails closed for this run's tools, as the thread's mode does
-    // in a chat, but is not stamped: the thread would keep a mode the bot never had.
-    const botModeRead =
+    // names, else for the bot of the thread it continues. A failed read fails closed: this run's tools, and a new thread of the bot,
+    // are supervised, so a later chat there never starts wider than the bot asks; the owner can widen the thread.
+    const botMode =
         options.botId !== undefined || (buildsTools && continuedThreadId !== undefined)
             ? await ctx
                   .runQuery(internal.bots.functions.getBotPermissionModeForRun, { botId: options.botId, threadId: continuedThreadId, userId })
-                  .then((mode) => {
-                      return { mode, stamp: mode };
-                  })
                   .catch((error: unknown) => {
                       console.warn("[headless-run] bot permission mode unavailable, using supervised", error);
 
-                      return { mode: "supervised" as const, stamp: null };
+                      return "supervised" as const;
                   })
-            : { mode: null, stamp: null };
+            : null;
     const toolResult = buildsTools
         ? await buildAgentTools(ctx, {
               headless: true,
@@ -293,7 +290,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
               organizationId: options.organizationId,
               searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
               skillTools: headlessSkillTools(skill?.config, options.additionalTools, options.withheldTools),
-              ...(botModeRead.mode && { unattendedMode: botModeRead.mode }),
+              ...(botMode && { unattendedMode: botMode }),
               userId,
           })
         : {
@@ -387,8 +384,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // thread's organization, which went in with the insert above. A thread that already exists is never moved.
             if (options.botId) {
                 // The mode before the bot: a thread that names its bot always carries the bot's mode, like a chat started with it.
-                if (botModeRead.stamp) {
-                    await ctx.runMutation(internal.chat.thread_state.copyThreadPermissionMode, { mode: botModeRead.stamp, threadId });
+                if (botMode) {
+                    await ctx.runMutation(internal.chat.thread_state.copyThreadPermissionMode, { mode: botMode, threadId });
                 }
 
                 await ctx.runMutation(internal.agent.threads.updateThread, {

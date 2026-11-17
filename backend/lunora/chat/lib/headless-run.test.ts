@@ -613,7 +613,7 @@ describe("runHeadlessAgent tool allowlist", () => {
         expect(seen.buildOptions[0]).toMatchObject({ headless: true, unattendedMode: "supervised" });
     });
 
-    it("builds its tools supervised when the bot's mode cannot be read, and leaves a new thread's mode alone", async () => {
+    it("builds its tools supervised when the bot's mode cannot be read, and starts a new thread of the bot supervised", async () => {
         const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
 
         seen.botModeFails = true;
@@ -636,7 +636,9 @@ describe("runHeadlessAgent tool allowlist", () => {
         }
 
         expect(seen.buildOptions[0]).toMatchObject({ headless: true, unattendedMode: "supervised" });
-        expect(ctx.runMutation.mock.calls.some(([reference]) => reference === "chat_thread_state:copyThreadPermissionMode")).toBe(false);
+        expect(ctx.runMutation.mock.calls.find(([reference]) => reference === "chat_thread_state:copyThreadPermissionMode")?.[1]).toMatchObject({
+            mode: "supervised",
+        });
     });
 
     it("offers extra built-ins to the tool builder as candidates, headless", async () => {

@@ -18,6 +18,7 @@ import type { FC, FormEvent } from "react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
+import { useIsImpersonating } from "@/features/admin/hooks/use-admin";
 import PromptModelSelector from "@/features/prompts/components/prompt-model-selector";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -106,6 +107,9 @@ const BotsSettings = () => {
     const deleteMutation = useMutation(crpc.bots.functions.deleteBot.mutationOptions());
     const updateMutation = useMutation(crpc.bots.functions.updateBot.mutationOptions());
     const chatMutation = useMutation(crpc.chat.functions.createThread.mutationOptions());
+    // The server refuses a mode change from an admin acting as the owner.
+    const { data: impersonation } = useIsImpersonating();
+    const impersonating = impersonation?.isImpersonating === true;
 
     const [draft, setDraft] = useState<BotDraft>(emptyDraft);
     const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
@@ -210,6 +214,7 @@ const BotsSettings = () => {
                     </p>
                     <PermissionModeSelect
                         aria-describedby={modeDescriptionId}
+                        disabled={impersonating}
                         id={modeId}
                         onChange={(permissionMode) => setDraft({ ...draft, permissionMode })}
                         value={draft.permissionMode}
@@ -250,7 +255,7 @@ const BotsSettings = () => {
                             <div className="flex flex-wrap items-center gap-2">
                                 <PermissionModeSelect
                                     aria-label={t`Permission mode for ${bot.name}`}
-                                    disabled={updateMutation.isPending}
+                                    disabled={impersonating || updateMutation.isPending}
                                     onChange={(permissionMode) => handleModeChange(bot._id, permissionMode)}
                                     value={bot.permissionMode ?? DEFAULT_THREAD_PERMISSION_MODE}
                                 />

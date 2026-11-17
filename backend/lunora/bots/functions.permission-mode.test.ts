@@ -115,6 +115,16 @@ describe("a new chat with a bot", () => {
         // A bot with no mode leaves its chats on the default.
         expect(await modeOf("threads", await chatWith(await botWith()))).toBeUndefined();
     });
+
+    it("started by an admin acting as the owner never takes full from the bot, and still takes supervised", async () => {
+        const full = await botWith("full");
+        const supervised = await botWith("supervised");
+
+        impersonation.by = "admin-1";
+
+        expect(await modeOf("threads", await chatWith(full))).toBeUndefined();
+        expect(await modeOf("threads", await chatWith(supervised))).toBe("supervised");
+    });
 });
 
 describe("the bot's mode for an unattended run", () => {
