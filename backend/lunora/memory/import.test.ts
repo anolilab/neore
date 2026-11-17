@@ -390,6 +390,22 @@ describe("importing another assistant's memory", () => {
         expect(await save([{ memory: "The user ran a marathon in Porto", type: "context" }])).toStrictEqual({ added: 0, alreadyKnown: 1, updated: 0 });
     });
 
+    it("finds a repeat of the user's newest memory whatever its type", async () => {
+        expect.assertions(1);
+
+        await setMemoryEnabled(true);
+        // Five thousand older preferences sort ahead of an activity in a type-first read.
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 5000; index += 1) {
+                await ctx.db.insert("memories", { memory: `Preference number ${String(index)} of the user`, type: "preference", userId: USER });
+            }
+
+            await ctx.db.insert("memories", { memory: "The user ran a marathon in Porto", type: "activity", userId: USER });
+        });
+
+        expect(await save([{ memory: "The user ran a marathon in Porto", type: "context" }])).toStrictEqual({ added: 0, alreadyKnown: 1, updated: 0 });
+    });
+
     it("saves a paste once when two saves of it run at the same time", async () => {
         expect.assertions(1);
 

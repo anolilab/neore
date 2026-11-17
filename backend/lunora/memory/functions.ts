@@ -514,13 +514,13 @@ export const saveImportedMemoryBatch = internalMutation
             throw new LunoraError("FORBIDDEN", IMPORT_MEMORY_OFF_MESSAGE);
         }
 
-        // The user's own scope only, so a bot's rows never use up the read.
-        const own = await ctx.db
-            .query("memories")
-            .withIndex("by_userId_botId", (q) => q.eq("userId", args.userId).eq("botId", null as never))
-            .order("desc")
-            .take(IMPORT_EXACT_CHECK_ROWS);
-        const textOf = new Map(own.filter((row) => !row.supersededBy).map((row) => [row._id, importDedupKey(row.memory)]));
+        // The user's own active rows, newest first: a bot's rows and superseded history never use up the read.
+        const { page: own } = await ctx.db.memories.findMany({
+            limit: IMPORT_EXACT_CHECK_ROWS,
+            orderBy: [{ _creationTime: "desc" }],
+            where: { botId: { isNull: true }, supersededBy: { isNull: true }, userId: args.userId },
+        });
+        const textOf = new Map(own.map((row) => [row._id, importDedupKey(row.memory)]));
         const byText = new Map([...textOf].map(([memoryId, key]) => [key, memoryId]));
         const memoryIds: (Id<"memories"> | null)[] = [];
         // A superseded row is no longer a match for a later fact of this batch.
