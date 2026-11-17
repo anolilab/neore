@@ -231,6 +231,28 @@ describe("the sleep lock", () => {
         }
     });
 
+    it("logs a blocker that throws something other than an Error, and never throws into the turn", () => {
+        const messages: string[] = [];
+        const thrown: unknown = null;
+        const lock = new SleepLock(
+            {
+                isStarted: () => false,
+                start: () => {
+                    throw thrown;
+                },
+                stop: () => undefined,
+            },
+            (message) => {
+                messages.push(message);
+            },
+        );
+
+        expect(() => {
+            lock.report({}, true);
+        }).not.toThrow();
+        expect(messages).toEqual(["[keep-awake] could not hold the sleep lock: null"]);
+    });
+
     it("logs a blocker that cannot start and never throws into the turn", () => {
         const { blocker } = fakeBlocker({ failStart: true });
         const messages: string[] = [];

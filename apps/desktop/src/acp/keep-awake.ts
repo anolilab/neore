@@ -132,7 +132,9 @@ export class SleepLock {
 
     /** Logs a failed platform call, and holds further calls for the same state until the retry. */
     private fail(error: unknown, wanted: boolean): void {
-        this.log?.(`[keep-awake] could not ${wanted ? "hold" : "release"} the sleep lock: ${(error as Error).message}`);
+        const reason = error instanceof Error ? error.message : String(error);
+
+        this.log?.(`[keep-awake] could not ${wanted ? "hold" : "release"} the sleep lock: ${reason}`);
         this.failedWanted = wanted;
         this.retryLater();
     }
