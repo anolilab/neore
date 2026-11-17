@@ -104,7 +104,8 @@ export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmo
             return;
         }
 
-        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        // A shifted arrow extends the editor's text selection, so it is the editor's, not the list's.
+        if ((event.key === "ArrowDown" || event.key === "ArrowUp") && !event.shiftKey) {
             const step = event.key === "ArrowDown" ? 1 : -1;
 
             setActiveIndex((selected + step + suggestions.length) % suggestions.length);

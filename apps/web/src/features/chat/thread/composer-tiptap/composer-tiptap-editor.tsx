@@ -569,14 +569,44 @@ const ComposerTiptapEditor = ({
             return undefined;
         }
 
-        globalThis.addEventListener("scroll", updateEditorRect, { capture: true, passive: true });
-        globalThis.addEventListener("resize", updateEditorRect);
+        let frame: number | undefined;
+
+        // At most one measurement a frame, and none of the state update when the box has not moved: a scroll of the message
+        // list must not re-render the whole composer.
+        const remeasure = () => {
+            frame = undefined;
+
+            const container = editorContainerRef.current;
+
+            if (!container) {
+                return;
+            }
+
+            const rect = container.getBoundingClientRect();
+
+            setEditorRect((previous) => {
+                const moved =
+                    !previous || previous.left !== rect.left || previous.top !== rect.top || previous.width !== rect.width || previous.height !== rect.height;
+
+                return moved ? rect : previous;
+            });
+        };
+        const schedule = () => {
+            frame ??= requestAnimationFrame(remeasure);
+        };
+
+        globalThis.addEventListener("scroll", schedule, { capture: true, passive: true });
+        globalThis.addEventListener("resize", schedule);
 
         return () => {
-            globalThis.removeEventListener("scroll", updateEditorRect, { capture: true });
-            globalThis.removeEventListener("resize", updateEditorRect);
+            if (frame !== undefined) {
+                cancelAnimationFrame(frame);
+            }
+
+            globalThis.removeEventListener("scroll", schedule, { capture: true });
+            globalThis.removeEventListener("resize", schedule);
         };
-    }, [emojiOpen, updateEditorRect]);
+    }, [emojiOpen]);
 
     // The editor reads its attributes once, at creation: push a changed description, validity or open list to the live element.
     useEffect(() => {

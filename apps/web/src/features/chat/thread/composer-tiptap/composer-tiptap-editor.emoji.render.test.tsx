@@ -229,9 +229,22 @@ describe("composer emoji shortcodes", () => {
         // eslint-disable-next-line testing-library/no-node-access -- the positioned box is the element that has to move
         const box = listbox().parentElement!;
 
-        expect(box.style.left).toBe("40px");
+        // Measured once the frame that the scroll scheduled has run.
+        await waitFor(() => {
+            expect(box.style.left).toBe("40px");
+        });
         expect(box.style.top).toBe("260px");
 
         measure.mockRestore();
+    });
+
+    it("leaves a shifted arrow to the editor, so it can extend the selection", async () => {
+        const { ref } = renderEditor();
+
+        await typeText(ref, ":dog");
+        const options = await optionsOf();
+
+        expect(fireEvent.keyDown(editableWhileOpen(), { key: "ArrowDown", shiftKey: true })).toBe(true);
+        expect(options[0]!.getAttribute("aria-selected")).toBe("true");
     });
 });

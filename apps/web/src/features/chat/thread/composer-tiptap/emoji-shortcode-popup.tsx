@@ -65,7 +65,7 @@ const EmojiShortcodePopup: FC<EmojiShortcodePopupProps> = ({ editorRect, listbox
                     <button
                         aria-selected={position === selected}
                         className={clsx(
-                            "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
+                            "pointer-coarse:min-h-11 flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
                             POPUP_ROW_MOTION,
                             position === selected && "bg-accent text-accent-foreground",
                         )}
