@@ -11,7 +11,7 @@
 //! killed. The exit reports `SIGKILL` as a kill does, so a timeout is not told apart from one. A longer or configurable
 //! limit is a product decision that has not been made.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use serde_json::json;
@@ -85,6 +85,7 @@ impl DeviceState {
         let folder = validate_roots(std::slice::from_ref(&request.folder))?
             .pop()
             .ok_or("choose a folder")?;
+        let (_pinned, writable) = pin(Path::new(&folder))?;
 
         if !settings
             .acp_consents
@@ -132,7 +133,7 @@ impl DeviceState {
         let support = sandbox::support();
         // The terminal may write only in the folder the person approved for this agent, not in every shared folder: a sibling
         // under the same shared root is not the agent's. The shared roots above decided only whether the folder is eligible.
-        let agent_roots = vec![folder.clone()];
+        let agent_roots = vec![writable];
         // `allow_unsandboxed` is false whatever the setting says: where there is no sandbox this refuses.
         let policy = sandbox::policy_for_call(
             &support,
@@ -173,6 +174,35 @@ impl DeviceState {
     }
 }
 
+/// The approved folder opened once, and the path the sandbox's writable rule is built from. On Linux that path is the
+/// open descriptor's (`/proc/self/fd/N`), so a folder swapped for a symlink after the check cannot move the rule to the
+/// symlink's target, and the descriptor must still name `folder`. On macOS the Seatbelt rule matches the resolved path of
+/// each access, so a symlink in its place reaches nothing the canonical `folder` does not already cover.
+#[cfg(target_os = "linux")]
+fn pin(folder: &Path) -> Result<(Option<std::fs::File>, PathBuf), String> {
+    use std::os::fd::AsRawFd;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let changed = || "the agent's folder changed while the terminal was starting".to_owned();
+    let dir = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_PATH | libc::O_DIRECTORY)
+        .open(folder)
+        .map_err(|_| changed())?;
+    let link = PathBuf::from(format!("/proc/self/fd/{}", dir.as_raw_fd()));
+
+    if std::fs::read_link(&link).ok().as_deref() != Some(folder) {
+        return Err(changed());
+    }
+
+    Ok((Some(dir), link))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn pin(folder: &Path) -> Result<(Option<std::fs::File>, PathBuf), String> {
+    Ok((None, folder.to_path_buf()))
+}
+
 const REDACTED: &str = "[redacted]";
 /// A known value shorter than this is not searched for: it would strike ordinary characters out of the command.
 const MIN_KNOWN_SECRET_BYTES: usize = 4;
@@ -211,7 +241,7 @@ fn redact_command(line: &str, known: &[&str]) -> String {
     let mut rest = text.as_str();
 
     while !rest.is_empty() {
-        let word_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+        let word_end = word_end(rest);
         let (word, after) = rest.split_at(word_end);
         let space_end = after
             .find(|c: char| !c.is_whitespace())
@@ -276,6 +306,23 @@ fn redact_command(line: &str, known: &[&str]) -> String {
     }
 
     out
+}
+
+/// Where the first word of `text` ends: at whitespace, except a backslash-escaped one, which the shell keeps in the word.
+fn word_end(text: &str) -> usize {
+    let mut escaped = false;
+
+    for (at, c) in text.char_indices() {
+        if escaped {
+            escaped = false;
+        } else if c == '\\' {
+            escaped = true;
+        } else if c.is_whitespace() {
+            return at;
+        }
+    }
+
+    text.len()
 }
 
 /// Where the secret value starts inside one word: after `authorization:`, after `--token=` and the like, or after
@@ -475,6 +522,85 @@ mod tests {
         assert!(!sibling.join("leak.txt").exists());
     }
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_folder_swapped_for_a_symlink_after_its_check_gives_no_write_access_to_the_target() {
+        if !matches!(sandbox::support(), sandbox::Support::Available(_)) {
+            eprintln!("skipping: no sandbox here");
+            return;
+        }
+
+        let (_, project, other, _, _scratch) = setup("swap");
+        let (_pinned, writable) = pin(&project).unwrap();
+        let moved = project.with_file_name("moved");
+
+        fs::rename(&project, &moved).unwrap();
+        std::os::unix::fs::symlink(&other, &project).unwrap();
+
+        let policy = sandbox::policy_for_call(
+            &sandbox::support(),
+            false,
+            sandbox::NetworkTier::Off,
+            std::slice::from_ref(&writable),
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        let line = format!(
+            "echo kept > '{}/kept.txt'; echo leaked > '{}/leak.txt'",
+            moved.display(),
+            project.display()
+        );
+        let terminal =
+            Terminal::start(&line, &moved, &policy, &[], 1024, Duration::from_secs(20)).unwrap();
+        let exit = terminal.wait(Duration::from_secs(20)).expect("ended");
+
+        assert_ne!(exit.exit_code, Some(0), "{}", terminal.output().output);
+        assert!(moved.join("kept.txt").exists());
+        assert!(!other.join("leak.txt").exists());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn refuses_to_pin_a_path_that_no_longer_names_the_checked_folder() {
+        let (_, project, _, shared, _scratch) = setup("pin-link");
+        let link = shared.join("link");
+
+        std::os::unix::fs::symlink(&project, &link).unwrap();
+
+        assert!(pin(&link).is_err());
+        assert!(pin(&project).is_ok());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn cannot_read_the_environment_of_a_host_process() {
+        if !matches!(sandbox::support(), sandbox::Support::Available(_)) {
+            eprintln!("skipping: no sandbox here");
+            return;
+        }
+
+        let (state, project, _, _, _scratch) = setup("environ");
+        let (name, value) = std::env::vars()
+            .next()
+            .expect("the test has an environment");
+        let host = std::process::id();
+        // Its own environment stays readable: the refusal is Landlock's scoping of other processes, not a hidden `/proc`.
+        let line = format!("cat /proc/self/environ >/dev/null && cat /proc/{host}/environ");
+        let terminal = state
+            .acp_terminal_start(&request(&project, &line))
+            .unwrap_or_else(|error| panic!("the terminal did not start: {error}"));
+        let exit = terminal.wait(Duration::from_secs(20)).expect("ended");
+        let output = terminal.output().output;
+
+        assert!(
+            output.contains(&format!("/proc/{host}/environ")),
+            "{output}"
+        );
+        assert_ne!(exit.exit_code, Some(0), "{output}");
+        assert!(!output.contains(&format!("{name}={value}")), "{output}");
+    }
+
     #[test]
     fn offers_a_terminal_exactly_where_a_start_could_succeed() {
         let (state, project, _, _, _scratch) = setup("offers");
@@ -531,6 +657,31 @@ mod tests {
     }
 
     #[test]
+    fn redacts_every_part_of_a_value_with_escaped_spaces() {
+        for (line, shown) in [
+            (
+                "tool --password=two\\ words --verbose",
+                "tool --password=[redacted] --verbose",
+            ),
+            ("tool -u two\\ words x", "tool -u [redacted] x"),
+            ("GH_TOKEN=two\\ \\ words gh", "GH_TOKEN=[redacted] gh"),
+        ] {
+            let redacted = redact_command(line, &[]);
+
+            assert_eq!(redacted, shown);
+            assert!(
+                !redacted.contains("two") && !redacted.contains("words"),
+                "{redacted}"
+            );
+        }
+
+        assert_eq!(
+            redact_command("echo a\\\\ --token s3cr3t", &[]),
+            "echo a\\\\ --token [redacted]"
+        );
+    }
+
+    #[test]
     fn leaves_an_ordinary_command_unchanged() {
         for line in [
             "cargo test -p device-core",
@@ -549,7 +700,7 @@ mod tests {
         }
 
         let (state, project, _, _, scratch) = setup("redacts");
-        let line = "TOKEN=sentinel-one; echo \"$TOKEN Bearer sentinel-two\"";
+        let line = "TOKEN=sentinel-one; echo \"$TOKEN Bearer sentinel-two\"; true --password=sentinel-three\\ sentinel-four";
         let terminal = state
             .acp_terminal_start(&request(&project, line))
             .unwrap_or_else(|error| panic!("the terminal did not start: {error}"));

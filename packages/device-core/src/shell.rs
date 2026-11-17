@@ -408,24 +408,49 @@ impl Drop for Tracked {
     }
 }
 
-/// Kills the process group `process_group(0)` made for a run and, on Linux, every descendant that left it. `pid` must be
-/// unreaped, so it and its group are still the run's. The result is not checked: ESRCH means it ended.
+/// Kills the process group `process_group(0)` made for a run and, on Linux and macOS, every descendant that left it. `pid`
+/// must be unreaped, so it and its group are still the run's. The result is not checked: ESRCH means it ended.
 #[cfg(unix)]
 fn kill_group(pid: u32) {
     // SAFETY: plain syscalls with no memory arguments; the group is one this process made.
     unsafe {
         // Stopped first, so the group forks nothing while its tree is walked.
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         libc::kill(-(pid as libc::pid_t), libc::SIGSTOP);
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         kill_descendants(pid);
         libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
     }
 }
 
 /// How many times `kill_descendants` walks the tree at most.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 const DESCENDANT_PASSES: usize = 64;
+
+/// Every descendant of `root` among `processes` (`(pid, parent)` pairs), as `(pid, parent)`, each parent before its
+/// children. A pid is taken once, so a list read while processes come and go cannot make the walk loop.
+#[cfg(any(target_os = "linux", target_os = "macos", all(test, unix)))]
+fn descendants_of(root: u32, processes: &[(u32, u32)]) -> Vec<(u32, u32)> {
+    let mut seen = std::collections::HashSet::from([root]);
+    let mut tree = Vec::new();
+    let mut parent = root;
+    let mut next = 0;
+
+    loop {
+        for &(pid, ppid) in processes {
+            if ppid == parent && seen.insert(pid) {
+                tree.push((pid, parent));
+            }
+        }
+
+        let Some(&(pid, _)) = tree.get(next) else {
+            return tree;
+        };
+
+        next += 1;
+        parent = pid;
+    }
+}
 
 /// Every process as `(pid, parent, alive)`, from `/proc`. A zombie is listed, not alive: it still links its children until
 /// it is reaped.
@@ -488,35 +513,96 @@ fn kill_child_of(pid: u32, parent: u32) {
     }
 }
 
+/// Every process as `(pid, parent, alive)`, from `proc_listallpids`. A zombie is listed, not alive.
+#[cfg(target_os = "macos")]
+fn processes() -> Vec<(u32, u32, bool)> {
+    // SAFETY: a null buffer only asks how many pids there are.
+    let count = unsafe { libc::proc_listallpids(std::ptr::null_mut(), 0) };
+
+    if count <= 0 {
+        return Vec::new();
+    }
+
+    // Room for what starts between the two calls.
+    let mut pids: Vec<libc::pid_t> = vec![0; count as usize + 64];
+    // SAFETY: the buffer and its size in bytes describe `pids`, which outlives the call.
+    let filled = unsafe {
+        libc::proc_listallpids(
+            pids.as_mut_ptr().cast(),
+            (pids.len() * std::mem::size_of::<libc::pid_t>()) as libc::c_int,
+        )
+    };
+
+    pids.truncate(filled.max(0) as usize);
+    pids.into_iter()
+        .filter_map(|pid| {
+            let pid = u32::try_from(pid).ok()?;
+            let (parent, alive) = process_parent(pid)?;
+
+            Some((pid, parent, alive))
+        })
+        .collect()
+}
+
+/// A process's parent and whether it is alive, from `proc_pidinfo`.
+#[cfg(target_os = "macos")]
+fn process_parent(pid: u32) -> Option<(u32, bool)> {
+    let size = std::mem::size_of::<libc::proc_bsdshortinfo>() as libc::c_int;
+    // SAFETY: `info` is a plain out-parameter, zeroed first, and `size` is its size.
+    let mut info: libc::proc_bsdshortinfo = unsafe { std::mem::zeroed() };
+    let read = unsafe {
+        libc::proc_pidinfo(
+            pid as libc::c_int,
+            libc::PROC_PIDT_SHORTBSDINFO,
+            0,
+            std::ptr::addr_of_mut!(info).cast(),
+            size,
+        )
+    };
+
+    (read == size).then_some((info.pbsi_ppid, info.pbsi_status != libc::SZOMB))
+}
+
+/// Kills `pid` if its parent is still `parent`. macOS has no pidfd, so the check and the signal name `pid`, not a
+/// process: one that exits and whose pid is taken by a new process of the same parent between the two would be hit.
+/// An accepted risk: the window is two syscalls, and the parent is a stopped process of the run.
+#[cfg(target_os = "macos")]
+fn kill_child_of(pid: u32, parent: u32) {
+    if process_parent(pid).is_some_and(|(now, _)| now == parent) {
+        // SAFETY: a plain syscall with integer arguments.
+        unsafe {
+            libc::kill(pid as libc::pid_t, libc::SIGKILL);
+        }
+    }
+}
+
 /// Kills every live descendant of `root`, which must be unreaped. One that started its own session (`setsid`) left the
-/// process group but not this tree, and the shell is a subreaper, so one whose parent ended is re-parented to the shell,
-/// not to init. Walks again until a walk finds no one new: a process with SIGKILL pending cannot fork, so what it forked
-/// before shows up in the next walk.
-#[cfg(target_os = "linux")]
+/// process group but not this tree. On Linux the shell is a subreaper, so one whose parent ended is re-parented to the
+/// shell, not to init. macOS has no subreaper: one whose parent ended belongs to launchd and is not reached. Walks again
+/// until a walk finds no one new: a process with SIGKILL pending cannot fork, so what it forked before shows up in the
+/// next walk.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn kill_descendants(root: u32) {
     let mut signalled = std::collections::HashSet::new();
 
     for _ in 0..DESCENDANT_PASSES {
         let processes = processes();
-        let mut tree = vec![root];
+        let pairs: Vec<(u32, u32)> = processes
+            .iter()
+            .map(|&(pid, parent, _)| (pid, parent))
+            .collect();
+        let dead: std::collections::HashSet<u32> = processes
+            .iter()
+            .filter(|&&(_, _, alive)| !alive)
+            .map(|&(pid, _, _)| pid)
+            .collect();
         let mut found = false;
-        let mut next = 0;
 
-        while let Some(&parent) = tree.get(next) {
-            next += 1;
-
-            for &(pid, ppid, alive) in &processes {
-                if ppid != parent || pid == root {
-                    continue;
-                }
-
-                tree.push(pid);
-
-                // By parent too: one re-parented after a walk found it was not signalled, and is tried again under its new parent.
-                if alive && signalled.insert((pid, parent)) {
-                    kill_child_of(pid, parent);
-                    found = true;
-                }
+        for (pid, parent) in descendants_of(root, &pairs) {
+            // By parent too: one re-parented after a walk found it was not signalled, and is tried again under its new parent.
+            if !dead.contains(&pid) && signalled.insert((pid, parent)) {
+                kill_child_of(pid, parent);
+                found = true;
             }
         }
 
@@ -527,8 +613,8 @@ fn kill_descendants(root: u32) {
 }
 
 /// Kills every run in flight, background children included, and every run that starts from now on. For a host that
-/// was told to stop. On Linux that includes a descendant that left the run's process group (`setsid`) while the run's
-/// shell lives; elsewhere the group is the only handle there is.
+/// was told to stop. On Linux and macOS that includes a descendant that left the run's process group (`setsid`) while
+/// the run's shell lives (on macOS, only while its own parent lives too); elsewhere the group is the only handle there is.
 #[cfg(unix)]
 pub fn kill_running() {
     let mut running = RUNNING.lock().unwrap();
@@ -829,8 +915,10 @@ struct TerminalShared {
 /// while it runs. It always runs in the sandbox (the type takes a policy, never an absent one), keeps the tail of its
 /// output, and is killed with its whole process group when killed, dropped, past `timeout`, or once its shell ended
 /// (background children die with it, as for `shell_run`). On Linux a descendant that started its own session or group
-/// (`setsid`, or a double fork) is killed with it too while the shell lives. Once the shell has exited, such a descendant
-/// is no longer in its tree and is not reached; elsewhere it is never reached. One watcher thread owns the process.
+/// (`setsid`, or a double fork) is killed with it too while the shell lives. On macOS it is too while the shell and every
+/// process between them live: there is no subreaper, so one whose parent exited belongs to launchd. Once the shell has
+/// exited, such a descendant is no longer in its tree and is not reached; elsewhere it is never reached. One watcher
+/// thread owns the process.
 pub struct Terminal {
     shared: Arc<TerminalShared>,
     cap: usize,
@@ -1828,6 +1916,104 @@ mod tests {
         let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
         let output = run(
             "setsid sh -c 'echo $$ > child.pid; sleep 600' >/dev/null 2>&1 & wait",
+            &shared,
+            Duration::from_millis(500),
+            1024,
+            Some(&policy),
+        )
+        .unwrap();
+
+        assert!(output.timed_out);
+        assert!(
+            process_gone(written_pid(&shared.join("child.pid"))),
+            "the detached descendant outlived the run"
+        );
+    }
+
+    #[test]
+    fn the_descendants_of_a_pid_are_its_whole_subtree_and_nothing_else() {
+        let processes = [
+            (1, 0),
+            (10, 1),
+            (11, 10),
+            (12, 10),
+            (13, 12),
+            (20, 1),
+            (21, 20),
+        ];
+        let mut tree = descendants_of(10, &processes);
+
+        tree.sort_unstable();
+        assert_eq!(tree, [(11, 10), (12, 10), (13, 12)]);
+        assert!(descendants_of(13, &processes).is_empty());
+        assert!(descendants_of(99, &processes).is_empty());
+    }
+
+    #[test]
+    fn the_descendants_walk_ends_on_a_cycle_or_a_repeated_pid() {
+        let cycle = [(2, 3), (3, 2), (4, 3)];
+
+        let mut tree = descendants_of(2, &cycle);
+        tree.sort_unstable();
+        assert_eq!(tree, [(3, 2), (4, 3)]);
+
+        // A pid listed twice, once under each of two parents, as a list read while it was re-parented can show it.
+        let repeated = [(5, 1), (6, 5), (7, 5), (7, 6), (8, 7)];
+        let mut tree = descendants_of(5, &repeated);
+
+        tree.sort_unstable();
+        assert_eq!(tree, [(6, 5), (7, 5), (8, 7)]);
+        assert!(descendants_of(1, &[(1, 1)]).is_empty());
+    }
+
+    /// Runs the rest of a `sh -c` line in a new session. macOS ships no `setsid` command.
+    #[cfg(target_os = "macos")]
+    const SETSID: &str = "perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' sh -c";
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_killed_terminal_takes_down_a_descendant_that_left_its_group() {
+        let Some((policy, shared, _)) = terminal_policy("setsid") else {
+            return;
+        };
+        // The descendant starts its own session from a subshell, so it is not in the group. The subshell stays: macOS has no
+        // subreaper, so one whose parent exited is out of reach.
+        let terminal = Terminal::start(
+            &format!("({SETSID} 'echo $$ > child.pid; sleep 2; echo late > late.txt' >/dev/null 2>&1 & wait) & sleep 600"),
+            &shared,
+            &policy,
+            &[],
+            1024,
+            Duration::from_secs(600),
+        )
+        .unwrap();
+        let child = written_pid(&shared.join("child.pid"));
+
+        terminal.kill();
+        terminal.wait(Duration::from_secs(10)).expect("ended");
+
+        assert!(
+            process_gone(child),
+            "the detached descendant outlived the terminal"
+        );
+        std::thread::sleep(Duration::from_millis(2500));
+        assert!(
+            !shared.join("late.txt").exists(),
+            "the detached descendant wrote after the kill"
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_run_past_its_timeout_takes_down_a_descendant_that_left_its_group() {
+        if !sandbox_or_skip() {
+            return;
+        }
+
+        let (shared, _) = folders("setsid-run");
+        let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
+        let output = run(
+            &format!("{SETSID} 'echo $$ > child.pid; sleep 600' >/dev/null 2>&1 & wait"),
             &shared,
             Duration::from_millis(500),
             1024,
