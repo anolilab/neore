@@ -274,6 +274,22 @@ export const reassignGlobalRows = internalMutation
                 const { page } = await facades[table]!.findMany({ consistency: "primary", limit: room + 1, where: { [column]: args.from } });
 
                 for (const row of page.slice(0, room)) {
+                    // The new account may already be a contributor under the organization: its one entry is kept, and the guest's copy goes,
+                    // so the member's ledger is never summed twice.
+                    if (table === "usageOrganizationContributors") {
+                        const kept = await ctx.db.usageOrganizationContributors.findFirst({
+                            consistency: "primary",
+                            where: { organizationId: String(row.organizationId), userId: args.to },
+                        });
+
+                        if (kept) {
+                            await ctx.db.delete(table as never, row._id as never);
+                            reassigned += 1;
+
+                            continue;
+                        }
+                    }
+
                     await ctx.db.patch(table as never, row._id as never, { [column]: args.to } as never);
                     reassigned += 1;
                 }

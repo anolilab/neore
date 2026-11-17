@@ -95,6 +95,12 @@ describe("withoutLastCohort", () => {
         expect(withoutLastCohort(walked).map((entry) => entry.index)).toEqual([0, 1, 2, 3, 4]);
     });
 
+    it("keeps a full cohort the walk stopped after, since it holds no member it has not read", () => {
+        const walked = Array.from({ length: MIN_MEMBERS_PER_GROUP * 2 }, (_, index) => member(true, cohortOfBooking(index), index));
+
+        expect(withoutLastCohort(walked)).toHaveLength(MIN_MEMBERS_PER_GROUP * 2);
+    });
+
     it("keeps the whole walk when it stopped inside its only cohort, so the walk still moves on", () => {
         const walked = [member(true, 0, 0), member(true, 0, 1)];
 
