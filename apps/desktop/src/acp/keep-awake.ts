@@ -28,6 +28,9 @@ export class SleepLock {
 
     private retryAt = 0;
 
+    /** The state the last failed call was made for: during the pause, the platform is not asked again for that state. */
+    private failedWanted = false;
+
     public constructor(
         private readonly blocker: SleepBlocker,
         private readonly log?: (message: string) => void,
@@ -46,15 +49,19 @@ export class SleepLock {
             }
         }
 
-        // An output update repeats the state: it asks the platform only when the lock does not match the turns, and
-        // not during the pause after a failed call (the retry timer does that).
         const wanted = this.running.size > 0;
 
-        if (!changed && (this.blockerId !== undefined) === wanted) {
+        // During the pause after a failed call, the same state is not asked of the platform again: the retry timer does
+        // that. A reversed state goes through at once, so a turn that ends is never kept awake by a pending start.
+        if (Date.now() < this.retryAt && wanted === this.failedWanted) {
             return;
         }
 
-        if (!changed && Date.now() < this.retryAt) {
+        // An output update repeats the state: it asks the platform only when the inhibitor does not match the turns. The
+        // check also takes back an inhibitor the platform dropped during the turn.
+        const held = this.blockerId !== undefined && this.blocker.isStarted(this.blockerId);
+
+        if (!changed && held === wanted) {
             return;
         }
 
@@ -91,6 +98,7 @@ export class SleepLock {
             }
         } catch (error) {
             this.log?.(`[keep-awake] could not ${wanted ? "hold" : "release"} the sleep lock: ${(error as Error).message}`);
+            this.failedWanted = wanted;
             this.retryLater();
         }
     }

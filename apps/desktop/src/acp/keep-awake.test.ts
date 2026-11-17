@@ -243,4 +243,64 @@ describe("the sleep lock", () => {
         }).not.toThrow();
         expect(messages).toEqual(["[keep-awake] could not hold the sleep lock: no power service"]);
     });
+
+    it("takes back an inhibitor the platform dropped, on the next report from a running source", () => {
+        const { blocker, live } = fakeBlocker();
+        const lock = new SleepLock(blocker);
+        const source = {};
+
+        lock.report(source, true);
+        live.clear();
+        lock.report(source, true);
+
+        expect(live.size).toBe(1);
+        expect(blocker.starts).toBe(2);
+    });
+
+    it("does not ask the platform again for sources that start during the pause after a failed start", () => {
+        vi.useFakeTimers();
+
+        try {
+            const live = new Set<number>();
+            let attempts = 0;
+            const lock = new SleepLock(
+                {
+                    isStarted: (id) => live.has(id),
+                    start: () => {
+                        attempts += 1;
+
+                        if (attempts === 1) {
+                            throw new Error("no power service");
+                        }
+
+                        live.add(attempts);
+
+                        return attempts;
+                    },
+                    stop: (id) => {
+                        live.delete(id);
+                    },
+                },
+                () => undefined,
+                5000,
+            );
+
+            lock.report({}, true);
+
+            expect(attempts).toBe(1);
+
+            // Two more managers start a turn during the pause: neither asks the platform.
+            lock.report({}, true);
+            lock.report({}, true);
+
+            expect(attempts).toBe(1);
+
+            vi.advanceTimersByTime(5000);
+
+            expect(attempts).toBe(2);
+            expect(live.size).toBe(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
 });
