@@ -233,6 +233,12 @@ describe("parseSshConfig", () => {
 });
 
 describe("readSshConfig", () => {
+    it("matches a Host pattern without regard to case, as OpenSSH does", () => {
+        const entries = parse("Host PROD\n  User alice\nHost prod\n  Port 2200\n");
+
+        expect(entries).toEqual(expect.arrayContaining([expect.objectContaining({ alias: "prod", port: 2200, user: "alice" })]));
+    });
+
     it("returns an empty list for a missing file without throwing", () => {
         expect(
             readSshConfig(HOME, () => {

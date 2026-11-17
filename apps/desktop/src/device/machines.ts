@@ -11,7 +11,7 @@ import path from "node:path";
 import type { AddProjectMachine, CreatedMachineFolder, MachineFolderPage, MachineServerSpec, SharedMachineFolder } from "../add-project-machines.types";
 import type { SshHost } from "./ssh-config";
 import type { BrowsePage, CreatedFolder, DeviceStatus, HostView, SettingsView } from "./types";
-import { readMachinePath } from "./validate";
+import { readMachinePath, readSshAlias } from "./validate";
 
 /** The same page size and scan cap as the host's `browse`. */
 const PAGE_ENTRIES = 2000;
@@ -75,10 +75,24 @@ const declined = (): Error => new Error("device: the person declined");
 
 /** The longest name a native pairing accepts (`readHostSpec`); a longer SSH alias is cut for the name only. */
 const MAX_SERVER_NAME = 80;
-/** The longest user and address a pairing accepts (`readHostSpec`). A row that needs a longer one is disabled, not offered. */
-const MAX_SPEC_USER = 32;
-const MAX_SPEC_ADDRESS = 253;
-const TOO_LONG = "This server's user name or address is too long for Neore to pair.";
+/** The address and user names the native pairing accepts (`device-core` `ssh.rs`). A row that needs others is disabled, not offered. */
+const PAIRABLE_ADDRESS = /^[\w.:-]{1,253}$/u;
+const PAIRABLE_USER = /^[\w.-]{1,32}$/u;
+const LEADING_DASH_OR_DOT = /^[-.]/u;
+const NOT_PAIRABLE = "Neore cannot connect to this server: its name, address or user is not one it accepts.";
+
+const pairable = (spec: MachineServerSpec): boolean => PAIRABLE_ADDRESS.test(spec.address) && PAIRABLE_USER.test(spec.user) && !LEADING_DASH_OR_DOT.test(spec.address + spec.user);
+
+/** Whether the picker can connect to this alias at all: the same rule the IPC validator applies to it. */
+const aliasUsable = (alias: string): boolean => {
+    try {
+        readSshAlias(alias);
+
+        return true;
+    } catch {
+        return false;
+    }
+};
 
 const requireConnected = (host: HostView): HostView => {
     if (!host.connected) {
@@ -281,14 +295,18 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
             return { ...base, disabledReason: entry.disabledReason, id: null, label: `SSH · ${entry.alias}`, spec: null, status: "disabled" };
         }
 
+        if (!aliasUsable(entry.alias)) {
+            return { ...base, disabledReason: NOT_PAIRABLE, id: null, label: `SSH · ${entry.alias}`, spec: null, status: "disabled" };
+        }
+
         const paired = pairedFor(entry);
         const waiting = `SSH · ${entry.alias} · not connected yet`;
 
         if (paired === undefined) {
             const spec = specFor(entry);
 
-            if (spec.user.length > MAX_SPEC_USER || spec.address.length > MAX_SPEC_ADDRESS) {
-                return { ...base, disabledReason: TOO_LONG, id: null, label: `SSH · ${entry.alias}`, spec: null, status: "disabled" };
+            if (!pairable(spec)) {
+                return { ...base, disabledReason: NOT_PAIRABLE, id: null, label: `SSH · ${entry.alias}`, spec: null, status: "disabled" };
             }
 
             return { ...base, disabledReason: null, id: null, label: waiting, spec, status: "unpaired" };

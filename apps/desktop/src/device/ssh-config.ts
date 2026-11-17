@@ -232,10 +232,11 @@ const readMatch = (value: string): MatchCriterion[] => {
     return criteria.length === 0 ? [{ keyword: "other", names: [] }] : criteria;
 };
 
+/** OpenSSH matches host patterns without regard to case, so `Host PROD` selects `prod`. */
 const globMatches = (pattern: string, name: string): boolean => {
     const source = pattern.replaceAll(GLOB_SPECIAL, String.raw`\$&`).replaceAll("*", ".*").replaceAll("?", ".");
 
-    return new RegExp(`^${source}$`, "u").test(name);
+    return new RegExp(`^${source}$`, "iu").test(name);
 };
 
 /** Whether a block's `Host` patterns select the alias: a negated match excludes the block, otherwise one positive match suffices. */

@@ -125,10 +125,16 @@ describe("connect", () => {
         expect(deps.hostConnect).not.toHaveBeenCalled();
     });
 
-    it("disables an unpaired server whose user or address is too long to pair, instead of offering it", () => {
-        const [, box] = setup({ hosts: [], ssh: [ssh("box", { user: "u".repeat(33) })] }).machines.list();
+    it("disables a server whose user, address or alias the pairing or connection does not accept, instead of offering it", () => {
+        const { machines } = setup({
+            hosts: [],
+            ssh: [ssh("box", { user: "u".repeat(33) }), ssh("build!legacy", { hostName: null }), ssh("my box")],
+        });
+        const [, long, bang, spaced] = machines.list();
 
-        expect(box).toMatchObject({ disabledReason: expect.stringContaining("too long"), spec: null, status: "disabled" });
+        expect(long).toMatchObject({ disabledReason: expect.stringContaining("cannot connect"), status: "disabled" });
+        expect(bang).toMatchObject({ disabledReason: expect.stringContaining("cannot connect"), status: "disabled" });
+        expect(spaced).toMatchObject({ disabledReason: expect.stringContaining("cannot connect"), status: "disabled" });
     });
 
     it("gives an unpaired server the address, port, user and key file its config names", () => {
