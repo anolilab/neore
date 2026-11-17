@@ -30,6 +30,7 @@ export interface ApiTypes {
         cleanup: {
             executeCleanup: FunctionReference<"action", { dryRun?: boolean }, { deletedCount: number; durationMs: number; eligibleCount: number }>;
             getCleanupConfig: FunctionReference<"query", {}, { batchSize: number; isEnabled: boolean; thresholdDays: number }>;
+            getShardFootprint: FunctionReference<"action", { cursor?: string }, { approxBytes: number; continueCursor: string | null; incompleteShards: number; isDone: boolean; messageRows: number; shards: number; threads: number }>;
             listCleanupLogs: FunctionReference<"query", { cursor?: string | null; limit?: number }, { continueCursor?: string | null; isDone: boolean; logs: Array<{ _creationTime: number; _id: string; deletedCount: number; durationMs: number; eligibleCount: number; mode: "dry_run" | "execute"; runAt: number; triggeredBy: string }> }>;
             previewCleanup: FunctionReference<"query", { now: number }, { eligibleCount: number; thresholdDays: number }>;
             updateCleanupConfig: FunctionReference<"mutation", { batchSize?: number; isEnabled?: boolean; thresholdDays?: number }, null>;
@@ -948,6 +949,7 @@ export const api: ApiTypes = {
         cleanup: {
             executeCleanup: { __lunoraRef: "admin_cleanup:executeCleanup" },
             getCleanupConfig: { __lunoraRef: "admin_cleanup:getCleanupConfig" },
+            getShardFootprint: { __lunoraRef: "admin_cleanup:getShardFootprint" },
             listCleanupLogs: { __lunoraRef: "admin_cleanup:listCleanupLogs" },
             previewCleanup: { __lunoraRef: "admin_cleanup:previewCleanup" },
             updateCleanupConfig: { __lunoraRef: "admin_cleanup:updateCleanupConfig" },

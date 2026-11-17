@@ -44,6 +44,8 @@ export interface InternalApiTypes {
             getCleanupConfigInternal: FunctionReference<"query", {}, { batchSize: number; isEnabled: boolean; thresholdDays: number }>;
             getEligibleUsers: FunctionReference<"query", { limit: number; now: number; thresholdMs: number }, import("lunorash/server/data-model").LoadWith<import("./dataModel.js").DataModel, import("./dataModel.js").Relations, "user", {}, undefined>[]>;
             getUserThreads: FunctionReference<"query", { userId: string }, import("./dataModel.js").Doc_threads[]>;
+            listShardKeysPage: FunctionReference<"query", { cursor?: string; limit: number }, { continueCursor: string | null; isDone: boolean; shardKeys: Array<string> }>;
+            measureShardPage: FunctionReference<"query", { state?: { approxBytes: number; currentRows: number; currentThreadId: string | null; cursor: string | null; largest: Array<{ rows: number; threadId: string }>; messageRows: number; phase: "threads" | "messages" | "done"; threads: number } }, { done: boolean; pageRows: number; state: { approxBytes: number; currentRows: number; currentThreadId: string | null; cursor: string | null; largest: Array<{ rows: number; threadId: string }>; messageRows: number; phase: "threads" | "messages" | "done"; threads: number } }>;
             writeCleanupLog: FunctionReference<"mutation", { deletedCount: number; durationMs: number; eligibleCount: number; mode: "dry_run" | "execute"; runAt: number; triggeredBy: string }, null>;
         };
     };
@@ -1412,6 +1414,8 @@ export const internal: InternalApiTypes = {
             getCleanupConfigInternal: { __lunoraRef: "admin_cleanup:getCleanupConfigInternal" },
             getEligibleUsers: { __lunoraRef: "admin_cleanup:getEligibleUsers" },
             getUserThreads: { __lunoraRef: "admin_cleanup:getUserThreads" },
+            listShardKeysPage: { __lunoraRef: "admin_cleanup:listShardKeysPage" },
+            measureShardPage: { __lunoraRef: "admin_cleanup:measureShardPage" },
             writeCleanupLog: { __lunoraRef: "admin_cleanup:writeCleanupLog" },
         },
     },

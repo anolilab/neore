@@ -14,7 +14,9 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { adminAction, adminMutation, adminQuery, rateLimit } from "../lib/crpc";
 import { withoutUndefined } from "../lib/patch";
 import { callOnShard } from "../lib/cross-shard";
+import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
+import { addMessageRow, approxRowBytes, FOOTPRINT_PAGE_SIZE, finishCurrentThread, type FootprintState, startFootprint } from "./shard-footprint-logic";
 
 const DEFAULT_THRESHOLD_DAYS = 30;
 const DEFAULT_BATCH_SIZE = 100;
@@ -303,4 +305,155 @@ export const writeCleanupLog = internalMutation
         await ctx.db.insert("cleanupLogs", args);
 
         return null;
+    });
+
+// =============================================================================
+// Shard footprint
+// =============================================================================
+// Measures how much conversation data each user shard stores. `measureShardPage` runs on the
+// shard it measures and reads one page per call (threads, then message rows); a caller continues
+// until `done`. `getShardFootprint` drives a page of the shard census and returns totals only:
+// no thread ids leave the admin path. Counts are approximate under concurrent writes.
+
+/** Census rows (shards) an admin call measures. Shards within a call run side by side. */
+const SHARDS_PER_CALL = 10;
+/** Pages one shard may take in one admin call. A shard past it is reported as incomplete. */
+const MAX_PAGES_PER_SHARD = 40;
+
+/** The scan state's fields, spread into each validator that carries it. */
+const footprintFields = {
+    approxBytes: v.number(),
+    currentRows: v.number(),
+    currentThreadId: v.union(v.string(), v.null()),
+    cursor: v.union(v.string(), v.null()),
+    largest: v.array(v.object({ rows: v.number(), threadId: v.string() })),
+    messageRows: v.number(),
+    phase: v.union(v.literal("threads"), v.literal("messages"), v.literal("done")),
+    threads: v.number(),
+};
+
+/** One page of a shard's measurement. Message rows are read through their thread index, so a thread's rows arrive together. */
+export const measureShardPage = internalQuery
+    .input({ state: v.optional(v.object({ ...footprintFields })) })
+    .output(v.object({ done: v.boolean(), pageRows: v.number(), state: v.object({ ...footprintFields }) }))
+    .query(async ({ args, ctx }) => {
+        const state: FootprintState = args.state ?? startFootprint();
+
+        if (state.phase === "done") {
+            return { done: true, pageRows: 0, state };
+        }
+
+        if (state.phase === "threads") {
+            const page = await ctx.db.query("threads").paginate({ cursor: state.cursor, numItems: FOOTPRINT_PAGE_SIZE });
+
+            return {
+                done: false,
+                pageRows: page.page.length,
+                state: {
+                    ...state,
+                    cursor: page.isDone ? null : page.continueCursor,
+                    phase: page.isDone ? "messages" : "threads",
+                    threads: state.threads + page.page.length,
+                },
+            };
+        }
+
+        const page = await ctx.db.query("messages").withIndex("by_threadId_order_stepOrder").paginate({ cursor: state.cursor, numItems: FOOTPRINT_PAGE_SIZE });
+
+        let next = state;
+
+        for (const row of page.page) {
+            next = addMessageRow(next, String(row.threadId), approxRowBytes(row));
+        }
+
+        if (page.isDone) {
+            return { done: true, pageRows: page.page.length, state: { ...finishCurrentThread(next), cursor: null, phase: "done" } };
+        }
+
+        return { done: false, pageRows: page.page.length, state: { ...next, cursor: page.continueCursor } };
+    });
+
+/** One page of the shard census: the keys of the shards in it, minus the root shard. */
+export const listShardKeysPage = internalQuery
+    .input({ cursor: v.optional(v.string()), limit: v.number() })
+    .output(v.object({ continueCursor: v.union(v.string(), v.null()), isDone: v.boolean(), shardKeys: v.array(v.string()) }))
+    .query(async ({ args, ctx }) => {
+        const page = await ctx.db.shardActivity.findMany({
+            cursor: args.cursor ?? null,
+            limit: args.limit,
+            orderBy: [{ _id: "asc" }],
+        });
+
+        return {
+            continueCursor: page.continueCursor,
+            isDone: page.isDone,
+            shardKeys: page.page.map((row) => row.shardKey).filter((shardKey) => shardKey !== ROOT_SHARD_KEY),
+        };
+    });
+
+interface ShardMeasure {
+    complete: boolean;
+    state: FootprintState;
+}
+
+/** Reads one shard to its end, one page per call, within the page budget. */
+const measureShard = async (shardKey: string): Promise<ShardMeasure> => {
+    let state: FootprintState | undefined;
+
+    for (let pages = 0; pages < MAX_PAGES_PER_SHARD; pages += 1) {
+        const result = await callOnShard(internal.admin.cleanup.measureShardPage, state ? { state } : {}, { shardKey });
+
+        state = result.state;
+
+        if (result.done) {
+            return { complete: true, state };
+        }
+    }
+
+    return { complete: false, state: state ?? startFootprint() };
+};
+
+/**
+ * Totals for one page of the shard census. Continue with `continueCursor` until `isDone`.
+ * An incomplete shard's counts are lower bounds and are counted in `incompleteShards`.
+ */
+export const getShardFootprint = adminAction
+    .use(rateLimit("admin/read"))
+    .input({ cursor: v.optional(v.string()) })
+    .output(
+        v.object({
+            approxBytes: v.number(),
+            continueCursor: v.union(v.string(), v.null()),
+            incompleteShards: v.number(),
+            isDone: v.boolean(),
+            messageRows: v.number(),
+            shards: v.number(),
+            threads: v.number(),
+        }),
+    )
+    .action(async ({ args, ctx }) => {
+        const census = await ctx.runQuery(internal.admin.cleanup.listShardKeysPage, { cursor: args.cursor, limit: SHARDS_PER_CALL });
+        const measures = await Promise.all(census.shardKeys.map((shardKey) => measureShard(shardKey)));
+
+        const totals = {
+            approxBytes: 0,
+            continueCursor: census.continueCursor,
+            incompleteShards: 0,
+            isDone: census.isDone,
+            messageRows: 0,
+            shards: measures.length,
+            threads: 0,
+        };
+
+        for (const { complete, state } of measures) {
+            totals.approxBytes += state.approxBytes;
+            totals.messageRows += state.messageRows;
+            totals.threads += state.threads;
+
+            if (!complete) {
+                totals.incompleteShards += 1;
+            }
+        }
+
+        return totals;
     });

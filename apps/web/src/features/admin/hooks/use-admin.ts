@@ -295,3 +295,18 @@ export const useGatewayAnalytics = (period: "24h" | "7d" = "24h") => {
         staleTime: 30_000,
     });
 };
+
+/**
+ * One page of the shard footprint census (`getShardFootprint`): totals for the shards on that page.
+ * Pass the previous page's `continueCursor` to measure the next shards.
+ */
+export const useShardFootprint = (cursor?: string) => {
+    const measure = useAction(api.admin.cleanup.getShardFootprint);
+
+    return useQuery({
+        queryFn: () => measure(cursor === undefined ? {} : { cursor }),
+        queryKey: ["admin", "shardFootprint", cursor ?? null],
+        retry: 1,
+        staleTime: 60_000,
+    });
+};
