@@ -23,9 +23,10 @@ export const MAX_RUN_WEBHOOK_URL_LENGTH = 2048;
 export const RUN_WEBHOOK_TEST_EVENT = "webhook.test";
 
 export interface RunWebhookEvent {
-    /** The event's own id. It is the same on every redelivery of this event, so a receiver can drop a repeat. */
+    /** Milliseconds since the epoch, when the event was created. */
     createdAt: number;
     data: Record<string, unknown>;
+    /** The event's own id. It is the same on every redelivery of this event, so a receiver can drop a repeat. */
     id: string;
     type: string;
 }
