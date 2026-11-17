@@ -138,6 +138,8 @@ const NEVER_LIVE: ReadonlySet<string> = new Set<ApiPath>([
     "chat_functions:searchThreads",
     "connectors_user_connectors:listConnectorCatalog",
     "evals_functions:compareRuns",
+    // `.global()` rows written from the senders' shards never reach the admin's subscription: refetch instead.
+    "feedback_admin:listFeedback",
     "gdpr_functions:getDataAccessSummary",
     "pages_functions:searchPages",
     "projects_functions:listProjectRepos",

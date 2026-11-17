@@ -8,7 +8,7 @@ import { ScrollArea } from "@neore/ui/components/scroll-area";
 import { SidebarInset, SidebarTrigger } from "@neore/ui/components/sidebar";
 import ModeToggle from "@neore/ui/components/theme-toggle";
 import { createFileRoute, Outlet, redirect, useLocation } from "@tanstack/react-router";
-import { ClipboardList, LayoutDashboard, MessageSquare, ShieldAlert, Trash2, Users } from "lucide-react";
+import { ClipboardList, LayoutDashboard, MessageSquare, MessageSquareText, ShieldAlert, Trash2, Users } from "lucide-react";
 import { Fragment } from "react";
 
 import AppSidebar from "@/features/layout/components/app-sidebar";
@@ -35,6 +35,11 @@ const ADMIN_NAV_ITEMS: { icon: typeof LayoutDashboard; name: MessageDescriptor; 
         url: "/admin/audit-log",
     },
     {
+        icon: MessageSquareText,
+        name: msg`Feedback`,
+        url: "/admin/feedback",
+    },
+    {
         icon: ShieldAlert,
         name: msg`NSFW Review`,
         url: "/admin/nsfw-review",
@@ -51,6 +56,7 @@ const ADMIN_SEGMENT_NAMES: Record<string, MessageDescriptor> = {
     admin: msg`Admin`,
     "audit-log": msg`Audit Log`,
     cleanup: msg`Cleanup`,
+    feedback: msg`Feedback`,
     gateway: msg`Gateway`,
     keys: msg`API Keys`,
     "nsfw-review": msg`NSFW Review`,
