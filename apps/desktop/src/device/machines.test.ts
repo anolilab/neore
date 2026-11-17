@@ -291,6 +291,16 @@ describe("createFolder", () => {
         expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringContaining(target) }));
     });
 
+    it("names and makes the server folder at the path the host resolves, so a symlinked parent cannot move it", async () => {
+        const { deps, machines } = setup();
+
+        deps.hostBrowse.mockResolvedValueOnce({ entries: [], host: "build", next: null, parent: "/srv", path: "/srv/real/new", refusedRoot: false });
+        await machines.createFolder("srv-1", "/srv/link/new");
+
+        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringContaining("/srv/real/new") }));
+        expect(deps.hostMakeDir).toHaveBeenCalledWith("srv-1", "/srv/real/new");
+    });
+
     it("confirms by naming the server and the path, then makes the folder on the server", async () => {
         const { deps, machines } = setup();
 

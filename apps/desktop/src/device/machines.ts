@@ -331,6 +331,23 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         };
     };
 
+    /** The path a new server folder gets once the symlinks in its existing part are followed: the host resolves the nearest folder that exists. */
+    const resolveServerNewPath = async (deviceId: string, folder: string): Promise<string> => {
+        try {
+            const resolved = await dependencies.hostBrowse(deviceId, folder);
+
+            return resolved.path;
+        } catch (error) {
+            const parent = path.posix.dirname(folder);
+
+            if (parent === folder || !(error instanceof Error) || !error.message.includes("not found")) {
+                throw error;
+            }
+
+            return path.posix.join(await resolveServerNewPath(deviceId, parent), path.posix.basename(folder));
+        }
+    };
+
     const createFolder = async (machineId: string, folder: string): Promise<CreatedMachineFolder> => {
         const machine = machineFor(machineId);
 
@@ -354,12 +371,14 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         }
 
         const host = requireConnected(machine.host);
+        // The host follows symlinks when it creates a folder, so the prompt names, and the host makes, the path it resolves to.
+        const target = readMachinePath(await resolveServerNewPath(host.deviceId, folder), false);
 
-        if (!await ask({ detail: `Folder: ${JSON.stringify(folder)}`, message: `Create a new folder on the server “${host.name}”?` })) {
+        if (!await ask({ detail: `Folder: ${JSON.stringify(target)}`, message: `Create a new folder on the server “${host.name}”?` })) {
             throw declined();
         }
 
-        return dependencies.hostMakeDir(requireConnected(stillPaired(machineId, host)).deviceId, folder);
+        return dependencies.hostMakeDir(requireConnected(stillPaired(machineId, host)).deviceId, target);
     };
 
     const shareFolder = async (machineId: string, folder: string): Promise<SharedMachineFolder> => {
