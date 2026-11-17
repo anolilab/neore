@@ -10,6 +10,8 @@ import { lunora, lunoraError, lunoraHandlers } from "@/storybook/lunora";
 import DailyBriefOffer from "./daily-brief-offer";
 
 const HOUR = 60 * 60 * 1000;
+const DISMISSED = /we won't ask again/u;
+const TURNED_ON = /Daily Brief is on/u;
 
 const handlers = (...fixtures: LunoraFixture[]) =>
     lunoraHandlers(
@@ -44,8 +46,36 @@ export const TurnedOn: Story = {
     play: async ({ canvas, userEvent }) => {
         await userEvent.click(canvas.getByRole("button", { name: "Turn it on" }));
 
-        await expect(await canvas.findByRole("status")).toHaveTextContent("07:00");
+        await expect(await canvas.findByText(TURNED_ON)).toHaveTextContent("07:00");
         await expect(canvas.getByRole("link", { name: "Change it in settings" })).toBeVisible();
+    },
+};
+
+/** After "Not now": the answer is confirmed, with the way to change it later. */
+export const Dismissed: Story = {
+    play: async ({ canvas, userEvent }) => {
+        await userEvent.click(canvas.getByRole("button", { name: "Not now" }));
+
+        await expect(await canvas.findByText(DISMISSED)).toBeVisible();
+        await expect(canvas.getByRole("link", { name: "Open settings" })).toBeVisible();
+    },
+};
+
+/** The organization locks the brief: the refusal says so. */
+export const ManagedByOrganization: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: handlers(
+                    lunoraError(api.notifications.daily_brief.setDailyBriefEnabled, "FORBIDDEN", "Managed by your organization: dailyBriefEnabled", 403),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas, userEvent }) => {
+        await userEvent.click(canvas.getByRole("button", { name: "Turn it on" }));
+
+        await expect(await canvas.findByRole("alert")).toHaveTextContent("Your organization manages the Daily Brief.");
     },
 };
 

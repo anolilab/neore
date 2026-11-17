@@ -1,3 +1,5 @@
+/* eslint-disable testing-library/no-node-access -- focus placement (document.activeElement) and the live region holding the answer are what these tests assert */
+
 /**
  * The home page's one-time Daily Brief offer: nothing turns on without the
  * click, "Not now" only stores the answer, and "Turn it on" says when the first
@@ -65,6 +67,9 @@ vi.mock("@tanstack/react-router", () => {
 
 const { default: DailyBriefOffer } = await import("./daily-brief-offer");
 
+const DISMISSED = /we won't ask again/u;
+const TURNED_ON = /Daily Brief is on/u;
+
 const mount = (offered: boolean) => render(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(DailyBriefOffer, { offered })));
 
 afterEach(() => {
@@ -83,21 +88,25 @@ describe("daily brief offer", () => {
         mount(true);
         fireEvent.click(screen.getByRole("button", { name: "Not now" }));
 
-        await vi.waitFor(() => {
-            expect(calls.dismiss).toHaveLength(1);
-        });
+        const confirmation = await screen.findByText(DISMISSED);
+
+        expect(calls.dismiss).toHaveLength(1);
         expect(calls.enable).toHaveLength(0);
+        // Focus moves to the answer, not back to the top of the page.
+        expect(document.activeElement).toBe(confirmation);
+        expect(screen.getByRole("status").contains(confirmation)).toBe(true);
     });
 
     it('"Turn it on" says when the first brief arrives in the user\'s zone and links to the setting', async () => {
         mount(true);
         fireEvent.click(screen.getByRole("button", { name: "Turn it on" }));
 
-        const status = await screen.findByRole("status");
+        const confirmation = await screen.findByText(TURNED_ON);
 
         expect(calls.enable).toEqual([{ enabled: true }]);
-        expect(status.textContent).toContain("Wednesday");
-        expect(status.textContent).toContain("07:12");
+        expect(confirmation.textContent).toContain("Wednesday");
+        expect(confirmation.textContent).toContain("07:12");
+        expect(document.activeElement).toBe(confirmation);
         expect(screen.getByRole("link", { name: "Change it in settings" }).getAttribute("href")).toBe("/dashboard/settings/auth/account#daily-brief");
         expect(screen.queryByRole("button", { name: "Turn it on" })).toBeNull();
     });

@@ -11,10 +11,26 @@ import schema from "../schema";
 import { dismissDailyBriefOffer, setDailyBriefEnabled } from "../notifications/daily-brief";
 import { BRIEF_OFFER_MIN_THREADS, getHomeOverview } from "./overview";
 
-const { sessionFrom } = vi.hoisted(() => {
+const { activeOrganization, anonymous, sessionFrom } = vi.hoisted(() => {
+    const active = { id: null as string | null };
+
     return {
+        activeOrganization: active,
+        anonymous: new Set<string>(),
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
-            context.auth.userId ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, userId: context.auth.userId } : null,
+            context.auth.userId
+                ? { activeOrganization: active.id ? { id: active.id } : null, id: context.auth.userId, isAdmin: false, userId: context.auth.userId }
+                : null,
+    };
+});
+
+// `user` is a `.global()` (D1) table the in-memory harness cannot write.
+vi.mock("../auth/lib/better-auth-queries", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../auth/lib/better-auth-queries")>()),
+        getUser: async (_ctx: unknown, userId: string) => {
+            return { _id: userId, isAnonymous: anonymous.has(userId) };
+        },
     };
 });
 
@@ -76,6 +92,9 @@ beforeEach(() => {
 
 afterEach(() => {
     harness.close();
+    anonymous.clear();
+    activeOrganization.id = null;
+    vi.useRealTimers();
 });
 
 describe("getHomeOverview", () => {
@@ -268,7 +287,44 @@ describe("the one-time Daily Brief offer", () => {
         expect(await offered()).toBe(false);
     });
 
+    it("is never shown to a guest", async () => {
+        anonymous.add(USER);
+        await seedThreads(BRIEF_OFFER_MIN_THREADS);
+
+        expect(await offered()).toBe(false);
+    });
+
+    it("is not shown when the organization's policy sets the brief, and is when it does not", async () => {
+        activeOrganization.id = "org-1";
+        await seedThreads(BRIEF_OFFER_MIN_THREADS);
+
+        const policyId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("organizationPolicies", {
+                    document: JSON.stringify({ schemaVersion: 1, settings: { memoryEnabled: { locked: true, value: true } } }),
+                    organizationId: "org-1",
+                    revision: 1,
+                    schemaVersion: 1,
+                    updatedAt: Date.now(),
+                }),
+        );
+
+        expect(await offered()).toBe(true);
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("organizationPolicies", policyId, {
+                document: JSON.stringify({ schemaVersion: 1, settings: { dailyBriefEnabled: { locked: false, value: false } } }),
+            });
+        });
+
+        expect(await offered()).toBe(false);
+    });
+
     it('"Turn it on" enables it and says when the first brief arrives', async () => {
+        // Tuesday 2026-11-17 10:00 UTC: the next 07:xx in Berlin is the next morning.
+        const now = Date.UTC(2026, 10, 17, 10);
+
+        vi.useFakeTimers({ now, toFake: ["Date"] });
         await seedThreads(BRIEF_OFFER_MIN_THREADS);
         await harness.run(async (ctx: any) => await ctx.db.insert("userSettings", { timezone: "Europe/Berlin", userId: USER }));
 
@@ -276,7 +332,8 @@ describe("the one-time Daily Brief offer", () => {
         const localHour = Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hour12: false, timeZone: "Europe/Berlin" }).format(result.nextBriefAt));
 
         expect(result.timeZone).toBe("Europe/Berlin");
-        expect(result.nextBriefAt).toBeGreaterThan(Date.now());
+        expect(result.nextBriefAt).toBeGreaterThan(now);
+        expect(result.nextBriefAt - now).toBeLessThan(24 * 60 * 60 * 1000);
         expect(localHour).toBe(7);
 
         const row = await settings();

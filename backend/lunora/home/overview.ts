@@ -16,6 +16,7 @@ import type { QueryCtx } from "../_generated/server";
 import { repoLabel } from "../coding-agents/repo-label";
 import { vCodingAgentId } from "../coding-agents/validators";
 import { authQuery } from "../lib/crpc";
+import { getUser } from "../auth/lib/better-auth-queries";
 import { readPolicyState } from "../auth/lib/organization-policy";
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { loadUnread, toRedactedNotificationViews, UNREAD_COUNT_CAP } from "../notifications/functions";
@@ -82,23 +83,27 @@ export const vHomeOverview = v.object({
 export type HomeOverview = Infer<typeof vHomeOverview>;
 
 /**
- * Pending approvals past `PENDING_APPROVAL_TTL_MS` are not filtered here — a
- * query must not read the clock (it re-runs on every relevant write). They are
- * purged on the next pause in that shard, and answering one fails closed.
- */
-/**
  * Whether to offer the Daily Brief. Only someone who never decided: no value in
  * their settings (on OR off), no "Not now", and no organization policy setting
- * it for them (a default or a lock is the organization's decision). The policy
- * is read only when everything else says yes.
+ * it for them (a default or a lock is the organization's decision). Never a
+ * guest: an anonymous account gets no brief, has no settings switch for it, and
+ * its answer would not survive sign-up. The user and the policy are read only
+ * when everything else says yes.
  */
 const shouldOfferBrief = async (
     ctx: Pick<QueryCtx, "db">,
+    userId: string,
     settings: { dailyBriefEnabled?: boolean; dailyBriefOfferDismissedAt?: number } | null,
     liveThreadCount: number,
     organizationId: string | null,
 ): Promise<boolean> => {
     if (settings?.dailyBriefEnabled !== undefined || settings?.dailyBriefOfferDismissedAt !== undefined || liveThreadCount < BRIEF_OFFER_MIN_THREADS) {
+        return false;
+    }
+
+    const user = await getUser(ctx, userId);
+
+    if (!user || user.isAnonymous === true) {
         return false;
     }
 
@@ -113,7 +118,16 @@ const shouldOfferBrief = async (
     return state.kind === "none" || (state.kind === "policy" && state.policy.settings?.dailyBriefEnabled === undefined);
 };
 
-export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string, organizationId: string | null = null): Promise<HomeOverview> => {
+/**
+ * Pending approvals past `PENDING_APPROVAL_TTL_MS` are not filtered here — a
+ * query must not read the clock (it re-runs on every relevant write). They are
+ * purged on the next pause in that shard, and answering one fails closed.
+ */
+/**
+ * `offer` is the home page's own: only it computes the Daily Brief offer (and
+ * pays its reads). Other readers of the snapshot get `dailyBriefOffer: false`.
+ */
+export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string, offer?: { organizationId: string | null }): Promise<HomeOverview> => {
     const [approvalRows, reviewRows, taskRows, agentRows, subAgentRows, threadRows, unread, settings] = await Promise.all([
         ctx.db.toolApprovalRuns.findMany({
             limit: HOME_SECTION_LIMIT,
@@ -183,7 +197,7 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
             };
         }),
         dailyBriefEnabled: settings?.dailyBriefEnabled === true,
-        dailyBriefOffer: await shouldOfferBrief(ctx, settings, liveThreads.length, organizationId),
+        dailyBriefOffer: offer ? await shouldOfferBrief(ctx, userId, settings, liveThreads.length, offer.organizationId) : false,
         notifications: await toRedactedNotificationViews(ctx.db, unread.slice(0, HOME_NOTIFICATIONS)),
         recentThreads: liveThreads.slice(0, RECENT_THREADS).map((thread) => {
             return {
@@ -217,4 +231,4 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
 export const getHomeOverview = authQuery
     .input({})
     .output(vHomeOverview)
-    .query(async ({ ctx }) => await loadHomeOverview(ctx, ctx.user.userId, ctx.user.activeOrganization?.id ?? null));
+    .query(async ({ ctx }) => await loadHomeOverview(ctx, ctx.user.userId, { organizationId: ctx.user.activeOrganization?.id ?? null }));

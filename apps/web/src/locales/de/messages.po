@@ -5836,9 +5836,9 @@ msgstr "Änderung (Punkte)"
 msgid "Change colors"
 msgstr "Farben ändern"
 
-#: src/features/home/components/daily-brief-offer.tsx:69
+#: src/features/home/components/daily-brief-offer.tsx:98
 msgid "Change it in settings"
-msgstr ""
+msgstr "In den Einstellungen ändern"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:150
 #: src/features/chat/thread-list/thread-node.tsx:887
@@ -8662,9 +8662,9 @@ msgstr "Die Zusammenfassung konnte nicht gespeichert werden, daher wurde nichts 
 msgid "Could not save this. Try again."
 msgstr "Speichern nicht möglich. Versuche es erneut."
 
-#: src/features/home/components/daily-brief-offer.tsx:79
+#: src/features/home/components/daily-brief-offer.tsx:82
 msgid "Could not save your answer. Try again."
-msgstr ""
+msgstr "Deine Antwort konnte nicht gespeichert werden. Versuche es erneut."
 
 #: src/features/chat/host/host-options.tsx:256
 msgid "Could not send the change."
@@ -8742,9 +8742,9 @@ msgstr "Das Modell konnte nicht gewechselt werden. Bitte versuche es erneut."
 #~ msgid "Could not turn on the Daily Brief."
 #~ msgstr "Das Daily Brief konnte nicht aktiviert werden."
 
-#: src/features/home/components/daily-brief-offer.tsx:79
+#: src/features/home/components/daily-brief-offer.tsx:80
 msgid "Could not turn on the Daily Brief. Try again."
-msgstr ""
+msgstr "Daily Brief konnte nicht aktiviert werden. Versuche es erneut."
 
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:50
 msgid "Could not undo. Please try again."
@@ -9386,20 +9386,29 @@ msgstr "Tschechisch (Tschechische Republik)"
 msgid "Czech Republic"
 msgstr "Tschechische Republik"
 
-#: src/features/home/components/daily-brief-offer.tsx:59
+#: src/features/home/components/daily-brief-offer.tsx:89
 #: src/features/notifications/components/notification-settings.tsx:224
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:57
 msgid "Daily Brief"
 msgstr "Daily Brief"
 
 #: src/features/home/components/daily-brief-offer.tsx:66
-msgid "Daily Brief is on. It arrives each morning."
-msgstr ""
+#~ msgid "Daily Brief is on. It arrives each morning."
+#~ msgstr ""
+
+#: src/features/home/components/daily-brief-offer.tsx:74
+msgid "Daily Brief is on. It comes in the morning when there is something to report."
+msgstr "Daily Brief ist aktiv. Er kommt morgens, wenn es etwas zu berichten gibt."
+
+#. placeholder {0}: formatArrival(current.scheduled, i18n.locale)
+#: src/features/home/components/daily-brief-offer.tsx:73
+msgid "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
+msgstr "Daily Brief ist aktiv. Der nächste ist für {0} geplant; an einem Morgen ohne Neuigkeiten kommt keiner."
 
 #. placeholder {0}: formatArrival(scheduled, i18n.locale)
 #: src/features/home/components/daily-brief-offer.tsx:65
-msgid "Daily Brief is on. Your first one arrives {0}."
-msgstr ""
+#~ msgid "Daily Brief is on. Your first one arrives {0}."
+#~ msgstr ""
 
 #: src/features/notifications/components/notification-settings.tsx:111
 msgid "Daily Brief turned off"
@@ -15297,8 +15306,12 @@ msgid "Germany"
 msgstr "Deutschland"
 
 #: src/features/home/components/daily-brief-offer.tsx:75
-msgid "Get a short summary each morning of what finished, what needs you and what is still running."
-msgstr ""
+#~ msgid "Get a short summary each morning of what finished, what needs you and what is still running."
+#~ msgstr ""
+
+#: src/features/home/components/daily-brief-offer.tsx:106
+msgid "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
+msgstr "Erhalte jeden Morgen eine kurze Zusammenfassung: was fertig ist, was dich braucht und was noch läuft. Das zählt zu deiner täglichen Nutzung."
 
 #: src/features/home/components/home-page.tsx:234
 #~ msgid "Get a short summary here every morning."
@@ -22407,9 +22420,9 @@ msgstr "nicht gemessen"
 msgid "Not merged"
 msgstr "Nicht gemergt"
 
-#: src/features/home/components/daily-brief-offer.tsx:87
+#: src/features/home/components/daily-brief-offer.tsx:118
 msgid "Not now"
-msgstr ""
+msgstr "Jetzt nicht"
 
 #: src/features/devices/components/device-scope.tsx:125
 msgid "Not offered in any chat until you choose a project."
@@ -22674,6 +22687,10 @@ msgstr "Offset: 0x{hoveredOffsetHex} ({hoveredByte}) = 0x{hoveredValueHex} ({hov
 #: src/features/canvas/canvas-panel.tsx:201
 msgid "Oil Painting"
 msgstr "Ölgemälde"
+
+#: src/features/home/components/daily-brief-offer.tsx:69
+msgid "Okay, we won't ask again. You can turn it on any time in settings."
+msgstr "Okay, wir fragen nicht mehr. Du kannst ihn jederzeit in den Einstellungen aktivieren."
 
 #: src/lib/model-descriptions.ts:179
 msgid "Old generation cinematic model with higher consistency"
@@ -23182,6 +23199,7 @@ msgid "Open search"
 msgstr "Suche öffnen"
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:203
+#: src/features/home/components/daily-brief-offer.tsx:98
 msgid "Open settings"
 msgstr "Einstellungen öffnen"
 
@@ -35116,9 +35134,9 @@ msgstr "Türkisch (Türkei)"
 msgid "Turn any GitHub repository into a remote MCP endpoint"
 msgstr "Verwandle jedes GitHub-Repository in einen Remote-MCP-Endpunkt"
 
-#: src/features/home/components/daily-brief-offer.tsx:84
+#: src/features/home/components/daily-brief-offer.tsx:115
 msgid "Turn it on"
-msgstr ""
+msgstr "Aktivieren"
 
 #: src/features/develop/components/merge-panel.tsx:126
 msgid "Turn off"
@@ -38276,6 +38294,10 @@ msgstr "Deine Nachrichten konnten nicht geladen werden. Sie sind noch da; versuc
 #: src/features/develop/components/guide-tab.tsx:98
 msgid "Your organization does not allow agents on your computer."
 msgstr ""
+
+#: src/features/home/components/daily-brief-offer.tsx:80
+msgid "Your organization manages the Daily Brief."
+msgstr "Deine Organisation verwaltet den Daily Brief."
 
 #: src/features/home/components/home-page.tsx:142
 msgid "Your overview could not be loaded."
