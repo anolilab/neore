@@ -95,11 +95,11 @@ interface AddProjectContentProps extends Omit<AddProjectDialogProps, "open"> {
     /** The host being paired or connected. Held by the owner of the open state, so it outlives a closed dialog. */
     pairingHost: string | null;
     setPairingHost: (host: string | null) => void;
-    /** True while a project is being added; the owner refuses to close the dialog then. */
-    addingReference: { current: boolean };
+    /** Reports whether a project is being added; the owner refuses to close the dialog then. */
+    onAddingChange: (adding: boolean) => void;
 }
 
-const AddProjectContent = ({ addingReference, onClose, onCreateNew, pairedHosts, pairingHost, setPairingHost }: AddProjectContentProps) => {
+const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, pairingHost, setPairingHost }: AddProjectContentProps) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const { mutateAsync: createProject } = useMutation(crpc.projects.functions.createProject.mutationOptions());
@@ -115,12 +115,12 @@ const AddProjectContent = ({ addingReference, onClose, onCreateNew, pairedHosts,
     const [isAdding, setIsAdding] = useState(false);
 
     useEffect(() => {
-        addingReference.current = isAdding;
+        onAddingChange(isAdding);
 
         return () => {
-            addingReference.current = false;
+            onAddingChange(false);
         };
-    }, [addingReference, isAdding]);
+    }, [isAdding, onAddingChange]);
     const [message, setMessage] = useState("");
     const [problem, setProblem] = useState({ forPath: false, text: "" });
 
@@ -655,6 +655,9 @@ const AddProjectDialog = ({ onClose, onCreateNew, open }: AddProjectDialogProps)
     const [pairingHost, setPairingHost] = useState<string | null>(null);
     const [pairedHosts] = useState(() => new Set<string>());
     const addingReference = useRef(false);
+    const reportAdding = useCallback((adding: boolean) => {
+        addingReference.current = adding;
+    }, []);
 
     return (
         <Dialog
@@ -669,7 +672,7 @@ const AddProjectDialog = ({ onClose, onCreateNew, open }: AddProjectDialogProps)
             {/* Mounted only while open: the dialog roots keep closed children mounted, which would reopen the last session. */}
             {open && (
                 <AddProjectContent
-                    addingReference={addingReference}
+                    onAddingChange={reportAdding}
                     onClose={onClose}
                     onCreateNew={onCreateNew}
                     pairedHosts={pairedHosts}
