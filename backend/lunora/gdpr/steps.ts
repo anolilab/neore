@@ -610,10 +610,10 @@ export const generateExportFile = internalAction
             feedbackReadBudget(earlierReadBytes + repositories.readBytes),
         );
         // Every project the user owns, the ones without a repository too: an owner's computer and folder are their data.
-        // It shares the read budget left after the repositories and the feedback, and a project cannot be cut short, so it fails rather than omit one.
+        // It shares the read budget left after the repositories and the feedback; no floor, so past it a project loses its details (marked) and is never left out.
         const ownedProjects = await collectAllOwnedProjects(
             async (cursor) => await context.runQuery(internal.projects.gdpr.collectOwnedProjectsForExport, { cursor, userId: args.userId }),
-            repositoriesReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes),
+            projectDetailsReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes),
         );
         // The projects read for their details count too: a row is read whole, however little of it is exported.
         const triggerReadBytes = triggerReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes);

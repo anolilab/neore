@@ -224,7 +224,7 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
     const stillPaired = (machineId: string, before: HostView): HostView => {
         const latest = machineFor(machineId);
 
-        if (latest.kind !== "server" || latest.host.deviceId !== before.deviceId || latest.host.address !== before.address || latest.host.port !== before.port || latest.host.user !== before.user) {
+        if (latest.kind !== "server" || latest.host.deviceId !== before.deviceId || latest.host.address !== before.address || latest.host.port !== before.port || latest.host.user !== before.user || (latest.host.identityFile ?? null) !== (before.identityFile ?? null)) {
             throw new Error("device: the server changed while the confirmation was open; try again");
         }
 

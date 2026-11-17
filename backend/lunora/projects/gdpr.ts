@@ -255,7 +255,7 @@ export const collectProjectDetailsForExport = internalQuery
         }),
     )
     .query(async ({ args: { projectIds, userId }, ctx }) => {
-        const { page } = await ctx.db.projects.findMany({ where: { _id: { in: projectIds } } });
+        const { page } = await ctx.db.projects.findMany({ consistency: "primary", where: { _id: { in: projectIds } } });
         const readBytes = page.reduce((total, row) => total + new TextEncoder().encode(JSON.stringify(row)).byteLength, 0);
         const projects = page
             .filter((row) => row.userId === userId)
@@ -269,7 +269,7 @@ export const collectProjectDetailsForExport = internalQuery
 
 /**
  * One page of the user's projects for the export, the ones without a repository too (`collectAllOwnedProjects`). A project
- * row is read whole, so the read is counted from the whole row, and a page holds {@link PROJECTS_PER_DETAILS_READ} rows.
+ * row's heavy columns (`context`, the workflow) are not read: only the exported ones are selected, and a page holds {@link PROJECTS_PER_DETAILS_READ} rows.
  * Each project carries the machine and folder a computer's project records, which only its owner may see.
  */
 export const collectOwnedProjectsForExport = internalQuery
@@ -295,10 +295,13 @@ export const collectOwnedProjectsForExport = internalQuery
             cursor: cursor ?? null,
             limit: PROJECTS_PER_DETAILS_READ,
             orderBy: [{ _creationTime: "asc" }],
+            select: ["isPublic", "machineId", "path", "title"] as const,
             where: { userId },
         });
-        const readBytes = result.page.reduce((total, row) => total + new TextEncoder().encode(JSON.stringify(row)).byteLength, 0);
-        const projects = result.page.map((row) => {
+        // The typed `select` result is a union of one-column picks, which none of the reads below fit.
+        const rows = result.page as unknown as { _id: string; isPublic?: boolean; machineId?: string; path?: string; title: string }[];
+        const readBytes = rows.reduce((total, row) => total + new TextEncoder().encode(JSON.stringify(row)).byteLength, 0);
+        const projects = rows.map((row) => {
             return {
                 ...(row.machineId !== undefined && { machineId: row.machineId }),
                 ...(row.path !== undefined && { path: row.path }),

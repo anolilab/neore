@@ -97,14 +97,15 @@ export const collectAllRepositories = async (
 /** One page of `collectOwnedProjectsForExport`: its projects, where the next page starts, and what reading them cost. */
 interface OwnedProjectsPage {
     cursor?: string | null;
-    projects?: unknown[];
+    projects?: object[];
     readBytes?: number;
 }
 
 /**
- * Every project the user owns, one page per query, reported only after the last page. Unlike a details read, a project
- * cannot be left out, so a set past `maxBytes` (what reading the rows cost) fails with PAYLOAD_TOO_LARGE rather than
- * return a cut list.
+ * Every project the user owns, one page per query, reported only after the last page. A project is never left out and
+ * the export never fails for its size: the query reads only the columns it exports, and a page that takes the reads
+ * past `maxBytes` has its projects' sharing flag dropped and marked `{ detailsOmitted: true }`, the same way the
+ * repositories' project details are. The id, title, machine and folder stay on every row.
  */
 export const collectAllOwnedProjects = async (
     readPage: (cursor: string | null) => Promise<unknown>,
@@ -119,11 +120,18 @@ export const collectAllOwnedProjects = async (
 
         readBytes += result.readBytes ?? 0;
 
-        if (readBytes > maxBytes) {
-            throw new LunoraError("PAYLOAD_TOO_LARGE", "The projects are larger than the export limit");
-        }
+        const pageProjects = result.projects ?? [];
 
-        projects.push(...(result.projects ?? []));
+        for (const project of pageProjects) {
+            if (readBytes > maxBytes) {
+                const kept: Record<string, unknown> = { ...project, detailsOmitted: true };
+
+                delete kept.sharingEnabled;
+                projects.push(kept);
+            } else {
+                projects.push(project);
+            }
+        }
 
         if (!result.cursor) {
             break;

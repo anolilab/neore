@@ -11,6 +11,8 @@ import { collectOwnedProjectsForExport, collectProjectDetailsForExport, collectP
 
 const A = "user-a";
 const SHARE_TOKENS = /share-token|old-token/u;
+const PROJECT_FOLDER = /^\/home\/a\/p\d$/u;
+const PROJECT_TITLE = /^p\d$/u;
 const B = "user-b";
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -197,11 +199,36 @@ describe("owned projects in the GDPR export", () => {
         expect(readBytes).toBeGreaterThan(0);
     });
 
-    it("fails with PAYLOAD_TOO_LARGE once the reads pass the limit, rather than return a cut list", async () => {
+    it("exports every project past the read limit, marked detailsOmitted, with its id, title, machine and folder", async () => {
         await harness.run((async (ctx: any) => {
-            await ctx.db.insert("projects", { createdAt: 1, title: "x".repeat(2048), userId: A });
+            for (let index = 0; index < 5; index += 1) {
+                await ctx.db.insert("projects", { createdAt: index, isPublic: true, path: `/home/a/p${index}`, title: `p${index}`, userId: A });
+            }
         }) as never);
 
-        await expect(ownedFor(A, 16)).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+        const { projects } = await ownedFor(A, 16);
+
+        expect(projects).toHaveLength(5);
+
+        for (const project of projects) {
+            expect(project).toMatchObject({
+                detailsOmitted: true,
+                path: expect.stringMatching(PROJECT_FOLDER),
+                projectId: expect.any(String),
+                title: expect.stringMatching(PROJECT_TITLE),
+            });
+            expect(project).not.toHaveProperty("sharingEnabled");
+        }
+    });
+
+    it("does not read a project's heavy columns, so a large row costs no more than a small one", async () => {
+        await harness.run((async (ctx: any) => {
+            await ctx.db.insert("projects", { context: "x".repeat(100_000), createdAt: 1, title: "big", userId: A });
+        }) as never);
+
+        const { projects, readBytes } = await ownedFor(A, 4096);
+
+        expect(readBytes).toBeLessThan(4096);
+        expect(projects).toEqual([expect.not.objectContaining({ detailsOmitted: true })]);
     });
 });

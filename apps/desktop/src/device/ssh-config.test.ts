@@ -23,6 +23,10 @@ describe("parseSshConfig", () => {
         ]);
     });
 
+    it("keeps an escaped double quote inside a quoted value", () => {
+        expect(parse('Host a\n  IdentityFile "/home/me/keys/my\\"key" # note\n')[0]).toMatchObject({ disabledReason: null, identityFile: '/home/me/keys/my"key' });
+    });
+
     it("lists an alias once when a Host line repeats it", () => {
         const hosts = parse("Host box box\n  HostName box.example.com\n");
 

@@ -278,9 +278,20 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
     );
 
     // The content mounts only while the dialog is open, so every opening starts at step 1 with a fresh list.
+    // A load that starts after another one is the newer answer: the older one is dropped when it arrives.
+    const machinesGeneration = useRef(0);
+
     const loadMachines = useCallback(async (): Promise<void> => {
+        const generation = machinesGeneration.current + 1;
         const bridge = getAddProjectBridge();
+
+        machinesGeneration.current = generation;
+
         const result = await attempt(async () => (bridge === undefined ? [] : bridge.listAddProjectMachines()));
+
+        if (generation !== machinesGeneration.current) {
+            return;
+        }
 
         if (result.ok) {
             setMachines(result.value);
@@ -343,9 +354,13 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
         const confirmed = await attempt(() => pairNativeHost({ deviceId, secret, spec: nativeSpec }));
 
         if (!confirmed.ok || !confirmed.value) {
-            await attempt(() => revokeDevice({ deviceId: deviceId as Id<"devices"> }));
+            const revoked = await attempt(() => revokeDevice({ deviceId: deviceId as Id<"devices"> }));
 
-            return { error: new Error("device: the person declined the pairing"), ok: false };
+            // Said plainly when the registration is still there, so it is not reported as undone.
+            return {
+                error: new Error(revoked.ok ? "device: the person declined the pairing" : "device: declined, but its registration could not be removed"),
+                ok: false,
+            };
         }
 
         pairedHosts.add(sshAlias);
@@ -388,6 +403,12 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
             setPairingHost(null);
 
             if (!connected.ok) {
+                if (state.kind === "needs-pair" && !pairs) {
+                    // Paired earlier in this session, but no longer: the list shows it unpaired, so the next pick pairs it again.
+                    pairedHosts.delete(state.sshAlias);
+                    loadMachines().catch(() => {});
+                }
+
                 setError(describeFailure(connected.error));
 
                 return;
@@ -427,7 +448,7 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
         const bridge = getAddProjectBridge();
         const path = listing?.path;
 
-        if (bridge === undefined || machine === null || machineId === null || path === undefined || isAdding || typedPath.trim() !== path) {
+        if (bridge === undefined || machine === null || machineId === null || path === undefined || isAdding || typedPath !== path) {
             return;
         }
 
@@ -552,8 +573,15 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
                             onSubmit={(event) => {
                                 event.preventDefault();
 
-                                if (machineId !== null && typedPath.trim() !== "") {
-                                    start(browse(machineId, typedPath.trim(), { createIfMissing: true }));
+                                if (machineId === null || isAdding) {
+                                    return;
+                                }
+
+                                // A folder listed as it is named (a trailing space included) is opened as it is named; anything else is trimmed.
+                                const requested = listing !== null && typedPath === listing.path ? typedPath : typedPath.trim();
+
+                                if (requested !== "") {
+                                    start(browse(machineId, requested, { createIfMissing: true }));
                                 }
                             }}
                         >
@@ -564,6 +592,7 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
                                 aria-describedby={isPathError ? "add-project-path-error add-project-path-hint" : "add-project-path-hint"}
                                 aria-invalid={isPathError}
                                 autoComplete="off"
+                                disabled={isAdding}
                                 id="add-project-path"
                                 onChange={(event) => {
                                     cancelBrowse();
@@ -583,7 +612,7 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
                                         aria-label={t`Go up to ${parent}`}
                                         className={ROW_CLASS}
                                         data-row=""
-                                        disabled={isBrowsing || machineId === null}
+                                        disabled={isBrowsing || isAdding || machineId === null}
                                         onClick={() => machineId !== null && start(browse(machineId, parent, { createIfMissing: false }))}
                                         onKeyDown={moveFocus}
                                         type="button"
@@ -598,7 +627,7 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
                                     <button
                                         className={ROW_CLASS}
                                         data-row=""
-                                        disabled={isBrowsing || machineId === null}
+                                        disabled={isBrowsing || isAdding || machineId === null}
                                         onClick={() =>
                                             machineId !== null && start(browse(machineId, joinPath(listing.path, entry.name), { createIfMissing: false }))
                                         }
@@ -616,7 +645,7 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
                         )}
                         {listing?.next != null && machineId !== null && (
                             <Button
-                                disabled={isBrowsing}
+                                disabled={isBrowsing || isAdding}
                                 onClick={() => start(browse(machineId, listing.path, { after: listing.next ?? undefined, createIfMissing: false }))}
                                 size="sm"
                                 type="button"
@@ -643,11 +672,7 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
                         <Button disabled={isAdding} onClick={goBack} type="button" variant="outline">
                             {t`Back`}
                         </Button>
-                        <Button
-                            disabled={isAdding || isBrowsing || listing === null || typedPath.trim() !== listing.path}
-                            onClick={() => start(add())}
-                            type="button"
-                        >
+                        <Button disabled={isAdding || isBrowsing || listing === null || typedPath !== listing.path} onClick={() => start(add())} type="button">
                             {isAdding ? t`Adding…` : t`Add project`}
                         </Button>
                     </>

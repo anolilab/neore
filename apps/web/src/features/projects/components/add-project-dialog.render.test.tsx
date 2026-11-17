@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import AddProjectDialog from "./add-project-dialog";
@@ -294,6 +295,27 @@ const page = (path: string) => {
 };
 
 describe("AddProjectDialog pairing and browsing guards", () => {
+    it("adds a folder whose name ends in a space as it is named, and Add project stays enabled for it", async () => {
+        const device = installBridge();
+        const onClose = vi.fn();
+
+        render(<AddProjectDialog onClose={onClose} onCreateNew={() => {}} open />);
+        fireEvent.click(await screen.findByRole("button", { name: THIS_COMPUTER }));
+        await waitFor(() => expect((screen.getByLabelText("Folder path") as HTMLInputElement).value).toBe("/home/me"));
+
+        device.browseMachineFolders.mockImplementationOnce(async () => page("/home/me/work "));
+        fireEvent.click(await screen.findByRole("button", { name: "app" }));
+        await waitFor(() => expect((screen.getByLabelText("Folder path") as HTMLInputElement).value).toBe("/home/me/work "));
+
+        const add = screen.getByRole("button", { name: "Add project" });
+
+        await waitFor(() => expect(add).toHaveProperty("disabled", false));
+        fireEvent.click(add);
+
+        await waitFor(() => expect(onClose).toHaveBeenCalled());
+        expect(createProject).toHaveBeenCalledWith(expect.objectContaining({ path: "/home/me/work " }));
+    });
+
     it("keeps the row locked until the machine list has refreshed after pairing", async () => {
         const device = installBridge();
         const refresh = deferred<typeof machines>();
@@ -388,11 +410,13 @@ describe("AddProjectDialog pairing and browsing guards", () => {
         const slow = deferred<ReturnType<typeof page>>();
         const input = screen.getByLabelText("Folder path");
 
+        const user = userEvent.setup();
+
         device.browseMachineFolders.mockImplementationOnce(() => slow.promise as never);
-        fireEvent.change(input, { target: { value: "/a" } });
-        fireEvent.submit(input);
-        fireEvent.change(input, { target: { value: "/b" } });
-        fireEvent.submit(input);
+        await user.clear(input);
+        await user.type(input, "/a{Enter}");
+        await user.clear(input);
+        await user.type(input, "/b{Enter}");
         await waitFor(() => expect((input as HTMLInputElement).value).toBe("/b"));
 
         slow.resolve(page("/a"));

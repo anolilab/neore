@@ -104,7 +104,8 @@ export const readServerPath = (value: unknown): string => {
 };
 
 const MAX_MACHINE_PATH_BYTES = 1024;
-const ALIAS_FORBIDDEN = /[\s!*?]/u;
+/** Whitespace and wildcards, and a leading `!` (negation); `!` elsewhere is a literal character, as in `build!legacy`. */
+const ALIAS_FORBIDDEN = /[\s*?]/u;
 
 /** Control, format (bidi overrides, zero-width) and line or paragraph separator characters: a native prompt would show another folder. */
 const UNSAFE_PATH_CHARACTER = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
@@ -143,7 +144,7 @@ export const readMachineId = (value: unknown): string => text(value, "machineId"
 export const readSshAlias = (value: unknown): string => {
     const alias = text(value, "sshAlias", 253);
 
-    if (ALIAS_FORBIDDEN.test(alias) || CONTROL_CHARACTER.test(alias)) {
+    if (alias.startsWith("!") || ALIAS_FORBIDDEN.test(alias) || CONTROL_CHARACTER.test(alias)) {
         throw new Error("device: sshAlias is invalid");
     }
 

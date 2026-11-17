@@ -59,7 +59,9 @@ const stripComment = (value: string): string => {
     for (let index = 0; index < value.length; index += 1) {
         const char = value.charAt(index);
 
-        if (char === '"') {
+        if (char === "\\" && (!quoted || value.charAt(index + 1) === '"')) {
+            index += 1;
+        } else if (char === '"') {
             quoted = !quoted;
         } else if (char === "#" && !quoted && (index === 0 || SPACE.test(value.charAt(index - 1)))) {
             return value.slice(0, index);
@@ -69,7 +71,7 @@ const stripComment = (value: string): string => {
     return value;
 };
 
-/** Splits a value into words as ssh does: spaces separate, double quotes group, and outside quotes a backslash makes the next character literal. */
+/** Splits a value into words as ssh does: spaces separate, double quotes group, and a backslash makes the next character literal (inside quotes only a double quote). */
 const words = (value: string): string[] => {
     const text = stripComment(value);
     const found: string[] = [];
@@ -79,12 +81,12 @@ const words = (value: string): string[] => {
     for (let index = 0; index < text.length; index += 1) {
         const char = text.charAt(index);
 
-        if (char === '"') {
-            quoted = !quoted;
-            word ??= "";
-        } else if (!quoted && char === "\\" && index + 1 < text.length) {
+        if (char === "\\" && index + 1 < text.length && (!quoted || text.charAt(index + 1) === '"')) {
             index += 1;
             word = (word ?? "") + text.charAt(index);
+        } else if (char === '"') {
+            quoted = !quoted;
+            word ??= "";
         } else if (!quoted && SPACE.test(char)) {
             if (word !== null) {
                 found.push(word);
