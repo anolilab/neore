@@ -33639,6 +33639,234 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#feedback_admin:listFeedback": {
+      "post": {
+        "description": "Invoke the `query` `feedback_admin:listFeedback` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "feedback_admin:listFeedback",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "cursor": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "kind": {
+                        "anyOf": [
+                          {
+                            "const": "idea",
+                            "type": "string"
+                          },
+                          {
+                            "const": "problem",
+                            "type": "string"
+                          },
+                          {
+                            "const": "other",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "limit": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "feedback_admin:listFeedback",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "continueCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "isDone": {
+                      "type": "boolean"
+                    },
+                    "page": {
+                      "items": {
+                        "properties": {
+                          "_id": {
+                            "description": "Id<\"feedback\">",
+                            "type": "string",
+                            "x-lunora-table": "feedback"
+                          },
+                          "createdAt": {
+                            "type": "number"
+                          },
+                          "images": {
+                            "items": {
+                              "properties": {
+                                "contentType": {
+                                  "type": "string"
+                                },
+                                "url": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "contentType",
+                                "url"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "kind": {
+                            "anyOf": [
+                              {
+                                "const": "idea",
+                                "type": "string"
+                              },
+                              {
+                                "const": "problem",
+                                "type": "string"
+                              },
+                              {
+                                "const": "other",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "pagePath": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "sender": {
+                            "properties": {
+                              "email": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "image": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "name": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "userId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "email",
+                              "image",
+                              "name",
+                              "userId"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "_id",
+                          "createdAt",
+                          "images",
+                          "kind",
+                          "message",
+                          "pagePath",
+                          "sender"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "continueCursor",
+                    "isDone",
+                    "page"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: feedback_admin:listFeedback",
+        "tags": [
+          "feedback"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#feedback_functions:submitFeedback": {
       "post": {
         "description": "Invoke the `action` `feedback_functions:submitFeedback` over the Lunora RPC envelope (POST /_lunora/rpc).",

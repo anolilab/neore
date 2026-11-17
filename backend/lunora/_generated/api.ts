@@ -472,6 +472,9 @@ export interface ApiTypes {
         };
     };
     feedback: {
+        admin: {
+            listFeedback: FunctionReference<"query", { cursor?: string | null; kind?: "idea" | "problem" | "other"; limit?: number }, { continueCursor: string | null; isDone: boolean; page: Array<{ _id: Id<"feedback">; createdAt: number; images: Array<{ contentType: string; url: string | null }>; kind: "idea" | "problem" | "other"; message: string; pagePath: string | null; sender: { email: string | null; image: string | null; name: string | null; userId: string } }> }>;
+        };
         functions: {
             submitFeedback: FunctionReference<"action", { kind: "idea" | "problem" | "other"; message: string; pagePath?: string; uploadIds: Array<string> }, { feedbackId: Id<"feedback"> }>;
         };
@@ -1396,6 +1399,9 @@ export const api: ApiTypes = {
         },
     },
     feedback: {
+        admin: {
+            listFeedback: { __lunoraRef: "feedback_admin:listFeedback" },
+        },
         functions: {
             submitFeedback: { __lunoraRef: "feedback_functions:submitFeedback" },
         },

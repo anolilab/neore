@@ -34,6 +34,7 @@ import { Route as ShortcutVaultRouteImport } from './routes/_shortcut/vault'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAuditLogRouteImport } from './routes/admin/audit-log'
 import { Route as AdminCleanupRouteImport } from './routes/admin/cleanup'
+import { Route as AdminFeedbackRouteImport } from './routes/admin/feedback'
 import { Route as AdminGatewayRouteImport } from './routes/admin/gateway'
 import { Route as AdminNsfwReviewRouteImport } from './routes/admin/nsfw-review'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
@@ -220,6 +221,11 @@ const AdminAuditLogRoute = AdminAuditLogRouteImport.update({
 const AdminCleanupRoute = AdminCleanupRouteImport.update({
   id: '/cleanup',
   path: '/cleanup',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
   getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminGatewayRoute = AdminGatewayRouteImport.update({
@@ -592,6 +598,7 @@ export interface FileRoutesByFullPath {
   '/vault': typeof ShortcutVaultRoute
   '/admin/audit-log': typeof AdminAuditLogRoute
   '/admin/cleanup': typeof AdminCleanupRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/gateway': typeof AdminGatewayRouteWithChildren
   '/admin/nsfw-review': typeof AdminNsfwReviewRoute
   '/admin/users': typeof AdminUsersRoute
@@ -676,6 +683,7 @@ export interface FileRoutesByTo {
   '/vault': typeof ShortcutVaultRoute
   '/admin/audit-log': typeof AdminAuditLogRoute
   '/admin/cleanup': typeof AdminCleanupRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/nsfw-review': typeof AdminNsfwReviewRoute
   '/admin/users': typeof AdminUsersRoute
   '/api/scribe-token': typeof ApiScribeTokenRoute
@@ -766,6 +774,7 @@ export interface FileRoutesById {
   '/_shortcut/vault': typeof ShortcutVaultRoute
   '/admin/audit-log': typeof AdminAuditLogRoute
   '/admin/cleanup': typeof AdminCleanupRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/gateway': typeof AdminGatewayRouteWithChildren
   '/admin/nsfw-review': typeof AdminNsfwReviewRoute
   '/admin/users': typeof AdminUsersRoute
@@ -858,6 +867,7 @@ export interface FileRouteTypes {
     | '/vault'
     | '/admin/audit-log'
     | '/admin/cleanup'
+    | '/admin/feedback'
     | '/admin/gateway'
     | '/admin/nsfw-review'
     | '/admin/users'
@@ -942,6 +952,7 @@ export interface FileRouteTypes {
     | '/vault'
     | '/admin/audit-log'
     | '/admin/cleanup'
+    | '/admin/feedback'
     | '/admin/nsfw-review'
     | '/admin/users'
     | '/api/scribe-token'
@@ -1031,6 +1042,7 @@ export interface FileRouteTypes {
     | '/_shortcut/vault'
     | '/admin/audit-log'
     | '/admin/cleanup'
+    | '/admin/feedback'
     | '/admin/gateway'
     | '/admin/nsfw-review'
     | '/admin/users'
@@ -1302,6 +1314,13 @@ declare module '@tanstack/react-router' {
       path: '/cleanup'
       fullPath: '/admin/cleanup'
       preLoaderRoute: typeof AdminCleanupRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/feedback': {
+      id: '/admin/feedback'
+      path: '/feedback'
+      fullPath: '/admin/feedback'
+      preLoaderRoute: typeof AdminFeedbackRouteImport
       parentRoute: typeof AdminRouteRoute
     }
     '/admin/gateway': {
@@ -1803,6 +1822,7 @@ const AdminGatewayRouteWithChildren = AdminGatewayRoute._addFileChildren(
 interface AdminRouteRouteChildren {
   AdminAuditLogRoute: typeof AdminAuditLogRoute
   AdminCleanupRoute: typeof AdminCleanupRoute
+  AdminFeedbackRoute: typeof AdminFeedbackRoute
   AdminGatewayRoute: typeof AdminGatewayRouteWithChildren
   AdminNsfwReviewRoute: typeof AdminNsfwReviewRoute
   AdminUsersRoute: typeof AdminUsersRoute
@@ -1812,6 +1832,7 @@ interface AdminRouteRouteChildren {
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminAuditLogRoute: AdminAuditLogRoute,
   AdminCleanupRoute: AdminCleanupRoute,
+  AdminFeedbackRoute: AdminFeedbackRoute,
   AdminGatewayRoute: AdminGatewayRouteWithChildren,
   AdminNsfwReviewRoute: AdminNsfwReviewRoute,
   AdminUsersRoute: AdminUsersRoute,
