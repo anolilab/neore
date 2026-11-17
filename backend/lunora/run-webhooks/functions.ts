@@ -65,6 +65,10 @@ export const saveRunWebhook = authMutation
             throw new LunoraError("INVALID_INPUT", problem);
         }
 
+        // Encrypted before the read, so the only await between the read and the insert is the write itself. The shard's
+        // input gate then keeps two first saves from both finding no row (the same read-then-write rule `rls/policies.ts` names).
+        const secret = generateRunWebhookSecret();
+        const secretCiphertext = await encryptKey(secret, "tool-keys");
         const existing = await ownRow(context, userId);
 
         if (existing) {
@@ -74,14 +78,12 @@ export const saveRunWebhook = authMutation
             return {};
         }
 
-        const secret = generateRunWebhookSecret();
-
         context.log.event("runWebhooks.save", { created: true, enabled: args.enabled });
 
         await context.db.insert("runWebhooks", {
             createdAt: context.now,
             enabled: args.enabled,
-            secretCiphertext: await encryptKey(secret, "tool-keys"),
+            secretCiphertext,
             updatedAt: context.now,
             url: args.url,
             userId,

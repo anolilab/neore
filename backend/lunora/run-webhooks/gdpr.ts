@@ -8,6 +8,7 @@
  */
 import { v } from "lunorash/server";
 
+import type { Doc } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
 
 const BATCH = 200;
@@ -16,10 +17,19 @@ export const collectRunWebhookForExport = internalQuery
     .input({ userId: v.string() })
     .output(v.object({ runWebhooks: v.array(v.object({ createdAt: v.number(), enabled: v.boolean(), updatedAt: v.number(), url: v.string() })) }))
     .query(async ({ args: { userId }, ctx }) => {
-        const { page } = await ctx.db.runWebhooks.findMany({ limit: 1, where: { userId } });
+        // Every page, to the last one: the export never drops a row on the assumption that there is only one.
+        const rows: Doc<"runWebhooks">[] = [];
+        let cursor: string | undefined;
+
+        do {
+            const result = await ctx.db.runWebhooks.findMany({ consistency: "primary", cursor, limit: BATCH, where: { userId } });
+
+            rows.push(...result.page);
+            cursor = result.isDone ? undefined : (result.continueCursor ?? undefined);
+        } while (cursor !== undefined);
 
         return {
-            runWebhooks: page.map((row) => {
+            runWebhooks: rows.map((row) => {
                 return { createdAt: row.createdAt, enabled: row.enabled, updatedAt: row.updatedAt, url: row.url };
             }),
         };
