@@ -19,6 +19,8 @@ pub mod acp_install;
 #[cfg(feature = "keychain")]
 pub mod acp_install_npm;
 pub mod acp_permission;
+#[cfg(feature = "keychain")]
+pub mod acp_terminal;
 pub mod actions;
 pub mod agent_env;
 pub mod agent_host;

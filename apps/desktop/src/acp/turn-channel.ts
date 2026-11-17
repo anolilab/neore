@@ -98,16 +98,17 @@ export class TurnChannel {
         return this.inflight !== undefined || this.pending.length > 0;
     }
 
-    public enqueue(event: HostEvent): void {
+    /** Whether the event was taken: a sealed or stopped channel, or one over its cap, takes nothing. */
+    public enqueue(event: HostEvent): boolean {
         if (this.sealed || this.stopped) {
-            return;
+            return false;
         }
 
         // Over the cap while the backend is out of reach: output is dropped, but the turn's own start and end are kept.
         if (event.kind !== "turn_start" && event.kind !== "turn_end" && this.pendingJson > MAX_PENDING_JSON) {
             this.dropped += 1;
 
-            return;
+            return false;
         }
 
         const isText = event.kind === "text" || event.kind === "reasoning";
@@ -118,12 +119,18 @@ export class TurnChannel {
         if (isText && last?.kind === event.kind && last.text.length + event.text.length <= MAX_EVENT_TEXT) {
             last.text += event.text;
             this.pendingJson += event.text.length;
+        } else if (event.kind === "plan" && this.replacePendingPlan(event)) {
+            // A plan is the whole list each time: the one still waiting is replaced, so a burst of updates costs one slot.
+        } else if (event.kind === "tool_output" && this.replacePendingOutput(event)) {
+            // Only the latest output of a call is shown: one still waiting is replaced in place.
         } else {
             this.pending.push(event);
             this.pendingJson += jsonLength(event);
         }
 
         this.schedule(Math.max(0, POST_INTERVAL_MS - (this.host.now() - this.lastPostAt)));
+
+        return true;
     }
 
     public append(kind: "reasoning" | "text", delta: string): void {
@@ -157,6 +164,56 @@ export class TurnChannel {
         this.stopped = true;
         clearTimeout(this.timer);
         clearTimeout(this.keepalive);
+    }
+
+    /**
+     * Replaces the plan still waiting, wherever it sits in the queue. The latest plan goes to the end, where it was last sent: a plan
+     * with reply text sent after it keeps that order, and a burst of updates between two texts still costs one slot.
+     */
+    private replacePendingPlan(event: HostEvent & { kind: "plan" }): boolean {
+        const index = this.pending.findIndex((queued) => queued.kind === "plan");
+        const queued = this.pending[index];
+
+        if (queued === undefined) {
+            return false;
+        }
+
+        this.pendingJson -= jsonLength(queued);
+        this.pending.splice(index, 1);
+        this.pending.push(event);
+        this.pendingJson += jsonLength(event);
+
+        return true;
+    }
+
+    /**
+     * Replaces the output of a call still waiting, so only its latest output is posted. A status change for the call queued after that
+     * output keeps the order the agent sent: the newer output then goes after the status, never ahead of it, so the backend does not
+     * show a final output next to the status before it.
+     */
+    private replacePendingOutput(event: HostEvent & { kind: "tool_output" }): boolean {
+        const index = this.pending.findIndex((queued) => queued.kind === "tool_output" && queued.id === event.id);
+        const queued = this.pending[index];
+
+        if (queued === undefined) {
+            return false;
+        }
+
+        const statusAfter = this.pending.slice(index + 1).some((later) => later.kind === "tool" && later.id === event.id);
+
+        if (statusAfter) {
+            this.pending.splice(index, 1);
+            this.pendingJson -= jsonLength(queued);
+            this.pending.push(event);
+            this.pendingJson += jsonLength(event);
+
+            return true;
+        }
+
+        this.pendingJson += jsonLength(event) - jsonLength(queued);
+        this.pending[index] = event;
+
+        return true;
     }
 
     private schedule(delayMs: number): void {

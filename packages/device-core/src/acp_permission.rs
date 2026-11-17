@@ -49,6 +49,10 @@ pub struct PermissionRequest {
     /// Everything the agent sent is in `details`. Without it the request cannot be approved in a batch.
     pub details_complete: bool,
     pub folder: String,
+    /// Decided one at a time: never approved in a batch, and never allowed from another device unless `terminal`.
+    /// Set for a command the agent asks to run on this computer (a terminal), as for `shell_run`.
+    #[serde(default)]
+    pub local_only: bool,
     pub options: Vec<OfferedOption>,
     /// The id the backend and the phone know this request by (`permission_request` in the turn post). A remote
     /// answer names it; the numeric id below is this window's own.
@@ -57,6 +61,10 @@ pub struct PermissionRequest {
     /// The host's session id, not the agent's.
     pub session_id: String,
     pub target: Option<String>,
+    /// A command to run in a terminal (`terminal/create`). Of the local-only requests, only this one may be allowed
+    /// from another device, and only once, with its command shown there.
+    #[serde(default)]
+    pub terminal: bool,
     pub tool: String,
     pub tool_kind: String,
 }
@@ -149,7 +157,7 @@ fn decline_outcome(request: &PermissionRequest) -> Outcome {
 }
 
 fn is_batchable(request: &PermissionRequest) -> bool {
-    request.details_complete && allow_option(request).is_some()
+    request.details_complete && !request.local_only && allow_option(request).is_some()
 }
 
 fn answered(pending: &Pending, decision: &'static str) -> Answered {
@@ -168,6 +176,10 @@ pub const ALREADY_ANSWERED: &str = "already_answered";
 /// What a remote "allow" gets for a request whose details were cut or never sent whole. The person decides on what
 /// the web shows, so an allow needs all of it; a decline needs none.
 pub const DETAILS_INCOMPLETE: &str = "details_incomplete";
+
+/// What a remote "allow" gets for a request only this computer's window may allow: a local-only request that is not a
+/// terminal, or a terminal with no command to show. A decline is accepted.
+pub const LOCAL_ONLY: &str = "local_only";
 
 /// Takes the request at `index` out of the queue and gives the agent the option, if it may be chosen.
 fn answer_at(queue: &mut Vec<Pending>, index: usize, option_id: &str) -> Result<Answered, String> {
@@ -221,6 +233,7 @@ impl AcpPermissions {
                 && request.details.len() <= MAX_DETAILS,
             details: limited(request.details, MAX_DETAILS),
             folder: limited(request.folder, MAX_TEXT),
+            local_only: request.local_only,
             // Checked on everything the agent sent, then cut: an id repeated past the cap would otherwise hide.
             options: distinct_options(request.options)
                 .into_iter()
@@ -229,6 +242,7 @@ impl AcpPermissions {
             request_id: limited(request.request_id, MAX_TEXT),
             session_id: request.session_id,
             target: request.target.map(|text| limited(text, MAX_TEXT)),
+            terminal: request.terminal,
             tool: limited(request.tool, MAX_TEXT),
             tool_kind: limited(request.tool_kind, 40),
         };
@@ -336,6 +350,19 @@ impl AcpPermissions {
 
         if allows && !queue[index].request.details_complete {
             return Err(DETAILS_INCOMPLETE.into());
+        }
+
+        let request = &queue[index].request;
+
+        if allows
+            && request.local_only
+            && !(request.terminal
+                && request
+                    .command
+                    .as_ref()
+                    .is_some_and(|text| !text.trim().is_empty()))
+        {
+            return Err(LOCAL_ONLY.into());
         }
 
         answer_at(&mut queue, index, option_id)
@@ -466,6 +493,7 @@ mod tests {
             details: "{}".into(),
             details_complete: true,
             folder: "/work".into(),
+            local_only: false,
             options: vec![
                 option("allow", ALLOW_ONCE),
                 option("always", "allow_always"),
@@ -474,6 +502,7 @@ mod tests {
             request_id: format!("req-{tool}"),
             session_id: session.into(),
             target: Some("/work/a.txt".into()),
+            terminal: false,
             tool: tool.into(),
             tool_kind: "execute".into(),
         }
@@ -634,6 +663,103 @@ mod tests {
         );
         permissions.cancel_session("s2");
         other.join().unwrap();
+    }
+
+    #[test]
+    fn a_local_only_request_that_is_not_a_terminal_is_allowed_only_here_and_never_in_a_batch() {
+        let permissions = Arc::new(AcpPermissions::default());
+        let mut terminal = request("s1", "Run in a terminal");
+
+        terminal.local_only = true;
+
+        let (id, waiting) = queue(&permissions, terminal);
+
+        assert!(!permissions.view()[0].batchable);
+        assert!(permissions.answer_batch(&[id]).is_err());
+        assert_eq!(
+            permissions
+                .answer_remote("s1", "req-Run in a terminal", "allow")
+                .unwrap_err(),
+            LOCAL_ONLY
+        );
+        assert_eq!(permissions.view().len(), 1);
+        permissions.answer(id, "allow").unwrap();
+        assert_eq!(waiting.join().unwrap(), selected("allow"));
+
+        let mut declined = request("s1", "Run again");
+
+        declined.local_only = true;
+
+        let (_, waiting) = queue(&permissions, declined);
+
+        permissions
+            .answer_remote("s1", "req-Run again", "reject")
+            .unwrap();
+        assert_eq!(waiting.join().unwrap(), selected("reject"));
+    }
+
+    #[test]
+    fn a_terminal_request_may_be_allowed_once_from_another_device_but_never_always_or_in_a_batch() {
+        let permissions = Arc::new(AcpPermissions::default());
+        let mut terminal = request("s1", "Run in a terminal");
+
+        terminal.local_only = true;
+        terminal.terminal = true;
+
+        let (id, waiting) = queue(&permissions, terminal);
+
+        assert!(!permissions.view()[0].batchable);
+        assert!(permissions.answer_batch(&[id]).is_err());
+        assert!(permissions
+            .answer_remote("s1", "req-Run in a terminal", "always")
+            .unwrap_err()
+            .contains("Always allow"));
+        assert_eq!(permissions.view().len(), 1);
+
+        let answered = permissions
+            .answer_remote("s1", "req-Run in a terminal", "allow")
+            .unwrap();
+
+        assert_eq!(answered.decision, "once");
+        assert_eq!(waiting.join().unwrap(), selected("allow"));
+
+        // Nothing is remembered: the same command asked again waits for a person again.
+        let mut again = request("s1", "Run in a terminal");
+
+        again.local_only = true;
+        again.terminal = true;
+
+        let (_, waiting) = queue(&permissions, again);
+
+        assert_eq!(permissions.view().len(), 1);
+        permissions.cancel_session("s1");
+        assert_eq!(waiting.join().unwrap(), Outcome::Cancelled);
+    }
+
+    #[test]
+    fn a_terminal_request_with_no_command_to_show_is_allowed_only_here() {
+        let permissions = Arc::new(AcpPermissions::default());
+
+        for command in [None, Some(" ".to_owned())] {
+            let mut terminal = request("s1", "Run in a terminal");
+
+            terminal.command = command;
+            terminal.local_only = true;
+            terminal.terminal = true;
+
+            let (_, waiting) = queue(&permissions, terminal);
+
+            assert_eq!(
+                permissions
+                    .answer_remote("s1", "req-Run in a terminal", "allow")
+                    .unwrap_err(),
+                LOCAL_ONLY
+            );
+            permissions
+                .answer_remote("s1", "req-Run in a terminal", "reject")
+                .unwrap();
+            assert_eq!(waiting.join().unwrap(), selected("reject"));
+        }
     }
 
     #[test]

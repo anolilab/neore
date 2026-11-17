@@ -30,6 +30,7 @@ import { initialize } from "./protocol";
 import type { SendResult } from "./session";
 import { AgentSession } from "./session";
 import { AgentSignedOutError } from "./signed-out";
+import type { TerminalHost } from "./terminals";
 import type { AcpUpdate, AcpView, ProbeResult, SessionSnapshot, SessionStatus, SessionSummary, SpawnPlan } from "./types";
 
 /** The window is told about changes at most this often; streamed text would otherwise re-render per chunk. */
@@ -76,6 +77,8 @@ export interface ManagerOptions {
     sleepLock?: SleepLock;
     spawn: Spawner;
     startupTimeoutMs?: number;
+    /** The core's terminals (`terminals.ts`), offered to agents whose folder is on this computer. Without it, none is. */
+    terminals?: TerminalHost;
 }
 
 /** The agent session a backend start opens from: one to load again (`nativeSessionId`) or one to fork (`forkSessionId`). */
@@ -260,26 +263,37 @@ export class AcpManager {
         const resumeFields = remote === undefined ? {} : savedSessionFields(remote);
         const { observer } = this.options;
         const hostFields = folderInfo === undefined || observer === undefined ? {} : { hostInfo: { agentKey, agentLabel, ...folderInfo }, observer };
-        const session = new AgentSession({
-            agentKey,
-            agentLabel,
-            appVersion: this.options.appVersion,
-            cancelGraceMs: this.options.cancelGraceMs,
-            folder: plan.cwd,
-            folderIsRemote: this.options.folderIsRemote,
-            gate: this.options.gate ?? declineGate,
-            lifecycle:
-                hooks === undefined
-                    ? undefined
-                    : { ended: () => runner?.stop(), turnEnded: () => runner?.turnEnded(), turnStarted: () => runner?.turnStarted() },
-            log: this.options.log,
-            onChange: () => this.sessionChanged(),
-            process: child,
-            startupTimeoutMs: this.options.startupTimeoutMs,
-            ...remoteFields,
-            ...resumeFields,
-            ...hostFields,
-        });
+        let session: AgentSession;
+
+        try {
+            session = new AgentSession({
+                agentKey,
+                agentLabel,
+                appVersion: this.options.appVersion,
+                cancelGraceMs: this.options.cancelGraceMs,
+                folder: plan.cwd,
+                folderIsRemote: this.options.folderIsRemote,
+                gate: this.options.gate ?? declineGate,
+                lifecycle:
+                    hooks === undefined
+                        ? undefined
+                        : { ended: () => runner?.stop(), turnEnded: () => runner?.turnEnded(), turnStarted: () => runner?.turnStarted() },
+                log: this.options.log,
+                onChange: () => this.sessionChanged(),
+                process: child,
+                startupTimeoutMs: this.options.startupTimeoutMs,
+                terminals: this.options.terminals,
+                ...remoteFields,
+                ...resumeFields,
+                ...hostFields,
+            });
+        } catch (error) {
+            // Nothing holds the agent yet: no session was registered, so nothing else would stop it. It is stopped here, and the
+            // refusal is reported as it was.
+            child.killNow();
+
+            throw error;
+        }
 
         this.sessions.set(session.id, session);
 

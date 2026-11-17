@@ -1435,6 +1435,7 @@ mod tests {
             details: "{}".into(),
             details_complete: true,
             folder: "/work".into(),
+            local_only: false,
             request_id: "r1".into(),
             options: vec![
                 OfferedOption {
@@ -1455,6 +1456,7 @@ mod tests {
             ],
             session_id: "s1".into(),
             target: Some("/work/x".into()),
+            terminal: false,
             tool: "Run curl".into(),
             tool_kind: "execute".into(),
         };
