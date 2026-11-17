@@ -61,23 +61,23 @@ msgstr "“{0}” 将在其依赖项完成后开始"
 msgid "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
 msgstr "“{badLogin}”不是有效的登录名。登录名须以字母或数字开头，最多 {0} 个字符，且只能包含字母、数字以及单个连字符或下划线。"
 
-#: src/features/chat/thread/composer-input.tsx:628
+#: src/features/chat/thread/composer-input.tsx:629
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "无法附加“{fileName}”：不支持此文件类型。"
 
-#: src/features/chat/thread/composer-input.tsx:621
+#: src/features/chat/thread/composer-input.tsx:622
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "无法附加“{fileName}”：文件内容与其文件类型不符。"
 
-#: src/features/chat/thread/composer-input.tsx:623
+#: src/features/chat/thread/composer-input.tsx:624
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "无法上传“{fileName}”。请检查你的网络连接，然后重试。"
 
-#: src/features/chat/thread/composer-input.tsx:626
+#: src/features/chat/thread/composer-input.tsx:627
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。文档最大为 {maxMegabytes} MB。"
 
-#: src/features/chat/thread/composer-input.tsx:627
+#: src/features/chat/thread/composer-input.tsx:628
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "“{fileName}”太大了。此类文件最大为 {maxMegabytes} MB。"
 
@@ -2459,12 +2459,12 @@ msgstr "将选取的帧添加为图片节点"
 
 #: src/features/chat/thread-list/thread-list-header.tsx:126
 #: src/features/chat/thread-list/thread-list-header.tsx:136
-#: src/features/projects/components/add-project-dialog.tsx:651
+#: src/features/projects/components/add-project-dialog.tsx:676
 msgid "Add project"
 msgstr ""
 
 #. placeholder {0}: rowName(machine)
-#: src/features/projects/components/add-project-dialog.tsx:478
+#: src/features/projects/components/add-project-dialog.tsx:499
 msgid "Add project on {0}"
 msgstr ""
 
@@ -2641,7 +2641,7 @@ msgstr "新增："
 msgid "Adding documents… {0} of {1}"
 msgstr "正在添加文档… {0} / {1}"
 
-#: src/features/projects/components/add-project-dialog.tsx:489
+#: src/features/projects/components/add-project-dialog.tsx:510
 msgid "Adding the project…"
 msgstr ""
 
@@ -2654,7 +2654,7 @@ msgid "Adding your earlier replies…"
 msgstr "正在添加你之前的回复…"
 
 #: src/features/chat/aside/aside-panel.tsx:168
-#: src/features/projects/components/add-project-dialog.tsx:651
+#: src/features/projects/components/add-project-dialog.tsx:676
 msgid "Adding…"
 msgstr "正在添加…"
 
@@ -4615,7 +4615,7 @@ msgstr "Azure 门户 → 你的 OpenAI 资源 → 密钥和终结点。加密存
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:394
 #: src/features/pages/components/page-version-panel.tsx:89
-#: src/features/projects/components/add-project-dialog.tsx:644
+#: src/features/projects/components/add-project-dialog.tsx:673
 msgid "Back"
 msgstr "返回"
 
@@ -5641,7 +5641,7 @@ msgstr "加拿大"
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
-#: src/features/projects/components/add-project-dialog.tsx:638
+#: src/features/projects/components/add-project-dialog.tsx:667
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:395
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
@@ -6312,7 +6312,7 @@ msgstr "选择搜索模式"
 msgid "Choose the camera system for your shot"
 msgstr "为你的镜头选择相机系统"
 
-#: src/features/projects/components/add-project-dialog.tsx:481
+#: src/features/projects/components/add-project-dialog.tsx:502
 msgid "Choose the project's folder, or type a path."
 msgstr ""
 
@@ -6586,7 +6586,7 @@ msgstr "点击任意消息上的图钉图标即可保存到这里。"
 msgid "Click the star on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型的星标即可将其添加到这里。"
 
-#: src/features/chat/thread/composer-input.tsx:316
+#: src/features/chat/thread/composer-input.tsx:317
 msgid "Click to edit"
 msgstr "点击编辑"
 
@@ -6626,7 +6626,7 @@ msgstr "剪贴板"
 msgid "clock"
 msgstr "时钟"
 
-#: src/features/projects/components/add-project-dialog.tsx:635
+#: src/features/projects/components/add-project-dialog.tsx:664
 msgid "Clone or create new…"
 msgstr ""
 
@@ -7697,7 +7697,7 @@ msgstr "已连接到 {0}"
 msgid "Connected. You can close this window."
 msgstr "已连接。你可以关闭此窗口。"
 
-#: src/features/projects/components/add-project-dialog.tsx:486
+#: src/features/projects/components/add-project-dialog.tsx:507
 msgid "Connecting {pairingHost}…"
 msgstr ""
 
@@ -8053,8 +8053,8 @@ msgstr "此列表未显示的文件上的对话和待提交评论"
 msgid "Conversations on lines this diff no longer shows"
 msgstr "此差异不再显示的行上的对话"
 
-#: src/features/chat/thread/composer-input.tsx:812
-#: src/features/chat/thread/composer-input.tsx:1553
+#: src/features/chat/thread/composer-input.tsx:813
+#: src/features/chat/thread/composer-input.tsx:1554
 msgid "Conversion failed"
 msgstr "转换失败"
 
@@ -8380,7 +8380,7 @@ msgstr "无法附加 {0}。其他文件已附加；请重试这些文件。"
 msgid "Could not attach {0}. Try those again."
 msgstr "无法附加 {0}。请重试。"
 
-#: src/features/chat/thread/composer-input.tsx:1575
+#: src/features/chat/thread/composer-input.tsx:1576
 msgid "Could not attach the chat"
 msgstr "无法附加该聊天"
 
@@ -8664,11 +8664,11 @@ msgstr "无法连接服务器以开始生成。请检查网络连接后重试。
 msgid "Could not reach the server. Try again."
 msgstr "无法连接服务器。请重试。"
 
-#: src/features/chat/thread/composer-input.tsx:1578
+#: src/features/chat/thread/composer-input.tsx:1579
 msgid "Could not read that chat"
 msgstr "无法读取该聊天"
 
-#: src/features/chat/thread/composer-input.tsx:1579
+#: src/features/chat/thread/composer-input.tsx:1580
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 
@@ -11114,7 +11114,7 @@ msgstr "拖放文件或点击上传"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1763
+#: src/features/chat/thread/composer-input.tsx:1765
 msgid "Drop files here"
 msgstr "将文件拖放到此处"
 
@@ -11423,8 +11423,8 @@ msgstr "编辑集合"
 msgid "Edit comment"
 msgstr "编辑评论"
 
-#: src/features/chat/thread/composer-input.tsx:323
-#: src/features/chat/thread/composer-input.tsx:335
+#: src/features/chat/thread/composer-input.tsx:324
+#: src/features/chat/thread/composer-input.tsx:336
 msgid "Edit content"
 msgstr "编辑内容"
 
@@ -13116,7 +13116,7 @@ msgid "Failed to attach collection"
 msgstr "附加集合失败"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1404
+#: src/features/chat/thread/composer-input.tsx:1405
 msgid "Failed to attach file"
 msgstr "附加文件失败"
 
@@ -13526,7 +13526,7 @@ msgstr "请求导出失败"
 msgid "Failed to reset to defaults"
 msgstr "恢复默认设置失败"
 
-#: src/features/chat/thread/composer-input.tsx:1436
+#: src/features/chat/thread/composer-input.tsx:1437
 msgid "Failed to restore attachment"
 msgstr "恢复附件失败"
 
@@ -14640,11 +14640,11 @@ msgstr "聚焦聊天：{title}"
 msgid "Focus Search"
 msgstr "聚焦搜索"
 
-#: src/features/projects/components/add-project-dialog.tsx:561
+#: src/features/projects/components/add-project-dialog.tsx:589
 msgid "Folder path"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:579
+#: src/features/projects/components/add-project-dialog.tsx:608
 msgid "Folders"
 msgstr ""
 
@@ -15649,7 +15649,7 @@ msgstr "前往文件库"
 msgid "Go to your pages"
 msgstr "前往你的页面"
 
-#: src/features/projects/components/add-project-dialog.tsx:583
+#: src/features/projects/components/add-project-dialog.tsx:612
 msgid "Go up to {parent}"
 msgstr ""
 
@@ -19020,7 +19020,7 @@ msgstr "正在加载文件"
 msgid "Loading files…"
 msgstr "正在加载文件…"
 
-#: src/features/projects/components/add-project-dialog.tsx:487
+#: src/features/projects/components/add-project-dialog.tsx:508
 msgid "Loading folders…"
 msgstr ""
 
@@ -19378,7 +19378,7 @@ msgstr "检测到长文本"
 msgid "Long text generation in images"
 msgstr "图像中的长文本生成"
 
-#: src/features/chat/thread/composer-input.tsx:888
+#: src/features/chat/thread/composer-input.tsx:889
 msgid "Long text was attached as a file."
 msgstr "长文本已作为文件附加。"
 
@@ -19414,7 +19414,7 @@ msgstr "LINE 频道 Messaging API 标签页中的长期 channel access token"
 msgid "Longest the answer may take, in milliseconds"
 msgstr "答案允许的最长耗时，单位为毫秒"
 
-#: src/features/projects/components/add-project-dialog.tsx:502
+#: src/features/projects/components/add-project-dialog.tsx:523
 msgid "Looking for machines…"
 msgstr ""
 
@@ -19501,7 +19501,7 @@ msgstr "Mach-O 二进制文件"
 msgid "Machine"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:506
+#: src/features/projects/components/add-project-dialog.tsx:527
 msgid "Machines"
 msgstr ""
 
@@ -22009,7 +22009,7 @@ msgstr "你的知识库中还没有文件。在上方上传文档即可开始。
 msgid "No focal length selected"
 msgstr "未选择焦距"
 
-#: src/features/projects/components/add-project-dialog.tsx:615
+#: src/features/projects/components/add-project-dialog.tsx:644
 msgid "No folders in here."
 msgstr ""
 
@@ -24843,7 +24843,7 @@ msgstr "从收件箱中选择一项进行阅读。"
 msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
 msgstr "选择要作为一个 Markdown 文件分享的技能、计划任务、webhook 和群聊。API 密钥、webhook 密钥、连接器令牌和其他凭据绝不会包含在内，你的账号或组织 ID 也不会。"
 
-#: src/features/projects/components/add-project-dialog.tsx:481
+#: src/features/projects/components/add-project-dialog.tsx:502
 msgid "Pick the computer or server the project's folder is on."
 msgstr ""
 
@@ -25387,7 +25387,7 @@ msgstr "按回车键或空格键选择节点。然后可使用方向键移动节
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr "按回车键或空格键选择连线。然后可按 Delete 键删除，或按 Esc 键取消。"
 
-#: src/features/projects/components/add-project-dialog.tsx:576
+#: src/features/projects/components/add-project-dialog.tsx:605
 msgid "Press Enter to open the folder. A folder that does not exist is created."
 msgstr ""
 
@@ -26496,7 +26496,7 @@ msgstr "只读预览——复刻后可编辑"
 msgid "Read-only shared conversation"
 msgstr "只读共享对话"
 
-#: src/features/chat/thread/composer-input.tsx:280
+#: src/features/chat/thread/composer-input.tsx:281
 msgid "Reading \"{attachmentName}\"…"
 msgstr "正在读取“{attachmentName}”…"
 
@@ -27123,10 +27123,10 @@ msgstr "记住我"
 #: src/features/chat/host/host-composer.tsx:1033
 #: src/features/chat/sharing/thread-share-button.tsx:300
 #: src/features/chat/sharing/thread-share-button.tsx:372
-#: src/features/chat/thread/composer-input.tsx:342
-#: src/features/chat/thread/composer-input.tsx:354
-#: src/features/chat/thread/composer-input.tsx:408
-#: src/features/chat/thread/composer-input.tsx:417
+#: src/features/chat/thread/composer-input.tsx:343
+#: src/features/chat/thread/composer-input.tsx:355
+#: src/features/chat/thread/composer-input.tsx:409
+#: src/features/chat/thread/composer-input.tsx:418
 #: src/features/devices/components/devices-settings.tsx:334
 #: src/features/devices/components/devices-settings.tsx:340
 #: src/features/projects/components/project-form-dialog.tsx:265
@@ -27508,7 +27508,7 @@ msgstr "所选期间内每个技能或智能体的回复、token 和支出"
 msgid "Reply"
 msgstr "回复"
 
-#: src/features/chat/thread/reply-complete-announcement.tsx:81
+#: src/features/chat/thread/reply-complete-announcement.tsx:93
 msgid "Reply complete"
 msgstr "回复完成"
 
@@ -27904,11 +27904,11 @@ msgstr "立即重试"
 msgid "Retry the device check"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:431
+#: src/features/chat/thread/composer-input.tsx:432
 msgid "Retry upload"
 msgstr "重试上传"
 
-#: src/features/chat/thread/composer-input.tsx:426
+#: src/features/chat/thread/composer-input.tsx:427
 msgid "Retry upload of {attachmentName}"
 msgstr "重试上传 {attachmentName}"
 
@@ -28723,7 +28723,7 @@ msgstr "得分"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "根据预期答案或评分标准为每个答案打 0–100% 的分。每个用例会额外调用一次小模型。"
 
-#: src/features/chat/thread/composer-input.tsx:1363
+#: src/features/chat/thread/composer-input.tsx:1364
 msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
@@ -29939,7 +29939,7 @@ msgstr "收起"
 msgid "Show more"
 msgstr "展开"
 
-#: src/features/projects/components/add-project-dialog.tsx:625
+#: src/features/projects/components/add-project-dialog.tsx:654
 msgid "Show more folders"
 msgstr ""
 
@@ -30991,7 +30991,7 @@ msgstr ""
 msgid "SSH · {0} · not connected yet"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:545
+#: src/features/projects/components/add-project-dialog.tsx:566
 msgid "SSH hosts come from ~/.ssh/config. Picking one connects it."
 msgstr ""
 
@@ -32753,7 +32753,7 @@ msgstr "文字方向已设为 LTR"
 msgid "Text direction set to RTL"
 msgstr "文字方向已设为 RTL"
 
-#: src/features/chat/thread/composer-input.tsx:316
+#: src/features/chat/thread/composer-input.tsx:317
 msgid "Text document"
 msgstr "文本文档"
 
@@ -33161,7 +33161,7 @@ msgstr ""
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "聊天智能体使用其工具处理任务，并可选择遵循某个技能。"
 
-#: src/features/chat/thread/composer-input.tsx:988
+#: src/features/chat/thread/composer-input.tsx:989
 msgid "The chat changed before the paste was ready, so it was not inserted."
 msgstr "粘贴内容准备好之前聊天已切换，因此未插入。"
 
@@ -33197,8 +33197,8 @@ msgstr ""
 msgid "The comparison could not be loaded."
 msgstr "无法加载对比结果。"
 
-#: src/features/chat/thread/composer-input.tsx:996
-#: src/features/chat/thread/composer-input.tsx:1018
+#: src/features/chat/thread/composer-input.tsx:997
+#: src/features/chat/thread/composer-input.tsx:1019
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "粘贴准备好之前输入框已被锁定，因此未插入。"
 
@@ -33609,7 +33609,7 @@ msgstr "页面现在显示的是另一个版本。请从你的版本中复制想
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "该页面、所有子页面、评论及版本历史都将被删除。此操作无法撤销。"
 
-#: src/features/chat/thread/composer-input.tsx:1044
+#: src/features/chat/thread/composer-input.tsx:1045
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "粘贴的文本无法附加，也未被插入。"
 
@@ -33771,7 +33771,7 @@ msgstr "两次输入的口令不一致。"
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "面向现代 AI 应用的统一 LLM 网关。"
 
-#: src/features/chat/thread/composer-input.tsx:622
+#: src/features/chat/thread/composer-input.tsx:623
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "“{fileName}”的上传已过期。请重新附加该文件。"
 
@@ -34110,7 +34110,7 @@ msgstr "此计算机已与另一个账户配对。"
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "此计算机已配对。请在桌面应用中选择要共享的文件夹。"
 
-#: src/features/projects/components/add-project-dialog.tsx:326
+#: src/features/projects/components/add-project-dialog.tsx:337
 msgid "This computer must be paired first."
 msgstr ""
 
@@ -34301,7 +34301,7 @@ msgstr "此链接不完整。请索取完整链接。"
 msgid "This link is not taking messages right now. Try again later."
 msgstr "此链接目前不接收消息。请稍后再试。"
 
-#: src/features/projects/components/add-project-dialog.tsx:400
+#: src/features/projects/components/add-project-dialog.tsx:421
 msgid "This machine is not ready yet."
 msgstr ""
 
@@ -35590,7 +35590,7 @@ msgid "Type your answer…"
 msgstr "输入你的回答…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1753
+#: src/features/chat/thread/composer-input.tsx:1755
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:197
 msgid "Type your message..."
 msgstr "输入你的消息..."
@@ -35760,7 +35760,7 @@ msgstr "下划线"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:890
+#: src/features/chat/thread/composer-input.tsx:891
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "撤销"
@@ -36003,7 +36003,7 @@ msgstr "任意库或框架的最新文档"
 msgid "Update Duration"
 msgstr "更新时长"
 
-#: src/features/chat/thread/composer-input.tsx:1610
+#: src/features/chat/thread/composer-input.tsx:1611
 msgid "Update failed"
 msgstr "更新失败"
 
@@ -36191,14 +36191,14 @@ msgstr "上传 CSV、运行 Python 分析并导出图表——无需配置 Jupyt
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "将文档上传到知识库并分组为集合。AI 会从中搜索相关上下文，并引用所用的段落。"
 
-#: src/features/chat/thread/composer-input.tsx:423
-#: src/features/chat/thread/composer-input.tsx:667
-#: src/features/chat/thread/composer-input.tsx:1531
+#: src/features/chat/thread/composer-input.tsx:424
+#: src/features/chat/thread/composer-input.tsx:668
+#: src/features/chat/thread/composer-input.tsx:1532
 msgid "Upload failed"
 msgstr "上传失败"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1524
+#: src/features/chat/thread/composer-input.tsx:1525
 msgid "Upload failed: {0}"
 msgstr "上传失败：{0}"
 
@@ -36248,7 +36248,7 @@ msgstr "已上传"
 msgid "Uploaded {fileName}"
 msgstr "已上传 {fileName}"
 
-#: src/features/chat/thread/composer-input.tsx:360
+#: src/features/chat/thread/composer-input.tsx:361
 msgid "Uploading {attachmentName}"
 msgstr "正在上传 {attachmentName}"
 
@@ -36603,7 +36603,7 @@ msgid "Uses AI SDK Text-to-Speech"
 msgstr "使用 AI SDK 文本转语音"
 
 #. placeholder {0}: newest.toolName
-#: src/features/chat/thread/turn-step-announcement.tsx:48
+#: src/features/chat/thread/turn-step-announcement.tsx:55
 msgid "Using {0}"
 msgstr "正在使用 {0}"
 
@@ -37831,7 +37831,7 @@ msgstr "助手应在什么时候使用此技能？"
 msgid "Where each run goes"
 msgstr "每次运行的去向"
 
-#: src/features/projects/components/add-project-dialog.tsx:478
+#: src/features/projects/components/add-project-dialog.tsx:499
 msgid "Where is the project?"
 msgstr ""
 
@@ -38239,8 +38239,8 @@ msgstr "你没有监视任何仓库。"
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "你已离线。网络恢复后，Neore 将重新连接。"
 
-#: src/features/chat/thread/composer-input.tsx:1102
-#: src/features/chat/thread/composer-input.tsx:1178
+#: src/features/chat/thread/composer-input.tsx:1103
+#: src/features/chat/thread/composer-input.tsx:1179
 #: src/features/chat/thread/composer-prompt-queue.tsx:112
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "你已离线。你的消息会保留在这里；恢复在线后再发送。"
@@ -38572,12 +38572,12 @@ msgid "Your First Chat"
 msgstr "你的第一次聊天"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:732
+#: src/features/chat/thread/composer-input.tsx:733
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "你的输入较大（约 {0} 个 token），将占用模型上下文窗口的很大一部分。"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:725
+#: src/features/chat/thread/composer-input.tsx:726
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "你的输入过大（约 {0} 个 token），超出了模型的上下文窗口。请缩短消息或移除附件后再提交。"
 
