@@ -20,6 +20,19 @@ const RETRY_MS = 5000;
 /** How often an output update checks the inhibitor the platform holds. */
 const VERIFY_MS = 5000;
 
+/** A readable reason for a failed call, whatever the blocker threw: the log must never fail a turn. */
+const reasonOf = (error: unknown): string => {
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    try {
+        return String(error);
+    } catch {
+        return "unknown error";
+    }
+};
+
 export class SleepLock {
     /** The sources that have a turn running now. A set, so a report that repeats changes nothing. */
     private readonly running = new Set<object>();
@@ -132,7 +145,7 @@ export class SleepLock {
 
     /** Logs a failed platform call, and holds further calls for the same state until the retry. */
     private fail(error: unknown, wanted: boolean): void {
-        const reason = error instanceof Error ? error.message : String(error);
+        const reason = reasonOf(error);
 
         this.log?.(`[keep-awake] could not ${wanted ? "hold" : "release"} the sleep lock: ${reason}`);
         this.failedWanted = wanted;
