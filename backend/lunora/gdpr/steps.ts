@@ -4,6 +4,7 @@ import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-
 import { readStoredText } from "../lib/storage-read";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { collectAcpSessionPages } from "../acp/gdpr";
+import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { collectAllRepositories } from "../projects/export-pages";
 import { projectDetailsReadBudget, repositoriesReadBudget, triggerReadBudget } from "./read-budget";
@@ -618,6 +619,10 @@ export const generateExportFile = internalAction
             evals: args.evals ?? { datasets: [] },
             exportDate: new Date().toISOString(),
             exportVersion: "1.0",
+            // What the user sent through "Send feedback", read here a page per query (`feedback/gdpr.ts`).
+            feedback: await collectAllFeedback(
+                async (cursor) => await context.runQuery(internal.feedback.gdpr.collectFeedbackForExport, { cursor, userId: args.userId }),
+            ),
             files: args.files,
             knowledgeCollections: activity?.knowledgeCollections ?? [],
             memories: args.memories ?? { digests: [], memories: [] },

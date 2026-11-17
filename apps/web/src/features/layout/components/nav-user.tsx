@@ -15,9 +15,9 @@ import {
 } from "@neore/ui/components/responsive-dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@neore/ui/components/sidebar";
 import { Link } from "@tanstack/react-router";
-import { Check, ChevronsUpDown, Globe, LogIn, LogOut, PlusCircleIcon, Sparkles, UserRound } from "lucide-react";
+import { Check, ChevronsUpDown, Globe, LogIn, LogOut, MessageSquareText, PlusCircleIcon, Sparkles, UserRound } from "lucide-react";
 import type { FC } from "react";
-import { Fragment, useCallback, useMemo, useState } from "react";
+import { Fragment, lazy, Suspense, useCallback, useMemo, useState } from "react";
 
 import UserView from "@/features/auth/components/user-view";
 import { useListDeviceSessions } from "@/features/auth/hooks/device-session-management";
@@ -37,6 +37,9 @@ import { resetAnalyticsIdentity } from "@/lib/analytics";
 import type { AuthClient } from "@/lib/auth/client";
 import { DEFAULT_LOCALE, deLocalizeUrl, dynamicActivate, locales as appLocales, shouldIgnorePath } from "@/lib/intl/client";
 import { setNativeBadge } from "@/lib/native/bridge";
+
+// Loaded on first open: the dialog pulls in the uploader and the image downscaler.
+const SendFeedbackDialog = lazy(() => import("@/features/feedback/components/send-feedback-dialog"));
 
 const LOCALE_DISPLAY_NAMES: Record<string, string> = {
     de: "Deutsch",
@@ -135,6 +138,7 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
     const releasePush = useReleasePushOnSignOut();
     const { isPending: checkoutPending, startCheckout } = useCheckout();
     const [activeSessionPending, setActiveSessionPending] = useState(false);
+    const [feedbackOpen, setFeedbackOpen] = useState(false);
 
     const isPending = sessionPending || activeSessionPending;
 
@@ -259,6 +263,10 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                     <Sparkles />
                     {t`Upgrade to Pro`}
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFeedbackOpen(true)}>
+                    <MessageSquareText />
+                    {t`Send feedback`}
+                </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             {user && multiSession ? (
@@ -323,10 +331,17 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
     // When a custom trigger is provided, render without SidebarMenu context
     if (trigger) {
         return (
-            <DropdownMenu>
-                <DropdownMenuTrigger render={trigger} />
-                {menuContent}
-            </DropdownMenu>
+            <>
+                <DropdownMenu>
+                    <DropdownMenuTrigger render={trigger} />
+                    {menuContent}
+                </DropdownMenu>
+                {feedbackOpen ? (
+                    <Suspense fallback={null}>
+                        <SendFeedbackDialog onOpenChange={setFeedbackOpen} open={feedbackOpen} />
+                    </Suspense>
+                ) : null}
+            </>
         );
     }
 
@@ -360,6 +375,11 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                     />
                     {menuContent}
                 </DropdownMenu>
+                {feedbackOpen ? (
+                    <Suspense fallback={null}>
+                        <SendFeedbackDialog onOpenChange={setFeedbackOpen} open={feedbackOpen} />
+                    </Suspense>
+                ) : null}
             </SidebarMenuItem>
         </SidebarMenu>
     );

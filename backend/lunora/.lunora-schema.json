@@ -1,6 +1,8 @@
 {
   "jurisdiction": "eu",
   "migrationIds": [
+    "add-agent-commands-acp-sessions",
+    "add-agent-commands-persistent-chunks",
     "add-approval-chain-source",
     "add-headless-approved",
     "add-headless-resume-bounds",
@@ -138,6 +140,42 @@
           "optional": true,
           "unique": false,
           "fields": {
+            "availableCommands": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "object",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "fields": {
+                  "description": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "refined": true
+                  },
+                  "hint": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": true,
+                    "unique": false,
+                    "refined": true
+                  },
+                  "name": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "refined": true
+                  }
+                }
+              },
+              "refined": true
+            },
             "configOptions": {
               "kind": "array",
               "nullable": false,
@@ -8441,6 +8479,113 @@
       "memory": false,
       "relations": {},
       "shardMode": "shardBy:userId"
+    },
+    "feedback": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "images": {
+          "kind": "array",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "contentType": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "key": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "size": {
+                "kind": "number",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            }
+          }
+        },
+        "kind": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"idea\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"other\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"problem\""
+            }
+          ]
+        },
+        "message": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "pagePath": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_createdAt": {
+          "fields": [
+            "createdAt"
+          ],
+          "unique": false
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
     },
     "files": {
       "commitOrdered": false,
@@ -18631,6 +18776,42 @@
                   "nullable": false,
                   "optional": false,
                   "unique": false,
+                  "refined": true
+                },
+                "availableCommands": {
+                  "kind": "array",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "of": {
+                    "kind": "object",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "fields": {
+                      "description": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "refined": true
+                      },
+                      "hint": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": true,
+                        "unique": false,
+                        "refined": true
+                      },
+                      "name": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "refined": true
+                      }
+                    }
+                  },
                   "refined": true
                 },
                 "configOptions": {

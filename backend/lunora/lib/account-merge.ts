@@ -58,6 +58,7 @@ export const shardLocalTables = (source: unknown = schema): string[] =>
  */
 export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>> = {
     chatFileAccess: ["userId"],
+    feedback: ["userId"],
     // Without this a guest's collection stays the guest's: the files that moved
     // point at it, and `requireOwnCollectionId` refuses the new owner.
     knowledgeCollections: ["userId"],
