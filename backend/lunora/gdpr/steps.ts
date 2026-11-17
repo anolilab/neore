@@ -4,9 +4,10 @@ import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-
 import { readStoredText } from "../lib/storage-read";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { collectAcpSessionPages } from "../acp/gdpr";
+import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { collectAllRepositories } from "../projects/export-pages";
-import { projectDetailsReadBudget, repositoriesReadBudget, triggerReadBudget } from "./read-budget";
+import { feedbackReadBudget, projectDetailsReadBudget, repositoriesReadBudget, triggerReadBudget } from "./read-budget";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
@@ -603,8 +604,13 @@ export const generateExportFile = internalAction
             projectDetailsReadBudget(earlierReadBytes),
         );
         const projectRepositories = { projectRepositories: repositories.projectRepositories };
+        // What the user sent through "Send feedback", read here a page per query within what the sections above left.
+        const feedback = await collectAllFeedback(
+            async (cursor) => await context.runQuery(internal.feedback.gdpr.collectFeedbackForExport, { cursor, userId: args.userId }),
+            feedbackReadBudget(earlierReadBytes + repositories.readBytes),
+        );
         // The projects read for their details count too: a row is read whole, however little of it is exported.
-        const triggerReadBytes = triggerReadBudget(earlierReadBytes + repositories.readBytes);
+        const triggerReadBytes = triggerReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes);
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
@@ -618,6 +624,7 @@ export const generateExportFile = internalAction
             evals: args.evals ?? { datasets: [] },
             exportDate: new Date().toISOString(),
             exportVersion: "1.0",
+            feedback: feedback.section,
             files: args.files,
             knowledgeCollections: activity?.knowledgeCollections ?? [],
             memories: args.memories ?? { digests: [], memories: [] },

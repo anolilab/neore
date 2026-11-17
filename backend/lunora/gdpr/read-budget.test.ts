@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
     ACTION_READ_BYTES,
+    FEEDBACK_READ_BYTES,
+    feedbackReadBudget,
     projectDetailsReadBudget,
     REPOSITORIES_READ_FLOOR_BYTES,
     repositoriesReadBudget,
@@ -30,5 +32,13 @@ describe("export read budget", () => {
     it("gives the projects' details no floor: once earlier sections used the budget, they read nothing", () => {
         expect(projectDetailsReadBudget(4 * MIB)).toBe(ACTION_READ_BYTES - 4 * MIB - READ_MARGIN_BYTES);
         expect(projectDetailsReadBudget(ACTION_READ_BYTES - READ_MARGIN_BYTES)).toBe(0);
+    });
+
+    it("leaves the feedback only what the ACP sessions and repositories did not read, at most its own cap", () => {
+        const used = 22 * MIB;
+
+        expect(used + feedbackReadBudget(used) + READ_MARGIN_BYTES).toBeLessThanOrEqual(ACTION_READ_BYTES);
+        expect(feedbackReadBudget(ACTION_READ_BYTES)).toBe(0);
+        expect(feedbackReadBudget(0)).toBe(FEEDBACK_READ_BYTES);
     });
 });
