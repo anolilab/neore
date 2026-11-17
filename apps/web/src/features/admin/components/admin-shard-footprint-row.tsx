@@ -9,21 +9,22 @@ import { useState } from "react";
 import { useShardFootprint } from "../hooks/use-admin";
 
 interface FootprintTotals {
+    /** Shards given up for this census: their counts are not in the totals. Each is reported once, so pages add up. */
+    abandonedShards: number;
     approxBytes: number;
-    incompleteShards: number;
     messageRows: number;
     shards: number;
     threads: number;
 }
 
-const NO_TOTALS: FootprintTotals = { approxBytes: 0, incompleteShards: 0, messageRows: 0, shards: 0, threads: 0 };
+const NO_TOTALS: FootprintTotals = { abandonedShards: 0, approxBytes: 0, messageRows: 0, shards: 0, threads: 0 };
 
 const sumTotals = (pages: FootprintTotals[]): FootprintTotals => {
     const sum = { ...NO_TOTALS };
 
     for (const page of pages) {
+        sum.abandonedShards += page.abandonedShards;
         sum.approxBytes += page.approxBytes;
-        sum.incompleteShards += page.incompleteShards;
         sum.messageRows += page.messageRows;
         sum.shards += page.shards;
         sum.threads += page.threads;
@@ -112,7 +113,7 @@ const AdminShardFootprintRow = () => {
                         {t`Shards still being measured: ${formatNumber(page.data.pendingShards, i18n.locale)}. Measure more shards to finish them.`}
                     </p>
                 ) : null}
-                {totals.incompleteShards > 0 ? (
+                {totals.abandonedShards > 0 ? (
                     <p className="text-muted-foreground text-sm">{t`Some shards were only partly measured; their counts are lower bounds.`}</p>
                 ) : null}
                 <div className="flex flex-wrap items-center gap-3">

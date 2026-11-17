@@ -40,11 +40,19 @@ export interface FootprintState {
     threads: number;
 }
 
+/** Consecutive failed reads after which a shard is given up for this census (its counts stay out). */
+export const MAX_SHARD_FAILURES = 3;
+
 /** A shard the census has handed out but that has not finished measuring, with its scan state. */
 export interface PendingShard {
+    /** Failed reads in a row since the shard last read successfully. */
+    failures?: number;
     shardKey: string;
     state: FootprintState;
 }
+
+/** Whether a shard that has now failed `failures` times in a row is retried by a later call. */
+export const willRetry = (failures: number): boolean => failures < MAX_SHARD_FAILURES;
 
 /** Where an admin measurement is: the census position and the shards still being measured. */
 export interface CensusCursor {

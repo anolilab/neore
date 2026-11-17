@@ -15,11 +15,13 @@ import {
     forCursor,
     LARGEST_THREAD_COUNT,
     MAX_SHARD_CALLS_PER_ACTION,
+    MAX_SHARD_FAILURES,
     rootOnlyCensus,
     runScanRounds,
     type ScanEntry,
     startCensus,
     startFootprint,
+    willRetry,
     withRootShard,
 } from "./shard-footprint-logic";
 
@@ -186,6 +188,12 @@ describe("scan state", () => {
         expect(state.approxBytes).toBe(25);
         expect(state.largest).toEqual([{ rows: 2, threadId: "thread-a" }]);
         expect(state.currentThreadId).toBe("thread-b");
+    });
+
+    it("retries a failing shard until it has failed MAX_SHARD_FAILURES times in a row, then gives it up", () => {
+        expect(willRetry(1)).toBe(true);
+        expect(willRetry(MAX_SHARD_FAILURES - 1)).toBe(true);
+        expect(willRetry(MAX_SHARD_FAILURES)).toBe(false);
     });
 });
 

@@ -35,6 +35,7 @@ import {
     startCensus,
     startFootprint,
     runScanRounds,
+    willRetry,
 } from "./shard-footprint-logic";
 
 const DEFAULT_THRESHOLD_DAYS = 30;
@@ -418,7 +419,7 @@ export const listShardKeysPage = internalQuery
 const censusCursorValidator = v.object({
     census: v.union(v.string(), v.null()),
     censusDone: v.boolean(),
-    pending: v.array(v.object({ shardKey: v.string(), state: v.object({ ...footprintFields }) })),
+    pending: v.array(v.object({ failures: v.optional(v.number()), shardKey: v.string(), state: v.object({ ...footprintFields }) })),
 });
 
 /** The opaque string an admin call returns and takes back. Callers never read it. */
@@ -489,6 +490,7 @@ export const getShardFootprint = adminAction
     .input({ cursor: v.optional(v.string()) })
     .output(
         v.object({
+            abandonedShards: v.number(),
             approxBytes: v.number(),
             continueCursor: v.union(v.string(), v.null()),
             incompleteShards: v.number(),
@@ -534,6 +536,7 @@ export const getShardFootprint = adminAction
         await runScanRounds(entries, readShardPage, MAX_SHARD_CALLS_PER_ACTION);
 
         const totals = {
+            abandonedShards: 0,
             approxBytes: 0,
             continueCursor: null as string | null,
             incompleteShards: 0,
@@ -545,6 +548,7 @@ export const getShardFootprint = adminAction
         };
         const stillPending: PendingShard[] = [];
         const failureNames: string[] = [];
+        const failuresBefore = new Map<string, number>(cursor.pending.map((entry): [string, number] => [entry.shardKey, entry.failures ?? 0]));
 
         for (const entry of entries) {
             if (entry.status === "done") {
@@ -552,13 +556,21 @@ export const getShardFootprint = adminAction
                 totals.approxBytes += entry.state.approxBytes;
                 totals.messageRows += entry.state.messageRows;
                 totals.threads += entry.state.threads;
-            } else {
-                if (entry.status === "failed") {
-                    totals.incompleteShards += 1;
-                    failureNames.push(entry.errorName ?? "unknown");
-                }
+            } else if (entry.status === "failed") {
+                const failures = (failuresBefore.get(entry.shardKey) ?? 0) + 1;
 
-                // A failed shard keeps its last good state, so the next call retries it from there.
+                failureNames.push(entry.errorName ?? "unknown");
+
+                if (willRetry(failures)) {
+                    // Keeps its last good state and its failure count, so a later call retries it from there.
+                    totals.incompleteShards += 1;
+                    stillPending.push({ failures, shardKey: entry.shardKey, state: entry.state });
+                } else {
+                    // Given up for this census: its counts stay out of the totals, and the census can finish without it.
+                    totals.abandonedShards += 1;
+                }
+            } else {
+                // A page that read successfully resets the failure count.
                 stillPending.push({ shardKey: entry.shardKey, state: entry.state });
             }
         }
@@ -568,6 +580,7 @@ export const getShardFootprint = adminAction
         totals.continueCursor = totals.isDone ? null : encodeCensusCursor({ census: cursor.census, censusDone: cursor.censusDone, pending: stillPending });
 
         ctx.log.event("admin.shard_footprint_measured", {
+            abandonedShards: totals.abandonedShards,
             failedBy: failureNames.toSorted((a, b) => a.localeCompare(b)).join(","),
             incompleteShards: totals.incompleteShards,
             isDone: totals.isDone,

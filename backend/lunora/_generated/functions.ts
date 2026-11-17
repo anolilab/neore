@@ -3541,7 +3541,7 @@ export interface Caller {
             getCleanupConfig: (args?: {}) => Promise<{ batchSize: number; isEnabled: boolean; thresholdDays: number }>;
             getCleanupConfigInternal: (args?: {}) => Promise<{ batchSize: number; isEnabled: boolean; thresholdDays: number }>;
             getEligibleUsers: (args: { limit: number; now: number; thresholdMs: number }) => Promise<import("lunorash/server/data-model").LoadWith<import("./dataModel.js").DataModel, import("./dataModel.js").Relations, "user", {}, undefined>[]>;
-            getShardFootprint: (args: { cursor?: string }) => Promise<{ approxBytes: number; continueCursor: string | null; incompleteShards: number; isDone: boolean; messageRows: number; pendingShards: number; shards: number; threads: number }>;
+            getShardFootprint: (args: { cursor?: string }) => Promise<{ abandonedShards: number; approxBytes: number; continueCursor: string | null; incompleteShards: number; isDone: boolean; messageRows: number; pendingShards: number; shards: number; threads: number }>;
             getUserThreads: (args: { userId: string }) => Promise<import("./dataModel.js").Doc_threads[]>;
             listCleanupLogs: (args: { cursor?: string | null; limit?: number }) => Promise<{ continueCursor?: string | null; isDone: boolean; logs: Array<{ _creationTime: number; _id: string; deletedCount: number; durationMs: number; eligibleCount: number; mode: "dry_run" | "execute"; runAt: number; triggeredBy: string }> }>;
             listShardKeysPage: (args: { cursor?: string; limit: number }) => Promise<{ continueCursor: string | null; isDone: boolean; shardKeys: Array<string> }>;

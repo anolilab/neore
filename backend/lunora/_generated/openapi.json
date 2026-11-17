@@ -6535,6 +6535,9 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "abandonedShards": {
+                      "type": "number"
+                    },
                     "approxBytes": {
                       "type": "number"
                     },
@@ -6568,6 +6571,7 @@
                     }
                   },
                   "required": [
+                    "abandonedShards",
                     "approxBytes",
                     "continueCursor",
                     "incompleteShards",
