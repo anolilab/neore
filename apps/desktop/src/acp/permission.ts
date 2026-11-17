@@ -9,6 +9,8 @@ export interface PermissionRequest {
     agentLabel: string;
     /** The session's folder, as the user approved it. */
     folder: string;
+    /** Answered in this computer's window alone, one at a time: never in a batch, never allowed from another device (a terminal). */
+    localOnly?: boolean;
     /** The request as the agent sent it: `sessionId`, `toolCall`, `options`. */
     params: Record<string, unknown>;
     /** The id the backend knows this request by (`permission_request` in the turn post); a remote answer names it. */
@@ -51,6 +53,7 @@ interface DescribedRequest {
     details: string;
     detailsComplete: boolean;
     folder: string;
+    localOnly: boolean;
     options: { kind: string; name: string; optionId: string }[];
     requestId: string;
     sessionId: string;
@@ -108,6 +111,7 @@ export const describePermission = (request: PermissionRequest): DescribedRequest
         details: request.scrub(full).slice(0, MAX_DETAILS_SENT),
         detailsComplete: (rawInput !== undefined || hasContent) && full.length <= MAX_DETAILS_SENT,
         folder: request.folder,
+        localOnly: request.localOnly === true,
         // Ids are the agent's to match and stay as sent; only the names the user reads are scrubbed.
         options: offeredOptions(request.params).map((option) => { return { ...option, name: request.scrub(option.name) }; }),
         requestId: request.requestId ?? "",
