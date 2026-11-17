@@ -35,6 +35,9 @@ auditConfig:
     # those dependencies move up.
     - GHSA-g3hv-75wg-m249
     - GHSA-3g3m-2fjr-6pw4
+    # picomatch <=4.0.7 (ReDoS through repeated extglobs), via vite, tinyglobby, fdir and metro
+    # (117 paths). No patched release exists.
+    - GHSA-fc5q-39xc-vjpf
 
 # OFF: auto-installing peers materialised Next.js — which nothing here uses — as
 # the peer of fumadocs, geist, better-auth, @visulima/pail and friends, and its
