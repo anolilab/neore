@@ -675,6 +675,14 @@ export interface ApiTypes {
             updateThreadVariable: FunctionReference<"mutation", { name: string; threadId: Id<"threads">; unlockProof?: string; value: string }, string>;
         };
     };
+    run_webhooks: {
+        functions: {
+            getRunWebhook: FunctionReference<"query", {}, { configured: boolean; enabled: boolean; url?: string }>;
+            rotateRunWebhookSecret: FunctionReference<"mutation", {}, { secret: string }>;
+            saveRunWebhook: FunctionReference<"mutation", { enabled: boolean; url: string }, { secret?: string }>;
+            sendRunWebhookTest: FunctionReference<"action", {}, { durationMs: number; error?: string; ok: boolean; status?: number }>;
+        };
+    };
     saas: {
         notification_functions: {
             listNotifications: FunctionReference<"query", {}, ({} & { action: string; currentValue: number; id: string; isRead: boolean; metric: string; ruleId: string; ruleName: string; threshold: number; triggeredAt: number; })[]>;
@@ -1591,6 +1599,14 @@ export const api: ApiTypes = {
             togglePromptFavorite: { __lunoraRef: "prompts_functions:togglePromptFavorite" },
             updatePrompt: { __lunoraRef: "prompts_functions:updatePrompt" },
             updateThreadVariable: { __lunoraRef: "prompts_functions:updateThreadVariable" },
+        },
+    },
+    run_webhooks: {
+        functions: {
+            getRunWebhook: { __lunoraRef: "run_webhooks_functions:getRunWebhook" },
+            rotateRunWebhookSecret: { __lunoraRef: "run_webhooks_functions:rotateRunWebhookSecret" },
+            saveRunWebhook: { __lunoraRef: "run_webhooks_functions:saveRunWebhook" },
+            sendRunWebhookTest: { __lunoraRef: "run_webhooks_functions:sendRunWebhookTest" },
         },
     },
     saas: {

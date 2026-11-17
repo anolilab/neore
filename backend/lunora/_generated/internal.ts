@@ -758,7 +758,7 @@ export interface InternalApiTypes {
             collectSettings: FunctionReference<"query", { userId: string }, { aiUserPreferences?: unknown | null; userSettings?: unknown | null }>;
             collectThreadTags: FunctionReference<"query", { userId: string }, Array<{ _id: string; color: string; createdAt: number; name: string; order: number; updatedAt: number }>>;
             deleteUsageJson: FunctionReference<"action", { key: string }, null>;
-            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; pullRequestGuides?: unknown; pullRequestThreads?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; usageKey?: string; userEmail: string; userId: string; watchedRepositories?: unknown }, string>;
+            generateExportFile: FunctionReference<"action", { acpSessions?: unknown; activity?: unknown; bots?: unknown; codingAgentRuns?: unknown; conversations?: unknown; devices?: unknown; evals?: unknown; files?: unknown; memories?: unknown; notifications?: unknown; pages?: unknown; profile?: unknown; prompts?: unknown; pullRequestGuides?: unknown; pullRequestThreads?: unknown; requestId: Id<"gdprRequests">; reviewDrafts?: unknown; runWebhooks?: unknown; settings?: unknown; tasks?: unknown; threadTags?: unknown; usageKey?: string; userEmail: string; userId: string; watchedRepositories?: unknown }, string>;
             prepareUsageForExport: FunctionReference<"action", { pass: number; requestId: string; userId: string }, string | null>;
             sendExportReadyEmail: FunctionReference<"action", { requestId: Id<"gdprRequests">; userEmail: string }, null>;
             deletion_steps: {
@@ -1083,6 +1083,15 @@ export interface InternalApiTypes {
             getPromptsByOrganizationInternal: FunctionReference<"query", { maxPrompts: number; organizationId: string }, import("lunorash/server/data-model").LoadWith<import("./dataModel.js").DataModel, import("./dataModel.js").Relations, "prompts", {}, undefined>[]>;
             getPromptsByUserInternal: FunctionReference<"query", { maxPrompts: number; userId: string }, import("lunorash/server/data-model").LoadWith<import("./dataModel.js").DataModel, import("./dataModel.js").Relations, "prompts", {}, undefined>[]>;
             optimizePrompt: FunctionReference<"action", { content: string; improvementInstructions?: string; userId: string }, { optimizedPrompt: string; }>;
+        };
+    };
+    run_webhooks: {
+        functions: {
+            getRunWebhookInternal: FunctionReference<"query", { userId: string }, { found: boolean; secretCiphertext?: string; url?: string }>;
+        };
+        gdpr: {
+            collectRunWebhookForExport: FunctionReference<"query", { userId: string }, { runWebhooks: Array<{ createdAt: number; enabled: boolean; updatedAt: number; url: string }> }>;
+            deleteUserRunWebhooks: FunctionReference<"mutation", { userId: string }, { hasMore: boolean }>;
         };
     };
     saas: {
@@ -2451,6 +2460,15 @@ export const internal: InternalApiTypes = {
             getPromptsByOrganizationInternal: { __lunoraRef: "prompts_functions:getPromptsByOrganizationInternal" },
             getPromptsByUserInternal: { __lunoraRef: "prompts_functions:getPromptsByUserInternal" },
             optimizePrompt: { __lunoraRef: "prompts_functions:optimizePrompt" },
+        },
+    },
+    run_webhooks: {
+        functions: {
+            getRunWebhookInternal: { __lunoraRef: "run_webhooks_functions:getRunWebhookInternal" },
+        },
+        gdpr: {
+            collectRunWebhookForExport: { __lunoraRef: "run_webhooks_gdpr:collectRunWebhookForExport" },
+            deleteUserRunWebhooks: { __lunoraRef: "run_webhooks_gdpr:deleteUserRunWebhooks" },
         },
     },
     saas: {

@@ -1,6 +1,8 @@
 {
   "jurisdiction": "eu",
   "migrationIds": [
+    "add-agent-commands-acp-sessions",
+    "add-agent-commands-persistent-chunks",
     "add-approval-chain-source",
     "add-headless-approved",
     "add-headless-resume-bounds",
@@ -138,6 +140,42 @@
           "optional": true,
           "unique": false,
           "fields": {
+            "availableCommands": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "object",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "fields": {
+                  "description": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "refined": true
+                  },
+                  "hint": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": true,
+                    "unique": false,
+                    "refined": true
+                  },
+                  "name": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "refined": true
+                  }
+                }
+              },
+              "refined": true
+            },
             "configOptions": {
               "kind": "array",
               "nullable": false,
@@ -18633,6 +18671,42 @@
                   "unique": false,
                   "refined": true
                 },
+                "availableCommands": {
+                  "kind": "array",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "of": {
+                    "kind": "object",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "fields": {
+                      "description": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "refined": true
+                      },
+                      "hint": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": true,
+                        "unique": false,
+                        "refined": true
+                      },
+                      "name": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "refined": true
+                      }
+                    }
+                  },
+                  "refined": true
+                },
                 "configOptions": {
                   "kind": "array",
                   "nullable": false,
@@ -22945,6 +23019,58 @@
             "hostOrigin",
             "repository",
             "number"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
+    "runWebhooks": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "enabled": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "secretCiphertext": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "url": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_userId": {
+          "fields": [
+            "userId"
           ],
           "unique": false
         }

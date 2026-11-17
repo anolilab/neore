@@ -465,6 +465,12 @@ export const RATE_LIMIT_CONFIGS = {
     "publicApi/read:premium": Ratelimit.tokenBucket(120, MINUTE, 240),
     "publicApi/write:free": Ratelimit.tokenBucket(30, MINUTE, 60),
     "publicApi/write:premium": Ratelimit.tokenBucket(30, MINUTE, 60),
+    // Outbound run webhook (`run-webhooks/functions.ts`): "Send test" is one outbound request each time.
+    "runWebhooks/test:free": Ratelimit.fixedWindow(10, MINUTE),
+    "runWebhooks/test:premium": Ratelimit.fixedWindow(10, MINUTE),
+    // Saving or rotating the outbound run webhook.
+    "runWebhooks/update:free": Ratelimit.fixedWindow(20, MINUTE),
+    "runWebhooks/update:premium": Ratelimit.fixedWindow(20, MINUTE),
     // Sandbox / code execution limits
     "sandbox/execute:free": Ratelimit.fixedWindow(30, HOUR),
     "sandbox/execute:premium": Ratelimit.fixedWindow(200, HOUR),

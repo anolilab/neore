@@ -54,6 +54,15 @@ describe("getRateLimitKey", () => {
             expect(key).toBe(`organization/create:${tier}`);
         }
     });
+
+    it("resolves every run webhook limit for a signed-in tier to a configured entry", () => {
+        // The guard looks up the tier-suffixed key, so a bare name without `:free` and `:premium` throws on every call.
+        for (const base of ["runWebhooks/update", "runWebhooks/test"] as const) {
+            for (const tier of ["free", "premium"] as const) {
+                expect(RATE_LIMIT_CONFIGS).toHaveProperty(getRateLimitKey(base, tier));
+            }
+        }
+    });
 });
 
 describe("RATE_LIMIT_CONFIGS", () => {

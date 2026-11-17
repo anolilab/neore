@@ -191,6 +191,11 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                     { dedupId: stepDedupId(scope, "collect-notifications") },
                 ),
         );
+        const runWebhooks = await context.step.do(
+            "collect-run-webhooks",
+            async () =>
+                await context.run(internal.run_webhooks.gdpr.collectRunWebhookForExport, { userId }, { dedupId: stepDedupId(scope, "collect-run-webhooks") }),
+        );
         const pages = await context.step.do(
             "collect-pages",
             async () => await context.run(internal.pages.gdpr.collectPagesForExport, { userId }, { dedupId: stepDedupId(scope, "collect-pages") }),
@@ -348,6 +353,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                             pullRequestThreads,
                             requestId,
                             reviewDrafts,
+                            runWebhooks,
                             settings,
                             tasks,
                             threadTags,
