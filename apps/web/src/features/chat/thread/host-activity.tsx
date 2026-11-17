@@ -10,7 +10,7 @@ import { useLingui } from "@lingui/react/macro";
 import { formatNumber } from "@neore/ui/utils/locale-format";
 import { CheckCircle2, Circle, Loader2 } from "lucide-react";
 import type { FC } from "react";
-import { memo, useLayoutEffect, useRef } from "react";
+import { memo, useLayoutEffect, useRef, useState } from "react";
 
 export type HostPlanStatus = "completed" | "in_progress" | "pending";
 
@@ -114,10 +114,71 @@ export const HostPlan: FC<{ entries: HostPlanEntry[] }> = memo(({ entries }) => 
 
 HostPlan.displayName = "HostPlan";
 
+const FINISHED: ReadonlySet<HostToolStatus> = new Set(["cancelled", "completed", "declined", "failed"]);
+
+/** A tool call's status and exit in words, and the sentence that announces its outcome. */
+const useToolWords = (): {
+    announcement: (tool: HostToolRow) => string;
+    exitTextOf: (tool: HostToolRow) => string | undefined;
+    statusText: (status: HostToolStatus) => string;
+} => {
+    const { i18n, t } = useLingui();
+
+    const statusText = (status: HostToolStatus): string => {
+        switch (status) {
+            case "cancelled": {
+                return t`Cancelled`;
+            }
+            case "completed": {
+                return t`Done`;
+            }
+            case "declined": {
+                return t`Declined`;
+            }
+            case "failed": {
+                return t`Failed`;
+            }
+            case "in_progress": {
+                return t`Running`;
+            }
+            default: {
+                return t`Waiting`;
+            }
+        }
+    };
+
+    const exitTextOf = ({ exit }: HostToolRow): string | undefined => {
+        if (exit?.code !== undefined) {
+            const { code } = exit;
+
+            // The number in the reader's own digits and separators, as the rest of the page shows numbers.
+            return t`Exited with code ${formatNumber(code, i18n.locale)}`;
+        }
+
+        if (exit?.signal !== undefined) {
+            const { signal } = exit;
+
+            return t`Ended by ${signal}`;
+        }
+
+        return undefined;
+    };
+
+    const announcement = (tool: HostToolRow): string => {
+        const { status, title } = tool;
+        const exitText = exitTextOf(tool);
+
+        return exitText === undefined ? t`${title}: ${statusText(status)}` : t`${title}: ${statusText(status)}. ${exitText}`;
+    };
+
+    return { announcement, exitTextOf, statusText };
+};
+
 /** One tool call: its title, its status in words, and the tail of what it printed in a region that scrolls on its own. */
 const HostToolCall: FC<{ tool: HostToolRow }> = memo(({ tool }) => {
-    const { i18n, t } = useLingui();
-    const { exit, output, status, title } = tool;
+    const { t } = useLingui();
+    const { exitTextOf, statusText } = useToolWords();
+    const { output, status, title } = tool;
     const outputRef = useRef<HTMLPreElement>(null);
     const rowRef = useRef<HTMLLIElement>(null);
     // The output is a tail, so it opens at its newest lines; a box the reader scrolled up from keeps its place.
@@ -143,56 +204,15 @@ const HostToolCall: FC<{ tool: HostToolRow }> = memo(({ tool }) => {
         rowRef.current?.focus();
     }, [hasOutput]);
 
-    const statusText = (): string => {
-        switch (status) {
-            case "cancelled": {
-                return t`Cancelled`;
-            }
-            case "completed": {
-                return t`Done`;
-            }
-            case "declined": {
-                return t`Declined`;
-            }
-            case "failed": {
-                return t`Failed`;
-            }
-            case "in_progress": {
-                return t`Running`;
-            }
-            default: {
-                return t`Waiting`;
-            }
-        }
-    };
-
-    const finished = ["cancelled", "completed", "declined", "failed"].includes(status);
-
-    let exitText: string | undefined;
-
-    if (exit?.code !== undefined) {
-        const { code } = exit;
-
-        // The number in the reader's own digits and separators, as the rest of the page shows numbers.
-        exitText = t`Exited with code ${formatNumber(code, i18n.locale)}`;
-    } else if (exit?.signal !== undefined) {
-        const { signal } = exit;
-
-        exitText = t`Ended by ${signal}`;
-    }
+    const exitText = exitTextOf(tool);
 
     return (
         <li className="rounded-md border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-950/40" data-status={status} ref={rowRef} tabIndex={-1}>
             <div className="flex items-center gap-2 text-sm">
                 <span className="min-w-0 flex-1 font-mono break-all text-gray-800 dark:text-gray-200">{title}</span>
-                <span className="text-muted-foreground shrink-0 text-xs">{statusText()}</span>
+                <span className="text-muted-foreground shrink-0 text-xs">{statusText(status)}</span>
             </div>
             {exitText !== undefined && <p className="text-muted-foreground mt-1 text-xs">{exitText}</p>}
-            {/* Said once, when the call reaches its outcome; the output streams past it, so it is not part of this announcement. The region
-                is mounted from the start and filled at the outcome: a live region inserted with its text already in it is often not announced. */}
-            <span className="sr-only" role="status">
-                {finished && (exitText === undefined ? t`${title}: ${statusText()}` : t`${title}: ${statusText()}. ${exitText}`)}
-            </span>
             {output !== undefined && output !== "" && (
                 // Scrolls on its own, so it takes keyboard focus (a keyboard user could not reach the rest otherwise); the name says
                 // whose output it is.
@@ -224,22 +244,42 @@ const HostToolCall: FC<{ tool: HostToolRow }> = memo(({ tool }) => {
 
 HostToolCall.displayName = "HostToolCall";
 
-/** The turn's tool calls, oldest first, each at its latest report. */
+/**
+ * The turn's tool calls, oldest first, each at its latest report. One status region, mounted with the list, says each call
+ * that finishes while it is shown; calls already finished when it mounts (a thread opened mid-turn) are not announced.
+ */
 export const HostToolCalls: FC<{ tools: HostToolRow[] }> = ({ tools }) => {
     const { t } = useLingui();
+    const { announcement } = useToolWords();
+    const [announced, setAnnounced] = useState(() => {
+        return { finished: new Set(tools.filter((tool) => FINISHED.has(tool.status)).map((tool) => tool.id)), text: "" };
+    });
+    const newlyFinished = tools.filter((tool) => FINISHED.has(tool.status) && !announced.finished.has(tool.id));
 
-    if (tools.length === 0) {
-        return null;
+    // Adjusted while rendering (React's sanctioned alternative to an effect that only sets state).
+    if (newlyFinished.length > 0) {
+        setAnnounced({
+            finished: new Set([...announced.finished, ...newlyFinished.map((tool) => tool.id)]),
+            text: newlyFinished.map((tool) => announcement(tool)).join(" "),
+        });
     }
 
     return (
-        <section aria-label={t`The agent's tool calls`} className="mb-4">
-            <ul className="flex flex-col gap-2">
-                {tools.map((tool) => (
-                    <HostToolCall key={tool.id} tool={tool} />
-                ))}
-            </ul>
-        </section>
+        <>
+            {/* Said once, when a call reaches its outcome; the output streams past it, so it is not part of this announcement. */}
+            <span aria-live="polite" className="sr-only" role="status">
+                {announced.text}
+            </span>
+            {tools.length > 0 && (
+                <section aria-label={t`The agent's tool calls`} className="mb-4">
+                    <ul className="flex flex-col gap-2">
+                        {tools.map((tool) => (
+                            <HostToolCall key={tool.id} tool={tool} />
+                        ))}
+                    </ul>
+                </section>
+            )}
+        </>
     );
 };
 

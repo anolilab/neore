@@ -3,7 +3,7 @@
  * newest lines and keeps the reader's place once they scroll up.
  */
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HostToolRow } from "./host-activity";
@@ -119,10 +119,12 @@ describe("a coding agent's tool calls", () => {
         reader.locale = "ar-EG";
 
         try {
-            render(<HostToolCalls tools={[{ exit: { code: 1 }, id: "c1", output: "", status: "failed", title: "Run tests", toolKind: "execute" }]} />);
+            const { rerender } = render(<HostToolCalls tools={[running("")]} />);
+
+            rerender(<HostToolCalls tools={[{ ...running(""), exit: { code: 1 }, status: "failed" }]} />);
 
             expect(screen.getByText(`Exited with code ${digit}`)).toBeTruthy();
-            expect(within(screen.getByRole("listitem")).getByRole("status").textContent).toBe(`Run tests: Failed. Exited with code ${digit}`);
+            expect(screen.getByRole("status").textContent).toBe(`Run tests: Failed. Exited with code ${digit}`);
         } finally {
             reader.locale = "en";
         }
@@ -130,15 +132,37 @@ describe("a coding agent's tool calls", () => {
 
     it("keeps a command's status region in place from the start and fills it when the command finishes", () => {
         const { rerender } = render(<HostToolCalls tools={[running("")]} />);
-        const row = screen.getByRole("listitem");
-        const region = within(row).getByRole("status");
+        const region = screen.getByRole("status");
 
         expect(region.textContent).toBe("");
 
         rerender(<HostToolCalls tools={[{ ...running(""), status: "completed" }]} />);
 
-        expect(within(row).getByRole("status")).toBe(region);
+        expect(screen.getByRole("status")).toBe(region);
         expect(region.textContent).toBe("Run tests: Done");
+    });
+
+    it("announces nothing for the commands already finished when the list first shows", () => {
+        render(
+            <HostToolCalls
+                tools={[
+                    { id: "c1", status: "completed", title: "Run tests", toolKind: "execute" },
+                    { exit: { code: 2 }, id: "c2", status: "failed", title: "Build", toolKind: "execute" },
+                ]}
+            />,
+        );
+
+        expect(screen.getByRole("status").textContent).toBe("");
+    });
+
+    it("announces a command that first shows up already finished, in the region that was already there", () => {
+        const { rerender } = render(<HostToolCalls tools={[running("")]} />);
+        const region = screen.getByRole("status");
+
+        rerender(<HostToolCalls tools={[running(""), { id: "c2", status: "completed", title: "Build", toolKind: "execute" }]} />);
+
+        expect(screen.getByRole("status")).toBe(region);
+        expect(region.textContent).toBe("Build: Done");
     });
 
     it("moves the reader's focus to the tool row when its output is cleared while they are in it", () => {
