@@ -309,7 +309,8 @@ export const useShardFootprint = (cursor?: string) => {
         refetchOnReconnect: false,
         refetchOnWindowFocus: false,
         retry: 1,
-        // A page's counts are a snapshot of one measurement: refetching on focus or reconnect would re-run the scan.
-        staleTime: Infinity,
+        // Stale at once: a new dashboard visit measures again rather than showing an earlier visit's totals.
+        // Focus and reconnect refetches stay off (above), so a visit is the only thing that re-runs the scan.
+        staleTime: 0,
     });
 };

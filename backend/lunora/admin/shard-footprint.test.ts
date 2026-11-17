@@ -12,6 +12,7 @@ import {
     addMessageRow,
     type CensusCursor,
     FOOTPRINT_PAGE_SIZE,
+    forCursor,
     LARGEST_THREAD_COUNT,
     MAX_SHARD_CALLS_PER_ACTION,
     rootOnlyCensus,
@@ -158,6 +159,21 @@ describe("measureShardPage on small shards", () => {
 });
 
 describe("scan state", () => {
+    it("drops thread ids from the cursor but keeps the counts", () => {
+        const state = {
+            ...startFootprint(),
+            currentRows: 4,
+            currentThreadId: "thread-x",
+            largest: [{ rows: 9, threadId: "thread-y" }],
+            messageRows: 13,
+            threads: 2,
+        };
+        const carried = forCursor(state);
+
+        expect(JSON.stringify(carried)).not.toContain("thread-");
+        expect(carried).toMatchObject({ messageRows: 13, threads: 2 });
+    });
+
     it("carries a thread's row count across pages", () => {
         let state = startFootprint();
 
@@ -228,7 +244,11 @@ describe("census scheduling", () => {
             pending: [{ shardKey: "user-1", state: { ...startFootprint(), largest: [{ rows: 2, threadId: "thread-1" }], threads: 3 } }],
         };
 
-        expect(decodeCensusCursor(encodeCensusCursor(cursor))).toEqual(cursor);
+        // The thread ids in each pending state are dropped on the way out; the counts survive.
+        const encoded = encodeCensusCursor(cursor);
+
+        expect(decodeCensusCursor(encoded)).toMatchObject({ census: "census-cursor", pending: [{ shardKey: "user-1", state: { threads: 3 } }] });
+        expect(decodeCensusCursor(encoded)?.pending[0]?.state.largest).toEqual([]);
         expect(decodeCensusCursor("not a cursor!")).toBeUndefined();
         expect(decodeCensusCursor(btoa(JSON.stringify({ census: 1 })))).toBeUndefined();
     });

@@ -24,6 +24,7 @@ import {
     type CensusCursor,
     FOOTPRINT_PAGE_SIZE,
     finishCurrentThread,
+    forCursor,
     type FootprintState,
     MAX_SHARD_CALLS_PER_ACTION,
     type PendingShard,
@@ -421,7 +422,13 @@ const censusCursorValidator = v.object({
 
 /** The opaque string an admin call returns and takes back. Callers never read it. */
 export const encodeCensusCursor = (cursor: CensusCursor): string => {
-    const bytes = new TextEncoder().encode(JSON.stringify(cursor));
+    const forBrowser = {
+        ...cursor,
+        pending: cursor.pending.map((entry) => {
+            return { ...entry, state: forCursor(entry.state) };
+        }),
+    };
+    const bytes = new TextEncoder().encode(JSON.stringify(forBrowser));
     let binary = "";
 
     for (const byte of bytes) {

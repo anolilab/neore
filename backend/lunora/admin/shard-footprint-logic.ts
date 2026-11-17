@@ -68,6 +68,15 @@ export const startFootprint = (): FootprintState => {
     };
 };
 
+/**
+ * A scan state as an admin call's cursor carries it. The cursor reaches the browser, so the thread ids
+ * in it (the largest list and the thread the scan is in) are dropped. The partial thread's rows still
+ * count toward the totals; only its place in the largest list is lost.
+ */
+export const forCursor = (state: FootprintState): FootprintState => {
+    return { ...state, currentRows: 0, currentThreadId: null, largest: [] };
+};
+
 export const startCensus = (): CensusCursor => {
     return { census: null, censusDone: false, pending: [] };
 };
