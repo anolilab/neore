@@ -742,7 +742,7 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
                     <MessageContent isStreaming={isStreaming} message={streamingMessage} />
                 </div>
                 {isStreaming && <ToolProgressRows state={toolProgress} />}
-                {isStreaming && <HostActivity activity={hostActivity} />}
+                {isStreaming && <HostActivity activity={hostActivity} key={streamId} />}
                 {metricsBar}
             </div>
         );
@@ -765,7 +765,7 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
                         <MessageContent isStreaming={isStreaming} message={streamingMessage} />
                     </div>
                     {isStreaming && <ToolProgressRows state={toolProgress} />}
-                    {isStreaming && <HostActivity activity={hostActivity} />}
+                    {isStreaming && <HostActivity activity={hostActivity} key={streamId} />}
                     {isStreaming && <HostStateLine state={hostState} />}
                     {metricsBar}
                 </MessageContentWrapper>
