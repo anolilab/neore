@@ -176,7 +176,14 @@ impl DeviceState {
 const REDACTED: &str = "[redacted]";
 /// A known value shorter than this is not searched for: it would strike ordinary characters out of the command.
 const MIN_KNOWN_SECRET_BYTES: usize = 4;
-const SECRET_FLAGS: [&str; 4] = ["--token", "--password", "--api-key", "--secret"];
+const SECRET_FLAGS: [&str; 6] = [
+    "--token",
+    "--password",
+    "--api-key",
+    "--secret",
+    "-u",
+    "--user",
+];
 const SECRET_NAME_PARTS: [&str; 5] = ["TOKEN", "SECRET", "PASSWORD", "KEY", "CREDENTIAL"];
 const AUTH_SCHEMES: [&str; 4] = ["bearer", "basic", "token", "digest"];
 
@@ -504,6 +511,14 @@ mod tests {
         assert_eq!(
             redact_command("tool --password=\"two words\" --api-key=k", &[]),
             "tool --password=\"[redacted] [redacted]\" --api-key=[redacted]"
+        );
+        assert_eq!(
+            redact_command("tool -u somevalue https://example.com", &[]),
+            "tool -u [redacted] https://example.com"
+        );
+        assert_eq!(
+            redact_command("git --user=alice:pw status", &[]),
+            "git --user=[redacted] status"
         );
         assert_eq!(
             redact_command("GH_TOKEN=ghp_123 MY_api_key=x DEBUG=1 gh pr list", &[]),
