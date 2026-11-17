@@ -2048,7 +2048,8 @@ mod tests {
         let output = run(
             &format!("{SETSID} 'echo $$ > child.pid; sleep 600' >/dev/null 2>&1 & wait"),
             &shared,
-            Duration::from_millis(500),
+            // Long enough for the child to start and write its pid on a slow runner: the timeout must not come first.
+            Duration::from_secs(5),
             1024,
             Some(&policy),
         )
