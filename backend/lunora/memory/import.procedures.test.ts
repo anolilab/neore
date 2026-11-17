@@ -28,6 +28,9 @@ vi.mock("ai", async (importOriginal) => {
 });
 vi.mock("../chat/lib/model-filter-rules", () => {
     return {
+        getUtilityModelForUser: async () => {
+            return {};
+        },
         loadModelFilterRules: async () => {
             return {};
         },

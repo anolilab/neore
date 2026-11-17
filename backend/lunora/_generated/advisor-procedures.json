@@ -24257,7 +24257,7 @@
       "handlesErrors": false,
       "reachesOutbound": false,
       "runsAiGeneration": false,
-      "throwsBareError": false,
+      "throwsBareError": true,
       "unboundedAiGeneration": false,
       "usesInsertManyUnsafe": false,
       "writesUserTable": false,

@@ -21,6 +21,9 @@ vi.mock("ai", async (importOriginal) => {
 });
 vi.mock("../chat/lib/model-filter-rules", () => {
     return {
+        getUtilityModelForUser: async () => {
+            return {};
+        },
         loadModelFilterRules: async () => {
             return {};
         },
@@ -405,6 +408,28 @@ describe("importing another assistant's memory", () => {
             updated: 1,
         });
         expect(harness.scheduler.list().map((job) => job.args)).toStrictEqual([{ memoryId: rowId, userId: USER }]);
+    });
+
+    it("schedules one new vector for a row two facts merge into", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER });
+        });
+        generateText
+            .mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: "The user lives in Berlin near the river with a garden and bikes daily" } })
+            .mockResolvedValueOnce({
+                output: { action: "UPDATE", mergedMemory: "The user lives in Berlin near the river with a garden and bikes daily often" },
+            });
+
+        expect(
+            await save([
+                { memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" },
+                { memory: "The user lives in Berlin near the river with a garden and bikes daily often", type: "context" },
+            ]),
+        ).toStrictEqual({ added: 0, alreadyKnown: 0, updated: 2 });
+        expect(harness.scheduler.list()).toHaveLength(1);
     });
 
     it("saves the fact when the row it would supersede is gone by the time of the save", async () => {

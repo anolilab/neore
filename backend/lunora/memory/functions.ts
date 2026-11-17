@@ -9,8 +9,8 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { memoryLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
 import { withoutUndefined } from "../lib/patch";
-import { type ImportApp, importDedupKey, IMPORT_MEMORY_OFF_MESSAGE } from "./import-logic";
-import { lastConfirmedOf, type MemoryType } from "./taxonomy";
+import { type ImportApp, importDedupKey, IMPORT_MEMORY_OFF_MESSAGE, IMPORTED_CONFIDENCE, IMPORTED_IMPORTANCE, vImportApp } from "./import-logic";
+import { lastConfirmedOf, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { requireOwnedThread } from "../agent/thread-read-access";
 import { getVectorIdInfo, type VectorTableId, type VectorTableName } from "../agent/vector/tables";
@@ -91,7 +91,7 @@ export const listUserMemories = authQuery
                 confidence: v.optional(v.number()),
                 createdAt: v.number(),
                 importance: v.optional(v.number()),
-                importedFrom: v.optional(v.union(v.literal("chatgpt"), v.literal("claude"), v.literal("gemini"), v.literal("other"))),
+                importedFrom: v.optional(vImportApp),
                 lastConfirmedAt: v.number(),
                 memory: v.string(),
                 pinned: v.boolean(),
@@ -436,7 +436,7 @@ const vMemoryInsertFields = {
     botId: v.optional(v.string()),
     confidence: v.optional(v.number()),
     importance: v.optional(v.number()),
-    importedFrom: v.optional(v.union(v.literal("chatgpt"), v.literal("claude"), v.literal("gemini"), v.literal("other"))),
+    importedFrom: v.optional(vImportApp),
     memory: v.string(),
     source: v.optional(v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"), v.literal("imported"))),
     supersedes: v.optional(v.id("memories")),
@@ -521,11 +521,14 @@ const IMPORT_EXACT_CHECK_ROWS = 5000;
  */
 export const saveImportedMemoryBatch = internalMutation
     .input({
+        app: vImportApp,
         confirms: v.array(v.id("memories")),
-        memories: v.array(
+        facts: v.array(
             v.object({
-                ...vMemoryInsertFields,
+                memory: v.string(),
                 merge: v.optional(v.object({ base: v.string(), confidence: v.number(), memory: v.string(), memoryId: v.id("memories") })),
+                supersedes: v.optional(v.id("memories")),
+                type: vMemoryType,
             }),
         ),
         userId: v.string(),
@@ -539,16 +542,24 @@ export const saveImportedMemoryBatch = internalMutation
         }
 
         const ownActive = (row: Doc<"memories"> | null): row is Doc<"memories"> => row?.userId === args.userId && !row.botId && !row.supersededBy;
-        const outcomes: ({ memoryId: Id<"memories">; status: "added" | "known" | "updated" } | undefined)[] = args.memories.map(() => undefined);
+        const outcomes: ({ memoryId: Id<"memories">; status: "added" | "known" | "updated" } | undefined)[] = args.facts.map(() => undefined);
 
-        for (const [index, { merge }] of args.memories.entries()) {
+        const reembed = new Set<Id<"memories">>();
+
+        for (const [index, { merge }] of args.facts.entries()) {
             const target = merge ? await ctx.db.get("memories", merge.memoryId) : null;
 
             // The row must still read as the text the merge was built from: an edit or another save meanwhile is not overwritten.
             if (merge && ownActive(target) && target.pinned !== true && target.memory === merge.base) {
                 await ctx.db.patch("memories", target._id, { confidence: merge.confidence, lastConfirmedAt: now, memory: merge.memory, updatedAt: now });
+
                 // The merged text needs its own vector, or a repeat import matches the old one and revises again.
-                await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: target._id, userId: args.userId });
+                // Once per row, though two facts of the paste may merge into it.
+                if (!reembed.has(target._id)) {
+                    reembed.add(target._id);
+                    await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: target._id, userId: args.userId });
+                }
+
                 outcomes[index] = { memoryId: target._id, status: "updated" };
             }
         }
@@ -577,7 +588,7 @@ export const saveImportedMemoryBatch = internalMutation
             }
         };
 
-        for (const [index, mem] of args.memories.entries()) {
+        for (const [index, mem] of args.facts.entries()) {
             const done = outcomes[index];
 
             if (done) {
@@ -600,7 +611,20 @@ export const saveImportedMemoryBatch = internalMutation
 
                 outcomes[index] = { memoryId: known, status: "known" };
             } else {
-                const memoryId = await insertMemory(ctx, { ...mem, supersedes, userId: args.userId }, now);
+                const memoryId = await insertMemory(
+                    ctx,
+                    {
+                        confidence: IMPORTED_CONFIDENCE,
+                        importance: IMPORTED_IMPORTANCE,
+                        importedFrom: args.app,
+                        memory: mem.memory,
+                        source: "imported",
+                        supersedes,
+                        type: mem.type,
+                        userId: args.userId,
+                    },
+                    now,
+                );
 
                 byText.set(key, memoryId);
                 outcomes[index] = { memoryId, status: "added" };
@@ -609,7 +633,14 @@ export const saveImportedMemoryBatch = internalMutation
             retire(supersedes);
         }
 
-        return outcomes.filter((outcome) => outcome !== undefined);
+        // One outcome per fact, in order: the action pairs them with its facts by index.
+        return outcomes.map((outcome) => {
+            if (!outcome) {
+                throw new Error("[memory/import] A fact was left without an outcome");
+            }
+
+            return outcome;
+        });
     });
 
 export const updateMemoryInternal = internalMutation

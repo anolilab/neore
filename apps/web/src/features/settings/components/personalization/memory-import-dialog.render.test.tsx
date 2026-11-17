@@ -21,7 +21,10 @@ vi.mock("@lingui/core/macro", () => {
 vi.mock("@lingui/react/macro", () => {
     return {
         useLingui: () => {
-            return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+            return {
+                i18n: { number: (value: number) => value.toLocaleString("en-US") },
+                t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values),
+            };
         },
     };
 });
@@ -39,7 +42,7 @@ vi.mock("@/lib/lunora/crpc", () => {
 });
 
 const LIKES_TEA_RE = /likes tea/;
-const TOO_LONG_RE = /longer than 20000 characters/;
+const TOO_LONG_RE = /longer than 20,000 characters/;
 
 const openDialog = (memoryEnabled: boolean, onEnableMemory: () => Promise<void> = async () => undefined) => {
     render(
@@ -132,6 +135,24 @@ describe("memory import dialog", () => {
 
         expect(screen.getByText(TOO_LONG_RE)).toBeTruthy();
         expect(screen.getByRole("button", { name: "Preview" }).hasAttribute("disabled")).toBe(true);
+    });
+
+    it("reopens on the paste step, not on a preview it was closed with", async () => {
+        expect.hasAssertions();
+
+        calls.preview.mockResolvedValue({ cut: 0, dropped: 0, facts: [{ memory: "The user is a nurse", type: "identity" }] });
+
+        openDialog(true);
+
+        fireEvent.change(await screen.findByLabelText("3. Paste its answer"), { target: { value: "The user is a nurse" } });
+        fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+        await screen.findByRole("checkbox");
+        fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        fireEvent.click(screen.getByRole("button", { name: "Bring in what another AI knows about you" }));
+
+        expect(await screen.findByLabelText("3. Paste its answer")).toBeTruthy();
+        expect(screen.queryByRole("checkbox")).toBeNull();
     });
 
     it("returns focus to the paste field on Back", async () => {

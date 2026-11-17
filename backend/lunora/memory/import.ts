@@ -5,7 +5,6 @@
  * saved rows are ordinary `memories` (source `imported`), so the memory export and
  * account deletion cover them. Rules for the paste live in `./import-logic.ts`.
  */
-import type { ModelFilterRules } from "@neore/ai/models";
 import { generateText, Output } from "ai";
 import { LunoraError, v } from "lunorash/server";
 import z from "zod/v4";
@@ -13,16 +12,16 @@ import z from "zod/v4";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
-import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
+import { getUtilityModelForUser, loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { authAction, rateLimit } from "../lib/crpc";
 import { gatewayFetch } from "../lib/services";
-import { getUtilityModel, NO_ALLOWED_UTILITY_MODEL_MESSAGE, NoAllowedUtilityModelError } from "../lib/utility-model";
 import { type DedupMemory, embedMemoryFacts, findSimilarMemoryByJaccard, findSimilarMemoryByVector, saveMemoryVectors } from "./dedup";
 import { runBeliefRevision } from "./extract";
 import {
     applyImportLabels,
     buildImportLabelPrompt,
     IMPORT_LABEL_SYSTEM_PROMPT,
+    IMPORTED_CONFIDENCE,
     cleanImportLine,
     IMPORT_MAX_FACT_CHARS,
     IMPORT_MAX_FACTS,
@@ -34,19 +33,16 @@ import {
     looksSensitive,
     sanitizeImportedFacts,
     splitImportedText,
+    vImportApp,
 } from "./import-logic";
 import { REFLECTION_LIMITS } from "./reflection-logic";
-import { MEMORY_TYPES } from "./taxonomy";
+import { MEMORY_TYPES, vMemoryType } from "./taxonomy";
 
 /**
  * Existing memories the near-match dedup reads (`getActiveMemoriesForUser`: by type, then
  * newest). Wider than extraction's 50; an exact repeat past it is still caught by the save.
  */
 const IMPORT_DEDUP_WINDOW = 1000;
-
-/** Imported facts were stated by the user's own assistant, not by the user: high, not full, confidence. */
-const IMPORTED_CONFIDENCE = 80;
-const IMPORTED_IMPORTANCE = 60;
 
 /**
  * Belief-revision calls one save may make. Past it a near-match is saved as new, as a failed
@@ -60,18 +56,6 @@ const LABEL_MAX_OUTPUT_TOKENS = 8000;
 const requireMemoryEnabled = async (ctx: ActionCtx, userId: string): Promise<void> => {
     if (!(await ctx.runQuery(internal.memory.functions.isMemoryEnabled, { userId }))) {
         throw new LunoraError("FORBIDDEN", IMPORT_MEMORY_OFF_MESSAGE);
-    }
-};
-
-const utilityModelFor = async (ctx: ActionCtx, userId: string, rules: ModelFilterRules) => {
-    try {
-        return await getUtilityModel(gatewayFetch(ctx), { rules, userId });
-    } catch (error) {
-        if (error instanceof NoAllowedUtilityModelError) {
-            throw new LunoraError("FORBIDDEN", NO_ALLOWED_UTILITY_MODEL_MESSAGE);
-        }
-
-        throw error;
     }
 };
 
@@ -104,7 +88,9 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
         facts.map((fact) => fact.memory),
         "[memory/import]",
     );
-    let model: Awaited<ReturnType<typeof utilityModelFor>> | undefined;
+    let model: Awaited<ReturnType<typeof getUtilityModelForUser>> | undefined;
+    // Set once the user has no allowed utility model: the rest of the save does not ask again.
+    let modelUnavailable = false;
 
     // Every write is planned here and applied by one mutation, which re-checks the setting first.
     const planned: {
@@ -142,12 +128,12 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
 
         if (similar && similar.score >= 0.95) {
             action = "IGNORE";
-        } else if (similar && revisions < IMPORT_MAX_REVISIONS && !match?.pinned) {
+        } else if (similar && !modelUnavailable && revisions < IMPORT_MAX_REVISIONS && !match?.pinned) {
             // A pinned row is never reworded or replaced by an import; the fact is saved beside it.
             revisions += 1;
 
             try {
-                model ??= await utilityModelFor(ctx, args.userId, rules);
+                model ??= await getUtilityModelForUser(ctx, gatewayFetch(ctx), { userId: args.userId });
 
                 const revision = await runBeliefRevision(model, similar.memory, fact.memory, REVISION_MAX_OUTPUT_TOKENS);
 
@@ -163,10 +149,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
             } catch (error) {
                 console.error("[memory/import] Belief revision failed, saving as new:", error);
 
-                // No model for this user: the rest of the save does not ask again.
-                if (!model) {
-                    revisions = IMPORT_MAX_REVISIONS;
-                }
+                modelUnavailable = !model;
             }
         }
 
@@ -201,21 +184,10 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
     }
 
     const outcomes = await ctx.runMutation(internal.memory.functions.saveImportedMemoryBatch, {
+        app: args.app,
         confirms: toConfirm,
-        memories: planned.map(({ fact, merge, supersedes }) => {
-            return {
-                botId: undefined,
-                confidence: IMPORTED_CONFIDENCE,
-                importance: IMPORTED_IMPORTANCE,
-                importedFrom: args.app,
-                memory: fact.memory,
-                merge,
-                source: "imported" as const,
-                supersedes,
-                threadId: undefined,
-                type: fact.type,
-                userId: args.userId,
-            };
+        facts: planned.map(({ fact, merge, supersedes }) => {
+            return { memory: fact.memory, merge, supersedes, type: fact.type };
         }),
         userId: args.userId,
     });
@@ -256,15 +228,16 @@ export const labelImportedText = async (ctx: ActionCtx, userId: string, text: st
         return { cut, dropped, facts: [] };
     }
 
-    const model = await utilityModelFor(ctx, userId, await loadModelFilterRules(ctx, userId));
+    const model = await getUtilityModelForUser(ctx, gatewayFetch(ctx), { userId });
     const { output } = await generateText({
         // One short label per kept line, at most `IMPORT_MAX_FACTS` of them.
         maxOutputTokens: LABEL_MAX_OUTPUT_TOKENS,
         model,
         output: Output.object({
             schema: z.object({
-                // A line number out of range is dropped by `applyImportLabels`, not a reason to refuse the whole answer.
-                keep: z.array(z.object({ line: z.int(), type: z.enum(MEMORY_TYPES) })).max(IMPORT_MAX_FACTS),
+                // A repeated or out-of-range line number is dropped by `applyImportLabels`, not a reason to refuse the whole
+                // answer; the output cap bounds the list.
+                keep: z.array(z.object({ line: z.int(), type: z.enum(MEMORY_TYPES) })),
             }),
         }),
         prompt: buildImportLabelPrompt(lines),
@@ -274,9 +247,6 @@ export const labelImportedText = async (ctx: ActionCtx, userId: string, text: st
 
     return { cut, dropped: dropped + lines.length - facts.length, facts };
 };
-
-const vImportApp = v.union(v.literal("chatgpt"), v.literal("claude"), v.literal("gemini"), v.literal("other"));
-const vMemoryType = v.union(v.literal("identity"), v.literal("preference"), v.literal("context"), v.literal("activity"), v.literal("experience"));
 
 export const previewMemoryImport = authAction
     .input({ text: v.string().max(IMPORT_MAX_INPUT_CHARS) })

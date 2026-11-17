@@ -42,7 +42,7 @@ interface MemoryImportDialogProps {
  * that asks it to list its memory, paste the answer, uncheck what to leave out, save.
  */
 const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnableMemory, onImported }) => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
     const appLabels = useImportAppLabels();
     const typeLabels = useMemoryTypeLabels();
     const appLabelId = useId();
@@ -132,9 +132,21 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
 
     const kept = preview?.facts.filter((_, index) => !unchecked.has(index)) ?? [];
     const tooLong = text.length > MAX_PASTE_CHARS;
+    const maxPasteChars = i18n.number(MAX_PASTE_CHARS);
 
     return (
-        <Dialog onOpenChange={setOpen} open={open}>
+        <Dialog
+            onOpenChange={(next) => {
+                setOpen(next);
+
+                // Closing drops the preview: reopening starts from the paste, never from facts checked earlier.
+                if (!next) {
+                    setPreview(undefined);
+                    setUnchecked(new Set());
+                }
+            }}
+            open={open}
+        >
             <DialogTrigger render={<Button className="w-full" variant="outline" />}>
                 <DownloadIcon aria-hidden="true" className="mr-2 h-4 w-4" />
                 {t`Bring in what another AI knows about you`}
@@ -204,7 +216,7 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
                                 />
                                 {tooLong && (
                                     <p className="text-destructive text-xs" id={tooLongId}>
-                                        {t`This is longer than ${MAX_PASTE_CHARS} characters. Paste it in parts and bring in each one.`}
+                                        {t`This is longer than ${maxPasteChars} characters. Paste it in parts and bring in each one.`}
                                     </p>
                                 )}
                             </div>

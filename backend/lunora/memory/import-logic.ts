@@ -4,11 +4,20 @@
  * so the stored wording is the user's own paste and a repeat import produces the
  * same text again — which dedup then recognises. The model only labels each line.
  */
+import { v } from "lunorash/server";
+
 import { MEMORY_TYPE_GUIDE, type MemoryType } from "./taxonomy";
 
 export const IMPORT_APPS = ["chatgpt", "claude", "gemini", "other"] as const;
 
 export type ImportApp = (typeof IMPORT_APPS)[number];
+
+/** Spelled out inline rather than mapped from {@link IMPORT_APPS}: codegen resolves a literal union, not a computed one. */
+export const vImportApp = v.union(v.literal("chatgpt"), v.literal("claude"), v.literal("gemini"), v.literal("other"));
+
+/** Imported facts were stated by the user's own assistant, not by the user: high, not full, confidence. */
+export const IMPORTED_CONFIDENCE = 80;
+export const IMPORTED_IMPORTANCE = 60;
 
 export const IMPORT_MEMORY_OFF_MESSAGE = "Turn on memory before bringing in memories";
 
