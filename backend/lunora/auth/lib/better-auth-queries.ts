@@ -84,7 +84,7 @@ export const getInvitationsByEmailOrganizationAndStatus = async (
  * type only because `organization.ts` still reads `inviter.username` — that read
  * is dead and should be deleted, at which point this intersection goes with it.
  */
-export const getUser = async (context: AuthContext, userId: string): Promise<(Doc<"user"> & { username?: string | null }) | null> =>
+export const getUser = async (context: Pick<AuthContext, "db">, userId: string): Promise<(Doc<"user"> & { username?: string | null }) | null> =>
     context.db.user.findFirst({ where: { _id: context.db.asId("user", userId) } });
 
 /**
