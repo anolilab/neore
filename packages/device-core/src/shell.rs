@@ -611,9 +611,22 @@ fn kill_descendants(root: u32) {
             .map(|&(pid, _, _)| pid)
             .collect();
         let mut found = false;
+        let tree = descendants_of(root, &pairs);
+
+        // Every process in the tree is stopped before any is killed. Killing a child first lets its parent run on until its own
+        // kill lands, and a parent that does so can still act: a shell whose `sleep` was killed runs its next command. A stopped
+        // process runs nothing, and its parent cannot exit to re-parent it while it is stopped, so the parent check still holds.
+        for &(pid, _) in &tree {
+            if !dead.contains(&pid) {
+                // SAFETY: a plain signal to a pid found under this run's root.
+                unsafe {
+                    libc::kill(pid as libc::pid_t, libc::SIGSTOP);
+                }
+            }
+        }
 
         // Children before their parents: a parent killed first re-parents its child, and the parent check then refuses it.
-        for (pid, parent) in descendants_of(root, &pairs).into_iter().rev() {
+        for (pid, parent) in tree.into_iter().rev() {
             // By parent too: one re-parented after a walk found it was not signalled, and is tried again under its new parent.
             if !dead.contains(&pid) && signalled.insert((pid, parent)) {
                 kill_child_of(pid, parent);
