@@ -355,6 +355,58 @@ describe("importing another assistant's memory", () => {
         expect(rows.find((row: { _id: string }) => row._id === merged)?.memory).toBe("The user lives in Berlin near the river with a garden and bikes");
     });
 
+    it("saves the fact as new when its merge row was edited while the save ran", async () => {
+        expect.assertions(3);
+
+        await setMemoryEnabled(true);
+
+        const rowId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER }),
+        );
+
+        generateText.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("memories", rowId, { memory: "The user lives in Berlin near the river with a garden" });
+            });
+
+            return { output: { action: "UPDATE", mergedMemory: "The user lives in Berlin near the river with a garden and bikes daily" } };
+        });
+
+        expect(await save([{ memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" }])).toStrictEqual({
+            added: 1,
+            alreadyKnown: 0,
+            updated: 0,
+        });
+
+        const rows = await memories();
+
+        expect(rows.find((row: { _id: string }) => row._id === rowId)?.memory).toBe("The user lives in Berlin near the river with a garden");
+        expect(harness.scheduler.list()).toHaveLength(0);
+    });
+
+    it("schedules a new vector for a merged row", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+
+        const rowId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER }),
+        );
+
+        generateText.mockResolvedValueOnce({
+            output: { action: "UPDATE", mergedMemory: "The user lives in Berlin near the river with a garden and bikes daily" },
+        });
+
+        expect(await save([{ memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" }])).toStrictEqual({
+            added: 0,
+            alreadyKnown: 0,
+            updated: 1,
+        });
+        expect(harness.scheduler.list().map((job) => job.args)).toStrictEqual([{ memoryId: rowId, userId: USER }]);
+    });
+
     it("saves the fact when the row it would supersede is gone by the time of the save", async () => {
         expect.assertions(1);
 

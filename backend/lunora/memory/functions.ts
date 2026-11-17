@@ -511,8 +511,8 @@ const IMPORT_EXACT_CHECK_ROWS = 5000;
 /**
  * Every write of one import, applied together after the memory setting is re-checked, so
  * memory switched off meanwhile leaves the user's rows untouched. In order:
- * - a planned merge (`merge`) rewords its row while that is still the user's own, active and
- *   unpinned; otherwise the fact is saved as new;
+ * - a planned merge (`merge`) rewords its row while that is still the user's own, active,
+ *   unpinned and unchanged since it was read; otherwise the fact is saved as new;
  * - `confirms` are marked confirmed;
  * - the other facts are inserted, minus any whose text the user already has (that row is
  *   confirmed instead). It runs in the mutation because one shard's mutations run one at a
@@ -525,7 +525,7 @@ export const saveImportedMemoryBatch = internalMutation
         memories: v.array(
             v.object({
                 ...vMemoryInsertFields,
-                merge: v.optional(v.object({ confidence: v.number(), memory: v.string(), memoryId: v.id("memories") })),
+                merge: v.optional(v.object({ base: v.string(), confidence: v.number(), memory: v.string(), memoryId: v.id("memories") })),
             }),
         ),
         userId: v.string(),
@@ -544,7 +544,8 @@ export const saveImportedMemoryBatch = internalMutation
         for (const [index, { merge }] of args.memories.entries()) {
             const target = merge ? await ctx.db.get("memories", merge.memoryId) : null;
 
-            if (merge && ownActive(target) && target.pinned !== true) {
+            // The row must still read as the text the merge was built from: an edit or another save meanwhile is not overwritten.
+            if (merge && ownActive(target) && target.pinned !== true && target.memory === merge.base) {
                 await ctx.db.patch("memories", target._id, { confidence: merge.confidence, lastConfirmedAt: now, memory: merge.memory, updatedAt: now });
                 // The merged text needs its own vector, or a repeat import matches the old one and revises again.
                 await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: target._id, userId: args.userId });

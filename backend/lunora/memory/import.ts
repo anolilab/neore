@@ -110,7 +110,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
     const planned: {
         embedding: number[] | null;
         fact: ImportedFact;
-        merge?: { confidence: number; memory: string; memoryId: Id<"memories"> };
+        merge?: { base: string; confidence: number; memory: string; memoryId: Id<"memories"> };
         supersedes?: Id<"memories">;
     }[] = [];
     const toConfirm: Id<"memories">[] = [];
@@ -174,7 +174,11 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
             toConfirm.push(similar.id);
             result.alreadyKnown += 1;
         } else if (similar && action === "UPDATE") {
-            planned.push({ embedding, fact, merge: { confidence: Math.max(IMPORTED_CONFIDENCE, similar.confidence ?? 50), memory, memoryId: similar.id } });
+            planned.push({
+                embedding,
+                fact,
+                merge: { base: similar.memory, confidence: Math.max(IMPORTED_CONFIDENCE, similar.confidence ?? 50), memory, memoryId: similar.id },
+            });
 
             if (match) {
                 match.memory = memory;
