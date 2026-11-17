@@ -262,7 +262,7 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         return [computer, ...dependencies.sshHosts().map((entry) => rowFor(entry))];
     };
 
-    /** Connects a paired server again. A server that is not paired yet is paired by the page first, with the shell's prompts. */
+    /** Connects a paired server again, after the person approves it in the desktop window. A server that is not paired yet is paired by the page first, with the shell's prompts. */
     const connect = async (sshAlias: string): Promise<AddProjectMachine> => {
         const entry = entryFor(sshAlias);
         const paired = pairedFor(entry);
@@ -272,7 +272,11 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         }
 
         if (!paired.connected) {
-            await dependencies.hostConnect(paired.deviceId);
+            if (!await ask({ detail: `Server: ${paired.name} (${paired.address})`, message: `Connect to the server “${paired.name}” over SSH?` })) {
+                throw declined();
+            }
+
+            await dependencies.hostConnect(stillPaired(paired.deviceId, paired).deviceId);
         }
 
         return rowFor(entry);

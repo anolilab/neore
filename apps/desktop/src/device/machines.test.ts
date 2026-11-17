@@ -100,7 +100,16 @@ describe("connect", () => {
         });
 
         await expect(machines.connect("build")).resolves.toMatchObject({ status: "connected" });
+        expect(deps.confirm).toHaveBeenCalledTimes(1);
         expect(deps.hostConnect).toHaveBeenCalledWith("srv-1");
+    });
+
+    it("asks before connecting a paired server that is down, and connects nothing when declined", async () => {
+        const { deps, machines } = setup({ answer: false, hosts: [server({ connected: false })] });
+
+        await expect(machines.connect("build")).rejects.toThrow("the person declined");
+        expect(deps.confirm).toHaveBeenCalledTimes(1);
+        expect(deps.hostConnect).not.toHaveBeenCalled();
     });
 
     it("refuses to connect a server that is not paired yet, and connects nothing", async () => {
