@@ -335,4 +335,17 @@ describe("composer emoji shortcodes", () => {
         expect(ref.current?.getEditor()?.getText()).toBe(":do");
         expect(screen.queryByRole("listbox", { name: "Emoji suggestions" })).toBeNull();
     });
+
+    it("does not open with the caret in front of a closing colon, which is not the end of the shortcode", async () => {
+        const { ref } = renderEditor();
+
+        await typeText(ref, ":thumbsup:");
+
+        // Between "p" and the closing ":": the text before the caret is ":thumbsup", but the shortcode goes on past it.
+        act(() => {
+            ref.current!.getEditor()!.commands.setTextSelection(10);
+        });
+
+        expect(screen.queryByRole("listbox", { name: "Emoji suggestions" })).toBeNull();
+    });
 });

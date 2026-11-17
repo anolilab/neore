@@ -29,8 +29,11 @@ export interface EmojiShortcodeOptions {
 
 const OBJECT_REPLACEMENT = "\u{FFFC}";
 
-/** The characters a shortcode is made of, the same set the trigger accepts. */
-const SHORTCODE_CHARACTER = /^[\w+-]/;
+/**
+ * What continues a shortcode after the caret: its characters, and the colon that closes a finished `:thumbsup:`. A caret
+ * in front of either is not at the shortcode's end.
+ */
+const SHORTCODE_CHARACTER = /^[\w+:-]/;
 
 /** Characters read before the caret: longer than any shortcode with its colon. */
 const TEXT_WINDOW = 64;

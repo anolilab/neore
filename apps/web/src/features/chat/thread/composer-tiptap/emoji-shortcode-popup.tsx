@@ -88,6 +88,10 @@ const EmojiShortcodePopup: FC<EmojiShortcodePopupProps> = ({ editorRect, listbox
                             event.preventDefault();
                         }}
                         onMouseEnter={() => onHighlight(position)}
+                        onPointerDown={(event) => {
+                            // A touch tap sends no mousedown in time: keeps the editor focused as well, so the list is not closed first.
+                            event.preventDefault();
+                        }}
                         ref={position === selected ? selectedRef : undefined}
                         role="option"
                         tabIndex={-1}
