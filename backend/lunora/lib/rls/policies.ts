@@ -478,7 +478,7 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     teamSettings: "org-scoped settings, checked by org role",
     threadKnowledge: "link rows with no owner column; every access follows a thread access check",
     triggerExecutions: "no owner column; every access follows the parent trigger's owner check",
-    usageOrganizationCohorts: "global booking counter per organization; read and written only by the contributor booking, through systemDb",
+    usageOrganizationCohortSlots: "global booking slots per organization; read and written only by the contributor booking, through systemDb",
     usageOrganizationContributors:
         "global list of the organization view's contributors; read only by the admin-checked organization query (through systemDb), written by the contributor's own reply and erased with the account",
     verification: "better-auth verification tokens",
