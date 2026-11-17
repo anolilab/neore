@@ -24,6 +24,33 @@ pub struct ShellOutput {
     pub truncated: bool,
 }
 
+type SpawnGate = Box<dyn Fn() -> Result<(), String>>;
+
+thread_local! {
+    static SPAWN_GATE: std::cell::RefCell<Option<SpawnGate>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `run` with `gate` asked right before every command it spawns on this thread: an error from `gate` refuses that
+/// spawn with the error, and nothing is started.
+pub fn with_spawn_gate<T>(
+    gate: impl Fn() -> Result<(), String> + 'static,
+    run: impl FnOnce() -> T,
+) -> T {
+    struct Restore(Option<SpawnGate>);
+
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            let previous = self.0.take();
+
+            SPAWN_GATE.with(|gate| *gate.borrow_mut() = previous);
+        }
+    }
+
+    let _restore = Restore(SPAWN_GATE.with(|slot| slot.borrow_mut().replace(Box::new(gate))));
+
+    run()
+}
+
 /// How long a finished command may keep its output pipes open (a background child) before we return what we have.
 const READER_GRACE: Duration = Duration::from_millis(500);
 
@@ -736,6 +763,8 @@ fn spawn(
     if let Some(proxy) = &proxy {
         command.envs(egress::proxy_env(proxy.port()));
     }
+
+    SPAWN_GATE.with(|gate| gate.borrow().as_ref().map_or(Ok(()), |gate| gate()))?;
 
     let spawned = command
         .current_dir(cwd)

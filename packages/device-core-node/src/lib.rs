@@ -128,14 +128,19 @@ const MAX_TERMINALS: usize = 32;
 const TERMINAL_WAIT: Duration = Duration::from_secs(11 * 60);
 /// How long quitting waits for the agent's terminals to end once their groups are signalled.
 const STOP_WAIT: Duration = Duration::from_secs(2);
+/// How long quitting waits for the starts still in progress to settle before it ends the terminals without them.
+const START_WAIT: Duration = Duration::from_secs(5);
 
 #[derive(Default)]
 struct Slots {
     running: HashMap<u64, Arc<Terminal>>,
     /// Starts that have reserved a place and are still spawning: they count against the cap like a running terminal.
     starting: usize,
-    /// Set by `close`. No start reserves a place after it, and `stop` drains only once every reserved one has settled.
+    /// Set by `close`. No start reserves a place or spawns after it, and `stop` drains once every reserved one has
+    /// settled or [`START_WAIT`] has passed.
     stopping: bool,
+    /// Set once `stop` has drained: a terminal that settles later is ended by its own start.
+    drained: bool,
 }
 
 /// The terminals coding agents started, by handle, and the starts still spawning.
@@ -178,6 +183,13 @@ impl Terminals {
 
         let terminal = started?;
 
+        if slots.drained {
+            drop(slots);
+            shell::end_now(std::iter::once(&terminal), STOP_WAIT);
+
+            return Err("the app is shutting down".into());
+        }
+
         slots.running.insert(handle, Arc::new(terminal));
 
         if slots.stopping {
@@ -195,19 +207,54 @@ impl Terminals {
         self.slots.lock().unwrap().running.remove(&handle)
     }
 
+    /// Reserves a place, runs `run` with every spawn it makes gated on `admit`, and keeps what it started.
+    fn start(
+        self: &Arc<Self>,
+        handle: u64,
+        run: impl FnOnce() -> std::result::Result<Terminal, String>,
+    ) -> std::result::Result<u64, String> {
+        self.reserve()?;
+
+        let gate = Arc::clone(self);
+        // Settled even when the start panics: `stop` waits for every reservation.
+        let started = panic::catch_unwind(AssertUnwindSafe(|| {
+            shell::with_spawn_gate(move || gate.admit(), run)
+        }))
+        .unwrap_or_else(|_| Err("the terminal failed to start".into()));
+
+        self.settle(handle, started)
+    }
+
+    /// Asked under the slots lock right before a start spawns: once `close` has run, a start that reaches its spawn is
+    /// refused, so a start `stop` stopped waiting for never spawns.
+    fn admit(&self) -> std::result::Result<(), String> {
+        if self.slots.lock().unwrap().stopping {
+            return Err("the app is shutting down".into());
+        }
+
+        Ok(())
+    }
+
     /// Admits no further start.
     fn close(&self) {
         self.slots.lock().unwrap().stopping = true;
     }
 
-    /// Waits for every reserved start to settle, then ends every terminal and waits for them. Signalled here, not left to
-    /// the watchers: quitting exits the process right after this returns. Call after `close`.
+    /// Waits up to [`START_WAIT`] for every reserved start to settle, then ends every terminal and waits for them.
+    /// Signalled here, not left to the watchers: quitting exits the process right after this returns. Call after
+    /// `close`.
+    ///
+    /// A start still blocked after the wait (a folder on a hung mount) does not hold quitting up: `stop` returns without
+    /// it, and when it resumes it is refused at its spawn by `admit`, so it starts nothing.
     fn stop(&self) {
         let slots = self.slots.lock().unwrap();
-        let mut slots = self
+        let (mut slots, _) = self
             .settled
-            .wait_while(slots, |slots| slots.starting > 0)
+            .wait_timeout_while(slots, START_WAIT, |slots| slots.starting > 0)
             .unwrap();
+
+        slots.drained = true;
+
         let ended: Vec<Arc<Terminal>> = slots
             .running
             .drain()
@@ -898,15 +945,8 @@ impl DeviceCore {
         let handle = self.next_terminal.fetch_add(1, Ordering::Relaxed);
 
         blocking(env, move || {
-            terminals.reserve()?;
-
-            // Settled even when the start panics: `stop` waits for every reservation.
-            let started =
-                panic::catch_unwind(AssertUnwindSafe(|| state.acp_terminal_start(&request)))
-                    .unwrap_or_else(|_| Err("the terminal failed to start".into()));
-
             terminals
-                .settle(handle, started)
+                .start(handle, || state.acp_terminal_start(&request))
                 .map(|handle| handle as f64)
         })
     }
@@ -1076,5 +1116,78 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         assert!(!alive, "the command outlived stop");
         assert!(terminals.slots.lock().unwrap().running.is_empty());
+    }
+
+    #[test]
+    fn stop_returns_past_a_blocked_start_and_that_start_never_spawns() {
+        if let Support::Unavailable(reason) = sandbox::support() {
+            eprintln!("skipping: {reason}");
+            return;
+        }
+
+        let dir = std::env::temp_dir().join(format!("neore-node-blocked-{}", std::process::id()));
+
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let dir: PathBuf = std::fs::canonicalize(dir).unwrap();
+        let policy = Policy::for_roots(std::slice::from_ref(&dir), None);
+        let terminals = Arc::new(Terminals::default());
+        let (entered, blocked) = std::sync::mpsc::channel::<()>();
+        let (resume, resumed) = std::sync::mpsc::channel::<()>();
+        let (report, reported) = std::sync::mpsc::channel::<std::result::Result<(), String>>();
+        let starting = Arc::clone(&terminals);
+        let folder = dir.clone();
+        let start = thread::spawn(move || {
+            starting.start(7, move || {
+                entered.send(()).unwrap();
+                resumed.recv().unwrap();
+
+                let started = Terminal::start(
+                    "sleep 600",
+                    &folder,
+                    &policy,
+                    &[],
+                    1024,
+                    Duration::from_secs(600),
+                );
+
+                report
+                    .send(started.as_ref().map(|_| ()).map_err(Clone::clone))
+                    .unwrap();
+                started
+            })
+        });
+
+        blocked.recv().unwrap();
+
+        let began = std::time::Instant::now();
+
+        terminals.close();
+        terminals.stop();
+
+        let waited = began.elapsed();
+
+        resume.send(()).unwrap();
+
+        let started = start.join().unwrap();
+        let spawn = reported.recv().unwrap();
+
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(waited >= START_WAIT, "stop did not wait for the start");
+        assert!(
+            waited < START_WAIT + Duration::from_secs(2),
+            "stop waited past its bound: {waited:?}"
+        );
+        assert_eq!(
+            spawn,
+            Err("the app is shutting down".into()),
+            "the start spawned after stop returned"
+        );
+        assert_eq!(started, Err("the app is shutting down".into()));
+
+        let slots = terminals.slots.lock().unwrap();
+
+        assert_eq!(slots.starting, 0);
+        assert!(slots.running.is_empty());
     }
 }
