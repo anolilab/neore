@@ -12,6 +12,9 @@ auditConfig:
   # eight of those did not even apply to the installed 16.x — they were written
   # against `< 15.5.21`. The ninth was live and suppressed.
   ignoreGhsas:
+    # picomatch <=4.0.7 (ReDoS via repeated extglobs), 117 paths: lint, build and dev tooling, and better-auth and
+    # drizzle-orm's own glob matching. No patched release exists as of 2026-11-17; drop this entry once one ships.
+    - GHSA-fc5q-39xc-vjpf
     # braces <=3.0.3, via micromatch/fast-glob (28 paths). No patched release exists.
     - GHSA-vfj7-8cjw-p6xm
     # sprintf-js <=1.1.3, via argparse 1 under `mammoth`. No patched release exists.
