@@ -108,7 +108,8 @@ export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmo
 
     // Effect Event: the listener is attached once per open/close, not re-attached on every keystroke that changes the rows.
     const onKeyDown = useEffectEvent((event: KeyboardEvent): void => {
-        if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) {
+        // The listener is removed in an effect after the list closes: a key in that gap must not be taken for the list.
+        if (!open || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) {
             return;
         }
 
