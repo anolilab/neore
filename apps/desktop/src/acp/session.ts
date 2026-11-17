@@ -1783,9 +1783,11 @@ export class AgentSession {
     private async createTerminal(terminals: SessionTerminals, params: Record<string, unknown>): Promise<string> {
         const { cwd, env, line, outputByteLimit, shown } = createRequestOf(params);
 
-        // The person approves the text the screen shows. A configured secret in the command is masked there, so the text
-        // approved would differ from the bytes that run: such a command is refused rather than approved blind.
-        if (this.options.process.scrub(line) !== line) {
+        // The person approves the text the screen shows. A configured secret anywhere in what is shown (the command, its variables
+        // or its working folder) is masked there, so the text approved would differ from what runs: such a request is refused.
+        const { scrub } = this.options.process;
+
+        if (scrub(shown) !== shown || (cwd !== undefined && scrub(cwd) !== cwd)) {
             throw new RpcError(INVALID_PARAMS, "the command contains a configured secret, so it cannot be shown for approval");
         }
 
