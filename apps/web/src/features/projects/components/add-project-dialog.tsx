@@ -12,7 +12,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
-import { getAddProjectBridge, pairNativeHost, probeNativeHost } from "@/lib/native/bridge";
+import { getAddProjectBridge } from "@/lib/native/bridge";
+import { pairNativeHost, probeNativeHost } from "@/lib/native/device-bridge";
 
 import type { AddProjectMachine, AddProjectMachinesBridge, MachineFolderPage, MachineServerSpec } from "../../../../../desktop/src/add-project-machines.types";
 import {
