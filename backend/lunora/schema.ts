@@ -1090,7 +1090,9 @@ export const schema = defineSchema({
         .index("by_userId", ["userId"])
         // One user's rows oldest first, for the export; the admins read across users by time.
         .index("by_userId_createdAt", ["userId", "createdAt"])
-        .index("by_createdAt", ["createdAt"]),
+        .index("by_createdAt", ["createdAt"])
+        // The admins' list filtered to one kind, so a rare kind does not walk every newer row.
+        .index("by_kind_createdAt", ["kind", "createdAt"]),
 
     files: defineTable({
         chatId: v.optional(v.string()),

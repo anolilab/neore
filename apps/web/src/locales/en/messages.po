@@ -3245,7 +3245,7 @@ msgstr "All Icons"
 msgid "All installers"
 msgstr "All installers"
 
-#: src/features/admin/components/feedback-admin-page.tsx:162
+#: src/features/admin/components/feedback-admin-page.tsx:168
 msgid "All kinds"
 msgstr "All kinds"
 
@@ -14165,18 +14165,18 @@ msgstr "Features: {0}"
 msgid "Feed image"
 msgstr "Feed image"
 
-#: src/features/admin/components/feedback-admin-page.tsx:138
-#: src/features/admin/components/feedback-admin-page.tsx:153
+#: src/features/admin/components/feedback-admin-page.tsx:139
+#: src/features/admin/components/feedback-admin-page.tsx:154
 #: src/routes/admin/route.tsx:39
 #: src/routes/admin/route.tsx:59
 msgid "Feedback"
 msgstr "Feedback"
 
-#: src/features/admin/components/feedback-admin-page.tsx:131
+#: src/features/admin/components/feedback-admin-page.tsx:132
 msgid "Feedback could not be loaded."
 msgstr "Feedback could not be loaded."
 
-#: src/features/admin/components/feedback-admin-page.tsx:174
+#: src/features/admin/components/feedback-admin-page.tsx:181
 msgid "Feedback pages"
 msgstr "Feedback pages"
 
@@ -14343,8 +14343,8 @@ msgstr "Filmmakers creating cinematic videos with a strong focus on visual narra
 msgid "Filter by action"
 msgstr "Filter by action"
 
-#: src/features/admin/components/feedback-admin-page.tsx:158
-#: src/features/admin/components/feedback-admin-page.tsx:159
+#: src/features/admin/components/feedback-admin-page.tsx:164
+#: src/features/admin/components/feedback-admin-page.tsx:165
 msgid "Filter by kind"
 msgstr "Filter by kind"
 
@@ -16648,7 +16648,7 @@ msgstr "Idea to finished output, one thread"
 msgid "Ideal for simple classification and extraction"
 msgstr "Ideal for simple classification and extraction"
 
-#: src/features/admin/components/feedback-admin-page.tsx:163
+#: src/features/admin/components/feedback-admin-page.tsx:169
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:69
 msgid "Ideas"
 msgstr "Ideas"
@@ -21575,7 +21575,7 @@ msgstr "New user registrations per day"
 msgid "New Workflow"
 msgstr "New Workflow"
 
-#: src/features/admin/components/feedback-admin-page.tsx:177
+#: src/features/admin/components/feedback-admin-page.tsx:184
 msgid "Newer"
 msgstr "Newer"
 
@@ -21900,11 +21900,11 @@ msgstr "No expiration"
 msgid "No failures in the checks shown."
 msgstr "No failures in the checks shown."
 
-#: src/features/admin/components/feedback-admin-page.tsx:135
+#: src/features/admin/components/feedback-admin-page.tsx:136
 msgid "No feedback of this kind"
 msgstr "No feedback of this kind"
 
-#: src/features/admin/components/feedback-admin-page.tsx:135
+#: src/features/admin/components/feedback-admin-page.tsx:136
 msgid "No feedback yet"
 msgstr "No feedback yet"
 
@@ -22811,7 +22811,7 @@ msgid "old lines {text}"
 msgstr "old lines {text}"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:45
-#: src/features/admin/components/feedback-admin-page.tsx:189
+#: src/features/admin/components/feedback-admin-page.tsx:196
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:643
 msgid "Older"
 msgstr "Older"
@@ -23976,7 +23976,7 @@ msgstr "Original system prompt"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:171
 #: src/features/admin/components/feedback-admin-page.tsx:24
-#: src/features/admin/components/feedback-admin-page.tsx:165
+#: src/features/admin/components/feedback-admin-page.tsx:171
 #: src/features/feedback/components/send-feedback-dialog.tsx:30
 #: src/features/settings/components/chat/models-settings.tsx:521
 msgid "Other"
@@ -25546,7 +25546,7 @@ msgstr "Pro models need a Pro plan. On a free plan the run stops before it start
 msgid "Problem"
 msgstr "Problem"
 
-#: src/features/admin/components/feedback-admin-page.tsx:164
+#: src/features/admin/components/feedback-admin-page.tsx:170
 msgid "Problems"
 msgstr "Problems"
 
@@ -26839,6 +26839,7 @@ msgid "Refining the draft…"
 msgstr "Refining the draft…"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:221
+#: src/features/admin/components/feedback-admin-page.tsx:161
 msgid "Refresh"
 msgstr "Refresh"
 
@@ -37609,7 +37610,7 @@ msgstr "What to send, and how to tell a good answer from a bad one."
 msgid "What to watch"
 msgstr "What to watch"
 
-#: src/features/admin/components/feedback-admin-page.tsx:154
+#: src/features/admin/components/feedback-admin-page.tsx:155
 msgid "What users sent from the app, newest first"
 msgstr "What users sent from the app, newest first"
 

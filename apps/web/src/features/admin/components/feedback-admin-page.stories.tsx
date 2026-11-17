@@ -99,6 +99,38 @@ export const NextPage: Story = {
     },
 };
 
+/** How many times the `Refresh` story's list was read; reset each time the story opens. */
+const refreshReads = { count: 0 };
+
+/** "Refresh" reads the list again and shows feedback sent since the page opened. */
+export const Refresh: Story = {
+    beforeEach: () => {
+        refreshReads.count = 0;
+    },
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    lunora(api.feedback.admin.listFeedback, () => {
+                        refreshReads.count += 1;
+
+                        return { continueCursor: null, isDone: true, page: refreshReads.count === 1 ? FEEDBACK.slice(1) : FEEDBACK };
+                    }),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await canvas.findByText(/pin a project/i);
+        await expect(canvas.queryByText(/model picker closes/i)).not.toBeInTheDocument();
+
+        await userEvent.click(canvas.getByRole("button", { name: /refresh/i }));
+
+        await expect(await canvas.findByText(/model picker closes/i)).toBeVisible();
+    },
+};
+
 export const Empty: Story = {
     parameters: {
         msw: {

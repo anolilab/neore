@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neor
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { formatDateTime } from "@neore/ui/utils/locale-format";
-import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImageOff, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import type { AdminFeedbackItem, FeedbackKind } from "../hooks/use-admin";
@@ -105,7 +105,7 @@ const FeedbackAdminPage = () => {
     const [cursors, setCursors] = useState<(string | null)[]>([null]);
     const cursor = cursors.at(-1) ?? null;
 
-    const { data, isError, isPending } = useAdminFeedback({ cursor, kind: kind === "all" ? undefined : kind, limit: FEEDBACK_PAGE_SIZE });
+    const { data, isFetching, isPending, refetch } = useAdminFeedback({ cursor, kind: kind === "all" ? undefined : kind, limit: FEEDBACK_PAGE_SIZE });
 
     const changeKind = (value: FeedbackKind | "all") => {
         setKind(value);
@@ -125,7 +125,8 @@ const FeedbackAdminPage = () => {
                 ))}
             </div>
         );
-    } else if (isError) {
+    } else if (data === undefined) {
+        // Only when there is nothing to show: a failed background read keeps the list it already has.
         body = (
             <p className="text-destructive py-8 text-center" role="alert">
                 {t`Feedback could not be loaded.`}
@@ -154,17 +155,23 @@ const FeedbackAdminPage = () => {
                         <CardDescription>{t`What users sent from the app, newest first`}</CardDescription>
                     </div>
 
-                    <Select onValueChange={(value) => value && changeKind(value)} value={kind}>
-                        <SelectTrigger aria-label={t`Filter by kind`} className="w-[180px]">
-                            <SelectValue placeholder={t`Filter by kind`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">{t`All kinds`}</SelectItem>
-                            <SelectItem value="idea">{t`Ideas`}</SelectItem>
-                            <SelectItem value="problem">{t`Problems`}</SelectItem>
-                            <SelectItem value="other">{t`Other`}</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2">
+                        <Button onClick={() => refetch()} size="sm" variant="outline">
+                            <RefreshCw aria-hidden="true" className={isFetching ? "size-4 animate-spin" : "size-4"} />
+                            {t`Refresh`}
+                        </Button>
+                        <Select onValueChange={(value) => value && changeKind(value)} value={kind}>
+                            <SelectTrigger aria-label={t`Filter by kind`} className="w-[180px]">
+                                <SelectValue placeholder={t`Filter by kind`} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">{t`All kinds`}</SelectItem>
+                                <SelectItem value="idea">{t`Ideas`}</SelectItem>
+                                <SelectItem value="problem">{t`Problems`}</SelectItem>
+                                <SelectItem value="other">{t`Other`}</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
             </CardHeader>
 

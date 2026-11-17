@@ -8576,6 +8576,13 @@
           ],
           "unique": false
         },
+        "by_kind_createdAt": {
+          "fields": [
+            "kind",
+            "createdAt"
+          ],
+          "unique": false
+        },
         "by_userId": {
           "fields": [
             "userId"

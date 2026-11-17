@@ -3217,9 +3217,9 @@ msgstr "Todos los iconos"
 msgid "All installers"
 msgstr "Todos los instaladores"
 
-#: src/features/admin/components/feedback-admin-page.tsx:162
+#: src/features/admin/components/feedback-admin-page.tsx:168
 msgid "All kinds"
-msgstr ""
+msgstr "Todos los tipos"
 
 #: src/features/chat/thread/composer-mcp-selector.tsx:125
 msgid "All MCP servers active"
@@ -4221,7 +4221,7 @@ msgstr "Imagen adjunta"
 
 #: src/features/admin/components/feedback-admin-page.tsx:69
 msgid "Attached images"
-msgstr ""
+msgstr "Imágenes adjuntas"
 
 #: src/features/chat/thread/ask-user-prompt.tsx:231
 msgid "Attached:"
@@ -10126,7 +10126,7 @@ msgstr "{0, plural, one {# prompt eliminado} other {# prompts eliminados}}"
 
 #: src/features/admin/components/feedback-admin-page.tsx:49
 msgid "Deleted user"
-msgstr ""
+msgstr "Usuario eliminado"
 
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:16
 msgid "Deletes 3 files in /drafts"
@@ -14133,20 +14133,20 @@ msgstr "Funciones: {0}"
 msgid "Feed image"
 msgstr "Imagen para el feed"
 
-#: src/features/admin/components/feedback-admin-page.tsx:138
-#: src/features/admin/components/feedback-admin-page.tsx:153
+#: src/features/admin/components/feedback-admin-page.tsx:139
+#: src/features/admin/components/feedback-admin-page.tsx:154
 #: src/routes/admin/route.tsx:39
 #: src/routes/admin/route.tsx:59
 msgid "Feedback"
-msgstr ""
+msgstr "Comentarios"
 
-#: src/features/admin/components/feedback-admin-page.tsx:131
+#: src/features/admin/components/feedback-admin-page.tsx:132
 msgid "Feedback could not be loaded."
-msgstr ""
+msgstr "No se pudieron cargar los comentarios."
 
-#: src/features/admin/components/feedback-admin-page.tsx:174
+#: src/features/admin/components/feedback-admin-page.tsx:181
 msgid "Feedback pages"
-msgstr ""
+msgstr "Páginas de comentarios"
 
 #: src/features/chat/thread/widgets/weather-widget.tsx:186
 msgid "Feels like {feelsLike}{temporaryUnit}"
@@ -14311,10 +14311,10 @@ msgstr "Cineastas que crean videos cinematográficos con un fuerte enfoque en la
 msgid "Filter by action"
 msgstr "Filtrar por acción"
 
-#: src/features/admin/components/feedback-admin-page.tsx:158
-#: src/features/admin/components/feedback-admin-page.tsx:159
+#: src/features/admin/components/feedback-admin-page.tsx:164
+#: src/features/admin/components/feedback-admin-page.tsx:165
 msgid "Filter by kind"
-msgstr ""
+msgstr "Filtrar por tipo"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:718
 msgid "Filter by mode"
@@ -16602,7 +16602,7 @@ msgstr "URL del icono (opcional)"
 #: src/features/admin/components/feedback-admin-page.tsx:23
 #: src/features/feedback/components/send-feedback-dialog.tsx:28
 msgid "Idea"
-msgstr ""
+msgstr "Idea"
 
 #: src/features/marketing/components/landing-page.tsx:236
 msgid "Idea to finished output, one thread"
@@ -16612,7 +16612,7 @@ msgstr "De la idea al resultado final, en una sola conversación"
 msgid "Ideal for simple classification and extraction"
 msgstr "Ideal para clasificación y extracción sencillas"
 
-#: src/features/admin/components/feedback-admin-page.tsx:163
+#: src/features/admin/components/feedback-admin-page.tsx:169
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:69
 msgid "Ideas"
 msgstr "Ideas"
@@ -16683,11 +16683,11 @@ msgstr "Imagen"
 
 #: src/features/admin/components/feedback-admin-page.tsx:84
 msgid "Image {position} could not be loaded"
-msgstr ""
+msgstr "No se pudo cargar la imagen {position}"
 
 #: src/features/admin/components/feedback-admin-page.tsx:72
 msgid "Image {position} from {senderName}"
-msgstr ""
+msgstr "Imagen {position} de {senderName}"
 
 #: src/features/marketing/components/landing-page.tsx:211
 msgid "Image & Video"
@@ -18897,7 +18897,7 @@ msgstr "Cargando editor…"
 
 #: src/features/admin/components/feedback-admin-page.tsx:119
 msgid "Loading feedback"
-msgstr ""
+msgstr "Cargando comentarios"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:344
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
@@ -21528,9 +21528,9 @@ msgstr "Registros de usuarios nuevos por día"
 msgid "New Workflow"
 msgstr "Nuevo flujo de trabajo"
 
-#: src/features/admin/components/feedback-admin-page.tsx:177
+#: src/features/admin/components/feedback-admin-page.tsx:184
 msgid "Newer"
-msgstr ""
+msgstr "Más recientes"
 
 #: src/features/marketing/data/models-data.ts:1115
 msgid "newest"
@@ -21853,13 +21853,13 @@ msgstr "Sin caducidad"
 msgid "No failures in the checks shown."
 msgstr "No hay fallos en las comprobaciones mostradas."
 
-#: src/features/admin/components/feedback-admin-page.tsx:135
+#: src/features/admin/components/feedback-admin-page.tsx:136
 msgid "No feedback of this kind"
-msgstr ""
+msgstr "No hay comentarios de este tipo"
 
-#: src/features/admin/components/feedback-admin-page.tsx:135
+#: src/features/admin/components/feedback-admin-page.tsx:136
 msgid "No feedback yet"
-msgstr ""
+msgstr "Aún no hay comentarios"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-sort-menu.tsx:264
 msgid "No fields found."
@@ -22764,7 +22764,7 @@ msgid "old lines {text}"
 msgstr "líneas anteriores {text}"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:45
-#: src/features/admin/components/feedback-admin-page.tsx:189
+#: src/features/admin/components/feedback-admin-page.tsx:196
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:643
 msgid "Older"
 msgstr "Anteriores"
@@ -23920,7 +23920,7 @@ msgstr "Prompt de sistema original"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:171
 #: src/features/admin/components/feedback-admin-page.tsx:24
-#: src/features/admin/components/feedback-admin-page.tsx:165
+#: src/features/admin/components/feedback-admin-page.tsx:171
 #: src/features/feedback/components/send-feedback-dialog.tsx:30
 #: src/features/settings/components/chat/models-settings.tsx:521
 msgid "Other"
@@ -25488,11 +25488,11 @@ msgstr "Los modelos Pro requieren un plan Pro. En un plan gratuito, la ejecució
 #: src/features/admin/components/feedback-admin-page.tsx:25
 #: src/features/feedback/components/send-feedback-dialog.tsx:29
 msgid "Problem"
-msgstr ""
+msgstr "Problema"
 
-#: src/features/admin/components/feedback-admin-page.tsx:164
+#: src/features/admin/components/feedback-admin-page.tsx:170
 msgid "Problems"
-msgstr ""
+msgstr "Problemas"
 
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:29
 msgid "Process a text file with AI to extract key points, then generate an image based on the summary"
@@ -26779,6 +26779,7 @@ msgid "Refining the draft…"
 msgstr "Refinando el borrador…"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:221
+#: src/features/admin/components/feedback-admin-page.tsx:161
 msgid "Refresh"
 msgstr "Actualizar"
 
@@ -29372,7 +29373,7 @@ msgstr "Enviado por ti"
 #. placeholder {0}: item.pagePath
 #: src/features/admin/components/feedback-admin-page.tsx:62
 msgid "Sent from <0>{0}</0>"
-msgstr ""
+msgstr "Enviado desde <0>{0}</0>"
 
 #: src/features/devices/components/device-tool-call.tsx:197
 msgid "Sent to {device}…"
@@ -37485,9 +37486,9 @@ msgstr "Qué enviar y cómo distinguir una buena respuesta de una mala."
 msgid "What to watch"
 msgstr "Qué vigilar"
 
-#: src/features/admin/components/feedback-admin-page.tsx:154
+#: src/features/admin/components/feedback-admin-page.tsx:155
 msgid "What users sent from the app, newest first"
-msgstr ""
+msgstr "Lo que los usuarios enviaron desde la app, primero lo más reciente"
 
 #: src/features/settings/lib/settings-keywords.ts:107
 msgid "what we store"

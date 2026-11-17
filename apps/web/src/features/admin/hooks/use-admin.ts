@@ -305,9 +305,18 @@ export type AdminFeedbackPage = ReturnOf<typeof api.feedback.admin.listFeedback>
 export type AdminFeedbackItem = AdminFeedbackPage["page"][number];
 export type FeedbackKind = AdminFeedbackItem["kind"];
 
+/**
+ * How often an open feedback page reads again. The list is not live (`NEVER_LIVE` in `crpc.tsx`), so this is what
+ * brings in rows sent since, and it renews the signed image URLs long before their 12 hours run out.
+ */
+export const ADMIN_FEEDBACK_REFETCH_INTERVAL_MS = 5 * 60_000;
+
 /** One page of the feedback users sent, newest first; `cursor` is the previous page's `continueCursor`. */
 export const useAdminFeedback = (options: { cursor: string | null; kind?: FeedbackKind; limit: number }) => {
     const crpc = useCRPC();
 
-    return useQuery(crpc.feedback.admin.listFeedback.queryOptions({ cursor: options.cursor, kind: options.kind, limit: options.limit }));
+    return useQuery({
+        ...crpc.feedback.admin.listFeedback.queryOptions({ cursor: options.cursor, kind: options.kind, limit: options.limit }),
+        refetchInterval: ADMIN_FEEDBACK_REFETCH_INTERVAL_MS,
+    });
 };

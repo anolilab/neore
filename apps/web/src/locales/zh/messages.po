@@ -3217,9 +3217,9 @@ msgstr "所有图标"
 msgid "All installers"
 msgstr "所有安装包"
 
-#: src/features/admin/components/feedback-admin-page.tsx:162
+#: src/features/admin/components/feedback-admin-page.tsx:168
 msgid "All kinds"
-msgstr ""
+msgstr "所有类型"
 
 #: src/features/chat/thread/composer-mcp-selector.tsx:125
 msgid "All MCP servers active"
@@ -4221,7 +4221,7 @@ msgstr "附加的图片"
 
 #: src/features/admin/components/feedback-admin-page.tsx:69
 msgid "Attached images"
-msgstr ""
+msgstr "附加的图片"
 
 #: src/features/chat/thread/ask-user-prompt.tsx:231
 msgid "Attached:"
@@ -10126,7 +10126,7 @@ msgstr "{0, plural, other {已删除 # 个提示词}}"
 
 #: src/features/admin/components/feedback-admin-page.tsx:49
 msgid "Deleted user"
-msgstr ""
+msgstr "已删除的用户"
 
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:16
 msgid "Deletes 3 files in /drafts"
@@ -14133,20 +14133,20 @@ msgstr "功能：{0}"
 msgid "Feed image"
 msgstr "信息流图片"
 
-#: src/features/admin/components/feedback-admin-page.tsx:138
-#: src/features/admin/components/feedback-admin-page.tsx:153
+#: src/features/admin/components/feedback-admin-page.tsx:139
+#: src/features/admin/components/feedback-admin-page.tsx:154
 #: src/routes/admin/route.tsx:39
 #: src/routes/admin/route.tsx:59
 msgid "Feedback"
-msgstr ""
+msgstr "反馈"
 
-#: src/features/admin/components/feedback-admin-page.tsx:131
+#: src/features/admin/components/feedback-admin-page.tsx:132
 msgid "Feedback could not be loaded."
-msgstr ""
+msgstr "无法加载反馈。"
 
-#: src/features/admin/components/feedback-admin-page.tsx:174
+#: src/features/admin/components/feedback-admin-page.tsx:181
 msgid "Feedback pages"
-msgstr ""
+msgstr "反馈分页"
 
 #: src/features/chat/thread/widgets/weather-widget.tsx:186
 msgid "Feels like {feelsLike}{temporaryUnit}"
@@ -14311,10 +14311,10 @@ msgstr "专注视觉叙事和故事品质、制作电影感视频的电影人"
 msgid "Filter by action"
 msgstr "按操作筛选"
 
-#: src/features/admin/components/feedback-admin-page.tsx:158
-#: src/features/admin/components/feedback-admin-page.tsx:159
+#: src/features/admin/components/feedback-admin-page.tsx:164
+#: src/features/admin/components/feedback-admin-page.tsx:165
 msgid "Filter by kind"
-msgstr ""
+msgstr "按类型筛选"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:718
 msgid "Filter by mode"
@@ -16602,7 +16602,7 @@ msgstr "图标 URL（可选）"
 #: src/features/admin/components/feedback-admin-page.tsx:23
 #: src/features/feedback/components/send-feedback-dialog.tsx:28
 msgid "Idea"
-msgstr ""
+msgstr "创意"
 
 #: src/features/marketing/components/landing-page.tsx:236
 msgid "Idea to finished output, one thread"
@@ -16612,7 +16612,7 @@ msgstr "从想法到成品，一个对话搞定"
 msgid "Ideal for simple classification and extraction"
 msgstr "非常适合简单的分类和提取任务"
 
-#: src/features/admin/components/feedback-admin-page.tsx:163
+#: src/features/admin/components/feedback-admin-page.tsx:169
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:69
 msgid "Ideas"
 msgstr "创意"
@@ -16683,11 +16683,11 @@ msgstr "图像"
 
 #: src/features/admin/components/feedback-admin-page.tsx:84
 msgid "Image {position} could not be loaded"
-msgstr ""
+msgstr "无法加载图片 {position}"
 
 #: src/features/admin/components/feedback-admin-page.tsx:72
 msgid "Image {position} from {senderName}"
-msgstr ""
+msgstr "来自 {senderName} 的图片 {position}"
 
 #: src/features/marketing/components/landing-page.tsx:211
 msgid "Image & Video"
@@ -18897,7 +18897,7 @@ msgstr "正在加载编辑器…"
 
 #: src/features/admin/components/feedback-admin-page.tsx:119
 msgid "Loading feedback"
-msgstr ""
+msgstr "正在加载反馈"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:344
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
@@ -21528,9 +21528,9 @@ msgstr "每日新注册用户"
 msgid "New Workflow"
 msgstr "新建工作流"
 
-#: src/features/admin/components/feedback-admin-page.tsx:177
+#: src/features/admin/components/feedback-admin-page.tsx:184
 msgid "Newer"
-msgstr ""
+msgstr "较新"
 
 #: src/features/marketing/data/models-data.ts:1115
 msgid "newest"
@@ -21853,13 +21853,13 @@ msgstr "不过期"
 msgid "No failures in the checks shown."
 msgstr "所显示的检查中没有失败项。"
 
-#: src/features/admin/components/feedback-admin-page.tsx:135
+#: src/features/admin/components/feedback-admin-page.tsx:136
 msgid "No feedback of this kind"
-msgstr ""
+msgstr "没有此类型的反馈"
 
-#: src/features/admin/components/feedback-admin-page.tsx:135
+#: src/features/admin/components/feedback-admin-page.tsx:136
 msgid "No feedback yet"
-msgstr ""
+msgstr "暂无反馈"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-sort-menu.tsx:264
 msgid "No fields found."
@@ -22764,7 +22764,7 @@ msgid "old lines {text}"
 msgstr "旧版第 {text} 行"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:45
-#: src/features/admin/components/feedback-admin-page.tsx:189
+#: src/features/admin/components/feedback-admin-page.tsx:196
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:643
 msgid "Older"
 msgstr "更早"
@@ -23920,7 +23920,7 @@ msgstr "原始系统提示词"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:171
 #: src/features/admin/components/feedback-admin-page.tsx:24
-#: src/features/admin/components/feedback-admin-page.tsx:165
+#: src/features/admin/components/feedback-admin-page.tsx:171
 #: src/features/feedback/components/send-feedback-dialog.tsx:30
 #: src/features/settings/components/chat/models-settings.tsx:521
 msgid "Other"
@@ -25488,11 +25488,11 @@ msgstr "Pro 模型需要 Pro 套餐。免费套餐下，运行会在开始前停
 #: src/features/admin/components/feedback-admin-page.tsx:25
 #: src/features/feedback/components/send-feedback-dialog.tsx:29
 msgid "Problem"
-msgstr ""
+msgstr "问题"
 
-#: src/features/admin/components/feedback-admin-page.tsx:164
+#: src/features/admin/components/feedback-admin-page.tsx:170
 msgid "Problems"
-msgstr ""
+msgstr "问题"
 
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:29
 msgid "Process a text file with AI to extract key points, then generate an image based on the summary"
@@ -26779,6 +26779,7 @@ msgid "Refining the draft…"
 msgstr "正在优化草稿…"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:221
+#: src/features/admin/components/feedback-admin-page.tsx:161
 msgid "Refresh"
 msgstr "刷新"
 
@@ -29372,7 +29373,7 @@ msgstr "由你发送"
 #. placeholder {0}: item.pagePath
 #: src/features/admin/components/feedback-admin-page.tsx:62
 msgid "Sent from <0>{0}</0>"
-msgstr ""
+msgstr "发送自 <0>{0}</0>"
 
 #: src/features/devices/components/device-tool-call.tsx:197
 msgid "Sent to {device}…"
@@ -37485,9 +37486,9 @@ msgstr "要发送什么，以及如何区分好答案和坏答案。"
 msgid "What to watch"
 msgstr "监视内容"
 
-#: src/features/admin/components/feedback-admin-page.tsx:154
+#: src/features/admin/components/feedback-admin-page.tsx:155
 msgid "What users sent from the app, newest first"
-msgstr ""
+msgstr "用户从应用发送的内容，最新的在前"
 
 #: src/features/settings/lib/settings-keywords.ts:107
 msgid "what we store"
