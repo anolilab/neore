@@ -342,4 +342,19 @@ describe("coding agents on a server", () => {
         expect(ended).toHaveLength(1);
         expect(runtime.acp.summaries()[0]?.status).toBe("ended");
     });
+
+    it("hands a held turn's end the poster of a server being removed, and the server's own poster otherwise", async () => {
+        const { servers } = setup();
+        const runtime = servers.get(SERVER);
+        const removal = servers.remove(SERVER);
+
+        expect(servers.posterForEnd(SERVER)).toBe(runtime.poster);
+        expect(() => servers.posterForEnd("someone-else")).toThrow("not paired");
+
+        await removal;
+        secretGone = true;
+
+        // Once the removal is over, the server is paired again only as a runtime that a later command builds.
+        expect(servers.posterForEnd(SERVER)).not.toBe(runtime.poster);
+    });
 });

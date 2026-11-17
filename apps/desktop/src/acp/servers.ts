@@ -107,6 +107,21 @@ export class ServerAgents {
         return this.options.servers().some((server) => server.deviceId === deviceId);
     }
 
+    /**
+     * The poster that ends a held turn of a server. While the server is being removed, the runtime's poster carries the end:
+     * the removal flushes it before stopping. Otherwise it is the server's poster as any command gets it, which builds the
+     * runtime after a restart.
+     */
+    public posterForEnd(deviceId: string): HostPoster {
+        const runtime = this.runtimes.get(deviceId);
+
+        if (runtime !== undefined && this.removing.has(deviceId)) {
+            return runtime.poster;
+        }
+
+        return this.get(deviceId).poster;
+    }
+
     /** Ends the sessions the person's approvals for a server no longer cover. */
     public async closeUnapproved(deviceId: string, view: Pick<AcpView, "agents" | "consents">): Promise<void> {
         await this.runtimes.get(deviceId)?.acp.closeUnapproved(view);
