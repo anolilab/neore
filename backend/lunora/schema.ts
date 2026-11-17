@@ -1088,6 +1088,8 @@ export const schema = defineSchema({
         // `.global()`, not `.shardBy("userId")`: read across users by the admins.
         .global()
         .index("by_userId", ["userId"])
+        // One user's rows oldest first, for the export; the admins read across users by time.
+        .index("by_userId_createdAt", ["userId", "createdAt"])
         .index("by_createdAt", ["createdAt"]),
 
     files: defineTable({

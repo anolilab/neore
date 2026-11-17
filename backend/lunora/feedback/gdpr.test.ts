@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { FEEDBACK_READ_BYTES } from "../gdpr/read-budget";
 import { deleteUserIntegrations } from "../gdpr/steps/residual-deletion-steps";
 import schema from "../schema";
 import { collectAllFeedback, collectFeedbackForExport } from "./gdpr";
@@ -89,6 +90,7 @@ describe("feedback in GDPR flows", () => {
 
         const { section: exported } = await collectAllFeedback(
             async (cursor) => await harness.run(async (ctx: any) => await ctx.runQuery(collectFeedbackForExport, { cursor, userId: A })),
+            FEEDBACK_READ_BYTES,
         );
 
         expect(exported.truncated).toBe(false);
@@ -113,11 +115,24 @@ describe("feedback in the export file", () => {
         expect(readBytes).toBeGreaterThan(0);
     });
 
+    it("reads nothing once the earlier sections used the action's budget, and marks the feedback as cut", async () => {
+        const readPage = vi.fn(async () => {
+            return { feedback: [{}] };
+        });
+
+        const { readBytes, section } = await collectAllFeedback(readPage, 0);
+
+        expect(readPage).not.toHaveBeenCalled();
+        expect(readBytes).toBe(0);
+        expect(section).toStrictEqual({ feedback: [], truncated: true });
+    });
+
     // Read from source: the export action needs storage and a workflow to run.
     it("is written into the export and counted before the trigger history", () => {
         const source = readFileSync(join(import.meta.dirname, "../gdpr/steps.ts"), "utf8");
 
         expect(source).toContain("feedback: feedback.section");
+        expect(source).toContain("feedbackReadBudget(earlierReadBytes + repositories.readBytes)");
         expect(source).toContain("triggerReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes)");
     });
 });

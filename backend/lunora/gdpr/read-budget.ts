@@ -15,6 +15,9 @@ export const READ_MARGIN_BYTES = 8 * 1024 * 1024;
  */
 export const TRIGGER_READ_BYTES = 12 * 1024 * 1024;
 
+/** The most reading the user's feedback may cost (`feedback/gdpr.ts`); its rows are exported about as read. */
+export const FEEDBACK_READ_BYTES = 4 * 1024 * 1024;
+
 /** The least the project repositories may read, even when earlier sections used the rest of the budget. */
 export const REPOSITORIES_READ_FLOOR_BYTES = 256 * 1024;
 
@@ -32,3 +35,6 @@ export const projectDetailsReadBudget = (used: number): number => Math.max(0, AC
 
 /** What the trigger history may read after every other section read `used` bytes; 0 leaves it all out, marked as cut. */
 export const triggerReadBudget = (used: number): number => Math.max(0, Math.min(TRIGGER_READ_BYTES, ACTION_READ_BYTES - used - READ_MARGIN_BYTES));
+
+/** What the feedback may read after the earlier sections read `used` bytes; 0 leaves it all out, marked as cut. */
+export const feedbackReadBudget = (used: number): number => Math.max(0, Math.min(FEEDBACK_READ_BYTES, ACTION_READ_BYTES - used - READ_MARGIN_BYTES));

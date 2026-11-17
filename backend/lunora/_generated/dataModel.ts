@@ -2646,7 +2646,7 @@ export interface IndexNamesByTable {
     evalDatasets: "by_user_and_updatedAt";
     evalResults: "by_run_and_index" | "by_user";
     evalRuns: "by_user_and_status" | "by_dataset_and_createdAt";
-    feedback: "by_userId" | "by_createdAt";
+    feedback: "by_userId" | "by_userId_createdAt" | "by_createdAt";
     files: "by_user_and_folder" | "by_key" | "by_chatId" | "by_user_and_chatId" | "by_organization_and_chatId" | "by_projectId" | "by_folderId";
     folders: "by_parent" | "by_user_and_parent";
     followupSuggestions: "by_thread";

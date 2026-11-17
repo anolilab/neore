@@ -8581,6 +8581,13 @@
             "userId"
           ],
           "unique": false
+        },
+        "by_userId_createdAt": {
+          "fields": [
+            "userId",
+            "createdAt"
+          ],
+          "unique": false
         }
       },
       "memory": false,

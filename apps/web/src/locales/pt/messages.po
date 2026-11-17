@@ -2281,7 +2281,7 @@ msgid "Add a tag..."
 msgstr "Adicione uma tag..."
 
 #: src/features/auth/components/settings/account/accounts-card.tsx:30
-#: src/features/layout/components/nav-user.tsx:278
+#: src/features/layout/components/nav-user.tsx:285
 msgid "Add Account"
 msgstr "Adicionar conta"
 
@@ -2375,7 +2375,7 @@ msgstr "Adicionar filtro"
 msgid "Add Header"
 msgstr "Adicionar cabeçalho"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:272
+#: src/features/feedback/components/send-feedback-dialog.tsx:331
 msgid "Add images"
 msgstr ""
 
@@ -3450,6 +3450,10 @@ msgstr ""
 msgid "An approved call to an external (MCP) server runs only if that tool's name, input schema and annotations are unchanged since you approved it. If they changed, the call does not run. The model is told, and a new call asks you again."
 msgstr ""
 
+#: src/features/feedback/components/send-feedback-dialog.tsx:227
+msgid "An attached image was not accepted. Remove it or attach a PNG, JPEG, WebP or GIF image."
+msgstr ""
+
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:38
 msgid "An Encrypt Key is required: Feishu only signs events when one is set, and unsigned events are refused."
 msgstr "Uma Encrypt Key é obrigatória: o Feishu só assina eventos quando ela está definida, e eventos sem assinatura são recusados."
@@ -4232,12 +4236,12 @@ msgid "Attachment (hidden)"
 msgstr "Anexo (oculto)"
 
 #. placeholder {0}: index + 1
-#: src/features/feedback/components/send-feedback-dialog.tsx:255
+#: src/features/feedback/components/send-feedback-dialog.tsx:307
 msgid "Attachment {0}"
 msgstr ""
 
 #. placeholder {0}: result.position
-#: src/features/feedback/components/send-feedback-dialog.tsx:176
+#: src/features/feedback/components/send-feedback-dialog.tsx:217
 msgid "Attachment {0} is over {MAX_FEEDBACK_IMAGE_MB} MB and could not be made smaller. Remove it or attach a smaller image."
 msgstr ""
 
@@ -5572,7 +5576,7 @@ msgstr "Canadá"
 #: src/features/evals/components/import-cases-dialog.tsx:113
 #: src/features/evals/components/run-dialog.tsx:282
 #: src/features/evals/components/save-eval-case-action.tsx:137
-#: src/features/feedback/components/send-feedback-dialog.tsx:313
+#: src/features/feedback/components/send-feedback-dialog.tsx:372
 #: src/features/knowledge/components/collection-dialog.tsx:97
 #: src/features/knowledge/components/collection-picker.tsx:112
 #: src/features/local-models/components/ollama-model-manager.tsx:300
@@ -15868,7 +15872,7 @@ msgid "Guatemala"
 msgstr "Guatemala"
 
 #: src/features/auth/components/anonymous/anonymous-user-indicator.tsx:34
-#: src/features/layout/components/nav-user.tsx:359
+#: src/features/layout/components/nav-user.tsx:366
 msgid "Guest"
 msgstr "Visitante"
 
@@ -16525,7 +16529,7 @@ msgstr "Ícone"
 msgid "Icon URL (Optional)"
 msgstr "URL do ícone (opcional)"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:27
+#: src/features/feedback/components/send-feedback-dialog.tsx:28
 msgid "Idea"
 msgstr ""
 
@@ -16723,7 +16727,7 @@ msgstr "imagens"
 msgid "Images"
 msgstr "Imagens"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:250
+#: src/features/feedback/components/send-feedback-dialog.tsx:302
 msgid "Images ({MAX_FEEDBACK_IMAGES} at most)"
 msgstr ""
 
@@ -17076,7 +17080,7 @@ msgstr "Seções da caixa de entrada"
 msgid "Inception's diffusion-based language model"
 msgstr "O modelo de linguagem baseado em difusão da Inception"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:300
+#: src/features/feedback/components/send-feedback-dialog.tsx:359
 msgid "Include the page you are on"
 msgstr ""
 
@@ -18036,7 +18040,7 @@ msgstr "Grande"
 #~ msgid "Large photos are made smaller before sending (up to {0} MB each)."
 #~ msgstr ""
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:293
+#: src/features/feedback/components/send-feedback-dialog.tsx:352
 msgid "Large photos are made smaller before sending; each image can be up to {MAX_FEEDBACK_IMAGE_MB} MB."
 msgstr ""
 
@@ -19095,7 +19099,7 @@ msgstr "Restrito a modelos {anchorModeName}"
 msgid "Log"
 msgstr "Log"
 
-#: src/features/layout/components/nav-user.tsx:326
+#: src/features/layout/components/nav-user.tsx:333
 msgid "Log out"
 msgstr "Sair"
 
@@ -22866,7 +22870,7 @@ msgstr "Apenas parte deste período está incluída."
 msgid "Only participants you @mention answer."
 msgstr "Só os participantes que você @mencionar respondem."
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:124
+#: src/features/feedback/components/send-feedback-dialog.tsx:148
 msgid "Only PNG, JPEG, WebP or GIF images can be attached, four at most."
 msgstr ""
 
@@ -23808,7 +23812,7 @@ msgid "Original system prompt"
 msgstr "Prompt de sistema original"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:171
-#: src/features/feedback/components/send-feedback-dialog.tsx:29
+#: src/features/feedback/components/send-feedback-dialog.tsx:30
 #: src/features/settings/components/chat/models-settings.tsx:521
 msgid "Other"
 msgstr "Outros"
@@ -25372,7 +25376,7 @@ msgstr "Pro é o seu plano pessoal: todos os modelos e 1.000 mensagens por dia."
 msgid "Pro models need a Pro plan. On a free plan the run stops before it starts."
 msgstr "Os modelos Pro exigem um plano Pro. Em um plano gratuito, a execução é interrompida antes de começar."
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:28
+#: src/features/feedback/components/send-feedback-dialog.tsx:29
 msgid "Problem"
 msgstr ""
 
@@ -26930,7 +26934,7 @@ msgid "Remove All Files"
 msgstr "Remover todos os arquivos"
 
 #. placeholder {0}: index + 1
-#: src/features/feedback/components/send-feedback-dialog.tsx:257
+#: src/features/feedback/components/send-feedback-dialog.tsx:309
 msgid "Remove attachment {0}"
 msgstr ""
 
@@ -29078,7 +29082,7 @@ msgstr "Estilo visual semirrealista"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:430
 #: src/features/chat/host/host-composer.tsx:707
-#: src/features/feedback/components/send-feedback-dialog.tsx:317
+#: src/features/feedback/components/send-feedback-dialog.tsx:376
 #: src/features/sub-agents/components/worker-composer.tsx:118
 msgid "Send"
 msgstr "Enviar"
@@ -29127,8 +29131,8 @@ msgstr "botão de enviar"
 msgid "Send during a coding agent's turn"
 msgstr "Enviar durante a vez de um agente de programação"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:199
-#: src/features/layout/components/nav-user.tsx:268
+#: src/features/feedback/components/send-feedback-dialog.tsx:249
+#: src/features/layout/components/nav-user.tsx:275
 msgid "Send feedback"
 msgstr ""
 
@@ -29212,7 +29216,7 @@ msgstr "Enviando sua mensagem e aguardando a resposta"
 
 #: src/features/chat/guest-links/guest-page.tsx:274
 #: src/features/chat/thread/streaming-placeholder.tsx:617
-#: src/features/feedback/components/send-feedback-dialog.tsx:317
+#: src/features/feedback/components/send-feedback-dialog.tsx:376
 msgid "Sending…"
 msgstr "Enviando…"
 
@@ -29754,7 +29758,7 @@ msgstr "Barra lateral à direita"
 #: src/features/auth/components/auth/auth-card.tsx:493
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:415
 #: src/features/auth/components/device-approval.tsx:363
-#: src/features/layout/components/nav-user.tsx:244
+#: src/features/layout/components/nav-user.tsx:251
 #: src/features/marketing/components/landing-page.tsx:1058
 #: src/features/settings/components/chat/mcp/server-list.tsx:127
 #: src/routes/auth/extension.tsx:80
@@ -29895,7 +29899,7 @@ msgstr "Login expirado"
 msgid "Sign-in request"
 msgstr ""
 
-#: src/features/layout/components/nav-user.tsx:306
+#: src/features/layout/components/nav-user.tsx:313
 msgid "Sign-out failed. Please try again."
 msgstr "Falha ao sair. Tente novamente."
 
@@ -32245,7 +32249,7 @@ msgstr "Diga à IA como redigir os títulos que ela dá às novas conversas. Ist
 msgid "Tell the assistant exactly what to do. Use {VARIABLE_PLACEHOLDER} for inputs."
 msgstr "Diga ao assistente exatamente o que fazer. Use {VARIABLE_PLACEHOLDER} para entradas."
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:200
+#: src/features/feedback/components/send-feedback-dialog.tsx:250
 msgid "Tell us about an idea or a problem. You can paste or drop screenshots too."
 msgstr ""
 
@@ -32529,7 +32533,7 @@ msgstr "Tailândia"
 msgid "Thanks for rating"
 msgstr "Obrigado pela avaliação"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:188
+#: src/features/feedback/components/send-feedback-dialog.tsx:235
 msgid "Thanks! Your feedback was sent."
 msgstr ""
 
@@ -35736,7 +35740,7 @@ msgid "Upgrade organization to Team, monthly"
 msgstr "Atualizar organização para Team, mensal"
 
 #: src/features/billing/components/personal-plan-card.tsx:63
-#: src/features/layout/components/nav-user.tsx:264
+#: src/features/layout/components/nav-user.tsx:271
 msgid "Upgrade to Pro"
 msgstr "Fazer upgrade para o Pro"
 
@@ -36096,8 +36100,8 @@ msgstr "usuário"
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
 #: src/features/devices/components/devices-settings.tsx:487
-#: src/features/layout/components/nav-user.tsx:366
-#: src/features/layout/components/nav-user.tsx:366
+#: src/features/layout/components/nav-user.tsx:373
+#: src/features/layout/components/nav-user.tsx:373
 #: src/features/layout/components/sidebar-shortcut.tsx:212
 msgid "User"
 msgstr "Usuário"
@@ -37277,7 +37281,7 @@ msgstr "O que aprendi ({0})"
 msgid "What is {0} best for?"
 msgstr "Para que o {0} é melhor?"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:215
+#: src/features/feedback/components/send-feedback-dialog.tsx:265
 msgid "What is it about?"
 msgstr ""
 
@@ -37937,6 +37941,10 @@ msgstr "Você ainda não tem tags."
 msgid "You have returned to your admin account"
 msgstr "Você voltou para sua conta de admin"
 
+#: src/features/feedback/components/send-feedback-dialog.tsx:226
+msgid "You have sent a lot of feedback recently. Please try again in an hour."
+msgstr ""
+
 #: src/features/chat/aside/aside-panel.tsx:96
 #: src/features/chat/aside/aside-panel.tsx:107
 #: src/features/chat/compaction/use-compact-thread.ts:61
@@ -38146,11 +38154,11 @@ msgstr "Seu rascunho foi mantido. O prompt do link não foi adicionado."
 msgid "Your export will include: profile, settings, conversations, files metadata, prompts, and usage history. The download link expires in 7 days."
 msgstr "Sua exportação vai incluir: perfil, configurações, conversas, metadados de arquivos, prompts e histórico de uso. O link de download expira em 7 dias."
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:235
+#: src/features/feedback/components/send-feedback-dialog.tsx:286
 msgid "Your feedback"
 msgstr ""
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:183
+#: src/features/feedback/components/send-feedback-dialog.tsx:225
 msgid "Your feedback could not be sent. Please try again."
 msgstr ""
 

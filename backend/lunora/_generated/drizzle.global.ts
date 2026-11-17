@@ -229,6 +229,7 @@ export const feedback = sqliteTable("feedback", {
     userId: text("userId").notNull(),
 }, (t) => ({
     by_userId: index("by_userId").on(t.userId),
+    by_userId_createdAt: index("by_userId_createdAt").on(t.userId, t.createdAt),
     by_createdAt: index("by_createdAt").on(t.createdAt),
 }));
 

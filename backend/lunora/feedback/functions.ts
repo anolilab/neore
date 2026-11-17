@@ -15,6 +15,7 @@ import { internalMutation } from "../_generated/server";
 import { takeStagedUpload } from "../lib/chat-upload";
 import { authAction, rateLimit } from "../lib/crpc";
 import { withDependency } from "../lib/dependency";
+import { storageLogger } from "../lib/logger";
 import { withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { FEEDBACK_IMAGE_TYPES, MAX_FEEDBACK_IMAGE_BYTES, MAX_FEEDBACK_IMAGES, MAX_FEEDBACK_MESSAGE_LENGTH } from "./limits";
@@ -78,8 +79,17 @@ export const submitFeedback = authAction
 
             return { feedbackId };
         } catch (error) {
-            // No row, no reference: an image stored before the failure would be unreachable.
-            await Promise.all(images.map(async ({ key }) => await ctx.storage.delete(key).catch(() => undefined)));
+            // No row, no reference: an image stored before the failure would be unreachable. One that cannot be deleted
+            // is logged with its key, as `lib/storage-cleanup.ts` does, so the leak can be found and removed.
+            await Promise.all(
+                images.map(async ({ key }) => {
+                    try {
+                        await ctx.storage.delete(key);
+                    } catch (deleteError) {
+                        storageLogger.warn(`Failed to delete feedback image ${key}`, deleteError);
+                    }
+                }),
+            );
 
             throw error;
         }

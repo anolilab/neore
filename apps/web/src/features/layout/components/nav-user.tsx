@@ -139,8 +139,15 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
     const { isPending: checkoutPending, startCheckout } = useCheckout();
     const [activeSessionPending, setActiveSessionPending] = useState(false);
     const [feedbackOpen, setFeedbackOpen] = useState(false);
+    // Mounted from the first open on, so a close keeps the draft (text, kind, images) for the next open.
+    const [feedbackMounted, setFeedbackMounted] = useState(false);
 
     const isPending = sessionPending || activeSessionPending;
+
+    const openFeedback = () => {
+        setFeedbackMounted(true);
+        setFeedbackOpen(true);
+    };
 
     const switchAccount = useCallback(
         async (sessionToken: string) => {
@@ -263,7 +270,7 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                     <Sparkles />
                     {t`Upgrade to Pro`}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFeedbackOpen(true)}>
+                <DropdownMenuItem onClick={openFeedback}>
                     <MessageSquareText />
                     {t`Send feedback`}
                 </DropdownMenuItem>
@@ -336,9 +343,9 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                     <DropdownMenuTrigger render={trigger} />
                     {menuContent}
                 </DropdownMenu>
-                {feedbackOpen ? (
+                {feedbackMounted ? (
                     <Suspense fallback={null}>
-                        <SendFeedbackDialog onOpenChange={setFeedbackOpen} open={feedbackOpen} />
+                        <SendFeedbackDialog key={user?.id} onOpenChange={setFeedbackOpen} open={feedbackOpen} />
                     </Suspense>
                 ) : null}
             </>
@@ -375,9 +382,9 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                     />
                     {menuContent}
                 </DropdownMenu>
-                {feedbackOpen ? (
+                {feedbackMounted ? (
                     <Suspense fallback={null}>
-                        <SendFeedbackDialog onOpenChange={setFeedbackOpen} open={feedbackOpen} />
+                        <SendFeedbackDialog key={user?.id} onOpenChange={setFeedbackOpen} open={feedbackOpen} />
                     </Suspense>
                 ) : null}
             </SidebarMenuItem>
