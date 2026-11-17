@@ -14,8 +14,10 @@ const NO_SUGGESTIONS: ReadonlyArray<EmojiSuggestion> = [];
 export const emojiOptionId = (listboxId: string, index: number): string => `${listboxId}-option-${index}`;
 
 interface UseEmojiShortcodeOptions {
-    /** Whether the list may open: suggestions are on and no other composer popup is open. */
+    /** Whether the list may open: suggestions are on, the composer is enabled and no other composer popup is open. */
     enabled: boolean;
+    /** Whether the editor has focus. The list and its keys belong to the composer only while it does. */
+    focused: boolean;
     match: EmojiShortcodeMatch | null;
     /** Replaces the typed range with the emoji. */
     onReplace: (from: number, to: number, replacement: string) => void;
@@ -26,7 +28,7 @@ interface UseEmojiShortcodeOptions {
  * are a window capture listener while the list is open, so they take Enter, Tab, the arrows and Escape before the editor
  * does; Escape closes the list and leaves the text as typed, until the shortcode itself ends.
  */
-export const useEmojiShortcode = ({ enabled, match, onReplace }: UseEmojiShortcodeOptions) => {
+export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmojiShortcodeOptions) => {
     const { t } = useLingui();
     const listboxId = useId();
     const [index, setIndex] = useState<EmojiIndex | undefined>(getLoadedEmojiIndex);
@@ -34,8 +36,10 @@ export const useEmojiShortcode = ({ enabled, match, onReplace }: UseEmojiShortco
     const [activeQuery, setActiveQuery] = useState<string | undefined>(undefined);
     const [dismissedFrom, setDismissedFrom] = useState<number | null>(null);
     const query = match?.query;
+    const hasMatch = match !== null;
 
-    // The index loads once per page, started as soon as the composer can show the list.
+    // The index loads once per page, started as soon as the composer can show the list. A failed load is retried when a
+    // shortcode starts, so the retry follows the person's typing rather than running in a loop.
     useEffect(() => {
         if (!enabled || index !== undefined) {
             return undefined;
@@ -51,7 +55,7 @@ export const useEmojiShortcode = ({ enabled, match, onReplace }: UseEmojiShortco
                     setIndex(loaded);
                 }
             } catch {
-                // The list stays off until a reload; the composer itself does not need it.
+                // Nothing is stored on failure, so the next shortcode tries the load again.
             }
         };
 
@@ -60,7 +64,7 @@ export const useEmojiShortcode = ({ enabled, match, onReplace }: UseEmojiShortco
         return () => {
             cancelled = true;
         };
-    }, [enabled, index]);
+    }, [enabled, hasMatch, index]);
 
     // Derived state, adjusted during render: a new query starts at the top of the list, and a finished shortcode forgets
     // that it was dismissed, so the next one opens.
@@ -79,7 +83,8 @@ export const useEmojiShortcode = ({ enabled, match, onReplace }: UseEmojiShortco
     );
 
     const isDismissed = match !== null && match.from === dismissedFrom;
-    const open = enabled && match !== null && !isDismissed && suggestions.length > 0;
+    const showing = enabled && focused && match !== null && !isDismissed;
+    const open = showing && suggestions.length > 0;
     const selected = Math.min(activeIndex, Math.max(suggestions.length - 1, 0));
 
     const select = useCallback(
@@ -130,7 +135,7 @@ export const useEmojiShortcode = ({ enabled, match, onReplace }: UseEmojiShortco
     // Empty until the index is in and a shortcode is being typed, so a screen reader hears the count, not a stale one.
     let announcement = "";
 
-    if (index !== undefined && enabled && match !== null && !isDismissed) {
+    if (index !== undefined && showing) {
         announcement = suggestions.length === 0 ? t`No emoji found` : t`${plural(suggestions.length, { one: "# emoji", other: "# emoji" })} found`;
     }
 

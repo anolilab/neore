@@ -83,6 +83,9 @@ const typeText = async (ref: React.RefObject<ComposerTiptapEditorRef | null>, te
         expect(ref.current?.getEditor()).toBeTruthy();
     });
 
+    // Typing happens in the focused editor, which is what gives the list its keys.
+    fireEvent.focus(ref.current!.getEditor()!.view.dom);
+
     act(() => {
         ref.current!.getEditor()!.commands.insertContent(text);
     });
@@ -178,5 +181,57 @@ describe("composer emoji shortcodes", () => {
 
         expect(screen.queryByRole("listbox", { name: "Emoji suggestions" })).toBeNull();
         expect(editableWhenClosed().getAttribute("aria-activedescendant")).toBeNull();
+    });
+
+    it("closes and stops taking keys once the composer is disabled", async () => {
+        const ref = createRef<ComposerTiptapEditorRef>();
+        const view = render(<ComposerTiptapEditor onChange={vi.fn()} onSubmit={vi.fn()} ref={ref} value="" />);
+
+        await typeText(ref, ":dog");
+        await optionsOf();
+
+        view.rerender(<ComposerTiptapEditor disabled onChange={vi.fn()} onSubmit={vi.fn()} ref={ref} value="" />);
+
+        expect(screen.queryByRole("listbox", { name: "Emoji suggestions" })).toBeNull();
+        expect(ref.current?.getEditor()?.getText()).toBe(":dog");
+    });
+
+    it("leaves the keys to another field once the editor loses focus", async () => {
+        const { ref } = renderEditor();
+
+        render(<input aria-label="Other field" />);
+        const other = screen.getByRole("textbox", { name: "Other field" });
+
+        await typeText(ref, ":dog");
+        await optionsOf();
+
+        fireEvent.blur(ref.current!.getEditor()!.view.dom);
+
+        expect(screen.queryByRole("listbox", { name: "Emoji suggestions" })).toBeNull();
+        // Not prevented: the other field receives its own Enter.
+        expect(fireEvent.keyDown(other, { key: "Enter" })).toBe(true);
+        expect(ref.current?.getEditor()?.getText()).toBe(":dog");
+    });
+
+    it("moves the list with the composer when the page scrolls", async () => {
+        const measure = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(new DOMRect(10, 200, 300, 20));
+        const { ref } = renderEditor();
+
+        await typeText(ref, ":dog");
+        await optionsOf();
+
+        measure.mockReturnValue(new DOMRect(40, 260, 300, 20));
+        act(() => {
+            globalThis.dispatchEvent(new Event("scroll"));
+        });
+
+        // The list's fixed box is its parent; its position is what moved.
+        // eslint-disable-next-line testing-library/no-node-access -- the positioned box is the element that has to move
+        const box = listbox().parentElement!;
+
+        expect(box.style.left).toBe("40px");
+        expect(box.style.top).toBe("260px");
+
+        measure.mockRestore();
     });
 });

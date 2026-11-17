@@ -13,23 +13,29 @@ const cache: { index?: EmojiIndex; loading?: Promise<EmojiIndex> } = {};
 /** The index if it has loaded, else `undefined`. */
 export const getLoadedEmojiIndex = (): EmojiIndex | undefined => cache.index;
 
-/** Loads the index on first call and returns the same promise after that. */
+/** Loads the index on first call and returns the same promise after that. A failed load is not kept: the next call tries again. */
 export const loadEmojiIndex = (): Promise<EmojiIndex> => {
-    cache.loading ??= import("@tiptap/extension-emoji").then(({ gitHubEmojis }) => {
-        const entries: EmojiEntry[] = [];
+    cache.loading ??= import("@tiptap/extension-emoji")
+        .then(({ gitHubEmojis }) => {
+            const entries: EmojiEntry[] = [];
 
-        for (const item of gitHubEmojis) {
-            if (item.emoji !== undefined) {
-                entries.push({ emoji: item.emoji, shortcodes: item.shortcodes });
+            for (const item of gitHubEmojis) {
+                if (item.emoji !== undefined) {
+                    entries.push({ emoji: item.emoji, shortcodes: item.shortcodes });
+                }
             }
-        }
 
-        const index = buildEmojiIndex(entries);
+            const index = buildEmojiIndex(entries);
 
-        cache.index = index;
+            cache.index = index;
 
-        return index;
-    });
+            return index;
+        })
+        .catch((error: unknown) => {
+            cache.loading = undefined;
+
+            throw error;
+        });
 
     return cache.loading;
 };

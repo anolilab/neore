@@ -24,7 +24,7 @@ import { Selection } from "@tiptap/pm/state";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKitExtension from "@tiptap/starter-kit";
 import clsx from "clsx";
-import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import useFavoriteModels from "@/features/chat/core/hooks/use-favorite-models";
@@ -526,15 +526,57 @@ const ComposerTiptapEditor = ({
         [editor],
     );
 
-    // The `:shortcode` list. It waits while another popup is open, since each takes the keys while it shows.
+    // Focus decides whether the `:shortcode` list is the composer's: keys typed in another field are not its to take. Read
+    // from the editor rather than tracked by an effect, so the state is right when the editor autofocuses on mount.
+    const subscribeEmojiFocus = useCallback(
+        (notify: () => void): (() => void) => {
+            if (!editor) {
+                return () => {};
+            }
+
+            editor.on("focus", notify);
+            editor.on("blur", notify);
+
+            return () => {
+                editor.off("focus", notify);
+                editor.off("blur", notify);
+            };
+        },
+        [editor],
+    );
+    const emojiEditorFocused = useSyncExternalStore(
+        subscribeEmojiFocus,
+        () => editor?.isFocused ?? false,
+        () => false,
+    );
+
+    // The `:shortcode` list. It waits while another popup is open, since each takes the keys while it shows, and while the
+    // composer is disabled.
     const emoji = useEmojiShortcode({
-        enabled: suggestions && !slashMatch && !fileMentionMatch && !variableMatch,
+        enabled: suggestions && !disabled && !slashMatch && !fileMentionMatch && !variableMatch,
+        focused: emojiEditorFocused,
         match: emojiMatchState,
         onReplace: handleReplace,
     });
     const emojiOpen = emoji.open;
     const emojiListboxId = emoji.listboxId;
     const emojiActiveOptionId = emoji.activeOptionId;
+
+    // The list is fixed to the composer's box as measured when it opened: re-measure while it is open, so scrolling or
+    // resizing does not leave it behind.
+    useEffect(() => {
+        if (!emojiOpen) {
+            return undefined;
+        }
+
+        globalThis.addEventListener("scroll", updateEditorRect, { capture: true, passive: true });
+        globalThis.addEventListener("resize", updateEditorRect);
+
+        return () => {
+            globalThis.removeEventListener("scroll", updateEditorRect, { capture: true });
+            globalThis.removeEventListener("resize", updateEditorRect);
+        };
+    }, [emojiOpen, updateEditorRect]);
 
     // The editor reads its attributes once, at creation: push a changed description, validity or open list to the live element.
     useEffect(() => {
