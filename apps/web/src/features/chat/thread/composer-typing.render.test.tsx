@@ -190,6 +190,7 @@ for (const path of [
     "./completion-sound",
     "./composer-prompt-queue",
     "./reply-complete-announcement",
+    "./turn-step-announcement",
     "./host-changes-of-thread",
     "./generation-model-menu",
     "./read-aloud-action",

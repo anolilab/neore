@@ -967,6 +967,7 @@ export interface Doc_messages {
     providerOptions?: unknown;
     reasoning?: string;
     reasoningDetails?: unknown;
+    replyId?: string;
     retrievedMemories?: Array<{ memoryId: string; score: number }>;
     sources?: unknown;
     speakerSkillId?: string;
@@ -4206,6 +4207,7 @@ export interface Insert_messages {
     providerOptions?: unknown;
     reasoning?: string;
     reasoningDetails?: unknown;
+    replyId?: string;
     retrievedMemories?: Array<{ memoryId: string; score: number }>;
     sources?: unknown;
     speakerSkillId?: string;
