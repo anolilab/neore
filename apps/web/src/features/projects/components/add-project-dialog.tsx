@@ -90,13 +90,13 @@ const ROW_CLASS =
     "hover:bg-muted focus-visible:ring-ring flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60";
 
 interface AddProjectContentProps extends Omit<AddProjectDialogProps, "open"> {
+    /** Reports whether a project is being added; the owner refuses to close the dialog then. */
+    onAddingChange: (adding: boolean) => void;
     /** Servers paired in this session. One that is still listed as unpaired is connected, never paired again. */
     pairedHosts: Set<string>;
     /** The host being paired or connected. Held by the owner of the open state, so it outlives a closed dialog. */
     pairingHost: string | null;
     setPairingHost: (host: string | null) => void;
-    /** Reports whether a project is being added; the owner refuses to close the dialog then. */
-    onAddingChange: (adding: boolean) => void;
 }
 
 const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, pairingHost, setPairingHost }: AddProjectContentProps) => {
