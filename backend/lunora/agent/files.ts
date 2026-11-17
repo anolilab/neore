@@ -224,6 +224,40 @@ export const fileGatedByLockedChat = async (
 };
 
 /**
+ * The `fileIds` that are gated for `userId` (`fileGatedByLockedChat`), checked on the shard it runs on.
+ *
+ * Run on the CALLER's shard, never only the thread owner's. A collaborator's own locked chat has its passcode rows and
+ * file links on the collaborator's shard, so the owner's shard cannot see that the file is gated: a file from the
+ * collaborator's locked chat would attach to the owner's shared chat with no passcode. `/chat/start` and `/chat/edit`
+ * call this on the caller's shard before they switch to the thread's shard.
+ */
+export const gatedFileIdsOnCallerShard = async (
+    context: Pick<QueryCtx, "db">,
+    { fileIds, threadId, unlockProof, userId }: { fileIds: Id<"chatFiles">[]; threadId?: Id<"threads">; unlockProof?: string; userId: string },
+): Promise<Id<"chatFiles">[]> => {
+    const gated: Id<"chatFiles">[] = [];
+
+    for (const fileId of fileIds) {
+        if (await fileGatedByLockedChat(context, { fileId, threadId, unlockProof, userId })) {
+            gated.push(fileId);
+        }
+    }
+
+    return gated;
+};
+
+/** `gatedFileIdsOnCallerShard`, as a query: a route runs it on the caller's shard (`context.forShard(userId)`). */
+export const gateFilesOnCallerShard = internalQuery
+    .input({
+        fileIds: v.array(v.id("chatFiles")),
+        threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+        userId: v.string(),
+    })
+    .output(v.array(v.id("chatFiles")))
+    .query(async ({ args, ctx }) => await gatedFileIdsOnCallerShard(ctx, args));
+
+/**
  * The file, if `userId` may attach it: they stored the bytes themselves
  * (a `chatFileAccess` grant), or it is already attached to a message in
  * `threadId` and they can read that thread. `null` otherwise — the same

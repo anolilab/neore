@@ -408,6 +408,44 @@ const workerThreadResponse = (): Response =>
 const threadLockedResponse = (): Response => Response.json({ code: THREAD_LOCKED_CODE, error: "This chat is locked." }, { status: 403 });
 
 /**
+ * Refuses an attach of a file that the CALLER's own locked chats hold (`gatedFileIdsOnCallerShard`), and runs that check
+ * on the caller's shard. The thread's shard cannot see the caller's passcode rows or file links, so a collaborator's file
+ * from their own locked chat would pass there. A gated file answers as a missing one, as `getFile` does for a file it may
+ * not serve. A failed check refuses the attach (fail closed). An id that is not well-formed is left to the attach's own
+ * check, which refuses it.
+ */
+const refuseGatedFiles = async (
+    context: HttpActionCtx,
+    {
+        fileIds,
+        threadId,
+        unlockProof,
+        userId,
+    }: { fileIds: string[] | undefined; threadId: string | undefined; unlockProof: string | undefined; userId: string },
+): Promise<Response | undefined> => {
+    const ids = (fileIds ?? []).filter((fileId) => isValidDocumentIdFormat(fileId)) as Id<"chatFiles">[];
+
+    if (ids.length === 0) {
+        return undefined;
+    }
+
+    try {
+        const gated = await context.forShard(userId).runQuery(internal.agent.files.gateFilesOnCallerShard, {
+            fileIds: ids,
+            ...(threadId && { threadId: threadId as Id<"threads"> }),
+            ...(unlockProof !== undefined && { unlockProof }),
+            userId,
+        });
+
+        return gated.length > 0 ? Response.json({ error: "File not found" }, { status: 404 }) : undefined;
+    } catch (error) {
+        chatLogger.error("Error checking attached files on the caller's shard:", error);
+
+        return Response.json({ error: "Could not attach the file" }, { status: 400 });
+    }
+};
+
+/**
  * Everything `/chat/start` does once the caller is trusted: resolve the user
  * from the request identity, apply the daily limit, create or continue the
  * thread and schedule the agent.
@@ -522,6 +560,18 @@ export const runChatStart = async (
     // The thread's shard: the caller's own, or — in a thread shared with them —
     // its owner's, where the thread, its messages and this run's stream live.
     // Everything below runs there.
+    // A file from the caller's own locked chat is refused here, on the caller's shard, before the thread's shard is entered.
+    const refusedFiles = await refuseGatedFiles(context, {
+        fileIds: body.fileIds,
+        threadId: body.threadId === "default" ? undefined : body.threadId,
+        unlockProof: body.unlockProof,
+        userId,
+    });
+
+    if (refusedFiles) {
+        return refusedFiles;
+    }
+
     const shardKey = await threadShardFor(context, userId, body.threadId);
 
     return await inShard(
@@ -1568,6 +1618,13 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
         // The reply would come from a cloud model, in a thread the desktop owns.
         if (gateResult.hostRun) {
             return hostRunThreadResponse();
+        }
+
+        // The edit's files are checked on the caller's own shard too: this route runs on the thread owner's (`onThreadShard`).
+        const refusedFiles = await refuseGatedFiles(context, { fileIds, threadId, unlockProof, userId });
+
+        if (refusedFiles) {
+            return refusedFiles;
         }
 
         // An edit of a guest's note the owner sent on is still the guest's words: it keeps the mark and the note's id.

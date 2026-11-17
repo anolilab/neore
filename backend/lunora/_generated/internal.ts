@@ -93,6 +93,7 @@ export interface InternalApiTypes {
             addFile: FunctionReference<"mutation", { filename?: string; hash: string; mediaType: string; storageId: string; userId?: string }, { fileId: Id<"chatFiles">; storageId: string }>;
             copyFile: FunctionReference<"mutation", { fileId: Id<"chatFiles"> }, null>;
             deleteFiles: FunctionReference<"mutation", { fileIds: Array<Id<"chatFiles">>; force?: boolean }, Array<Id<"chatFiles">>>;
+            gateFilesOnCallerShard: FunctionReference<"query", { fileIds: Array<Id<"chatFiles">>; threadId?: Id<"threads">; unlockProof?: string; userId: string }, Array<Id<"chatFiles">>>;
             getFileForUser: FunctionReference<"query", { fileId: Id<"chatFiles">; threadId?: Id<"threads">; unlockProof?: string; userId: string }, { _id: Id<"chatFiles">; extractedText?: string; extractionStatus?: "pending" | "processing" | "completed" | "failed" | "unsupported"; filename?: string; hash: string; mediaType: string; storageId: string } | null>;
             getFilesToDelete: FunctionReference<"query", { paginationOpts: { cursor: unknown; endCursor?: unknown; id?: number; maximumRowsRead?: number; numItems: number } }, { continueCursor: string | null; isDone: boolean; page: import("lunorash/server/data-model").LoadWith<import("./dataModel.js").DataModel, import("./dataModel.js").Relations, "chatFiles", {}, undefined>[]; }>;
             getOwnedStorageKeys: FunctionReference<"query", { keys: Array<string>; userId: string }, Array<string>>;
@@ -1471,6 +1472,7 @@ export const internal: InternalApiTypes = {
             addFile: { __lunoraRef: "agent_files:addFile" },
             copyFile: { __lunoraRef: "agent_files:copyFile" },
             deleteFiles: { __lunoraRef: "agent_files:deleteFiles" },
+            gateFilesOnCallerShard: { __lunoraRef: "agent_files:gateFilesOnCallerShard" },
             getFileForUser: { __lunoraRef: "agent_files:getFileForUser" },
             getFilesToDelete: { __lunoraRef: "agent_files:getFilesToDelete" },
             getOwnedStorageKeys: { __lunoraRef: "agent_files:getOwnedStorageKeys" },
