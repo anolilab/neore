@@ -83,7 +83,12 @@ export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmo
         [enabled, index, query],
     );
 
-    const isDismissed = match !== null && dismissed !== null && match.from === dismissed.from && match.query.startsWith(dismissed.query);
+    // The same shortcode, grown or shrunk by typing or Backspace, stays closed; a different one at that place does not.
+    const isDismissed =
+        match !== null &&
+        dismissed !== null &&
+        match.from === dismissed.from &&
+        (match.query.startsWith(dismissed.query) || dismissed.query.startsWith(match.query));
     const showing = enabled && focused && match !== null && !isDismissed;
     const open = showing && suggestions.length > 0;
     const selected = Math.min(activeIndex, Math.max(suggestions.length - 1, 0));

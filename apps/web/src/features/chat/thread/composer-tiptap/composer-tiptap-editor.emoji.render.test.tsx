@@ -104,6 +104,8 @@ describe("composer emoji shortcodes", () => {
     beforeAll(() => {
         Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
         Range.prototype.getBoundingClientRect = () => new DOMRect();
+        // The list keeps the highlighted row in view; jsdom has no layout to scroll.
+        Element.prototype.scrollIntoView = () => {};
     });
 
     it("opens the list as the shortcode is typed and names its highlighted row on the editable", async () => {
@@ -283,5 +285,37 @@ describe("composer emoji shortcodes", () => {
         });
 
         expect(screen.queryByRole("listbox", { name: "Emoji suggestions" })).toBeNull();
+    });
+
+    it("stays closed after Backspace within the shortcode that Escape closed", async () => {
+        const { ref } = renderEditor();
+
+        await typeText(ref, ":dog");
+        await optionsOf();
+        fireEvent.keyDown(editableWhileOpen(), { key: "Escape" });
+
+        // Removes the "g" at the end of ":dog", leaving ":do", the same shortcode, shorter.
+        act(() => {
+            ref.current!.getEditor()!.commands.deleteRange({ from: 4, to: 5 });
+        });
+
+        expect(ref.current?.getEditor()?.getText()).toBe(":do");
+        expect(screen.queryByRole("listbox", { name: "Emoji suggestions" })).toBeNull();
+    });
+
+    it("opens after a long draft and replaces the shortcode where its colon is", async () => {
+        const { ref } = renderEditor();
+        const draft = "word ".repeat(40);
+
+        await typeText(ref, `${draft}:dog`);
+
+        const options = await optionsOf();
+        const expected = searchEmojiShortcodes(await loadEmojiIndex(), "dog");
+
+        expect(options[0]!.textContent).toContain(`:${expected[0]!.shortcode}:`);
+
+        fireEvent.keyDown(editableWhileOpen(), { key: "Enter" });
+
+        expect(ref.current?.getEditor()?.getText()).toBe(`${draft}${expected[0]!.emoji}`);
     });
 });

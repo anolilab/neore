@@ -5,15 +5,20 @@
  *
  * Focus stays in the editor: the editable names the highlighted row through aria-activedescendant, so the rows are not
  * focused and take no key listener of their own. It is portalled and fixed to the composer's box, so opening it moves no line.
+ * The list is capped to the room above the composer and scrolls, so the highlighted row stays on screen.
  */
 import { useLingui } from "@lingui/react/macro";
 import clsx from "clsx";
 import type { FC } from "react";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 import type { EmojiSuggestion } from "./emoji-shortcode/search";
 import { POPUP_ENTER_MOTION, POPUP_ROW_MOTION } from "./popup-motion";
 import { emojiOptionId } from "./use-emoji-shortcode";
+
+/** Space between the list and the composer's top edge. */
+const GAP_PX = 6;
 
 interface EmojiShortcodePopupProps {
     /** Rect of the composer, for positioning. */
@@ -30,6 +35,12 @@ interface EmojiShortcodePopupProps {
 
 const EmojiShortcodePopup: FC<EmojiShortcodePopupProps> = ({ editorRect, listboxId, onHighlight, onSelect, open, selected, suggestions }) => {
     const { t } = useLingui();
+    const selectedRef = useRef<HTMLButtonElement>(null);
+
+    // Arrow keys move the highlight; the row it lands on scrolls into view within the capped list.
+    useEffect(() => {
+        selectedRef.current?.scrollIntoView({ block: "nearest" });
+    }, [selected]);
 
     if (!open || !editorRect) {
         return null;
@@ -41,13 +52,13 @@ const EmojiShortcodePopup: FC<EmojiShortcodePopupProps> = ({ editorRect, listbox
             style={{
                 left: `${editorRect.left}px`,
                 top: `${editorRect.top}px`,
-                transform: "translateY(calc(-100% - 6px))",
+                transform: `translateY(calc(-100% - ${GAP_PX}px))`,
             }}
         >
             <div
                 aria-label={t`Emoji suggestions`}
                 className={clsx(
-                    "overflow-hidden rounded-lg border p-1",
+                    "overflow-y-auto rounded-lg border p-1",
                     "bg-popover text-popover-foreground",
                     "dark:bg-[oklch(0.205_0_0)] dark:text-[oklch(0.985_0_0)]",
                     "border-border dark:border-white/10",
@@ -57,7 +68,7 @@ const EmojiShortcodePopup: FC<EmojiShortcodePopupProps> = ({ editorRect, listbox
                 )}
                 id={listboxId}
                 role="listbox"
-                style={{ width: editorRect.width }}
+                style={{ maxHeight: `${Math.max(editorRect.top - GAP_PX, 0)}px`, width: editorRect.width }}
             >
                 {suggestions.map((suggestion, position) => (
                     // A button, so the click needs no key handler: it takes no focus (tabIndex -1, mousedown is prevented)
@@ -77,6 +88,7 @@ const EmojiShortcodePopup: FC<EmojiShortcodePopupProps> = ({ editorRect, listbox
                             event.preventDefault();
                         }}
                         onMouseEnter={() => onHighlight(position)}
+                        ref={position === selected ? selectedRef : undefined}
                         role="option"
                         tabIndex={-1}
                         type="button"

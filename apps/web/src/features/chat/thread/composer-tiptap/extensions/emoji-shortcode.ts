@@ -30,6 +30,9 @@ const OBJECT_REPLACEMENT = "\u{FFFC}";
 /** The characters a shortcode is made of, the same set the trigger accepts. */
 const SHORTCODE_CHARACTER = /^[\w+-]/;
 
+/** Characters read before the caret: longer than any shortcode with its colon. */
+const TEXT_WINDOW = 64;
+
 /** A hard break reads as the line break it shows, so a colon at the start of a wrapped line still counts. */
 const leafText = (node: ProseMirrorNode): string => (node.type.name === "hardBreak" ? "\n" : OBJECT_REPLACEMENT);
 
@@ -42,9 +45,12 @@ export const readEmojiShortcodeMatch = (state: EditorState): EmojiShortcodeMatch
     }
 
     const $pos = state.doc.resolve(selection.from);
-    const found = findEmojiShortcodeQuery($pos.parent.textBetween(0, $pos.parentOffset, undefined, leafText));
+    // Only a window before the caret is read, so a long draft costs no more per keystroke than a short one. A window that
+    // starts mid-block cannot see what precedes its first character, so a colon there is not taken.
+    const windowStart = Math.max(0, $pos.parentOffset - TEXT_WINDOW);
+    const found = findEmojiShortcodeQuery($pos.parent.textBetween(windowStart, $pos.parentOffset, undefined, leafText));
 
-    if (!found) {
+    if (!found || (windowStart > 0 && found.startOffset === 0)) {
         return null;
     }
 
@@ -55,7 +61,7 @@ export const readEmojiShortcodeMatch = (state: EditorState): EmojiShortcodeMatch
         return null;
     }
 
-    return { from: $pos.start() + found.startOffset, query: found.query, to: selection.from };
+    return { from: $pos.start() + windowStart + found.startOffset, query: found.query, to: selection.from };
 };
 
 const sameMatch = (a: EmojiShortcodeMatch | null, b: EmojiShortcodeMatch | null): boolean =>

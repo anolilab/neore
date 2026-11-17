@@ -595,6 +595,8 @@ const ComposerTiptapEditor = ({
             frame ??= requestAnimationFrame(remeasure);
         };
 
+        // Measured as the list opens too: it may reopen after the composer moved while the list was closed.
+        schedule();
         globalThis.addEventListener("scroll", schedule, { capture: true, passive: true });
         globalThis.addEventListener("resize", schedule);
 
