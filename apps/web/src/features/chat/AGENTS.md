@@ -75,3 +75,5 @@ Tabs: `"summary"` | `"prompts"` | `"variables"` | `"pins"` (and any future tabs 
 - Don't directly mutate UI state - use stores/hooks
 - Don't mix message formats without converters
 - Don't create chat components without proper TypeScript types
+- Don't import `@tiptap/extension-emoji` statically in the composer: its data is ~64 KB gzipped. Load it through
+  `thread/composer-tiptap/emoji-shortcode/emoji-index.ts`, which the composer starts once the list can open.

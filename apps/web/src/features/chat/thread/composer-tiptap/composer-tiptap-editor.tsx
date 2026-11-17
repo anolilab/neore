@@ -37,8 +37,11 @@ import type { ChatReference } from "../chat-reference";
 import { cleanEditorText } from "./clean-editor-text";
 import { readComposerText } from "./composer-text";
 import { composerEditorAttributes } from "./editor-attributes";
+import EmojiShortcodePopup from "./emoji-shortcode-popup";
 import type { BannedWordMatch } from "./extensions/banned-word-decoration";
 import BannedWordDecoration from "./extensions/banned-word-decoration";
+import type { EmojiShortcodeMatch } from "./extensions/emoji-shortcode";
+import EmojiShortcode from "./extensions/emoji-shortcode";
 import type { FileMentionMatch } from "./extensions/file-mention";
 import FileMention from "./extensions/file-mention";
 import GhostCompletion from "./extensions/ghost-completion";
@@ -57,6 +60,7 @@ import { createGhostController, shouldAnnounceGhost } from "./ghost-completion-c
 import { appendPlainText, composerCoreExtensionOptions, pastePlainText } from "./paste-plain-text";
 import { plainTextToHtml } from "./plain-text";
 import SlashCommandPopup from "./slash-command-popup";
+import { useEmojiShortcode } from "./use-emoji-shortcode";
 import useMentionPrefetch from "./use-mention-prefetch";
 import VariableAutocompletePopup from "./variable-autocomplete-popup";
 import type { VimMode as VimModeName } from "./vim-keys";
@@ -204,6 +208,7 @@ const ComposerTiptapEditor = ({
     const [slashMatchState, setSlashMatch] = useState<SlashCommandMatch | null>(null);
     const [fileMentionMatchState, setFileMentionMatch] = useState<FileMentionMatch | null>(null);
     const [variableMatchState, setVariableMatch] = useState<VariableAutocompleteMatch | null>(null);
+    const [emojiMatchState, setEmojiMatch] = useState<EmojiShortcodeMatch | null>(null);
     // With suggestions off nothing opens, so Enter still sends "/like this".
     const slashMatch = suggestions ? slashMatchState : null;
     const fileMentionMatch = suggestions ? fileMentionMatchState : null;
@@ -249,6 +254,18 @@ const ComposerTiptapEditor = ({
     const handleVariableStateChange = useCallback(
         (match: VariableAutocompleteMatch | null) => {
             setVariableMatch(match);
+
+            if (match) {
+                updateEditorRect();
+            }
+        },
+        [updateEditorRect],
+    );
+
+    // Emoji shortcode state change handler
+    const handleEmojiStateChange = useCallback(
+        (match: EmojiShortcodeMatch | null) => {
+            setEmojiMatch(match);
 
             if (match) {
                 updateEditorRect();
@@ -355,6 +372,10 @@ const ComposerTiptapEditor = ({
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             VariableAutocomplete.configure({
                 onStateChange: handleVariableStateChange,
+            }),
+            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
+            EmojiShortcode.configure({
+                onStateChange: handleEmojiStateChange,
             }),
             // Inert until `requestCompletion` is set: it only draws what it is handed.
             GhostCompletion,
@@ -464,15 +485,6 @@ const ComposerTiptapEditor = ({
         }
     }, [disabled, editor]);
 
-    // The editor reads its attributes once, at creation: push a changed description or validity to the live element.
-    useEffect(() => {
-        if (editor && !editor.isDestroyed) {
-            editor.setOptions({
-                editorProps: { ...editor.options.editorProps, attributes: composerEditorAttributes({ describedBy, invalid, label: t`Message` }) },
-            });
-        }
-    }, [editor, describedBy, invalid, t]);
-
     // Turning Vim on or off while the editor is open: the caret class and the mode label follow at once, not at the next keystroke.
     useEffect(() => {
         if (editor && !editor.isDestroyed) {
@@ -502,6 +514,45 @@ const ComposerTiptapEditor = ({
         editor.commands.setBannedWordMatches(bannedWordMatches);
     }, [bannedWordMatches, editor]);
 
+    // Replace for slash commands, file mentions, variables and emoji shortcodes
+    const handleReplace = useCallback(
+        (from: number, to: number, replacement: string) => {
+            if (!editor) {
+                return;
+            }
+
+            editor.chain().focus().deleteRange({ from, to }).insertContent(replacement).run();
+        },
+        [editor],
+    );
+
+    // The `:shortcode` list. It waits while another popup is open, since each takes the keys while it shows.
+    const emoji = useEmojiShortcode({
+        enabled: suggestions && !slashMatch && !fileMentionMatch && !variableMatch,
+        match: emojiMatchState,
+        onReplace: handleReplace,
+    });
+    const emojiOpen = emoji.open;
+    const emojiListboxId = emoji.listboxId;
+    const emojiActiveOptionId = emoji.activeOptionId;
+
+    // The editor reads its attributes once, at creation: push a changed description, validity or open list to the live element.
+    useEffect(() => {
+        if (editor && !editor.isDestroyed) {
+            editor.setOptions({
+                editorProps: {
+                    ...editor.options.editorProps,
+                    attributes: composerEditorAttributes({
+                        describedBy,
+                        invalid,
+                        label: t`Message`,
+                        popup: emojiOpen ? { activeOptionId: emojiActiveOptionId, listboxId: emojiListboxId } : undefined,
+                    }),
+                },
+            });
+        }
+    }, [editor, describedBy, invalid, t, emojiOpen, emojiActiveOptionId, emojiListboxId]);
+
     // ---- Ghost-text autocomplete -------------------------------------------
     const [ghostAnnouncement, setGhostAnnouncement] = useState("");
     const ghostControllerRef = useRef<GhostController | null>(null);
@@ -509,7 +560,7 @@ const ComposerTiptapEditor = ({
     const requestCompletionRef = useRef(requestCompletion);
     const lastAnnouncedAtRef = useRef<number | null>(null);
     const hasCompletionSource = Boolean(requestCompletion);
-    const isPopupOpen = Boolean(slashMatch || fileMentionMatch || variableMatch);
+    const isPopupOpen = Boolean(slashMatch || fileMentionMatch || variableMatch || emojiOpen);
     const ghostAnnouncementText = t`Suggestion available, press Right Arrow to accept`;
 
     useEffect(() => {
@@ -580,18 +631,6 @@ const ComposerTiptapEditor = ({
             ghostControllerRef.current.update({ ...ghostPropsRef.current, ...editorGhostState(editor, editor.isFocused) });
         }
     }, [disabled, isStreaming, isPopupOpen, editor]);
-
-    // Handle replace for slash commands, file mentions, and variables
-    const handleReplace = useCallback(
-        (from: number, to: number, replacement: string) => {
-            if (!editor) {
-                return;
-            }
-
-            editor.chain().focus().deleteRange({ from, to }).insertContent(replacement).run();
-        },
-        [editor],
-    );
 
     // The editor's text now, for a `/clear` that finished while the person may have kept typing. A destroyed editor (the
     // chat changed) reads as empty, which no command matches.
@@ -679,6 +718,22 @@ const ComposerTiptapEditor = ({
                 match={variableMatch}
                 onDismiss={handleDismissVariable}
                 onReplace={handleReplace}
+            />
+
+            {/* Emoji shortcode list. The announcement is always mounted, so a screen reader hears each count change. */}
+            {suggestions && (
+                <span aria-live="polite" className="sr-only" role="status">
+                    {emoji.announcement}
+                </span>
+            )}
+            <EmojiShortcodePopup
+                editorRect={editorRect}
+                listboxId={emoji.listboxId}
+                onHighlight={emoji.highlight}
+                onSelect={emoji.select}
+                open={emoji.open}
+                selected={emoji.selected}
+                suggestions={emoji.suggestions}
             />
         </div>
     );
