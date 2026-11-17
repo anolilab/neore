@@ -234,6 +234,9 @@ describe("census scheduling", () => {
         const calls = await runScanRounds(entries, readPage, MAX_SHARD_CALLS_PER_ACTION);
 
         expect(entries.map((entry) => entry.status)).toEqual(["done", "failed", "done"]);
+        // The failure keeps its name and its last good state (no page was counted), so a later call can retry it.
+        expect(entries[1]?.errorName).toBe("Error");
+        expect(entries[1]?.state.threads).toBe(0);
         // One round of 3 calls, then 4 more rounds of the 2 healthy shards.
         expect(calls).toBe(3 + 2 * (PAGES_NEEDED - 1));
     });

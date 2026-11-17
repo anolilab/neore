@@ -141,6 +141,8 @@ export const addMessageRow = (state: FootprintState, threadId: string, bytes: nu
 
 /** One shard in a round-based scan: its state so far, and whether it is still being read. */
 export interface ScanEntry {
+    /** The error's name (for example `TypeError`) when the shard failed; the message is never kept. */
+    errorName?: string;
     shardKey: string;
     state: FootprintState;
     status: "active" | "done" | "failed";
@@ -149,7 +151,8 @@ export interface ScanEntry {
 /**
  * Reads the active shards one page each per round, until none is active or `maxCalls` pages
  * have been read. A round that cannot fit every active shard reads the first ones in order.
- * A shard whose read throws is marked `failed` and is not read again. Returns the calls made.
+ * A shard whose read throws is marked `failed` and is not read again in this call; its state stays at
+ * the last page that succeeded, so the next call can retry it from there. Returns the calls made.
  */
 export const runScanRounds = async (
     entries: ScanEntry[],
@@ -176,7 +179,8 @@ export const runScanRounds = async (
 
                     entry.state = result.state;
                     entry.status = result.done ? "done" : "active";
-                } catch {
+                } catch (error) {
+                    entry.errorName = error instanceof Error ? error.name : "unknown";
                     entry.status = "failed";
                 }
             }),

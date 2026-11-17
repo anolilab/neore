@@ -481,8 +481,8 @@ const readShardPage = async (entry: ScanEntry): Promise<{ done: boolean; state: 
 /**
  * Totals for the shards this call finished. A shard that is not finished yet is `pendingShards`: its
  * state travels in `continueCursor`, and its counts join the totals once a later call finishes it, so
- * no shard is counted twice. A shard that errors is `incompleteShards` and its counts are left out.
- * Continue with `continueCursor` until it is `null`.
+ * no shard is counted twice. A shard that errors is `incompleteShards`, its counts are left out, and it
+ * stays pending so a later call retries it. Continue with `continueCursor` until it is `null`.
  */
 export const getShardFootprint = adminAction
     .use(rateLimit("admin/read"))
@@ -544,6 +544,7 @@ export const getShardFootprint = adminAction
             threads: 0,
         };
         const stillPending: PendingShard[] = [];
+        const failureNames: string[] = [];
 
         for (const entry of entries) {
             if (entry.status === "done") {
@@ -551,9 +552,13 @@ export const getShardFootprint = adminAction
                 totals.approxBytes += entry.state.approxBytes;
                 totals.messageRows += entry.state.messageRows;
                 totals.threads += entry.state.threads;
-            } else if (entry.status === "failed") {
-                totals.incompleteShards += 1;
             } else {
+                if (entry.status === "failed") {
+                    totals.incompleteShards += 1;
+                    failureNames.push(entry.errorName ?? "unknown");
+                }
+
+                // A failed shard keeps its last good state, so the next call retries it from there.
                 stillPending.push({ shardKey: entry.shardKey, state: entry.state });
             }
         }
@@ -563,6 +568,7 @@ export const getShardFootprint = adminAction
         totals.continueCursor = totals.isDone ? null : encodeCensusCursor({ census: cursor.census, censusDone: cursor.censusDone, pending: stillPending });
 
         ctx.log.event("admin.shard_footprint_measured", {
+            failedBy: failureNames.toSorted((a, b) => a.localeCompare(b)).join(","),
             incompleteShards: totals.incompleteShards,
             isDone: totals.isDone,
             pendingShards: totals.pendingShards,
