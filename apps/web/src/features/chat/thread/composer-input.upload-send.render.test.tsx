@@ -162,10 +162,10 @@ for (const path of [
 
 const { default: ComposerInput } = await import("./composer-input");
 
-const renderComposer = () =>
+const renderComposer = (props: { disabled?: boolean } = {}) =>
     render(
         <QueryClientProvider client={new QueryClient()}>
-            <ComposerInput />
+            <ComposerInput {...props} />
         </QueryClientProvider>,
     );
 
@@ -276,6 +276,27 @@ describe("ComposerInput send during an upload", () => {
             expect(sendState()).toBe("ready");
         });
         expect(harness.sendMessage).not.toHaveBeenCalled();
+        expect(useChatUIStore.getState().composerText).toBe("see notes");
+    });
+
+    it("says so and keeps the draft when the uploads finish while the composer is locked", async () => {
+        const id = addUpload("uploading");
+        const view = renderComposer();
+
+        pressSend();
+
+        view.rerender(
+            <QueryClientProvider client={new QueryClient()}>
+                <ComposerInput disabled />
+            </QueryClientProvider>,
+        );
+        useChatUIStore.getState().updateAttachment(id, { fileId: "file-1", status: "complete" });
+
+        await waitFor(() => {
+            expect(harness.showInfo).toHaveBeenCalledWith("The uploads finished, but the message was not sent. Press send to send it.");
+        });
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+        expect(sendState()).toBe("ready");
         expect(useChatUIStore.getState().composerText).toBe("see notes");
     });
 });

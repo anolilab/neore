@@ -1385,9 +1385,14 @@ const ComposerInput = ({
         if (outcome.kind === "failed") {
             notifyFailedUpload(outcome.name);
         } else if (outcome.kind === "send") {
-            handleSubmit();
+            // A locked composer or a send already in flight cannot take this message now: say so, and keep the draft.
+            if (disabled || useChatUIStore.getState().isSubmitting) {
+                showInfo(t`The uploads finished, but the message was not sent. Press send to send it.`);
+            } else {
+                handleSubmit();
+            }
         }
-    }, [attachments, handleSubmit, notifyFailedUpload, threadId, uploadWait]);
+    }, [attachments, disabled, handleSubmit, notifyFailedUpload, t, threadId, uploadWait]);
 
     // Handle cancel/stop
     // A manual stop pauses the queue: the chips stay, nothing auto-sends.

@@ -77,3 +77,5 @@ Tabs: `"summary"` | `"prompts"` | `"variables"` | `"pins"` (and any future tabs 
 - Don't create chat components without proper TypeScript types
 - Don't import `@tiptap/extension-emoji` statically in the composer: its data is ~64 KB gzipped. Load it through
   `thread/composer-tiptap/emoji-shortcode/emoji-index.ts`, which the composer starts once the list can open.
+- Never send a draft attachment that is not complete. A send pressed during an upload waits (`thread/upload-send-wait.ts`);
+  a failed upload stops it and a removed file cancels it. Keep the pending check in `handleSubmit` when changing it.
