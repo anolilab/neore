@@ -922,6 +922,7 @@ mod tests {
                 request_id: "r1".into(),
                 session_id: "s1".into(),
                 target: None,
+                terminal: false,
                 tool: "Run tests".into(),
                 tool_kind: "execute".into(),
             })

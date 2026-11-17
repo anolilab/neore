@@ -1456,6 +1456,7 @@ mod tests {
             ],
             session_id: "s1".into(),
             target: Some("/work/x".into()),
+            terminal: false,
             tool: "Run curl".into(),
             tool_kind: "execute".into(),
         };

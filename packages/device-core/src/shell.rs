@@ -289,6 +289,20 @@ fn command(line: &str, policy: Option<&Policy>) -> Result<(Command, Guard), Stri
         // Its own process group, so a timeout kills everything it started.
         command.process_group(0);
 
+        // A subreaper keeps what the command double-forks in its tree, for `kill_descendants`, instead of handing it to init.
+        // The attribute survives `exec`.
+        #[cfg(target_os = "linux")]
+        // SAFETY: only `prctl`, which is safe between `fork` and `exec`.
+        unsafe {
+            command.pre_exec(|| {
+                if libc::prctl(libc::PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+
+                Ok(())
+            });
+        }
+
         Ok((command, guard))
     }
 }
@@ -394,18 +408,127 @@ impl Drop for Tracked {
     }
 }
 
-/// Kills the process group `process_group(0)` made for a run. The result is not checked: ESRCH means it ended.
+/// Kills the process group `process_group(0)` made for a run and, on Linux, every descendant that left it. `pid` must be
+/// unreaped, so it and its group are still the run's. The result is not checked: ESRCH means it ended.
 #[cfg(unix)]
 fn kill_group(pid: u32) {
-    // SAFETY: plain syscall with no memory arguments; the group is one this process made.
+    // SAFETY: plain syscalls with no memory arguments; the group is one this process made.
     unsafe {
+        // Stopped first, so the group forks nothing while its tree is walked.
+        #[cfg(target_os = "linux")]
+        libc::kill(-(pid as libc::pid_t), libc::SIGSTOP);
+        #[cfg(target_os = "linux")]
+        kill_descendants(pid);
         libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
     }
 }
 
+/// How many times `kill_descendants` walks the tree at most.
+#[cfg(target_os = "linux")]
+const DESCENDANT_PASSES: usize = 64;
+
+/// Every process as `(pid, parent, alive)`, from `/proc`. A zombie is listed, not alive: it still links its children until
+/// it is reaped.
+#[cfg(target_os = "linux")]
+fn processes() -> Vec<(u32, u32, bool)> {
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return Vec::new();
+    };
+
+    entries
+        .filter_map(|entry| entry.ok()?.file_name().to_str()?.parse::<u32>().ok())
+        .filter_map(|pid| {
+            let (parent, alive) = process_parent(pid)?;
+
+            Some((pid, parent, alive))
+        })
+        .collect()
+}
+
+/// A process's parent and whether it is alive, from `/proc/<pid>/stat`. The name in parentheses can hold anything, so the
+/// fields are read after its last `)`.
+#[cfg(target_os = "linux")]
+fn process_parent(pid: u32) -> Option<(u32, bool)> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    let mut fields = stat.get(stat.rfind(')')? + 1..)?.split_whitespace();
+    let state = fields.next()?;
+    let parent = fields.next()?.parse().ok()?;
+
+    Some((parent, !matches!(state, "Z" | "X")))
+}
+
+/// Kills `pid` if its parent is still `parent`. Through a pidfd where there is one, so the check and the signal name the
+/// same process even if `pid` is reused in between.
+#[cfg(target_os = "linux")]
+fn kill_child_of(pid: u32, parent: u32) {
+    // SAFETY: plain syscalls with integer arguments and a null `siginfo`; the descriptor is closed once.
+    unsafe {
+        let fd = libc::syscall(libc::SYS_pidfd_open, pid as libc::pid_t, 0) as libc::c_int;
+        let still = process_parent(pid).is_some_and(|(now, _)| now == parent);
+
+        if fd < 0 {
+            if still {
+                libc::kill(pid as libc::pid_t, libc::SIGKILL);
+            }
+
+            return;
+        }
+
+        if still {
+            libc::syscall(
+                libc::SYS_pidfd_send_signal,
+                fd,
+                libc::SIGKILL,
+                std::ptr::null::<libc::siginfo_t>(),
+                0,
+            );
+        }
+
+        libc::close(fd);
+    }
+}
+
+/// Kills every live descendant of `root`, which must be unreaped. One that started its own session (`setsid`) left the
+/// process group but not this tree, and the shell is a subreaper, so one whose parent ended is re-parented to the shell,
+/// not to init. Walks again until a walk finds no one new: a process with SIGKILL pending cannot fork, so what it forked
+/// before shows up in the next walk.
+#[cfg(target_os = "linux")]
+fn kill_descendants(root: u32) {
+    let mut signalled = std::collections::HashSet::new();
+
+    for _ in 0..DESCENDANT_PASSES {
+        let processes = processes();
+        let mut tree = vec![root];
+        let mut found = false;
+        let mut next = 0;
+
+        while let Some(&parent) = tree.get(next) {
+            next += 1;
+
+            for &(pid, ppid, alive) in &processes {
+                if ppid != parent || pid == root {
+                    continue;
+                }
+
+                tree.push(pid);
+
+                // By parent too: one re-parented after a walk found it was not signalled, and is tried again under its new parent.
+                if alive && signalled.insert((pid, parent)) {
+                    kill_child_of(pid, parent);
+                    found = true;
+                }
+            }
+        }
+
+        if !found {
+            return;
+        }
+    }
+}
+
 /// Kills every run in flight, background children included, and every run that starts from now on. For a host that
-/// was told to stop. A descendant that left the run's process group (`setsid`) is out of reach: the group is the
-/// only handle there is without a cgroup.
+/// was told to stop. On Linux that includes a descendant that left the run's process group (`setsid`) while the run's
+/// shell lives; elsewhere the group is the only handle there is.
 #[cfg(unix)]
 pub fn kill_running() {
     let mut running = RUNNING.lock().unwrap();
@@ -448,15 +571,9 @@ fn has_exited(child: &mut Child) -> std::io::Result<bool> {
 }
 
 fn kill_tree(child: &mut Child) {
+    // Signalled directly: an external `kill` can fail on Linux and leave a background child running, and nothing would notice.
     #[cfg(unix)]
-    {
-        // A negative pid signals the process group `process_group(0)` made for the run. Signalled directly: an
-        // external `kill` can fail on Linux and leave a background child running, and nothing would notice.
-        // SAFETY: plain syscall with no memory arguments. The result is not checked: ESRCH means the group already ended.
-        unsafe {
-            libc::kill(-(child.id() as libc::pid_t), libc::SIGKILL);
-        }
-    }
+    kill_group(child.id());
 
     #[cfg(windows)]
     {
@@ -631,26 +748,28 @@ pub fn run(
     let started = Instant::now();
     let mut timed_out = false;
 
-    let status = loop {
-        match spawned.child.try_wait() {
-            Ok(Some(status)) => break Some(status),
-            Ok(None) if started.elapsed() >= timeout => {
+    // The shell is left unreaped until its tree has been killed, so its pid and group id cannot name another process yet.
+    loop {
+        match has_exited(&mut spawned.child) {
+            Ok(true) => break,
+            Ok(false) if started.elapsed() >= timeout => {
                 timed_out = true;
-                kill_tree(&mut spawned.child);
-                break spawned.child.wait().ok();
+                break;
             }
-            Ok(None) => thread::sleep(Duration::from_millis(25)),
+            Ok(false) => thread::sleep(Duration::from_millis(25)),
             Err(error) => return Err(error.to_string()),
         }
-    };
+    }
 
     // Whatever the command started and left running dies with it; output it already
     // wrote stays readable in the pipe.
     kill_tree(&mut spawned.child);
 
-    // The group is gone, so a host that stops now must not signal its number: it may be someone else's by then.
+    // The group is gone, so a host that stops now must not signal its number: it may be someone else's once reaped.
     #[cfg(unix)]
     drop(spawned.tracked.take());
+
+    let status = spawned.child.wait().ok();
 
     // The readers are joined: once stopped they leave within a poll slice, so nothing is written after the output is read.
     finish_readers(readers, &stop);
@@ -709,9 +828,9 @@ struct TerminalShared {
 /// A command started for a coding agent's `terminal/create` (`acp_terminal.rs`): it returns at once and is read
 /// while it runs. It always runs in the sandbox (the type takes a policy, never an absent one), keeps the tail of its
 /// output, and is killed with its whole process group when killed, dropped, past `timeout`, or once its shell ended
-/// (background children die with it, as for `shell_run`). A descendant that started its own session or group (`setsid`,
-/// or a double fork) is not in that group and is not reached, so it can keep running in the sandbox after the end.
-/// One watcher thread owns the process.
+/// (background children die with it, as for `shell_run`). On Linux a descendant that started its own session or group
+/// (`setsid`, or a double fork) is killed with it too while the shell lives. Once the shell has exited, such a descendant
+/// is no longer in its tree and is not reached; elsewhere it is never reached. One watcher thread owns the process.
 pub struct Terminal {
     shared: Arc<TerminalShared>,
     cap: usize,
@@ -825,11 +944,11 @@ impl Terminal {
             }
 
             kill_tree(&mut spawned.child);
-            // Reaping returns the group id to the system: from here no signal from `signal_now` may reach it.
-            watched.state.lock().unwrap().reaped = true;
-            let status = spawned.child.wait().ok();
+            // Reaping returns the group id to the system: from here no signal from `signal_now` or `kill_running` may reach it.
             #[cfg(unix)]
             drop(spawned.tracked.take());
+            watched.state.lock().unwrap().reaped = true;
+            let status = spawned.child.wait().ok();
             finish_readers(readers, &stop);
 
             let exit = exit_of(status);
@@ -1663,6 +1782,64 @@ mod tests {
             }
             std::thread::sleep(Duration::from_millis(20));
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_killed_terminal_takes_down_a_descendant_that_left_its_group() {
+        let Some((policy, shared, _)) = terminal_policy("setsid") else {
+            return;
+        };
+        // The descendant starts its own session, and the one in the middle exits, so it is neither in the group nor a
+        // child of a process in it.
+        let terminal = Terminal::start(
+            "(setsid sh -c 'echo $$ > child.pid; sleep 2; echo late > late.txt' >/dev/null 2>&1 &); sleep 600",
+            &shared,
+            &policy,
+            &[],
+            1024,
+            Duration::from_secs(600),
+        )
+        .unwrap();
+        let child = written_pid(&shared.join("child.pid"));
+
+        terminal.kill();
+        terminal.wait(Duration::from_secs(10)).expect("ended");
+
+        assert!(
+            process_gone(child),
+            "the detached descendant outlived the terminal"
+        );
+        std::thread::sleep(Duration::from_millis(2500));
+        assert!(
+            !shared.join("late.txt").exists(),
+            "the detached descendant wrote after the kill"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_run_past_its_timeout_takes_down_a_descendant_that_left_its_group() {
+        if !sandbox_or_skip() {
+            return;
+        }
+
+        let (shared, _) = folders("setsid-run");
+        let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
+        let output = run(
+            "setsid sh -c 'echo $$ > child.pid; sleep 600' >/dev/null 2>&1 & wait",
+            &shared,
+            Duration::from_millis(500),
+            1024,
+            Some(&policy),
+        )
+        .unwrap();
+
+        assert!(output.timed_out);
+        assert!(
+            process_gone(written_pid(&shared.join("child.pid"))),
+            "the detached descendant outlived the run"
+        );
     }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]

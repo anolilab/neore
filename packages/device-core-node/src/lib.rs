@@ -12,8 +12,9 @@
 //! rejects it.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::panic::{self, AssertUnwindSafe};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
 use device_core::acp::AcpUpdate;
@@ -128,18 +129,101 @@ const TERMINAL_WAIT: Duration = Duration::from_secs(11 * 60);
 /// How long quitting waits for the agent's terminals to end once their groups are signalled.
 const STOP_WAIT: Duration = Duration::from_secs(2);
 
-/// The terminals coding agents started, by handle.
-type Terminals = Arc<Mutex<HashMap<u64, Arc<Terminal>>>>;
+#[derive(Default)]
+struct Slots {
+    running: HashMap<u64, Arc<Terminal>>,
+    /// Starts that have reserved a place and are still spawning: they count against the cap like a running terminal.
+    starting: usize,
+    /// Set by `close`. No start reserves a place after it, and `stop` drains only once every reserved one has settled.
+    stopping: bool,
+}
+
+/// The terminals coding agents started, by handle, and the starts still spawning.
+#[derive(Default)]
+struct Terminals {
+    slots: Mutex<Slots>,
+    settled: Condvar,
+}
+
+impl Terminals {
+    /// Reserves a place before the spawn: starts that run together count each other, so they cannot all pass the check and
+    /// spawn past the cap.
+    fn reserve(&self) -> std::result::Result<(), String> {
+        let mut slots = self.slots.lock().unwrap();
+
+        if slots.stopping {
+            return Err("the app is shutting down".into());
+        }
+
+        if slots.running.len() + slots.starting >= MAX_TERMINALS {
+            return Err("too many terminals are running".into());
+        }
+
+        slots.starting += 1;
+
+        Ok(())
+    }
+
+    /// Gives up a reservation and keeps what it started, under one lock. A terminal started once shutdown has begun is kept
+    /// too, so `stop` (waiting for this) ends it with the rest, and the start is refused.
+    fn settle(
+        &self,
+        handle: u64,
+        started: std::result::Result<Terminal, String>,
+    ) -> std::result::Result<u64, String> {
+        let mut slots = self.slots.lock().unwrap();
+
+        slots.starting -= 1;
+        self.settled.notify_all();
+
+        let terminal = started?;
+
+        slots.running.insert(handle, Arc::new(terminal));
+
+        if slots.stopping {
+            return Err("the app is shutting down".into());
+        }
+
+        Ok(handle)
+    }
+
+    fn get(&self, handle: u64) -> Option<Arc<Terminal>> {
+        self.slots.lock().unwrap().running.get(&handle).cloned()
+    }
+
+    fn remove(&self, handle: u64) -> Option<Arc<Terminal>> {
+        self.slots.lock().unwrap().running.remove(&handle)
+    }
+
+    /// Admits no further start.
+    fn close(&self) {
+        self.slots.lock().unwrap().stopping = true;
+    }
+
+    /// Waits for every reserved start to settle, then ends every terminal and waits for them. Signalled here, not left to
+    /// the watchers: quitting exits the process right after this returns. Call after `close`.
+    fn stop(&self) {
+        let slots = self.slots.lock().unwrap();
+        let mut slots = self
+            .settled
+            .wait_while(slots, |slots| slots.starting > 0)
+            .unwrap();
+        let ended: Vec<Arc<Terminal>> = slots
+            .running
+            .drain()
+            .map(|(_, terminal)| terminal)
+            .collect();
+
+        drop(slots);
+        shell::end_now(ended.iter().map(|terminal| terminal.as_ref()), STOP_WAIT);
+    }
+}
 
 #[napi]
 pub struct DeviceCore {
     state: Arc<DeviceState>,
     next_terminal: AtomicU64,
-    terminals: Terminals,
-    /// Set by `stop` before it drains the terminals. A start that spawned after that is killed, not added to the map.
-    stopping: Arc<AtomicBool>,
-    /// Starts that have reserved a place and are still spawning: they count against the cap like a running terminal.
-    starting: Arc<AtomicUsize>,
+    terminals: Arc<Terminals>,
 }
 
 #[napi]
@@ -185,8 +269,6 @@ impl DeviceCore {
         Ok(DeviceCore {
             next_terminal: AtomicU64::new(1),
             state,
-            starting: Arc::default(),
-            stopping: Arc::default(),
             terminals: Arc::default(),
         })
     }
@@ -813,42 +895,19 @@ impl DeviceCore {
             .map_err(|_| Error::from_reason("invalid terminal request"))?;
         let state = Arc::clone(&self.state);
         let terminals = Arc::clone(&self.terminals);
-        let stopping = Arc::clone(&self.stopping);
-        let starting = Arc::clone(&self.starting);
         let handle = self.next_terminal.fetch_add(1, Ordering::Relaxed);
 
         blocking(env, move || {
-            // The place is reserved under the map's lock, before the spawn: starts that run together count each other, so they
-            // cannot all pass the check and spawn past the cap.
-            {
-                let running = terminals.lock().unwrap();
+            terminals.reserve()?;
 
-                if running.len() + starting.load(Ordering::SeqCst) >= MAX_TERMINALS {
-                    return Err("too many terminals are running".into());
-                }
+            // Settled even when the start panics: `stop` waits for every reservation.
+            let started =
+                panic::catch_unwind(AssertUnwindSafe(|| state.acp_terminal_start(&request)))
+                    .unwrap_or_else(|_| Err("the terminal failed to start".into()));
 
-                starting.fetch_add(1, Ordering::SeqCst);
-            }
-
-            let started = state.acp_terminal_start(&request);
-            // The reservation is given up under the same lock that inserts the terminal, so no other start sees the place free twice.
-            let mut running = terminals.lock().unwrap();
-
-            starting.fetch_sub(1, Ordering::SeqCst);
-
-            let terminal = started?;
-
-            // Shutdown has begun (`stop` drains under this lock, after setting the flag): the command just started is killed here,
-            // since nothing else will reach it.
-            if stopping.load(Ordering::SeqCst) {
-                terminal.signal_now();
-
-                return Err("the app is shutting down".into());
-            }
-
-            running.insert(handle, Arc::new(terminal));
-
-            Ok(handle as f64)
+            terminals
+                .settle(handle, started)
+                .map(|handle| handle as f64)
         })
     }
 
@@ -894,7 +953,7 @@ impl DeviceCore {
     /// Ends a terminal and forgets it. A handle that is already gone is not an error.
     #[napi]
     pub fn acp_terminal_release(&self, handle: f64) -> Result<()> {
-        if let Some(terminal) = self.terminals.lock().unwrap().remove(&request_id(handle)?) {
+        if let Some(terminal) = self.terminals.remove(request_id(handle)?) {
             terminal.kill();
         }
 
@@ -923,32 +982,99 @@ impl DeviceCore {
     /// Stops every local MCP server and every agent's terminal. Call on quit.
     #[napi]
     pub fn stop(&self) {
+        self.terminals.close();
         self.state.stop_servers();
-
-        // The flag is set, then the map is drained under its lock: a start either inserted before this (and is drained here), or
-        // sees the flag and kills its own command.
-        self.stopping.store(true, Ordering::SeqCst);
-
-        let ended: Vec<Arc<Terminal>> = self
-            .terminals
-            .lock()
-            .unwrap()
-            .drain()
-            .map(|(_, terminal)| terminal)
-            .collect();
-
-        // Signalled here, not left to the watchers: quitting exits the process right after this returns.
-        shell::end_now(ended.iter().map(|terminal| terminal.as_ref()), STOP_WAIT);
+        self.terminals.stop();
     }
 }
 
 impl DeviceCore {
     fn terminal(&self, handle: f64) -> Result<Arc<Terminal>> {
         self.terminals
-            .lock()
-            .unwrap()
-            .get(&request_id(handle)?)
-            .cloned()
+            .get(request_id(handle)?)
             .ok_or_else(|| Error::from_reason("that terminal is gone"))
+    }
+}
+
+#[cfg(all(test, any(target_os = "linux", target_os = "macos")))]
+mod tests {
+    use std::path::PathBuf;
+    use std::thread;
+
+    use device_core::sandbox::{self, Policy, Support};
+
+    use super::*;
+
+    #[test]
+    fn stop_ends_a_terminal_that_was_still_spawning_when_it_began() {
+        if let Support::Unavailable(reason) = sandbox::support() {
+            eprintln!("skipping: {reason}");
+            return;
+        }
+
+        let dir = std::env::temp_dir().join(format!("neore-node-stop-{}", std::process::id()));
+
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let dir: PathBuf = std::fs::canonicalize(dir).unwrap();
+        let policy = Policy::for_roots(std::slice::from_ref(&dir), None);
+        let terminals = Arc::new(Terminals::default());
+
+        terminals.reserve().unwrap();
+
+        let stopping = Arc::clone(&terminals);
+        let stopper = thread::spawn(move || {
+            stopping.close();
+            stopping.stop();
+        });
+
+        while !terminals.slots.lock().unwrap().stopping {
+            thread::sleep(Duration::from_millis(5));
+        }
+
+        assert!(
+            terminals.reserve().is_err(),
+            "a start was admitted during shutdown"
+        );
+        thread::sleep(Duration::from_millis(100));
+        assert!(
+            !stopper.is_finished(),
+            "stop returned while a start was spawning"
+        );
+
+        let terminal = Terminal::start(
+            "echo $$ > shell.pid; sleep 600",
+            &dir,
+            &policy,
+            &[],
+            1024,
+            Duration::from_secs(600),
+        )
+        .unwrap();
+        let pid = loop {
+            if let Some(pid) = std::fs::read_to_string(dir.join("shell.pid"))
+                .ok()
+                .filter(|text| text.ends_with('\n'))
+            {
+                break pid.trim().to_owned();
+            }
+
+            thread::sleep(Duration::from_millis(10));
+        };
+
+        assert!(terminals.settle(7, Ok(terminal)).is_err());
+        stopper.join().unwrap();
+
+        // Checked at once: the drained terminal is dropped, and a drop alone would end the command only later.
+        let alive = std::process::Command::new("kill")
+            .args(["-0", &pid])
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap()
+            .success();
+
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(!alive, "the command outlived stop");
+        assert!(terminals.slots.lock().unwrap().running.is_empty());
     }
 }

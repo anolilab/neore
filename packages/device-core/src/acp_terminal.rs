@@ -149,14 +149,178 @@ impl DeviceState {
             })
             .clamp(1, MAX_TERMINAL_OUTPUT_BYTES);
         let terminal = Terminal::start(line, &cwd, &policy, &request.env, cap, SHELL_MAX_TIMEOUT)?;
+        let agent_env = settings
+            .acp_agents
+            .iter()
+            .filter(|agent| agent.key == request.agent_key)
+            .flat_map(|agent| agent.env.0.values());
+        let known: Vec<&str> = request
+            .env
+            .iter()
+            .map(|(_, value)| value)
+            .chain(settings.acp_env.0.values())
+            .chain(agent_env)
+            .map(String::as_str)
+            .collect();
+        let shown = redact_command(line, &known);
 
         self.audit(json!({
-            "at": now_ms(), "decision": "once", "detail": format!("{line}\n(in {})", cwd.display()),
+            "at": now_ms(), "decision": "once", "detail": format!("{shown}\n(in {})", cwd.display()),
             "status": "started", "tool": "acp_terminal",
         }));
 
         Ok(terminal)
     }
+}
+
+const REDACTED: &str = "[redacted]";
+/// A known value shorter than this is not searched for: it would strike ordinary characters out of the command.
+const MIN_KNOWN_SECRET_BYTES: usize = 4;
+const SECRET_FLAGS: [&str; 4] = ["--token", "--password", "--api-key", "--secret"];
+const SECRET_NAME_PARTS: [&str; 5] = ["TOKEN", "SECRET", "PASSWORD", "KEY", "CREDENTIAL"];
+const AUTH_SCHEMES: [&str; 4] = ["bearer", "basic", "token", "digest"];
+
+/// The command line as the audit log keeps it: every known secret value, and the value of each credential-shaped
+/// argument (an `Authorization:` header, a `Bearer` token, a `--token`-like flag, a `*TOKEN*=`-like assignment), is
+/// replaced with `[redacted]`. A quoted value spanning several words has each of its words replaced.
+fn redact_command(line: &str, known: &[&str]) -> String {
+    let mut known: Vec<&str> = known
+        .iter()
+        .copied()
+        .filter(|value| value.len() >= MIN_KNOWN_SECRET_BYTES)
+        .collect();
+
+    known.sort_by_key(|value| std::cmp::Reverse(value.len()));
+
+    let mut text = line.to_owned();
+
+    for value in known {
+        text = text.replace(value, REDACTED);
+    }
+
+    let mut out = String::with_capacity(text.len());
+    let mut redact_next = false;
+    let mut open_quote: Option<char> = None;
+    let mut rest = text.as_str();
+
+    while !rest.is_empty() {
+        let word_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+        let (word, after) = rest.split_at(word_end);
+        let space_end = after
+            .find(|c: char| !c.is_whitespace())
+            .unwrap_or(after.len());
+        let (space, next) = after.split_at(space_end);
+
+        rest = next;
+
+        if word.is_empty() {
+            out.push_str(space);
+            continue;
+        }
+
+        if let Some(quote) = open_quote {
+            if word.ends_with(quote) {
+                open_quote = None;
+            }
+
+            out.push_str(&redacted(word));
+            out.push_str(space);
+            continue;
+        }
+
+        let core = unquoted(word);
+        let lower = core.to_ascii_lowercase();
+
+        if redact_next {
+            if AUTH_SCHEMES.contains(&lower.as_str()) {
+                out.push_str(word);
+            } else {
+                redact_next = false;
+                open_quote = opens_quote(word);
+                out.push_str(&redacted(word));
+            }
+
+            out.push_str(space);
+            continue;
+        }
+
+        if lower == "bearer"
+            || lower.ends_with("authorization:")
+            || SECRET_FLAGS.contains(&lower.as_str())
+        {
+            redact_next = true;
+            out.push_str(word);
+        } else if let Some(split) = value_start(word, &lower) {
+            let (head, value) = word.split_at(split);
+
+            if AUTH_SCHEMES.contains(&unquoted(value).to_ascii_lowercase().as_str()) {
+                redact_next = true;
+                out.push_str(word);
+            } else {
+                open_quote = opens_quote(value);
+                out.push_str(head);
+                out.push_str(&redacted(value));
+            }
+        } else {
+            out.push_str(word);
+        }
+
+        out.push_str(space);
+    }
+
+    out
+}
+
+/// Where the secret value starts inside one word: after `authorization:`, after `--token=` and the like, or after
+/// `NAME=` when the name looks like a credential's.
+fn value_start(word: &str, lower: &str) -> Option<usize> {
+    let lead = word.len() - word.trim_start_matches(['"', '\'']).len();
+    let value_at =
+        |prefix_len: usize| (lead + prefix_len < word.len()).then_some(lead + prefix_len);
+
+    if let Some(at) = lower.find("authorization:") {
+        return value_at(at + "authorization:".len());
+    }
+
+    for flag in SECRET_FLAGS {
+        if lower.starts_with(flag) && lower[flag.len()..].starts_with('=') {
+            return value_at(flag.len() + 1);
+        }
+    }
+
+    let core = unquoted(word);
+    let eq = core.find('=')?;
+    let name = &core[..eq];
+    let upper = name.to_ascii_uppercase();
+
+    (!name.is_empty()
+        && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+        && SECRET_NAME_PARTS.iter().any(|part| upper.contains(part)))
+    .then_some(())
+    .and_then(|()| value_at(eq + 1))
+}
+
+fn unquoted(word: &str) -> &str {
+    word.trim_matches(['"', '\''])
+}
+
+/// The quote a value opens and does not close within its word.
+fn opens_quote(value: &str) -> Option<char> {
+    let quote = value.chars().next().filter(|c| matches!(c, '"' | '\''))?;
+
+    (value.matches(quote).count() % 2 == 1).then_some(quote)
+}
+
+/// `word` with everything but its surrounding quotes replaced.
+fn redacted(word: &str) -> String {
+    let lead = word.len() - word.trim_start_matches(['"', '\'']).len();
+    let trail = word.len() - word.trim_end_matches(['"', '\'']).len();
+
+    if lead + trail >= word.len() {
+        return word.to_owned();
+    }
+
+    format!("{}{REDACTED}{}", &word[..lead], &word[word.len() - trail..])
 }
 
 #[cfg(all(test, unix))]
@@ -318,6 +482,78 @@ mod tests {
         let (state, _, other, _, _scratch) = setup("unshared");
 
         assert!(!state.acp_terminal_available(other.to_str().unwrap()));
+    }
+
+    #[test]
+    fn redacts_credentials_from_the_audit_text() {
+        assert_eq!(
+            redact_command(
+                "curl -H 'Authorization: Bearer abc.def' https://x.test",
+                &[]
+            ),
+            "curl -H 'Authorization: Bearer [redacted]' https://x.test"
+        );
+        assert_eq!(
+            redact_command("curl -H 'authorization:Bearer abc' x", &[]),
+            "curl -H 'authorization:Bearer [redacted]' x"
+        );
+        assert_eq!(
+            redact_command("tool --token s3cr3t --verbose", &[]),
+            "tool --token [redacted] --verbose"
+        );
+        assert_eq!(
+            redact_command("tool --password=\"two words\" --api-key=k", &[]),
+            "tool --password=\"[redacted] [redacted]\" --api-key=[redacted]"
+        );
+        assert_eq!(
+            redact_command("GH_TOKEN=ghp_123 MY_api_key=x DEBUG=1 gh pr list", &[]),
+            "GH_TOKEN=[redacted] MY_api_key=[redacted] DEBUG=1 gh pr list"
+        );
+        assert_eq!(
+            redact_command("echo hunter22 && psql -p 5432", &["hunter22", "5"]),
+            "echo [redacted] && psql -p 5432"
+        );
+    }
+
+    #[test]
+    fn leaves_an_ordinary_command_unchanged() {
+        for line in [
+            "cargo test -p device-core",
+            "git log --oneline -5 && echo \"a  b\"",
+            "TOKEN= true",
+        ] {
+            assert_eq!(redact_command(line, &[]), line);
+        }
+    }
+
+    #[test]
+    fn runs_the_command_as_given_and_audits_it_redacted() {
+        if !matches!(sandbox::support(), sandbox::Support::Available(_)) {
+            eprintln!("skipping: no sandbox here");
+            return;
+        }
+
+        let (state, project, _, _, scratch) = setup("redacts");
+        let line = "TOKEN=sentinel-one; echo \"$TOKEN Bearer sentinel-two\"";
+        let terminal = state
+            .acp_terminal_start(&request(&project, line))
+            .unwrap_or_else(|error| panic!("the terminal did not start: {error}"));
+        let exit = terminal.wait(Duration::from_secs(20)).expect("ended");
+        let output = terminal.output().output;
+
+        assert_eq!(exit.exit_code, Some(0), "{output}");
+        assert!(
+            output.contains("sentinel-one Bearer sentinel-two"),
+            "{output}"
+        );
+
+        let audit = fs::read_to_string(scratch.0.join("data/device-audit.jsonl")).unwrap();
+
+        assert!(
+            audit.contains("acp_terminal") && audit.contains("[redacted]"),
+            "{audit}"
+        );
+        assert!(!audit.contains("sentinel-"), "{audit}");
     }
 
     #[test]

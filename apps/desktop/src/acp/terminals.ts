@@ -368,7 +368,7 @@ export class SessionTerminals {
         const reports: Promise<void>[] = [];
 
         for (const terminal of this.open.values()) {
-            if (terminal.cancelled === true && terminal.turnId === turnId && terminal.ended === undefined && terminal.reported !== undefined) {
+            if ((terminal.cancelled === true || terminal.released === true) && terminal.turnId === turnId && terminal.ended === undefined && terminal.reported !== undefined) {
                 reports.push(terminal.reported);
             }
         }

@@ -9,7 +9,7 @@ export interface PermissionRequest {
     agentLabel: string;
     /** The session's folder, as the user approved it. */
     folder: string;
-    /** Answered in this computer's window alone, one at a time: never in a batch, never allowed from another device (a terminal). */
+    /** Answered one at a time: never in a batch, and never allowed from another device unless it is a `terminal`. */
     localOnly?: boolean;
     /** The request as the agent sent it: `sessionId`, `toolCall`, `options`. */
     params: Record<string, unknown>;
@@ -19,6 +19,8 @@ export interface PermissionRequest {
     scrub: (text: string) => string;
     /** Our session id, not the agent's. */
     sessionId: string;
+    /** A command to run in a terminal (`terminal/create`): another device may allow it once, with its command and folder shown. */
+    terminal?: boolean;
 }
 
 export type PermissionOutcome = { optionId: string; outcome: "selected" } | { outcome: "cancelled" };
@@ -58,6 +60,7 @@ interface DescribedRequest {
     requestId: string;
     sessionId: string;
     target?: string;
+    terminal: boolean;
     tool: string;
     toolKind: string;
 }
@@ -103,6 +106,8 @@ export const describePermission = (request: PermissionRequest): DescribedRequest
     const hasContent = Array.isArray(content) && content.length > 0;
     const full = JSON.stringify({ content, kind: toolCall.kind, locations: toolCall.locations, rawInput, title: toolCall.title }, undefined, 2);
     const shown = (text: string | undefined): string | undefined => text === undefined ? undefined : request.scrub(text);
+    // Where a terminal's command runs, when it is not the session's folder.
+    const cwd = isRecord(rawInput) ? stringOf(rawInput.cwd) : undefined;
 
     return {
         agentLabel: request.agentLabel,
@@ -116,11 +121,22 @@ export const describePermission = (request: PermissionRequest): DescribedRequest
         options: offeredOptions(request.params).map((option) => { return { ...option, name: request.scrub(option.name) }; }),
         requestId: request.requestId ?? "",
         sessionId: request.sessionId,
-        target: shown(targetOf(toolCall)),
+        target: shown(request.terminal === true ? cwd : targetOf(toolCall)),
+        terminal: request.terminal === true,
         tool: request.scrub(stringOf(toolCall.title) ?? "A tool call"),
         toolKind: stringOf(toolCall.kind) ?? "other",
     };
 };
+
+/**
+ * The options another device is offered: never an "always" one, and no allow for a local-only request, except a terminal's
+ * allow once. The core refuses the same from a remote answer.
+ */
+export const remoteOptions = (described: DescribedRequest): DescribedRequest["options"] =>
+    described.options.filter(
+        (option) =>
+            !option.kind.includes("always") && (!described.localOnly || !option.kind.startsWith("allow") || (described.terminal && option.kind === "allow_once")),
+    );
 
 /** The core, as far as the gate needs it. */
 interface PermissionCore {

@@ -27,7 +27,7 @@ import type { AgentOption, AgentUsage, TerminalExit } from "./host-events";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate, PermissionOutcome } from "./permission";
-import { describePermission, offeredOptions } from "./permission";
+import { describePermission, offeredOptions, remoteOptions } from "./permission";
 import { planOf } from "./plan";
 import type { AgentProcess } from "./process";
 import type { Handshake } from "./protocol";
@@ -972,11 +972,9 @@ export class AgentSession {
                 this.cancelTimer = undefined;
             }
 
-            // A command the cancel killed may report how it ended only after the agent's answer. The turn is sealed once that
-            // is recorded, or after a bounded wait, so the command's last output still reaches the turn.
-            if (this.cancelRequested) {
-                await this.terminals?.settleKilled(turn.id, KILLED_TERMINAL_WAIT_MS);
-            }
+            // A command the cancel killed, or the agent released, may report how it ended only after the agent's answer. The turn
+            // is sealed once that is recorded, or after a bounded wait, so the command's last output still reaches the turn.
+            await this.terminals?.settleKilled(turn.id, KILLED_TERMINAL_WAIT_MS);
 
             this.finishTurn(turn, STOP_REASONS.has(reason as StopReason) ? (reason as StopReason) : "end_turn");
         } catch (error) {
@@ -1317,15 +1315,13 @@ export class AgentSession {
 
         this.observe((observer) =>
             observer.permissionRequested(this.id, turn.id, {
-                // Whole when the agent's details are. A command run on this computer is allowed only in its window, so the web is
-                // offered its decline alone: that is what the options say, not whether the request is whole.
+                // Whole when the agent's details are. A local-only request is offered its decline alone, a terminal's its allow once
+                // too: that is what the options say, not whether the request is whole.
                 complete: described.detailsComplete,
                 kind: "permission_request",
-                options: described.options
-                    .filter((option) => !option.kind.includes("always") && !(request.localOnly === true && option.kind.startsWith("allow")))
-                    .map((option) => {
-                        return { ...option, kind: this.options.process.scrub(option.kind), optionId: this.options.process.scrub(option.optionId) };
-                    }),
+                options: remoteOptions(described).map((option) => {
+                    return { ...option, kind: this.options.process.scrub(option.kind), optionId: this.options.process.scrub(option.optionId) };
+                }),
                 requestId,
                 tool: described.tool,
                 // The label the user chose for the folder, never its path.
@@ -1685,10 +1681,10 @@ export class AgentSession {
     }
 
     /**
-     * Asks the person about one request and says how it ended, to the backend too. `localOnly`: answered in this
-     * computer's window alone, never in a batch and never allowed from another device (a terminal).
+     * Asks the person about one request and says how it ended, to the backend too. `terminal`: a command to run here, never
+     * approved in a batch, and allowed from another device only once.
      */
-    private async decide(params: Record<string, unknown>, localOnly = false): Promise<PermissionOutcome> {
+    private async decide(params: Record<string, unknown>, terminal = false): Promise<PermissionOutcome> {
         // Only while a turn the user started is running: a request between turns has nothing to authorize.
         if (this.cancelRequested || this.status !== "busy" || this.current === undefined) {
             return { outcome: "cancelled" };
@@ -1698,12 +1694,13 @@ export class AgentSession {
         const request = {
             agentLabel: this.options.agentLabel,
             folder: this.options.folder,
-            localOnly,
+            localOnly: terminal,
             params,
             // The id the backend and the phone know this request by, so a remote answer can find it here.
             requestId,
             scrub: this.options.process.scrub,
             sessionId: this.id,
+            terminal,
         };
         const turn = this.current;
 

@@ -279,7 +279,7 @@ describe("a session's terminals", () => {
         expect(host.release).toHaveBeenCalledWith(41);
     });
 
-    it("tells the web a command run here is whole, and offers it a decline alone", async () => {
+    it("tells the web a command run here is whole, with its line and folder, and offers it allow once and decline", async () => {
         const requested: unknown[] = [];
         const observer: SessionObserver = {
             permissionRequested: (_session, _turn, request) => {
@@ -301,7 +301,14 @@ describe("a session's terminals", () => {
         create(agent, 5);
         await answerTo(agent, 5);
 
-        expect(requested).toEqual([expect.objectContaining({ complete: true, options: [expect.objectContaining({ kind: "reject_once" })] })]);
+        expect(requested).toEqual([
+            expect.objectContaining({
+                command: expect.stringContaining("npm test") as unknown,
+                complete: true,
+                folder: "neore",
+                options: [expect.objectContaining({ kind: "allow_once", optionId: "allow" }), expect.objectContaining({ kind: "reject_once", optionId: "decline" })],
+            }),
+        ]);
     });
 
     it("tells the web a request whose details were cut is incomplete", async () => {
