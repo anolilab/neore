@@ -676,6 +676,63 @@ describe("importShardRows for runWebhooks", () => {
     });
 });
 
+describe("a shard that holds both accounts' rows", () => {
+    it("clears only the guest's threads, keeping the new account's", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const result = await harness.run(async (context: any) => {
+                const guestId = await context.db.insert("threads", { title: "guest chat", userId: "guest" });
+
+                await context.db.insert("threads", { title: "own chat", userId: "user" });
+
+                const ids = await context.runQuery(listShardRowIds, { ownedBy: "guest", table: "threads" });
+
+                return { guestId, ids };
+            });
+
+            expect(result.ids).toEqual([result.guestId]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("re-owns the guest's thread in place under its id, and leaves the new account's row as it is", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const result = await harness.run(async (context: any) => {
+                const guestId = await context.db.insert("threads", { title: "guest chat", userId: "guest" });
+                const ownId = await context.db.insert("threads", { title: "own chat", userId: "user" });
+
+                await context.runMutation(importShardRows, {
+                    from: "guest",
+                    rows: [
+                        { _id: guestId, title: "guest chat", userId: "guest" },
+                        { _id: ownId, title: "own chat", userId: "user" },
+                    ],
+                    table: "threads",
+                    to: "user",
+                });
+
+                const stored = await context.db.query("threads").take(MERGE_PAGE_SIZE);
+
+                return { guestId, ownId, stored };
+            });
+
+            expect(result.stored).toHaveLength(2);
+            expect(result.stored.filter((row: Record<string, unknown>) => row.userId === "guest")).toHaveLength(0);
+            expect(result.stored.find((row: Record<string, unknown>) => row._id === result.guestId)).toMatchObject({
+                title: "guest chat",
+                userId: "user",
+            });
+            expect(result.stored.find((row: Record<string, unknown>) => row._id === result.ownId)).toMatchObject({ userId: "user" });
+        } finally {
+            harness.close();
+        }
+    });
+});
+
 describe("clearing the guest's settings", () => {
     it("lists only the guest's own settings rows, so a shard that also holds the new account's keeps it", async () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
@@ -716,6 +773,6 @@ describe("clearing the guest's settings", () => {
 
         expect(listIdCalls.find((args) => args.table === "userSettings")).toEqual({ ownedBy: "guest", table: "userSettings" });
         expect(listIdCalls.find((args) => args.table === "runWebhooks")).toEqual({ ownedBy: "guest", table: "runWebhooks" });
-        expect(listIdCalls.find((args) => args.table === "threads")).toEqual({ table: "threads" });
+        expect(listIdCalls.find((args) => args.table === "threads")).toEqual({ ownedBy: "guest", table: "threads" });
     });
 });
