@@ -84,11 +84,16 @@ describe("feedback in GDPR flows", () => {
         expect(deletedKeys.every((key) => key.startsWith(`feedback/${A}/`))).toBe(true);
     });
 
-    it("exports every row of the user, oldest first, without the storage keys", async () => {
+    it("exports every row of the user, oldest first, without the storage keys, and counts the whole rows it read", async () => {
         await seed(A, MANY);
         await seed(B, 1);
 
-        const { section: exported } = await collectAllFeedback(
+        const storedBytes = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.feedback.findMany({ where: { userId: A } });
+
+            return page.reduce((total: number, row: unknown) => total + new TextEncoder().encode(JSON.stringify(row)).byteLength, 0);
+        });
+        const { readBytes, section: exported } = await collectAllFeedback(
             async (cursor) => await harness.run(async (ctx: any) => await ctx.runQuery(collectFeedbackForExport, { cursor, userId: A })),
             FEEDBACK_READ_BYTES,
         );
@@ -98,6 +103,7 @@ describe("feedback in GDPR flows", () => {
         expect(exported.feedback[0]).toMatchObject({ createdAt: 0, images: [{ contentType: "image/png", size: 10 }], kind: "idea" });
         expect(JSON.stringify(exported)).not.toContain(B);
         expect(JSON.stringify(exported)).not.toContain("feedback/");
+        expect(readBytes).toBe(storedBytes);
     });
 });
 
@@ -117,7 +123,7 @@ describe("feedback in the export file", () => {
 
     it("reads nothing once the earlier sections used the action's budget, and marks the feedback as cut", async () => {
         const readPage = vi.fn(async () => {
-            return { feedback: [{}] };
+            return { feedback: [{}], readBytes: 2 };
         });
 
         const { readBytes, section } = await collectAllFeedback(readPage, 0);

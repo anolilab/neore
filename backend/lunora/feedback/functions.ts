@@ -105,4 +105,4 @@ export const insertFeedback = internalMutation
         userId: v.string(),
     })
     .output(v.id("feedback"))
-    .mutation(async ({ args, ctx }) => await ctx.db.insert("feedback", withoutUndefined({ ...args, createdAt: Date.now() })));
+    .mutation(async ({ args, ctx }) => await ctx.db.insert("feedback", withoutUndefined({ ...args, createdAt: ctx.now })));

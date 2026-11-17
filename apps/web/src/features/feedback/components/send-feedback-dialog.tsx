@@ -148,12 +148,12 @@ const SendFeedbackDialog: FC<SendFeedbackDialogProperties> = ({ onOpenChange, op
             showError(t`Only PNG, JPEG, WebP or GIF images can be attached, four at most.`);
         }
 
-        setImages((current) => [
-            ...current,
-            ...accepted.map((file) => {
-                return { file, id: crypto.randomUUID(), previewUrl: URL.createObjectURL(file) };
-            }),
-        ]);
+        // Made outside the updater: Strict Mode runs an updater twice and keeps one result, so a URL made inside it could never be revoked.
+        const added = accepted.map((file) => {
+            return { file, id: crypto.randomUUID(), previewUrl: URL.createObjectURL(file) };
+        });
+
+        setImages((current) => [...current, ...added]);
     };
 
     const removeImage = (image: PickedImage) => {
@@ -244,7 +244,7 @@ const SendFeedbackDialog: FC<SendFeedbackDialogProperties> = ({ onOpenChange, op
         <Dialog dismissible={!sending} onOpenChange={(next) => (sending && !next ? undefined : onOpenChange(next))} open={open}>
             <DialogContent>
                 {/* The drop target wraps the header and the form, not the content: the mobile sheet does not take the content's handlers. */}
-                <div className="grid gap-4" onDragOver={onDragOver} onDrop={onDrop}>
+                <div className="grid min-h-0 gap-4 overflow-y-auto" onDragOver={onDragOver} onDrop={onDrop}>
                     <DialogHeader>
                         <DialogTitle>{t`Send feedback`}</DialogTitle>
                         <DialogDescription>{t`Tell us about an idea or a problem. You can paste or drop screenshots too.`}</DialogDescription>
@@ -260,112 +260,125 @@ const SendFeedbackDialog: FC<SendFeedbackDialogProperties> = ({ onOpenChange, op
                             }
                         }}
                     >
-                        <div className="grid gap-2">
-                            <span className="text-sm font-medium" id={kindLabelId}>
-                                {t`What is it about?`}
-                            </span>
-                            <RadioGroup
-                                aria-labelledby={kindLabelId}
-                                className="flex flex-wrap gap-4"
-                                disabled={sending}
-                                onValueChange={(value) => setKind(value as FeedbackKind)}
-                                value={kind}
-                            >
-                                {KINDS.map((option) => (
-                                    // eslint-disable-next-line jsx-a11y/label-has-associated-control -- the label wraps the Base UI control, which renders the input
-                                    <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm" key={option.value}>
-                                        <RadioGroupItem value={option.value} />
-                                        {i18n._(option.label)}
-                                    </label>
-                                ))}
-                            </RadioGroup>
-                        </div>
+                        {/* Padded like the header, so the scroll area does not cut the focus rings at its sides. */}
+                        <div className="grid gap-4 px-4 md:px-6">
+                            <div className="grid gap-2">
+                                <span className="text-sm font-medium" id={kindLabelId}>
+                                    {t`What is it about?`}
+                                </span>
+                                <RadioGroup
+                                    aria-labelledby={kindLabelId}
+                                    className="flex flex-wrap gap-4"
+                                    disabled={sending}
+                                    onValueChange={(value) => setKind(value as FeedbackKind)}
+                                    value={kind}
+                                >
+                                    {KINDS.map((option) => (
+                                        <div className="flex items-center gap-2 text-sm" key={option.value}>
+                                            <RadioGroupItem id={`${kindLabelId}-${option.value}`} value={option.value} />
+                                            <label className="flex min-h-11 cursor-pointer items-center" htmlFor={`${kindLabelId}-${option.value}`}>
+                                                {i18n._(option.label)}
+                                            </label>
+                                        </div>
+                                    ))}
+                                </RadioGroup>
+                            </div>
 
-                        <div className="grid gap-2">
-                            <label className="text-sm font-medium" htmlFor={messageId}>
-                                {t`Your feedback`}
-                            </label>
-                            <Textarea
-                                className="min-h-28"
-                                id={messageId}
-                                maxLength={MAX_FEEDBACK_MESSAGE_LENGTH}
-                                onChange={(event) => setMessage(event.target.value)}
-                                onPaste={sending ? undefined : onPaste}
-                                readOnly={sending}
-                                required
-                                value={message}
-                            />
-                        </div>
+                            <div className="grid gap-2">
+                                <label className="text-sm font-medium" htmlFor={messageId}>
+                                    {t`Your feedback`}
+                                </label>
+                                <Textarea
+                                    className="min-h-28"
+                                    id={messageId}
+                                    maxLength={MAX_FEEDBACK_MESSAGE_LENGTH}
+                                    onChange={(event) => setMessage(event.target.value)}
+                                    onPaste={sending ? undefined : onPaste}
+                                    readOnly={sending}
+                                    required
+                                    value={message}
+                                />
+                            </div>
 
-                        <div className="grid gap-2">
-                            <span className="text-sm font-medium" id={imagesLabelId}>
-                                {t`Images (${MAX_FEEDBACK_IMAGES} at most)`}
-                            </span>
-                            <ul aria-labelledby={imagesLabelId} className="flex flex-wrap gap-2">
-                                {images.map((image, index) => (
-                                    <li className="relative" key={image.id}>
-                                        <img alt={t`Attachment ${index + 1}`} className="size-16 rounded-md border object-cover" src={image.previewUrl} />
-                                        <button
-                                            aria-label={t`Remove attachment ${index + 1}`}
-                                            className="group absolute -top-5 -right-5 flex size-11 items-center justify-center disabled:opacity-50"
-                                            disabled={sending}
-                                            onClick={() => removeImage(image)}
-                                            type="button"
-                                        >
-                                            <span className="bg-background group-focus-visible:ring-ring flex size-6 items-center justify-center rounded-full border group-focus-visible:ring-2">
-                                                <X aria-hidden="true" className="size-3" />
-                                            </span>
-                                        </button>
-                                    </li>
-                                ))}
-                                {images.length < MAX_FEEDBACK_IMAGES ? (
-                                    <li>
-                                        <Button
-                                            className="size-16"
-                                            disabled={sending}
-                                            onClick={() => fileInputRef.current?.click()}
-                                            type="button"
-                                            variant="outline"
-                                        >
-                                            <ImagePlus aria-hidden="true" />
-                                            <span className="sr-only">{t`Add images`}</span>
-                                        </Button>
-                                    </li>
-                                ) : null}
-                            </ul>
-                            <input
-                                accept={FEEDBACK_IMAGE_TYPES.join(",")}
-                                aria-hidden="true"
-                                className="hidden"
-                                key={pickerKey}
-                                multiple
-                                onChange={(event) => {
-                                    addImages([...(event.target.files ?? [])]);
-                                    // A fresh input, so picking the same file again still fires a change.
-                                    setPickerKey((key) => key + 1);
-                                }}
-                                ref={fileInputRef}
-                                tabIndex={-1}
-                                type="file"
-                            />
-                            <p className="text-muted-foreground text-xs">
-                                {t`Large photos are made smaller before sending; each image can be up to ${MAX_FEEDBACK_IMAGE_MB} MB.`}
+                            <div className="grid gap-2">
+                                <span className="text-sm font-medium" id={imagesLabelId}>
+                                    {t`Images (${MAX_FEEDBACK_IMAGES} at most)`}
+                                </span>
+                                <ul aria-labelledby={imagesLabelId} className="flex flex-wrap gap-2">
+                                    {images.map((image, index) => (
+                                        <li className="relative" key={image.id}>
+                                            <img alt={t`Attachment ${index + 1}`} className="size-16 rounded-md border object-cover" src={image.previewUrl} />
+                                            <button
+                                                aria-label={t`Remove attachment ${index + 1}`}
+                                                className="group absolute -top-5 -right-5 flex size-11 items-center justify-center disabled:opacity-50"
+                                                disabled={sending}
+                                                onClick={() => removeImage(image)}
+                                                type="button"
+                                            >
+                                                <span className="bg-background group-focus-visible:ring-ring flex size-6 items-center justify-center rounded-full border group-focus-visible:ring-2">
+                                                    <X aria-hidden="true" className="size-3" />
+                                                </span>
+                                            </button>
+                                        </li>
+                                    ))}
+                                    {images.length < MAX_FEEDBACK_IMAGES ? (
+                                        <li>
+                                            <Button
+                                                className="size-16"
+                                                disabled={sending}
+                                                onClick={() => fileInputRef.current?.click()}
+                                                type="button"
+                                                variant="outline"
+                                            >
+                                                <ImagePlus aria-hidden="true" />
+                                                <span className="sr-only">{t`Add images`}</span>
+                                            </Button>
+                                        </li>
+                                    ) : null}
+                                </ul>
+                                <input
+                                    accept={FEEDBACK_IMAGE_TYPES.join(",")}
+                                    aria-hidden="true"
+                                    className="hidden"
+                                    key={pickerKey}
+                                    multiple
+                                    onChange={(event) => {
+                                        addImages([...(event.target.files ?? [])]);
+                                        // A fresh input, so picking the same file again still fires a change.
+                                        setPickerKey((key) => key + 1);
+                                    }}
+                                    ref={fileInputRef}
+                                    tabIndex={-1}
+                                    type="file"
+                                />
+                                <p className="text-muted-foreground text-xs">
+                                    {t`Large photos are made smaller before sending; each image can be up to ${MAX_FEEDBACK_IMAGE_MB} MB.`}
+                                </p>
+                            </div>
+
+                            <div className="flex items-start gap-2">
+                                <Checkbox
+                                    checked={includePage}
+                                    disabled={sending}
+                                    id={pageId}
+                                    onCheckedChange={(checked) => setIncludePage(checked === true)}
+                                />
+                                <label className="grid gap-0.5 text-sm" htmlFor={pageId}>
+                                    {t`Include the page you are on`}
+                                    <code className="text-muted-foreground text-xs break-all">{pathname}</code>
+                                </label>
+                            </div>
+
+                            {sendError === null ? null : (
+                                <p className="text-destructive text-sm" role="alert">
+                                    {sendError}
+                                </p>
+                            )}
+
+                            <p className="sr-only" role="status">
+                                {sending ? t`Sending…` : ""}
                             </p>
                         </div>
-
-                        <div className="flex items-start gap-2">
-                            <Checkbox checked={includePage} disabled={sending} id={pageId} onCheckedChange={(checked) => setIncludePage(checked === true)} />
-                            <label className="grid gap-0.5 text-sm" htmlFor={pageId}>
-                                {t`Include the page you are on`}
-                                <code className="text-muted-foreground text-xs break-all">{pathname}</code>
-                            </label>
-                        </div>
-
-                        {sendError === null ? null : (
-                            <p className="text-destructive text-sm" role="alert">
-                                {sendError}
-                            </p>
-                        )}
 
                         <DialogFooter>
                             <Button disabled={sending} onClick={() => onOpenChange(false)} type="button" variant="outline">

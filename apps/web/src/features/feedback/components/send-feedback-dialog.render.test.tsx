@@ -1,9 +1,10 @@
 /**
- * While feedback is sending, what it sends cannot change and the dialog does not close; a failed send says why; a
- * drop of text is left to the text box.
+ * While feedback is sending, what it sends cannot change, the dialog does not close and the send is announced; a failed
+ * send says why; a drop of text is left to the text box; every preview URL made is given back.
  */
 import { createEvent, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { StrictMode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import SendFeedbackDialog from "./send-feedback-dialog";
 
@@ -62,10 +63,13 @@ vi.mock("@/lib/toast", () => {
 
 const renderDialog = () => {
     const onOpenChange = vi.fn();
+    const { unmount } = render(
+        <StrictMode>
+            <SendFeedbackDialog onOpenChange={onOpenChange} open />
+        </StrictMode>,
+    );
 
-    render(<SendFeedbackDialog onOpenChange={onOpenChange} open />);
-
-    return { onOpenChange };
+    return { onOpenChange, unmount };
 };
 
 const dropFile = () => {
@@ -74,19 +78,26 @@ const dropFile = () => {
     fireEvent.drop(screen.getByLabelText("Your feedback"), { dataTransfer: { files: [file], types: ["Files"] } });
 };
 
+const { createObjectURL, revokeObjectURL } = URL;
+
+beforeEach(() => {
+    URL.createObjectURL = vi.fn(() => `blob:${crypto.randomUUID()}`);
+    URL.revokeObjectURL = vi.fn();
+});
+
 afterEach(() => {
     submit.mockReset();
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL;
 });
 
 describe("send feedback dialog", () => {
-    it("locks the images and the page choice while sending, and stays open on Escape", async () => {
+    it("locks the images and the page choice while sending, announces the send, and stays open on Escape", async () => {
         submit.mockReturnValue(
             new Promise(() => {
                 // Never settles: the send stays in flight.
             }),
         );
-        URL.createObjectURL = vi.fn(() => "blob:preview");
-
         const { onOpenChange } = renderDialog();
 
         dropFile();
@@ -97,6 +108,7 @@ describe("send feedback dialog", () => {
             expect((screen.getByRole("button", { name: "Remove attachment 1" }) as HTMLButtonElement).disabled).toBe(true);
         });
         expect(screen.getByRole("checkbox").getAttribute("aria-disabled")).toBe("true");
+        expect(screen.getByRole("status").textContent).toBe("Sending…");
 
         fireEvent.keyDown(screen.getByLabelText("Your feedback"), { key: "Escape" });
 
@@ -114,6 +126,18 @@ describe("send feedback dialog", () => {
         const alert = await screen.findByRole("alert");
 
         expect(alert.textContent).toBe("You have sent a lot of feedback recently. Please try again in an hour.");
+    });
+
+    it("gives back every preview URL it made once it closes", () => {
+        const { unmount } = renderDialog();
+
+        dropFile();
+        unmount();
+
+        const created = vi.mocked(URL.createObjectURL).mock.results.map((result) => result.value);
+
+        expect(created.length).toBeGreaterThan(0);
+        expect(vi.mocked(URL.revokeObjectURL).mock.calls.map(([url]) => url)).toStrictEqual(created);
     });
 
     it("leaves a drop of text to the text box", () => {

@@ -725,7 +725,7 @@ export interface InternalApiTypes {
             insertFeedback: FunctionReference<"mutation", { images: Array<{ contentType: string; key: string; size: number }>; kind: "idea" | "problem" | "other"; message: string; pagePath?: string; userId: string }, Id<"feedback">>;
         };
         gdpr: {
-            collectFeedbackForExport: FunctionReference<"query", { cursor?: string; userId: string }, { continueCursor?: string; feedback: Array<{ createdAt: number; images: Array<{ contentType: string; size: number }>; kind: "idea" | "problem" | "other"; message: string; pagePath?: string }> }>;
+            collectFeedbackForExport: FunctionReference<"query", { cursor?: string; userId: string }, { continueCursor?: string; feedback: Array<{ createdAt: number; images: Array<{ contentType: string; size: number }>; kind: "idea" | "problem" | "other"; message: string; pagePath?: string }>; readBytes: number }>;
         };
     };
     file: {

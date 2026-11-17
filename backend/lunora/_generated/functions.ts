@@ -4556,7 +4556,7 @@ export interface Caller {
             submitFeedback: (args: { kind: "idea" | "problem" | "other"; message: string; pagePath?: string; uploadIds: Array<string> }) => Promise<{ feedbackId: Id<"feedback"> }>;
         };
         gdpr: {
-            collectFeedbackForExport: (args: { cursor?: string; userId: string }) => Promise<{ continueCursor?: string; feedback: Array<{ createdAt: number; images: Array<{ contentType: string; size: number }>; kind: "idea" | "problem" | "other"; message: string; pagePath?: string }> }>;
+            collectFeedbackForExport: (args: { cursor?: string; userId: string }) => Promise<{ continueCursor?: string; feedback: Array<{ createdAt: number; images: Array<{ contentType: string; size: number }>; kind: "idea" | "problem" | "other"; message: string; pagePath?: string }>; readBytes: number }>;
         };
     };
     file: {

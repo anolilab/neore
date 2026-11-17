@@ -11,6 +11,8 @@ import { scheduleObjectDeletion } from "../lib/storage-cleanup";
 import { MAX_LENGTH } from "../lib/validators";
 import { vFeedbackKind } from "./validators";
 
+const bytesOf = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+
 /** A batch of the user's feedback with its images. */
 export const eraseFeedbackForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
     const { page: rows } = await ctx.db.feedback.findMany({ limit: BATCH, where: { userId } });
@@ -27,7 +29,10 @@ export const eraseFeedbackForUser = async (ctx: MutationCtx, userId: string): Pr
     return { hasMore: full(rows) };
 };
 
-/** One page of the user's feedback for the GDPR export, oldest first. The images are listed by type and size. */
+/**
+ * One page of the user's feedback for the GDPR export, oldest first. The images are listed by type and size.
+ * `readBytes` is what reading the page cost: the whole rows, image keys included, not the smaller rows it returns.
+ */
 export const collectFeedbackForExport = internalQuery
     .input({ cursor: v.optional(v.string().max(MAX_LENGTH.cursor)), userId: v.string() })
     .output(
@@ -42,6 +47,7 @@ export const collectFeedbackForExport = internalQuery
                     pagePath: v.optional(v.string()),
                 }),
             ),
+            readBytes: v.number(),
         }),
     )
     .query(async ({ args: { cursor, userId }, ctx }) => {
@@ -60,12 +66,11 @@ export const collectFeedbackForExport = internalQuery
                     pagePath: row.pagePath,
                 };
             }),
+            readBytes: page.page.reduce((total, row) => total + bytesOf(row), 0),
         };
     });
 
-type FeedbackExportPage = { continueCursor?: string; feedback: unknown[] };
-
-const bytesOf = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+type FeedbackExportPage = { continueCursor?: string; feedback: unknown[]; readBytes: number };
 
 /**
  * Every page of the user's feedback, read through `readPage` until the last one or `maxBytes` read (its share of the
@@ -85,7 +90,7 @@ export const collectAllFeedback = async (
         const page = await readPage(cursor);
 
         feedback.push(...page.feedback);
-        readBytes += bytesOf(page.feedback);
+        readBytes += page.readBytes;
         cursor = page.continueCursor;
         done = cursor === undefined;
     }
