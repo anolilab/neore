@@ -201,8 +201,12 @@ export const RECORD_RETRY = { backoff: "exponential", baseMs: 10_000, maxAttempt
  */
 export const RETRY_COUNTS_WITHIN_MS = 24 * 60 * 60 * 1000;
 
-/** Where a reply is filed besides the total: its thread's project. */
+/**
+ * Where a reply is filed besides the total: its thread's project, and the organization that project belonged to when the reply was
+ * made. The organization is read from the project's row where the reply is filed, never taken from an argument.
+ */
 export interface Attribution {
+    organizationId?: string;
     projectKey?: string;
 }
 

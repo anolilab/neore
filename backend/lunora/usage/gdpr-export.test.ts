@@ -528,6 +528,24 @@ describe("the usage export, as steps", () => {
         expect(parsed["usageDaily"]).toEqual([{ date: "2026-02-01", replies: 1 }]);
     });
 
+    it("splices the usage object's rows and organization ledger in as the file's last keys, and both parse back", () => {
+        const head = JSON.stringify({ profile: { id: A }, watchedRepositories: { watched: [] } }, null, 2);
+        const ledger = [{ at: 1, costMicrodollars: 2, organizationId: "org-1", projectKey: "p", tokens: 3 }];
+        const usage = `{"usageDaily":${JSON.stringify([{ date: "2026-02-01", replies: 1 }])},"organizationReplies":${JSON.stringify(ledger)}}`;
+        const parsed = JSON.parse(spliceUsageJson(head, usage)) as Record<string, unknown>;
+
+        expect(Object.keys(parsed)).toEqual(["profile", "watchedRepositories", "usageDaily", "organizationReplies"]);
+        expect(parsed["usageDaily"]).toEqual([{ date: "2026-02-01", replies: 1 }]);
+        expect(parsed["organizationReplies"]).toEqual(ledger);
+    });
+
+    it("splices a usage object stored before the ledger was in it as the usage rows alone", () => {
+        const head = JSON.stringify({ profile: { id: A } }, null, 2);
+        const parsed = JSON.parse(spliceUsageJson(head, JSON.stringify([{ date: "2026-02-01", replies: 1 }]))) as Record<string, unknown>;
+
+        expect(Object.keys(parsed)).toEqual(["profile", "usageDaily"]);
+    });
+
     it("keeps a user west of UTC on its first pass when a live reply is dated their yesterday", async () => {
         await harness.run(async (ctx: any) => {
             for (let index = 0; index < 1200; index += 1) {

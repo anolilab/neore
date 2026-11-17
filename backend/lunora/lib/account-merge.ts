@@ -32,6 +32,7 @@ import { internalAction, internalMutation, internalQuery } from "../_generated/s
 import { mergeSkippedSteps } from "../auth/lib/setup-step-limits";
 import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
+import { noteRetentionDueAt, noteShardDue } from "./shard-housekeeping";
 import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
 import { mergeThreadFollowsPage } from "../chat/follows/follow-writes";
@@ -78,6 +79,8 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     skills: ["userId"],
     threadAccess: ["userId", "ownerId", "grantedBy"],
     threadInvites: ["ownerId", "invitedBy", "acceptedBy"],
+    // The organizations a guest's projects were filed under: the list follows the guest's ledger rows (which move with their shard).
+    usageOrganizationContributors: ["userId"],
     userVariableDefaults: ["userId"],
 };
 
@@ -206,6 +209,13 @@ export const importShardRows = internalMutation
 
             await db.insert(args.table, rewriteOwner(row, args.from, args.to), { allowExplicitId: true });
             imported += 1;
+        }
+
+        // Moved usage rows have no retention time on this shard (its census row was the guest's): wake it now, so the tick prunes them and
+        // sets the exact time.
+        if (imported > 0 && (args.table === "usageOrganizationReplies" || args.table === "usageDaily")) {
+            await noteRetentionDueAt(ctx, ctx.now);
+            await noteShardDue(ctx, ctx.now);
         }
 
         return { imported };

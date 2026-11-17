@@ -57,6 +57,8 @@ const SYSTEM_DB_IMPORTERS = [
     "agent/threads.ts",
     // The owner of a thread a message write links files under (`chatFileThreads`); the link is written, never returned.
     "agent/files.ts",
+    // The admin's organization's projects, listed only after its admin role is checked on the primary: titles and ids, no usage rows.
+    "usage/organization.ts",
     "gdpr/functions.ts",
     "skills/functions.ts",
     // Whether the lead is shared at all, before a worker is allowed to reach the owner's computer: a refusal, never rows.
