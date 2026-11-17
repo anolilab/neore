@@ -40,6 +40,16 @@ describe(hostActivityOf, () => {
         expect(hostActivityOf([printed("orphan")])).toBeUndefined();
     });
 
+    it("shows no exit for a second command in a call until that command ends", () => {
+        const printed = (output: string, code?: number) => {
+            return { event: { id: "a", kind: "tool_output" as const, output, ...(code !== undefined && { exit: { code } }) } };
+        };
+
+        expect(hostActivityOf([tool("a", "in_progress"), printed("first", 0), printed("second")])?.tools).toEqual([
+            { id: "a", output: "second", status: "in_progress", title: "Run a", toolKind: "execute" },
+        ]);
+    });
+
     it("keeps the most recent calls of a long turn", () => {
         const chunks = Array.from({ length: MAX_ACTIVITY_TOOLS + 3 }, (_, index) => tool(`t${String(index)}`, "completed"));
         const tools = hostActivityOf(chunks)?.tools ?? [];

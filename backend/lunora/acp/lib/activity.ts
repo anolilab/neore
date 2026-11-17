@@ -61,7 +61,16 @@ export const hostActivityOf = (chunks: ReadonlyArray<Pick<Doc<"persistentChunks"
 
                 // Output is posted after its call's first report; one for a call never reported has no row to go on.
                 if (tool !== undefined) {
-                    tools.set(event.id, { ...tool, output: event.output, ...(event.exit !== undefined && { exit: event.exit }) });
+                    // The exit is the terminal's own: a later output of another command in the same call has none yet, so the old one goes.
+                    const next = { ...tool, output: event.output };
+
+                    delete next.exit;
+
+                    if (event.exit !== undefined) {
+                        next.exit = event.exit;
+                    }
+
+                    tools.set(event.id, next);
                 }
 
                 break;
