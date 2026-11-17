@@ -246,13 +246,13 @@ export class ServerAgents {
                 // eslint-disable-next-line no-await-in-loop -- the state is persisted again after each wait
                 await runtime.poster.persisted();
             }
-
-            // Nothing is awaited between the last check of `busy` and the stop, so no end can be queued in between.
+        } finally {
+            // Whatever failed above, the runtime is dropped. The stop follows the loop's last check of `busy` with no await in
+            // between, so no end can be queued in between. Nothing may still run on the dropped runtime (this also releases its
+            // sleep-lock source), and a later start for the server gets a new runtime, not this one.
             runtime.poster.stop();
-            // Nothing may still run on the runtime being dropped: this also releases its sleep-lock source.
             runtime.acp.retire();
             this.runtimes.delete(deviceId);
-        } finally {
             this.removing.delete(deviceId);
         }
     }

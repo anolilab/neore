@@ -4,7 +4,7 @@
  * delivers a real host's. What is checked is the plan's S7 line: a turn on a server streams into the thread through this
  * computer's ingest, signed as that server, and quitting stops the agent.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { declineGate } from "./permission";
 import type { AgentProcess } from "./process";
@@ -305,6 +305,21 @@ describe("coding agents on a server", () => {
         await expect(runtime.acp.startSession("fake", "Fake on build-box", scratch.work, { sessionId: "session-6", threadId: "thread-6" })).rejects.toThrow(
             "being removed",
         );
+    });
+
+    it("drops the runtime of a removal that fails, so a later start for the still-paired server gets one that can start", async () => {
+        const { servers } = setup();
+        const runtime = servers.get(SERVER);
+
+        vi.spyOn(runtime.acp, "closeUnapproved").mockRejectedValueOnce(new Error("close failed"));
+
+        await expect(servers.remove(SERVER)).rejects.toThrow("close failed");
+
+        const fresh = servers.get(SERVER);
+
+        expect(fresh).not.toBe(runtime);
+        await fresh.acp.startSession("fake", "Fake on build-box", scratch.work, { sessionId: "session-9", threadId: "thread-9" });
+        servers.killAll();
     });
 
     it("joins an overlapping removal of the same server, so one removal runs and its live turn ends once", async () => {
