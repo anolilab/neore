@@ -723,7 +723,8 @@ export const vThreadDocFields = {
     lockedAt: v.optional(v.number()),
     order: v.optional(v.number()),
     // Written by `chat/thread-state.ts#setThreadPermissionMode` (the owner, for a cloud thread), by its internal
-    // `copyThreadPermissionMode` (a branch of the owner's own thread, after the owner check), and by the ACP handoff's insert
+    // `copyThreadPermissionMode` (a branch of the owner's own thread, or a new chat of the owner's bot taking the bot's mode, after the
+    // owner check), and by the ACP handoff's insert
     // (`acp/switch.ts`, carrying a cloud thread's mode to the thread that takes over).
     permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
     // Written once by `acp/ingest.ts` when a host session opens, so deliberately not a create field: a client

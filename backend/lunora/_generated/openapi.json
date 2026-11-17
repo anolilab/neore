@@ -15084,6 +15084,22 @@
                       },
                       "name": {
                         "type": "string"
+                      },
+                      "permissionMode": {
+                        "anyOf": [
+                          {
+                            "const": "supervised",
+                            "type": "string"
+                          },
+                          {
+                            "const": "auto",
+                            "type": "string"
+                          },
+                          {
+                            "const": "full",
+                            "type": "string"
+                          }
+                        ]
                       }
                     },
                     "required": [
@@ -15261,6 +15277,22 @@
                       "name": {
                         "type": "string"
                       },
+                      "permissionMode": {
+                        "anyOf": [
+                          {
+                            "const": "supervised",
+                            "type": "string"
+                          },
+                          {
+                            "const": "auto",
+                            "type": "string"
+                          },
+                          {
+                            "const": "full",
+                            "type": "string"
+                          }
+                        ]
+                      },
                       "updatedAt": {
                         "type": "number"
                       },
@@ -15331,6 +15363,22 @@
                           },
                           "name": {
                             "type": "string"
+                          },
+                          "permissionMode": {
+                            "anyOf": [
+                              {
+                                "const": "supervised",
+                                "type": "string"
+                              },
+                              {
+                                "const": "auto",
+                                "type": "string"
+                              },
+                              {
+                                "const": "full",
+                                "type": "string"
+                              }
+                            ]
                           }
                         },
                         "required": [],

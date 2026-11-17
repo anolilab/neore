@@ -363,6 +363,9 @@ export const schema = defineSchema({
         instructions: v.string(),
         model: v.string(),
         name: v.string(),
+        // The mode a new chat with this bot starts in (`chat/lib/thread-permission-mode.ts`); absent = the default. A run
+        // nobody watches takes it only when it asks more (`unattendedMode` in `chat/lib/tool-permissions.ts`).
+        permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
         updatedAt: v.number(),
         userId: v.string(),
     })

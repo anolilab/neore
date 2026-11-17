@@ -4,11 +4,14 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalQuery } from "../_generated/server";
+import type { ThreadPermissionMode } from "../chat/lib/thread-permission-mode";
 import { deleteBotConnectorAccess } from "../connectors/access";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { isTaskModelAllowed } from "../tasks/logic";
+
+const vPermissionMode = v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"));
 
 const vBot = v.object({
     _creationTime: v.number(),
@@ -19,12 +22,20 @@ const vBot = v.object({
     instructions: v.string(),
     model: v.string(),
     name: v.string(),
+    permissionMode: v.optional(vPermissionMode),
     updatedAt: v.number(),
     userId: v.string(),
 });
 
 /** A listing returns at most this many, so a bot past it would be unreachable from the UI. */
 export const MAX_BOTS_PER_USER = 100;
+
+/** `full` lets the owner's tools run unasked: an admin acting as the owner must not widen what the owner's runs may do. */
+const assertModeChangeAllowed = (context: { user: { impersonatedBy?: string | null } }, mode: ThreadPermissionMode | undefined): void => {
+    if (mode !== undefined && context.user.impersonatedBy) {
+        throw new LunoraError("FORBIDDEN", "The permission mode cannot be changed while impersonating");
+    }
+};
 
 const assertUsableModel = (model: string): void => {
     if (!isTaskModelAllowed(model, (id) => MODEL_LOOKUP.get(id))) {
@@ -50,6 +61,7 @@ export const createBot = authMutation
         instructions: v.string().max(MAX_LENGTH.document),
         model: v.string().max(MAX_LENGTH.short),
         name: v.string().max(MAX_LENGTH.short),
+        permissionMode: v.optional(vPermissionMode),
     })
     .output(v.string())
     .mutation(async ({ args, ctx: context }) => {
@@ -57,6 +69,7 @@ export const createBot = authMutation
         const { now } = context;
 
         assertUsableModel(args.model);
+        assertModeChangeAllowed(context, args.permissionMode);
 
         // The web form trims its fields, but an API caller sends them raw: a blank name or instruction is refused here.
         if (args.name.trim() === "" || args.instructions.trim() === "") {
@@ -79,11 +92,12 @@ export const createBot = authMutation
             instructions: args.instructions,
             model: args.model,
             name: args.name,
+            ...(args.permissionMode && { permissionMode: args.permissionMode }),
             updatedAt: now,
             userId,
         });
 
-        context.log.event("bots.create_bot", { computerEnabled: args.computerEnabled });
+        context.log.event("bots.create_bot", { computerEnabled: args.computerEnabled, permissionMode: args.permissionMode ?? "auto" });
 
         return botId as string;
     });
@@ -98,6 +112,7 @@ export const updateBot = authMutation
             instructions: v.optional(v.string().max(MAX_LENGTH.document)),
             model: v.optional(v.string().max(MAX_LENGTH.short)),
             name: v.optional(v.string().max(MAX_LENGTH.short)),
+            permissionMode: v.optional(vPermissionMode),
         }),
     })
     .output(v.null())
@@ -113,6 +128,8 @@ export const updateBot = authMutation
             assertUsableModel(patch.model);
         }
 
+        assertModeChangeAllowed(context, patch.permissionMode);
+
         if ((patch.name !== undefined && patch.name.trim() === "") || (patch.instructions !== undefined && patch.instructions.trim() === "")) {
             throw new LunoraError("INVALID_ARGUMENT", "A bot needs a name and instructions.");
         }
@@ -120,6 +137,11 @@ export const updateBot = authMutation
         await patchRow(context.db, "bots", bot, withoutUndefined({ ...patch, updatedAt: context.now }));
 
         context.log.event("bots.update_bot", { computerEnabled: patch.computerEnabled });
+
+        if (patch.permissionMode !== undefined && patch.permissionMode !== (bot.permissionMode ?? "auto")) {
+            // Who changed which bot's default tool permissions, and from what: kept in the request log for a later investigation.
+            context.log.event("bots.bot_permission_mode_changed", { botId: bot._id, from: bot.permissionMode ?? "auto", to: patch.permissionMode });
+        }
 
         return null;
     });
@@ -173,7 +195,18 @@ export const listBotIdsForUser = internalQuery
  */
 export const getBotForRun = internalQuery
     .input({ botId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.union(v.object({ computerEnabled: v.boolean(), instructions: v.string(), model: v.string(), name: v.string() }), v.null()))
+    .output(
+        v.union(
+            v.object({
+                computerEnabled: v.boolean(),
+                instructions: v.string(),
+                model: v.string(),
+                name: v.string(),
+                permissionMode: v.optional(vPermissionMode),
+            }),
+            v.null(),
+        ),
+    )
     .query(async ({ args: { botId, userId }, ctx }) => {
         const bot = await ctx.db.get("bots", botId as Id<"bots">);
 
@@ -181,5 +214,33 @@ export const getBotForRun = internalQuery
             return null;
         }
 
-        return { computerEnabled: bot.computerEnabled, instructions: bot.instructions, model: bot.model, name: bot.name };
+        return {
+            computerEnabled: bot.computerEnabled,
+            instructions: bot.instructions,
+            model: bot.model,
+            name: bot.name,
+            ...(bot.permissionMode && { permissionMode: bot.permissionMode }),
+        };
+    });
+
+/**
+ * The permission mode of the bot an unattended run belongs to: the bot it names, else the bot of the thread it continues (a task's
+ * round on a bot's chat), or `null` when neither leads to a bot of the caller's. Internal: `chat/lib/headless-run.ts`.
+ */
+export const getBotPermissionModeForRun = internalQuery
+    .input({ botId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.optional(v.string().max(MAX_LENGTH.id)), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.union(vPermissionMode, v.null()))
+    .query(async ({ args: { botId, threadId, userId }, ctx }) => {
+        let id = botId;
+
+        if (id === undefined && threadId !== undefined) {
+            const normalized = ctx.db.normalizeId("threads", threadId);
+            const thread = normalized ? await ctx.db.get("threads", normalized) : null;
+
+            id = thread?.userId === userId ? thread.botId : undefined;
+        }
+
+        const bot = id === undefined ? null : await ctx.db.get("bots", id as Id<"bots">);
+
+        return bot?.userId === userId ? (bot.permissionMode ?? null) : null;
     });

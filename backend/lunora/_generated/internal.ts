@@ -329,7 +329,8 @@ export interface InternalApiTypes {
     };
     bots: {
         functions: {
-            getBotForRun: FunctionReference<"query", { botId: string; userId: string }, { computerEnabled: boolean; instructions: string; model: string; name: string } | null>;
+            getBotForRun: FunctionReference<"query", { botId: string; userId: string }, { computerEnabled: boolean; instructions: string; model: string; name: string; permissionMode?: "supervised" | "auto" | "full" } | null>;
+            getBotPermissionModeForRun: FunctionReference<"query", { botId?: string; threadId?: string; userId: string }, "supervised" | "auto" | "full" | null>;
             listBotIdsForUser: FunctionReference<"query", { userId: string }, Array<string>>;
         };
         gdpr: {
@@ -1711,6 +1712,7 @@ export const internal: InternalApiTypes = {
     bots: {
         functions: {
             getBotForRun: { __lunoraRef: "bots_functions:getBotForRun" },
+            getBotPermissionModeForRun: { __lunoraRef: "bots_functions:getBotPermissionModeForRun" },
             listBotIdsForUser: { __lunoraRef: "bots_functions:listBotIdsForUser" },
         },
         gdpr: {

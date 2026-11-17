@@ -2,16 +2,19 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
+import type { ThreadPermissionMode } from "@neore/backend/chat/permission-mode";
+import { DEFAULT_THREAD_PERMISSION_MODE, isThreadPermissionMode, THREAD_PERMISSION_MODES } from "@neore/backend/chat/permission-mode";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Switch } from "@neore/ui/components/switch";
 import { Textarea } from "@neore/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import type { FormEvent } from "react";
+import type { FC, FormEvent } from "react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
@@ -24,10 +27,60 @@ interface BotDraft {
     instructions: string;
     model: string;
     name: string;
+    permissionMode: ThreadPermissionMode;
 }
 
 const emptyDraft = (): BotDraft => {
-    return { computerEnabled: false, description: "", instructions: "", model: DEFAULT_CHAT_MODEL, name: "" };
+    return {
+        computerEnabled: false,
+        description: "",
+        instructions: "",
+        model: DEFAULT_CHAT_MODEL,
+        name: "",
+        permissionMode: DEFAULT_THREAD_PERMISSION_MODE,
+    };
+};
+
+interface PermissionModeSelectProps {
+    "aria-describedby"?: string;
+    "aria-label"?: string;
+    disabled?: boolean;
+    id?: string;
+    onChange: (mode: ThreadPermissionMode) => void;
+    value: ThreadPermissionMode;
+}
+
+/** The three modes a bot's new chats can start in, in the backend's order. */
+const PermissionModeSelect: FC<PermissionModeSelectProps> = ({ onChange, value, ...trigger }) => {
+    const { t } = useLingui();
+    const labels: Record<ThreadPermissionMode, string> = {
+        auto: t`Auto`,
+        full: t`Full access`,
+        supervised: t`Supervised`,
+    };
+
+    return (
+        <Select
+            disabled={trigger.disabled}
+            onValueChange={(next: string | null) => {
+                if (isThreadPermissionMode(next)) {
+                    onChange(next);
+                }
+            }}
+            value={value}
+        >
+            <SelectTrigger aria-describedby={trigger["aria-describedby"]} aria-label={trigger["aria-label"]} id={trigger.id}>
+                <SelectValue>{(selected: string | null) => (isThreadPermissionMode(selected) ? labels[selected] : labels.auto)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+                {THREAD_PERMISSION_MODES.map((mode) => (
+                    <SelectItem key={mode} value={mode}>
+                        {labels[mode]}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
 };
 
 /**
@@ -44,11 +97,14 @@ const BotsSettings = () => {
     const instructionsId = useId();
     const computerId = useId();
     const modelLabelId = useId();
+    const modeId = useId();
+    const modeDescriptionId = useId();
 
     const botsQuery = crpc.bots.functions.listBots.queryOptions({});
     const { data: bots = [], isLoading } = useQuery(botsQuery);
     const createMutation = useMutation(crpc.bots.functions.createBot.mutationOptions());
     const deleteMutation = useMutation(crpc.bots.functions.deleteBot.mutationOptions());
+    const updateMutation = useMutation(crpc.bots.functions.updateBot.mutationOptions());
     const chatMutation = useMutation(crpc.chat.functions.createThread.mutationOptions());
 
     const [draft, setDraft] = useState<BotDraft>(emptyDraft);
@@ -70,6 +126,8 @@ const BotsSettings = () => {
                 instructions: draft.instructions.trim(),
                 model: draft.model,
                 name: draft.name.trim(),
+                // The default is stored as nothing, so a bot made without a choice keeps following it.
+                ...(draft.permissionMode !== DEFAULT_THREAD_PERMISSION_MODE && { permissionMode: draft.permissionMode }),
             });
             setDraft(emptyDraft());
             await queryClient.invalidateQueries({ queryKey: botsQuery.queryKey });
@@ -86,6 +144,16 @@ const BotsSettings = () => {
             await navigate({ params: { threadId }, to: "/chat/$threadId" });
         } catch {
             toast.error(t`Could not start a chat with this bot.`);
+        }
+    };
+
+    const handleModeChange = async (botId: string, permissionMode: ThreadPermissionMode) => {
+        try {
+            await updateMutation.mutateAsync({ botId: botId as Id<"bots">, patch: { permissionMode } });
+            await queryClient.invalidateQueries({ queryKey: botsQuery.queryKey });
+            toast.success(t`New chats with this bot start in the chosen mode`);
+        } catch {
+            toast.error(t`Could not change the bot's permission mode.`);
         }
     };
 
@@ -135,6 +203,18 @@ const BotsSettings = () => {
                     <Label id={modelLabelId}>{t`Model`}</Label>
                     <PromptModelSelector onChange={(model) => setDraft({ ...draft, model: model ?? DEFAULT_CHAT_MODEL })} value={draft.model} />
                 </div>
+                <div className="space-y-2">
+                    <Label htmlFor={modeId}>{t`Permission mode`}</Label>
+                    <p className="text-muted-foreground text-xs" id={modeDescriptionId}>
+                        {t`The mode each new chat with this bot starts in. You can still change it per chat. Scheduled runs use it only when it asks more.`}
+                    </p>
+                    <PermissionModeSelect
+                        aria-describedby={modeDescriptionId}
+                        id={modeId}
+                        onChange={(permissionMode) => setDraft({ ...draft, permissionMode })}
+                        value={draft.permissionMode}
+                    />
+                </div>
                 <div className="flex items-center justify-between gap-4">
                     <div>
                         <Label htmlFor={computerId}>{t`Computer`}</Label>
@@ -167,7 +247,13 @@ const BotsSettings = () => {
                                 {bot.description && <p className="text-muted-foreground truncate text-sm">{bot.description}</p>}
                                 {bot.computerEnabled && <p className="text-muted-foreground text-xs">{t`Has a computer`}</p>}
                             </div>
-                            <div className="flex shrink-0 gap-2">
+                            <div className="flex shrink-0 items-center gap-2">
+                                <PermissionModeSelect
+                                    aria-label={t`Permission mode for ${bot.name}`}
+                                    disabled={updateMutation.isPending}
+                                    onChange={(permissionMode) => handleModeChange(bot._id, permissionMode)}
+                                    value={bot.permissionMode ?? DEFAULT_THREAD_PERMISSION_MODE}
+                                />
                                 <Button onClick={() => handleChat(bot)} size="sm" type="button" variant="outline">
                                     {t`Chat`}
                                 </Button>
