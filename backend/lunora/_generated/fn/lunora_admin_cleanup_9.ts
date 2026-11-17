@@ -25,11 +25,36 @@ if (typeof source["now"] !== "number" || !Number.isFinite(source["now"])) return
 if (typeof source["thresholdMs"] !== "number" || !Number.isFinite(source["thresholdMs"])) return DEFER;
 return { "limit": source["limit"], "now": source["now"], "thresholdMs": source["thresholdMs"] };
 });
+installCompiledValidatorMap(lunora_admin_cleanup_9.getShardFootprint.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["cursor"] !== undefined) {
+if (typeof source["cursor"] !== "string") return DEFER;
+__val1 = source["cursor"];
+__has1 = true;
+}
+return { ...(__has1 ? { "cursor": __val1 } : {}) };
+});
 installCompiledValidatorMap(lunora_admin_cleanup_9.getUserThreads.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "userId": source["userId"] };
+});
+installCompiledValidatorMap(lunora_admin_cleanup_9.listShardKeysPage.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+let __has1 = false;
+let __val1;
+if (source["cursor"] !== undefined) {
+if (typeof source["cursor"] !== "string") return DEFER;
+__val1 = source["cursor"];
+__has1 = true;
+}
+if (typeof source["limit"] !== "number" || !Number.isFinite(source["limit"])) return DEFER;
+return { ...(__has1 ? { "cursor": __val1 } : {}), "limit": source["limit"] };
 });
 installCompiledValidatorMap(lunora_admin_cleanup_9.previewCleanup.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;

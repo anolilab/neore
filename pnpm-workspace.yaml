@@ -26,6 +26,9 @@ auditConfig:
     # @lunora/notify > @visulima/email), which merges its own option objects, never
     # input; the other users (Expo config, rollup, shadcn) are build tools.
     - GHSA-gcqx-w48m-w2h4
+    # picomatch <=4.0.7 (ReDoS). No patched release exists. It is reached through test and build
+    # tooling only (vitest, dotenvx, the shadcn CLI), as `pnpm why picomatch` shows, not the shipped app.
+    - GHSA-fc5q-39xc-vjpf
     # minimatch <11.0.1 and glob >=9 <=14.0.1 are fixed only in new majors (minimatch
     # 11, glob 14). Their consumers ask for minimatch 3/9/10 (3 kept CJS on purpose,
     # see the overrides) and glob 10–13: rimraf, workbox-build, commitizen and eslint at
