@@ -156,8 +156,9 @@ const HomePage: FC = () => {
                 </div>
             )}
 
-            {/* An account switch happens in place: a fresh card, so one account's answer never shows on another's home. */}
-            {overview && <DailyBriefOffer key={session?.user.id} offered={overview.dailyBriefOffer} />}
+            {/* An account switch happens in place: a fresh card, so one account's answer never shows on another's home, and
+                no offer until the overview is the signed-in account's (signing in another account keeps the last one's cached). */}
+            {overview && overview.userId === session?.user.id && <DailyBriefOffer key={session.user.id} offered={overview.dailyBriefOffer} />}
 
             {overview && (
                 <div className="grid gap-4 md:grid-cols-2">

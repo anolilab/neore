@@ -34933,6 +34933,9 @@
                     },
                     "unreadCount": {
                       "type": "number"
+                    },
+                    "userId": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -34945,7 +34948,8 @@
                     "reviews",
                     "runningTasks",
                     "subAgents",
-                    "unreadCount"
+                    "unreadCount",
+                    "userId"
                   ],
                   "type": "object"
                 }

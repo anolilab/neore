@@ -1,7 +1,8 @@
 /**
  * The home page's failure path: a failed overview reads as an alert with a
  * retry, and the retry asks for the overview again. A sub-agent waiting on its
- * owner's approval reads as waiting, not running.
+ * owner's approval reads as waiting, not running. The Daily Brief offer shows
+ * only on the signed-in account's own overview.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -93,7 +94,7 @@ const mount = () => {
     const tree = () => createElement(QueryClientProvider, { client: queryClient }, createElement(HomePage));
     const view = render(tree());
 
-    return { ...view, rerenderPage: () => view.rerender(tree()) };
+    return { ...view, queryClient, rerenderPage: () => view.rerender(tree()) };
 };
 
 afterEach(() => {
@@ -124,6 +125,7 @@ describe("home page sub-agents", () => {
                 { _id: "run-2", childThreadId: "child-2", createdAt: 2, parentThreadId: "thread-2", status: "running", task: "Sort the inbox" },
             ],
             unreadCount: 0,
+            userId: "user-a",
         };
         mount();
 
@@ -137,9 +139,8 @@ describe("home page sub-agents", () => {
 });
 
 describe("home page Daily Brief offer", () => {
-    it("starts over for another account after an in-place switch", async () => {
-        harness.shouldFail = false;
-        harness.overview = {
+    const offeredTo = (userId: string) => {
+        return {
             approvals: [],
             codingAgents: [],
             dailyBriefEnabled: false,
@@ -150,9 +151,27 @@ describe("home page Daily Brief offer", () => {
             runningTasks: [],
             subAgents: [],
             unreadCount: 0,
+            userId,
         };
+    };
 
-        const { rerenderPage } = mount();
+    it("offers nothing on another account's cached overview", async () => {
+        // Signing in another account keeps the last one's overview in the cache until it is fetched again.
+        harness.shouldFail = false;
+        harness.overview = offeredTo("user-a");
+        harness.userId = "user-b";
+        mount();
+
+        await screen.findByText("Nothing is waiting on you.");
+
+        expect(screen.queryByRole("button", { name: "Turn it on" })).toBeNull();
+    });
+
+    it("starts over for another account after an in-place switch", async () => {
+        harness.shouldFail = false;
+        harness.overview = offeredTo("user-a");
+
+        const { queryClient, rerenderPage } = mount();
 
         fireEvent.click(await screen.findByRole("button", { name: "Not now" }));
         await screen.findByText(DISMISSED);
@@ -161,7 +180,13 @@ describe("home page Daily Brief offer", () => {
         rerenderPage();
 
         expect(screen.queryByText(DISMISSED)).toBeNull();
-        expect(screen.getByRole("button", { name: "Not now" })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Not now" })).toBeNull();
+
+        harness.overview = offeredTo("user-b");
+        await queryClient.invalidateQueries();
+
+        expect(await screen.findByRole("button", { name: "Not now" })).toBeTruthy();
+        expect(screen.queryByText(DISMISSED)).toBeNull();
     });
 });
 

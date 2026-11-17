@@ -159,6 +159,8 @@ export const dismissDailyBriefOffer = authMutation
 
         if (settings?.dailyBriefOfferDismissedAt === undefined) {
             await saveUserSettings(ctx.db, settings, userId, { dailyBriefOfferDismissedAt: Date.now() }, ctx.user.activeOrganization?.id ?? null);
+            // Counted next to `notifications.set_daily_brief_enabled`, the "Turn it on" answer.
+            ctx.log.event("notifications.dismiss_daily_brief_offer", {});
         }
 
         return null;

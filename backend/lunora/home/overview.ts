@@ -80,6 +80,8 @@ export const vHomeOverview = v.object({
         }),
     ),
     unreadCount: v.number(),
+    // Whose overview this is: the home page offers the brief only to the account it was computed for.
+    userId: v.string(),
 });
 
 export type HomeOverview = Infer<typeof vHomeOverview>;
@@ -254,6 +256,7 @@ export const loadHomeOverview = async (ctx: Pick<QueryCtx, "db">, userId: string
             };
         }),
         unreadCount: unread.length,
+        userId,
     };
 };
 

@@ -94,6 +94,7 @@ afterEach(() => {
     harness.close();
     anonymous.clear();
     activeOrganization.id = null;
+    vi.restoreAllMocks();
     vi.useRealTimers();
 });
 
@@ -108,6 +109,8 @@ describe("getHomeOverview", () => {
         expect(result.recentThreads.map((thread: { title: string }) => thread.title)).toEqual([`Plans of ${USER}`]);
         expect(result.unreadCount).toBe(1);
         expect(result.dailyBriefEnabled).toBe(true);
+        // The page offers the brief only on its own account's overview.
+        expect(result.userId).toBe(USER);
     });
 
     it("lists recent threads by last update, never a soft-deleted or temporary one, however many there are", async () => {
@@ -302,6 +305,17 @@ describe("the one-time Daily Brief offer", () => {
         expect(row?.dailyBriefOfferDismissedAt).toEqual(expect.any(Number));
         expect(row?.dailyBriefEnabled).toBeUndefined();
         expect(await offered()).toBe(false);
+    });
+
+    it('"Not now" is counted once, next to the "Turn it on" event', async () => {
+        // The harness hands every function the same logger.
+        const log = await harness.run(async (ctx: any) => ctx.log);
+        const event = vi.spyOn(log, "event");
+
+        await asUser().mutation(dismissDailyBriefOffer as never, {} as never);
+        await asUser().mutation(dismissDailyBriefOffer as never, {} as never);
+
+        expect(event.mock.calls).toStrictEqual([["notifications.dismiss_daily_brief_offer", {}]]);
     });
 
     it("is never shown to a guest", async () => {
