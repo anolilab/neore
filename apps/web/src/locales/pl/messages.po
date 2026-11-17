@@ -25,30 +25,17 @@ msgstr " · model: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, one {# wiersz} few {# wiersze} many {# wierszy} other {# wiersza}}, {1, plural, one {# kolumna} few {# kolumny} many {# kolumn} other {# kolumny}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:639
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:752
 msgid "-- INSERT --"
 msgstr "-- WSTAWIANIE --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:639
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:752
 msgid "-- NORMAL --"
 msgstr "-- NORMALNY --"
 
 #: src/features/notifications/components/notification-list.tsx:115
 msgid ", unread"
 msgstr ", nieprzeczytane"
-
-#: src/features/chat/thread/composer-tiptap/emoji-shortcode-popup.tsx:48
-msgid "Emoji suggestions"
-msgstr ""
-
-#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:134
-msgid "No emoji found"
-msgstr ""
-
-#. placeholder {0}: suggestions.length
-#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:134
-msgid "{0, plural, one {# emoji} other {# emoji}} found"
-msgstr ""
 
 #: src/features/sub-agents/components/sub-agent-approvals.tsx:63
 msgid "… ({omitted, plural, one {# more character not shown} other {# more characters not shown}}; approving runs the whole call)"
@@ -216,6 +203,11 @@ msgstr "{0, plural, one {# kontrola kończy się niepowodzeniem} few {# kontrole
 #: src/features/develop/components/checks-tab.tsx:91
 msgid "{0, plural, one {# check is still running} other {# checks are still running}}"
 msgstr "{0, plural, one {# kontrola nadal trwa} few {# kontrole nadal trwają} many {# kontroli nadal trwa} other {# kontroli nadal trwa}}"
+
+#. placeholder {0}: suggestions.length
+#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:162
+msgid "{0, plural, one {# emoji} other {# emoji}} found"
+msgstr ""
 
 #. placeholder {0}: files.length
 #: src/features/chat/thread/host-changes.tsx:53
@@ -2472,12 +2464,12 @@ msgstr "Dodaj wybraną klatkę jako węzeł obrazu"
 
 #: src/features/chat/thread-list/thread-list-header.tsx:126
 #: src/features/chat/thread-list/thread-list-header.tsx:136
-#: src/features/projects/components/add-project-dialog.tsx:676
+#: src/features/projects/components/add-project-dialog.tsx:687
 msgid "Add project"
 msgstr ""
 
 #. placeholder {0}: rowName(machine)
-#: src/features/projects/components/add-project-dialog.tsx:499
+#: src/features/projects/components/add-project-dialog.tsx:510
 msgid "Add project on {0}"
 msgstr ""
 
@@ -2654,7 +2646,7 @@ msgstr "Dodano:"
 msgid "Adding documents… {0} of {1}"
 msgstr "Dodawanie dokumentów… {0} z {1}"
 
-#: src/features/projects/components/add-project-dialog.tsx:510
+#: src/features/projects/components/add-project-dialog.tsx:521
 msgid "Adding the project…"
 msgstr ""
 
@@ -2667,7 +2659,7 @@ msgid "Adding your earlier replies…"
 msgstr "Dodawanie Twoich wcześniejszych odpowiedzi…"
 
 #: src/features/chat/aside/aside-panel.tsx:168
-#: src/features/projects/components/add-project-dialog.tsx:676
+#: src/features/projects/components/add-project-dialog.tsx:687
 msgid "Adding…"
 msgstr "Dodawanie…"
 
@@ -4628,7 +4620,7 @@ msgstr "Portal Azure → Twój zasób OpenAI → Klucze i punkt końcowy. Przech
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:394
 #: src/features/pages/components/page-version-panel.tsx:89
-#: src/features/projects/components/add-project-dialog.tsx:673
+#: src/features/projects/components/add-project-dialog.tsx:684
 msgid "Back"
 msgstr "Wstecz"
 
@@ -5654,7 +5646,7 @@ msgstr "Kanada"
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
-#: src/features/projects/components/add-project-dialog.tsx:667
+#: src/features/projects/components/add-project-dialog.tsx:678
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:395
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
@@ -6325,7 +6317,7 @@ msgstr "Wybierz tryb wyszukiwania"
 msgid "Choose the camera system for your shot"
 msgstr "Wybierz system kamery do swojego ujęcia"
 
-#: src/features/projects/components/add-project-dialog.tsx:502
+#: src/features/projects/components/add-project-dialog.tsx:513
 msgid "Choose the project's folder, or type a path."
 msgstr ""
 
@@ -6639,7 +6631,7 @@ msgstr "schowek"
 msgid "clock"
 msgstr "zegar"
 
-#: src/features/projects/components/add-project-dialog.tsx:664
+#: src/features/projects/components/add-project-dialog.tsx:675
 msgid "Clone or create new…"
 msgstr ""
 
@@ -7049,7 +7041,7 @@ msgstr "Komenda może mieć maksymalnie {SKILL_SLUG_MAX} znaków"
 msgid "Command Palette"
 msgstr "Paleta poleceń"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:537
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:544
 msgid "Commands"
 msgstr "Polecenia"
 
@@ -7413,7 +7405,7 @@ msgstr "Kompresowanie kontekstu..."
 msgid "Computer"
 msgstr "Komputer"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:64
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:66
 msgid "Condense older messages for the model"
 msgstr "Skróć starsze wiadomości dla modelu"
 
@@ -7710,7 +7702,7 @@ msgstr "Połączono z {0}"
 msgid "Connected. You can close this window."
 msgstr "Połączono. Możesz zamknąć to okno."
 
-#: src/features/projects/components/add-project-dialog.tsx:507
+#: src/features/projects/components/add-project-dialog.tsx:518
 msgid "Connecting {pairingHost}…"
 msgstr ""
 
@@ -9134,9 +9126,14 @@ msgstr "Utwórz swój pierwszy przepływ pracy, aby wizualnie automatyzować zad
 msgid "Created"
 msgstr "Utworzono"
 
-#: src/features/projects/components/add-project-dialog.tsx:245
-msgid "Created {path}"
+#. placeholder {0}: created.value.path
+#: src/features/projects/components/add-project-dialog.tsx:246
+msgid "Created {0}"
 msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:245
+#~ msgid "Created {path}"
+#~ msgstr ""
 
 #: src/features/skills/components/bundle-import-dialog.tsx:151
 msgid "Created switched off."
@@ -11821,6 +11818,10 @@ msgstr "E-mail:"
 #: src/features/canvas/canvas-panel.tsx:149
 msgid "Emboss"
 msgstr "Wytłoczenie"
+
+#: src/features/chat/thread/composer-tiptap/emoji-shortcode-popup.tsx:59
+msgid "Emoji suggestions"
+msgstr ""
 
 #. placeholder {0}: provider.name
 #. placeholder {0}: skill.name
@@ -14653,11 +14654,11 @@ msgstr "Przejdź do czatu: {title}"
 msgid "Focus Search"
 msgstr "Przejdź do wyszukiwania"
 
-#: src/features/projects/components/add-project-dialog.tsx:589
+#: src/features/projects/components/add-project-dialog.tsx:600
 msgid "Folder path"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:608
+#: src/features/projects/components/add-project-dialog.tsx:619
 msgid "Folders"
 msgstr ""
 
@@ -15621,7 +15622,7 @@ msgstr "Przejdź do poprzedniej strony"
 msgid "Go to Prompts"
 msgstr "Przejdź do promptów"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:344
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:351
 msgid "Go to reply"
 msgstr "Przejdź do odpowiedzi"
 
@@ -15662,7 +15663,7 @@ msgstr "Przejdź do sejfu"
 msgid "Go to your pages"
 msgstr "Przejdź do swoich stron"
 
-#: src/features/projects/components/add-project-dialog.tsx:612
+#: src/features/projects/components/add-project-dialog.tsx:623
 msgid "Go up to {parent}"
 msgstr ""
 
@@ -17397,7 +17398,7 @@ msgstr "Tokeny wejściowe"
 msgid "Input:"
 msgstr "Wejście:"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:62
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:64
 msgid "Insert a saved prompt"
 msgstr "Wstaw zapisany prompt"
 
@@ -17409,7 +17410,7 @@ msgstr "Wstaw kolumnę po"
 msgid "Insert column before"
 msgstr "Wstaw kolumnę przed"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:601
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:608
 msgid "Insert Prompt"
 msgstr "Wstaw prompt"
 
@@ -17704,11 +17705,11 @@ msgstr "Zaproszenie do dołączenia"
 msgid "Invites"
 msgstr "Zaproszenia"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:63
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:65
 msgid "Invoke a skill"
 msgstr "Wywołaj umiejętność"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:634
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:641
 msgid "Invoke Skill"
 msgstr "Wywołaj umiejętność"
 
@@ -19033,7 +19034,7 @@ msgstr "Wczytywanie plików"
 msgid "Loading files…"
 msgstr "Wczytywanie plików…"
 
-#: src/features/projects/components/add-project-dialog.tsx:508
+#: src/features/projects/components/add-project-dialog.tsx:519
 msgid "Loading folders…"
 msgstr ""
 
@@ -19427,7 +19428,7 @@ msgstr "Długoterminowy token dostępu do kanału z karty Messaging API twojego 
 msgid "Longest the answer may take, in milliseconds"
 msgstr "Maksymalny czas odpowiedzi w milisekundach"
 
-#: src/features/projects/components/add-project-dialog.tsx:523
+#: src/features/projects/components/add-project-dialog.tsx:534
 msgid "Looking for machines…"
 msgstr ""
 
@@ -19514,7 +19515,7 @@ msgstr "Plik binarny Mach-O"
 msgid "Machine"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:527
+#: src/features/projects/components/add-project-dialog.tsx:538
 msgid "Machines"
 msgstr ""
 
@@ -20161,8 +20162,8 @@ msgstr "Scalono w {hostLabel}."
 msgid "Merging…"
 msgstr "Scalanie…"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:294
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:471
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:301
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:619
 msgid "Message"
 msgstr "Wiadomość"
 
@@ -21980,6 +21981,10 @@ msgstr "Brak sparowanych urządzeń."
 msgid "No diff data available for this version"
 msgstr "Brak danych o różnicach dla tej wersji"
 
+#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:162
+msgid "No emoji found"
+msgstr ""
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:395
 msgid "No enabled MCP servers."
 msgstr "Brak włączonych serwerów MCP."
@@ -22022,7 +22027,7 @@ msgstr "W bazie wiedzy nie ma jeszcze plików. Prześlij dokumenty powyżej, aby
 msgid "No focal length selected"
 msgstr "Nie wybrano ogniskowej"
 
-#: src/features/projects/components/add-project-dialog.tsx:644
+#: src/features/projects/components/add-project-dialog.tsx:655
 msgid "No folders in here."
 msgstr ""
 
@@ -22292,7 +22297,7 @@ msgstr "Nie ma jeszcze odpowiedzi"
 msgid "No results"
 msgstr "Brak wyników"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:662
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:669
 msgid "No results found"
 msgstr "Nie znaleziono wyników"
 
@@ -24856,7 +24861,7 @@ msgstr "Wybierz jeden ze skrzynki odbiorczej, aby go przeczytać."
 msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
 msgstr "Wybierz umiejętności, harmonogramy, webhooki i czaty grupowe do udostępnienia jako jeden plik Markdown. Klucze API, sekrety webhooków, tokeny konektorów i inne poświadczenia nigdy nie są dołączane, podobnie jak identyfikatory Twojego konta czy organizacji."
 
-#: src/features/projects/components/add-project-dialog.tsx:502
+#: src/features/projects/components/add-project-dialog.tsx:513
 msgid "Pick the computer or server the project's folder is on."
 msgstr ""
 
@@ -25400,7 +25405,7 @@ msgstr "Naciśnij enter lub spację, aby zaznaczyć węzeł. Następnie możesz 
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr "Naciśnij enter lub spację, aby zaznaczyć krawędź. Następnie możesz nacisnąć delete, aby ją usunąć, lub escape, aby anulować."
 
-#: src/features/projects/components/add-project-dialog.tsx:605
+#: src/features/projects/components/add-project-dialog.tsx:616
 msgid "Press Enter to open the folder. A folder that does not exist is created."
 msgstr ""
 
@@ -29952,7 +29957,7 @@ msgstr "Pokaż mniej"
 msgid "Show more"
 msgstr "Pokaż więcej"
 
-#: src/features/projects/components/add-project-dialog.tsx:654
+#: src/features/projects/components/add-project-dialog.tsx:665
 msgid "Show more folders"
 msgstr ""
 
@@ -31004,7 +31009,7 @@ msgstr ""
 msgid "SSH · {0} · not connected yet"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:566
+#: src/features/projects/components/add-project-dialog.tsx:577
 msgid "SSH hosts come from ~/.ssh/config. Picking one connects it."
 msgstr ""
 
@@ -31139,7 +31144,7 @@ msgstr "Rozpocznij nowy czat ({0})"
 msgid "Start a new chat to get started"
 msgstr "Rozpocznij nowy czat, aby zacząć"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:65
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:67
 msgid "Start a new context: earlier messages are no longer sent to the model"
 msgstr "Rozpocznij nowy kontekst: wcześniejsze wiadomości nie są już wysyłane do modelu"
 
@@ -31985,7 +31990,7 @@ msgstr "Sugerowane"
 msgid "Suggested answers"
 msgstr "Sugerowane odpowiedzi"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:513
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:638
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Dostępna sugestia, naciśnij Strzałkę w prawo, aby ją przyjąć"
 
@@ -32139,7 +32144,7 @@ msgstr "Wirujące bokeh, vintage"
 msgid "Switch Account"
 msgstr "Przełącz konto"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:61
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:63
 msgid "Switch AI model"
 msgstr "Zmień model AI"
 
@@ -32155,7 +32160,7 @@ msgstr "Przełączaj się między OpenAI, Google, Anthropic i innymi jednym para
 msgid "switch model"
 msgstr "zmień model"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:558
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:565
 msgid "Switch Model"
 msgstr "Zmień model"
 
@@ -34123,7 +34128,7 @@ msgstr "Ten komputer jest sparowany z innym kontem."
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "Ten komputer jest sparowany. Wybierz w aplikacji desktopowej, które foldery udostępnić."
 
-#: src/features/projects/components/add-project-dialog.tsx:337
+#: src/features/projects/components/add-project-dialog.tsx:348
 msgid "This computer must be paired first."
 msgstr ""
 
@@ -34314,7 +34319,7 @@ msgstr "Ten link jest niekompletny. Poproś o pełny link."
 msgid "This link is not taking messages right now. Try again later."
 msgstr "Ten link nie przyjmuje teraz wiadomości. Spróbuj ponownie później."
 
-#: src/features/projects/components/add-project-dialog.tsx:421
+#: src/features/projects/components/add-project-dialog.tsx:432
 msgid "This machine is not ready yet."
 msgstr ""
 
@@ -35604,7 +35609,7 @@ msgstr "Wpisz odpowiedź…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
 #: src/features/chat/thread/composer-input.tsx:1755
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:197
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:201
 msgid "Type your message..."
 msgstr "Wpisz wiadomość..."
 
@@ -37844,7 +37849,7 @@ msgstr "Kiedy asystent ma używać tej umiejętności?"
 msgid "Where each run goes"
 msgstr "Dokąd trafia każde uruchomienie"
 
-#: src/features/projects/components/add-project-dialog.tsx:499
+#: src/features/projects/components/add-project-dialog.tsx:510
 msgid "Where is the project?"
 msgstr ""
 

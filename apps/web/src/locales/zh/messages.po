@@ -25,30 +25,17 @@ msgstr " · 模型：{modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, other {# 行}}，{1, plural, other {# 列}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:639
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:752
 msgid "-- INSERT --"
 msgstr "-- 插入 --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:639
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:752
 msgid "-- NORMAL --"
 msgstr "-- 普通 --"
 
 #: src/features/notifications/components/notification-list.tsx:115
 msgid ", unread"
 msgstr "，未读"
-
-#: src/features/chat/thread/composer-tiptap/emoji-shortcode-popup.tsx:48
-msgid "Emoji suggestions"
-msgstr ""
-
-#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:134
-msgid "No emoji found"
-msgstr ""
-
-#. placeholder {0}: suggestions.length
-#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:134
-msgid "{0, plural, one {# emoji} other {# emoji}} found"
-msgstr ""
 
 #: src/features/sub-agents/components/sub-agent-approvals.tsx:63
 msgid "… ({omitted, plural, one {# more character not shown} other {# more characters not shown}}; approving runs the whole call)"
@@ -216,6 +203,11 @@ msgstr "{0, plural, other {# 项检查失败}}"
 #: src/features/develop/components/checks-tab.tsx:91
 msgid "{0, plural, one {# check is still running} other {# checks are still running}}"
 msgstr "{0, plural, other {# 项检查仍在运行}}"
+
+#. placeholder {0}: suggestions.length
+#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:162
+msgid "{0, plural, one {# emoji} other {# emoji}} found"
+msgstr ""
 
 #. placeholder {0}: files.length
 #: src/features/chat/thread/host-changes.tsx:53
@@ -2472,12 +2464,12 @@ msgstr "将选取的帧添加为图片节点"
 
 #: src/features/chat/thread-list/thread-list-header.tsx:126
 #: src/features/chat/thread-list/thread-list-header.tsx:136
-#: src/features/projects/components/add-project-dialog.tsx:676
+#: src/features/projects/components/add-project-dialog.tsx:687
 msgid "Add project"
 msgstr ""
 
 #. placeholder {0}: rowName(machine)
-#: src/features/projects/components/add-project-dialog.tsx:499
+#: src/features/projects/components/add-project-dialog.tsx:510
 msgid "Add project on {0}"
 msgstr ""
 
@@ -2654,7 +2646,7 @@ msgstr "新增："
 msgid "Adding documents… {0} of {1}"
 msgstr "正在添加文档… {0} / {1}"
 
-#: src/features/projects/components/add-project-dialog.tsx:510
+#: src/features/projects/components/add-project-dialog.tsx:521
 msgid "Adding the project…"
 msgstr ""
 
@@ -2667,7 +2659,7 @@ msgid "Adding your earlier replies…"
 msgstr "正在添加你之前的回复…"
 
 #: src/features/chat/aside/aside-panel.tsx:168
-#: src/features/projects/components/add-project-dialog.tsx:676
+#: src/features/projects/components/add-project-dialog.tsx:687
 msgid "Adding…"
 msgstr "正在添加…"
 
@@ -4628,7 +4620,7 @@ msgstr "Azure 门户 → 你的 OpenAI 资源 → 密钥和终结点。加密存
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:394
 #: src/features/pages/components/page-version-panel.tsx:89
-#: src/features/projects/components/add-project-dialog.tsx:673
+#: src/features/projects/components/add-project-dialog.tsx:684
 msgid "Back"
 msgstr "返回"
 
@@ -5654,7 +5646,7 @@ msgstr "加拿大"
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
-#: src/features/projects/components/add-project-dialog.tsx:667
+#: src/features/projects/components/add-project-dialog.tsx:678
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:395
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
@@ -6325,7 +6317,7 @@ msgstr "选择搜索模式"
 msgid "Choose the camera system for your shot"
 msgstr "为你的镜头选择相机系统"
 
-#: src/features/projects/components/add-project-dialog.tsx:502
+#: src/features/projects/components/add-project-dialog.tsx:513
 msgid "Choose the project's folder, or type a path."
 msgstr ""
 
@@ -6639,7 +6631,7 @@ msgstr "剪贴板"
 msgid "clock"
 msgstr "时钟"
 
-#: src/features/projects/components/add-project-dialog.tsx:664
+#: src/features/projects/components/add-project-dialog.tsx:675
 msgid "Clone or create new…"
 msgstr ""
 
@@ -7049,7 +7041,7 @@ msgstr "命令不能超过 {SKILL_SLUG_MAX} 个字符"
 msgid "Command Palette"
 msgstr "命令面板"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:537
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:544
 msgid "Commands"
 msgstr "命令"
 
@@ -7413,7 +7405,7 @@ msgstr "正在压缩上下文..."
 msgid "Computer"
 msgstr "电脑"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:64
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:66
 msgid "Condense older messages for the model"
 msgstr "为模型精简较早的消息"
 
@@ -7710,7 +7702,7 @@ msgstr "已连接到 {0}"
 msgid "Connected. You can close this window."
 msgstr "已连接。你可以关闭此窗口。"
 
-#: src/features/projects/components/add-project-dialog.tsx:507
+#: src/features/projects/components/add-project-dialog.tsx:518
 msgid "Connecting {pairingHost}…"
 msgstr ""
 
@@ -9134,9 +9126,14 @@ msgstr "创建你的第一个工作流，可视化地自动化 AI 任务。"
 msgid "Created"
 msgstr "已创建"
 
-#: src/features/projects/components/add-project-dialog.tsx:245
-msgid "Created {path}"
+#. placeholder {0}: created.value.path
+#: src/features/projects/components/add-project-dialog.tsx:246
+msgid "Created {0}"
 msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:245
+#~ msgid "Created {path}"
+#~ msgstr ""
 
 #: src/features/skills/components/bundle-import-dialog.tsx:151
 msgid "Created switched off."
@@ -11821,6 +11818,10 @@ msgstr "邮箱："
 #: src/features/canvas/canvas-panel.tsx:149
 msgid "Emboss"
 msgstr "浮雕"
+
+#: src/features/chat/thread/composer-tiptap/emoji-shortcode-popup.tsx:59
+msgid "Emoji suggestions"
+msgstr ""
 
 #. placeholder {0}: provider.name
 #. placeholder {0}: skill.name
@@ -14653,11 +14654,11 @@ msgstr "聚焦聊天：{title}"
 msgid "Focus Search"
 msgstr "聚焦搜索"
 
-#: src/features/projects/components/add-project-dialog.tsx:589
+#: src/features/projects/components/add-project-dialog.tsx:600
 msgid "Folder path"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:608
+#: src/features/projects/components/add-project-dialog.tsx:619
 msgid "Folders"
 msgstr ""
 
@@ -15621,7 +15622,7 @@ msgstr "上一页"
 msgid "Go to Prompts"
 msgstr "前往提示词"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:344
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:351
 msgid "Go to reply"
 msgstr "转到回复"
 
@@ -15662,7 +15663,7 @@ msgstr "前往文件库"
 msgid "Go to your pages"
 msgstr "前往你的页面"
 
-#: src/features/projects/components/add-project-dialog.tsx:612
+#: src/features/projects/components/add-project-dialog.tsx:623
 msgid "Go up to {parent}"
 msgstr ""
 
@@ -17397,7 +17398,7 @@ msgstr "输入 token"
 msgid "Input:"
 msgstr "输入："
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:62
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:64
 msgid "Insert a saved prompt"
 msgstr "插入已保存的提示词"
 
@@ -17409,7 +17410,7 @@ msgstr "在右侧插入列"
 msgid "Insert column before"
 msgstr "在左侧插入列"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:601
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:608
 msgid "Insert Prompt"
 msgstr "插入提示词"
 
@@ -17704,11 +17705,11 @@ msgstr "受邀加入"
 msgid "Invites"
 msgstr "邀请"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:63
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:65
 msgid "Invoke a skill"
 msgstr "调用技能"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:634
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:641
 msgid "Invoke Skill"
 msgstr "调用技能"
 
@@ -19033,7 +19034,7 @@ msgstr "正在加载文件"
 msgid "Loading files…"
 msgstr "正在加载文件…"
 
-#: src/features/projects/components/add-project-dialog.tsx:508
+#: src/features/projects/components/add-project-dialog.tsx:519
 msgid "Loading folders…"
 msgstr ""
 
@@ -19427,7 +19428,7 @@ msgstr "LINE 频道 Messaging API 标签页中的长期 channel access token"
 msgid "Longest the answer may take, in milliseconds"
 msgstr "答案允许的最长耗时，单位为毫秒"
 
-#: src/features/projects/components/add-project-dialog.tsx:523
+#: src/features/projects/components/add-project-dialog.tsx:534
 msgid "Looking for machines…"
 msgstr ""
 
@@ -19514,7 +19515,7 @@ msgstr "Mach-O 二进制文件"
 msgid "Machine"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:527
+#: src/features/projects/components/add-project-dialog.tsx:538
 msgid "Machines"
 msgstr ""
 
@@ -20161,8 +20162,8 @@ msgstr "已在 {hostLabel} 上合并。"
 msgid "Merging…"
 msgstr "正在合并…"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:294
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:471
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:301
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:619
 msgid "Message"
 msgstr "消息"
 
@@ -21980,6 +21981,10 @@ msgstr "没有已配对的设备。"
 msgid "No diff data available for this version"
 msgstr "此版本没有可用的差异数据"
 
+#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:162
+msgid "No emoji found"
+msgstr ""
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:395
 msgid "No enabled MCP servers."
 msgstr "没有已启用的 MCP 服务器。"
@@ -22022,7 +22027,7 @@ msgstr "你的知识库中还没有文件。在上方上传文档即可开始。
 msgid "No focal length selected"
 msgstr "未选择焦距"
 
-#: src/features/projects/components/add-project-dialog.tsx:644
+#: src/features/projects/components/add-project-dialog.tsx:655
 msgid "No folders in here."
 msgstr ""
 
@@ -22292,7 +22297,7 @@ msgstr "还没有回复"
 msgid "No results"
 msgstr "无结果"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:662
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:669
 msgid "No results found"
 msgstr "未找到结果"
 
@@ -24856,7 +24861,7 @@ msgstr "从收件箱中选择一项进行阅读。"
 msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
 msgstr "选择要作为一个 Markdown 文件分享的技能、计划任务、webhook 和群聊。API 密钥、webhook 密钥、连接器令牌和其他凭据绝不会包含在内，你的账号或组织 ID 也不会。"
 
-#: src/features/projects/components/add-project-dialog.tsx:502
+#: src/features/projects/components/add-project-dialog.tsx:513
 msgid "Pick the computer or server the project's folder is on."
 msgstr ""
 
@@ -25400,7 +25405,7 @@ msgstr "按回车键或空格键选择节点。然后可使用方向键移动节
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr "按回车键或空格键选择连线。然后可按 Delete 键删除，或按 Esc 键取消。"
 
-#: src/features/projects/components/add-project-dialog.tsx:605
+#: src/features/projects/components/add-project-dialog.tsx:616
 msgid "Press Enter to open the folder. A folder that does not exist is created."
 msgstr ""
 
@@ -29952,7 +29957,7 @@ msgstr "收起"
 msgid "Show more"
 msgstr "展开"
 
-#: src/features/projects/components/add-project-dialog.tsx:654
+#: src/features/projects/components/add-project-dialog.tsx:665
 msgid "Show more folders"
 msgstr ""
 
@@ -31004,7 +31009,7 @@ msgstr ""
 msgid "SSH · {0} · not connected yet"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:566
+#: src/features/projects/components/add-project-dialog.tsx:577
 msgid "SSH hosts come from ~/.ssh/config. Picking one connects it."
 msgstr ""
 
@@ -31139,7 +31144,7 @@ msgstr "开始新聊天（{0}）"
 msgid "Start a new chat to get started"
 msgstr "新建聊天即可开始"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:65
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:67
 msgid "Start a new context: earlier messages are no longer sent to the model"
 msgstr "开始新的上下文：之前的消息不再发送给模型"
 
@@ -31985,7 +31990,7 @@ msgstr "推荐"
 msgid "Suggested answers"
 msgstr "建议的答案"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:513
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:638
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "有可用建议，按右方向键接受"
 
@@ -32139,7 +32144,7 @@ msgstr "旋涡状焦外，复古"
 msgid "Switch Account"
 msgstr "切换账号"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:61
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:63
 msgid "Switch AI model"
 msgstr "切换 AI 模型"
 
@@ -32155,7 +32160,7 @@ msgstr "只需一个参数即可在 OpenAI、Google、Anthropic 等之间切换�
 msgid "switch model"
 msgstr "切换模型"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:558
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:565
 msgid "Switch Model"
 msgstr "切换模型"
 
@@ -34123,7 +34128,7 @@ msgstr "此计算机已与另一个账户配对。"
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "此计算机已配对。请在桌面应用中选择要共享的文件夹。"
 
-#: src/features/projects/components/add-project-dialog.tsx:337
+#: src/features/projects/components/add-project-dialog.tsx:348
 msgid "This computer must be paired first."
 msgstr ""
 
@@ -34314,7 +34319,7 @@ msgstr "此链接不完整。请索取完整链接。"
 msgid "This link is not taking messages right now. Try again later."
 msgstr "此链接目前不接收消息。请稍后再试。"
 
-#: src/features/projects/components/add-project-dialog.tsx:421
+#: src/features/projects/components/add-project-dialog.tsx:432
 msgid "This machine is not ready yet."
 msgstr ""
 
@@ -35604,7 +35609,7 @@ msgstr "输入你的回答…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
 #: src/features/chat/thread/composer-input.tsx:1755
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:197
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:201
 msgid "Type your message..."
 msgstr "输入你的消息..."
 
@@ -37844,7 +37849,7 @@ msgstr "助手应在什么时候使用此技能？"
 msgid "Where each run goes"
 msgstr "每次运行的去向"
 
-#: src/features/projects/components/add-project-dialog.tsx:499
+#: src/features/projects/components/add-project-dialog.tsx:510
 msgid "Where is the project?"
 msgstr ""
 
