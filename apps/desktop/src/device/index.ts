@@ -449,6 +449,21 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         return deviceId !== undefined && servers.isServer(deviceId) ? servers.posterForEnd(deviceId) : requireHost(requireCore());
     };
 
+    /**
+     * The poster that ends a held turn, or none when its server's runtime has already ended. The receipt replay calls the
+     * callbacks that end held turns one after another: a throw here would stop it, so the missing poster is logged instead and
+     * the receipt still completes.
+     */
+    const posterOfHeld = (deviceId: string | undefined): HostPoster | undefined => {
+        try {
+            return posterFor(deviceId);
+        } catch (error) {
+            console.error(`[acp-host] a held turn could not be ended: ${error instanceof Error ? error.message : String(error)}`);
+
+            return undefined;
+        }
+    };
+
     /** Opens the session the backend asked for; the command's receipt stays open until it has opened or failed, and the messages held for it follow. */
     const startRequestedSession = async (
         command: Extract<AcpCommand, { kind: "start" }>,
@@ -521,12 +536,13 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         state.commands ??= new HostCommands({
             apply: applyCommand,
             core: requireCore(),
-            interrupted: (held) => posterFor(held.deviceId).endLapsedTurn(held.sessionId, held.turnId, held.threadId, { reason: "interrupted" }),
-            lapsed: (held) => posterFor(held.deviceId).endLapsedTurn(held.sessionId, held.turnId, held.threadId, { error: NEVER_OPENED, reason: "failed" }),
+            interrupted: (held) => posterOfHeld(held.deviceId)?.endLapsedTurn(held.sessionId, held.turnId, held.threadId, { reason: "interrupted" }),
+            lapsed: (held) =>
+                posterOfHeld(held.deviceId)?.endLapsedTurn(held.sessionId, held.turnId, held.threadId, { error: NEVER_OPENED, reason: "failed" }),
             log: (message) => console.error(message),
             receiptFile: path.join(app.getPath("userData"), "acp-host-receipts.json"),
             refused: (held, reason) =>
-                posterFor(held.deviceId).endLapsedTurn(held.sessionId, held.turnId, held.threadId, {
+                posterOfHeld(held.deviceId)?.endLapsedTurn(held.sessionId, held.turnId, held.threadId, {
                     error: `the message was not sent: ${reason}`.slice(0, 1000),
                     reason: "failed",
                 }),

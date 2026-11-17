@@ -249,14 +249,18 @@ export class ServerAgents {
 
             const deadline = Date.now() + REMOVAL_FLUSH_MS;
 
+            await runtime.poster.persisted();
+
             while (runtime.poster.busy && Date.now() < deadline) {
                 // eslint-disable-next-line no-await-in-loop -- the posts go out on timers of their own; this only waits for them
                 await new Promise((resolve) => {
                     setTimeout(resolve, REMOVAL_POLL_MS);
                 });
+                // eslint-disable-next-line no-await-in-loop -- the state is persisted again after each wait
+                await runtime.poster.persisted();
             }
 
-            await runtime.poster.persisted();
+            // Nothing is awaited between the last check of `busy` and the stop, so no end can be queued in between.
             runtime.poster.stop();
             // Nothing may still run on the runtime being dropped: this also releases its sleep-lock source.
             runtime.acp.retire();
