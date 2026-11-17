@@ -161,6 +161,18 @@ describe("connect", () => {
 });
 
 describe("browse", () => {
+    it("names the resolved folder in the prompt when the request has a .. part, and lists that folder", async () => {
+        const { deps, machines } = setup();
+
+        mkdirSync(path.join(root, "a"));
+        const page = await machines.browse("desk-1", path.join(root, "a", ".."));
+
+        const resolved = JSON.stringify(realpathSync(root));
+
+        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: `Folder: ${resolved}` }));
+        expect(page.entries).toEqual([{ name: "a" }]);
+    });
+
     it("asks before looking at a folder, a missing one included, so a page learns nothing unseen", async () => {
         const { deps, machines } = setup();
 

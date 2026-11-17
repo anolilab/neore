@@ -117,17 +117,32 @@ const insertSmallest = (sorted: string[], name: string, size: number): void => {
 };
 
 /** Directory names of a folder on this computer; a symlink is neither a directory nor a file here, as on a server. */
-const browseLocal = async (requested: string, after: string | undefined, approve: (folder: string) => Promise<void>): Promise<MachineFolderPage> => {
-    // Asked before the folder is looked up at all, so a page learns nothing about this computer that the person did not see.
-    await approve(requested);
-
-    let folder: string;
-
+/** The real path of a folder, or null when it does not exist or cannot be read. */
+const resolveOrNull = async (folder: string): Promise<string | null> => {
     try {
-        folder = await realpath(requested);
+        return await realpath(folder);
     } catch {
+        return null;
+    }
+};
+
+const browseLocal = async (requested: string, after: string | undefined, approve: (folder: string) => Promise<void>): Promise<MachineFolderPage> => {
+    // The lookup comes first, but its answer is given only after the person says yes. The prompt names the folder that would be
+    // listed (the resolved one; for a missing folder, the normalised request), so what is approved is what gets listed.
+    const resolved = await resolveOrNull(requested);
+
+    await approve(resolved ?? path.resolve(requested));
+
+    if (resolved === null) {
         throw new Error("device: that folder was not found");
     }
+
+    // Looked up again after the answer: a folder swapped for a link while the prompt was open is not the one approved.
+    if (await resolveOrNull(requested) !== resolved) {
+        throw new Error("device: that folder changed while it was being approved; try again");
+    }
+
+    const folder = resolved;
 
     // Only the page and one more name are kept, so a folder of a million entries costs one page of memory.
     const kept: string[] = [];
