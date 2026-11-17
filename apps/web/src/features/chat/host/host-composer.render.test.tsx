@@ -276,12 +276,6 @@ const pickOption = async (user: ReturnType<typeof userEvent.setup>, select: HTML
 };
 
 describe("the coding-agent composer", () => {
-    beforeEach(() => {
-        harness.calls = [];
-        harness.sendResults = [];
-        // The popup brings its active command into view; jsdom has no layout, so the call is recorded instead.
-        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: vi.fn(), writable: true });
-    });
     it("is a focus area for F6, as the cloud composer is, so F6 reaches it", async () => {
         mount(session());
 
@@ -2097,6 +2091,13 @@ describe("what the agent reports about itself", () => {
 });
 
 describe("the agent's slash commands", () => {
+    beforeEach(() => {
+        harness.calls = [];
+        harness.sendResults = [];
+        // The popup brings its active command into view; jsdom has no layout, so the call is recorded instead.
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: vi.fn(), writable: true });
+    });
+
     const COMMANDS = [
         { description: "Compact the context", name: "compact" },
         { description: "Review the changes", hint: "a branch", name: "review" },
@@ -2178,7 +2179,19 @@ describe("the agent's slash commands", () => {
         const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
 
         typeInto(box, "/re");
-        fireEvent.mouseDown(screen.getAllByRole("option")[1]!);
+        fireEvent.click(screen.getAllByRole("option")[1]!);
+
+        await waitFor(() => expect(box.value).toBe("/resume "));
+        expect(harness.calls).toEqual([]);
+    });
+
+    it("inserts a command on a click alone, as assistive technology sends it, with no mouse-down before it", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+        fireEvent.click(screen.getAllByRole("option")[1]!);
 
         await waitFor(() => expect(box.value).toBe("/resume "));
         expect(harness.calls).toEqual([]);
@@ -2238,7 +2251,7 @@ describe("the agent's slash commands", () => {
         fireEvent.keyUp(box);
 
         expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([expect.stringContaining("/resume")]);
-        fireEvent.mouseDown(screen.getAllByRole("option")[0]!);
+        fireEvent.click(screen.getAllByRole("option")[0]!);
 
         await waitFor(() => expect(box.value).toBe("/re and /resume "));
     });
@@ -2262,7 +2275,7 @@ describe("the agent's slash commands", () => {
         const draft = `${"x".repeat(30_000 - 4)} /re`; // 30,000 is the send limit the mock above sets.
 
         typeInto(box, draft);
-        fireEvent.mouseDown(screen.getAllByRole("option")[1]!);
+        fireEvent.click(screen.getAllByRole("option")[1]!);
 
         expect(box.value).toBe(draft);
         expect(harness.calls).toEqual([]);
@@ -2299,7 +2312,7 @@ describe("the agent's slash commands", () => {
         typeInto(box, "/review and");
         box.setSelectionRange(3, 3);
         fireEvent.keyUp(box);
-        fireEvent.mouseDown(screen.getAllByRole("option")[0]!);
+        fireEvent.click(screen.getAllByRole("option")[0]!);
 
         await waitFor(() => expect(box.selectionStart).toBe(8));
         expect(box.value).toBe("/review and");

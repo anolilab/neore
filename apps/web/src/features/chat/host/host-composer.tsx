@@ -1092,14 +1092,17 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                             role="listbox"
                         >
                             {choices.map((command, index) => (
+                                // The keyboard picks from the box (aria-activedescendant), so an option is not focused and needs no key listener.
+                                // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- the box owns the keyboard path for these options
                                 <li
                                     aria-selected={index === active}
                                     className={cn("flex cursor-pointer flex-col gap-0.5 rounded px-2 py-1.5", index === active && "bg-accent")}
                                     id={`${listId}-${index}`}
                                     key={command.name}
+                                    onClick={() => pick(command)}
                                     onMouseDown={(event) => {
+                                        // Keeps the textarea focused; the pick runs on the click, which a touch or assistive technology also sends.
                                         event.preventDefault();
-                                        pick(command);
                                     }}
                                     role="option"
                                 >
