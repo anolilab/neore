@@ -14,7 +14,7 @@
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { callOnShard } from "../lib/cross-shard";
 import { decryptKey, encryptKey } from "../lib/encryption";
@@ -46,24 +46,41 @@ const SCOPE_BATCH = 10;
 export const MIN_MEMBERS_PER_GROUP = COHORT_SIZE;
 
 /**
- * Splits a walk's members into fixed groups of `MIN_MEMBERS_PER_GROUP`, in walk order. `closed` holds the full groups; `open` holds the
- * trailing members not yet in one, which are shown only when none of them was active.
+ * Splits a walk's members into one group per cohort. The walk is in cohort order, so each cohort's members are contiguous and each group is
+ * the cohort as the walk read it. A cohort's membership was fixed when its members were booked, so a group never changes between calls.
  */
-export const groupMembers = <Member extends { active: boolean }>(members: ReadonlyArray<Member>): { closed: Member[][]; open: Member[] } => {
-    const closed: Member[][] = [];
-    let open: Member[] = [];
+export const groupByCohort = <Member extends { cohort: number }>(members: ReadonlyArray<Member>): Member[][] => {
+    const groups: Member[][] = [];
 
     for (const member of members) {
-        open.push(member);
+        const last = groups.at(-1);
 
-        if (open.length === MIN_MEMBERS_PER_GROUP) {
-            closed.push(open);
-            open = [];
+        if (last !== undefined && last[0]?.cohort === member.cohort) {
+            last.push(member);
+        } else {
+            groups.push([member]);
         }
     }
 
-    return { closed, open };
+    return groups;
 };
+
+/**
+ * The walk's members without the cohort it stopped inside, when an earlier cohort exists; otherwise all of them, so a walk whose first cohort
+ * is cut short still moves on. `members` is in cohort order, so the cohort it stopped in is a suffix.
+ */
+export const withoutLastCohort = <Member extends { cohort: number }>(members: ReadonlyArray<Member>): Member[] => {
+    const last = members.at(-1)?.cohort;
+    const earlier = members.filter((member) => member.cohort !== last);
+
+    return earlier.length > 0 ? earlier : [...members];
+};
+
+/** Where a walk stands: the last member it has read, in cohort order. */
+export interface WalkPosition {
+    cohort: number;
+    userId: string;
+}
 
 /**
  * Whether a full group's sums are released: not withheld (see {@link pageWithheld}), and no member read past the ledger's ceiling. A
@@ -90,9 +107,50 @@ export const isOrganizationAdminRole = (role: string): boolean => role.split(","
 
 const vTotals = { costMicrodollars: v.number(), replies: v.number(), tokens: v.number() };
 
+/**
+ * One batch of an organization's contributors in walk order: by cohort, then user id, from the cursor's position on. The cursor's cohort is
+ * read from its user id on, then the later cohorts, so a booking that lands between two batches is not read twice or skipped.
+ */
+const contributorBatch = async (ctx: QueryCtx, organizationId: string, after?: WalkPosition): Promise<{ cohort: number; userId: string }[]> => {
+    const db = systemDb(ctx);
+    const limit = SCOPE_BATCH + 1;
+    const rows: { cohort: number; userId: string }[] = [];
+
+    if (after !== undefined) {
+        const { page } = await db.usageOrganizationContributors.findMany({
+            limit,
+            orderBy: [{ userId: "asc" }],
+            where: { cohort: after.cohort, organizationId, userId: { gt: after.userId } },
+        });
+
+        rows.push(
+            ...page.map((row) => {
+                return { cohort: row.cohort, userId: row.userId };
+            }),
+        );
+    }
+
+    if (rows.length < limit) {
+        const { page } = await db.usageOrganizationContributors.findMany({
+            limit: limit - rows.length,
+            orderBy: [{ cohort: "asc" }, { userId: "asc" }],
+            where: { organizationId, ...(after !== undefined && { cohort: { gt: after.cohort } }) },
+        });
+
+        rows.push(
+            ...page.map((row) => {
+                return { cohort: row.cohort, userId: row.userId };
+            }),
+        );
+    }
+
+    return rows;
+};
+
 /** The organization's projects and members, or `null` when `userId` is not one of its admins. */
 export const organizationUsageScope = internalQuery
     .input({
+        afterCohort: v.optional(v.number()),
         afterUserId: v.optional(v.string().max(MAX_LENGTH.id)),
         organizationId: v.string().max(MAX_LENGTH.id),
         userId: v.string().max(MAX_LENGTH.id),
@@ -103,7 +161,8 @@ export const organizationUsageScope = internalQuery
         v.union(
             v.null(),
             v.object({
-                memberIds: v.array(v.string()),
+                // In walk order: by cohort, then user id.
+                members: v.array(v.object({ cohort: v.number(), userId: v.string() })),
                 // Whether contributors follow this batch.
                 more: v.boolean(),
                 projects: v.array(v.object({ projectId: v.string(), title: v.string() })),
@@ -111,7 +170,7 @@ export const organizationUsageScope = internalQuery
             }),
         ),
     )
-    .query(async ({ args: { afterUserId, organizationId, userId, withProjects }, ctx }) => {
+    .query(async ({ args: { afterCohort, afterUserId, organizationId, userId, withProjects }, ctx }) => {
         // From the primary: a replica that still holds a revoked membership must not grant the view.
         const member = await getMemberByOrganizationAndUser(ctx, organizationId, userId, "primary");
 
@@ -122,23 +181,32 @@ export const organizationUsageScope = internalQuery
         // Everyone with rows under the organization, current members and those who left, a batch at a time by user id: a key no change moves,
         // so someone added mid-way is not counted twice.
         const [contributors, projects] = await Promise.all([
-            systemDb(ctx).usageOrganizationContributors.findMany({
-                limit: SCOPE_BATCH + 1,
-                orderBy: [{ userId: "asc" }],
-                where: { organizationId, ...(afterUserId !== undefined && { userId: { gt: afterUserId } }) },
-            }),
+            contributorBatch(
+                ctx,
+                organizationId,
+                afterCohort !== undefined && afterUserId !== undefined ? { cohort: afterCohort, userId: afterUserId } : undefined,
+            ),
             // From the primary: a project that just moved out must not still be listed, or its usage would show to the old organization's admins.
             withProjects === false
                 ? undefined
                 : systemDb(ctx).projects.findMany({ consistency: "primary", limit: MAX_PROJECTS + 1, where: { organizationId } }),
         ]);
         // Each member once: two entries for one member (a race while their first replies were recorded) must not count them twice.
-        const memberIds = [...new Set(contributors.page.slice(0, SCOPE_BATCH).map((row) => row.userId))];
+        const seen = new Set<string>();
+        const members = contributors.slice(0, SCOPE_BATCH).filter((row) => {
+            if (seen.has(row.userId)) {
+                return false;
+            }
+
+            seen.add(row.userId);
+
+            return true;
+        });
         const listed = projects?.page ?? [];
 
         return {
-            memberIds,
-            more: contributors.page.length > SCOPE_BATCH,
+            members,
+            more: contributors.length > SCOPE_BATCH,
             projects: listed.slice(0, MAX_PROJECTS).map((row) => {
                 return { projectId: row._id as string, title: row.title };
             }),
@@ -234,6 +302,7 @@ export const memberProjectUsage = internalQuery
 /** One member's usage as the walk reads it. */
 interface MemberWalk {
     active: boolean;
+    cohort: number;
     projects: { costMicrodollars: number; projectKey: string; replies: number; tokens: number }[];
     removed?: { costMicrodollars: number; replies: number; tokens: number };
     truncated: boolean;
@@ -254,11 +323,11 @@ export const CURSOR_TTL_MS = 60 * 60 * 1000;
  * period (`since`) it was issued for, and it expires after {@link CURSOR_TTL_MS}. A cursor the caller makes up, takes from another
  * organization or period, or keeps past its time, does not open.
  */
-export const sealOrganizationCursor = async (organizationId: string, userId: string, since: number, issuedAt = Date.now()): Promise<string> =>
-    await encryptKey(JSON.stringify({ issuedAt, organizationId, since, userId }), "usage-cursor");
+export const sealOrganizationCursor = async (organizationId: string, position: WalkPosition, since: number, issuedAt = Date.now()): Promise<string> =>
+    await encryptKey(JSON.stringify({ cohort: position.cohort, issuedAt, organizationId, since, userId: position.userId }), "usage-cursor");
 
-export const openOrganizationCursor = async (organizationId: string, since: number, cursor: string, now = Date.now()): Promise<string> => {
-    let opened: { issuedAt?: unknown; organizationId?: unknown; since?: unknown; userId?: unknown } | undefined;
+export const openOrganizationCursor = async (organizationId: string, since: number, cursor: string, now = Date.now()): Promise<WalkPosition> => {
+    let opened: { cohort?: unknown; issuedAt?: unknown; organizationId?: unknown; since?: unknown; userId?: unknown } | undefined;
 
     try {
         opened = JSON.parse(await decryptKey(cursor, "usage-cursor")) as typeof opened;
@@ -268,11 +337,18 @@ export const openOrganizationCursor = async (organizationId: string, since: numb
 
     const fresh = typeof opened?.issuedAt === "number" && now - opened.issuedAt <= CURSOR_TTL_MS;
 
-    if (!opened || opened.organizationId !== organizationId || opened.since !== since || !fresh || typeof opened.userId !== "string") {
+    if (
+        !opened ||
+        opened.organizationId !== organizationId ||
+        opened.since !== since ||
+        !fresh ||
+        typeof opened.userId !== "string" ||
+        typeof opened.cohort !== "number"
+    ) {
         return throwForbidden("The usage page is not valid; load the organization's usage again.");
     }
 
-    return opened.userId;
+    return { cohort: opened.cohort, userId: opened.userId };
 };
 
 export const getOrganizationProjectUsage = authAction
@@ -297,8 +373,8 @@ export const getOrganizationProjectUsage = authAction
             return throwForbidden("Only organization admins can see the organization's usage.");
         }
 
-        // The walk resumes after the last member asked; it starts at the cursor's member, if there is one.
-        let resume = cursor === undefined ? undefined : await openOrganizationCursor(organizationId, since, cursor);
+        // The walk resumes after the last member asked, in cohort order; it starts at the cursor's member, if there is one.
+        let resume: WalkPosition | undefined = cursor === undefined ? undefined : await openOrganizationCursor(organizationId, since, cursor);
         const walked: MemberWalk[] = [];
         // The project list is read once, with the call's first batch: every member of the call is then summed against the same list.
         let projects: { projectId: string; title: string }[] | undefined;
@@ -309,7 +385,7 @@ export const getOrganizationProjectUsage = authAction
             const scope = await ctx.runQuery(internal.usage.organization.organizationUsageScope, {
                 organizationId,
                 userId: ctx.user.userId,
-                ...(resume !== undefined && { afterUserId: resume }),
+                ...(resume !== undefined && { afterCohort: resume.cohort, afterUserId: resume.userId }),
                 withProjects: projects === undefined,
             });
 
@@ -323,9 +399,8 @@ export const getOrganizationProjectUsage = authAction
             }
 
             const projectIds = projects.map((project) => project.projectId);
-            const batch = scope.memberIds;
+            const batch = scope.members;
             let stopped = false;
-            let budgetStop = false;
 
             let index = 0;
 
@@ -336,7 +411,6 @@ export const getOrganizationProjectUsage = authAction
 
                 if (size <= 0) {
                     stopped = true;
-                    budgetStop = true;
                     break;
                 }
 
@@ -346,7 +420,7 @@ export const getOrganizationProjectUsage = authAction
                 // Asked even with no projects left: a member's replies to projects that left the organization still count, as `removed`.
                 const results = await Promise.all(
                     chunk.map(
-                        async (userId) =>
+                        async ({ userId }) =>
                             await callOnShard(
                                 internal.usage.organization.memberProjectUsage,
                                 { organizationId, projectIds, projectsListed: !projectsCut, since, userId },
@@ -356,32 +430,25 @@ export const getOrganizationProjectUsage = authAction
                 );
 
                 for (const [position, result] of results.entries()) {
-                    walked.push({ ...result, userId: chunk[position] ?? "" });
-                    resume = chunk[position];
+                    const member = chunk[position];
 
-                    // The call stops once it has enough members and its groups are closed.
-                    const { open } = groupMembers(walked);
+                    if (member === undefined) {
+                        break;
+                    }
 
-                    if (walked.length >= MAX_MEMBERS_PER_CALL && open.length === 0) {
+                    walked.push({ ...result, cohort: member.cohort, userId: member.userId });
+                    resume = { cohort: member.cohort, userId: member.userId };
+
+                    // The call stops once it has enough members; the cohort it stops in is cut back below unless the walk has passed it.
+                    if (walked.length >= MAX_MEMBERS_PER_CALL) {
                         stopped = true;
                         break;
                     }
                 }
             }
 
-            // The call budget ran out inside an open group: the call stops after its last closed group instead, so the next call walks the open
-            // members again, in fresh groups, rather than losing them. With no closed group yet, the open group stays as it is (partial).
-            if (budgetStop) {
-                const closedCount = groupMembers(walked).closed.flat().length;
-
-                if (closedCount > 0 && closedCount < walked.length) {
-                    walked.splice(closedCount);
-                    resume = walked.at(-1)?.userId;
-                }
-            }
-
             if (stopped) {
-                remaining = resume !== batch.at(-1) || scope.more;
+                remaining = resume?.userId !== batch.at(-1)?.userId || scope.more;
                 break;
             }
 
@@ -392,13 +459,27 @@ export const getOrganizationProjectUsage = authAction
 
         const listed = projects ?? [];
 
-        // A full group is shown when none of its members was active or all were; a group with some active members is withheld whole. The
-        // trailing members are shown only when none of them was active.
-        const { closed, open } = groupMembers(walked);
-        const releasedGroups = closed.filter((group) => groupReleased(group));
-        const groupsWithheld = releasedGroups.length < closed.length;
-        const openWithheld = pageWithheld(open);
-        const shown = [...releasedGroups.flat(), ...(openWithheld ? [] : open)];
+        // The walk stopped inside a cohort: that cohort is cut back to the cohort before it, and the next call walks it whole. A cohort is
+        // released only once the walk has passed it or read every member. With no earlier cohort, the partial one stays (a booking race
+        // can make a cohort very large, and the walk must still move on).
+        if (remaining) {
+            const kept = withoutLastCohort(walked).length;
+
+            if (kept < walked.length) {
+                walked.splice(kept);
+
+                const tail = walked.at(-1);
+
+                resume = tail === undefined ? undefined : { cohort: tail.cohort, userId: tail.userId };
+            }
+        }
+
+        // A cohort is shown when none of its members was active or all were; a cohort with some active members is withheld whole, and so is one
+        // smaller than a cohort (`pageWithheld`).
+        const groups = groupByCohort(walked);
+        const releasedGroups = groups.filter((group) => groupReleased(group));
+        const groupsWithheld = releasedGroups.length < groups.length;
+        const shown = releasedGroups.flat();
         const removed = { costMicrodollars: 0, replies: 0, tokens: 0 };
         const sums = new Map(
             listed.map((project) => [project.projectId, { costMicrodollars: 0, projectKey: project.projectId, replies: 0, title: project.title, tokens: 0 }]),
@@ -460,6 +541,7 @@ export const getOrganizationProjectUsage = authAction
         ctx.log.event("usage.get_organization_project_usage", { members: walked.length, projects: listed.length });
 
         const nextCursor = remaining && resume !== undefined ? await sealOrganizationCursor(organizationId, resume, since) : undefined;
+        // `walked` is in cohort order, so its last member is the position the walk reached.
 
         return {
             ...(nextCursor !== undefined && { nextCursor }),
@@ -471,7 +553,7 @@ export const getOrganizationProjectUsage = authAction
             ...(removed.replies > 0 && { removed }),
             // A member's own truncation is never copied out: it would show that one member had more rows than the read takes. Their group is
             // withheld instead, which says only that some group is partial.
-            truncated: projectsCut || openWithheld || groupsWithheld || someWithheld,
+            truncated: projectsCut || groupsWithheld || someWithheld,
         };
     });
 

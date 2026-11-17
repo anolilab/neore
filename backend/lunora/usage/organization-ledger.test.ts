@@ -213,24 +213,24 @@ describe("the organization ledger", () => {
         });
 
         const scope = (await harness.run(async (ctx: any) => await ctx.runQuery(organizationUsageScope, { organizationId: "org-1", userId: ADMIN }))) as {
-            memberIds: string[];
+            members: { cohort: number; userId: string }[];
         } | null;
 
-        expect(scope?.memberIds).toContain(MEMBER);
+        expect(scope?.members.map((entry: { userId: string }) => entry.userId)).toContain(MEMBER);
     });
 
     it("lists a member once, even when two entries exist for them", async () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "admin", userId: ADMIN });
-            await ctx.db.insert("usageOrganizationContributors", { createdAt: 1, organizationId: "org-1", userId: MEMBER });
-            await ctx.db.insert("usageOrganizationContributors", { createdAt: 2, organizationId: "org-1", userId: MEMBER });
+            await ctx.db.insert("usageOrganizationContributors", { cohort: 0, createdAt: 1, organizationId: "org-1", userId: MEMBER });
+            await ctx.db.insert("usageOrganizationContributors", { cohort: 0, createdAt: 2, organizationId: "org-1", userId: MEMBER });
         });
 
         const scope = (await harness.run(async (ctx: any) => await ctx.runQuery(organizationUsageScope, { organizationId: "org-1", userId: ADMIN }))) as {
-            memberIds: string[];
+            members: { cohort: number; userId: string }[];
         } | null;
 
-        expect(scope?.memberIds).toEqual([MEMBER]);
+        expect(scope?.members.map((entry: { userId: string }) => entry.userId)).toEqual([MEMBER]);
     });
 
     it("collects every page of the ledger for the export in reply-time order, and past its budget keeps the newest rows and says it cut the oldest", async () => {
@@ -286,12 +286,12 @@ describe("the organization ledger", () => {
 
         await harness.scheduler.runPending();
         const scope = (await harness.run(async (ctx: any) => await ctx.runQuery(organizationUsageScope, { organizationId: "org-1", userId: ADMIN }))) as {
-            memberIds: string[];
+            members: { cohort: number; userId: string }[];
         } | null;
 
         expect(pruned).toBe(1);
         expect(await orgUsage("org-1", [project], 0)).toEqual({ projects: [], truncated: false });
-        expect(scope?.memberIds).not.toContain(MEMBER);
+        expect(scope?.members.map((entry: { userId: string }) => entry.userId)).not.toContain(MEMBER);
     });
 
     it("removes every contributor entry of a member left with no rows, not only the first", async () => {
@@ -305,7 +305,7 @@ describe("the organization ledger", () => {
         await record(project, 1000);
         // A second entry, as two first replies recorded at once would leave.
         await harness.run(async (ctx: any) => {
-            await ctx.db.insert("usageOrganizationContributors", { createdAt: 2, organizationId: "org-1", userId: MEMBER });
+            await ctx.db.insert("usageOrganizationContributors", { cohort: 0, createdAt: 2, organizationId: "org-1", userId: MEMBER });
         });
         await harness.run(async (ctx: any) => await pruneOrganizationRepliesBefore(ctx, 2000, 100));
         await harness.scheduler.runPending();
@@ -335,7 +335,7 @@ describe("the organization ledger", () => {
 
         // An entry with no rows under it, as a reply whose mutation aborted would leave.
         await harness.run(async (ctx: any) => {
-            await ctx.db.insert("usageOrganizationContributors", { createdAt: 2, organizationId: "org-1", userId: MEMBER });
+            await ctx.db.insert("usageOrganizationContributors", { cohort: 0, createdAt: 2, organizationId: "org-1", userId: MEMBER });
         });
         await reconcile();
 
@@ -359,7 +359,7 @@ describe("the organization ledger", () => {
 
         await record(project, 1000);
         await harness.run(async (ctx: any) => {
-            await ctx.db.insert("usageOrganizationContributors", { createdAt: 2, organizationId: "org-1", userId: MEMBER });
+            await ctx.db.insert("usageOrganizationContributors", { cohort: 0, createdAt: 2, organizationId: "org-1", userId: MEMBER });
         });
         await harness.run(async (ctx: any) => await ctx.runMutation(reconcileOrganizationContributor, { organizationId: "org-1", userId: MEMBER }));
 

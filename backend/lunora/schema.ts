@@ -3886,6 +3886,14 @@ export const schema = defineSchema({
         .index("by_deleteAt", ["deleteAt"])
         .index("by_userId", ["userId"])
         .index("by_requestId", ["requestId"]),
+    // The number of contributors ever booked under an organization, which places the next one in its cohort (`usage/cohorts.ts`).
+    usageOrganizationCohorts: defineTable({
+        booked: v.number(),
+        organizationId: v.string(),
+    })
+        .global()
+        .index("by_organization", ["organizationId"], { unique: true }),
+
     // Everyone with ledger rows under an organization, whether or not they are still a member: the organization view lists these, so a
     // member who leaves keeps counting. Global, so the live path, the view and erasure reach it from any shard.
     usageOrganizationContributors: defineTable({
@@ -3899,14 +3907,6 @@ export const schema = defineSchema({
         .index("by_organization_and_user", ["organizationId", "userId"])
         .index("by_organization_and_cohort", ["organizationId", "cohort", "userId"])
         .index("by_user", ["userId"]),
-
-    // The number of contributors ever booked under an organization, which places the next one in its cohort (`usage/cohorts.ts`).
-    usageOrganizationCohorts: defineTable({
-        booked: v.number(),
-        organizationId: v.string(),
-    })
-        .global()
-        .index("by_organization", ["organizationId"], { unique: true }),
 
     // One row per reply filed under a project the user's organization owns, when the reply is recorded. The organization view sums
     // these by instant, so a project moved into an organization later does not expose its earlier usage, and a reply stays with the
