@@ -25,6 +25,7 @@ import {
     FOOTPRINT_PAGE_SIZE,
     finishCurrentThread,
     forCursor,
+    withRootShard,
     type FootprintState,
     MAX_SHARD_CALLS_PER_ACTION,
     type PendingShard,
@@ -510,13 +511,20 @@ export const getShardFootprint = adminAction
 
         if (!isShardRoutingEnabled(env)) {
             cursor = rootOnlyCensus(carried, ROOT_SHARD_KEY);
-        } else if (!carried.censusDone && carried.pending.length < SHARDS_PER_CALL) {
-            const page = await ctx.runQuery(internal.admin.cleanup.listShardKeysPage, {
-                cursor: carried.census ?? undefined,
-                limit: SHARDS_PER_CALL - carried.pending.length,
-            });
+        } else if (!carried.censusDone) {
+            // The root shard holds anonymous conversations that no user row owns, so the first call measures it too.
+            const seeded = withRootShard(carried, ROOT_SHARD_KEY);
 
-            cursor = addCensusPage(carried, page);
+            cursor = seeded;
+
+            if (seeded.pending.length < SHARDS_PER_CALL) {
+                const page = await ctx.runQuery(internal.admin.cleanup.listShardKeysPage, {
+                    cursor: seeded.census ?? undefined,
+                    limit: SHARDS_PER_CALL - seeded.pending.length,
+                });
+
+                cursor = addCensusPage(seeded, page);
+            }
         }
 
         const entries: ScanEntry[] = cursor.pending.map(({ shardKey, state }) => {

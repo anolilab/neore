@@ -93,6 +93,18 @@ export const rootOnlyCensus = (carried: CensusCursor, rootShardKey: string): Cen
     return { census: null, censusDone: true, pending: [...carried.pending, { shardKey: rootShardKey, state: startFootprint() }] };
 };
 
+/**
+ * The first call of a census also measures the root shard. Anonymous conversations (guest links, no
+ * user shard) are written to the root shard, and no user row owns them, so the user walk misses them.
+ */
+export const withRootShard = (carried: CensusCursor, rootShardKey: string): CensusCursor => {
+    if (carried.census !== null || carried.censusDone || carried.pending.some((entry) => entry.shardKey === rootShardKey)) {
+        return carried;
+    }
+
+    return { ...carried, pending: [...carried.pending, { shardKey: rootShardKey, state: startFootprint() }] };
+};
+
 /** The row's JSON encoding in UTF-8 bytes. An estimate: the stored form is not JSON. */
 export const approxRowBytes = (row: unknown): number => new TextEncoder().encode(JSON.stringify(row)).byteLength;
 

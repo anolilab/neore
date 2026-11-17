@@ -20,6 +20,7 @@ import {
     type ScanEntry,
     startCensus,
     startFootprint,
+    withRootShard,
 } from "./shard-footprint-logic";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -251,6 +252,14 @@ describe("census scheduling", () => {
         expect(decodeCensusCursor(encoded)?.pending[0]?.state.largest).toEqual([]);
         expect(decodeCensusCursor("not a cursor!")).toBeUndefined();
         expect(decodeCensusCursor(btoa(JSON.stringify({ census: 1 })))).toBeUndefined();
+    });
+
+    it("seeds the root shard into the first call only, so anonymous conversations are measured once", () => {
+        const first = withRootShard(startCensus(), "__root__");
+
+        expect(first.pending).toEqual([{ shardKey: "__root__", state: startFootprint() }]);
+        expect(withRootShard(first, "__root__")).toEqual(first);
+        expect(withRootShard({ census: "next-page", censusDone: false, pending: [] }, "__root__").pending).toEqual([]);
     });
 
     it("measures the root shard once when routing is collapsed, however often it is asked", () => {
