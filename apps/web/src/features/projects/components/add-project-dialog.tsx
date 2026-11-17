@@ -242,7 +242,8 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
                 }
 
                 if (created.ok) {
-                    setMessage(t`Created ${path}`);
+                    // Names the folder the desktop made or found, which is the resolved path, not the one typed.
+                    setMessage(created.value.created ? t`Created ${created.value.path}` : "");
                     result = await attempt(() => bridge.browseMachineFolders({ machineId: id, path: created.value.path }));
 
                     if (!isCurrent()) {
