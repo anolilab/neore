@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { findEmojiShortcodeQuery } from "./trigger";
+import { findEmojiShortcodeQuery, readEmojiShortcodeToken } from "./trigger";
 
 describe("findEmojiShortcodeQuery", () => {
     it.each([
@@ -46,5 +46,10 @@ describe("findEmojiShortcodeQuery", () => {
 
     it("reads the query after the last colon only", () => {
         expect(findEmojiShortcodeQuery(":dog :spee")).toEqual({ query: "spee", startOffset: 5 });
+    });
+
+    it("reports a shorter shortcode that does not open the list, so a dismissal can hold through it", () => {
+        expect(readEmojiShortcodeToken("hi :d")).toEqual({ query: "d", startOffset: 3 });
+        expect(findEmojiShortcodeQuery("hi :d")).toBeNull();
     });
 });

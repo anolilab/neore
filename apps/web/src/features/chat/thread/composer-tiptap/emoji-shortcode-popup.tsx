@@ -37,10 +37,10 @@ const EmojiShortcodePopup: FC<EmojiShortcodePopupProps> = ({ editorRect, listbox
     const { t } = useLingui();
     const selectedRef = useRef<HTMLButtonElement>(null);
 
-    // Arrow keys move the highlight; the row it lands on scrolls into view within the capped list.
+    // Arrow keys move the highlight, and a reopened list starts at the top: either way the highlighted row scrolls into view.
     useEffect(() => {
         selectedRef.current?.scrollIntoView({ block: "nearest" });
-    }, [selected]);
+    }, [open, selected]);
 
     if (!open || !editorRect) {
         return null;

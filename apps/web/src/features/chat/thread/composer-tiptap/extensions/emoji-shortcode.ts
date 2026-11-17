@@ -9,11 +9,13 @@ import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { EditorState } from "@tiptap/pm/state";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 
-import { findEmojiShortcodeQuery } from "../emoji-shortcode/trigger";
+import { isOpenableShortcodeQuery, readEmojiShortcodeToken } from "../emoji-shortcode/trigger";
 
 export interface EmojiShortcodeMatch {
     /** ProseMirror doc position of the colon. */
     from: number;
+    /** Whether the list may open for it: the query is long enough. A shorter one is still reported, to keep a dismissal. */
+    openable: boolean;
     /** Lower-cased text typed after the colon. */
     query: string;
     /** ProseMirror doc position of the caret, the end of the query. */
@@ -48,7 +50,7 @@ export const readEmojiShortcodeMatch = (state: EditorState): EmojiShortcodeMatch
     // Only a window before the caret is read, so a long draft costs no more per keystroke than a short one. A window that
     // starts mid-block cannot see what precedes its first character, so a colon there is not taken.
     const windowStart = Math.max(0, $pos.parentOffset - TEXT_WINDOW);
-    const found = findEmojiShortcodeQuery($pos.parent.textBetween(windowStart, $pos.parentOffset, undefined, leafText));
+    const found = readEmojiShortcodeToken($pos.parent.textBetween(windowStart, $pos.parentOffset, undefined, leafText));
 
     if (!found || (windowStart > 0 && found.startOffset === 0)) {
         return null;
@@ -61,11 +63,16 @@ export const readEmojiShortcodeMatch = (state: EditorState): EmojiShortcodeMatch
         return null;
     }
 
-    return { from: $pos.start() + windowStart + found.startOffset, query: found.query, to: selection.from };
+    return {
+        from: $pos.start() + windowStart + found.startOffset,
+        openable: isOpenableShortcodeQuery(found.query),
+        query: found.query,
+        to: selection.from,
+    };
 };
 
 const sameMatch = (a: EmojiShortcodeMatch | null, b: EmojiShortcodeMatch | null): boolean =>
-    a === b || (a !== null && b !== null && a.from === b.from && a.to === b.to && a.query === b.query);
+    a === b || (a !== null && b !== null && a.from === b.from && a.to === b.to && a.query === b.query && a.openable === b.openable);
 
 const emojiShortcodePluginKey = new PluginKey("emojiShortcode");
 

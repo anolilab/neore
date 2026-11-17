@@ -318,4 +318,21 @@ describe("composer emoji shortcodes", () => {
 
         expect(ref.current?.getEditor()?.getText()).toBe(`${draft}${expected[0]!.emoji}`);
     });
+
+    it("stays closed when Backspace shortens the dismissed shortcode and typing restores it", async () => {
+        const { ref } = renderEditor();
+
+        await typeText(ref, ":dog");
+        await optionsOf();
+        fireEvent.keyDown(editableWhileOpen(), { key: "Escape" });
+
+        // Removes "og", leaving ":d": too short to open the list, but still the shortcode that was closed.
+        act(() => {
+            ref.current!.getEditor()!.commands.deleteRange({ from: 3, to: 5 });
+        });
+        await typeText(ref, "o");
+
+        expect(ref.current?.getEditor()?.getText()).toBe(":do");
+        expect(screen.queryByRole("listbox", { name: "Emoji suggestions" })).toBeNull();
+    });
 });

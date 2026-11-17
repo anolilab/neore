@@ -78,9 +78,11 @@ export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmo
         setDismissed(null);
     }
 
+    // A query too short to open the list is still tracked for a dismissal, but it searches nothing.
+    const openable = match?.openable === true;
     const suggestions = useMemo(
-        () => (enabled && index !== undefined && query !== undefined ? searchEmojiShortcodes(index, query) : NO_SUGGESTIONS),
-        [enabled, index, query],
+        () => (enabled && index !== undefined && openable && query !== undefined ? searchEmojiShortcodes(index, query) : NO_SUGGESTIONS),
+        [enabled, index, openable, query],
     );
 
     // The same shortcode, grown or shrunk by typing or Backspace, stays closed; a different one at that place does not.
@@ -89,7 +91,7 @@ export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmo
         dismissed !== null &&
         match.from === dismissed.from &&
         (match.query.startsWith(dismissed.query) || dismissed.query.startsWith(match.query));
-    const showing = enabled && focused && match !== null && !isDismissed;
+    const showing = enabled && focused && openable && !isDismissed;
     const open = showing && suggestions.length > 0;
     const selected = Math.min(activeIndex, Math.max(suggestions.length - 1, 0));
 
