@@ -218,6 +218,22 @@ export const documentHistory = sqliteTable("documentHistory", {
     by_ts: index("by_ts").on(t.ts),
 }));
 
+export const feedback = sqliteTable("feedback", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    createdAt: real("createdAt").notNull(),
+    images: text("images", { mode: "json" }).$type<Array<{ contentType: string; key: string; size: number }>>().notNull(),
+    kind: text("kind", { mode: "json" }).$type<"idea" | "problem" | "other">().notNull(),
+    message: text("message").notNull(),
+    pagePath: text("pagePath"),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+    by_userId_createdAt: index("by_userId_createdAt").on(t.userId, t.createdAt),
+    by_createdAt: index("by_createdAt").on(t.createdAt),
+    by_kind_createdAt: index("by_kind_createdAt").on(t.kind, t.createdAt),
+}));
+
 export const invitation = sqliteTable("invitation", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

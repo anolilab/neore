@@ -449,6 +449,8 @@ for a schema table that is neither policed nor listed:
 | `evals_functions.startRun` | mutation | authMutation + RL | evalDatasets, evalRuns, knowledgeFiles, skills | owner helper | ok |
 | `evals_functions.updateCase` | mutation | authMutation + RL | evalCases | owner helper | ok |
 | `evals_functions.updateDataset` | mutation | authMutation + RL | evalDatasets | owner helper | ok |
+| `feedback_admin.listFeedback` | query | adminQuery | feedback, user | admin role; the admin RLS scope is what reads across users past the owner-only `feedback` policy; images return as short-lived signed URLs, never their storage keys; page size clamped to 50 | ok — new |
+| `feedback_functions.submitFeedback` | action | authAction + RL | feedback (via internal insert) | caller-scoped (ctx.user); upload ids resolve only under the caller's own staging key; still images only, size and count capped | ok — new |
 | `file.getChatFileExtraction` | query | authQuery | chatFileAccess, chatFiles | caller's own `chatFileAccess` grant on the id, else `null` (same as missing); returns the extraction STATUS only, never the text | ok — new |
 | `file.getChatFileImageUrl` | query | authQuery | chatFileAccess, chatFiles | caller's own `chatFileAccess` grant on the id, else `null` (same as missing); returns a short-lived signed display URL, never the storage key | ok — new |
 | `file.finalizeChatUpload` | action | authAction + RL | chatFiles, chatFileAccess (via `storeFile`) | key rebuilt under the CALLER's staging prefix from `uploadId`, else answered as expired; an object stamped for another purpose is refused; real size (per-kind cap), type (allowlist) and leading bytes re-checked; grant written for the caller only | ok — the bytes arrive on the TUS upload route (see HTTP routes) |
@@ -461,7 +463,7 @@ for a schema table that is neither policed nor listed:
 | `gdpr_functions.getGdprStatus` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `gdpr_functions.requestAccountDeletion` | mutation | authMutation + RL | gdprAuditLog, gdprRequests | identity (self-resolved) | ok |
 | `gdpr_functions.requestDataExport` | mutation | authMutation + RL | gdprAuditLog, gdprRequests | caller-scoped (ctx.user) | ok |
-| `home_overview.getHomeOverview` | query | authQuery | toolApprovalRuns, tasks, codingAgentRuns, subAgentRuns, threads, notifications, userSettings | caller-scoped (ctx.user) | ok — new; every read `where: { userId: caller }`, bounded |
+| `home_overview.getHomeOverview` | query | authQuery | toolApprovalRuns, tasks, codingAgentRuns, subAgentRuns, threads, notifications, userSettings, user, organizationPolicies | caller-scoped (ctx.user) | ok — new; row reads `where: { userId: caller }`, bounded, chats by id from the caller's own rows; for the Daily Brief offer, only when otherwise eligible, the caller's own `user` row and the policy of `ctx.user.activeOrganization` (from the session, never args; primary read) |
 | `knowledge_agent_assignment.assignToProject` | mutation | authMutation + RL | knowledgeFiles, projectKnowledge, projects | row.userId == caller | ok |
 | `knowledge_agent_assignment.getProjectKnowledge` | query | authQuery | projects | row.userId == caller | ok |
 | `knowledge_agent_assignment.unassignFromProject` | mutation | authMutation + RL | knowledgeFiles, projects | row.userId == caller | ok |
@@ -502,6 +504,7 @@ for a schema table that is neither policed nor listed:
 | `messenger_functions.regeneratePairingCode` | mutation | authMutation + RL | messengerConnections | row.userId == caller | ok — new; owner-only, rate-limited; code returned once, stored as SHA-256 |
 | `messenger_functions.updateConnectionReplyTools` | mutation | authMutation + RL | messengerConnections | row.userId == caller | ok — new; owner-only, rate-limited; groups normalised to a fixed list (`messenger/lib/reply-tools.ts`) |
 | `messenger_functions.updateConnectionStatus` | mutation | authMutation + RL | — | row.userId == caller | ok |
+| `notifications_daily_brief.dismissDailyBriefOffer` | mutation | authMutation + RL | userSettings | caller-scoped (ctx.user) | ok — new |
 | `notifications_daily_brief.setDailyBriefEnabled` | mutation | authMutation + RL | userSettings, dailyBriefState | caller-scoped (ctx.user) | ok — new |
 | `notifications_task_email.setTaskEmailEnabled` | mutation | authMutation + RL | userSettings | caller-scoped (ctx.user) | ok — new |
 | `notifications_functions.getNotificationInbox` | query | authQuery | notifications | caller-scoped (ctx.user) | ok — new |

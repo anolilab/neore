@@ -31,6 +31,7 @@ import {
     vDeviceTransport,
 } from "./devices/validators";
 import { embed } from "./embed";
+import { vFeedbackKind } from "./feedback/validators";
 import {
     vEvalCheck,
     vEvalCheckResult,
@@ -1070,6 +1071,28 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_user_and_status", ["userId", "status"])
         .index("by_dataset_and_createdAt", ["datasetId", "createdAt"]),
+
+    /**
+     * What a user sent through "Send feedback": a kind, their text, up to
+     * `MAX_FEEDBACK_IMAGES` images (R2 keys under `feedback/<userId>/`) and,
+     * when they agreed, the path of the page it was sent from.
+     */
+    feedback: defineTable({
+        createdAt: v.number(),
+        images: v.array(v.object({ contentType: v.string(), key: v.string(), size: v.number() })),
+        kind: vFeedbackKind,
+        message: v.string(),
+        pagePath: v.optional(v.string()),
+        userId: v.string(),
+    })
+        // `.global()`, not `.shardBy("userId")`: read across users by the admins.
+        .global()
+        .index("by_userId", ["userId"])
+        // One user's rows oldest first, for the export; the admins read across users by time.
+        .index("by_userId_createdAt", ["userId", "createdAt"])
+        .index("by_createdAt", ["createdAt"])
+        // The admins' list filtered to one kind, so a rare kind does not walk every newer row.
+        .index("by_kind_createdAt", ["kind", "createdAt"]),
 
     files: defineTable({
         chatId: v.optional(v.string()),
@@ -3728,6 +3751,8 @@ export const schema = defineSchema({
         customInstructions: v.optional(v.string()),
         // Opt-in morning summary (`notifications/daily-brief.ts`). Absent = off.
         dailyBriefEnabled: v.optional(v.boolean()),
+        // When the user answered "Not now" to the home page's one-time Daily Brief offer (`home/overview.ts`). Server-written only. Absent = not answered.
+        dailyBriefOfferDismissedAt: v.optional(v.number()),
         // Appearance: UI spacing preset (accepted values: `auth/fields.ts`).
         density: v.optional(v.string()),
         dictationLanguage: v.optional(v.string()),

@@ -1,7 +1,8 @@
 /**
  * The home page's failure path: a failed overview reads as an alert with a
  * retry, and the retry asks for the overview again. A sub-agent waiting on its
- * owner's approval reads as waiting, not running.
+ * owner's approval reads as waiting, not running. The Daily Brief offer shows
+ * only on the signed-in account's own overview.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -11,7 +12,7 @@ import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => {
-    return { overview: null as unknown, overviewCalls: 0, shouldFail: true };
+    return { overview: null as unknown, overviewCalls: 0, shouldFail: true, userId: "user-a" };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -50,7 +51,10 @@ vi.mock("@/lib/lunora/crpc", () => {
 
     return {
         useCRPC: () => {
-            return { home: { overview: { getHomeOverview: overview } }, notifications: { daily_brief: { setDailyBriefEnabled: mutation } } };
+            return {
+                home: { overview: { getHomeOverview: overview } },
+                notifications: { daily_brief: { dismissDailyBriefOffer: mutation, setDailyBriefEnabled: mutation } },
+            };
         },
     };
 });
@@ -71,6 +75,14 @@ vi.mock("@/features/notifications/hooks/use-notification-inbox", () => {
     };
 });
 
+vi.mock("@/features/auth/hooks/use-auth-session", () => {
+    return {
+        useAuthSession: () => {
+            return { data: { user: { id: harness.userId } } };
+        },
+    };
+});
+
 vi.mock("@/features/notifications/components/notification-list", () => {
     return { default: () => null };
 });
@@ -79,16 +91,20 @@ const { default: HomePage } = await import("./home-page");
 
 const mount = () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = () => createElement(QueryClientProvider, { client: queryClient }, createElement(HomePage));
+    const view = render(tree());
 
-    return render(createElement(QueryClientProvider, { client: queryClient }, createElement(HomePage)));
+    return { ...view, queryClient, rerenderPage: () => view.rerender(tree()) };
 };
 
 afterEach(() => {
     harness.overview = null;
     harness.overviewCalls = 0;
     harness.shouldFail = true;
+    harness.userId = "user-a";
 });
 
+const DISMISSED = /we won't ask again/u;
 const WAITING_ROW = /Delete the old files/u;
 const RUNNING_ROW = /Sort the inbox/u;
 
@@ -99,6 +115,7 @@ describe("home page sub-agents", () => {
             approvals: [],
             codingAgents: [],
             dailyBriefEnabled: true,
+            dailyBriefOffer: false,
             notifications: [],
             recentThreads: [],
             reviews: [],
@@ -108,6 +125,7 @@ describe("home page sub-agents", () => {
                 { _id: "run-2", childThreadId: "child-2", createdAt: 2, parentThreadId: "thread-2", status: "running", task: "Sort the inbox" },
             ],
             unreadCount: 0,
+            userId: "user-a",
         };
         mount();
 
@@ -117,6 +135,58 @@ describe("home page sub-agents", () => {
         // The approval is answered in the sub-agent's own thread; a running one is followed from its parent's.
         expect(waiting.getAttribute("href")).toBe("/chat/child-1");
         expect(screen.getByRole("link", { name: RUNNING_ROW }).getAttribute("href")).toBe("/chat/thread-2");
+    });
+});
+
+describe("home page Daily Brief offer", () => {
+    const offeredTo = (userId: string) => {
+        return {
+            approvals: [],
+            codingAgents: [],
+            dailyBriefEnabled: false,
+            dailyBriefOffer: true,
+            notifications: [],
+            recentThreads: [],
+            reviews: [],
+            runningTasks: [],
+            subAgents: [],
+            unreadCount: 0,
+            userId,
+        };
+    };
+
+    it("offers nothing on another account's cached overview", async () => {
+        // Signing in another account keeps the last one's overview in the cache until it is fetched again.
+        harness.shouldFail = false;
+        harness.overview = offeredTo("user-a");
+        harness.userId = "user-b";
+        mount();
+
+        await screen.findByText("Nothing is waiting on you.");
+
+        expect(screen.queryByRole("button", { name: "Turn it on" })).toBeNull();
+    });
+
+    it("starts over for another account after an in-place switch", async () => {
+        harness.shouldFail = false;
+        harness.overview = offeredTo("user-a");
+
+        const { queryClient, rerenderPage } = mount();
+
+        fireEvent.click(await screen.findByRole("button", { name: "Not now" }));
+        await screen.findByText(DISMISSED);
+
+        harness.userId = "user-b";
+        rerenderPage();
+
+        expect(screen.queryByText(DISMISSED)).toBeNull();
+        expect(screen.queryByRole("button", { name: "Not now" })).toBeNull();
+
+        harness.overview = offeredTo("user-b");
+        await queryClient.invalidateQueries();
+
+        expect(await screen.findByRole("button", { name: "Not now" })).toBeTruthy();
+        expect(screen.queryByText(DISMISSED)).toBeNull();
     });
 });
 
