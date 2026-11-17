@@ -26,6 +26,11 @@ export class SleepLock {
 
     /** Records whether `source` has a turn running, and holds or releases the inhibitor to match. */
     public report(source: object, running: boolean): void {
+        // Only a change of state touches the platform: output updates report the same state again and cost nothing.
+        if (this.running.has(source) === running) {
+            return;
+        }
+
         if (running) {
             this.running.add(source);
         } else {
@@ -53,14 +58,13 @@ export class SleepLock {
                 return;
             }
 
+            // The id stays until the stop is confirmed, so a stop that throws can be retried by the next release.
             if (this.blockerId !== undefined) {
-                const id = this.blockerId;
+                if (this.blocker.isStarted(this.blockerId)) {
+                    this.blocker.stop(this.blockerId);
+                }
 
                 this.blockerId = undefined;
-
-                if (this.blocker.isStarted(id)) {
-                    this.blocker.stop(id);
-                }
             }
         } catch (error) {
             this.log?.(`[keep-awake] could not ${wanted ? "hold" : "release"} the sleep lock: ${(error as Error).message}`);

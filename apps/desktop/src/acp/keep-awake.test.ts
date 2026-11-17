@@ -85,17 +85,59 @@ describe("the sleep lock", () => {
         expect(blocker.starts).toBe(2);
     });
 
-    it("takes a new inhibitor when the platform dropped the one it held while a turn still runs", () => {
+    it("takes a new inhibitor at the next change of state when the platform dropped the one it held", () => {
         const { blocker, live } = fakeBlocker();
         const lock = new SleepLock(blocker);
         const source = {};
 
         lock.report(source, true);
         live.clear();
+        lock.report(source, false);
         lock.report(source, true);
 
         expect(live.size).toBe(1);
         expect(blocker.starts).toBe(2);
+    });
+
+    it("keeps the inhibitor id when stop throws, so the next release retries the stop", () => {
+        const live = new Set<number>();
+        let starts = 0;
+        let stopFailures = 1;
+        const lock = new SleepLock(
+            {
+                isStarted: (id) => live.has(id),
+                start: () => {
+                    starts += 1;
+                    live.add(starts);
+
+                    return starts;
+                },
+                stop: (id) => {
+                    if (stopFailures > 0) {
+                        stopFailures -= 1;
+
+                        throw new Error("busy");
+                    }
+
+                    live.delete(id);
+                },
+            },
+            () => undefined,
+        );
+        const source = {};
+
+        lock.report(source, true);
+        lock.report(source, false);
+
+        expect(live.size).toBe(1);
+
+        lock.report(source, true);
+
+        expect(starts).toBe(1);
+
+        lock.report(source, false);
+
+        expect(live.size).toBe(0);
     });
 
     it("logs a blocker that cannot start and never throws into the turn", () => {

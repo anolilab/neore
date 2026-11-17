@@ -71,10 +71,17 @@ export interface ServerRuntime {
 export class ServerAgents {
     private readonly runtimes = new Map<string, ServerRuntime>();
 
+    /** Servers whose removal is under way: no command may start a turn on them until the runtime is gone. */
+    private readonly removing = new Set<string>();
+
     public constructor(private readonly options: ServerAgentsOptions) {}
 
     /** The runtime of a paired server; throws for any other device, so no command can conjure one. */
     public get(deviceId: string): ServerRuntime {
+        if (this.removing.has(deviceId)) {
+            throw new Error("that server is being removed");
+        }
+
         const existing = this.runtimes.get(deviceId);
 
         if (existing !== undefined) {
@@ -115,20 +122,28 @@ export class ServerAgents {
             return;
         }
 
-        await runtime.acp.closeUnapproved({ agents: [], consents: [] });
+        this.removing.add(deviceId);
 
-        const deadline = Date.now() + REMOVAL_FLUSH_MS;
+        try {
+            await runtime.acp.closeUnapproved({ agents: [], consents: [] });
 
-        while (runtime.poster.busy && Date.now() < deadline) {
-            // eslint-disable-next-line no-await-in-loop -- the posts go out on timers of their own; this only waits for them
-            await new Promise((resolve) => {
-                setTimeout(resolve, REMOVAL_POLL_MS);
-            });
+            const deadline = Date.now() + REMOVAL_FLUSH_MS;
+
+            while (runtime.poster.busy && Date.now() < deadline) {
+                // eslint-disable-next-line no-await-in-loop -- the posts go out on timers of their own; this only waits for them
+                await new Promise((resolve) => {
+                    setTimeout(resolve, REMOVAL_POLL_MS);
+                });
+            }
+
+            await runtime.poster.persisted();
+            runtime.poster.stop();
+            // Nothing may still run on the runtime being dropped: this also releases its sleep-lock source.
+            runtime.acp.killAll();
+            this.runtimes.delete(deviceId);
+        } finally {
+            this.removing.delete(deviceId);
         }
-
-        await runtime.poster.persisted();
-        runtime.poster.stop();
-        this.runtimes.delete(deviceId);
     }
 
     /** Ends and forgets every server with a runtime: the computer is being unpaired. */

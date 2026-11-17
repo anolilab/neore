@@ -276,4 +276,22 @@ describe("coding agents on a server", () => {
         // The runtime is gone with the server: a later command cannot conjure it again.
         expect(() => servers.get("someone-else")).toThrow("not paired");
     });
+
+    it("refuses a turn on a server while its removal is under way, so no session outlives the runtime it is dropped with", async () => {
+        const { servers } = setup();
+        const runtime = servers.get(SERVER);
+        const sessionId = await runtime.acp.startSession("fake", "Fake on build-box", scratch.work, { sessionId: "session-5", threadId: "thread-5" });
+
+        runtime.acp.send(sessionId, "tool", "turn-5");
+        await expect.poll(() => posts.some(({ post }) => post.turnId === "turn-5"), { timeout: 8000 }).toBe(true);
+
+        const removal = servers.remove(SERVER);
+
+        // Checked before the removal's first wait has finished: the runtime is still in the map, but no command may reach it.
+        expect(() => servers.get(SERVER)).toThrow("being removed");
+        await removal;
+        secretGone = true;
+
+        expect(runtime.acp.summaries()[0]?.status).toBe("ended");
+    });
 });
