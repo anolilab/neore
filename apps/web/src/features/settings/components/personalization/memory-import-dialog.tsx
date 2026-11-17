@@ -76,10 +76,12 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
 
     // "Turn on memory" unmounts once memory is on: focus moves to the paste field instead of the page.
     useEffect(() => {
-        if (memoryEnabled && focusPasteOnEnable.current) {
-            focusPasteOnEnable.current = false;
-            document.getElementById(pasteId)?.focus();
+        if (!memoryEnabled || !focusPasteOnEnable.current) {
+            return;
         }
+
+        focusPasteOnEnable.current = false;
+        document.querySelector<HTMLTextAreaElement>(`#${CSS.escape(pasteId)}`)?.focus();
     }, [memoryEnabled, pasteId]);
 
     const prompt = t`List everything you remember about me from our past conversations and your saved memory. Write one fact per line, in the third person, starting with "The user" (for example: "The user works as a nurse in Hamburg."). Where you know when you learned a fact, add the date in brackets at the end of its line. Leave out passwords, keys, account numbers and health details. Write no introduction, headings or comments.`;

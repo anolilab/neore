@@ -171,6 +171,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
                 memory,
                 memoryId: similar.id,
             });
+
             // The merged text needs its own vector, or a repeat import matches the old one and revises again.
             // Never fatal: the merge is saved, and the rest of the paste still has to be.
             try {
