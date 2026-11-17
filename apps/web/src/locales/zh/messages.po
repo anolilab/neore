@@ -688,7 +688,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} 个工具：{1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:217
+#: src/features/home/components/home-page.tsx:222
 msgid "{0} unread"
 msgstr "{0} 条未读"
 
@@ -1750,7 +1750,7 @@ msgstr ""
 msgid "a change is waiting to be read"
 msgstr "有变更等待查看"
 
-#: src/features/home/components/home-page.tsx:166
+#: src/features/home/components/home-page.tsx:171
 msgid "A chat is waiting for your answer"
 msgstr "有一个对话在等待你的回复"
 
@@ -2375,7 +2375,7 @@ msgstr "添加筛选条件"
 msgid "Add Header"
 msgstr "添加请求头"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:331
+#: src/features/feedback/components/send-feedback-dialog.tsx:334
 msgid "Add images"
 msgstr ""
 
@@ -3184,7 +3184,7 @@ msgstr "所有分类"
 msgid "All changes saved"
 msgstr "所有更改已保存"
 
-#: src/features/home/components/home-page.tsx:258
+#: src/features/home/components/home-page.tsx:242
 msgid "All chats"
 msgstr "全部对话"
 
@@ -4126,7 +4126,7 @@ msgstr "在不打断回复的情况下提出旁支问题"
 msgid "Ask all models anything..."
 msgstr "向所有模型提问任何问题..."
 
-#: src/features/home/components/home-page.tsx:92
+#: src/features/home/components/home-page.tsx:94
 msgid "Ask anything to start a new chat…"
 msgstr "输入任何问题来开始新对话…"
 
@@ -4236,7 +4236,7 @@ msgid "Attachment (hidden)"
 msgstr "附件（已隐藏）"
 
 #. placeholder {0}: index + 1
-#: src/features/feedback/components/send-feedback-dialog.tsx:307
+#: src/features/feedback/components/send-feedback-dialog.tsx:310
 msgid "Attachment {0}"
 msgstr ""
 
@@ -5576,7 +5576,7 @@ msgstr "加拿大"
 #: src/features/evals/components/import-cases-dialog.tsx:113
 #: src/features/evals/components/run-dialog.tsx:282
 #: src/features/evals/components/save-eval-case-action.tsx:137
-#: src/features/feedback/components/send-feedback-dialog.tsx:372
+#: src/features/feedback/components/send-feedback-dialog.tsx:385
 #: src/features/knowledge/components/collection-dialog.tsx:97
 #: src/features/knowledge/components/collection-picker.tsx:112
 #: src/features/local-models/components/ollama-model-manager.tsx:300
@@ -5835,6 +5835,10 @@ msgstr "变化（分）"
 #: src/features/canvas/components/canvas-toolbar.tsx:66
 msgid "Change colors"
 msgstr "更改颜色"
+
+#: src/features/home/components/daily-brief-offer.tsx:118
+msgid "Change it in settings"
+msgstr "在设置中更改"
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:150
 #: src/features/chat/thread-list/thread-node.tsx:887
@@ -8658,6 +8662,10 @@ msgstr "无法保存摘要，因此未提交任何内容。请重试。"
 msgid "Could not save this. Try again."
 msgstr "无法保存。请重试。"
 
+#: src/features/home/components/daily-brief-offer.tsx:98
+msgid "Could not save your answer. Try again."
+msgstr "无法保存你的回答。请重试。"
+
 #: src/features/chat/host/host-options.tsx:256
 msgid "Could not send the change."
 msgstr ""
@@ -8731,8 +8739,12 @@ msgid "Could not switch the model. Please try again."
 msgstr "无法切换模型。请重试。"
 
 #: src/features/home/components/home-page.tsx:241
-msgid "Could not turn on the Daily Brief."
-msgstr "无法开启每日简报。"
+#~ msgid "Could not turn on the Daily Brief."
+#~ msgstr "无法开启每日简报。"
+
+#: src/features/home/components/daily-brief-offer.tsx:96
+msgid "Could not turn on the Daily Brief. Try again."
+msgstr "无法开启每日简报。请重试。"
 
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:50
 msgid "Could not undo. Please try again."
@@ -9374,16 +9386,34 @@ msgstr "捷克语（捷克）"
 msgid "Czech Republic"
 msgstr "捷克"
 
+#: src/features/home/components/daily-brief-offer.tsx:105
 #: src/features/notifications/components/notification-settings.tsx:224
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:57
 msgid "Daily Brief"
 msgstr "每日简报"
 
+#: src/features/home/components/daily-brief-offer.tsx:66
+#~ msgid "Daily Brief is on. It arrives each morning."
+#~ msgstr ""
+
+#: src/features/home/components/daily-brief-offer.tsx:90
+msgid "Daily Brief is on. It comes in the morning when there is something to report."
+msgstr "每日简报已开启。有内容可报告时会在早上送达。"
+
+#. placeholder {0}: formatArrival(current.scheduled, i18n.locale)
+#: src/features/home/components/daily-brief-offer.tsx:89
+msgid "Daily Brief is on. The next one is planned for {0}; a morning with nothing to report sends none."
+msgstr "每日简报已开启。下一份计划于 {0} 送达；没有内容可报告的早上不会发送。"
+
+#. placeholder {0}: formatArrival(scheduled, i18n.locale)
+#: src/features/home/components/daily-brief-offer.tsx:65
+#~ msgid "Daily Brief is on. Your first one arrives {0}."
+#~ msgstr ""
+
 #: src/features/notifications/components/notification-settings.tsx:111
 msgid "Daily Brief turned off"
 msgstr "每日简报已关闭"
 
-#: src/features/home/components/home-page.tsx:242
 #: src/features/notifications/components/notification-settings.tsx:112
 msgid "Daily Brief turned on"
 msgstr "每日简报已开启"
@@ -15275,9 +15305,17 @@ msgstr "德语（瑞士）"
 msgid "Germany"
 msgstr "德国"
 
+#: src/features/home/components/daily-brief-offer.tsx:75
+#~ msgid "Get a short summary each morning of what finished, what needs you and what is still running."
+#~ msgstr ""
+
+#: src/features/home/components/daily-brief-offer.tsx:126
+msgid "Get a short summary each morning of what finished, what needs you and what is still running. It counts toward your daily usage."
+msgstr "每天早上收到一份简短摘要：已完成的、需要你处理的以及仍在运行的。这会计入你的每日用量。"
+
 #: src/features/home/components/home-page.tsx:234
-msgid "Get a short summary here every morning."
-msgstr "每天早上在这里收到一份简短汇总。"
+#~ msgid "Get a short summary here every morning."
+#~ msgstr "每天早上在这里收到一份简短汇总。"
 
 #: src/features/notifications/components/notification-settings.tsx:193
 msgid "Get a system notification when a task finishes or something needs your approval, even with the app closed."
@@ -16333,7 +16371,7 @@ msgid "HLS playback is not supported in this browser."
 msgstr "此浏览器不支持 HLS 播放。"
 
 #: src/components/error-boundaries/route-error-boundary.tsx:118
-#: src/features/home/components/home-page.tsx:128
+#: src/features/home/components/home-page.tsx:130
 #: src/features/layout/components/sidebar-shortcut.tsx:71
 #: src/features/layout/lib/dashboard-page-names.ts:24
 msgid "Home"
@@ -16727,7 +16765,7 @@ msgstr "图片"
 msgid "Images"
 msgstr "图像"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:302
+#: src/features/feedback/components/send-feedback-dialog.tsx:305
 msgid "Images ({MAX_FEEDBACK_IMAGES} at most)"
 msgstr ""
 
@@ -17080,7 +17118,7 @@ msgstr "收件箱分区"
 msgid "Inception's diffusion-based language model"
 msgstr "Inception 基于扩散的语言模型"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:359
+#: src/features/feedback/components/send-feedback-dialog.tsx:367
 msgid "Include the page you are on"
 msgstr ""
 
@@ -18040,7 +18078,7 @@ msgstr "大"
 #~ msgid "Large photos are made smaller before sending (up to {0} MB each)."
 #~ msgstr ""
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:352
+#: src/features/feedback/components/send-feedback-dialog.tsx:355
 msgid "Large photos are made smaller before sending; each image can be up to {MAX_FEEDBACK_IMAGE_MB} MB."
 msgstr ""
 
@@ -18987,7 +19025,7 @@ msgstr "正在加载你的项目…"
 msgid "Loading your messages…"
 msgstr "正在加载你的消息…"
 
-#: src/features/home/components/home-page.tsx:136
+#: src/features/home/components/home-page.tsx:138
 msgid "Loading your overview…"
 msgstr "正在加载概览…"
 
@@ -21079,7 +21117,7 @@ msgid "Needs review"
 msgstr "待审核"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
-#: src/features/home/components/home-page.tsx:159
+#: src/features/home/components/home-page.tsx:164
 msgid "Needs you"
 msgstr "待你处理"
 
@@ -21640,7 +21678,7 @@ msgstr "未选择相机"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "还没有用例。手动添加一个、导入 CSV 或 JSONL 文件，或用“保存为评测用例”保存一轮聊天。"
 
-#: src/features/home/components/home-page.tsx:265
+#: src/features/home/components/home-page.tsx:249
 msgid "No chats yet. Start one above."
 msgstr "还没有对话，在上方开始一个吧。"
 
@@ -22186,7 +22224,7 @@ msgstr "没有工具。"
 msgid "No triggers yet"
 msgstr "还没有触发器"
 
-#: src/features/home/components/home-page.tsx:224
+#: src/features/home/components/home-page.tsx:229
 msgid "No unread notifications."
 msgstr "没有未读通知。"
 
@@ -22382,6 +22420,10 @@ msgstr "未测量"
 msgid "Not merged"
 msgstr "未合并"
 
+#: src/features/home/components/daily-brief-offer.tsx:138
+msgid "Not now"
+msgstr "暂不"
+
 #: src/features/devices/components/device-scope.tsx:125
 msgid "Not offered in any chat until you choose a project."
 msgstr "在你选择项目之前，不会在任何聊天中提供。"
@@ -22458,7 +22500,7 @@ msgstr "这里没有内容。"
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "该地址上没有服务在监听。请启动 Ollama 或 LM Studio 的服务器，检查端口，并确保 URL 以 /v1 结尾。"
 
-#: src/features/home/components/home-page.tsx:180
+#: src/features/home/components/home-page.tsx:185
 msgid "Nothing is running right now."
 msgstr "当前没有正在运行的内容。"
 
@@ -22466,7 +22508,7 @@ msgstr "当前没有正在运行的内容。"
 msgid "Nothing is saved, installed or enabled until you choose to save."
 msgstr "在你选择保存之前，不会保存、安装或启用任何内容。"
 
-#: src/features/home/components/home-page.tsx:161
+#: src/features/home/components/home-page.tsx:166
 msgid "Nothing is waiting on you."
 msgstr "没有等待你处理的事项。"
 
@@ -22482,7 +22524,7 @@ msgstr "通知"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "通知工作流、渠道和收件人偏好"
 
-#: src/features/home/components/home-page.tsx:221
+#: src/features/home/components/home-page.tsx:226
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:199
@@ -22645,6 +22687,10 @@ msgstr "偏移：0x{hoveredOffsetHex}（{hoveredByte}）= 0x{hoveredValueHex}（
 #: src/features/canvas/canvas-panel.tsx:201
 msgid "Oil Painting"
 msgstr "油画"
+
+#: src/features/home/components/daily-brief-offer.tsx:85
+msgid "Okay, we won't ask again. You can turn it on any time in settings."
+msgstr "好的，我们不会再询问。你可以随时在设置中开启。"
 
 #: src/lib/model-descriptions.ts:179
 msgid "Old generation cinematic model with higher consistency"
@@ -23153,6 +23199,7 @@ msgid "Open search"
 msgstr "打开搜索"
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:203
+#: src/features/home/components/daily-brief-offer.tsx:118
 msgid "Open settings"
 msgstr "打开设置"
 
@@ -25944,9 +25991,9 @@ msgstr "排队消息"
 msgid "Queue message — sends when the current reply finishes"
 msgstr "排队消息——当前回复完成后发送"
 
-#: src/features/home/components/home-page.tsx:111
-#: src/features/home/components/home-page.tsx:184
-#: src/features/home/components/home-page.tsx:192
+#: src/features/home/components/home-page.tsx:113
+#: src/features/home/components/home-page.tsx:189
+#: src/features/home/components/home-page.tsx:197
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
 #: src/features/sub-agents/components/worker-list.tsx:83
 #: src/features/sub-agents/components/worker-run-log.tsx:29
@@ -26438,7 +26485,7 @@ msgstr "变基并合并"
 msgid "Recent"
 msgstr "最近"
 
-#: src/features/home/components/home-page.tsx:262
+#: src/features/home/components/home-page.tsx:246
 msgid "Recent chats"
 msgstr "最近的对话"
 
@@ -26934,7 +26981,7 @@ msgid "Remove All Files"
 msgstr "移除所有文件"
 
 #. placeholder {0}: index + 1
-#: src/features/feedback/components/send-feedback-dialog.tsx:309
+#: src/features/feedback/components/send-feedback-dialog.tsx:312
 msgid "Remove attachment {0}"
 msgstr ""
 
@@ -27649,7 +27696,7 @@ msgstr "带备注重试"
 msgid "Retrying now"
 msgstr "正在重试"
 
-#: src/features/home/components/home-page.tsx:152
+#: src/features/home/components/home-page.tsx:154
 msgid "Retrying…"
 msgstr "正在重试…"
 
@@ -27724,7 +27771,7 @@ msgid "Review submitted"
 msgstr "审查已提交"
 
 #. placeholder {0}: task.title
-#: src/features/home/components/home-page.tsx:171
+#: src/features/home/components/home-page.tsx:176
 msgid "Review task: {0}"
 msgstr "审阅任务：{0}"
 
@@ -28053,10 +28100,10 @@ msgstr "运行你的工作流后，可在此查看执行历史。"
 
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
-#: src/features/home/components/home-page.tsx:114
-#: src/features/home/components/home-page.tsx:178
-#: src/features/home/components/home-page.tsx:184
-#: src/features/home/components/home-page.tsx:192
+#: src/features/home/components/home-page.tsx:116
+#: src/features/home/components/home-page.tsx:183
+#: src/features/home/components/home-page.tsx:189
+#: src/features/home/components/home-page.tsx:197
 #: src/features/settings/components/chat/trigger-settings.tsx:184
 #: src/features/tasks/components/task-detail-dialog.tsx:138
 #: src/features/tasks/components/task-status.tsx:20
@@ -29082,7 +29129,7 @@ msgstr "半写实视觉风格"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:430
 #: src/features/chat/host/host-composer.tsx:707
-#: src/features/feedback/components/send-feedback-dialog.tsx:376
+#: src/features/feedback/components/send-feedback-dialog.tsx:389
 #: src/features/sub-agents/components/worker-composer.tsx:118
 msgid "Send"
 msgstr "发送"
@@ -29216,7 +29263,8 @@ msgstr "正在发送你的消息并等待回复"
 
 #: src/features/chat/guest-links/guest-page.tsx:274
 #: src/features/chat/thread/streaming-placeholder.tsx:617
-#: src/features/feedback/components/send-feedback-dialog.tsx:376
+#: src/features/feedback/components/send-feedback-dialog.tsx:379
+#: src/features/feedback/components/send-feedback-dialog.tsx:389
 msgid "Sending…"
 msgstr "正在发送…"
 
@@ -30795,7 +30843,7 @@ msgstr "开始对话以置顶消息。"
 msgid "Start a conversation, generate images, write a document in canvas, run code — no tab-switching, no copy-pasting between apps."
 msgstr "开始对话、生成图像、在画布中撰写文档、运行代码——无需切换标签页，也无需在应用间复制粘贴。"
 
-#: src/features/home/components/home-page.tsx:81
+#: src/features/home/components/home-page.tsx:83
 msgid "Start a new chat"
 msgstr "开始新对话"
 
@@ -30825,7 +30873,7 @@ msgstr "开始新的临时聊天（{0}）"
 msgid "Start building"
 msgstr "开始构建"
 
-#: src/features/home/components/home-page.tsx:95
+#: src/features/home/components/home-page.tsx:97
 msgid "Start chat"
 msgstr "开始对话"
 
@@ -35005,7 +35053,7 @@ msgstr "尝试调整搜索词。"
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
 #: src/features/develop/components/thread-pull-requests.tsx:169
-#: src/features/home/components/home-page.tsx:152
+#: src/features/home/components/home-page.tsx:154
 #: src/features/projects/components/project-repo-picker.tsx:190
 #: src/features/projects/components/project-repo-picker.tsx:198
 #: src/features/projects/components/project-repositories.tsx:297
@@ -35086,6 +35134,10 @@ msgstr "土耳其语（土耳其）"
 msgid "Turn any GitHub repository into a remote MCP endpoint"
 msgstr "将任意 GitHub 仓库变成远程 MCP 端点"
 
+#: src/features/home/components/daily-brief-offer.tsx:135
+msgid "Turn it on"
+msgstr "开启"
+
 #: src/features/develop/components/merge-panel.tsx:126
 msgid "Turn off"
 msgstr "关闭"
@@ -35103,8 +35155,8 @@ msgstr "要关闭自动合并吗？"
 #~ msgstr ""
 
 #: src/features/home/components/home-page.tsx:249
-msgid "Turn on Daily Brief"
-msgstr "开启每日简报"
+#~ msgid "Turn on Daily Brief"
+#~ msgstr "开启每日简报"
 
 #: src/features/chat/goal/composer-goal.tsx:62
 #~ msgid "Turn on run until done"
@@ -35573,7 +35625,7 @@ msgstr ""
 msgid "Untitled"
 msgstr "无标题"
 
-#: src/features/home/components/home-page.tsx:270
+#: src/features/home/components/home-page.tsx:254
 msgid "Untitled chat"
 msgstr "未命名对话"
 
@@ -37028,14 +37080,14 @@ msgid "Waiting for your answer"
 msgstr "正在等待你的回答"
 
 #. placeholder {0}: approval.threadTitle
-#: src/features/home/components/home-page.tsx:166
+#: src/features/home/components/home-page.tsx:171
 msgid "Waiting for your answer in {0}"
 msgstr "正在“{0}”中等待你的回答"
 
 #: src/features/chat/thread-list/thread-node.tsx:617
 #: src/features/chat/thread-list/thread-node.tsx:624
 #: src/features/chat/thread/tool-approval.tsx:78
-#: src/features/home/components/home-page.tsx:114
+#: src/features/home/components/home-page.tsx:116
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:57
 msgid "Waiting for your approval"
@@ -37281,7 +37333,7 @@ msgstr "我学到了什么（{0}）"
 msgid "What is {0} best for?"
 msgstr "{0} 最适合做什么？"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:265
+#: src/features/feedback/components/send-feedback-dialog.tsx:267
 msgid "What is it about?"
 msgstr ""
 
@@ -37297,7 +37349,7 @@ msgstr "什么是画布功能？"
 msgid "What it evaluates"
 msgstr "评测内容"
 
-#: src/features/home/components/home-page.tsx:129
+#: src/features/home/components/home-page.tsx:131
 msgid "What needs you, what's running, and where you left off."
 msgstr "待你处理的事项、正在运行的内容，以及你上次停下的地方。"
 
@@ -38154,7 +38206,7 @@ msgstr "你的草稿已保留。链接中的提示词未被添加。"
 msgid "Your export will include: profile, settings, conversations, files metadata, prompts, and usage history. The download link expires in 7 days."
 msgstr "你的导出将包括：个人资料、设置、对话、文件元数据、提示词和使用历史。下载链接 7 天后失效。"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:286
+#: src/features/feedback/components/send-feedback-dialog.tsx:289
 msgid "Your feedback"
 msgstr ""
 
@@ -38243,7 +38295,11 @@ msgstr "无法加载你的消息。它们仍然存在；请稍后再试。"
 msgid "Your organization does not allow agents on your computer."
 msgstr ""
 
-#: src/features/home/components/home-page.tsx:142
+#: src/features/home/components/daily-brief-offer.tsx:96
+msgid "Your organization manages the Daily Brief."
+msgstr "每日简报由你的组织管理。"
+
+#: src/features/home/components/home-page.tsx:144
 msgid "Your overview could not be loaded."
 msgstr "无法加载你的概览。"
 

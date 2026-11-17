@@ -30683,6 +30683,12 @@
           "optional": true,
           "unique": false
         },
+        "dailyBriefOfferDismissedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "density": {
           "kind": "string",
           "nullable": false,

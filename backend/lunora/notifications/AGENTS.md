@@ -24,7 +24,10 @@
   live `getNotificationInbox` (after first paint). The Daily Brief is opt-in
   (`userSettings.dailyBriefEnabled`) and scheduled like memory reflection —
   `afterRun` → `noteDailyBriefActivity` → `runAt` local 07:xx — and charged
-  via `chargeRound` only when there is something to report.
+  via `chargeRound` only when there is something to report. The home page
+  offers it once (`dailyBriefOffer`): only while `dailyBriefEnabled` is unset,
+  no `dailyBriefOfferDismissedAt` ("Not now"), no org policy entry for it, and
+  at least `BRIEF_OFFER_MIN_THREADS` live chats. Never turn it on without a click.
 - **Phone push registration** (`native-push.ts`, `push-device-writes.ts`) —
   on only with `EXPO_ACCESS_TOKEN` (a Worker secret; unset = no row).
     - Tokens are `pushDevices` rows (global, unique `token`, owner-policied, every

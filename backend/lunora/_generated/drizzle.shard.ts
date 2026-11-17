@@ -1994,6 +1994,7 @@ export const userSettings = sqliteTable("userSettings", {
     contrast: text("contrast"),
     customInstructions: text("customInstructions"),
     dailyBriefEnabled: integer("dailyBriefEnabled", { mode: "boolean" }),
+    dailyBriefOfferDismissedAt: real("dailyBriefOfferDismissedAt"),
     density: text("density"),
     dictationLanguage: text("dictationLanguage"),
     disableExternalLinkWarning: integer("disableExternalLinkWarning", { mode: "boolean" }),

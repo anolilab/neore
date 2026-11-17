@@ -3749,6 +3749,8 @@ export const schema = defineSchema({
         customInstructions: v.optional(v.string()),
         // Opt-in morning summary (`notifications/daily-brief.ts`). Absent = off.
         dailyBriefEnabled: v.optional(v.boolean()),
+        // When the user answered "Not now" to the home page's one-time Daily Brief offer (`home/overview.ts`). Server-written only. Absent = not answered.
+        dailyBriefOfferDismissedAt: v.optional(v.number()),
         // Appearance: UI spacing preset (accepted values: `auth/fields.ts`).
         density: v.optional(v.string()),
         dictationLanguage: v.optional(v.string()),

@@ -497,7 +497,7 @@ export interface ApiTypes {
     };
     home: {
         overview: {
-            getHomeOverview: FunctionReference<"query", {}, { approvals: Array<{ approvalId: string; createdAt: number; threadId: string; threadTitle?: string }>; codingAgents: Array<{ _id: string; agent: "claude_code" | "codex"; createdAt: number; prompt: string; repo: string; status: "queued" | "running"; threadId?: string }>; dailyBriefEnabled: boolean; notifications: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "task_stuck" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request" }>; recentThreads: Array<{ _id: string; locked?: boolean; title?: string; updatedAt: number }>; reviews: Array<{ _id: string; title: string; updatedAt: number }>; runningTasks: Array<{ _id: string; status: "queued" | "running"; title: string; updatedAt: number }>; subAgents: Array<{ _id: string; childThreadId?: string; createdAt: number; parentThreadId: string; status: "queued" | "running" | "awaiting"; task: string }>; unreadCount: number }>;
+            getHomeOverview: FunctionReference<"query", {}, { approvals: Array<{ approvalId: string; createdAt: number; threadId: string; threadTitle?: string }>; codingAgents: Array<{ _id: string; agent: "claude_code" | "codex"; createdAt: number; prompt: string; repo: string; status: "queued" | "running"; threadId?: string }>; dailyBriefEnabled: boolean; dailyBriefOffer: boolean; notifications: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "task_stuck" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request" }>; recentThreads: Array<{ _id: string; locked?: boolean; title?: string; updatedAt: number }>; reviews: Array<{ _id: string; title: string; updatedAt: number }>; runningTasks: Array<{ _id: string; status: "queued" | "running"; title: string; updatedAt: number }>; subAgents: Array<{ _id: string; childThreadId?: string; createdAt: number; parentThreadId: string; status: "queued" | "running" | "awaiting"; task: string }>; unreadCount: number; userId: string }>;
         };
     };
     knowledge: {
@@ -568,7 +568,8 @@ export interface ApiTypes {
     };
     notifications: {
         daily_brief: {
-            setDailyBriefEnabled: FunctionReference<"mutation", { enabled: boolean }, null>;
+            dismissDailyBriefOffer: FunctionReference<"mutation", {}, null>;
+            setDailyBriefEnabled: FunctionReference<"mutation", { enabled: boolean }, null | { nextBriefAt: number; timeZone: string }>;
         };
         functions: {
             getNotificationInbox: FunctionReference<"query", {}, { items: Array<{ _id: string; body?: string; createdAt: number; link?: string; outcome?: "success" | "failure"; read: boolean; title: string; type: "task" | "task_stuck" | "tool_approval" | "ask_user" | "secret_request" | "trigger" | "coding_agent" | "eval" | "sub_agent" | "chat_import" | "data_export" | "daily_brief" | "usage_alert" | "review_request" }>; unreadCount: number }>;
@@ -1492,6 +1493,7 @@ export const api: ApiTypes = {
     },
     notifications: {
         daily_brief: {
+            dismissDailyBriefOffer: { __lunoraRef: "notifications_daily_brief:dismissDailyBriefOffer" },
             setDailyBriefEnabled: { __lunoraRef: "notifications_daily_brief:setDailyBriefEnabled" },
         },
         functions: {
