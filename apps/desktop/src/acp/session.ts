@@ -1780,6 +1780,12 @@ export class AgentSession {
     private async createTerminal(terminals: SessionTerminals, params: Record<string, unknown>): Promise<string> {
         const { cwd, env, line, outputByteLimit, shown } = createRequestOf(params);
 
+        // The person approves the text the screen shows. A configured secret in the command is masked there, so the text
+        // approved would differ from the bytes that run: such a command is refused rather than approved blind.
+        if (this.options.process.scrub(line) !== line) {
+            throw new RpcError(INVALID_PARAMS, "the command contains a configured secret, so it cannot be shown for approval");
+        }
+
         if (terminals.live >= MAX_SESSION_TERMINALS) {
             throw new RpcError(INVALID_PARAMS, `at most ${String(MAX_SESSION_TERMINALS)} terminals at once; release one first`);
         }

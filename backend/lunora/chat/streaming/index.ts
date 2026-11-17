@@ -156,8 +156,17 @@ export const getStreamBody = optionalAuthQuery
 
         const body = await persistentTextStreaming.getStreamBody(ctx, input.streamId as StreamId);
 
+        // What a coding agent runs and prints is its owner's: a viewer the thread is shared with sees the reply, not the activity.
         if (access.kind === "full") {
-            return body;
+            if (access.thread.userId === ctx.user?.userId) {
+                return body;
+            }
+
+            const shared = { ...body };
+
+            delete shared.hostActivity;
+
+            return shared;
         }
 
         // Like the reasoning, which tool is running (and what it says) is not part of what a public thread shows.
