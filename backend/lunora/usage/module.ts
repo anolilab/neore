@@ -8,6 +8,7 @@ export default defineModule({
         "usageExportPieces",
         "usageExportProjects",
         "usageExportRuns",
+        "usageOrganizationCohorts",
         "usageOrganizationContributors",
         "usageOrganizationReplies",
         "usageReplies",
