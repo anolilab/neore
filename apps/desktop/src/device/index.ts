@@ -31,6 +31,7 @@ import { AgentRegistry } from "../acp/registry";
 import { RemoteAgents } from "../acp/remote-process";
 import { ServerAgents } from "../acp/servers";
 import { AgentSignIn } from "../acp/sign-in";
+import { coreTerminals } from "../acp/terminals";
 import type { AcpUpdate, AcpView, PermissionView, SpawnPlan } from "../acp/types";
 import { backendOrigin } from "../site";
 import type { TerminalOpener } from "../terminal/index";
@@ -377,6 +378,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             plan: (agentKey, folder) => JSON.parse(core.acpSpawnPlan(agentKey, folder)) as SpawnPlan,
             sleepLock,
             spawn: spawnAgent,
+            // Run by the core in the shell sandbox, after a once-only prompt in this computer's window.
+            terminals: coreTerminals(core),
         });
 
         return state.acp;

@@ -913,6 +913,7 @@ mod tests {
                 details: "{}".into(),
                 details_complete: true,
                 folder: "neore".into(),
+                local_only: false,
                 options: vec![OfferedOption {
                     kind: "allow_once".into(),
                     name: "Yes".into(),
@@ -921,6 +922,7 @@ mod tests {
                 request_id: "r1".into(),
                 session_id: "s1".into(),
                 target: None,
+                terminal: false,
                 tool: "Run tests".into(),
                 tool_kind: "execute".into(),
             })
