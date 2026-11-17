@@ -9,7 +9,13 @@ import schema from "../schema";
 import { recordReplyUsage } from "./activity";
 import { DEFAULT_SKILL_KEY } from "./activity-logic";
 import { eraseUsageForUser, pruneOrganizationRepliesBefore } from "./gdpr";
-import { collectOrganizationReplyPages, memberProjectUsage, organizationUsageScope, reconcileOrganizationContributor } from "./organization";
+import {
+    collectOrganizationRepliesForExport,
+    collectOrganizationReplyPages,
+    memberProjectUsage,
+    organizationUsageScope,
+    reconcileOrganizationContributor,
+} from "./organization";
 
 const ADMIN = "admin-1";
 const MEMBER = "member-1";
@@ -228,13 +234,43 @@ describe("the organization ledger", () => {
     });
 
     it("collects every page of the ledger for the export in reply-time order, and past its budget keeps the newest rows and says it cut the oldest", async () => {
-        // Read out of reply-time order, as the ledger is stored.
+        // Newest first, as the export reads it: the first page holds the newest rows.
         const read = async (cursor: string | null) =>
-            cursor === null ? { cursor: "next", rows: [{ at: 2 }, { at: 1 }] } : { cursor: null, rows: [{ at: 3 }] };
+            cursor === null ? { cursor: "next", rows: [{ at: 3 }, { at: 2 }] } : { cursor: null, rows: [{ at: 1 }] };
 
         expect(await collectOrganizationReplyPages(read, 1000)).toEqual({ cut: false, rows: [{ at: 1 }, { at: 2 }, { at: 3 }] });
         // Each row is eight bytes; with the brackets and a comma after the first kept row, two fit in twenty, and the oldest is cut for a third.
         expect(await collectOrganizationReplyPages(read, 20)).toEqual({ cut: true, rows: [{ at: 2 }, { at: 3 }] });
+    });
+
+    it("reads the member's ledger newest first, so the export can stop at its budget", async () => {
+        const project = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-1", role: "member", userId: MEMBER });
+
+            return await ctx.db.insert("projects", { createdAt: 1, organizationId: "org-1", title: "Team", userId: OWNER });
+        });
+
+        await record(project, 1000);
+        await record(project, 3000);
+        await record(project, 2000);
+
+        const page = (await harness.run(async (ctx: any) => await ctx.runQuery(collectOrganizationRepliesForExport, { cursor: null, userId: MEMBER }))) as {
+            rows: { at: number }[];
+        };
+
+        expect(page.rows.map((row) => row.at)).toEqual([3000, 2000, 1000]);
+    });
+
+    it("stops reading after its page cap and says it cut what it did not read, keeping the newest rows it read", async () => {
+        const reads: (string | null)[] = [];
+        const read = async (cursor: string | null) => {
+            reads.push(cursor);
+
+            return cursor === null ? { cursor: "next", rows: [{ at: 9 }, { at: 8 }] } : { cursor: "more", rows: [{ at: 7 }] };
+        };
+
+        expect(await collectOrganizationReplyPages(read, 1000, 1)).toEqual({ cut: true, rows: [{ at: 8 }, { at: 9 }] });
+        expect(reads).toEqual([null]);
     });
 
     it("prunes rows past the retention window, and a contributor left with none drops off the list", async () => {
