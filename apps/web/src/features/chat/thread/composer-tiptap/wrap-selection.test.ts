@@ -5,8 +5,9 @@ import { TextSelection } from "@tiptap/pm/state";
 import StarterKitExtension from "@tiptap/starter-kit";
 import { afterEach, describe, expect, it } from "vitest";
 
+import VimMode from "./extensions/vim-mode";
 import { composerCoreExtensionOptions } from "./paste-plain-text";
-import { wrapSelection, wrapSelectionOnTextInput } from "./wrap-selection";
+import { WrapSelection, wrapSelection, wrapSelectionOnTextInput } from "./wrap-selection";
 
 const editors: Editor[] = [];
 
@@ -113,6 +114,60 @@ describe("wrapSelectionOnTextInput", () => {
         Object.defineProperty(editor.view, "composing", { configurable: true, get: () => true });
 
         expect(wrapSelectionOnTextInput(editor.view, 7, 12, "*")).toBe(false);
+    });
+});
+
+describe("WrapSelection with vim mode", () => {
+    afterEach(() => {
+        for (const editor of editors) {
+            editor.destroy();
+        }
+
+        editors.length = 0;
+    });
+
+    // The order the composer registers them in: vim first, so its normal mode takes typed text before a wrap can.
+    const vimEditorWith = (content: string): Editor => {
+        const editor = new Editor({
+            content,
+            coreExtensionOptions: composerCoreExtensionOptions,
+            extensions: [
+                StarterKitExtension,
+                VimMode.configure({ isEnabled: () => true, isHistoryRecalled: () => false, onModeChange: () => {} }),
+                WrapSelection,
+            ],
+        });
+
+        editors.push(editor);
+
+        return editor;
+    };
+
+    /** Asks the view's text-input handlers in order, as ProseMirror does for typed text. */
+    const typeOver = (editor: Editor, from: number, to: number, typed: string): boolean =>
+        Boolean(editor.view.someProp("handleTextInput", (handle) => handle(editor.view, from, to, typed, () => editor.state.tr)));
+
+    const pressKey = (editor: Editor, key: string): void => {
+        editor.view.someProp("handleKeyDown", (handle) => handle(editor.view, new KeyboardEvent("keydown", { key })));
+    };
+
+    it("wraps the selection in insert mode, where vim takes no text", () => {
+        const editor = vimEditorWith("<p>hello world</p>");
+
+        select(editor, 7, 12);
+
+        expect(typeOver(editor, 7, 12, "*")).toBe(true);
+        expect(text(editor)).toBe("hello **world**");
+    });
+
+    it("leaves the selection alone in vim normal mode, which takes typed text", () => {
+        const editor = vimEditorWith("<p>hello world</p>");
+
+        select(editor, 7, 12);
+        pressKey(editor, "Escape");
+
+        expect(typeOver(editor, 7, 12, "*")).toBe(true);
+        expect(text(editor)).toBe("hello world");
     });
 });
 

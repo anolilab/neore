@@ -64,7 +64,7 @@ import { useEmojiShortcode } from "./use-emoji-shortcode";
 import useMentionPrefetch from "./use-mention-prefetch";
 import VariableAutocompletePopup from "./variable-autocomplete-popup";
 import type { VimMode as VimModeName } from "./vim-keys";
-import { wrapSelectionOnTextInput } from "./wrap-selection";
+import { WrapSelection } from "./wrap-selection";
 
 // ============================================================================
 // Types
@@ -303,8 +303,6 @@ const ComposerTiptapEditor = ({
             // The composer's paste handler runs first (capture phase) and prevents a paste it turns into a file; the editor
             // then leaves that paste alone, so a long text is never both attached and inserted.
             handlePaste: (_view, event) => event.defaultPrevented,
-            // A marker typed over a selection wraps it in Markdown instead of replacing it (`wrap-selection.ts`).
-            handleTextInput: wrapSelectionOnTextInput,
             handleKeyDown: (_view, event) => {
                 // `code` is the physical key: on a Cyrillic or Greek layout `key` is not "v" for the same shortcut.
                 if (event.shiftKey && (event.ctrlKey || event.metaKey) && (event.code === "KeyV" || event.key.toLowerCase() === "v")) {
@@ -377,6 +375,8 @@ const ComposerTiptapEditor = ({
                 isHistoryRecalled: () => historyRecalledRef.current?.() ?? false,
                 onModeChange: setVimMode,
             }),
+            // After VimMode: vim's normal mode takes typed text, and that must win over a wrap (`wrap-selection.ts`).
+            WrapSelection,
         ],
         immediatelyRender: false,
         onUpdate: ({ editor: ed }) => {

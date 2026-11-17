@@ -1,5 +1,6 @@
+import { Extension } from "@tiptap/core";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
-import { TextSelection } from "@tiptap/pm/state";
+import { Plugin, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 
 /**
@@ -52,8 +53,8 @@ export const wrapSelection = (state: EditorState, from: number, to: number, type
 };
 
 /**
- * The editor's `handleTextInput`: a marker typed over a selection wraps it. Composition text is left alone, so an IME
- * commit replaces the selection as it does today.
+ * A marker typed over a selection wraps it. Composition text is left alone, so an IME commit replaces the selection as
+ * it does today.
  */
 export const wrapSelectionOnTextInput = (view: EditorView, from: number, to: number, typed: string): boolean => {
     if (view.composing) {
@@ -70,3 +71,16 @@ export const wrapSelectionOnTextInput = (view: EditorView, from: number, to: num
 
     return true;
 };
+
+/**
+ * Registers `wrapSelectionOnTextInput` as a plugin. It must come after `VimMode` in the editor's extensions: ProseMirror
+ * asks plugins in order, and vim's normal mode takes typed text, so a selection there must not be wrapped. Editor props
+ * are asked before any plugin, which is why this is not an `editorProps` handler.
+ */
+export const WrapSelection = Extension.create({
+    addProseMirrorPlugins() {
+        return [new Plugin({ props: { handleTextInput: wrapSelectionOnTextInput } })];
+    },
+
+    name: "wrapSelection",
+});
