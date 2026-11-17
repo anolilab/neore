@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -223,6 +223,21 @@ describe("browse eligibility", () => {
 });
 
 describe("createFolder", () => {
+    it("names, and creates, the resolved folder when a symlink in the requested path points elsewhere", async () => {
+        const real = path.join(root, "real");
+
+        mkdirSync(real);
+        symlinkSync(real, path.join(root, "link"));
+        const { deps, machines } = setup({ deviceId: "desk-1" });
+        const resolved = JSON.stringify(path.join(realpathSync(real), "newdir"));
+        const detail = expect.stringContaining(resolved);
+
+        await machines.createFolder("desk-1", path.join(root, "link", "newdir"));
+
+        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail }));
+        expect(existsSync(path.join(real, "newdir"))).toBe(true);
+    });
+
     it("makes a folder on this computer after a confirmation, asks nothing for one that exists, and refuses a file", async () => {
         const { deps, machines } = setup();
         const target = path.join(root, "x", "y");

@@ -46,6 +46,21 @@ type Machine = { host: HostView; kind: "server" } | { kind: "this-computer" };
 
 const isInside = (folder: string, root: string): boolean => folder === root || folder.startsWith(root.endsWith("/") ? root : `${root}/`);
 
+/** The path a new folder gets once the symlinks in its existing part are followed, so the prompt can name what `mkdir` creates. */
+const resolveNewPath = async (folder: string): Promise<string> => {
+    try {
+        return await realpath(folder);
+    } catch {
+        const parent = path.dirname(folder);
+
+        if (parent === folder) {
+            return folder;
+        }
+
+        return path.join(await resolveNewPath(parent), path.basename(folder));
+    }
+};
+
 const statOrNull = async (file: string): Promise<Stats | null> => {
     try {
         return await stat(file);
@@ -313,13 +328,16 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
                 throw new Error("device: that path is a file");
             }
 
-            if (existing === null && !await ask({ detail: `Folder: ${JSON.stringify(folder)}`, message: "Create a new folder on this computer?" })) {
+            // The prompt names the folder that gets created: a symlink in the path is followed, so the resolved path is shown and created.
+            const target = existing === null ? await resolveNewPath(folder) : folder;
+
+            if (existing === null && !await ask({ detail: `Folder: ${JSON.stringify(target)}`, message: "Create a new folder on this computer?" })) {
                 throw declined();
             }
 
-            await mkdir(folder, { recursive: true });
+            await mkdir(target, { recursive: true });
 
-            return { created: existing === null, path: await realpath(folder) };
+            return { created: existing === null, path: await realpath(target) };
         }
 
         const host = requireConnected(machine.host);
