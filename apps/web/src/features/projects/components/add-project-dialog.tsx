@@ -93,10 +93,13 @@ interface AddProjectContentProps extends Omit<AddProjectDialogProps, "open"> {
     /** Servers paired in this session. One that is still listed as unpaired is connected, never paired again. */
     pairedHosts: Set<string>;
     /** The host being paired or connected. Held by the owner of the open state, so it outlives a closed dialog. */
-    pairingHosts: Set<string>;
+    pairingHost: string | null;
+    setPairingHost: (host: string | null) => void;
+    /** True while a project is being added; the owner refuses to close the dialog then. */
+    addingReference: { current: boolean };
 }
 
-const AddProjectContent = ({ onClose, onCreateNew, pairingHosts, pairedHosts }: AddProjectContentProps) => {
+const AddProjectContent = ({ addingReference, onClose, onCreateNew, pairedHosts, pairingHost, setPairingHost }: AddProjectContentProps) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const { mutateAsync: createProject } = useMutation(crpc.projects.functions.createProject.mutationOptions());
@@ -106,11 +109,18 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts, pairedHosts }: 
 
     const [machines, setMachines] = useState<AddProjectMachine[] | null>(null);
     const [machine, setMachine] = useState<AddProjectMachine | null>(null);
-    const [pendingKey, setPendingKey] = useState<string | null>(null);
     const [listing, setListing] = useState<MachineFolderPage | null>(null);
     const [typedPath, setTypedPath] = useState("");
     const [isBrowsing, setIsBrowsing] = useState(false);
     const [isAdding, setIsAdding] = useState(false);
+
+    useEffect(() => {
+        addingReference.current = isAdding;
+
+        return () => {
+            addingReference.current = false;
+        };
+    }, [addingReference, isAdding]);
     const [message, setMessage] = useState("");
     const [problem, setProblem] = useState({ forPath: false, text: "" });
 
@@ -340,7 +350,7 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts, pairedHosts }: 
         const state = machineRowState(row);
         const bridge = getAddProjectBridge();
 
-        if (state.kind === "disabled" || bridge === undefined || pendingKey !== null || pairingHosts.size > 0) {
+        if (state.kind === "disabled" || bridge === undefined || pairingHost !== null) {
             return;
         }
 
@@ -349,8 +359,7 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts, pairedHosts }: 
         let target = row;
 
         if (state.kind === "needs-connect" || state.kind === "needs-pair") {
-            pairingHosts.add(state.sshAlias);
-            setPendingKey(state.sshAlias);
+            setPairingHost(state.sshAlias);
 
             const pairs = state.kind === "needs-pair" && !pairedHosts.has(state.sshAlias);
             const connected =
@@ -369,8 +378,7 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts, pairedHosts }: 
             }
 
             // Cleared only after the refresh, so the row cannot be picked again while it still shows as unpaired.
-            pairingHosts.clear();
-            setPendingKey(null);
+            setPairingHost(null);
 
             if (!connected.ok) {
                 setError(describeFailure(connected.error));
@@ -393,10 +401,15 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts, pairedHosts }: 
         await browse(target.id, "", { createIfMissing: false });
     };
 
-    const goBack = (): void => {
-        // A request still in flight belongs to the machine being left, so its answer is dropped.
+    // Ends the browse in flight: its answer is dropped, and no spinner waits for it.
+    const cancelBrowse = (): void => {
         browseGeneration.current += 1;
         setIsBrowsing(false);
+    };
+
+    const goBack = (): void => {
+        // A request still in flight belongs to the machine being left, so its answer is dropped.
+        cancelBrowse();
         setMachine(null);
         setListing(null);
         setError("");
@@ -463,7 +476,7 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts, pairedHosts }: 
             </DialogHeader>
             <DialogPanel className="min-h-0 flex-1 space-y-3">
                 <div aria-live="polite" role="status">
-                    {pendingKey !== null && <p className="text-muted-foreground text-sm">{t`Connecting ${pendingKey}…`}</p>}
+                    {pairingHost !== null && <p className="text-muted-foreground text-sm">{t`Connecting ${pairingHost}…`}</p>}
                     {isBrowsing && <p className="text-muted-foreground text-sm">{t`Loading folders…`}</p>}
                     {message !== "" && !isBrowsing && <p className="text-muted-foreground text-sm">{message}</p>}
                     {isAdding && <p className="text-muted-foreground text-sm">{t`Adding the project…`}</p>}
@@ -496,7 +509,7 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts, pairedHosts }: 
                                                 aria-describedby={reason === "" ? undefined : `machine-reason-${key}`}
                                                 className={ROW_CLASS}
                                                 data-row=""
-                                                disabled={state.kind === "disabled" || pendingKey !== null}
+                                                disabled={state.kind === "disabled" || pairingHost !== null}
                                                 onClick={() => start(pick(row))}
                                                 onKeyDown={moveFocus}
                                                 type="button"
@@ -511,7 +524,7 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts, pairedHosts }: 
                                                         </span>
                                                     )}
                                                 </span>
-                                                {pendingKey !== null && pendingKey === row.sshAlias ? (
+                                                {pairingHost !== null && pairingHost === row.sshAlias ? (
                                                     <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin" />
                                                 ) : (
                                                     <ChevronRight aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
@@ -545,7 +558,10 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts, pairedHosts }: 
                                 aria-invalid={isPathError}
                                 autoComplete="off"
                                 id="add-project-path"
-                                onChange={(event) => setTypedPath(event.target.value)}
+                                onChange={(event) => {
+                                    cancelBrowse();
+                                    setTypedPath(event.target.value);
+                                }}
                                 spellCheck={false}
                                 value={typedPath}
                             />
@@ -635,13 +651,32 @@ const AddProjectContent = ({ onClose, onCreateNew, pairingHosts, pairedHosts }: 
 };
 
 const AddProjectDialog = ({ onClose, onCreateNew, open }: AddProjectDialogProps) => {
-    const [pairingHosts] = useState(() => new Set<string>());
+    // Owned here, not by the content: a pairing that outlives a closed dialog still blocks the picker when it reopens.
+    const [pairingHost, setPairingHost] = useState<string | null>(null);
     const [pairedHosts] = useState(() => new Set<string>());
+    const addingReference = useRef(false);
 
     return (
-        <Dialog onOpenChange={(nextOpen) => !nextOpen && onClose()} open={open}>
+        <Dialog
+            onOpenChange={(nextOpen) => {
+                // Escape, the overlay and the close button all land here: a submission in flight must finish on screen.
+                if (!nextOpen && !addingReference.current) {
+                    onClose();
+                }
+            }}
+            open={open}
+        >
             {/* Mounted only while open: the dialog roots keep closed children mounted, which would reopen the last session. */}
-            {open && <AddProjectContent onClose={onClose} onCreateNew={onCreateNew} pairedHosts={pairedHosts} pairingHosts={pairingHosts} />}
+            {open && (
+                <AddProjectContent
+                    addingReference={addingReference}
+                    onClose={onClose}
+                    onCreateNew={onCreateNew}
+                    pairedHosts={pairedHosts}
+                    pairingHost={pairingHost}
+                    setPairingHost={setPairingHost}
+                />
+            )}
         </Dialog>
     );
 };

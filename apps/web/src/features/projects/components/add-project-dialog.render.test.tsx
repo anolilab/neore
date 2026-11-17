@@ -472,4 +472,48 @@ describe("AddProjectDialog pairing and browsing guards", () => {
         expect(device.hostPair).toHaveBeenCalledTimes(1);
         expect(device.connectAddProjectMachine).toHaveBeenCalledTimes(2);
     });
+
+    it("keeps a path typed while a browse is in flight, and the browse does not write its old path back", async () => {
+        const device = installBridge();
+
+        render(<AddProjectDialog onClose={noop} onCreateNew={noop} open />);
+        fireEvent.click(await screen.findByRole("button", { name: THIS_COMPUTER }));
+        await waitFor(() => expect((screen.getByLabelText("Folder path") as HTMLInputElement).value).toBe("/home/me"));
+
+        const slow = deferred<ReturnType<typeof page>>();
+        const input = screen.getByLabelText("Folder path");
+
+        device.browseMachineFolders.mockImplementationOnce(() => slow.promise as never);
+        fireEvent.change(input, { target: { value: "/a" } });
+        fireEvent.submit(input);
+        fireEvent.change(input, { target: { value: "/c" } });
+
+        slow.resolve(page("/a"));
+        await settle();
+
+        expect((input as HTMLInputElement).value).toBe("/c");
+    });
+
+    it("keeps the dialog open on Escape while a project is being added, and closes once the add has finished", async () => {
+        installBridge();
+        const onClose = vi.fn();
+
+        render(<AddProjectDialog onClose={onClose} onCreateNew={noop} open />);
+        fireEvent.click(await screen.findByRole("button", { name: THIS_COMPUTER }));
+        fireEvent.click(await screen.findByRole("button", { name: "app" }));
+        await waitFor(() => expect((screen.getByLabelText("Folder path") as HTMLInputElement).value).toBe("/home/me/app"));
+
+        const slow = deferred<string>();
+
+        createProject.mockImplementationOnce(() => slow.promise as never);
+        fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+        await waitFor(() => expect(createProject).toHaveBeenCalled());
+
+        fireEvent.keyDown(document, { key: "Escape" });
+        await settle();
+        expect(onClose).not.toHaveBeenCalled();
+
+        slow.resolve("project-1");
+        await waitFor(() => expect(onClose).toHaveBeenCalled());
+    });
 });
