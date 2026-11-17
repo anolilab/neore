@@ -270,4 +270,18 @@ describe("composer emoji shortcodes", () => {
 
         expect(options[0]!.textContent).toContain(`:${expected[0]!.shortcode}:`);
     });
+
+    it("does not open with the caret inside a shortcode, since the choice would replace only part of it", async () => {
+        const { ref } = renderEditor();
+
+        await typeText(ref, ":dog");
+        await optionsOf();
+
+        // Between "o" and "g": the text before the caret is ":do", but the shortcode goes on past it.
+        act(() => {
+            ref.current!.getEditor()!.commands.setTextSelection(4);
+        });
+
+        expect(screen.queryByRole("listbox", { name: "Emoji suggestions" })).toBeNull();
+    });
 });

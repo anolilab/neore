@@ -27,6 +27,9 @@ export interface EmojiShortcodeOptions {
 
 const OBJECT_REPLACEMENT = "\u{FFFC}";
 
+/** The characters a shortcode is made of, the same set the trigger accepts. */
+const SHORTCODE_CHARACTER = /^[\w+-]/;
+
 /** A hard break reads as the line break it shows, so a colon at the start of a wrapped line still counts. */
 const leafText = (node: ProseMirrorNode): string => (node.type.name === "hardBreak" ? "\n" : OBJECT_REPLACEMENT);
 
@@ -42,6 +45,13 @@ export const readEmojiShortcodeMatch = (state: EditorState): EmojiShortcodeMatch
     const found = findEmojiShortcodeQuery($pos.parent.textBetween(0, $pos.parentOffset, undefined, leafText));
 
     if (!found) {
+        return null;
+    }
+
+    // The caret must end the shortcode. Inside a longer `:word` the list would replace only the part before the caret.
+    const after = $pos.parent.textBetween($pos.parentOffset, Math.min($pos.parentOffset + 1, $pos.parent.content.size), undefined, leafText);
+
+    if (SHORTCODE_CHARACTER.test(after)) {
         return null;
     }
 
