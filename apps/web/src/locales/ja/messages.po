@@ -688,7 +688,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} 個のツール: {1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:222
+#: src/features/home/components/home-page.tsx:223
 msgid "{0} unread"
 msgstr "未読 {0} 件"
 
@@ -1750,7 +1750,7 @@ msgstr ""
 msgid "a change is waiting to be read"
 msgstr "読み取り待ちの変更があります"
 
-#: src/features/home/components/home-page.tsx:171
+#: src/features/home/components/home-page.tsx:172
 msgid "A chat is waiting for your answer"
 msgstr "チャットがあなたの回答を待っています"
 
@@ -2646,9 +2646,9 @@ msgstr "調整"
 #: src/features/chat/sharing/thread-share-button.tsx:323
 #: src/features/layout/components/sidebar-shortcut.tsx:268
 #: src/features/layout/lib/dashboard-page-names.ts:12
-#: src/routes/admin/route.tsx:51
-#: src/routes/admin/route.tsx:70
-#: src/routes/admin/route.tsx:81
+#: src/routes/admin/route.tsx:56
+#: src/routes/admin/route.tsx:76
+#: src/routes/admin/route.tsx:87
 msgid "Admin"
 msgstr "管理者"
 
@@ -2931,7 +2931,7 @@ msgstr "両方の実行の集計スコア"
 msgid "AI"
 msgstr "AI"
 
-#: src/routes/admin/route.tsx:67
+#: src/routes/admin/route.tsx:73
 msgid "AI Chat"
 msgstr "AI チャット"
 
@@ -3184,7 +3184,7 @@ msgstr "すべてのカテゴリ"
 msgid "All changes saved"
 msgstr "すべての変更を保存しました"
 
-#: src/features/home/components/home-page.tsx:242
+#: src/features/home/components/home-page.tsx:243
 msgid "All chats"
 msgstr "すべてのチャット"
 
@@ -3216,6 +3216,10 @@ msgstr "すべてのアイコン"
 #: src/features/download/components/download-page.tsx:101
 msgid "All installers"
 msgstr "すべてのインストーラー"
+
+#: src/features/admin/components/feedback-admin-page.tsx:160
+msgid "All kinds"
+msgstr ""
 
 #: src/features/chat/thread/composer-mcp-selector.tsx:125
 msgid "All MCP servers active"
@@ -3723,7 +3727,7 @@ msgstr "API キーを作成しました"
 #: src/features/settings/components/chat/api-keys-settings.tsx:554
 #: src/features/settings/lib/settings-navigation.ts:96
 #: src/features/settings/lib/settings-navigation.ts:104
-#: src/routes/admin/route.tsx:55
+#: src/routes/admin/route.tsx:61
 msgid "API Keys"
 msgstr "API キー"
 
@@ -4215,6 +4219,10 @@ msgstr "添付画像"
 #~ msgid "Attached image {0}"
 #~ msgstr ""
 
+#: src/features/admin/components/feedback-admin-page.tsx:67
+msgid "Attached images"
+msgstr ""
+
 #: src/features/chat/thread/ask-user-prompt.tsx:231
 msgid "Attached:"
 msgstr "添付:"
@@ -4298,7 +4306,7 @@ msgstr "音声・動画"
 #: src/features/admin/components/audit-log-card.tsx:130
 #: src/features/layout/lib/dashboard-page-names.ts:18
 #: src/routes/admin/route.tsx:34
-#: src/routes/admin/route.tsx:52
+#: src/routes/admin/route.tsx:57
 msgid "Audit Log"
 msgstr "監査ログ"
 
@@ -6381,8 +6389,8 @@ msgstr "データのクリーンアップ"
 msgid "Clean title slide"
 msgstr "すっきりしたタイトルスライド"
 
-#: src/routes/admin/route.tsx:44
-#: src/routes/admin/route.tsx:53
+#: src/routes/admin/route.tsx:49
+#: src/routes/admin/route.tsx:58
 msgid "Cleanup"
 msgstr "クリーンアップ"
 
@@ -10115,6 +10123,10 @@ msgstr "ファイルごと削除"
 #: src/features/prompts/components/prompt-list.tsx:257
 msgid "Deleted {0, plural, one {# prompt} other {# prompts}}"
 msgstr "{0, plural, other {# 件のプロンプトを削除しました}}"
+
+#: src/features/admin/components/feedback-admin-page.tsx:48
+msgid "Deleted user"
+msgstr ""
 
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:16
 msgid "Deletes 3 files in /drafts"
@@ -14121,6 +14133,21 @@ msgstr "機能：{0}"
 msgid "Feed image"
 msgstr "フィード画像"
 
+#: src/features/admin/components/feedback-admin-page.tsx:136
+#: src/features/admin/components/feedback-admin-page.tsx:151
+#: src/routes/admin/route.tsx:39
+#: src/routes/admin/route.tsx:59
+msgid "Feedback"
+msgstr ""
+
+#: src/features/admin/components/feedback-admin-page.tsx:129
+msgid "Feedback could not be loaded."
+msgstr ""
+
+#: src/features/admin/components/feedback-admin-page.tsx:172
+msgid "Feedback pages"
+msgstr ""
+
 #: src/features/chat/thread/widgets/weather-widget.tsx:186
 msgid "Feels like {feelsLike}{temporaryUnit}"
 msgstr "体感温度 {feelsLike}{temporaryUnit}"
@@ -14283,6 +14310,11 @@ msgstr "映像による物語とストーリーテリングの質を重視した
 #: src/features/admin/components/audit-log-card.tsx:136
 msgid "Filter by action"
 msgstr "操作で絞り込み"
+
+#: src/features/admin/components/feedback-admin-page.tsx:156
+#: src/features/admin/components/feedback-admin-page.tsx:157
+msgid "Filter by kind"
+msgstr ""
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:718
 msgid "Filter by mode"
@@ -15025,7 +15057,7 @@ msgid "Gamma"
 msgstr "ガンマ"
 
 #: src/features/marketing/components/gateway-navbar.tsx:43
-#: src/routes/admin/route.tsx:54
+#: src/routes/admin/route.tsx:60
 msgid "Gateway"
 msgstr "ゲートウェイ"
 
@@ -16567,6 +16599,7 @@ msgstr "アイコン"
 msgid "Icon URL (Optional)"
 msgstr "アイコン URL（任意）"
 
+#: src/features/admin/components/feedback-admin-page.tsx:22
 #: src/features/feedback/components/send-feedback-dialog.tsx:28
 msgid "Idea"
 msgstr ""
@@ -16579,6 +16612,7 @@ msgstr "アイデアから完成まで、1 つのスレッドで"
 msgid "Ideal for simple classification and extraction"
 msgstr "シンプルな分類や抽出に最適"
 
+#: src/features/admin/components/feedback-admin-page.tsx:161
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:69
 msgid "Ideas"
 msgstr "アイデア"
@@ -16646,6 +16680,14 @@ msgstr "イラスト"
 #: src/routes/(chat)/workflow/gallery.tsx:21
 msgid "Image"
 msgstr "画像"
+
+#: src/features/admin/components/feedback-admin-page.tsx:82
+msgid "Image {position} could not be loaded"
+msgstr ""
+
+#: src/features/admin/components/feedback-admin-page.tsx:70
+msgid "Image {position} from {senderName}"
+msgstr ""
 
 #: src/features/marketing/components/landing-page.tsx:211
 msgid "Image & Video"
@@ -18852,6 +18894,10 @@ msgstr "エディターを読み込んでいます..."
 #: src/features/pages/components/page-editor.tsx:40
 msgid "Loading editor…"
 msgstr "エディターを読み込んでいます…"
+
+#: src/features/admin/components/feedback-admin-page.tsx:117
+msgid "Loading feedback"
+msgstr ""
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:344
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
@@ -21117,7 +21163,7 @@ msgid "Needs review"
 msgstr "要レビュー"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
-#: src/features/home/components/home-page.tsx:164
+#: src/features/home/components/home-page.tsx:165
 msgid "Needs you"
 msgstr "対応が必要"
 
@@ -21482,6 +21528,10 @@ msgstr "1 日あたりの新規ユーザー登録数"
 msgid "New Workflow"
 msgstr "新しいワークフロー"
 
+#: src/features/admin/components/feedback-admin-page.tsx:175
+msgid "Newer"
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:1115
 msgid "newest"
 msgstr "最新"
@@ -21678,7 +21728,7 @@ msgstr "カメラが選択されていません"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "まだケースがありません。手動で追加するか、CSV または JSONL ファイルをインポートするか、チャットのターンを「評価ケースとして保存」で保存してください。"
 
-#: src/features/home/components/home-page.tsx:249
+#: src/features/home/components/home-page.tsx:250
 msgid "No chats yet. Start one above."
 msgstr "まだチャットはありません。上から始めましょう。"
 
@@ -21802,6 +21852,10 @@ msgstr "有効期限なし"
 #: src/features/develop/components/checks-tab.tsx:138
 msgid "No failures in the checks shown."
 msgstr "表示されているチェックに失敗はありません。"
+
+#: src/features/admin/components/feedback-admin-page.tsx:133
+msgid "No feedback yet"
+msgstr ""
 
 #: ../../packages/ui/src/components/data-grid/data-grid-sort-menu.tsx:264
 msgid "No fields found."
@@ -21934,6 +21988,7 @@ msgid "No models installed yet."
 msgstr "インストール済みのモデルはまだありません。"
 
 #: src/features/admin/components/admin-dashboard-stats.tsx:246
+#: src/features/admin/components/feedback-admin-page.tsx:47
 #: src/features/admin/components/user-cell.tsx:72
 msgid "No name"
 msgstr "名前なし"
@@ -22224,7 +22279,7 @@ msgstr "ツールはありません。"
 msgid "No triggers yet"
 msgstr "トリガーはまだありません"
 
-#: src/features/home/components/home-page.tsx:229
+#: src/features/home/components/home-page.tsx:230
 msgid "No unread notifications."
 msgstr "未読の通知はありません。"
 
@@ -22500,7 +22555,7 @@ msgstr "ここには何もありません。"
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "そのアドレスで待ち受けているサーバーがありません。Ollama または LM Studio のサーバーを起動し、ポートを確認して、URL が /v1 で終わっていることを確認してください。"
 
-#: src/features/home/components/home-page.tsx:185
+#: src/features/home/components/home-page.tsx:186
 msgid "Nothing is running right now."
 msgstr "現在実行中のものはありません。"
 
@@ -22508,7 +22563,7 @@ msgstr "現在実行中のものはありません。"
 msgid "Nothing is saved, installed or enabled until you choose to save."
 msgstr "保存を選択するまで、何も保存、インストール、有効化されません。"
 
-#: src/features/home/components/home-page.tsx:166
+#: src/features/home/components/home-page.tsx:167
 msgid "Nothing is waiting on you."
 msgstr "対応待ちのものはありません。"
 
@@ -22524,7 +22579,7 @@ msgstr "通知"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "通知ワークフロー、チャネル、受信者の設定"
 
-#: src/features/home/components/home-page.tsx:226
+#: src/features/home/components/home-page.tsx:227
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:199
@@ -22571,8 +22626,8 @@ msgstr "拡散ベースの新しい言語モデルアーキテクチャ"
 msgid "NSFW Content Review"
 msgstr "NSFW コンテンツのレビュー"
 
-#: src/routes/admin/route.tsx:39
-#: src/routes/admin/route.tsx:56
+#: src/routes/admin/route.tsx:44
+#: src/routes/admin/route.tsx:62
 msgid "NSFW Review"
 msgstr "NSFW レビュー"
 
@@ -22705,6 +22760,7 @@ msgid "old lines {text}"
 msgstr "旧 {text} 行目"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:45
+#: src/features/admin/components/feedback-admin-page.tsx:187
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:643
 msgid "Older"
 msgstr "それ以前"
@@ -23859,6 +23915,8 @@ msgid "Original system prompt"
 msgstr "元のシステムプロンプト"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:171
+#: src/features/admin/components/feedback-admin-page.tsx:23
+#: src/features/admin/components/feedback-admin-page.tsx:163
 #: src/features/feedback/components/send-feedback-dialog.tsx:30
 #: src/features/settings/components/chat/models-settings.tsx:521
 msgid "Other"
@@ -25423,8 +25481,13 @@ msgstr "Pro はあなた個人のプランです。すべてのモデルと1日1
 msgid "Pro models need a Pro plan. On a free plan the run stops before it starts."
 msgstr "Pro モデルには Pro プランが必要です。無料プランでは、実行は開始前に停止します。"
 
+#: src/features/admin/components/feedback-admin-page.tsx:24
 #: src/features/feedback/components/send-feedback-dialog.tsx:29
 msgid "Problem"
+msgstr ""
+
+#: src/features/admin/components/feedback-admin-page.tsx:162
+msgid "Problems"
 msgstr ""
 
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:29
@@ -25992,8 +26055,8 @@ msgid "Queue message — sends when the current reply finishes"
 msgstr "メッセージを待機列に追加 — 現在の返信が終わると送信されます"
 
 #: src/features/home/components/home-page.tsx:113
-#: src/features/home/components/home-page.tsx:189
-#: src/features/home/components/home-page.tsx:197
+#: src/features/home/components/home-page.tsx:190
+#: src/features/home/components/home-page.tsx:198
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
 #: src/features/sub-agents/components/worker-list.tsx:83
 #: src/features/sub-agents/components/worker-run-log.tsx:29
@@ -26485,7 +26548,7 @@ msgstr "リベースしてマージ"
 msgid "Recent"
 msgstr "最近"
 
-#: src/features/home/components/home-page.tsx:246
+#: src/features/home/components/home-page.tsx:247
 msgid "Recent chats"
 msgstr "最近のチャット"
 
@@ -27771,7 +27834,7 @@ msgid "Review submitted"
 msgstr "レビューを送信しました"
 
 #. placeholder {0}: task.title
-#: src/features/home/components/home-page.tsx:176
+#: src/features/home/components/home-page.tsx:177
 msgid "Review task: {0}"
 msgstr "タスクを確認：{0}"
 
@@ -28101,9 +28164,9 @@ msgstr "ワークフローを実行すると、ここに実行履歴が表示さ
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
 #: src/features/home/components/home-page.tsx:116
-#: src/features/home/components/home-page.tsx:183
-#: src/features/home/components/home-page.tsx:189
-#: src/features/home/components/home-page.tsx:197
+#: src/features/home/components/home-page.tsx:184
+#: src/features/home/components/home-page.tsx:190
+#: src/features/home/components/home-page.tsx:198
 #: src/features/settings/components/chat/trigger-settings.tsx:184
 #: src/features/tasks/components/task-detail-dialog.tsx:138
 #: src/features/tasks/components/task-status.tsx:20
@@ -29297,6 +29360,15 @@ msgstr "オーナーが送信済み"
 #: src/features/sub-agents/components/worker-run-log.tsx:35
 msgid "Sent by you"
 msgstr "自分が送信"
+
+#: src/features/admin/components/feedback-admin-page.tsx:60
+#~ msgid "Sent from"
+#~ msgstr ""
+
+#. placeholder {0}: item.pagePath
+#: src/features/admin/components/feedback-admin-page.tsx:60
+msgid "Sent from <0>{0}</0>"
+msgstr ""
 
 #: src/features/devices/components/device-tool-call.tsx:197
 msgid "Sent to {device}…"
@@ -35625,7 +35697,7 @@ msgstr ""
 msgid "Untitled"
 msgstr "無題"
 
-#: src/features/home/components/home-page.tsx:254
+#: src/features/home/components/home-page.tsx:255
 msgid "Untitled chat"
 msgstr "無題のチャット"
 
@@ -36239,7 +36311,7 @@ msgstr "ユーザー名: @{platformUsername}"
 
 #: src/features/layout/lib/dashboard-page-names.ts:42
 #: src/routes/admin/route.tsx:29
-#: src/routes/admin/route.tsx:57
+#: src/routes/admin/route.tsx:63
 msgid "Users"
 msgstr "ユーザー"
 
@@ -37080,7 +37152,7 @@ msgid "Waiting for your answer"
 msgstr "あなたの回答を待っています"
 
 #. placeholder {0}: approval.threadTitle
-#: src/features/home/components/home-page.tsx:171
+#: src/features/home/components/home-page.tsx:172
 msgid "Waiting for your answer in {0}"
 msgstr "{0} であなたの回答を待っています"
 
@@ -37408,6 +37480,10 @@ msgstr "何を送るか、そして良い回答と悪い回答をどう見分け
 #: src/features/settings/components/chat/event-trigger-fields.tsx:189
 msgid "What to watch"
 msgstr "監視する対象"
+
+#: src/features/admin/components/feedback-admin-page.tsx:152
+msgid "What users sent from the app, newest first"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:107
 msgid "what we store"

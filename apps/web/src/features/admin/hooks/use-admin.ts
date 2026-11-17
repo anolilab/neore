@@ -4,6 +4,7 @@
  * Hooks for admin operations using Lunora queries and mutations.
  * Provides type-safe access to admin functions with TanStack Query integration.
  */
+import type { ReturnOf } from "@lunora/react";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
@@ -294,4 +295,19 @@ export const useGatewayAnalytics = (period: "24h" | "7d" = "24h") => {
         retry: 1,
         staleTime: 30_000,
     });
+};
+
+// =============================================================================
+// Feedback
+// =============================================================================
+
+export type AdminFeedbackPage = ReturnOf<typeof api.feedback.admin.listFeedback>;
+export type AdminFeedbackItem = AdminFeedbackPage["page"][number];
+export type FeedbackKind = AdminFeedbackItem["kind"];
+
+/** One page of the feedback users sent, newest first; `cursor` is the previous page's `continueCursor`. */
+export const useAdminFeedback = (options: { cursor: string | null; kind?: FeedbackKind; limit: number }) => {
+    const crpc = useCRPC();
+
+    return useQuery(crpc.feedback.admin.listFeedback.queryOptions({ cursor: options.cursor, kind: options.kind, limit: options.limit }));
 };
