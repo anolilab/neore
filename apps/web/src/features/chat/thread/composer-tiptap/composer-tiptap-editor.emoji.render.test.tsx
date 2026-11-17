@@ -367,6 +367,23 @@ describe("composer emoji shortcodes", () => {
         expect(options[0]!.textContent).toContain(`:${expected[0]!.shortcode}:`);
     });
 
+    it("stays closed while the dismissed shortcode is edited to another spelling of itself", async () => {
+        const { ref } = renderEditor();
+
+        await typeText(ref, ":dog");
+        await optionsOf();
+        fireEvent.keyDown(editableWhileOpen(), { key: "Escape" });
+
+        // Removes "og", then types "a": ":d", then ":da". Neither is a prefix of ":dog" as it was closed, but each is the same token.
+        act(() => {
+            ref.current!.getEditor()!.commands.deleteRange({ from: 3, to: 5 });
+        });
+        await typeText(ref, "a");
+
+        expect(ref.current?.getEditor()?.getText()).toBe(":da");
+        expect(screen.queryByRole("listbox", { name: "Emoji suggestions" })).toBeNull();
+    });
+
     it("does not open in Vim normal mode, where Enter and Escape are the Vim keys", async () => {
         settings.data = { composerVimMode: true };
 

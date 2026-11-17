@@ -11,6 +11,9 @@ import type { EmojiShortcodeMatch } from "./extensions/emoji-shortcode";
 
 const NO_SUGGESTIONS: ReadonlyArray<EmojiSuggestion> = [];
 
+/** Whether two queries are one shortcode at two stages of typing: one is a prefix of the other. */
+const isSameShortcode = (a: string, b: string): boolean => a.startsWith(b) || b.startsWith(a);
+
 export const emojiOptionId = (listboxId: string, index: number): string => `${listboxId}-option-${index}`;
 
 interface UseEmojiShortcodeOptions {
@@ -84,12 +87,19 @@ export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmo
         [enabled, index, openable, query],
     );
 
-    // The same shortcode, grown or shrunk by typing or Backspace, stays closed; a different one at that place does not.
-    const isDismissed =
+    // The shortcode Escape closed follows its edits: grown or shrunk by typing or Backspace, it is still that shortcode, and
+    // the stored query follows it. A different one typed in its place, such as `:cat` over `:dog`, is not, and opens.
+    if (
         match !== null &&
         dismissed !== null &&
         match.from === dismissed.from &&
-        (match.query.startsWith(dismissed.query) || dismissed.query.startsWith(match.query));
+        match.query !== dismissed.query &&
+        isSameShortcode(match.query, dismissed.query)
+    ) {
+        setDismissed({ from: match.from, query: match.query });
+    }
+
+    const isDismissed = match !== null && dismissed !== null && match.from === dismissed.from && isSameShortcode(match.query, dismissed.query);
     const showing = enabled && focused && openable && !isDismissed;
     const open = showing && suggestions.length > 0;
     const selected = Math.min(activeIndex, Math.max(suggestions.length - 1, 0));
