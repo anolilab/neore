@@ -58,8 +58,13 @@ describe(looksSensitive, () => {
         expect(looksSensitive(line)).toBe(true);
     });
 
+    it("flags a shorter account number named as one", () => {
+        expect(looksSensitive("The user's account number is 123456789012")).toBe(true);
+    });
+
     it("leaves an ordinary fact alone", () => {
         expect(looksSensitive("The user keeps a password manager and prefers TypeScript")).toBe(false);
+        expect(looksSensitive("The user walks 120000 steps a month and has a card game night in 2024")).toBe(false);
     });
 });
 

@@ -9,7 +9,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { memoryLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
 import { withoutUndefined } from "../lib/patch";
-import { type ImportApp, importDedupKey } from "./import-logic";
+import { type ImportApp, importDedupKey, IMPORT_MEMORY_OFF_MESSAGE } from "./import-logic";
 import { lastConfirmedOf, type MemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { requireOwnedThread } from "../agent/thread-read-access";
@@ -491,26 +491,36 @@ export const saveMemoryBatch = internalMutation
         return memoryIds;
     });
 
-/** Active rows the import's last check reads: far past the action's dedup window. */
+/** The user's own rows the import's last check reads: far past the action's dedup window. */
 const IMPORT_EXACT_CHECK_ROWS = 5000;
 
 /**
  * Imported rows, minus any whose text the user already has (that row is confirmed and its
  * place is `null`). It runs in the mutation because one shard's mutations run one at a time:
- * a second save of the same paste sees what the first wrote, and a repeat past the action's
- * dedup window is still found.
+ * a second save of the same paste sees what the first wrote, a repeat past the action's
+ * dedup window is still found, and memory switched off meanwhile stops the write.
  */
 export const saveImportedMemoryBatch = internalMutation
     .input({ memories: v.array(v.object({ ...vMemoryInsertFields })), userId: v.string() })
     .output(v.array(v.union(v.id("memories"), v.null())))
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
-        const active = await ctx.db
+        const settings = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .unique();
+
+        if (settings?.memoryEnabled !== true) {
+            throw new LunoraError("FORBIDDEN", IMPORT_MEMORY_OFF_MESSAGE);
+        }
+
+        // The user's own scope only, so a bot's rows never use up the read.
+        const own = await ctx.db
             .query("memories")
-            .withIndex("by_userId_supersededBy", (q) => q.eq("userId", args.userId).eq("supersededBy", null as never))
+            .withIndex("by_userId_botId", (q) => q.eq("userId", args.userId).eq("botId", null as never))
             .order("desc")
             .take(IMPORT_EXACT_CHECK_ROWS);
-        const textOf = new Map(active.filter((row) => !row.botId).map((row) => [row._id, importDedupKey(row.memory)]));
+        const textOf = new Map(own.filter((row) => !row.supersededBy).map((row) => [row._id, importDedupKey(row.memory)]));
         const byText = new Map([...textOf].map(([memoryId, key]) => [key, memoryId]));
         const memoryIds: (Id<"memories"> | null)[] = [];
         // A superseded row is no longer a match for a later fact of this batch.
@@ -525,27 +535,28 @@ export const saveImportedMemoryBatch = internalMutation
         for (const mem of args.memories) {
             const key = importDedupKey(mem.memory);
             const known = byText.get(key);
+            // The row the action planned to supersede ends only while it is still the user's own active row:
+            // another save may have ended or removed it meanwhile.
+            const planned = mem.supersedes ? await ctx.db.get("memories", mem.supersedes) : null;
+            const supersedes =
+                planned && planned._id !== known && !planned.supersededBy && !planned.botId && planned.userId === args.userId ? planned._id : undefined;
 
             if (known) {
                 await ctx.db.patch("memories", known, { lastConfirmedAt: now });
 
-                // The fact still contradicts the row the action matched: that row ends, in favour of the one found
-                // here — unless another save ended it meanwhile.
-                const contradicted = mem.supersedes && mem.supersedes !== known ? await ctx.db.get("memories", mem.supersedes) : null;
-
-                if (contradicted && !contradicted.supersededBy && contradicted.userId === args.userId) {
-                    await ctx.db.patch("memories", contradicted._id, { supersededBy: known, updatedAt: now });
-                    retire(contradicted._id);
+                if (supersedes) {
+                    await ctx.db.patch("memories", supersedes, { supersededBy: known, updatedAt: now });
                 }
 
                 memoryIds.push(null);
             } else {
-                const memoryId = await insertMemory(ctx, { ...mem, userId: args.userId }, now);
+                const memoryId = await insertMemory(ctx, { ...mem, supersedes, userId: args.userId }, now);
 
-                retire(mem.supersedes);
                 byText.set(key, memoryId);
                 memoryIds.push(memoryId);
             }
+
+            retire(supersedes);
         }
 
         return memoryIds;

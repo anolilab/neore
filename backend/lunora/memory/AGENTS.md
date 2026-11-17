@@ -22,7 +22,7 @@
   split by the pure parser and stored as pasted (the model labels `type`; only a
   belief-revision UPDATE rewords a row), so a repeat import is the same text and
   dedup confirms it. Near-match dedup reads a 1000-row window (type first, then newest), not
-  extraction's 50; the save (`saveImportedMemoryBatch`) re-checks exact text in the mutation, so
+  extraction's 50; the save (`saveImportedMemoryBatch`) re-checks the memory setting and exact text (own rows only) in the mutation, so
   a repeat past the window or a second tab saving the same paste confirms, not adds. Vector hits
   are walked best first; one past the window is read by its embedding id (`getMemoriesByEmbeddingIds`),
   and a bot's row or one this save superseded is passed over. An import never revises a pinned row,

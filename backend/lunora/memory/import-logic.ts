@@ -10,6 +10,8 @@ export const IMPORT_APPS = ["chatgpt", "claude", "gemini", "other"] as const;
 
 export type ImportApp = (typeof IMPORT_APPS)[number];
 
+export const IMPORT_MEMORY_OFF_MESSAGE = "Turn on memory before bringing in memories";
+
 /** Longest paste accepted. */
 export const IMPORT_MAX_INPUT_CHARS = 20_000;
 
@@ -51,12 +53,14 @@ const SENSITIVE_RES: ReadonlyArray<RegExp> = [
     /\b\d{3}-\d{2}-\d{4}\b/,
     /\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){3,7}\b/,
     /\b(?:password|passwort|passcode|api[ _-]?key|secret|token|pin)\b\s*(?:is|:|=)\s*\S+/i,
+    // A shorter account, routing or card number, when the line says that is what it is.
+    /\b(?:account|acct|konto|routing|sort code|card|iban|bic|swift)\b[\w\s.#:]{1,20}?\d(?:[ -]?\d){5,}/i,
 ];
 
 export const looksSensitive = (line: string): boolean => SENSITIVE_RES.some((re) => re.test(line));
 
 /** Two lines that differ only in case or spacing are the same fact. */
-export const importDedupKey = (line: string): string => line.toLowerCase().replaceAll(WHITESPACE_RE, " ");
+export const importDedupKey = (line: string): string => line.toLowerCase().replaceAll(WHITESPACE_RE, " ").trim();
 
 /** Prompt tags removed until none is left: one removal can join the text around it into a new tag. */
 const stripDataTags = (text: string): string => {

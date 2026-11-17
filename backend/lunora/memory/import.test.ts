@@ -172,7 +172,8 @@ describe("importing another assistant's memory", () => {
         await setMemoryEnabled(true);
         // The window reads by type first: a thousand preferences push the one activity row out of it.
         await harness.run(async (ctx: any) => {
-            await ctx.db.insert("memories", { memory: "The user ran a marathon in Porto", type: "activity", userId: USER });
+            // Stored with stray spacing, which the match ignores.
+            await ctx.db.insert("memories", { memory: "The user ran a  marathon in Porto ", type: "activity", userId: USER });
 
             for (let index = 0; index < 1000; index += 1) {
                 await ctx.db.insert("memories", { memory: `Preference number ${String(index)} of the user`, type: "preference", userId: USER });
@@ -281,6 +282,92 @@ describe("importing another assistant's memory", () => {
         });
 
         expect(await save([{ memory: "The user is a nurse in Hamburg", type: "identity" }])).toStrictEqual({ added: 1, alreadyKnown: 0, updated: 0 });
+    });
+
+    it("writes nothing when memory is turned off while the save runs", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+        embedMany.mockImplementation(async () => {
+            await harness.run(async (ctx: any) => {
+                const settings = await ctx.db.query("userSettings").first();
+
+                await ctx.db.patch("userSettings", settings._id, { memoryEnabled: false });
+            });
+
+            throw new Error("no embeddings in this test");
+        });
+
+        await expect(save(FACTS.slice(0, 3))).rejects.toThrow(MEMORY_OFF_RE);
+        expect(await memories()).toHaveLength(0);
+    });
+
+    it("saves the fact when the row it would supersede is gone by the time of the save", async () => {
+        expect.assertions(1);
+
+        await setMemoryEnabled(true);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user works at the harbour office in Porto", type: "context", userId: USER });
+        });
+        generateText.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.query("memories").first();
+
+                await ctx.db.delete("memories", row._id);
+            });
+
+            return { output: { action: "SUPERSEDE" } };
+        });
+
+        expect(await save([{ memory: "The user works at the harbour office in Porto now", type: "context" }])).toStrictEqual({
+            added: 1,
+            alreadyKnown: 0,
+            updated: 0,
+        });
+    });
+
+    it("keeps two checked facts of one paste that differ only in a date", async () => {
+        expect.assertions(1);
+
+        await setMemoryEnabled(true);
+
+        const fact = (year: number) => {
+            return {
+                memory: `The user moved with their partner, two children, an old grey cat and a large collection of vinyl records from a small rented flat above a bakery in central Hamburg to a narrow stone house with a walled garden, a lemon tree and a view of the river in Lisbon in ${String(year)}`,
+                type: "context" as const,
+            };
+        };
+
+        expect(await save([fact(2023), fact(2024)])).toMatchObject({ added: 2 });
+    });
+
+    it("does not let a bot's newer rows push the user's own fact out of the exact check", async () => {
+        expect.assertions(1);
+
+        await setMemoryEnabled(true);
+        await harness.run(async (ctx: any) => {
+            const botId = await ctx.db.insert("bots", {
+                computerEnabled: false,
+                createdAt: 1,
+                instructions: "",
+                model: "m",
+                name: "Ada",
+                updatedAt: 1,
+                userId: USER,
+            });
+
+            await ctx.db.insert("memories", { memory: "The user ran a marathon in Porto", type: "activity", userId: USER });
+
+            for (let index = 0; index < 1000; index += 1) {
+                await ctx.db.insert("memories", { memory: `Preference number ${String(index)} of the user`, type: "preference", userId: USER });
+            }
+
+            for (let index = 0; index < 5000; index += 1) {
+                await ctx.db.insert("memories", { botId, memory: `Bot note number ${String(index)}`, type: "context", userId: USER });
+            }
+        });
+
+        expect(await save([{ memory: "The user ran a marathon in Porto", type: "context" }])).toStrictEqual({ added: 0, alreadyKnown: 1, updated: 0 });
     });
 
     it("saves a paste once when two saves of it run at the same time", async () => {

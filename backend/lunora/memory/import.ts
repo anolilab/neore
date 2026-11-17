@@ -28,6 +28,7 @@ import {
     IMPORT_MAX_FACT_CHARS,
     IMPORT_MAX_FACTS,
     IMPORT_MAX_INPUT_CHARS,
+    IMPORT_MEMORY_OFF_MESSAGE,
     IMPORT_MIN_FACT_CHARS,
     type ImportApp,
     type ImportedFact,
@@ -53,10 +54,11 @@ const IMPORTED_IMPORTANCE = 60;
  */
 const IMPORT_MAX_REVISIONS = 20;
 const REVISION_MAX_OUTPUT_TOKENS = 400;
+const LABEL_MAX_OUTPUT_TOKENS = 3000;
 
 const requireMemoryEnabled = async (ctx: ActionCtx, userId: string): Promise<void> => {
     if (!(await ctx.runQuery(internal.memory.functions.isMemoryEnabled, { userId }))) {
-        throw new LunoraError("FORBIDDEN", "Turn on memory before bringing in memories");
+        throw new LunoraError("FORBIDDEN", IMPORT_MEMORY_OFF_MESSAGE);
     }
 };
 
@@ -169,20 +171,12 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
 
     const toSave: { embedding: number[] | null; fact: ImportedFact; supersedes: Id<"memories"> | undefined }[] = [];
     const toConfirm: Id<"memories">[] = [];
-    // New facts join the dedup list, so two near-identical lines in one paste save once. Only a
-    // near-exact repeat is dropped: the user checked both, so a merely similar one is kept.
-    const added: { _id: string; memory: string }[] = [];
     // Rows a fact of this save superseded: still active until the save, but no longer a match.
     const retired = new Set<string>();
 
     let revisions = 0;
 
     for (const [index, fact] of facts.entries()) {
-        if ((findSimilarMemoryByJaccard(fact.memory, added)?.score ?? 0) >= 0.95) {
-            result.alreadyKnown += 1;
-            continue;
-        }
-
         const embedding = embeddings[index] ?? null;
         let similar = embedding
             ? await findSimilarByVector(ctx, args.userId, embedding, existing, retired).catch((error: unknown) => {
@@ -244,7 +238,6 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
             result.updated += 1;
         } else {
             toSave.push({ embedding, fact, supersedes: action === "SUPERSEDE" ? similar?.id : undefined });
-            added.push({ _id: String(index), memory: fact.memory });
 
             if (action === "SUPERSEDE" && similar) {
                 retired.add(similar.id);
@@ -336,9 +329,11 @@ export const labelImportedText = async (ctx: ActionCtx, userId: string, text: st
 
     const model = await utilityModelFor(ctx, userId, await loadModelFilterRules(ctx, userId));
     const { output } = await generateText({
+        // One short label per kept line, at most `IMPORT_MAX_FACTS` of them.
+        maxOutputTokens: LABEL_MAX_OUTPUT_TOKENS,
         model,
         output: Output.object({
-            schema: z.object({ keep: z.array(z.object({ line: z.int().min(1).max(IMPORT_MAX_FACTS), type: z.enum(MEMORY_TYPES) })) }),
+            schema: z.object({ keep: z.array(z.object({ line: z.int().min(1).max(IMPORT_MAX_FACTS), type: z.enum(MEMORY_TYPES) })).max(IMPORT_MAX_FACTS) }),
         }),
         prompt: buildImportLabelPrompt(lines),
         system: IMPORT_LABEL_SYSTEM_PROMPT,
