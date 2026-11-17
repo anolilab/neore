@@ -384,6 +384,26 @@ describe("composer emoji shortcodes", () => {
         expect(screen.queryByRole("listbox", { name: "Emoji suggestions" })).toBeNull();
     });
 
+    it("opens for a new shortcode typed after a bare colon that followed a dismissed one", async () => {
+        const { ref } = renderEditor();
+
+        await typeText(ref, ":dog");
+        await optionsOf();
+        fireEvent.keyDown(editableWhileOpen(), { key: "Escape" });
+
+        // Removes "dog", leaving a bare ":", then types "cat": a new shortcode, not the closed one.
+        act(() => {
+            ref.current!.getEditor()!.commands.deleteRange({ from: 2, to: 5 });
+        });
+        await typeText(ref, "cat");
+
+        const expected = searchEmojiShortcodes(await loadEmojiIndex(), "cat");
+        const options = await optionsOf();
+
+        expect(ref.current?.getEditor()?.getText()).toBe(":cat");
+        expect(options[0]!.textContent).toContain(`:${expected[0]!.shortcode}:`);
+    });
+
     it("does not open in Vim normal mode, where Enter and Escape are the Vim keys", async () => {
         settings.data = { composerVimMode: true };
 

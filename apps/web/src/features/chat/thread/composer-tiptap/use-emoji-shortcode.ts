@@ -11,8 +11,11 @@ import type { EmojiShortcodeMatch } from "./extensions/emoji-shortcode";
 
 const NO_SUGGESTIONS: ReadonlyArray<EmojiSuggestion> = [];
 
-/** Whether two queries are one shortcode at two stages of typing: one is a prefix of the other. */
-const isSameShortcode = (a: string, b: string): boolean => a.startsWith(b) || b.startsWith(a);
+/**
+ * Whether two queries are one shortcode at two stages of typing: one is a prefix of the other. An empty query is no
+ * shortcode yet, and every string starts with it, so it never counts.
+ */
+const isSameShortcode = (a: string, b: string): boolean => a !== "" && b !== "" && (a.startsWith(b) || b.startsWith(a));
 
 export const emojiOptionId = (listboxId: string, index: number): string => `${listboxId}-option-${index}`;
 
@@ -76,7 +79,8 @@ export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmo
         setActiveIndex(0);
     }
 
-    if (match === null && dismissed !== null) {
+    // A finished shortcode (the text no longer ends in one) or a bare colon, where a new one starts, forgets the dismissal.
+    if ((match === null || match.query === "") && dismissed !== null) {
         setDismissed(null);
     }
 
