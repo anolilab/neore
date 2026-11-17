@@ -118,6 +118,9 @@ const insertSmallest = (sorted: string[], name: string, size: number): void => {
 
 /** Directory names of a folder on this computer; a symlink is neither a directory nor a file here, as on a server. */
 const browseLocal = async (requested: string, after: string | undefined, approve: (folder: string) => Promise<void>): Promise<MachineFolderPage> => {
+    // Asked before the folder is looked up at all, so a page learns nothing about this computer that the person did not see.
+    await approve(requested);
+
     let folder: string;
 
     try {
@@ -125,9 +128,6 @@ const browseLocal = async (requested: string, after: string | undefined, approve
     } catch {
         throw new Error("device: that folder was not found");
     }
-
-    // Asked for the folder as it resolved, and only once it exists: a missing folder has nothing to list.
-    await approve(folder);
 
     // Only the page and one more name are kept, so a folder of a million entries costs one page of memory.
     const kept: string[] = [];
@@ -320,8 +320,8 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
             const local = folder === "" ? dependencies.home() : folder;
 
             // Every page asks: a continuation is only a cursor a page can send, so it cannot stand in for the person's yes.
-            return browseLocal(local, after, async (listed) => {
-                if (!await ask({ detail: `Folder: ${JSON.stringify(listed)}`, message: "List the folders in this folder on this computer?" })) {
+            return browseLocal(local, after, async (requested) => {
+                if (!await ask({ detail: `Folder: ${JSON.stringify(requested)}`, message: "Look at this folder on this computer?" })) {
                     throw declined();
                 }
             });
@@ -362,6 +362,11 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         const machine = machineFor(machineId);
 
         if (machine.kind === "this-computer") {
+            // Asked before the folder is looked up, as for a listing: whether a path exists is something the person sees first.
+            if (!await ask({ detail: `Folder: ${JSON.stringify(folder)}`, message: "Look at this folder on this computer?" })) {
+                throw declined();
+            }
+
             const existing = await statOrNull(folder);
 
             if (existing !== null && !existing.isDirectory()) {

@@ -161,11 +161,11 @@ describe("connect", () => {
 });
 
 describe("browse", () => {
-    it("asks only about a folder that exists, so a missing one is refused without a prompt", async () => {
+    it("asks before looking at a folder, a missing one included, so a page learns nothing unseen", async () => {
         const { deps, machines } = setup();
 
         await expect(machines.browse("desk-1", path.join(root, "missing"))).rejects.toThrow("not found");
-        expect(deps.confirm).not.toHaveBeenCalled();
+        expect(deps.confirm).toHaveBeenCalledTimes(1);
     });
 
     it("asks before every listing of a folder on this computer, a continuation page included, and lists nothing when declined", async () => {
@@ -275,17 +275,19 @@ describe("createFolder", () => {
         expect(existsSync(path.join(real, "newdir"))).toBe(true);
     });
 
-    it("makes a folder on this computer after a confirmation, asks nothing for one that exists, and refuses a file", async () => {
+    it("asks before looking at a folder on this computer, asks to create only a missing one, and refuses a file", async () => {
         const { deps, machines } = setup();
         const target = path.join(root, "x", "y");
 
+        // The look, then the creation of the missing folder.
         await expect(machines.createFolder("desk-1", target)).resolves.toMatchObject({ created: true });
-        expect(deps.confirm).toHaveBeenCalledTimes(1);
+        expect(deps.confirm).toHaveBeenCalledTimes(2);
+        // Existing: only the look.
         await expect(machines.createFolder("desk-1", target)).resolves.toMatchObject({ created: false });
-        expect(deps.confirm).toHaveBeenCalledTimes(1);
+        expect(deps.confirm).toHaveBeenCalledTimes(3);
         writeFileSync(path.join(root, "f"), "x");
         await expect(machines.createFolder("desk-1", path.join(root, "f"))).rejects.toThrow("is a file");
-        expect(deps.confirm).toHaveBeenCalledTimes(1);
+        expect(deps.confirm).toHaveBeenCalledTimes(4);
     });
 
     it("makes nothing on this computer when the confirmation is declined", async () => {
