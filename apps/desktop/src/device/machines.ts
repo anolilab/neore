@@ -303,8 +303,8 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         if (machine.kind === "this-computer") {
             const local = folder === "" ? dependencies.home() : folder;
 
-            // The first page of a folder needs the person's yes; the next pages of that listing belong to it.
-            if (after === undefined && !await ask({ detail: `Folder: ${JSON.stringify(local)}`, message: "List the folders in this folder on this computer?" })) {
+            // Every page asks: a continuation is only a cursor a page can send, so it cannot stand in for the person's yes.
+            if (!await ask({ detail: `Folder: ${JSON.stringify(local)}`, message: "List the folders in this folder on this computer?" })) {
                 throw declined();
             }
 

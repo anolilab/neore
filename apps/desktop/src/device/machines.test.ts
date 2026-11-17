@@ -148,7 +148,7 @@ describe("connect", () => {
 });
 
 describe("browse", () => {
-    it("asks once per folder on this computer before listing it, and lists nothing when declined", async () => {
+    it("asks before every listing of a folder on this computer, a continuation page included, and lists nothing when declined", async () => {
         const { deps, machines } = setup();
 
         mkdirSync(path.join(root, "a"));
@@ -156,9 +156,12 @@ describe("browse", () => {
         expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringContaining(root) }));
         expect(deps.confirm).toHaveBeenCalledTimes(1);
 
+        await machines.browse("desk-1", root, "a");
+        expect(deps.confirm).toHaveBeenCalledTimes(2);
+
         const declined = setup({ answer: false });
 
-        await expect(declined.machines.browse("desk-1", root)).rejects.toThrow("declined");
+        await expect(declined.machines.browse("desk-1", root, "a")).rejects.toThrow("declined");
         expect(declined.deps.confirm).toHaveBeenCalledTimes(1);
     });
 
