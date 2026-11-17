@@ -36602,6 +36602,11 @@ msgstr "Usuarios que quieren la última generación de las capacidades de chat d
 msgid "Uses AI SDK Text-to-Speech"
 msgstr "Usa el Text-to-Speech del AI SDK"
 
+#. placeholder {0}: newest.toolName
+#: src/features/chat/thread/turn-step-announcement.tsx:48
+msgid "Using {0}"
+msgstr "Usando {0}"
+
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:227
 msgid "Using an authenticator app like"
 msgstr "Con una app de autenticación como"

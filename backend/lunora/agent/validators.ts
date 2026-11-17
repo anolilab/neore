@@ -408,6 +408,8 @@ export const vMessageWithMetadataInternalFields = {
     providerMetadata,
     reasoning: v.optional(v.string()),
     reasoningDetails: v.optional(vReasoningDetails),
+    // The run that wrote the row (`schema.ts`, `replyId`); the save path sets it, so the validator must accept it.
+    replyId: v.optional(v.string()),
     sources: v.optional(v.array(vSource)),
     status: v.optional(vMessageStatus),
     text: v.optional(v.string()),
@@ -559,6 +561,8 @@ export const vStreamMessage = v.object({
     order: v.number(),
     provider: v.optional(v.string()),
     providerOptions, // Sent to model
+    // The run's stream id, the reply's `replyId` once its rows are saved.
+    runStreamId: v.optional(v.string()),
     status: v.union(v.literal("streaming"), v.literal("finished"), v.literal("aborted")),
     stepOrder: v.number(),
     streamId: v.string(),
@@ -598,6 +602,8 @@ export const vMessageDocFields = {
     reasoning: v.optional(v.string()),
 
     reasoningDetails: v.optional(vReasoningDetails),
+    // The run that wrote the row (`schema.ts`, `replyId`).
+    replyId: v.optional(v.string()),
     // Memories injected into this reply's prompt — `memory/functions.ts#getMessageMemoryUsage`.
     retrievedMemories: v.optional(v.array(v.object({ memoryId: v.string(), score: v.number() }))),
     sources: v.optional(v.array(vSource)),

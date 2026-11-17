@@ -85,6 +85,7 @@ import useComposerAutocomplete from "./composer-tiptap/use-composer-autocomplete
 import interruptAndSend from "./interrupt-and-send";
 import { readChatMessages } from "./read-chat-messages";
 import ReplyCompleteAnnouncement from "./reply-complete-announcement";
+import TurnStepAnnouncement from "./turn-step-announcement";
 import { useAttachmentExtraction } from "./use-attachment-extraction";
 import { usePasteGuard } from "./use-paste-guard";
 import { PromptHistorySource, usePromptHistory } from "./use-prompt-history";
@@ -1661,6 +1662,7 @@ const ComposerInput = ({
             {isThreadComposer && <AutoReadReplies />}
             {isThreadComposer && <CompletionSound />}
             {isThreadComposer && <ReplyCompleteAnnouncement />}
+            {isThreadComposer && <TurnStepAnnouncement />}
 
             <ComposerInputArea
                 afterTextarea={

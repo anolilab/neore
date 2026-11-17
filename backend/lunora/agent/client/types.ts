@@ -641,6 +641,12 @@ export type Options = {
     contextOptions?: ContextOptions;
 
     /**
+     * Labels one step's content as it is written, before its rows are saved, so a live MCP call carries its real names
+     * as the saved call will. Returns the new content, or `undefined` when nothing changed.
+     */
+    labelStepContent?: (content: unknown) => unknown[] | undefined;
+
+    /**
      * The run that saves (`chat/lib/run-epoch.ts`). Each step's rows are written by `addMessages`, which refuses the
      * write inside its own transaction once a newer run holds the stream, so a replaced run lands nothing beside it.
      */

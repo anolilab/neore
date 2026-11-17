@@ -36602,6 +36602,11 @@ msgstr "想要 DeepSeek 最新一代通用聊天能力的用户"
 msgid "Uses AI SDK Text-to-Speech"
 msgstr "使用 AI SDK 文本转语音"
 
+#. placeholder {0}: newest.toolName
+#: src/features/chat/thread/turn-step-announcement.tsx:48
+msgid "Using {0}"
+msgstr "正在使用 {0}"
+
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:227
 msgid "Using an authenticator app like"
 msgstr "使用身份验证器应用，例如"
