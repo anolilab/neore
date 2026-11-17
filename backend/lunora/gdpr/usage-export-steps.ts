@@ -356,13 +356,28 @@ export const assembleUsageExport = async (
 };
 
 /**
- * The export file's JSON with the usage array as its last key. `head` is the file's JSON without usage (its object, closed by
- * its final brace); `usageJson` is the usage array, already JSON. The usage is spliced in as text, so it is not parsed again.
+ * The export file's JSON with `name` as its last key, its value already JSON. `head` is the file's JSON so far (its object, closed by
+ * its final brace); `json` is the value, spliced in as text so it is not parsed again.
  */
-export const spliceUsageJson = (head: string, usageJson: string): string => {
+export const spliceArrayKey = (head: string, name: string, json: string): string => {
     const open = head.slice(0, head.lastIndexOf("}")).trimEnd();
 
-    return `${open},\n  "usageDaily": ${usageJson}\n}`;
+    return `${open},\n  "${name}": ${json}\n}`;
+};
+
+/**
+ * The export file's JSON with the usage as its last keys. `usage` is the stored usage JSON: an object of its members (`usageDaily`
+ * and `organizationReplies`, from `prepareUsageForExport`), whose members are spliced in; or, for a usage object stored before the
+ * ledger was in it, the usage array alone, spliced as `usageDaily`.
+ */
+export const spliceUsageJson = (head: string, usage: string): string => {
+    if (usage.startsWith("[")) {
+        return spliceArrayKey(head, "usageDaily", usage);
+    }
+
+    const open = head.slice(0, head.lastIndexOf("}")).trimEnd();
+
+    return `${open},\n  ${usage.slice(1, -1).trim()}\n}`;
 };
 
 /**

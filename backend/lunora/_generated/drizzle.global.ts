@@ -545,6 +545,7 @@ export const shardActivity = sqliteTable("shardActivity", {
     lastActiveAt: real("lastActiveAt").notNull(),
     nextDueAt: real("nextDueAt"),
     rateLimitsPending: integer("rateLimitsPending", { mode: "boolean" }),
+    retentionDueAt: real("retentionDueAt"),
     shardKey: text("shardKey").notNull(),
 }, (t) => ({
     by_shardKey: index("by_shardKey").on(t.shardKey),
@@ -728,6 +729,28 @@ export const twoFactor = sqliteTable("twoFactor", {
     verified: integer("verified", { mode: "boolean" }),
 }, (t) => ({
     userId: index("userId").on(t.userId),
+}));
+
+export const usageOrganizationCohortSlots = sqliteTable("usageOrganizationCohortSlots", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    organizationId: text("organizationId").notNull(),
+    slot: real("slot").notNull(),
+}, (t) => ({
+    by_organization_and_slot: uniqueIndex("by_organization_and_slot").on(t.organizationId, t.slot),
+}));
+
+export const usageOrganizationContributors = sqliteTable("usageOrganizationContributors", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    cohort: real("cohort").notNull(),
+    createdAt: real("createdAt").notNull(),
+    organizationId: text("organizationId").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_organization_and_user: index("by_organization_and_user").on(t.organizationId, t.userId),
+    by_organization_and_cohort: index("by_organization_and_cohort").on(t.organizationId, t.cohort, t.userId),
+    by_user: index("by_user").on(t.userId),
 }));
 
 export const user = sqliteTable("user", {

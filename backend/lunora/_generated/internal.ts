@@ -757,7 +757,7 @@ export interface InternalApiTypes {
             handleGdprRequestTimeouts: FunctionReference<"mutation", {}, null>;
         };
         retention: {
-            pruneRetainedActivity: FunctionReference<"mutation", {}, { subAgentRuns: number; usageDaily: number }>;
+            pruneRetainedActivity: FunctionReference<"mutation", {}, { organizationReplies: number; subAgentRuns: number; usageDaily: number }>;
         };
         steps: {
             collectActivityForExport: FunctionReference<"query", { userId: string }, { knowledgeCollections: Array<unknown>; subAgentRuns: Array<unknown> }>;
@@ -1324,7 +1324,7 @@ export interface InternalApiTypes {
     usage: {
         activity: {
             forwardReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; projectRetry?: boolean; replyKey: string; skillKey: string; skillName?: string; threadId: string; tokens: number; userId: string }, null>;
-            recordReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; projectUnread?: boolean; replyKey: string; retry?: boolean; skillKey: string; skillName?: string; threadAttribution?: { projectKey?: string }; threadId?: string; tokens: number; userId: string }, null>;
+            recordReplyUsage: FunctionReference<"mutation", { at: number; costMicrodollars: number; date: string; projectUnread?: boolean; replyKey: string; retry?: boolean; skillKey: string; skillName?: string; threadAttribution?: { organizationId?: string; projectKey?: string }; threadId?: string; tokens: number; userId: string }, null>;
             stillMemberOf: FunctionReference<"query", { organizationIds: Array<string>; userId: string }, Array<string>>;
             verifyUsageTitles: FunctionReference<"mutation", { budgetBytes: number; from: number; pass: number; requestId: string; seq: number; userId: string }, { bytes: number; done: boolean; next: number; titles: number }>;
         };
@@ -1346,6 +1346,12 @@ export interface InternalApiTypes {
             recordUsageFile: FunctionReference<"mutation", { key: string; requestId: string; userId: string }, null>;
             releaseUsageKey: FunctionReference<"mutation", { runId: Id<"usageExportRuns"> }, null>;
             sweepUsageExportPieces: FunctionReference<"mutation", {}, null>;
+        };
+        organization: {
+            collectOrganizationRepliesForExport: FunctionReference<"query", { cursor: string | null; userId: string }, { cursor: string | null; rows: Array<{ at: number; costMicrodollars: number; organizationId: string; projectKey: string; tokens: number }> }>;
+            memberProjectUsage: FunctionReference<"query", { organizationId: string; projectIds: Array<string>; projectsListed: boolean; since: number; userId: string }, { active: boolean; projects: Array<{ costMicrodollars: number; replies: number; tokens: number; projectKey: string }>; removed?: { costMicrodollars: number; replies: number; tokens: number }; truncated: boolean }>;
+            organizationUsageScope: FunctionReference<"query", { afterCohort?: number; afterUserId?: string; organizationId: string; userId: string; withProjects?: boolean }, null | { members: Array<{ cohort: number; userId: string }>; more: boolean; projects: Array<{ projectId: string; title: string }>; truncated: boolean }>;
+            reconcileOrganizationContributor: FunctionReference<"mutation", { organizationId: string; userId: string }, null>;
         };
     };
     vault: {
@@ -2724,6 +2730,12 @@ export const internal: InternalApiTypes = {
             recordUsageFile: { __lunoraRef: "usage_gdpr:recordUsageFile" },
             releaseUsageKey: { __lunoraRef: "usage_gdpr:releaseUsageKey" },
             sweepUsageExportPieces: { __lunoraRef: "usage_gdpr:sweepUsageExportPieces" },
+        },
+        organization: {
+            collectOrganizationRepliesForExport: { __lunoraRef: "usage_organization:collectOrganizationRepliesForExport" },
+            memberProjectUsage: { __lunoraRef: "usage_organization:memberProjectUsage" },
+            organizationUsageScope: { __lunoraRef: "usage_organization:organizationUsageScope" },
+            reconcileOrganizationContributor: { __lunoraRef: "usage_organization:reconcileOrganizationContributor" },
         },
     },
     vault: {

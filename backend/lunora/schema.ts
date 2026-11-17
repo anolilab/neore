@@ -2488,6 +2488,12 @@ export const schema = defineSchema({
          * dormant-shard sweep that leaves the table empty (`lib/shard-housekeeping.ts`).
          */
         rateLimitsPending: v.optional(v.boolean()),
+        /**
+         * When the shard's oldest retained rows expire (`gdpr/retention.ts`), or `NO_RETENTION_DUE` when it holds none (a number, not an absent
+         * field, so clearing it is one field write). The shard tick prunes only once this has come, so a tick for other work does not read the
+         * retained rows.
+         */
+        retentionDueAt: v.optional(v.number()),
         shardKey: v.string(),
     })
         .global()
@@ -3629,6 +3635,7 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_userId", ["userId"])
         .index("by_request_project", ["requestId", "pass", "projectId"]),
+
     // One small row per export run: its key, its owner, when it began, and the key of the usage JSON object it stored, if any. The
     // row is that object's record: kept until the object is confirmed deleted, so the sweep can retry the purge from it. `deleteAt` is
     // the time the sweep next acts on the run: each sweep that finds the run live sets it one time to live ahead, so a dead run's pieces
@@ -3648,6 +3655,47 @@ export const schema = defineSchema({
         .index("by_deleteAt", ["deleteAt"])
         .index("by_userId", ["userId"])
         .index("by_requestId", ["requestId"]),
+    // One claimed booking slot per contributor booked under an organization (`usage/cohorts.ts`). The unique slot is the claim: two bookings
+    // cannot take the same one. Holds no user, so it carries no one's usage.
+    usageOrganizationCohortSlots: defineTable({
+        organizationId: v.string(),
+        slot: v.number(),
+    })
+        .global()
+        .index("by_organization_and_slot", ["organizationId", "slot"], { unique: true }),
+
+    // Everyone with ledger rows under an organization, whether or not they are still a member: the organization view lists these, so a
+    // member who leaves keeps counting. Global, so the live path, the view and erasure reach it from any shard.
+    usageOrganizationContributors: defineTable({
+        // The stable cohort the contributor was booked into (`usage/cohorts.ts`); it never changes once set.
+        cohort: v.number(),
+        createdAt: v.number(),
+        organizationId: v.string(),
+        userId: v.string(),
+    })
+        .global()
+        .index("by_organization_and_user", ["organizationId", "userId"])
+        .index("by_organization_and_cohort", ["organizationId", "cohort", "userId"])
+        .index("by_user", ["userId"]),
+
+    // One row per reply filed under a project the user's organization owns, when the reply is recorded. The organization view sums
+    // these by instant, so a project moved into an organization later does not expose its earlier usage, and a reply stays with the
+    // organization it was recorded under. Sharded with the member, so erasure and the member's view read the member's shard.
+    usageOrganizationReplies: defineTable({
+        // The reply's instant (epoch ms), as recorded.
+        at: v.number(),
+        costMicrodollars: v.number(),
+        organizationId: v.string(),
+        projectKey: v.string(),
+        replyKey: v.string(),
+        tokens: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_organization_and_at", ["organizationId", "at"])
+        // The retention sweep (`gdpr/retention.ts`), which reads a shard's rows by age.
+        .index("by_at", ["at"])
+        .index("by_user_and_reply", ["userId", "replyKey"]),
 
     // The replies already in `usageDaily`, keyed by the reply's first row id:
     // what makes `recordReplyUsage` and the backfill count a reply once.

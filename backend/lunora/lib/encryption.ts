@@ -54,7 +54,15 @@ const getLegacyCryptoKey = async (): Promise<CryptoKey> => {
 // ============================================================================
 
 /** Valid key purposes for HKDF derivation */
-export type KeyPurpose = "connector-tokens" | "custom-providers" | "device-secrets" | "mcp-headers" | "messenger-keys" | "provider-keys" | "tool-keys";
+export type KeyPurpose =
+    | "connector-tokens"
+    | "custom-providers"
+    | "device-secrets"
+    | "mcp-headers"
+    | "messenger-keys"
+    | "provider-keys"
+    | "tool-keys"
+    | "usage-cursor";
 
 // Import master key as HKDF base key material (once, cached)
 let hkdfBaseKey: CryptoKey | null = null;

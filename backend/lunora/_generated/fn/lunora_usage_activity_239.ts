@@ -61,31 +61,38 @@ if (typeof source["skillName"] !== "string") return DEFER;
 __val3 = source["skillName"];
 __has3 = true;
 }
-let __has6 = false;
-let __val6;
+let __has7 = false;
+let __val7;
 if (source["threadAttribution"] !== undefined) {
 if (typeof source["threadAttribution"] !== "object" || source["threadAttribution"] === null || Array.isArray(source["threadAttribution"])) return DEFER;
 if (Object.getPrototypeOf(source["threadAttribution"]) !== Object.prototype && Object.getPrototypeOf(source["threadAttribution"]) !== null) return DEFER;
 let __has4 = false;
 let __val4;
-if (source["threadAttribution"]["projectKey"] !== undefined) {
-if (typeof source["threadAttribution"]["projectKey"] !== "string") return DEFER;
-__val4 = source["threadAttribution"]["projectKey"];
+if (source["threadAttribution"]["organizationId"] !== undefined) {
+if (typeof source["threadAttribution"]["organizationId"] !== "string") return DEFER;
+__val4 = source["threadAttribution"]["organizationId"];
 __has4 = true;
 }
-const __obj5 = { ...(__has4 ? { "projectKey": __val4 } : {}) };
-__val6 = __obj5;
-__has6 = true;
+let __has5 = false;
+let __val5;
+if (source["threadAttribution"]["projectKey"] !== undefined) {
+if (typeof source["threadAttribution"]["projectKey"] !== "string") return DEFER;
+__val5 = source["threadAttribution"]["projectKey"];
+__has5 = true;
 }
-let __has7 = false;
-let __val7;
+const __obj6 = { ...(__has4 ? { "organizationId": __val4 } : {}), ...(__has5 ? { "projectKey": __val5 } : {}) };
+__val7 = __obj6;
+__has7 = true;
+}
+let __has8 = false;
+let __val8;
 if (source["threadId"] !== undefined) {
 if (typeof source["threadId"] !== "string") return DEFER;
-__val7 = source["threadId"];
-__has7 = true;
+__val8 = source["threadId"];
+__has8 = true;
 }
 if (typeof source["tokens"] !== "number" || !Number.isFinite(source["tokens"])) return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
-return { "at": source["at"], "costMicrodollars": source["costMicrodollars"], "date": source["date"], ...(__has1 ? { "projectUnread": __val1 } : {}), "replyKey": source["replyKey"], ...(__has2 ? { "retry": __val2 } : {}), "skillKey": source["skillKey"], ...(__has3 ? { "skillName": __val3 } : {}), ...(__has6 ? { "threadAttribution": __val6 } : {}), ...(__has7 ? { "threadId": __val7 } : {}), "tokens": source["tokens"], "userId": source["userId"] };
+return { "at": source["at"], "costMicrodollars": source["costMicrodollars"], "date": source["date"], ...(__has1 ? { "projectUnread": __val1 } : {}), "replyKey": source["replyKey"], ...(__has2 ? { "retry": __val2 } : {}), "skillKey": source["skillKey"], ...(__has3 ? { "skillName": __val3 } : {}), ...(__has7 ? { "threadAttribution": __val7 } : {}), ...(__has8 ? { "threadId": __val8 } : {}), "tokens": source["tokens"], "userId": source["userId"] };
 });
 export * from "../../usage/activity.js";

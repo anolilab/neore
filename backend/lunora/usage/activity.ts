@@ -28,9 +28,12 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { authQuery } from "../lib/crpc";
 import { logger } from "../lib/logger";
+import { noteRetentionWake } from "../lib/shard-housekeeping";
 import { runAfterOnShard, runAfterWithRetry } from "../lib/shard-scheduler";
 import { MAX_LENGTH } from "../lib/validators";
 import { readableProject, readableProjectGrantsMeasured, readableProjectTitles, type ProjectTitleGrant } from "../projects/functions";
+import { retentionExpiryOf } from "../gdpr/retention";
+import { insertContributor } from "./cohorts";
 import { deletionUnderwayOnPrimary, PROJECT_POSITION, TITLE_ID_BYTES, TITLE_PIECE_BYTES, USAGE_TITLE_STEP } from "./gdpr";
 import { leadThreadOf } from "../sub-agents/worker-thread";
 import type { Attribution, AttributionIncrement, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
@@ -87,7 +90,11 @@ const LEAD_HOPS = 4;
  * retention) has no lead to follow, and counts under no project.
  */
 const threadProject = async (ctx: ReadCtx, threadId: string): Promise<Attribution> => {
-    let current: { projectId?: string | null } | null = await ctx.db.threads.findFirst({ where: { _id: threadId as Id<"threads"> } });
+    // From the primary: a thread moved to another project must file its reply under the new one, not the one a lagging replica still shows.
+    let current: { projectId?: string | null } | null = await ctx.db.threads.findFirst({
+        consistency: "primary",
+        where: { _id: threadId as Id<"threads"> },
+    });
     let currentId = threadId;
 
     for (let hop = 0; hop < LEAD_HOPS && current && !current.projectId; hop += 1) {
@@ -107,21 +114,142 @@ const threadProject = async (ctx: ReadCtx, threadId: string): Promise<Attributio
 /**
  * `attribution` as `userId` may file it: without a project they cannot open (a confirmed lack of access — a teammate's
  * personal project, or an organization they have left). A read that fails throws: the caller counts the total without the
- * project and retries the project (`RECORD_RETRY`), never filing it as if the user had no access.
+ * project and retries the project (`RECORD_RETRY`), never filing it as if the user had no access. The project's organization comes
+ * from the same read, so an organization is never a separate read after the reply's rows are written; an organization in
+ * `attribution` is ignored, as it was not read here.
  */
 const readableAttribution = async (ctx: MutationCtx | QueryCtx, attribution: Attribution, userId: string): Promise<Attribution> => {
     if (attribution.projectKey === undefined) {
-        return attribution;
+        return {};
     }
 
-    return (await readableProject(ctx, attribution.projectKey as Id<"projects">, userId)) ? attribution : {};
+    // From the primary: a replica that still holds a project's old organization would file the reply under it.
+    const project = await readableProject(ctx, attribution.projectKey as Id<"projects">, userId, { primary: true });
+
+    if (!project) {
+        return {};
+    }
+
+    return {
+        projectKey: attribution.projectKey,
+        ...(project.organizationId && { organizationId: project.organizationId }),
+    };
 };
 
 /** What `userId`'s reply in `threadId` is filed under: the thread's (or its lead's) project, when they can open it. */
 const attributionFor = async (ctx: MutationCtx | QueryCtx, threadId: string | undefined, userId: string): Promise<Attribution> =>
     threadId === undefined || threadId.length === 0 ? {} : await readableAttribution(ctx, await threadProject(ctx, threadId), userId);
 
-const vAttribution = v.object({ projectKey: v.optional(v.string()) });
+// The organization a forwarded attribution carries is only for the record's shape: `readableAttribution` reads it again where the reply lands.
+const vAttribution = v.object({ organizationId: v.optional(v.string()), projectKey: v.optional(v.string()) });
+
+/**
+ * Records a reply under the organization its project belonged to when the reply was counted (`readableAttribution`): a row with the
+ * reply's instant and that organization, so a later move of the project does not change what the organization's view shows. A reply
+ * has one row. A reply whose project could not be read when it was counted gets no row (`countedLate`). No read of the project happens
+ * here, so nothing that can fail runs after the reply's total is written.
+ */
+const recordOrganizationReply = async (
+    ctx: MutationCtx,
+    reply: { at: number; costMicrodollars: number; organizationId?: string; projectKey: string; replyKey: string; tokens: number; userId: string },
+): Promise<void> => {
+    // A personal project has no organization, and so no row.
+    if (!reply.organizationId) {
+        return;
+    }
+
+    const { organizationId } = reply;
+
+    // From the primary: a lagging replica would count a redelivered reply twice. The first count of a reply runs once: its marker is written in
+    // the same mutation, and a redelivery finds the marker and writes nothing here. So a read that fails is not a reason to leave the row
+    // out (a failure must not cost the reply's organization usage); the marker is what stops a second copy.
+    let existing: unknown;
+
+    try {
+        existing = await ctx.db.usageOrganizationReplies.findFirst({
+            consistency: "primary",
+            where: { replyKey: reply.replyKey, userId: reply.userId },
+        });
+    } catch (error) {
+        usageLogger.warn("[usage] the organization ledger's duplicate check failed; the row is written, the reply's marker guards a second copy", {
+            error,
+            userId: reply.userId,
+        });
+    }
+
+    if (existing) {
+        // A redelivery repairs the entry too: the first delivery may have failed to book it, and the reply is then in the ledger already.
+        await bookContributor(ctx, { at: reply.at, organizationId, userId: reply.userId });
+
+        return;
+    }
+
+    await ctx.db.insert("usageOrganizationReplies", {
+        at: reply.at,
+        costMicrodollars: reply.costMicrodollars,
+        organizationId: reply.organizationId,
+        projectKey: reply.projectKey,
+        replyKey: reply.replyKey,
+        tokens: reply.tokens,
+        userId: reply.userId,
+    });
+
+    // The shard's next wake for this row's expiry (`gdpr/retention.ts`): a shard with no other timed work would otherwise never wake for it.
+    const expiresAt = retentionExpiryOf({ ledgerAt: reply.at });
+
+    if (expiresAt !== undefined) {
+        await noteRetentionWake(ctx, expiresAt);
+    }
+
+    await bookContributor(ctx, { at: reply.at, organizationId, userId: reply.userId });
+};
+
+/**
+ * Books the member's contributor entry under the organization, when they have none yet. The entry is set after the reply's mutation commits,
+ * by `reconcileOrganizationContributor` on the member's shard: a mutation that aborts then leaves no entry, and one that commits gets it.
+ * Where the reconcile cannot be scheduled, the entry is booked here instead. Booking never costs the reply's total.
+ */
+const bookContributor = async (ctx: MutationCtx, reply: { at: number; organizationId: string; userId: string }): Promise<void> => {
+    // A read that fails is taken as not listed: the reconcile only sets the entry to match the rows, so running it when there is one is harmless.
+    let listed: unknown;
+
+    try {
+        // The primary: a stale hit on an entry pruning just removed would skip the reconcile that restores it, and the row would stay out of
+        // the view until the member's next reply.
+        listed = await ctx.db.usageOrganizationContributors.findFirst({
+            consistency: "primary",
+            where: { organizationId: reply.organizationId, userId: reply.userId },
+        });
+    } catch (error) {
+        usageLogger.warn("[usage] the organization contributor read failed; the reconcile settles it", { error, userId: reply.userId });
+    }
+
+    if (listed) {
+        return;
+    }
+
+    try {
+        await runAfterOnShard(
+            ctx.scheduler,
+            0,
+            internal.usage.organization.reconcileOrganizationContributor,
+            { organizationId: reply.organizationId, userId: reply.userId },
+            reply.userId,
+            RECORD_RETRY,
+        );
+    } catch (error) {
+        usageLogger.warn("[usage] the organization contributor reconcile could not be scheduled; booking the entry here", { error, userId: reply.userId });
+
+        try {
+            await insertContributor(ctx, { createdAt: reply.at, organizationId: reply.organizationId, userId: reply.userId });
+        } catch (bookingError) {
+            usageLogger.warn("[usage] the organization contributor could not be booked; the next reply books it", {
+                error: bookingError,
+                userId: reply.userId,
+            });
+        }
+    }
+};
 
 /** Adds `increments` to the user's per-day project rows. */
 const addToAttributionRollup = async (ctx: DbCtx, userId: string, increments: ReadonlyArray<AttributionIncrement>, at: number): Promise<void> => {
@@ -217,15 +345,29 @@ export const recordReplyUsage = internalMutation
             args.threadAttribution === undefined
                 ? await attributionFor(ctx, args.threadId, args.userId)
                 : await readableAttribution(ctx, args.threadAttribution, args.userId);
-        const fileProject = async (attribution: Attribution): Promise<void> => {
-            if (attribution.projectKey !== undefined) {
-                await addToAttributionRollup(
-                    ctx,
-                    args.userId,
-                    [{ costMicrodollars, date: args.date, projectKey: attribution.projectKey, replies: 1, tokens }],
-                    args.at,
-                );
+        // `countedLate`: the reply's total went in without its project, and the project is filed now. Its organization is the one it has
+        // now, not the one the reply had when it was made, so no organization row is written for it: the reply stays out of the organization
+        // view, as the recording-time rule (`recordOrganizationReply`) requires.
+        const fileProject = async (attribution: Attribution, { countedLate = false }: { countedLate?: boolean } = {}): Promise<void> => {
+            if (attribution.projectKey === undefined) {
+                return;
             }
+
+            await addToAttributionRollup(
+                ctx,
+                args.userId,
+                [{ costMicrodollars, date: args.date, projectKey: attribution.projectKey, replies: 1, tokens }],
+                args.at,
+            );
+            await recordOrganizationReply(ctx, {
+                at: args.at,
+                costMicrodollars,
+                ...(!countedLate && { organizationId: attribution.organizationId }),
+                projectKey: attribution.projectKey,
+                replyKey: args.replyKey,
+                tokens,
+                userId: args.userId,
+            });
         };
         const countTotal = async (): Promise<void> => {
             await addToRollup(
@@ -294,7 +436,7 @@ export const recordReplyUsage = internalMutation
                 }
             } else if (recorded.withoutProject === true && (args.projectUnread !== true || args.retry === true)) {
                 // A retry: a read that fails throws, and the scheduler runs it again (`RECORD_RETRY`).
-                await fileProject(await projectNow());
+                await fileProject(await projectNow(), { countedLate: true });
                 await ctx.db.patch("usageReplies", recorded._id, { withoutProject: false });
             }
 

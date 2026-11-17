@@ -103,7 +103,7 @@ describe("pruneRetainedActivity", () => {
 
         const pruned = await harness.run(async (ctx: any) => await ctx.runMutation(pruneRetainedActivity, {}));
 
-        expect(pruned).toEqual({ subAgentRuns: 1, usageDaily: 1 });
+        expect(pruned).toEqual({ organizationReplies: 0, subAgentRuns: 1, usageDaily: 1 });
         expect(await count("usageDaily", A)).toBe(1);
         expect(await count("subAgentRuns", A)).toBe(2);
         expect(RETENTION_BATCH).toBeGreaterThan(0);

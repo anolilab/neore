@@ -31,6 +31,7 @@ import { internalAction, internalMutation, internalQuery } from "../_generated/s
 import { mergeSkippedSteps } from "../auth/lib/setup-step-limits";
 import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
+import { noteRetentionDueAt, noteShardDue } from "./shard-housekeeping";
 import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
 
@@ -74,6 +75,8 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     skills: ["userId"],
     threadAccess: ["userId", "ownerId", "grantedBy"],
     threadInvites: ["ownerId", "invitedBy", "acceptedBy"],
+    // The organizations a guest's projects were filed under: the list follows the guest's ledger rows (which move with their shard).
+    usageOrganizationContributors: ["userId"],
     userVariableDefaults: ["userId"],
 };
 
@@ -202,6 +205,13 @@ export const importShardRows = internalMutation
             imported += 1;
         }
 
+        // Moved usage rows have no retention time on this shard (its census row was the guest's): wake it now, so the tick prunes them and
+        // sets the exact time.
+        if (imported > 0 && (args.table === "usageOrganizationReplies" || args.table === "usageDaily")) {
+            await noteRetentionDueAt(ctx, ctx.now);
+            await noteShardDue(ctx, ctx.now);
+        }
+
         return { imported };
     });
 
@@ -237,6 +247,22 @@ export const reassignGlobalRows = internalMutation
                 const { page } = await facades[table]!.findMany({ where: { [column]: args.from } });
 
                 for (const row of page) {
+                    // The new account may already be a contributor under the organization: its one entry is kept, and the guest's copy goes,
+                    // so the member's ledger is never summed twice.
+                    if (table === "usageOrganizationContributors") {
+                        const kept = await ctx.db.usageOrganizationContributors.findFirst({
+                            consistency: "primary",
+                            where: { organizationId: String(row.organizationId), userId: args.to },
+                        });
+
+                        if (kept) {
+                            await ctx.db.delete(table as never, row._id as never);
+                            reassigned += 1;
+
+                            continue;
+                        }
+                    }
+
                     await ctx.db.patch(table as never, row._id as never, { [column]: args.to } as never);
                     reassigned += 1;
                 }

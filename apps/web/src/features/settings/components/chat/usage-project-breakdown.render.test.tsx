@@ -28,11 +28,44 @@ vi.mock("@/features/settings/hooks/use-usage-today", () => {
     };
 });
 
+// Members see their own breakdown: the organization view is for an admin, and these tests have no organization.
+vi.mock("@/features/auth/lib/auth-ui-provider", () => {
+    return {
+        useAuth: () => {
+            return { authClient: {} };
+        },
+    };
+});
+
+vi.mock("@/features/auth/hooks/use-auth-session", () => {
+    return {
+        useAuthSession: () => {
+            return { data: { user: { id: "viewer-1" } } };
+        },
+    };
+});
+
+vi.mock("@/features/auth/hooks/organization-management", () => {
+    return {
+        useActiveOrganization: () => {
+            return { data: undefined };
+        },
+        useHasPermission: () => {
+            return { data: undefined };
+        },
+    };
+});
+
+vi.mock("@neore/backend/api", () => {
+    return { api: { usage: { organization: { getOrganizationProjectUsage: () => undefined } } } };
+});
+
 vi.mock("@/lib/lunora/crpc", async () => {
     // A query still waiting for its day reads nothing, as `skipToken` does in the app.
     const { skipToken } = await vi.importActual<typeof import("@tanstack/react-query")>("@tanstack/react-query");
 
     return {
+        useAction: () => async () => undefined,
         useCRPC: () => {
             return {
                 usage: {

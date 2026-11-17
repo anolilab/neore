@@ -346,10 +346,11 @@ Audit history supports configurable retention via the vacuum feature:
 `gdpr/retention.ts#pruneRetainedActivity` runs in every shard's housekeeping
 sweep (`lib/shard-housekeeping.ts`), a bounded batch per table per run:
 
-| Table          | Kept                                               | Why                                                                           |
-| -------------- | -------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `usageDaily`   | 400 days                                           | The usage page's per-day rollup; a year plus a month of history is enough.    |
-| `subAgentRuns` | 90 days, finished runs only (`succeeded`/`failed`) | The answer was already posted into the parent thread; the row is bookkeeping. |
+| Table                      | Kept                                               | Why                                                                                                                                                                          |
+| -------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `usageDaily`               | 400 days                                           | The usage page's per-day rollup; a year plus a month of history is enough.                                                                                                   |
+| `usageOrganizationReplies` | 400 days                                           | Replies recorded under an organization's projects, read by the organization view; the same window as the rollup. Its contributor list drops a user once their rows are gone. |
+| `subAgentRuns`             | 90 days, finished runs only (`succeeded`/`failed`) | The answer was already posted into the parent thread; the row is bookkeeping.                                                                                                |
 
 Both are also in the export and deleted with the account in their own batched
 steps (`deleteUserUsageDaily`, `deleteUserSubAgentRuns`). A failed delete fails
