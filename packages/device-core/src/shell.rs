@@ -598,7 +598,8 @@ fn kill_descendants(root: u32) {
             .collect();
         let mut found = false;
 
-        for (pid, parent) in descendants_of(root, &pairs) {
+        // Children before their parents: a parent killed first re-parents its child, and the parent check then refuses it.
+        for (pid, parent) in descendants_of(root, &pairs).into_iter().rev() {
             // By parent too: one re-parented after a walk found it was not signalled, and is tried again under its new parent.
             if !dead.contains(&pid) && signalled.insert((pid, parent)) {
                 kill_child_of(pid, parent);
