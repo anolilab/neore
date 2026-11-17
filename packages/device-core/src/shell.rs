@@ -1860,8 +1860,11 @@ mod tests {
         let deadline = Instant::now() + Duration::from_secs(10);
 
         loop {
-            // SAFETY: signal 0 sends nothing; it only asks whether the process exists.
-            if unsafe { libc::kill(pid, 0) } != 0 {
+            // SAFETY: signal 0 sends nothing; it only asks whether the process exists. Only "no such process" counts as gone: a
+            // process that exists but cannot be signalled (EPERM) is still alive.
+            if unsafe { libc::kill(pid, 0) } != 0
+                && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH)
+            {
                 return true;
             }
 
