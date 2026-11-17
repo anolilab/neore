@@ -34,6 +34,7 @@ import {
     MAX_MANIFEST_BYTES,
 } from "./lib/constants";
 import { isAppVersion } from "./lib/app-version";
+import { scheduleClearDeviceProjects } from "./internal";
 import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
 import { filterOwnProjectIds } from "./lib/scope";
@@ -243,23 +244,6 @@ export const setDeviceProjectScope = authMutation
         return null;
     });
 
-const PROJECT_CLEAR_BATCH = 100;
-
-/** Removes the machine and folder from the user's projects that live on `machineId`; the projects stay. */
-const clearProjectsOnMachine = async (ctx: Pick<MutationCtx, "db">, userId: string, machineId: Id<"devices">): Promise<void> => {
-    for (;;) {
-        const { page } = await ctx.db.projects.findMany({ limit: PROJECT_CLEAR_BATCH, where: { machineId, userId } });
-
-        for (const project of page) {
-            await patchRow(ctx.db, "projects", project, { machineId: undefined, path: undefined });
-        }
-
-        if (page.length < PROJECT_CLEAR_BATCH) {
-            return;
-        }
-    }
-};
-
 /**
  * Unpairs a device from the web — the way out for a lost laptop. The row (and
  * with it the secret) is deleted, so nothing is ever signed for it again; its
@@ -296,7 +280,10 @@ export const revokeDevice = authMutation
             await expireOpenCalls(ctx, revoked._id, "The device was removed");
             await endHostSessionsOfDevice(ctx, revoked._id, ctx.now);
             await deleteShardRoute(ctx, "device", revoked._id as string);
-            await clearProjectsOnMachine(ctx, userId, revoked._id);
+            // The projects live in D1, outside this mutation's transaction, so the revoke writes none of them: a failed
+            // device delete would leave them cleared. A scheduled run clears them instead, and the scheduler call commits
+            // with the revoke, so a revoke that fails queues nothing and can be retried.
+            await scheduleClearDeviceProjects(ctx.scheduler, { machineId: revoked._id, userId });
             await ctx.db.delete("devices", revoked._id);
         }
 
