@@ -37745,6 +37745,9 @@
                       "importance": {
                         "type": "number"
                       },
+                      "importedFrom": {
+                        "type": "string"
+                      },
                       "lastConfirmedAt": {
                         "type": "number"
                       },
@@ -37976,6 +37979,253 @@
           "memory"
         ],
         "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#memory_import:previewMemoryImport": {
+      "post": {
+        "description": "Invoke the `action` `memory_import:previewMemoryImport` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "memory_import:previewMemoryImport",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "text"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "memory_import:previewMemoryImport",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "cut": {
+                      "type": "number"
+                    },
+                    "dropped": {
+                      "type": "number"
+                    },
+                    "facts": {
+                      "items": {
+                        "properties": {
+                          "memory": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "anyOf": [
+                              {
+                                "const": "identity",
+                                "type": "string"
+                              },
+                              {
+                                "const": "preference",
+                                "type": "string"
+                              },
+                              {
+                                "const": "context",
+                                "type": "string"
+                              },
+                              {
+                                "const": "activity",
+                                "type": "string"
+                              },
+                              {
+                                "const": "experience",
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "memory",
+                          "type"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "cut",
+                    "dropped",
+                    "facts"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: memory_import:previewMemoryImport",
+        "tags": [
+          "memory"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#memory_import:saveImportedMemories": {
+      "post": {
+        "description": "Invoke the `action` `memory_import:saveImportedMemories` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "memory_import:saveImportedMemories",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "app": {
+                        "anyOf": [
+                          {
+                            "const": "chatgpt",
+                            "type": "string"
+                          },
+                          {
+                            "const": "claude",
+                            "type": "string"
+                          },
+                          {
+                            "const": "gemini",
+                            "type": "string"
+                          },
+                          {
+                            "const": "other",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "facts": {
+                        "items": {
+                          "properties": {
+                            "memory": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "anyOf": [
+                                {
+                                  "const": "identity",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "preference",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "context",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "activity",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "experience",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "memory",
+                            "type"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "app",
+                      "facts"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "memory_import:saveImportedMemories",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "added": {
+                      "type": "number"
+                    },
+                    "alreadyKnown": {
+                      "type": "number"
+                    },
+                    "updated": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "added",
+                    "alreadyKnown",
+                    "updated"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: memory_import:saveImportedMemories",
+        "tags": [
+          "memory"
+        ],
+        "x-lunora-function-kind": "action"
       }
     },
     "/_lunora/rpc#memory_reflection:dismissMemoryDigest": {

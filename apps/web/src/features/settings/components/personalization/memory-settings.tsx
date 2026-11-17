@@ -28,6 +28,7 @@ import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import MemoryDigestCard from "./memory-digest-card";
+import MemoryImportDialog from "./memory-import-dialog";
 import MemoryItem from "./memory-item";
 import type { MemoryType } from "./memory-types";
 import { isMemoryType, MEMORY_TYPES, useMemoryTypeLabels } from "./memory-types";
@@ -146,6 +147,15 @@ const MemorySettings: FC = () => {
         }
     }, [memoryEnabled, updateSettingsMutation, t]);
 
+    const handleEnableMemory = useCallback(async () => {
+        try {
+            await updateSettingsMutation.mutateAsync({ memoryEnabled: true });
+            trackEvent("memory_toggled", { enabled: true });
+        } catch {
+            toast.error(t`Failed to update setting`);
+        }
+    }, [updateSettingsMutation, t]);
+
     const visible = (memories ?? []).filter((memory) => typeFilter === "all" || memory.type === typeFilter);
     const busy = isDeleting || isUpdating || isPinning;
     const relativeTime = (timestamp: number) => formatRelativeTime(timestamp, t);
@@ -164,6 +174,9 @@ const MemorySettings: FC = () => {
                     </label>
                     <Switch checked={memoryEnabled} id="memory-enabled-switch" onCheckedChange={handleToggleMemory} />
                 </div>
+
+                {/* Outside the enabled block: with memory off it offers to turn it on first. */}
+                <MemoryImportDialog memoryEnabled={memoryEnabled} onEnableMemory={handleEnableMemory} onImported={refresh} />
 
                 {memoryEnabled && (
                     <>

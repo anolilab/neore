@@ -18,3 +18,8 @@
   LLM only words merges/promotions/the digest — WHICH rows change is decided by
   the pure, tested planner. Injected memories are recorded on the reply's first
   row (`messages.retrievedMemories`) for the "memories used" popover.
+  **Import** (`memory/import*.ts`): another assistant's memory, pasted. Lines are
+  split by the pure parser, never reworded by a model (the model only labels
+  `type`), so a repeat import is the same text and dedup confirms it; dedup reads
+  a 1000-row window, not extraction's 50. Rows are `source: "imported"` with
+  `importedFrom`; both actions refuse while memory is off.

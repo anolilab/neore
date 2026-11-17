@@ -9,6 +9,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { memoryLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
 import { withoutUndefined } from "../lib/patch";
+import type { ImportApp } from "./import-logic";
 import { lastConfirmedOf, type MemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { requireOwnedThread } from "../agent/thread-read-access";
@@ -27,6 +28,7 @@ const toMemoryView = (m: Doc<"memories">) => {
         confidence: m.confidence ?? undefined,
         createdAt: m._creationTime,
         importance: m.importance ?? undefined,
+        importedFrom: m.importedFrom ?? undefined,
         lastConfirmedAt: lastConfirmedOf(m),
         memory: m.memory,
         pinned: m.pinned === true,
@@ -75,6 +77,7 @@ export const listUserMemories = authQuery
                 confidence: v.optional(v.number()),
                 createdAt: v.number(),
                 importance: v.optional(v.number()),
+                importedFrom: v.optional(v.string()),
                 lastConfirmedAt: v.number(),
                 memory: v.string(),
                 pinned: v.boolean(),
@@ -419,8 +422,9 @@ const vMemoryInsertFields = {
     botId: v.optional(v.string()),
     confidence: v.optional(v.number()),
     importance: v.optional(v.number()),
+    importedFrom: v.optional(v.union(v.literal("chatgpt"), v.literal("claude"), v.literal("gemini"), v.literal("other"))),
     memory: v.string(),
-    source: v.optional(v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"))),
+    source: v.optional(v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"), v.literal("imported"))),
     supersedes: v.optional(v.id("memories")),
     threadId: v.optional(v.id("threads")),
     type: v.union(v.literal("identity"), v.literal("preference"), v.literal("context"), v.literal("activity"), v.literal("experience")),
@@ -431,8 +435,9 @@ type MemoryInsert = {
     botId?: string;
     confidence?: number;
     importance?: number;
+    importedFrom?: ImportApp;
     memory: string;
-    source?: "auto" | "compressed" | "manual" | "reflection";
+    source?: "auto" | "compressed" | "imported" | "manual" | "reflection";
     supersedes?: Id<"memories">;
     threadId?: Id<"threads">;
     type: MemoryType;
@@ -446,6 +451,7 @@ const insertMemory = async (ctx: Pick<MutationCtx, "db">, mem: MemoryInsert, now
         botId: mem.botId as Id<"bots"> | undefined,
         confidence: mem.confidence,
         importance: mem.importance,
+        importedFrom: mem.importedFrom,
         lastConfirmedAt: now,
         memory: mem.memory,
         source: mem.source ?? "auto",

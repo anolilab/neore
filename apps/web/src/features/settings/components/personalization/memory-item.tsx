@@ -10,12 +10,14 @@ import { CheckIcon, ExternalLinkIcon, PencilIcon, PinIcon, PinOffIcon, Trash2Ico
 import type { FC } from "react";
 import { useId, useState } from "react";
 
+import { isImportApp, useImportAppLabels } from "./memory-import-dialog";
 import type { MemoryType } from "./memory-types";
 import { isMemoryType, MEMORY_TYPE_COLORS, MEMORY_TYPES, useMemoryTypeLabels } from "./memory-types";
 
 export interface MemoryItemData {
     _id: string;
     createdAt: number;
+    importedFrom?: string;
     lastConfirmedAt: number;
     memory: string;
     pinned: boolean;
@@ -41,6 +43,8 @@ interface MemoryItemProps {
 const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTogglePin, relativeTime }) => {
     const { t } = useLingui();
     const typeLabels = useMemoryTypeLabels();
+    const appLabels = useImportAppLabels();
+    const importedFromLabel = appLabels[isImportApp(memory.importedFrom) ? memory.importedFrom : "other"];
     const [isEditing, setIsEditing] = useState(false);
     const [draft, setDraft] = useState(memory.memory);
     const textareaId = useId();
@@ -88,6 +92,7 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
                     </SelectContent>
                 </Select>
                 <span className="text-muted-foreground text-[10px]">{t`Last confirmed ${relativeTime(memory.lastConfirmedAt)}`}</span>
+                {memory.source === "imported" && <span className="text-muted-foreground text-[10px]">{t`Imported from ${importedFromLabel}`}</span>}
                 {memory.threadId && (
                     <Link
                         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-[10px] underline-offset-2 hover:underline"

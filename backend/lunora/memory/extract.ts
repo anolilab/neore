@@ -754,7 +754,7 @@ interface SimilarMemoryResult {
  * Find similar memory using vector cosine similarity.
  * Returns the best match if cosine score >= 0.85.
  */
-const findSimilarMemoryByVector = async (
+export const findSimilarMemoryByVector = async (
     context: ActionContext,
     userId: string,
     factEmbedding: number[],
@@ -806,7 +806,7 @@ const findSimilarMemoryByVector = async (
  * Find the most similar existing memory using Jaccard similarity on word sets.
  * Fast fallback when no embedding is available.
  */
-const findSimilarMemoryByJaccard = (
+export const findSimilarMemoryByJaccard = (
     newFact: string,
     existingMemories: { _id: string; confidence?: number | null; memory: string }[],
 ): SimilarMemoryResult | null => {

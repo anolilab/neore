@@ -944,7 +944,7 @@ export interface InternalApiTypes {
     memory: {
         compress: {
             compressThreadMemories: FunctionReference<"action", { botId?: string; threadId: Id<"threads">; userId: string }, void>;
-            getThreadMemoriesForCompression: FunctionReference<"query", { botId?: string; threadId: Id<"threads">; userId: string }, { _id: Id<"memories">; confidence: number | undefined; importance: number | undefined; memory: string; pinned: boolean; source: "auto" | "manual" | "compressed" | "reflection" | undefined; type: string; updatedAt: number | undefined; }[]>;
+            getThreadMemoriesForCompression: FunctionReference<"query", { botId?: string; threadId: Id<"threads">; userId: string }, { _id: Id<"memories">; confidence: number | undefined; importance: number | undefined; memory: string; pinned: boolean; source: "auto" | "manual" | "compressed" | "reflection" | "imported" | undefined; type: string; updatedAt: number | undefined; }[]>;
             maybeCompressThreadMemories: FunctionReference<"action", { botId?: string; threadId: Id<"threads">; userId: string }, void>;
             tryStartCompression: FunctionReference<"mutation", { threadId: Id<"threads"> }, boolean>;
         };
@@ -964,8 +964,8 @@ export interface InternalApiTypes {
             markMemorySupersededByCompression: FunctionReference<"mutation", { memoryId: Id<"memories">; userId: string }, void>;
             recordRetrievedMemories: FunctionReference<"mutation", { memories: Array<{ memoryId: string; score: number }>; messageId: Id<"messages">; userId: string }, null>;
             retryMemoryVectorDelete: FunctionReference<"mutation", { attempt: number; embeddingId: string; memoryId: string; userId: string }, null>;
-            saveMemory: FunctionReference<"mutation", { botId?: string; confidence?: number; importance?: number; memory: string; source?: "auto" | "manual" | "compressed" | "reflection"; supersedes?: Id<"memories">; threadId?: Id<"threads">; type: "identity" | "preference" | "context" | "activity" | "experience"; userId: string }, Id<"memories">>;
-            saveMemoryBatch: FunctionReference<"mutation", { memories: Array<{ botId?: string; confidence?: number; importance?: number; memory: string; source?: "auto" | "manual" | "compressed" | "reflection"; supersedes?: Id<"memories">; threadId?: Id<"threads">; type: "identity" | "preference" | "context" | "activity" | "experience"; userId: string }> }, Array<Id<"memories">>>;
+            saveMemory: FunctionReference<"mutation", { botId?: string; confidence?: number; importance?: number; importedFrom?: "chatgpt" | "claude" | "gemini" | "other"; memory: string; source?: "auto" | "manual" | "compressed" | "reflection" | "imported"; supersedes?: Id<"memories">; threadId?: Id<"threads">; type: "identity" | "preference" | "context" | "activity" | "experience"; userId: string }, Id<"memories">>;
+            saveMemoryBatch: FunctionReference<"mutation", { memories: Array<{ botId?: string; confidence?: number; importance?: number; importedFrom?: "chatgpt" | "claude" | "gemini" | "other"; memory: string; source?: "auto" | "manual" | "compressed" | "reflection" | "imported"; supersedes?: Id<"memories">; threadId?: Id<"threads">; type: "identity" | "preference" | "context" | "activity" | "experience"; userId: string }> }, Array<Id<"memories">>>;
             updateMemoryInternal: FunctionReference<"mutation", { confidence?: number; embeddingId?: string; importance?: number; lastConfirmedAt?: number; memory?: string; memoryId: Id<"memories"> }, void>;
         };
         gdpr: {
