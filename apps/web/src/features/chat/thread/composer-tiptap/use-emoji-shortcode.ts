@@ -34,7 +34,8 @@ export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmo
     const [index, setIndex] = useState<EmojiIndex | undefined>(getLoadedEmojiIndex);
     const [activeIndex, setActiveIndex] = useState(0);
     const [activeQuery, setActiveQuery] = useState<string | undefined>(undefined);
-    const [dismissedFrom, setDismissedFrom] = useState<number | null>(null);
+    // The shortcode Escape closed. Typing on from it keeps it closed; a different shortcode, even at the same place, opens.
+    const [dismissed, setDismissed] = useState<{ from: number; query: string } | null>(null);
     const query = match?.query;
     const hasMatch = match !== null;
 
@@ -73,8 +74,8 @@ export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmo
         setActiveIndex(0);
     }
 
-    if (match === null && dismissedFrom !== null) {
-        setDismissedFrom(null);
+    if (match === null && dismissed !== null) {
+        setDismissed(null);
     }
 
     const suggestions = useMemo(
@@ -82,7 +83,7 @@ export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmo
         [enabled, index, query],
     );
 
-    const isDismissed = match !== null && match.from === dismissedFrom;
+    const isDismissed = match !== null && dismissed !== null && match.from === dismissed.from && match.query.startsWith(dismissed.query);
     const showing = enabled && focused && match !== null && !isDismissed;
     const open = showing && suggestions.length > 0;
     const selected = Math.min(activeIndex, Math.max(suggestions.length - 1, 0));
@@ -112,7 +113,7 @@ export const useEmojiShortcode = ({ enabled, focused, match, onReplace }: UseEmo
         } else if ((event.key === "Enter" || event.key === "Tab") && !event.shiftKey) {
             select(selected);
         } else if (match && event.key === "Escape") {
-            setDismissedFrom(match.from);
+            setDismissed({ from: match.from, query: match.query });
         } else {
             return;
         }

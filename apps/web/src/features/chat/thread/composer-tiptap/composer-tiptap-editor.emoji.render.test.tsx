@@ -121,6 +121,9 @@ describe("composer emoji shortcodes", () => {
         expect(editableWhileOpen().getAttribute("aria-controls")).toBe(listbox().id);
         expect(editableWhileOpen().getAttribute("aria-expanded")).toBe("true");
         expect(screen.getByRole("status").textContent).toMatch(EMOJI_FOUND);
+        // A combobox takes no aria-multiline; the label stays.
+        expect(editableWhileOpen().getAttribute("aria-multiline")).toBeNull();
+        expect(editableWhileOpen().getAttribute("aria-label")).toBe("Message");
     });
 
     it("moves the highlight with the arrow keys and inserts the highlighted emoji on Enter", async () => {
@@ -167,6 +170,7 @@ describe("composer emoji shortcodes", () => {
         expect(ref.current?.getEditor()?.getText()).toBe(":dog");
         // Closing hands the editable back its textbox role and drops the combobox attributes.
         expect(editableWhenClosed().getAttribute("aria-activedescendant")).toBeNull();
+        expect(editableWhenClosed().getAttribute("aria-multiline")).toBe("true");
 
         await typeText(ref, "s");
 
@@ -246,5 +250,24 @@ describe("composer emoji shortcodes", () => {
 
         expect(fireEvent.keyDown(editableWhileOpen(), { key: "ArrowDown", shiftKey: true })).toBe(true);
         expect(options[0]!.getAttribute("aria-selected")).toBe("true");
+    });
+
+    it("opens for a different shortcode typed over a dismissed one in the same place", async () => {
+        const { ref } = renderEditor();
+
+        await typeText(ref, ":dog");
+        await optionsOf();
+        fireEvent.keyDown(editableWhileOpen(), { key: "Escape" });
+
+        // One edit swaps the shortcode in place, so no moment without a match sits between the two.
+        const expected = searchEmojiShortcodes(await loadEmojiIndex(), "cat");
+
+        act(() => {
+            ref.current!.getEditor()!.chain().insertContentAt({ from: 1, to: 5 }, ":cat").run();
+        });
+
+        const options = await optionsOf();
+
+        expect(options[0]!.textContent).toContain(`:${expected[0]!.shortcode}:`);
     });
 });

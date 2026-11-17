@@ -38,6 +38,8 @@ export const composerEditorAttributes = ({ describedBy, invalid = false, label, 
     }
 
     if (popup) {
+        // `aria-multiline` belongs to a textbox; a combobox does not take it, so it is dropped while the list is open.
+        delete attributes["aria-multiline"];
         attributes.role = "combobox";
         attributes["aria-autocomplete"] = "list";
         attributes["aria-controls"] = popup.listboxId;
