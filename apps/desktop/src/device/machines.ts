@@ -75,6 +75,10 @@ const declined = (): Error => new Error("device: the person declined");
 
 /** The longest name a native pairing accepts (`readHostSpec`); a longer SSH alias is cut for the name only. */
 const MAX_SERVER_NAME = 80;
+/** The longest user and address a pairing accepts (`readHostSpec`). A row that needs a longer one is disabled, not offered. */
+const MAX_SPEC_USER = 32;
+const MAX_SPEC_ADDRESS = 253;
+const TOO_LONG = "This server's user name or address is too long for Neore to pair.";
 
 const requireConnected = (host: HostView): HostView => {
     if (!host.connected) {
@@ -259,7 +263,13 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         const waiting = `SSH · ${entry.alias} · not connected yet`;
 
         if (paired === undefined) {
-            return { ...base, disabledReason: null, id: null, label: waiting, spec: specFor(entry), status: "unpaired" };
+            const spec = specFor(entry);
+
+            if (spec.user.length > MAX_SPEC_USER || spec.address.length > MAX_SPEC_ADDRESS) {
+                return { ...base, disabledReason: TOO_LONG, id: null, label: `SSH · ${entry.alias}`, spec: null, status: "disabled" };
+            }
+
+            return { ...base, disabledReason: null, id: null, label: waiting, spec, status: "unpaired" };
         }
 
         return paired.connected

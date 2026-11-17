@@ -55,6 +55,8 @@ describe("lastSegment", () => {
     it.each([
         ["/home/me/app", "app"],
         ["/home/me/app/", "app"],
+        ["/home/me/work ", "work "],
+        ["/home/me/   ", ""],
         [windows(String.raw`Users\me`), "me"],
         ["/", ""],
     ])("%s -> %s", (input, expected) => {

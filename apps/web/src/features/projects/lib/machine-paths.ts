@@ -90,13 +90,16 @@ export const parentPath = (path: string): string | null => {
 
 /** The folder's own name: the project title for a folder. Empty for a root. */
 export const lastSegment = (path: string): string => {
-    const trimmed = trimTrailing(path.trim());
+    // Only separators are stripped: a folder whose name is spaces is still its own folder, not its parent.
+    const trimmed = trimTrailing(path);
 
     if (isRoot(trimmed)) {
         return "";
     }
 
-    return trimmed.slice(trimmed.lastIndexOf(separatorOf(trimmed)) + 1);
+    const name = trimmed.slice(trimmed.lastIndexOf(separatorOf(trimmed)) + 1);
+
+    return name.trim() === "" ? "" : name;
 };
 
 export const joinPath = (folder: string, name: string): string => {

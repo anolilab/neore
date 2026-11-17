@@ -125,6 +125,12 @@ describe("connect", () => {
         expect(deps.hostConnect).not.toHaveBeenCalled();
     });
 
+    it("disables an unpaired server whose user or address is too long to pair, instead of offering it", () => {
+        const [, box] = setup({ hosts: [], ssh: [ssh("box", { user: "u".repeat(33) })] }).machines.list();
+
+        expect(box).toMatchObject({ disabledReason: expect.stringContaining("too long"), spec: null, status: "disabled" });
+    });
+
     it("gives an unpaired server the address, port, user and key file its config names", () => {
         const [, box] = setup({ hosts: [], ssh: [ssh("box", { identityFile: "/k/id", port: 2222 })] }).machines.list();
 
