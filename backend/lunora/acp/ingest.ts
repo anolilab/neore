@@ -36,6 +36,7 @@ import { patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
+import { confirmedOf, mergeAgentState, sameOptionFields, settledBy } from "./lib/agent-state";
 import { MAX_EVENTS_PER_POST } from "./lib/constants";
 import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
@@ -44,9 +45,11 @@ import { reapExpiredHostStreams } from "./lib/reap";
 import { markReattachFailed, nativeIdFits, reattachFailureOf } from "./lib/reattach";
 import { sessionOfThread, touchSession } from "./lib/sessions";
 import { verifyDeviceRequest } from "./lib/verify-device";
+import type { vAgentUsage } from "./validators";
 import { vHostEvent } from "./validators";
 
 type Event = Infer<typeof vHostEvent>;
+type Usage = Infer<typeof vAgentUsage>;
 
 /** Who owns the device whose signed post this is, or null: unknown or revoked device, bad signature, stale post. */
 export const verifyHostPost = internalQuery
@@ -76,17 +79,14 @@ const sessionTitle = (event: Extract<Event, { kind: "session_open" }>): string =
 
 /**
  * `session_open`: creates the host thread and its session, or finds them again. The desktop's own session id
- * (`hostSessionId`, indexed with the device) makes a redelivered open the same session, not a second thread. A
- * `session_options` may follow it in the same post: the options the agent offers, kept with the open's report.
+ * (`hostSessionId`, indexed with the device) makes a redelivered open the same session, not a second thread.
  */
 const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSessionId: string, events: Event[], now: number): Promise<ApplyResult> => {
-    const [received, optionsEvent] = events;
+    const [received] = events;
 
-    if (received?.kind !== "session_open" || events.length > 2 || (optionsEvent !== undefined && optionsEvent.kind !== "session_options")) {
+    if (events.length !== 1 || received?.kind !== "session_open") {
         return REFUSED;
     }
-
-    const options = optionsEvent?.kind === "session_options" ? optionsEvent.options : undefined;
 
     // An id the computer's core would refuse to load again is never stored, so a later switch cannot choose it.
     const open = received.nativeSessionId !== undefined && !nativeIdFits(received.nativeSessionId) ? { ...received, nativeSessionId: undefined } : received;
@@ -107,22 +107,10 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         // can also report more once it has been used; the thread and session stay as they are. A delayed or
         // replayed open carries an older report and must not roll the stored one back: only a strictly newer one
         // replaces it (an equal time keeps what is stored), and a time ahead of this clock is taken as now, so one
-        // future-dated report cannot shut out every later one. The agent's options are sent with a newer report whenever they
-        // change, and are ordered by that report's time as the desktop sent it: capped, two reports from a desktop clock ahead
-        // of this one would tie, or a late older one could pass a newer one.
-        // A report the desktop dated before the stored options' is older than them, whatever the capped times say: it would put
-        // back the models and reasoning effort of options already replaced.
-        const optionsAt = open.capabilities?.reportedAt;
+        // future-dated report cannot shut out every later one.
         const reportedAt = open.capabilities ? Math.min(open.capabilities.reportedAt, now) : 0;
-        const newerReport =
-            open.capabilities !== undefined &&
-            reportedAt > (existing.capabilities?.reportedAt ?? 0) &&
-            !(optionsAt !== undefined && existing.agentOptionsAt !== undefined && optionsAt < existing.agentOptionsAt);
+        const newerReport = open.capabilities !== undefined && reportedAt > (existing.capabilities?.reportedAt ?? 0);
         const opened = existing.status === "starting";
-        const newerOptions =
-            options !== undefined && optionsAt !== undefined && optionsAt > (existing.agentOptionsAt ?? -1)
-                ? { agentOptions: options, agentOptionsAt: optionsAt }
-                : undefined;
 
         // A session the backend started with a saved session id (`openHostSession` records it on the row) that the agent
         // did not end up in: the thread says so and hands the conversation over instead. An agent that cannot say it
@@ -150,11 +138,10 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
                 where: { producer: "host", status: { in: ["pending", "streaming"] }, threadId: existing.threadId },
             })) !== null;
 
-        if (existing.status !== "ended" && (opened || newerReport || newerOptions !== undefined || learnedNativeId !== undefined)) {
+        if (existing.status !== "ended" && (opened || newerReport || learnedNativeId !== undefined)) {
             await ctx.db.patch("acpSessions", existing._id, {
                 updatedAt: now,
                 ...(newerReport && open.capabilities && { capabilities: { ...open.capabilities, reportedAt } }),
-                ...newerOptions,
                 ...(learnedNativeId !== undefined && { nativeSessionId: learnedNativeId }),
                 ...(opened && { lastEventAt: now, status: opening ? ("busy" as const) : ("idle" as const) }),
             });
@@ -189,11 +176,79 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         updatedAt: now,
         userId: device.userId,
         ...(open.capabilities && { capabilities: { ...open.capabilities, reportedAt: Math.min(open.capabilities.reportedAt, now) } }),
-        ...(options && open.capabilities && { agentOptions: options, agentOptionsAt: open.capabilities.reportedAt }),
         ...(open.nativeSessionId !== undefined && { nativeSessionId: open.nativeSessionId }),
     });
 
     return { ended: false, next: 0, outcome: "applied", threadId: threadId as string };
+};
+
+/** A usage report with the cost it kept from before, when it did not restate one (never an `undefined` value: the store refuses it). */
+const withKeptCost = (usage: Usage, stored: Usage | undefined): Usage => {
+    const cost = usage.cost ?? stored?.cost;
+
+    return { size: usage.size, used: usage.used, ...(cost !== undefined && { cost }) };
+};
+
+/** The same reported usage, field by field: stored values come back in whatever order the store keeps them. */
+const sameUsage = (a: Usage | undefined, b: Usage | undefined): boolean =>
+    a?.used === b?.used && a?.size === b?.size && a?.cost?.amount === b?.cost?.amount && a?.cost?.currency === b?.cost?.currency;
+
+/**
+ * A `session_state` report: each field present replaces the stored one, an absent field keeps it. A report older than the
+ * one applied is dropped. One whose values are already stored writes only its ordering (`agentStateAt`, `agentStateSeq`), so a
+ * later older report cannot overwrite it. Answered "applied" either way, so the desktop does not resend it. Not claim-once:
+ * writing the same values twice changes nothing.
+ */
+const applySessionState = async (
+    ctx: MutationCtx,
+    device: Doc<"devices">,
+    hostSessionId: string,
+    event: Extract<Event, { kind: "session_state" }>,
+    now: number,
+): Promise<ApplyResult> => {
+    const session = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
+
+    if (!session || session.userId !== device.userId) {
+        return REFUSED;
+    }
+
+    // The time is capped to the server clock, which is what the stored `agentStateAt` shows. A desktop clock running ahead cannot
+    // order a report by its own time: a report that carries the desktop's sequence number is ordered by it (the newest observation
+    // wins whatever the clocks say), and only a report without one (an older desktop) is ordered by its time, as before.
+    // The report is stored even after the session closed: a debounced report can outlive its close, and its usage is the final one.
+    const at = Math.min(event.at, now);
+    const older =
+        event.seq === undefined
+            ? session.agentStateAt !== undefined && at < session.agentStateAt
+            : session.agentStateSeq !== undefined && event.seq <= session.agentStateSeq;
+
+    if (older) {
+        return { ended: false, next: 0, outcome: "applied" };
+    }
+
+    const ordering = event.seq === undefined ? {} : { agentStateSeq: event.seq };
+
+    // A usage report that leaves the cost out keeps the cost reported before: the agent's cost is cumulative.
+    const usage = event.usage === undefined ? undefined : withKeptCost(event.usage, session.agentState?.usage);
+    const usageChanged = usage !== undefined && !sameUsage(usage, session.agentState?.usage);
+    const changed = usageChanged || !sameOptionFields(session.agentState, event);
+
+    // An option change refused without a known outcome is settled by the agent's own report of its value (a late answer, or a
+    // restart before the answer was recorded): the record then says it was confirmed.
+    const stored = session.optionResult;
+    const settled = stored !== undefined && settledBy(stored, event);
+
+    // The watermark is stored with every accepted report, changed or not: a report that repeats the stored values still records
+    // its sequence, so a delayed older report that arrives later is dropped instead of overwriting the newest observation. The
+    // desktop does not post a report whose values the backend already holds, so the row is written for each change.
+    await ctx.db.patch("acpSessions", session._id, {
+        ...(changed && { agentState: mergeAgentState(session.agentState, { ...event, ...(usage !== undefined && { usage }) }) }),
+        agentStateAt: at,
+        ...ordering,
+        ...(settled && stored !== undefined && { optionResult: confirmedOf(stored) }),
+    });
+
+    return { ended: false, next: 0, outcome: "applied" };
 };
 
 /**
@@ -216,8 +271,7 @@ const closeSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSessio
 };
 
 /** Events that come from the agent itself: the first of them moves a turn to `running`. */
-const isAgentEvent = (event: Event): boolean =>
-    event.kind !== "turn_start" && event.kind !== "turn_end" && event.kind !== "session_open" && event.kind !== "session_options";
+const isAgentEvent = (event: Event): boolean => event.kind !== "turn_start" && event.kind !== "turn_end" && event.kind !== "session_open";
 
 /** The chunk an event leaves. Text and reasoning are the chunk's own fields; anything else rides as `event`. */
 const chunkFor = (event: Event): Pick<Doc<"persistentChunks">, "event" | "reasoning" | "text"> => {
@@ -265,7 +319,7 @@ const applyTurnPost = async (
         firstSeq === undefined ||
         !Number.isSafeInteger(firstSeq) ||
         firstSeq < 0 ||
-        events.some((event) => event.kind === "session_open" || event.kind === "session_options" || isImportEvent(event))
+        events.some((event) => event.kind === "session_open" || isImportEvent(event))
     ) {
         return REFUSED;
     }
@@ -457,6 +511,19 @@ export const applyHostEvents = internalMutation
 
         if (args.close === true) {
             return args.threadId === undefined && args.events.length === 0 ? await closeSession(ctx, device, args.sessionId, now) : REFUSED;
+        }
+
+        // A state report is one event, posted turn-less on its own. Anywhere else (in a turn, an import, or beside a session
+        // open) it is refused, so it can never be stored as a chunk or move a turn to `running`.
+        const [first] = args.events;
+        const isStateReport = args.threadId === undefined && args.events.length === 1 && first?.kind === "session_state";
+
+        if (args.events.some((event) => event.kind === "session_state") && !isStateReport) {
+            return REFUSED;
+        }
+
+        if (isStateReport && first?.kind === "session_state") {
+            return await applySessionState(ctx, device, args.sessionId, first, now);
         }
 
         if (args.threadId === undefined) {

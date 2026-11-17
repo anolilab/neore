@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AcpManager } from "./manager";
 import { spawnAgent } from "./process";
-import { newSession } from "./protocol";
+import { openNewSession } from "./protocol";
 import { AgentSignedOutError } from "./signed-out";
 import { alive, expectGone, Scratch } from "./testing/harness";
 import type { AcpUpdate, SessionSnapshot, SpawnPlan } from "./types";
@@ -321,7 +321,7 @@ describe("a version probe", () => {
         await expect(failure).rejects.toThrow("Sign in with the agent's own login command");
         // Callers tell "not signed in" from other failures by the type, after a session start and after `withAgent`.
         await expect(failure).rejects.toBeInstanceOf(AgentSignedOutError);
-        await expect(target.withAgent("fake", scratch.work, {}, async ({ connection }) => await newSession(connection, scratch.work))).rejects.toBeInstanceOf(
+        await expect(target.withAgent("fake", scratch.work, {}, async ({ connection }) => await openNewSession(connection, scratch.work))).rejects.toBeInstanceOf(
             AgentSignedOutError,
         );
         target.killAll();

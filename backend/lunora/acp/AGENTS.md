@@ -67,10 +67,11 @@
   and opens the next in the SAME thread, so `sessionOfThread` is the newest by creation and an older one stays as an `ended` row.
   The handoff for the new agent rides the first `acp_send` (`acp/lib/pending-handoff.ts`, derived from the path, no flag), never
   the saved message; a switch across the runner makes a new thread linked by a `continuation` relationship.
-  **The agent's own options** (model, reasoning effort, mode) ride a `session_options` event right after `session_open` in the
-  same post, sent again with a newer report whenever the agent changes them; they are stored (`acpSessions.agentOptions`) only
-  with a strictly newer report. They are their own union member on purpose: a new field on an existing `vHostEvent` member
-  changes the shape of the stored `persistentChunks.event` and the build's schema gate refuses it; a new member is additive.
+    - **Agent-reported state** (`session_state`, a turn-less post like `session_open`):
+        - Usage (`usage_update`) is stored on `acpSessions.agentState` with `agentStateAt`; each field present replaces the stored one, and a usage report without a cost keeps the stored cost.
+        - Order: a report with the desktop's `seq` (counted per session in observation order) is dropped when `seq` is not newer than `agentStateSeq`, so a desktop clock ahead cannot let an older report win. A report without `seq` (an older desktop) is dropped when its time is older than `agentStateAt`. The stored time is capped to the server clock. Every accepted report stores its sequence, so a delayed older report is dropped even when a newer one repeated the values; the desktop does not post a report whose values the backend already holds, so the row is written for each change. A refusal whose outcome is unknown (no answer, an expired window, a restart) is recorded as confirmed when a report shows the value it asked for.
+        - The desktop coalesces it to one post per session every 2 s (`HostPoster.flushState`).
+        - A failed post backs off 30 s, unless a fresh report is waiting; a report failed `MAX_STATE_ATTEMPTS` times with nothing newer is dropped.
 
 - **Coding agents on a paired computer** (`backend/lunora/acp/`, `apps/desktop/src/acp/`, acp-agent-host.md) —
   the web and the phone reach them only through signed `acp_*` device calls (`devices/lib/acp-call.ts`), and the
@@ -80,7 +81,7 @@
   written BEFORE the command is acted on) makes the second delivery an acknowledgement. The page's relay retries a
   failed claim or completion until the call's deadline, whatever the error. A call's prompt is cleared from `input` and
   `envelope` on every terminal path (`ACP_CLEARED`). Any new way a call can end must go through `onAcpCallEnded`, or its
-  turn stays "Sending". `acp_cancel` has its own open-call budget and a turn's end withdraws its waiting answers (`acp/lib/withdraw.ts`); when the backend ends a turn the desktop did not, the poster stops the agent itself. A refused command keeps a tombstone in the receipt log, so the same envelope is refused again, never run later. A request whose command or target was cut is declined, never allowed, from the web (Rust refuses it too). The numbers they are tuned by were not measured (`acp-s4-throttling.md`).
+  turn stays "Sending". `acp_cancel` and `acp_set_config` each have their own open-call budget (`devices/lib/acp-call.ts`) and a turn's end withdraws its waiting answers (`acp/lib/withdraw.ts`); when the backend ends a turn the desktop did not, the poster stops the agent itself. A refused command keeps a tombstone in the receipt log, so the same envelope is refused again, never run later. A request whose command or target was cut is declined, never allowed, from the web (Rust refuses it too). The numbers they are tuned by were not measured (`acp-s4-throttling.md`).
   **An organization's cap**: an agent on a computer approves its own tools, so it runs for an organization only at the `auto` cap and
   only while the owner is still a member. Every way one is started or sent a turn (a start, `/hosts/send`, a switch to a computer,
   `/clear`, the pull-request guide, a worker) checks `acp/lib/organization-cap.ts` with the thread's own organization first, then

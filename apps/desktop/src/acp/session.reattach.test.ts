@@ -14,6 +14,7 @@ import { Scratch } from "./testing/harness";
 let scratch: Scratch;
 let manager: AcpManager;
 let opened: HostSessionInfo[];
+let states: unknown[];
 
 const observer: SessionObserver = {
     permissionRequested: () => {},
@@ -21,6 +22,9 @@ const observer: SessionObserver = {
     sessionEnded: () => {},
     sessionOpened: (_id, info) => {
         opened.push(info);
+    },
+    sessionState: (_id, patch) => {
+        states.push(patch);
     },
     text: () => {},
     thought: () => {},
@@ -55,6 +59,7 @@ const methods = () => scratch.methods();
 beforeEach(() => {
     scratch = new Scratch();
     opened = [];
+    states = [];
 });
 
 afterEach(() => {
@@ -70,6 +75,14 @@ describe("a start with a saved session id", () => {
         expect(methods()).toContain("session/load");
         expect(methods()).not.toContain("session/new");
         expect(opened[0]).toMatchObject({ nativeSessionId: "s-new", reattach: { loaded: true } });
+    });
+
+    it("does not offer an option the agent replayed while it loaded, when its load answer names none", async () => {
+        await startWith({ FAKE_AGENT_LOAD_REPLAYS_OPTIONS: "1", FAKE_AGENT_SESSIONS: "load" }, "s-new");
+
+        expect(opened[0]?.reattach?.loaded).toBe(true);
+        // The model the history replayed is not what the session offers now: the answer names no option, so none is reported.
+        expect(states.some((patch) => (patch as { configOptions?: unknown }).configOptions !== undefined)).toBe(false);
     });
 
     it("sends no load frame to an agent that did not advertise it, and opens a new session saying why", async () => {

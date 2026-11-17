@@ -10,7 +10,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HostEvent, PosterOptions } from "./ingest";
-import { HostPoster, KEEPALIVE_MS, POST_INTERVAL_MS } from "./ingest";
+import { HostPoster, KEEPALIVE_MS, MAX_STATE_ATTEMPTS, newerPending, POST_INTERVAL_MS } from "./ingest";
 
 interface Post {
     close?: boolean;
@@ -41,6 +41,9 @@ class FakeBackend {
 
     public respond: ((post: Post) => Response | undefined) | undefined;
 
+    /** Holds a post's answer back until the promise it returns settles, so a test can stall one session's request. */
+    public gate: ((post: Post) => Promise<void> | undefined) | undefined;
+
     public readonly fetch = async (_url: URL | string, init?: RequestInit): Promise<Response> => {
         const { payload, signature } = JSON.parse(String(init?.body)) as { payload: string; signature: string };
         const post = JSON.parse(payload) as Post;
@@ -58,6 +61,8 @@ class FakeBackend {
         if (typeof failure === "number") {
             return Response.json({ error: "x" }, { status: failure });
         }
+
+        await this.gate?.(post);
 
         const custom = this.respond?.(post);
 
@@ -93,7 +98,7 @@ class FakeBackend {
     };
 
     public texts(turnId: string): string {
-        return (this.chunks.get(turnId) ?? []).map((event) => ("text" in event && event.kind === "text" ? event.text : "")).join("");
+        return (this.chunks.get(turnId) ?? []).map((event) => "text" in event && event.kind === "text" ? event.text : "").join("");
     }
 }
 
@@ -118,7 +123,7 @@ const poster = (media?: PosterOptions["media"], fetcher: typeof fetch = backend.
         log: (message) => {
             logs.push(message);
         },
-        ...(media && { media }),
+        ...media && { media },
         now: () => clock,
         random: () => 0.5,
         sign: (payload) => `sig:${String(payload.length)}`,
@@ -184,7 +189,7 @@ afterEach(async () => {
 
 describe("a turn's files", () => {
     const UPLOAD_ID = "abcdefghijklmnopqrstu";
-    const PNG = { bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1]), kind: "image", mime: "image/png", name: "chart.png", size: 5, status: "read" };
+    const PNG = { bytes: new Uint8Array([0x89, 0x50, 0x4E, 0x47, 1]), kind: "image", mime: "image/png", name: "chart.png", size: 5, status: "read" };
 
     /** The backend for a poster that also uploads: ingest posts go to the stand-in, upload requests are accepted. */
     const withUploads = () => {
@@ -285,9 +290,7 @@ describe("a turn's files", () => {
     it("posts nothing for a reference the core refuses, and still ends the turn", async () => {
         const { fetcher, uploads } = withUploads();
         const host = poster(
-            media(async () => {
-                return { kind: "", mime: "", name: "", size: 0, status: "refused" };
-            }),
+            media(async () => { return { kind: "", mime: "", name: "", size: 0, status: "refused" }; }),
             fetcher,
         );
 
@@ -371,104 +374,6 @@ describe("opening a session", () => {
         expect(backend.posts[0]?.post.events[0]).not.toHaveProperty("nativeSessionId");
     });
 
-    it("sends the open again when the agent's options change, after an open still in flight is answered", async () => {
-        const host = poster();
-        const options = (current: string) => {
-            return {
-                configOptions: [
-                    {
-                        choices: [
-                            { name: "Plan", value: "plan" },
-                            { name: "Build", value: "build" },
-                        ],
-                        currentValue: current,
-                        id: "mode",
-                        name: "Mode",
-                    },
-                ],
-            };
-        };
-
-        host.sessionOpened("s1", { ...INFO, options: options("build") });
-        // The first open is still in flight: the change rides a second open once it is answered, never a parallel one.
-        host.sessionUpdated("s1", { ...INFO, options: options("plan") });
-        await settle();
-
-        expect(backend.posts.map(({ post }) => (post.events[1] as { options?: ReturnType<typeof options> }).options?.configOptions[0]?.currentValue)).toEqual([
-            "build",
-            "plan",
-        ]);
-
-        host.sessionUpdated("s1", { ...INFO, options: options("build") });
-        await settle();
-
-        expect(backend.posts).toHaveLength(3);
-        expect(backend.posts[2]?.post).toMatchObject({
-            events: [
-                { ...INFO, kind: "session_open" },
-                { kind: "session_options", options: options("build") },
-            ],
-            sessionId: "s1",
-        });
-        expect(backend.posts[2]?.post.events[0]).not.toHaveProperty("options");
-    });
-
-    it("keeps the session on its thread when the backend refuses a re-post of its options", async () => {
-        const host = poster();
-
-        await open(host);
-        backend.failNext = [413];
-        host.sessionUpdated("s1", { ...INFO, options: { configOptions: [] } });
-        await settle();
-
-        // Turns still go to the thread, and the close still reaches the backend.
-        host.turnStarted("s1", "t1", "hello");
-        await settle(1000);
-        expect(backend.posts.some(({ post }) => post.turnId === "t1" && post.threadId === "thread-1")).toBe(true);
-
-        host.turnEnded("s1", "t1", "end_turn");
-        host.sessionEnded("s1");
-        await settle(1000);
-        expect(backend.posts.some(({ post }) => post.close === true)).toBe(true);
-    });
-
-    it("still sends a change made while a refused re-post was in flight", async () => {
-        const host = poster();
-
-        await open(host);
-        backend.failNext = [413];
-        host.sessionUpdated("s1", { ...INFO, options: { configOptions: [] } });
-        host.sessionUpdated("s1", { ...INFO, options: { modes: { available: [{ name: "Ask", value: "ask" }], current: "ask" } } });
-        await settle();
-
-        expect(backend.posts.at(-1)?.post.events[1]).toEqual({
-            kind: "session_options",
-            options: { modes: { available: [{ name: "Ask", value: "ask" }], current: "ask" } },
-        });
-    });
-
-    it("sends nothing more once the poster has stopped, not even an open deferred while one was in flight", async () => {
-        const host = poster();
-
-        host.sessionOpened("s1", INFO);
-        host.sessionUpdated("s1", { ...INFO, options: { configOptions: [] } });
-        host.stop();
-        await settle(60_000);
-
-        expect(backend.posts).toHaveLength(1);
-    });
-
-    it("sends no open for a change of a session that has ended", async () => {
-        const host = poster();
-
-        await open(host);
-        host.sessionEnded("s1");
-        host.sessionUpdated("s1", { ...INFO, options: { configOptions: [] } });
-        await settle();
-
-        expect(backend.posts.filter(({ post }) => post.events[0]?.kind === "session_open")).toHaveLength(1);
-    });
-
     it("posts nothing while the computer is not paired", async () => {
         paired = undefined;
 
@@ -499,7 +404,7 @@ describe("pairing after a session opened", () => {
     });
 
     it("posts no turn into a session the backend answers as ended", async () => {
-        backend.respond = (post) => (post.threadId === undefined ? Response.json({ ended: true, next: 0, threadId: "thread-1" }) : undefined);
+        backend.respond = (post) => post.threadId === undefined ? Response.json({ ended: true, next: 0, threadId: "thread-1" }) : undefined;
 
         const host = poster();
 
@@ -513,7 +418,7 @@ describe("pairing after a session opened", () => {
 
 describe("a session that never gets a thread", () => {
     it("ends a turn that started during session_open when the backend refuses the open", async () => {
-        backend.respond = (post) => (post.threadId === undefined ? Response.json({ error: "no" }, { status: 403 }) : undefined);
+        backend.respond = (post) => post.threadId === undefined ? Response.json({ error: "no" }, { status: 403 }) : undefined;
 
         const host = poster();
 
@@ -522,20 +427,6 @@ describe("a session that never gets a thread", () => {
         await settle(1000);
 
         expect(host.busy).toBe(false);
-    });
-
-    it("leaves a session the backend started local when the backend refuses its first open", async () => {
-        backend.respond = (post) => (post.threadId === undefined ? Response.json({ error: "no" }, { status: 403 }) : undefined);
-
-        const host = poster();
-
-        // The backend named the thread before the first open: a refusal of that open is still the end of the link.
-        host.sessionOpened("s1", INFO, "thread-1");
-        await settle();
-        host.turnStarted("s1", "t1", "hello");
-        await settle(1000);
-
-        expect(backend.posts.some(({ post }) => post.turnId === "t1")).toBe(false);
     });
 
     it("stops retrying session_open once the local session has ended", async () => {
@@ -559,7 +450,7 @@ describe("a session and turns the backend started", () => {
     it("knows the thread already, so a prompt it received is posted at once, before the open is answered", async () => {
         const host = poster();
 
-        backend.respond = (post) => (post.threadId === undefined ? Response.json({ error: "slow" }, { status: 503 }) : undefined);
+        backend.respond = (post) => post.threadId === undefined ? Response.json({ error: "slow" }, { status: 503 }) : undefined;
         host.sessionOpened("s1", INFO, "thread-1");
         host.turnReceived("s1", "t1", "fix it");
         await settle(POST_INTERVAL_MS);
@@ -994,13 +885,13 @@ describe("a turn", () => {
 
         for (let step = 0; step < 40; step += 1) {
             host.text("s1", "t1", "字".repeat(16_000));
-            host.text("s1", "t1", '"\\'.repeat(4000));
+            host.text("s1", "t1", "\"\\".repeat(4000));
         }
 
         await settle(POST_INTERVAL_MS);
         await settle(POST_INTERVAL_MS * 80);
 
-        const turnBodies = backend.posts.flatMap(({ post }, index) => (post.turnId === "t1" ? [backend.bodyBytes[index] ?? 0] : []));
+        const turnBodies = backend.posts.flatMap(({ post }, index) => post.turnId === "t1" ? [backend.bodyBytes[index] ?? 0] : []);
 
         expect(turnBodies.length).toBeGreaterThan(1);
         expect(Math.max(...turnBodies)).toBeLessThan(256 * 1024);
@@ -1117,7 +1008,7 @@ describe("a computer the backend no longer knows", () => {
         const host = poster();
 
         await open(host);
-        backend.respond = (post) => (post.turnId === undefined ? undefined : Response.json({ error: "unauthorized" }, { status: 401 }));
+        backend.respond = (post) => post.turnId === undefined ? undefined : Response.json({ error: "unauthorized" }, { status: 401 });
         host.turnStarted("s1", "t1", "go");
         host.turnStarted("s1", "t2", "again");
         await settleInSteps(180_000);
@@ -1227,7 +1118,7 @@ describe("a session that ends locally", () => {
         const host = poster();
 
         await open(host);
-        backend.respond = (post) => (post.close === true ? Response.json({ error: "down" }, { status: 503 }) : undefined);
+        backend.respond = (post) => post.close === true ? Response.json({ error: "down" }, { status: 503 }) : undefined;
         host.sessionEnded("s1");
         await settleInSteps(600_000);
 
@@ -1270,7 +1161,7 @@ describe("a session that ends locally", () => {
     it("sends no close for a session the backend refused to open", async () => {
         const host = poster();
 
-        backend.respond = (post) => (post.close === true ? undefined : Response.json({ error: "no" }, { status: 403 }));
+        backend.respond = (post) => post.close === true ? undefined : Response.json({ error: "no" }, { status: 403 });
         await open(host);
         host.sessionEnded("s1");
         await settle(60_000);
@@ -1370,5 +1261,581 @@ describe("a restart", () => {
         await host.persisted();
 
         expect(await runningTurns()).toEqual({ turns: [{ sessionId: "s1", threadId: "thread-1", turnId: "t1" }] });
+    });
+});
+
+describe("what the agent reports about itself", () => {
+    const usage = (used: number) => {
+        return { size: 200_000, used };
+    };
+
+    // The state posts the backend received, in order. A state report is not a turn event (`HostEvent`), so its kind is read off the raw event.
+    const statePosts = () => backend.posts.filter((entry) => (entry.post.events[0] as { kind?: string } | undefined)?.kind === "session_state");
+
+    it("posts a report as a turn-less session post, signed, once the session has its thread", async () => {
+        const host = poster();
+
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        expect(backend.posts).toEqual([]);
+
+        await open(host);
+
+        const observedAt = clock;
+
+        host.sessionState("s1", { usage: usage(20) });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(1);
+        expect(statePosts()[0]?.post).toMatchObject({ deviceId: "dev1", kind: "turn", sessionId: "s1", v: 1 });
+        expect(statePosts()[0]?.post).not.toHaveProperty("threadId");
+        expect(statePosts()[0]?.post).not.toHaveProperty("turnId");
+        // `at` is when the value was observed, not when it was sent: the backend orders reports by it.
+        expect(statePosts()[0]?.post.events).toEqual([{ at: observedAt, kind: "session_state", seq: expect.any(Number), usage: usage(20) }]);
+        expect(statePosts()[0]?.signature).toMatch(SIGNED);
+    });
+
+    it("numbers each report in the order it was observed, so a report observed later carries the higher number whatever the clock says", async () => {
+        const host = poster();
+
+        await open(host);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        // The desktop clock moves back between the two observations: the number still rises, so the backend keeps the newer one.
+        clock -= 60_000;
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(2000);
+
+        const sent = statePosts().map((entry) => entry.post.events[0] as unknown as { at: number; seq?: number; usage?: unknown });
+
+        expect(sent[1]?.seq).toBe((sent[0]?.seq ?? 0) + 1);
+        expect(sent[1]?.at).toBeLessThan(sent[0]?.at ?? 0);
+    });
+
+    it("numbers a restarted desktop's reports above the ones the earlier process sent for the same session", async () => {
+        const earlier = poster();
+
+        await open(earlier);
+        earlier.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        const before = (statePosts().at(-1)?.post.events[0] as { seq?: number } | undefined)?.seq ?? 0;
+
+        // The desktop restarts a minute later and reopens the session the backend already holds.
+        await settle(60_000);
+        const restarted = poster();
+
+        await open(restarted);
+        restarted.sessionState("s1", { usage: usage(11) });
+        await settle(2000);
+
+        expect((statePosts().at(-1)?.post.events[0] as { seq?: number } | undefined)?.seq ?? 0).toBeGreaterThan(before);
+    });
+
+    it("sends the newest value of each field once, however many updates arrive inside the window", async () => {
+        const host = poster();
+
+        await open(host);
+
+        for (const used of [1, 2, 3, 4]) {
+            host.sessionState("s1", { usage: usage(used) });
+        }
+
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(1);
+        expect(statePosts()[0]?.post.events[0]).toMatchObject({ usage: usage(4) });
+    });
+
+    it("drops a report for a session that is local only, and never posts it", async () => {
+        paired = undefined;
+        const host = poster();
+
+        host.sessionOpened("s1", INFO);
+        host.sessionState("s1", { usage: usage(7) });
+        await settle(2000);
+        paired = "dev1";
+        await settle(2000);
+
+        expect(statePosts()).toEqual([]);
+    });
+
+    it("re-signs a retry with a fresh issuedAt and keeps the newer value that arrived meanwhile", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext.push("network");
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(1);
+
+        clock += 1000;
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(30_000);
+
+        const sent = statePosts();
+
+        expect(sent).toHaveLength(2);
+        expect(sent[1]?.post.events[0]).toMatchObject({ usage: usage(11) });
+        expect(sent[1]?.post.issuedAt).toBeGreaterThan(sent[0]?.post.issuedAt ?? 0);
+    });
+
+    it("keeps the cost reported earlier when a later usage report in the same window leaves it out", async () => {
+        const host = poster();
+
+        await open(host);
+        const cost = { amount: 0.4, currency: "USD" };
+
+        host.sessionState("s1", { usage: { cost, size: 1000, used: 10 } });
+        host.sessionState("s1", { usage: { size: 1000, used: 12 } });
+        await settle(2000);
+
+        expect(statePosts()[0]?.post.events[0]).toMatchObject({ usage: { cost, size: 1000, used: 12 } });
+    });
+
+    it("keeps the report of a session opened while unpaired, and posts it once the computer is paired", async () => {
+        paired = undefined;
+        const host = poster();
+
+        host.sessionOpened("s1", INFO);
+        host.sessionState("s1", { usage: usage(9) });
+        await settle(2000);
+        expect(statePosts()).toEqual([]);
+
+        paired = "dev1";
+        host.paired();
+        await settle(4000);
+
+        expect(statePosts()).toHaveLength(1);
+        expect(statePosts()[0]?.post.events[0]).toMatchObject({ usage: usage(9) });
+    });
+
+    it("never posts the report of a session that ended before it reached the backend, even once the computer is paired", async () => {
+        paired = undefined;
+        const host = poster();
+
+        host.sessionOpened("s1", INFO);
+        host.sessionState("s1", { usage: usage(9) });
+        host.sessionEnded("s1");
+        await settle(2000);
+
+        paired = "dev1";
+        host.paired();
+        await settle(4000);
+
+        expect(statePosts()).toEqual([]);
+    });
+
+    it("posts a fresh report at the debounce, not after a pending retry's long backoff", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext.push("network");
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(1);
+
+        clock += 1000;
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(2);
+        expect(statePosts()[1]?.post.events[0]).toMatchObject({ usage: usage(11) });
+    });
+
+    it("does not hold one session's report behind another session's stalled post", async () => {
+        const host = poster();
+        let release = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the supported Node range starts before it exists
+        const stalled = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+
+        await open(host, "s1");
+        await open(host, "s2");
+        backend.gate = (post) => post.sessionId === "s1" ? stalled : undefined;
+
+        host.sessionState("s1", { usage: usage(10) });
+        host.sessionState("s2", { usage: usage(20) });
+        await settle(2000);
+
+        // s1's post is still waiting for its answer; s2's report is posted all the same.
+        expect(statePosts().map((entry) => entry.post.sessionId)).toEqual(expect.arrayContaining(["s1", "s2"]));
+
+        release();
+        backend.gate = undefined;
+        await settle(2000);
+    });
+
+    it("does not retry one session's failed report early because another session reported", async () => {
+        const host = poster();
+
+        await open(host, "s1");
+        await open(host, "s2");
+        backend.failNext.push("network");
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        expect(statePosts().map((entry) => entry.post.sessionId)).toEqual(["s1"]);
+
+        // s2 reports while s1 is backing off: s2 is posted at its debounce, s1 waits for its own retry.
+        host.sessionState("s2", { usage: usage(20) });
+        await settle(2000);
+        expect(statePosts().map((entry) => entry.post.sessionId)).toEqual(["s1", "s2"]);
+
+        await settle(30_000);
+        expect(statePosts().filter((entry) => entry.post.sessionId === "s1")).toHaveLength(2);
+    });
+
+    it("does not post one session's fresh report less than two seconds after its last post, when another session's retry wakes the pass", async () => {
+        const host = poster();
+
+        await open(host, "s1");
+        await open(host, "s2");
+        const t0 = clock;
+
+        // s2's report fails, so its retry is due 30 s after the failed post (at t0 + 32 s).
+        backend.failNext.push("network");
+        host.sessionState("s2", { usage: usage(5) });
+        await settle(2000);
+
+        // s1 posts at t0 + 30.5 s; its next report arrives at t0 + 32 s, just as s2's retry comes due.
+        await settle(26_500);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(1500);
+
+        // s1's second post waits until two seconds after its first, not at the retry's wake-up.
+        const s1Posts = statePosts().filter((entry) => entry.post.sessionId === "s1");
+
+        expect(s1Posts.map((entry) => entry.at - t0)).toEqual([30_500]);
+
+        await settle(500);
+        expect(statePosts().filter((entry) => entry.post.sessionId === "s1").map((entry) => entry.at - t0)).toEqual([30_500, 32_500]);
+    });
+
+    it("posts a report at its debounce when the desktop clock moved back since the last post, rather than holding it", async () => {
+        const host = poster();
+
+        await open(host);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        clock -= 60_000;
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(2000);
+
+        // The window counts forward from the last post only, so the second report is not held until the clock catches up.
+        expect(statePosts()).toHaveLength(2);
+        expect(statePosts()[1]?.post.events[0]).toMatchObject({ usage: usage(11) });
+    });
+
+    it("sends a fresh report at its debounce when it arrived while the post it follows was failing", async () => {
+        const host = poster();
+        let release = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the supported Node range starts before it exists
+        const held = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        let holdFirst = true;
+        let failFirst = true;
+
+        backend.gate = (post) => {
+            if (holdFirst && (post.events[0] as { kind?: string } | undefined)?.kind === "session_state") {
+                holdFirst = false;
+
+                return held;
+            }
+
+            return undefined;
+        };
+        backend.respond = (post) => {
+            if (!failFirst || (post.events[0] as { kind?: string } | undefined)?.kind !== "session_state") {
+                return undefined;
+            }
+
+            failFirst = false;
+
+            return Response.json({ error: "x" }, { status: 503 });
+        };
+
+        await open(host);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(1);
+
+        // The first post is still in flight when a newer report arrives; it then fails.
+        clock += 1000;
+        host.sessionState("s1", { usage: usage(11) });
+        release();
+        backend.gate = undefined;
+        await settle(2000);
+
+        // The fresh report goes at its own debounce, not after the failed post's 30 s backoff.
+        expect(statePosts()).toHaveLength(2);
+        expect(statePosts()[1]?.post.events[0]).toMatchObject({ usage: usage(11) });
+    });
+
+    it("gives up on a report the backend keeps refusing, so a session that ended is not retried for ever", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.respond = (post) => (post.events[0] as { kind?: string } | undefined)?.kind === "session_state" ? Response.json({ error: "x" }, { status: 503 }) : undefined;
+        host.sessionState("s1", { usage: usage(10) });
+        await settleInSteps(10 * 60_000);
+
+        expect(statePosts()).toHaveLength(MAX_STATE_ATTEMPTS);
+
+        await settleInSteps(60 * 60_000);
+
+        expect(statePosts()).toHaveLength(MAX_STATE_ATTEMPTS);
+    });
+
+    it("sends the options of a dropped report with the session's next report, since the agent sends options only on change", async () => {
+        const host = poster();
+        const option = { category: "model", choices: [{ name: "Fast", value: "fast" }], currentValue: "fast", id: "model", name: "Model" };
+        let failing = true;
+
+        await open(host);
+        backend.respond = (post) => {
+            if (failing && (post.events[0] as { kind?: string } | undefined)?.kind === "session_state") {
+                return Response.json({ error: "x" }, { status: 503 });
+            }
+
+            return undefined;
+        };
+        host.sessionState("s1", { configOptions: [option], usage: usage(10) });
+        await settleInSteps(10 * 60_000);
+
+        expect(statePosts()).toHaveLength(MAX_STATE_ATTEMPTS);
+
+        failing = false;
+        host.sessionState("s1", { usage: usage(12) });
+        await settle(2000);
+
+        expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ configOptions: [option], usage: usage(12) });
+    });
+
+    it("forgets the bookkeeping of a session that ended once its last report is posted", async () => {
+        const host = poster();
+
+        await open(host);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        host.sessionEnded("s1");
+        await settle(2000);
+
+        // The per-session maps are private: read them to see that nothing is left for the ended session.
+        const bookkeeping = host as unknown as Record<"heldOptions" | "stateAttempts" | "stateRetryAt" | "stateSentAt", Map<string, unknown>>;
+
+        expect(bookkeeping.stateSentAt.has("s1")).toBe(false);
+        expect(bookkeeping.stateAttempts.has("s1")).toBe(false);
+        expect(bookkeeping.stateRetryAt.has("s1")).toBe(false);
+        expect(bookkeeping.heldOptions.has("s1")).toBe(false);
+    });
+
+    it("retries a failed report with what was observed, under a fresh issuedAt, when nothing newer is reported", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext.push("network");
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        const [first] = statePosts();
+
+        await settle(30_000);
+        const retried = statePosts()[1];
+
+        expect(statePosts()).toHaveLength(2);
+        expect(retried?.post.events).toEqual(first?.post.events);
+        // A retry is signed afresh: an old issuedAt fails the backend's freshness check after an outage.
+        expect(retried?.post.issuedAt).toBeGreaterThan(first?.post.issuedAt ?? 0);
+    });
+
+    it("posts the options the agent offers with the usage, keeping the newest of each", async () => {
+        const host = poster();
+        const option = (currentValue: string) => {
+            return { category: "model", choices: [{ name: "Fast", value: "fast" }, { name: "Deep", value: "deep" }], currentValue, id: "model", name: "Model" };
+        };
+        const modes = { available: [{ id: "ask", name: "Ask" }], current: "ask" };
+
+        await open(host);
+
+        const observed = clock;
+
+        host.sessionState("s1", { configOptions: [option("fast")], usage: usage(1) });
+        host.sessionState("s1", { configOptions: [option("deep")] });
+        host.sessionState("s1", { modes });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(1);
+        expect(statePosts()[0]?.post.events).toEqual([{ at: observed, configOptions: [option("deep")], kind: "session_state", modes, seq: expect.any(Number), usage: usage(1) }]);
+    });
+
+    it("retries the newer observation when the clock moved back while a failed send was in flight", async () => {
+        const host = poster();
+
+        await open(host);
+
+        // The first report's post is held in flight for ten seconds, then answered with a failure.
+        let held = false;
+        let refused = false;
+
+        backend.gate = (post) => {
+            if (!held && (post.events[0] as { kind?: string } | undefined)?.kind === "session_state") {
+                held = true;
+
+                return new Promise<void>((resolve) => {
+                    setTimeout(resolve, 10_000);
+                });
+            }
+
+            return undefined;
+        };
+        backend.respond = (post) => {
+            if (!refused && (post.events[0] as { kind?: string } | undefined)?.kind === "session_state") {
+                refused = true;
+
+                return Response.json({ error: "x" }, { status: 500 });
+            }
+
+            return undefined;
+        };
+
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(1);
+
+        // The newer observation is made after the clock moved back: its time is earlier than the failed report's.
+        clock -= 60_000;
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(2000);
+
+        // The held post is answered with the failure, then the retry goes out.
+        await settleInSteps(40_000);
+
+        // The retry carries the newer observation (the later sequence number), not the failed older one.
+        expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ usage: usage(11) });
+    });
+
+    it("does not post a report whose values the backend already holds, and posts a changed value", async () => {
+        const host = poster();
+
+        await open(host);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(1);
+
+        // The same usage again is not written: the backend would only rewrite its row to record the same values.
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(1);
+
+        host.sessionState("s1", { usage: usage(11) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(2);
+    });
+
+    it("drops a report the backend refuses, and the session keeps going", async () => {
+        const host = poster();
+
+        await open(host);
+        backend.failNext.push(400);
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(1);
+
+        host.sessionState("s1", { usage: usage(12) });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(2);
+        expect(statePosts()[1]?.post.events[0]).toMatchObject({ usage: usage(12) });
+    });
+
+    it("keeps the options of a report the backend refuses, and sends them with the session's next report", async () => {
+        const host = poster();
+        const option = { category: "model", choices: [{ name: "Fast", value: "fast" }], currentValue: "fast", id: "model", name: "Model" };
+
+        await open(host);
+        backend.failNext.push(400);
+        host.sessionState("s1", { configOptions: [option] });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(1);
+
+        // The agent sends its options only on change, so the usage that follows must still carry them.
+        host.sessionState("s1", { usage: usage(12) });
+        await settle(2000);
+
+        expect(statePosts().at(-1)?.post.events[0]).toMatchObject({ configOptions: [option], usage: usage(12) });
+    });
+
+    it("sends held options when the next usage repeats a value from a refused report, since the backend never stored that refused value", async () => {
+        const host = poster();
+        const option = { category: "model", choices: [{ name: "Fast", value: "fast" }], currentValue: "fast", id: "model", name: "Model" };
+
+        await open(host);
+        backend.failNext.push(400);
+        host.sessionState("s1", { configOptions: [option], usage: usage(10) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(1);
+
+        // The same usage as the refused report: the backend does not hold it, so this report is not a repeat and goes out with the options.
+        host.sessionState("s1", { usage: usage(10) });
+        await settle(2000);
+
+        expect(statePosts()).toHaveLength(2);
+        expect(statePosts()[1]?.post.events[0]).toMatchObject({ configOptions: [option], usage: usage(10) });
+    });
+
+    it("does not keep the options a second refusal refuses, so they cannot hold back the usage after them", async () => {
+        const host = poster();
+        const option = { category: "model", choices: [{ name: "Fast", value: "fast" }], currentValue: "fast", id: "model", name: "Model" };
+
+        await open(host);
+        backend.failNext.push(400, 400);
+        host.sessionState("s1", { configOptions: [option] });
+        await settle(2000);
+        host.sessionState("s1", { usage: usage(12) });
+        await settle(2000);
+        expect(statePosts()).toHaveLength(2);
+
+        host.sessionState("s1", { usage: usage(13) });
+        await settle(2000);
+
+        const last = statePosts().at(-1)?.post.events[0];
+
+        expect(last).toMatchObject({ usage: usage(13) });
+        expect(last).not.toHaveProperty("configOptions");
+    });
+});
+
+describe("a retry that finds a newer report waiting", () => {
+    it("orders the two by their sequence numbers when the clock moved back, so the later observation's usage wins", () => {
+        // The failed report was observed first (seq 1) but stamped later: the clock moved back before the waiting one.
+        const failed = { at: 2000, seq: 1, usage: { size: 10, used: 1 } };
+        const waiting = { at: 1000, seq: 2, usage: { size: 10, used: 2 } };
+
+        expect(newerPending(failed, waiting)).toEqual({ at: 1000, seq: 2, usage: { size: 10, used: 2 } });
+    });
+
+    it("keeps the cost of a failed send when the newer report carries only counts", () => {
+        const cost = { amount: 0.4, currency: "USD" };
+        const failed = { at: 1000, seq: 1, usage: { cost, size: 10, used: 1 } };
+        const waiting = { at: 2000, seq: 2, usage: { size: 10, used: 2 } };
+
+        expect(newerPending(failed, waiting)).toEqual({ at: 2000, seq: 2, usage: { cost, size: 10, used: 2 } });
+    });
+
+    it("keeps the newer observation for each field when the older send failed last", () => {
+        const failed = { at: 1000, seq: 1, usage: { size: 10, used: 1 } };
+        const waiting = { at: 2000, seq: 2, usage: { size: 10, used: 2 } };
+
+        expect(newerPending(failed, waiting)).toEqual(waiting);
+        expect(newerPending(waiting, failed)).toEqual(waiting);
+        expect(newerPending(failed, undefined)).toEqual(failed);
     });
 });

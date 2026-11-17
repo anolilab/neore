@@ -43,59 +43,119 @@ describe("reportFromHandshake", () => {
 });
 
 describe("withOptionCapabilities", () => {
-    const choice = (value: string) => {
-        return { name: value.toUpperCase(), value };
+    const base = reportFromHandshake({ loadSession: true }, NOW);
+    const model = {
+        category: "model",
+        choices: [
+            { name: "Fast", value: "fast" },
+            { name: "Deep", value: "deep" },
+        ],
+        currentValue: "fast",
+        id: "m",
+        name: "Model",
     };
+    const effort = { category: "thought_level", choices: [{ name: "High", value: "high" }], currentValue: "high", id: "e", name: "Effort" };
+    const mode = { category: "mode", choices: [{ name: "Ask", value: "ask" }, { name: "Code", value: "code" }], currentValue: "ask", id: "p", name: "Mode" };
+    const groups = (options: Parameters<typeof withOptionCapabilities>[1]) => withOptionCapabilities(base, options).groups;
 
-    it("reports the model choices and a reasoning-effort option by their category, never by name", () => {
-        const report = withOptionCapabilities(
-            reportFromHandshake({ loadSession: true }, NOW),
-            {
-                configOptions: [
-                    { category: "model", choices: [choice("a"), choice("b")], currentValue: "a", id: "m", name: "Model" },
-                    { category: "thought_level", choices: [choice("low")], currentValue: "low", id: "effort", name: "Effort" },
-                ],
-            },
-            NOW + 1,
-        );
-
-        expect(report.groups.identity).toEqual({
-            models: [
-                { id: "a", name: "A" },
-                { id: "b", name: "B" },
-            ],
-            reasoningEffort: { degradation: "none", supported: true },
-        });
-        expect(report.reportedAt).toBe(NOW + 1);
-        expect(isAvailable(capabilityOf(report, "sessions.load"))).toBe(true);
-    });
-
-    it("lists the choices of every option filed under model, each model once", () => {
-        const report = withOptionCapabilities(
-            reportFromHandshake({}, NOW),
-            {
-                configOptions: [
-                    { category: "model", choices: [], currentValue: "a", id: "m1", name: "Model" },
-                    { category: "model", choices: [choice("a"), choice("c")], currentValue: "a", id: "m2", name: "Fallback" },
-                    { category: "model", choices: [choice("c")], currentValue: "c", id: "m3", name: "Small" },
-                ],
-            },
-            NOW,
-        );
-
-        expect(report.groups.identity?.models).toEqual([
-            { id: "a", name: "A" },
-            { id: "c", name: "C" },
+    it("lists the models of a model option, by its choices", () => {
+        expect(groups({ configOptions: [model] }).identity?.models).toEqual([
+            { id: "fast", name: "Fast" },
+            { id: "deep", name: "Deep" },
         ]);
     });
 
-    it("reports neither for an agent that offers no such option", () => {
-        const report = withOptionCapabilities(
-            reportFromHandshake({}, NOW),
-            { configOptions: [{ choices: [choice("x")], currentValue: "x", id: "model", name: "Model" }] },
-            NOW,
-        );
+    it("reports reasoning effort when the agent has a thought-level option", () => {
+        expect(capabilityOf(withOptionCapabilities(base, { configOptions: [effort] }), "identity.reasoningEffort")).toEqual({ degradation: "none", supported: true });
+    });
 
-        expect(report.groups.identity).toEqual({ models: [], reasoningEffort: { reason: "not_offered", supported: false } });
+    it("reads the category of an option without regard to its case, so a model and a thought level named with capitals still count", () => {
+        const cased = [
+            { ...model, category: "Model" },
+            { ...effort, category: "Thought_Level" },
+        ];
+
+        expect(groups({ configOptions: cased }).identity?.models).toEqual([
+            { id: "fast", name: "Fast" },
+            { id: "deep", name: "Deep" },
+        ]);
+        const casedReport = withOptionCapabilities(base, { configOptions: cased });
+
+        expect(capabilityOf(casedReport, "identity.reasoningEffort")).toEqual({ degradation: "none", supported: true });
+    });
+
+    it("lists the models of every model option, each once, when the agent files more than one under the model category", () => {
+        const second = { category: "model", choices: [{ name: "Mini", value: "mini" }, { name: "Fast", value: "fast" }], currentValue: "mini", id: "m2", name: "Small" };
+
+        expect(groups({ configOptions: [model, second] }).identity?.models).toEqual([
+            { id: "fast", name: "Fast" },
+            { id: "deep", name: "Deep" },
+            { id: "mini", name: "Mini" },
+        ]);
+    });
+
+    it("keeps at most 200 models, the backend's limit, however many options offer them", () => {
+        const offering = (option: number) => {
+            return {
+                category: "model",
+                choices: Array.from({ length: 100 }, (_unused, index) => {
+                    return { name: `Model ${String(option)}.${String(index)}`, value: `m${String(option)}-${String(index)}` };
+                }),
+                currentValue: "m0-0",
+                id: `model${String(option)}`,
+                name: `Model ${String(option)}`,
+            };
+        };
+        const models = groups({ configOptions: [offering(0), offering(1), offering(2)] }).identity?.models ?? [];
+
+        expect(models).toHaveLength(200);
+        expect(models[0]).toEqual({ id: "m0-0", name: "Model 0.0" });
+    });
+
+    it("does not report a mode option as a permission mode: the session's modes are not the runner's", () => {
+        expect(groups({ configOptions: [mode] }).permissions?.modes ?? []).toEqual([]);
+    });
+
+    it("does not offer the legacy models, which the agent cannot change", () => {
+        expect(groups({ models: { available: [{ id: "m1", name: "M1" }], current: "m1" } }).identity?.models).toEqual([]);
+    });
+
+    it("does not report the legacy modes as permission modes", () => {
+        expect(groups({ modes: { available: [{ id: "ask", name: "Ask" }, { id: "code", name: "Code" }], current: "ask" } }).permissions?.modes ?? []).toEqual([]);
+    });
+
+    it("takes the options over the legacy states", () => {
+        const both = groups({
+            configOptions: [model, mode],
+            models: { available: [{ id: "legacy", name: "L" }], current: "legacy" },
+            modes: { available: [{ id: "legacy", name: "L" }], current: "legacy" },
+        });
+
+        expect(both.identity?.models).toEqual([
+            { id: "fast", name: "Fast" },
+            { id: "deep", name: "Deep" },
+        ]);
+        expect(both.permissions?.modes ?? []).toEqual([]);
+    });
+
+    it("reports nothing offered when the agent offered none, and keeps the handshake members", () => {
+        const none = withOptionCapabilities(base, {});
+
+        expect(none.groups.identity).toEqual({ models: [], reasoningEffort: { reason: "not_offered", supported: false } });
+        // The permission group is the handshake's own: session modes are not reported there.
+        expect(none.groups.permissions).toBeUndefined();
+        expect(isAvailable(capabilityOf(none, "sessions.load"))).toBe(true);
+        expect(none.reportedAt).toBe(NOW);
+    });
+
+    it("reads an option of another category as none of the three", () => {
+        const other = groups({ configOptions: [{ ...model, category: "model_config" }] });
+
+        expect(other.identity?.models).toEqual([]);
+        expect(other.permissions?.modes ?? []).toEqual([]);
+    });
+
+    it("never reads a name: an agent called anything reports the same", () => {
+        expect(withOptionCapabilities(reportFromHandshake({ agentName: "claude-code", loadSession: true }, NOW), {}).groups).toEqual(withOptionCapabilities(base, {}).groups);
     });
 });

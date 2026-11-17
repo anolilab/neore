@@ -30,38 +30,75 @@ export const vHostEndReason = v.union(
     v.literal("stopped"),
 );
 
-/** An id the agent chose, as the computer's core checks it: at most 128 UTF-8 bytes. */
-const fitsIdBytes = (text: string): boolean => text !== "" && new TextEncoder().encode(text).length <= 128;
+/**
+ * An id the agent chose, as the computer checks it: at most 128 UTF-8 bytes. A character count would admit an id the computer
+ * refuses, after the change is already sent.
+ */
+export const fitsIdBytes = (text: string): boolean => new TextEncoder().encode(text).length <= 128;
 
 /**
- * The options a host agent offers for its session (its model, reasoning effort, mode ...), as the desktop reads them
- * (`apps/desktop/src/acp/agent-options.ts`, which holds the same bounds): its list options, or, for an agent that sends
- * none, its legacy mode list. Only shown and reported; the values are the agent's own ids.
+ * The agent's context use and cost, as it reports them (`session_state`). Counts are whole and non-negative, the cost is a
+ * finite non-negative amount, and the currency is cut to 8 characters on the desktop (`apps/desktop/src/acp/agent-state.ts`).
  */
-export const vAgentOptions = v.object({
+export const vAgentUsage = v.object({
+    cost: v.optional(
+        v.object({
+            amount: v.number().check((amount) => Number.isFinite(amount) && amount >= 0, { message: "Invalid cost" }),
+            currency: v.string().min(1).max(8),
+        }),
+    ),
+    size: v.number().check((count) => Number.isSafeInteger(count) && count >= 0, { message: "Counts are non-negative integers" }),
+    used: v.number().check((count) => Number.isSafeInteger(count) && count >= 0, { message: "Counts are non-negative integers" }),
+});
+
+/** What an agent reported about itself outside its turns, as stored on the session row (`session_state`). */
+export const vAcpAgentState = v.object({
+    // The options the agent offers (model, reasoning effort, mode, ...): at most 20, each with at most 100 choices. Each of
+    // configOptions, modes and models is present on its own and replaced whole.
     configOptions: v.optional(
         v
             .array(
                 v.object({
                     category: v.optional(v.string().max(64)),
                     choices: v
-                        .array(v.object({ name: v.string().max(120), value: v.string().check(fitsIdBytes, { message: "An id is 1 to 128 bytes" }) }))
-                        .check((choices) => choices.length <= 64, { message: "Too many choices" }),
-                    currentValue: v.string().check(fitsIdBytes, { message: "An id is 1 to 128 bytes" }),
-                    id: v.string().check(fitsIdBytes, { message: "An id is 1 to 128 bytes" }),
-                    name: v.string().max(120),
+                        .array(v.object({ name: v.string().max(200), value: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }) }))
+                        .check((value) => value.length <= 100, { message: "Too many choices" }),
+                    currentValue: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
+                    id: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
+                    name: v.string().max(200),
                 }),
             )
-            .check((options) => options.length <= 10, { message: "Too many options" }),
+            .check((value) => value.length <= 20, { message: "Too many options" }),
     ),
+    // The legacy model state. Shown, never changed: there is no stable call that sets it.
+    models: v.optional(
+        v.object({
+            available: v
+                .array(v.object({ id: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }), name: v.string().max(200) }))
+                .check((value) => value.length <= 100, { message: "Too many models" }),
+            current: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
+        }),
+    ),
+    // The legacy mode state, for an agent that sends no `configOptions`.
     modes: v.optional(
         v.object({
             available: v
-                .array(v.object({ name: v.string().max(120), value: v.string().check(fitsIdBytes, { message: "An id is 1 to 128 bytes" }) }))
-                .check((modes) => modes.length <= 64, { message: "Too many modes" }),
-            current: v.string().check(fitsIdBytes, { message: "An id is 1 to 128 bytes" }),
+                .array(v.object({ id: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }), name: v.string().max(200) }))
+                .check((value) => value.length <= 100, { message: "Too many modes" }),
+            current: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
         }),
     ),
+    usage: v.optional(vAgentUsage),
+});
+
+/** How the agent answered the last change of one of its options (`acp_set_config`), shown beside the options. */
+export const vAcpOptionResult = v.object({
+    at: v.number(),
+    callId: v.string().max(128),
+    optionId: v.optional(v.string().max(128)),
+    outcome: v.union(v.literal("confirmed"), v.literal("refused")),
+    reason: v.optional(v.string().max(300)),
+    valueId: v.string().max(128),
 });
 
 export const vAcpSessionStatus = v.union(v.literal("starting"), v.literal("idle"), v.literal("busy"), v.literal("offline"), v.literal("ended"));
@@ -88,9 +125,6 @@ export const vHostEvent = v.union(
         // `load_unsupported` for an agent that does not load saved sessions; any other text is read as `load_failed`).
         reattach: v.optional(v.object({ loaded: v.boolean(), reason: v.optional(v.string().max(500)) })),
     }),
-    // The options the agent offers, posted right after a `session_open` in the same post. Kept with that open's report and
-    // only when it is newer than the stored one (`openSession`). Its own event, so stored turn events keep their shape.
-    v.object({ kind: v.literal("session_options"), options: vAgentOptions }),
     // An import (S6) of an agent's saved session: `import_open` finds or makes the thread, each `import_turn` is one
     // prompt and its reply, `import_end` closes the transcript. Posted as session-level (`import_open`) or turn-level posts.
     v.object({
@@ -110,6 +144,49 @@ export const vHostEvent = v.union(
         user: v.string().max(100_000),
     }),
     v.object({ kind: v.literal("import_end") }),
+    // The agent's own state (the desktop's turn-less `session_state` post). Each field present replaces the stored one; `at` orders
+    // the reports, so an older one arriving late is dropped (`applySessionState`).
+    v.object({
+        at: v.number().check((at) => Number.isSafeInteger(at) && at >= 0, { message: "Invalid time" }),
+        configOptions: v.optional(
+            v
+                .array(
+                    v.object({
+                        category: v.optional(v.string().min(1).max(64)),
+                        choices: v
+                            .array(
+                                v.object({ name: v.string().max(200), value: v.string().min(1).check(fitsIdBytes, { message: "An id is at most 128 bytes" }) }),
+                            )
+                            .check((value) => value.length <= 100, { message: "Too many choices" }),
+                        currentValue: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
+                        id: v.string().min(1).check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
+                        name: v.string().max(200),
+                    }),
+                )
+                .check((value) => value.length <= 20, { message: "Too many options" }),
+        ),
+        kind: v.literal("session_state"),
+        models: v.optional(
+            v.object({
+                available: v
+                    .array(v.object({ id: v.string().min(1).check(fitsIdBytes, { message: "An id is at most 128 bytes" }), name: v.string().max(200) }))
+                    .check((value) => value.length <= 100, { message: "Too many models" }),
+                current: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
+            }),
+        ),
+        modes: v.optional(
+            v.object({
+                available: v
+                    .array(v.object({ id: v.string().min(1).check(fitsIdBytes, { message: "An id is at most 128 bytes" }), name: v.string().max(200) }))
+                    .check((value) => value.length <= 100, { message: "Too many modes" }),
+                current: v.string().check(fitsIdBytes, { message: "An id is at most 128 bytes" }),
+            }),
+        ),
+        // The desktop's count of its reports for this session, in the order it observed them. The newest one wins whatever the two
+        // clocks say (`applySessionState`); a desktop that sends none is ordered by `at`.
+        seq: v.optional(v.number().check((seq) => Number.isSafeInteger(seq) && seq >= 1, { message: "Invalid sequence number" })),
+        usage: v.optional(vAgentUsage),
+    }),
     v.object({ kind: v.literal("turn_start"), text: v.string().max(100_000) }),
     v.object({ kind: v.literal("text"), text: v.string().max(65_536) }),
     v.object({ kind: v.literal("reasoning"), text: v.string().max(65_536) }),

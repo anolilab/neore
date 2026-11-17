@@ -2,19 +2,23 @@
  * What an agent told us at the handshake, as a capability report (`@neore/ai/capabilities`,
  * provider-capabilities.md §5). Pure, and keyed by what the agent ADVERTISED, never by its name.
  *
- * Only the `sessions` members are mapped so far: they are the ones something here acts on (the import of an
- * agent's saved sessions). A member left out reads as `unknown`, which hides its control; reporting one nothing
- * here enforces would be worse than leaving it out.
+ * Only the `sessions` members are mapped from the handshake: they are the ones something here acts on (the import of
+ * an agent's saved sessions). The options the agent offers are known only once it has opened a session, and are added
+ * by {@link withOptionCapabilities}. A member left out reads as `unknown`, which hides its control; reporting one
+ * nothing here enforces would be worse than leaving it out.
  */
 import type { CapabilityReport } from "@neore/ai/capabilities";
 
-import type { AgentOptions } from "./agent-options";
+import type { SessionStatePatch } from "./host-events";
 import type { AgentCapabilities } from "./types";
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 const NATIVE = { degradation: "none", supported: true } as const;
 const NOT_OFFERED = { reason: "not_offered", supported: false } as const;
+
+/** The most models a report keeps: the backend's own limit (`lunora/lib/capability-report.ts`). */
+const MAX_MODELS = 200;
 
 /**
  * `loadSession` is a boolean; `sessionCapabilities.list` and `.fork` are "present means supported" (ACP: omitted or `null` is no
@@ -36,28 +40,35 @@ export const reportFromHandshake = (capabilities: AgentCapabilities, now: number
     };
 };
 
-const optionsIn = (options: AgentOptions, category: string) => (options.configOptions ?? []).filter((option) => option.category === category);
-
-/** The report's own cap on the model list (`backend/lunora/lib/capability-report.ts`). */
-const MAX_MODELS = 200;
+/** The first option the agent filed under a category, if it sent any. The category is read without regard to case, as the backend reads it. */
+const optionIn = (options: SessionStatePatch, category: string) => options.configOptions?.find((option) => option.category?.toLowerCase() === category);
 
 /**
- * The options the agent offers for its session (`agent-options.ts`), added to its handshake report: the models it can run
- * (`identity.models`) and whether it has a reasoning-effort setting (`identity.reasoningEffort`). Read from the option's
- * category, never from the agent's or a model's name. Its modes (Plan, Build ...) are not permission modes the runner
- * enforces, so they are not reported as `permissions.modes`.
+ * What the agent offered when it opened the session (`agent-options.ts#resolveOptions`), added to its handshake report: the
+ * models it can run (`identity.models`) and whether it has a reasoning-effort setting (`identity.reasoningEffort`). Only a
+ * model option counts as a selectable model, since only an option can be changed (`acp_set_config`); the legacy model list
+ * is read-only and reports none. The agent's session modes (Plan, Build ...) are not permission modes the runner enforces,
+ * so they are not reported as `permissions.modes`. Read from the option's category, never from the agent's or a model's name.
  */
-export const withOptionCapabilities = (report: CapabilityReport, options: AgentOptions, now: number): CapabilityReport => {
-    // Every model option's choices, each model once: an agent may file more than one option under `model`.
-    const models = new Map<string, string>();
+export const withOptionCapabilities = (report: CapabilityReport, options: SessionStatePatch): CapabilityReport => {
+    // Every model option's choices, each model once: an agent may file more than one option under `model`. The backend takes at
+    // most MAX_MODELS (`lunora/lib/capability-report.ts`), and a longer list would replace the whole report, so this stops there.
+    const choices = new Map<string, string>();
+    const configOptions = options.configOptions ?? [];
 
-    const choices = optionsIn(options, "model").flatMap((option) => option.choices);
-
-    for (const choice of choices) {
-        if (!models.has(choice.value) && models.size < MAX_MODELS) {
-            models.set(choice.value, choice.name);
+    for (const option of configOptions) {
+        if (option.category?.toLowerCase() === "model") {
+            for (const choice of option.choices) {
+                if (!choices.has(choice.value) && choices.size < MAX_MODELS) {
+                    choices.set(choice.value, choice.name);
+                }
+            }
         }
     }
+
+    const models = [...choices].map(([id, name]) => {
+        return { id, name };
+    });
 
     return {
         ...report,
@@ -65,12 +76,9 @@ export const withOptionCapabilities = (report: CapabilityReport, options: AgentO
             ...report.groups,
             identity: {
                 ...report.groups.identity,
-                models: [...models].map(([id, name]) => {
-                    return { id, name };
-                }),
-                reasoningEffort: optionsIn(options, "thought_level").length === 0 ? NOT_OFFERED : NATIVE,
+                models,
+                reasoningEffort: optionIn(options, "thought_level") === undefined ? NOT_OFFERED : NATIVE,
             },
         },
-        reportedAt: now,
     };
 };

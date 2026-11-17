@@ -3,11 +3,8 @@
  * its text, tool calls and permission requests, and how it ended. The observer is told in the order things
  * happen, never an "always" option, never a folder path, and never a value the user asked to mask.
  */
-import type { PassThrough } from "node:stream";
-
 import { describe, expect, it } from "vitest";
 
-import { reportFromHandshake } from "./capabilities";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import type { PermissionGate } from "./permission";
 import { AgentSession } from "./session";
@@ -20,7 +17,6 @@ const OPENED = {
     ...HOST_INFO,
     capabilities: {
         groups: {
-            // The agent answered `session/new` with no options: no model list, no reasoning effort.
             identity: { models: [], reasoningEffort: { reason: "not_offered", supported: false } },
             sessions: {
                 fork: { reason: "not_offered", supported: false },
@@ -32,7 +28,6 @@ const OPENED = {
         version: 1,
     },
     nativeSessionId: "sess_1",
-    options: {},
 };
 
 const recorder = () => {
@@ -49,7 +44,6 @@ const recorder = () => {
         sessionOpened: (_sessionId, info, threadId) => {
             calls.push(threadId === undefined ? ["sessionOpened", info] : ["sessionOpened", info, threadId]);
         },
-        sessionUpdated: record("sessionUpdated"),
         text: record("text"),
         thought: record("thought"),
         tool: record("tool"),
@@ -66,6 +60,7 @@ const start = async (
     observer: SessionObserver,
     secret?: { scrub: (text: string) => string; secretLength: number },
     remote?: { sessionId: string; threadId: string },
+    fixture = "handshake-and-prompt",
 ) => {
     const agent = memoryAgent();
     const session = new AgentSession({
@@ -81,7 +76,7 @@ const start = async (
         process: { ...agent.process, ...secret },
     });
     const player = transcriptPlayer(agent);
-    const steps = readTranscript("handshake-and-prompt");
+    const steps = readTranscript(fixture);
 
     await Promise.all([session.start(), player.play(steps.slice(0, 4))]);
 
@@ -96,6 +91,30 @@ const refuse: PermissionGate = {
 };
 
 describe("a session's observer", () => {
+    it("is told what the agent reports about its usage, and only that", async () => {
+        const { observer } = recorder();
+        const reported: unknown[] = [];
+        const watched: SessionObserver = {
+            ...observer,
+            sessionState: (_id, patch) => {
+                reported.push(patch);
+            },
+        };
+        const { agent, player, session, steps } = await start(refuse, watched, undefined, undefined, "usage-and-prompt");
+
+        session.send("say hi");
+        await player.play(steps.slice(4));
+        await expect.poll(() => session.snapshot().status).toBe("idle");
+
+        expect(reported).toEqual([{ usage: { cost: { amount: 0.42, currency: "USD" }, size: 200_000, used: 12_345 } }]);
+
+        // A usage report after the turn has ended is still told: the observer is not limited to the current turn.
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "usage_update", size: 200_000, used: 20_000 } } });
+        await expect.poll(() => reported.length).toBe(2);
+
+        expect(reported[1]).toMatchObject({ usage: { size: 200_000, used: 20_000 } });
+    });
+
     it("is told the session opened, the turn, its text and its end, in order", async () => {
         const { calls, observer } = recorder();
         const { player, session, steps } = await start(refuse, observer);
@@ -218,141 +237,6 @@ describe("a session's observer", () => {
     });
 });
 
-describe("the agent's options", () => {
-    it("go out with the open, and again with a newer report each time the agent changes them", async () => {
-        const { calls, observer } = recorder();
-        const agent = memoryAgent();
-        const session = new AgentSession({
-            agentKey: "example",
-            agentLabel: "Example",
-            appVersion: "9.9.9",
-            folder: "/work",
-            gate: refuse,
-            hostInfo: HOST_INFO,
-            observer,
-            onChange: () => {},
-            process: agent.process,
-        });
-        const steps = readTranscript("handshake-and-prompt").slice(0, 4);
-        const mode = {
-            category: "mode",
-            currentValue: "build",
-            id: "mode",
-            name: "Mode",
-            options: [
-                { name: "Plan", value: "plan" },
-                { name: "Build", value: "build" },
-            ],
-            type: "select",
-        };
-
-        steps[3] = { in: { id: "$2", result: { configOptions: [mode], sessionId: "sess_1" } } };
-        await Promise.all([session.start(), transcriptPlayer(agent).play(steps)]);
-
-        const [opened] = calls[0]?.slice(1) as [HostSessionInfo];
-
-        expect(opened.options?.configOptions?.[0]?.currentValue).toBe("build");
-
-        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { currentModeId: "plan", sessionUpdate: "current_mode_update" } } });
-        await expect.poll(() => calls.length).toBe(2);
-
-        const [updated] = calls[1]?.slice(1) as [HostSessionInfo];
-
-        expect(calls[1]?.[0]).toBe("sessionUpdated");
-        expect(updated.options?.configOptions?.[0]?.currentValue).toBe("plan");
-        expect(updated.capabilities?.reportedAt).toBeGreaterThan(opened.capabilities?.reportedAt ?? Infinity);
-        expect({ ...updated, capabilities: undefined, options: undefined }).toEqual({ ...opened, capabilities: undefined, options: undefined });
-    });
-
-    it("keep an update that follows the answer before the session's id is known here", async () => {
-        const { calls, observer } = recorder();
-        const agent = memoryAgent();
-        const session = new AgentSession({
-            agentKey: "example",
-            agentLabel: "Example",
-            appVersion: "9.9.9",
-            folder: "/work",
-            gate: refuse,
-            hostInfo: HOST_INFO,
-            observer,
-            onChange: () => {},
-            process: agent.process,
-        });
-        const steps = readTranscript("handshake-and-prompt").slice(0, 3);
-        const mode = { category: "mode", currentValue: "build", id: "mode", name: "Mode", options: [{ name: "Plan", value: "plan" }, { name: "Build", value: "build" }], type: "select" };
-
-        const started = session.start();
-
-        await transcriptPlayer(agent).play(steps);
-        // The answer and the update in one read: the update is handled before the code that awaited the answer runs.
-        (agent.process.stdout as PassThrough).write(
-            [
-                { id: agent.written.at(-1)?.id, jsonrpc: "2.0", result: { configOptions: [mode], sessionId: "sess_1" } },
-                // A list that adds a mode, then more mode changes than are ever kept one by one: the list and the last change count.
-                {
-                    jsonrpc: "2.0",
-                    method: "session/update",
-                    params: {
-                        sessionId: "sess_1",
-                        update: { configOptions: [{ ...mode, options: [...mode.options, { name: "Ask", value: "ask" }] }], sessionUpdate: "config_option_update" },
-                    },
-                },
-                ...Array.from({ length: 12 }, (_, index) => {
-                    return {
-                        jsonrpc: "2.0",
-                        method: "session/update",
-                        params: { sessionId: "sess_1", update: { currentModeId: index % 2 === 0 ? "plan" : "ask", sessionUpdate: "current_mode_update" } },
-                    };
-                }),
-            ]
-                .map((frame) => `${JSON.stringify(frame)}\n`)
-                .join(""),
-        );
-        await started;
-
-        expect((calls[0]?.[1] as HostSessionInfo).options?.configOptions?.[0]?.currentValue).toBe("ask");
-    });
-
-    it.each([
-        ["drop a switch the load replays before its answer", false, "build"],
-        ["keep a switch read after the answer, in the same read", true, "plan"],
-    ])("%s", async (_name, after, current) => {
-        const { calls, observer } = recorder();
-        const agent = memoryAgent();
-        const session = new AgentSession({
-            agentKey: "example",
-            agentLabel: "Example",
-            appVersion: "9.9.9",
-            capabilityReport: () => reportFromHandshake({ loadSession: true }, Date.now()),
-            folder: "/work",
-            gate: refuse,
-            hostInfo: HOST_INFO,
-            observer,
-            onChange: () => {},
-            process: agent.process,
-            resumeSessionId: "sess_1",
-        });
-        const mode = { category: "mode", currentValue: "build", id: "mode", name: "Mode", options: [{ name: "Plan", value: "plan" }, { name: "Build", value: "build" }], type: "select" };
-        const update = (currentModeId: string) => {
-            return { jsonrpc: "2.0", method: "session/update", params: { sessionId: "sess_1", update: { currentModeId, sessionUpdate: "current_mode_update" } } };
-        };
-        const started = session.start();
-
-        await transcriptPlayer(agent).play(readTranscript("handshake-and-prompt").slice(0, 2));
-        await expect.poll(() => agent.written.at(-1)?.method).toBe("session/load");
-
-        // The replay (an old switch to Plan), then the answer (Build now) and, in one case, a switch to Plan after it: all in one read.
-        (agent.process.stdout as PassThrough).write(
-            [update("plan"), { id: agent.written.at(-1)?.id, jsonrpc: "2.0", result: { configOptions: [mode] } }, ...(after ? [update("plan")] : [])]
-                .map((frame) => `${JSON.stringify(frame)}\n`)
-                .join(""),
-        );
-        await started;
-
-        expect((calls[0]?.[1] as HostSessionInfo).options?.configOptions?.[0]?.currentValue).toBe(current);
-    });
-});
-
 describe("a session and turns the backend sent", () => {
     it("goes by the id the backend made, and says which thread it is", async () => {
         const { calls, observer } = recorder();
@@ -430,5 +314,376 @@ describe("a session and turns the backend sent", () => {
 
         expect(waiting[2]).toBe("failed");
         expect(typeof waiting[3]).toBe("string");
+    });
+});
+
+describe("a usage report the agent sends before its session answers", () => {
+    it("reaches the meter once the session has opened, rather than being dropped", async () => {
+        const reported: { usage?: unknown }[] = [];
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: {
+                ...recorder().observer,
+                sessionState: (_id, patch) => {
+                    reported.push(patch);
+                },
+            },
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        const initialize = agent.written.find((frame) => frame.method === "initialize");
+
+        agent.say({ id: initialize?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "usage_update", size: 200_000, used: 12_345 } } });
+
+        const opened = agent.written.find((frame) => frame.method === "session/new");
+
+        agent.say({ id: opened?.id, result: { sessionId: "sess_1" } });
+        await started;
+
+        expect(reported).toContainEqual({ usage: expect.objectContaining({ used: 12_345 }) });
+    });
+
+    it("keeps the valid report when a malformed one follows it before the answer", async () => {
+        const reported: { usage?: unknown }[] = [];
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: {
+                ...recorder().observer,
+                sessionState: (_id, patch) => {
+                    reported.push(patch);
+                },
+            },
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        agent.say({ id: agent.written.find((frame) => frame.method === "initialize")?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "usage_update", size: 200_000, used: 12_345 } } });
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "usage_update", size: 200_000, used: "lots" } } });
+
+        agent.say({ id: agent.written.find((frame) => frame.method === "session/new")?.id, result: { sessionId: "sess_1" } });
+        await started;
+
+        expect(reported).toEqual([{ usage: { size: 200_000, used: 12_345 } }]);
+    });
+
+    it("does not give a fresh session the options an update for another session carries", async () => {
+        const reported: { configOptions?: unknown }[] = [];
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: {
+                ...recorder().observer,
+                sessionState: (_id, patch) => {
+                    reported.push(patch);
+                },
+            },
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        agent.say({ id: agent.written.find((frame) => frame.method === "initialize")?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        // The session's id is not known until session/new answers: an update naming another session is not this one's options.
+        agent.say({
+            method: "session/update",
+            params: {
+                sessionId: "sess_other",
+                update: {
+                    configOptions: [{ category: "model", currentValue: "deep", id: "model", name: "Model", options: [{ name: "Deep", value: "deep" }], type: "select" }],
+                    sessionUpdate: "config_option_update",
+                },
+            },
+        });
+
+        agent.say({ id: agent.written.find((frame) => frame.method === "session/new")?.id, result: { sessionId: "sess_1" } });
+        await started;
+
+        expect(reported.filter((patch) => patch.configOptions !== undefined)).toEqual([]);
+    });
+
+    it("bounds what a chatty agent makes a fresh session keep before its answer, and still applies the latest option and usage", async () => {
+        const reported: { configOptions?: unknown; usage?: unknown }[] = [];
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: {
+                ...recorder().observer,
+                sessionState: (_id, patch) => {
+                    reported.push(patch);
+                },
+            },
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        agent.say({ id: agent.written.find((frame) => frame.method === "initialize")?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        const option = (value: number) => {
+            return {
+                category: "model",
+                currentValue: `v${String(value)}`,
+                id: "model",
+                name: "Model",
+                options: [{ name: "V", value: `v${String(value)}` }],
+                type: "select",
+            };
+        };
+        const update = (sessionId: string, fields: Record<string, unknown>) => {
+            return { method: "session/update", params: { sessionId, update: fields } };
+        };
+        const COUNT = 1000;
+
+        for (let index = 0; index < COUNT; index += 1) {
+            // Other sessions' options and chatter that startup has no use for arrive between the answering session's reports.
+            agent.say(update(`other-${String(index % 500)}`, { configOptions: [option(index)], sessionUpdate: "config_option_update" }));
+            agent.say(update("sess_1", { content: { text: "hi", type: "text" }, sessionUpdate: "agent_message_chunk" }));
+            agent.say(update("sess_1", { sessionUpdate: "usage_update", size: 200_000, used: index }));
+            agent.say(update("sess_1", { configOptions: [option(index)], sessionUpdate: "config_option_update" }));
+        }
+
+        // Only the latest option list and the latest usage report of the answering session are kept, and few sessions in all.
+        const retained = (session as unknown as { startupReads: Map<string, unknown[]> }).startupReads;
+
+        await expect.poll(() => retained.get("sess_1")?.length).toBe(2);
+        expect(retained.size).toBeLessThanOrEqual(4);
+        let entries = 0;
+
+        for (const reads of retained.values()) {
+            entries += reads.length;
+        }
+
+        expect(entries).toBeLessThanOrEqual(4 * 3);
+
+        agent.say({ id: agent.written.find((frame) => frame.method === "session/new")?.id, result: { sessionId: "sess_1" } });
+        await started;
+
+        expect(reported.find((patch) => patch.configOptions !== undefined)?.configOptions).toEqual([expect.objectContaining({ currentValue: `v${String(COUNT - 1)}` })]);
+        let usage: unknown;
+
+        for (const patch of reported) {
+            if (patch.usage !== undefined) {
+                usage = patch.usage;
+            }
+        }
+
+        expect(usage).toEqual({ size: 200_000, used: COUNT - 1 });
+    });
+
+    it("keeps the cost of a usage report the agent sent before its answer when a later usage report leaves it out", async () => {
+        const reported: { usage?: unknown }[] = [];
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: {
+                ...recorder().observer,
+                sessionState: (_id, patch) => {
+                    reported.push(patch);
+                },
+            },
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        agent.say({ id: agent.written.find((frame) => frame.method === "initialize")?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        const cost = { amount: 0.42, currency: "USD" };
+
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { cost, sessionUpdate: "usage_update", size: 200_000, used: 1000 } } });
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "usage_update", size: 200_000, used: 2000 } } });
+
+        agent.say({ id: agent.written.find((frame) => frame.method === "session/new")?.id, result: { sessionId: "sess_1" } });
+        await started;
+
+        // The cost is cumulative: the report that left it out keeps the cost reported before it.
+        let usage: unknown;
+
+        for (const patch of reported) {
+            if (patch.usage !== undefined) {
+                usage = patch.usage;
+            }
+        }
+
+        expect(usage).toEqual({ cost, size: 200_000, used: 2000 });
+    });
+
+    it("does not send the legacy model again once the agent has reported options and cleared them", async () => {
+        const reported: { configOptions?: unknown; models?: unknown }[] = [];
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: {
+                ...recorder().observer,
+                sessionState: (_id, patch) => {
+                    reported.push(patch);
+                },
+            },
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        agent.say({ id: agent.written.find((frame) => frame.method === "initialize")?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        const option = (current: string) => {
+            return {
+                category: "model",
+                currentValue: current,
+                id: "model",
+                name: "Model",
+                options: [
+                    { name: "Fast", value: "fast" },
+                    { name: "Deep", value: "deep" },
+                ],
+                type: "select",
+            };
+        };
+
+        // Both formats at the start: the legacy model is the one the agent had before it changed its model through an option.
+        agent.say({
+            id: agent.written.find((frame) => frame.method === "session/new")?.id,
+            result: {
+                configOptions: [option("fast")],
+                models: { availableModels: [{ modelId: "fast", name: "Fast" }], currentModelId: "fast" },
+                sessionId: "sess_1",
+            },
+        });
+        await started;
+
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { configOptions: [option("deep")], sessionUpdate: "config_option_update" } } });
+        agent.say({ method: "session/update", params: { sessionId: "sess_1", update: { configOptions: [], sessionUpdate: "config_option_update" } } });
+
+        await expect.poll(() => reported.at(-1)?.configOptions).toEqual([]);
+        // The legacy model is not sent again: what the agent has now is no options, not the model it had before its change.
+        expect(reported.at(-1)).not.toHaveProperty("models");
+    });
+
+    it("keeps nothing of the updates a session sent before its answer when the session fails to open", async () => {
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: recorder().observer,
+            onChange: () => {},
+            process: agent.process,
+        });
+        const started = session.start();
+
+        await expect.poll(() => agent.written.some((frame) => frame.method === "initialize")).toBe(true);
+        agent.say({ id: agent.written.find((frame) => frame.method === "initialize")?.id, result: { agentCapabilities: {}, protocolVersion: 1 } });
+        await expect.poll(() => agent.written.some((frame) => frame.method === "session/new")).toBe(true);
+
+        agent.say({
+            method: "session/update",
+            params: { sessionId: "sess_1", update: { configOptions: [{ category: "model", currentValue: "a", id: "model", name: "Model", options: [{ name: "A", value: "a" }], type: "select" }], sessionUpdate: "config_option_update" } },
+        });
+        await expect.poll(() => (session as unknown as { startupReads: Map<string, unknown[]> }).startupReads.size).toBe(1);
+
+        agent.say({ error: { code: -32_000, message: "no session" }, id: agent.written.find((frame) => frame.method === "session/new")?.id });
+        await expect(started).rejects.toThrow();
+
+        expect((session as unknown as { startupReads: Map<string, unknown[]> }).startupReads.size).toBe(0);
+    });
+});
+
+describe("a change asked for from the web or the phone", () => {
+    it("refuses a mode, whichever way it is named, and never sends it to the agent", async () => {
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: recorder().observer,
+            onChange: () => {},
+            process: agent.process,
+        });
+
+        // The legacy mode state (no option id) is a mode, refused before the session's own checks.
+        await expect(session.setRemoteOption(undefined, "code")).rejects.toThrow("a mode is changed on the computer");
+        expect(agent.written).toEqual([]);
+    });
+
+    it("refuses an option filed under no category, and an id the legacy mode state lists, as a mode", async () => {
+        const agent = memoryAgent();
+        const session = new AgentSession({
+            agentKey: "example",
+            agentLabel: "Example",
+            appVersion: "9.9.9",
+            folder: "/work",
+            gate: refuse,
+            hostInfo: HOST_INFO,
+            observer: recorder().observer,
+            onChange: () => {},
+            process: agent.process,
+        });
+        const offered = session as unknown as { offered: unknown };
+
+        offered.offered = { configOptions: [{ choices: [{ name: "High", value: "high" }], currentValue: "high", id: "effort", name: "Effort" }] };
+        await expect(session.setRemoteOption("effort", "low")).rejects.toThrow("a mode is changed on the computer");
+
+        offered.offered = { modes: { available: [{ id: "code", name: "Code" }], current: "ask" } };
+        await expect(session.setRemoteOption("code", "low")).rejects.toThrow("a mode is changed on the computer");
+
+        expect(agent.written).toEqual([]);
     });
 });

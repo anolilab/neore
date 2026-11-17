@@ -15,7 +15,7 @@ export const isDeviceOnline = (device: Pick<Doc<"devices">, "lastSeenAt">, now: 
 
 const ACP_TOOL_NAMES: ReadonlySet<string> = new Set(ACP_TOOLS);
 
-/** A coding-agent call (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`), not a device tool. */
+/** A coding-agent call (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`, `acp_set_config`), not a device tool. */
 export const isAcpTool = (toolName: string): boolean => ACP_TOOL_NAMES.has(toolName);
 
 /** How long a call may wait for its device to claim it. */

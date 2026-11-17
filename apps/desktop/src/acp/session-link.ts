@@ -1,7 +1,4 @@
-/**
- * A session's link to its thread on the backend: `session_open` until the backend answers, again whenever what it reports
- * changes (the agent's options), and `close` when the session is over.
- */
+/** A session's link to its thread on the backend: `session_open` until the backend answers, `close` when the session is over. */
 import type { HostSessionInfo, PostResult } from "./host-events";
 import { jitteredBackoff } from "./host-events";
 
@@ -29,12 +26,6 @@ export class SessionLink {
 
     private opening = false;
 
-    /** The backend has answered an open with the thread: a later re-post only carries changed options. */
-    private confirmed = false;
-
-    /** The info changed while an open was in flight: once it is answered, the open goes out again with the new info. */
-    private stale = false;
-
     /** A `session_open` was sent and the backend may have created the session (its answer was lost, or not yet known). */
     private posted = false;
 
@@ -42,7 +33,7 @@ export class SessionLink {
 
     public constructor(
         private readonly sessionId: string,
-        private info: HostSessionInfo,
+        private readonly info: HostSessionInfo,
         private readonly poster: {
             bound: (sessionId: string, threadId: string) => void;
             deviceId: () => string | undefined;
@@ -58,6 +49,11 @@ export class SessionLink {
         this.halted = true;
         clearTimeout(this.timer);
         clearTimeout(this.closeTimer);
+    }
+
+    /** Whether the local session has ended (`close`). */
+    public get isClosed(): boolean {
+        return this.closed;
     }
 
     /** The local session ended: a `session_open` still being retried must not create a backend session for it. */
@@ -99,33 +95,10 @@ export class SessionLink {
         }
 
         this.closeAttempts += 1;
-        this.closeTimer = setTimeout(
-            () => {
-                this.closeTimer = undefined;
-                this.announceClose();
-            },
-            jitteredBackoff(this.closeAttempts, this.poster.random),
-        );
-    }
-
-    /**
-     * The session's info changed. A post in flight or waiting to be retried sends the new info; otherwise it is posted now.
-     * The backend keeps it only when its report is newer than the one stored, so an open that arrives late changes nothing.
-     */
-    public update(info: HostSessionInfo): void {
-        this.info = info;
-
-        if (this.closed || this.threadId === null || this.timer !== undefined) {
-            return;
-        }
-
-        if (this.opening) {
-            this.stale = true;
-
-            return;
-        }
-
-        this.open();
+        this.closeTimer = setTimeout(() => {
+            this.closeTimer = undefined;
+            this.announceClose();
+        }, jitteredBackoff(this.closeAttempts, this.poster.random));
     }
 
     /** The computer was paired after this session opened: tries `session_open` again if it was left local. */
@@ -140,6 +113,7 @@ export class SessionLink {
 
     /** Posts `session_open` until the backend answers with the thread. */
     public async open(): Promise<void> {
+        // Once the poster has stopped, nothing opens again: a retry answered after the stop must not schedule one.
         if (this.opening || this.closed || this.halted) {
             return;
         }
@@ -150,10 +124,6 @@ export class SessionLink {
     }
 
     private async attempt(): Promise<void> {
-        // A re-post for a session the backend already opened (its options changed): a refusal of it drops the change only. A
-        // session the backend started knows its thread before its first open, so the thread alone does not say this.
-        const rebind = this.confirmed;
-
         try {
             const deviceId = this.poster.deviceId();
 
@@ -163,62 +133,42 @@ export class SessionLink {
                 return;
             }
 
-            // The agent's options ride as their own event after the open, in the same post.
-            const { options, ...info } = this.info;
-            const events = [{ ...info, kind: "session_open" }, ...(options === undefined ? [] : [{ kind: "session_options", options }])];
-            const payload = JSON.stringify({ deviceId, events, issuedAt: this.poster.now(), kind: "turn", sessionId: this.sessionId, v: 1 });
+            const payload = JSON.stringify({ deviceId, events: [{ ...this.info, kind: "session_open" }], issuedAt: this.poster.now(), kind: "turn", sessionId: this.sessionId, v: 1 });
 
             this.posted = true;
 
-            this.answered(await this.poster.request(payload), rebind);
+            const result = await this.poster.request(payload);
+
+            if (result.kind === "refused" || (result.kind === "ok" && result.ended)) {
+                this.posted = false;
+            }
+
+            if (this.closed) {
+                return;
+            }
+
+            if (result.kind === "ok" && result.threadId !== undefined) {
+                // An ended session (its thread was deleted in the app) takes no more turns.
+                if (result.ended) {
+                    this.local();
+                } else {
+                    this.threadId = result.threadId;
+                    this.poster.bound(this.sessionId, result.threadId);
+                }
+            } else if (result.kind === "refused") {
+                this.local();
+            } else {
+                this.retryLater();
+            }
         } catch {
             this.retryLater();
         } finally {
             this.opening = false;
         }
-
-        const again = this.stale;
-
-        this.stale = false;
-
-        if (again && !this.closed && this.timer === undefined && typeof this.threadId === "string") {
-            this.open();
-        }
-    }
-
-    /** What the backend said to an open. `rebind`: the backend had already opened this session, so this post only carried a change. */
-    private answered(result: PostResult, rebind: boolean): void {
-        const ended = result.kind === "ok" && result.ended;
-
-        if (ended || (!rebind && result.kind === "refused")) {
-            this.posted = false;
-        }
-
-        if (this.closed) {
-            return;
-        }
-
-        if (result.kind === "ok" && result.threadId !== undefined) {
-            // An ended session (its thread was deleted in the app) takes no more turns.
-            if (ended) {
-                this.local();
-            } else {
-                this.threadId = result.threadId;
-                this.confirmed = true;
-                this.poster.bound(this.sessionId, result.threadId);
-            }
-        } else if (result.kind !== "refused") {
-            this.retryLater();
-        } else if (!rebind) {
-            this.local();
-        }
-        // A refused re-post leaves the session and its thread as they are: turns still post into it, and its close still goes out.
     }
 
     private local(): void {
         this.threadId = null;
-        // A later open (after pairing) is a first open again.
-        this.confirmed = false;
         this.poster.released(this.sessionId);
     }
 
@@ -228,12 +178,9 @@ export class SessionLink {
         }
 
         this.attempts += 1;
-        this.timer = setTimeout(
-            () => {
-                this.timer = undefined;
-                this.open();
-            },
-            jitteredBackoff(this.attempts, this.poster.random),
-        );
+        this.timer = setTimeout(() => {
+            this.timer = undefined;
+            this.open();
+        }, jitteredBackoff(this.attempts, this.poster.random));
     }
 }

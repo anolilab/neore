@@ -15,20 +15,22 @@ import { randomUUID } from "node:crypto";
 import type { CapabilityReport } from "@neore/ai/capabilities";
 import { capabilityOf, isAvailable } from "@neore/ai/capabilities";
 
-import type { AgentOptions } from "./agent-options";
-import { applyOptionsUpdate, keepEarlyUpdate, optionsOf } from "./agent-options";
+import type { RawOptions } from "./agent-options";
+import { configOptionsOf, idOf, isOffered, optionsOf, resolveOptions, withCurrentMode, withOptionValue } from "./agent-options";
+import { usageOf } from "./agent-state";
 import { reportFromHandshake, withOptionCapabilities } from "./capabilities";
 import { TurnChanges } from "./changes";
 import { childEventOf, childParentOf, completionText, contentText, isRecord, text, toolIdOf } from "./child-updates";
 import type { ChildEvent } from "./children";
 import { ChildLedger } from "./children";
+import type { AgentOption, AgentUsage } from "./host-events";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
 import type { PermissionGate, PermissionOutcome } from "./permission";
 import { describePermission, offeredOptions } from "./permission";
 import type { AgentProcess } from "./process";
 import type { Handshake } from "./protocol";
-import { forkSession, initialize, loadSession, METHOD, newSession, promptParams } from "./protocol";
+import { forkSession, initialize, loadSession, METHOD, openNewSession, promptParams, setConfigOption, setMode } from "./protocol";
 import { INVALID_PARAMS, METHOD_NOT_FOUND, RpcError } from "./rpc-error";
 import { AgentSignedOutError } from "./signed-out";
 import { Turn } from "./turn";
@@ -79,6 +81,60 @@ interface QueuedPrompt {
     prompt: string;
     turnId?: string;
 }
+
+/** An update the agent sent while the session opened, with the session it names. */
+interface StartupUpdate {
+    sessionId: unknown;
+    update: Record<string, unknown>;
+}
+
+/**
+ * The most agent session ids a fresh session's startup keeps updates for while it waits for its own id. An agent that names more
+ * ids than this loses the oldest ones' updates, so a chatty agent cannot grow the desktop's memory without limit.
+ */
+const MAX_STARTUP_SESSIONS = 4;
+
+/** What startup keeps of an update it can use, already read: its effect is applied in arrival order once the session answers. */
+type StartupRead = { configOptions: AgentOption[]; kind: "config" } | { kind: "mode"; modeId: string } | { kind: "usage"; usage: AgentUsage };
+
+/**
+ * A usage read that leaves out the cost takes the cost of the usage read it replaces, when that one had a cost; a read with a cost keeps its own.
+ */
+const withCarriedUsageCost = (previous: StartupRead[], read: Extract<StartupRead, { kind: "usage" }>): StartupRead => {
+    const earlier = previous.find((entry): entry is Extract<StartupRead, { kind: "usage" }> => entry.kind === "usage");
+
+    if (read.usage.cost !== undefined || earlier?.usage.cost === undefined) {
+        return read;
+    }
+
+    return { kind: "usage", usage: { ...read.usage, cost: earlier.usage.cost } };
+};
+
+/**
+ * Reads an update startup can use. Any other kind, and a malformed update (which changes nothing), reads as `undefined`, so it is
+ * never kept. The mode id is read with the same check the mode change applies, so a kept id is one it would apply.
+ */
+const startupReadOf = (update: Record<string, unknown>, scrub: (text: string) => string): StartupRead | undefined => {
+    if (update.sessionUpdate === "config_option_update") {
+        const configOptions = configOptionsOf(update.configOptions, scrub);
+
+        return configOptions === undefined ? undefined : { configOptions, kind: "config" };
+    }
+
+    if (update.sessionUpdate === "current_mode_update") {
+        const modeId = idOf(update.currentModeId, scrub);
+
+        return modeId === undefined ? undefined : { kind: "mode", modeId };
+    }
+
+    if (update.sessionUpdate === "usage_update") {
+        const usage = usageOf(update, scrub);
+
+        return usage === undefined ? undefined : { kind: "usage", usage };
+    }
+
+    return undefined;
+};
 
 export interface SessionOptions {
     agentKey: string;
@@ -170,17 +226,32 @@ export class AgentSession {
     /** What the agent reported at the handshake. Unset until it has. */
     private report: CapabilityReport | undefined;
 
-    /** The options the agent offers for this session (`agent-options.ts`); empty until it has said. */
-    private agentOptions: AgentOptions = {};
+    /** What the agent offers (its model, reasoning effort, mode ...), as it last said; unset until the session is open. */
+    private offered: RawOptions = {};
 
     /**
-     * Option updates that came before the agent's answer naming its session was handled: the update can follow the answer in
-     * the same read from the agent, before the session id is known here. At most a few are kept.
+     * The count of observed changes so far, and the count at which each option (or the legacy mode state) last changed. A change
+     * request is superseded only by a change of its own option, so an unrelated update does not refuse its answer, and an answer
+     * does not put back a value another option has since changed.
      */
-    private earlyOptionUpdates = new Map<string, Record<string, unknown>[]>();
+    private observed = 0;
 
-    /** What the backend was told when the session opened, kept so a change of the options can send it again. */
-    private opened: HostSessionInfo | undefined;
+    private readonly changedAt = new Map<string, number>();
+
+    /** Counts the changes asked for, by option (the legacy mode state is one): a late answer to an earlier change of an option does not replace a later one of it. */
+    private readonly optionRequests = new Map<string, number>();
+
+    /** Whether the startup updates are the saved session's (while it loads) or a fresh session's (once it is opened). */
+    private startupPhase: "loading" | "opening" = "opening";
+
+    /** The newest usage report sent before the session answered, reported once it has opened. */
+    private startupUsage: StartupUpdate | undefined;
+
+    /**
+     * What a fresh session's startup kept of the updates sent before its answer, per agent session id: the latest of each kind, in
+     * arrival order. Only the id the answer names counts (`openFresh`); the others are dropped then, and on a failed start.
+     */
+    private readonly startupReads = new Map<string, StartupRead[]>();
 
     /** What happened to the saved session the backend asked to load; unset when it asked for none. */
     private reattach: HostSessionInfo["reattach"];
@@ -221,13 +292,30 @@ export class AgentSession {
             this.agent = await initialize(this.connection, this.options.appVersion, this.options.startupTimeoutMs);
             this.report = this.options.capabilityReport?.(this.agent) ?? reportFromHandshake(this.agent.capabilities, Date.now());
             this.agentSessionId = await this.openAgentSession();
-            this.report = withOptionCapabilities(this.report, this.agentOptions, Date.now());
+
+            // A usage report the agent sent before its session answered reaches the meter now. Its session id is checked like any
+            // other update's, so a report from a failed load is not carried into this session.
+            const early = this.startupUsage;
+
+            this.startupUsage = undefined;
+
+            if (early !== undefined) {
+                this.onNotification(METHOD.sessionUpdate, early);
+            }
+
+            // What the agent offered is known now, so the report says whether it has models, reasoning effort and modes.
+            if (this.report !== undefined) {
+                this.report = withOptionCapabilities(this.report, resolveOptions(this.offered));
+            }
 
             // The agent can exit while the last answer is on its way; that session is over, not ready.
             if (this.status === "ended") {
                 throw new Error(this.endReason ?? "the agent ended during startup");
             }
         } catch (error) {
+            // A failed start keeps nothing it read before its answer.
+            this.startupReads.clear();
+            this.startupUsage = undefined;
             await this.exitStatus();
 
             const stderr = this.options.process.stderrTail().trim();
@@ -257,15 +345,105 @@ export class AgentSession {
             const opened = {
                 ...hostInfo,
                 nativeSessionId: this.agentSessionId,
-                options: this.agentOptions,
                 ...(this.report !== undefined && { capabilities: this.report }),
                 ...(this.fork !== undefined && { fork: this.fork }),
                 ...(this.reattach !== undefined && { reattach: this.reattach }),
             };
 
-            this.opened = opened;
             this.observe((observer) => observer.sessionOpened(this.id, opened, this.options.threadId));
         }
+
+        this.reportOptions();
+    }
+
+    /**
+     * A change asked for from the web or the phone. A mode can grant standing permissions, so it is changed on the computer only:
+     * the legacy mode state (no option id), an id the legacy mode state lists, and an option the agent reports as a mode are refused
+     * here, whatever the backend checked. An option filed under no category cannot be shown to be something else, so it is refused too.
+     */
+    public async setRemoteOption(optionId: string | undefined, valueId: string): Promise<void> {
+        const option = this.offered.configOptions?.find((candidate) => candidate.id === optionId);
+        const legacyMode = optionId !== undefined && this.offered.modes?.available.some((mode) => mode.id === optionId) === true;
+        const mode = option !== undefined && (option.category === undefined || option.category.toLowerCase() === "mode");
+
+        if (optionId === undefined || legacyMode || mode) {
+            throw new Error("a mode is changed on the computer, not from here");
+        }
+
+        await this.setOption(optionId, valueId);
+    }
+
+    /**
+     * Changes one of the agent's options for the backend's `acp_set_config`: `optionId` names a list option, and without it
+     * `valueId` is a mode of the legacy state. Only a value the agent itself offered is sent. Refuses with a fixed phrase,
+     * never with the agent's own words (they can quote its environment); the agent's answer is the confirmation.
+     */
+    public async setOption(optionId: string | undefined, valueId: string): Promise<void> {
+        if (this.status === "ended" || this.status === "starting") {
+            throw new Error("this session is not open");
+        }
+
+        if (!isOffered(this.offered, optionId, valueId)) {
+            throw new Error("the agent does not offer that choice");
+        }
+
+        let answer: unknown;
+        const since = this.observed;
+
+        const key = optionId === undefined ? "mode" : `option:${optionId}`;
+        const request = (this.optionRequests.get(key) ?? 0) + 1;
+
+        this.optionRequests.set(key, request);
+
+        // The timeout does not cancel the agent's request: an answer that arrives after it is applied here and reported, so what the
+        // person sees follows what the agent did.
+        const onLate = (late: unknown): void => {
+            // An answer older than a list the agent has sent since, or than a later change of this option, is not applied: that is what is
+            // true now.
+            if (this.status === "ended" || this.changedSince(key, since) || request !== this.optionRequests.get(key)) {
+                return;
+            }
+
+            this.applyOptionAnswer(optionId, valueId, late, since);
+            this.reportOptions();
+        };
+
+        try {
+            answer = optionId === undefined ? await setMode(this.connection, this.agentSessionId, valueId, undefined, onLate) : await setConfigOption(this.connection, this.agentSessionId, optionId, valueId, undefined, onLate);
+        } catch (error) {
+            // The agent's own words can quote its environment: only a fixed phrase leaves, and the cause stays out of it.
+            const timedOut = (error as Error).message === "the agent did not answer";
+
+            // eslint-disable-next-line preserve-caught-error -- the cause is the agent's own error
+            throw new Error(timedOut ? "the agent did not answer" : "the agent did not accept the change");
+        }
+
+        // A later change of this option was asked for while this one was outstanding: its answer is the newer one, so this answer is not
+        // applied, and this change is not reported as made (the same as a late answer to an older change, `onLate`).
+        if (request !== this.optionRequests.get(key)) {
+            throw new Error("the agent did not apply the change");
+        }
+
+        // The agent sent its own value for this option while the change was outstanding, and that value is newer than the answer: it
+        // stands. It must show the value asked for, or the change was not made.
+        if (this.changedSince(key, since)) {
+            this.reportOptions();
+
+            if (!this.showsValue(optionId, valueId)) {
+                throw new Error("the agent did not apply the change");
+            }
+
+            return;
+        }
+
+        // The agent's list is what is true now; if it still shows another value, the change was not made.
+        if (!this.applyOptionAnswer(optionId, valueId, answer, since)) {
+            this.reportOptions();
+
+            throw new Error("the agent did not apply the change");
+        }
+
+        this.reportOptions();
     }
 
     /** `turnId` is the id the backend gave the turn (`acp_send`): the turn keeps it, and the backend hears it was received. */
@@ -417,6 +595,106 @@ export class AgentSession {
         };
     }
 
+    /** Whether the option (`key`) changed after the count `since`, which a change request took when it was asked for. */
+    private changedSince(key: string, since: number): boolean {
+        return (this.changedAt.get(key) ?? 0) > since;
+    }
+
+    /** Counts a change of the option (`key`), so a request asked for before it knows it was superseded. */
+    private markChanged(key: string): void {
+        this.observed += 1;
+        this.changedAt.set(key, this.observed);
+    }
+
+    /**
+     * Counts a change for each option whose entry differs between two lists (its value, choices, name or category), an option added
+     * or removed included.
+     */
+    private markConfigChanges(previous: AgentOption[] | undefined, next: AgentOption[] | undefined): void {
+        const before = new Map((previous ?? []).map((option) => [option.id, JSON.stringify(option)]));
+        const after = new Map((next ?? []).map((option) => [option.id, JSON.stringify(option)]));
+
+        const ids = new Set([...before.keys(), ...after.keys()]);
+
+        for (const id of ids) {
+            if (before.get(id) !== after.get(id)) {
+                this.markChanged(`option:${id}`);
+            }
+        }
+    }
+
+    /**
+     * Applies the agent's answer to a change to what the session offers. False when the answer still shows another value. The answer
+     * lists every option, but a value another option changed after `since` is newer than the answer's copy of it (a late answer can
+     * arrive after the agent's own update), so that value stays.
+     */
+    private applyOptionAnswer(optionId: string | undefined, valueId: string, answer: unknown, since: number): boolean {
+        if (optionId === undefined) {
+            this.offered = withCurrentMode(this.offered, valueId, this.options.process.scrub);
+
+            return true;
+        }
+
+        // The answer lists every option with its new value; one that is not a list means only this value moved. A list that holds
+        // no usable option is not that: it confirms nothing, and what is offered stays as it was.
+        const sent = isRecord(answer) ? answer.configOptions : undefined;
+        const listed = configOptionsOf(sent, this.options.process.scrub);
+
+        if (sent !== undefined && listed === undefined) {
+            return false;
+        }
+
+        const previous = this.offered.configOptions ?? [];
+        const next = listed === undefined ? withOptionValue(this.offered, optionId, valueId).configOptions : this.merged(listed, previous, optionId, since);
+
+        this.markConfigChanges(previous, next);
+        this.offered = { ...this.offered, ...next !== undefined && { configOptions: next } };
+
+        return listed === undefined || listed.find((option) => option.id === optionId)?.currentValue === valueId;
+    }
+
+    /**
+     * The answer's full list, corrected by what the agent observed after `since`: the requested option takes the answer, and an
+     * option another observation changed keeps that newer entry, or is dropped when that observation removed it. An option that
+     * observation added, which the answer does not list, is kept.
+     */
+    private merged(listed: AgentOption[], previous: AgentOption[], optionId: string, since: number): AgentOption[] {
+        const newer = (id: string): boolean => this.changedSince(`option:${id}`, since);
+        const kept: AgentOption[] = [];
+        const listedIds = new Set<string>();
+
+        for (const option of listed) {
+            listedIds.add(option.id);
+
+            if (option.id === optionId || !newer(option.id)) {
+                kept.push(option);
+            } else {
+                const current = previous.find((entry) => entry.id === option.id);
+
+                if (current !== undefined) {
+                    kept.push(current);
+                }
+            }
+        }
+
+        for (const option of previous) {
+            if (!listedIds.has(option.id) && newer(option.id)) {
+                kept.push(option);
+            }
+        }
+
+        return kept;
+    }
+
+    /** Whether what the session offers now shows the value asked for. */
+    private showsValue(optionId: string | undefined, valueId: string): boolean {
+        if (optionId === undefined) {
+            return this.offered.modes?.current === valueId;
+        }
+
+        return this.offered.configOptions?.find((option) => option.id === optionId)?.currentValue === valueId;
+    }
+
     /** The agent's session: the saved one when asked for and loadable, else a new one (`reattach` says which, and why not). */
     private async openAgentSession(): Promise<string> {
         const { folder, forkSessionId, resumeSessionId, startupTimeoutMs } = this.options;
@@ -426,56 +704,55 @@ export class AgentSession {
         }
 
         if (resumeSessionId === undefined) {
-            return this.withEarlyUpdates(await newSession(this.connection, folder, startupTimeoutMs));
+            return await this.openFresh(folder, startupTimeoutMs);
         }
 
         // No `session/load` frame goes to an agent that did not say it loads them.
+        this.startupPhase = "loading";
+
         if (isAvailable(capabilityOf(this.report, "sessions.load"))) {
-            // Until the load is given up on: an answer that comes after its timeout must not touch the fallback session's updates.
-            let awaited = true;
-
             try {
-                // What came before the answer is the replayed history, dropped as the answer is read: the answer holds the options
-                // as they are then. An update read after it, before the session's id is known here, is kept and applied.
-                const answer = await loadSession(this.connection, resumeSessionId, folder, undefined, () => {
-                    if (awaited) {
-                        this.earlyOptionUpdates.clear();
-                    }
-                });
-
+                // The answer is the agent's current state. What it sent while the session loaded is the history it replayed, so it
+                // is not carried over: an option the answer does not name is not offered.
+                this.offered = optionsOf(await loadSession(this.connection, resumeSessionId, folder), this.options.process.scrub);
                 this.reattach = { loaded: true };
 
-                return this.withEarlyUpdates({ answer, sessionId: resumeSessionId });
+                return resumeSessionId;
             } catch {
-                awaited = false;
                 // The agent's own error can quote its environment: the backend is told that it failed (a code), not its text.
                 this.reattach = { loaded: false, reason: "load_failed" };
+                this.offered = {};
+                // What the failed load read is not the fresh session's: its buffered usage is dropped, not carried into it.
+                this.startupUsage = undefined;
             }
         } else {
             this.reattach = { loaded: false, reason: "load_unsupported" };
         }
 
-        // A failed load's replay must not fill the room the new session's own early updates need.
-        this.earlyOptionUpdates.clear();
+        this.startupPhase = "opening";
 
-        return this.withEarlyUpdates(await newSession(this.connection, folder, startupTimeoutMs));
+        return await this.openFresh(folder, startupTimeoutMs);
     }
 
-    /** A new or forked session's options: its answer's, then any update for it that came before the answer was handled. */
-    private withEarlyUpdates(opened: { answer: unknown; sessionId: string }): string {
-        const { scrub } = this.options.process;
-        let options = optionsOf(opened.answer, scrub);
+    private async openFresh(folder: string, timeoutMs?: number): Promise<string> {
+        const { response, sessionId } = await openNewSession(this.connection, folder, timeoutMs);
 
-        const early = this.earlyOptionUpdates.get(opened.sessionId) ?? [];
+        return this.adoptOpened(sessionId, response);
+    }
 
-        for (const update of early) {
-            options = applyOptionsUpdate(options, update, scrub) ?? options;
+    /** A fresh or forked session's answer: its options, with what the agent sent for the session before the answer (older, so the answer wins). */
+    private adoptOpened(sessionId: string, answer: Record<string, unknown>): string {
+        const reads = this.startupReads.get(sessionId) ?? [];
+
+        this.startupReads.clear();
+
+        for (const read of reads) {
+            this.applyStartupRead(sessionId, read);
         }
 
-        this.agentOptions = options;
-        this.earlyOptionUpdates.clear();
+        this.offered = { ...this.offered, ...optionsOf(answer, this.options.process.scrub) };
 
-        return opened.sessionId;
+        return sessionId;
     }
 
     /** A fork of the agent's session `source` when it said it forks them, else a new session (`fork` says which, and why not). */
@@ -494,7 +771,7 @@ export class AgentSession {
 
                 this.fork = { forked: true };
 
-                return this.withEarlyUpdates(forked);
+                return this.adoptOpened(forked.sessionId, forked.answer);
             } catch {
                 // The agent's own error can quote its environment: the backend is told that it failed (a code), not its text.
                 this.fork = { forked: false, reason: "fork_failed" };
@@ -503,7 +780,55 @@ export class AgentSession {
             this.fork = { forked: false, reason: "fork_unsupported" };
         }
 
-        return this.withEarlyUpdates(await newSession(this.connection, folder, startupTimeoutMs));
+        return await this.openFresh(folder, startupTimeoutMs);
+    }
+
+    /** Applies one update startup kept: an option list or mode is taken now, and the newest valid usage report is kept for `start` to report. */
+    private applyStartupRead(sessionId: string, read: StartupRead): void {
+        if (read.kind === "config") {
+            this.offered = { ...this.offered, configOptions: read.configOptions };
+        } else if (read.kind === "mode") {
+            this.offered = withCurrentMode(this.offered, read.modeId, this.options.process.scrub);
+        } else {
+            // The cost is cumulative: a report that leaves it out keeps the cost the buffered report carried, as `retainStartupRead` does.
+            // Only a buffered report of this same session counts: a failed load's cost is not the fresh session's.
+            const buffered = this.startupUsage?.sessionId === sessionId ? this.startupUsage.update.cost : undefined;
+            const cost: unknown = read.usage.cost ?? buffered;
+
+            this.startupUsage = { sessionId, update: { sessionUpdate: "usage_update", ...read.usage, ...(cost !== undefined && { cost }) } };
+        }
+    }
+
+    /**
+     * Keeps one read for a fresh session, whose id is not known yet. A newer read of the same kind for the same id replaces the older
+     * one (only the latest counts), and the ids are capped: the most recently updated ones stay.
+     */
+    private retainStartupRead(sessionId: string, read: StartupRead): void {
+        const previous = this.startupReads.get(sessionId) ?? [];
+        // The agent's cost is cumulative: a usage report that leaves it out keeps the cost reported before it, as the live path does.
+        const carried = read.kind === "usage" ? withCarriedUsageCost(previous, read) : read;
+        const kept = previous.filter((entry) => entry.kind !== read.kind);
+
+        this.startupReads.delete(sessionId);
+
+        if (this.startupReads.size >= MAX_STARTUP_SESSIONS) {
+            const [oldest] = this.startupReads.keys();
+
+            if (oldest !== undefined) {
+                this.startupReads.delete(oldest);
+            }
+        }
+
+        this.startupReads.set(sessionId, [...kept, carried]);
+    }
+
+    /** Tells the backend what the agent offers now (it keeps the newest of each field and sends them in one post). */
+    private reportOptions(): void {
+        const options = resolveOptions(this.offered);
+
+        if (Object.keys(options).length > 0) {
+            this.observe((observer) => observer.sessionState?.(this.id, options));
+        }
     }
 
     /** Drops the prompts still waiting. The ones the backend queued are told their turn was cancelled, so no stream waits on them. */
@@ -723,29 +1048,6 @@ export class AgentSession {
         this.options.onChange();
     }
 
-    /** The agent changed its options: kept, and once the backend knows the session, sent to it again with a newer report. */
-    private onOptionsUpdate(update: Record<string, unknown>): void {
-        const next = applyOptionsUpdate(this.agentOptions, update, this.options.process.scrub);
-
-        if (next === undefined) {
-            return;
-        }
-
-        this.agentOptions = next;
-
-        if (this.report === undefined || this.opened === undefined) {
-            return;
-        }
-
-        // Strictly newer than the report before it: the backend keeps a report only over an older one.
-        this.report = withOptionCapabilities(this.report, next, Math.max(Date.now(), this.report.reportedAt + 1));
-
-        const opened: HostSessionInfo = { ...this.opened, capabilities: this.report, options: next };
-
-        this.opened = opened;
-        this.observe((observer) => observer.sessionUpdated?.(this.id, opened));
-    }
-
     // ─── To the observer ───────────────────────────────────────────────────
 
     /** Persistence never changes what the session does: an observer that throws is ignored. */
@@ -878,38 +1180,37 @@ export class AgentSession {
 
     // ─── From the agent ────────────────────────────────────────────────────
 
-    /** An option update read before the session's id is known here (`withEarlyUpdates` applies it once the answer is handled). */
-    private keepEarly(sessionId: unknown, update: Record<string, unknown>): void {
-        const kind = update.sessionUpdate;
+    /**
+     * An update that arrives while the session opens, before its id is known. While the saved session loads, its id is known and only
+     * its updates count. A fresh session's id is known only once it answers, so its updates wait for that (`openFresh`).
+     */
+    private takeStartupUpdate(params: Record<string, unknown>): void {
+        if (!isRecord(params.update) || typeof params.sessionId !== "string") {
+            return;
+        }
 
-        // Coalesced per session (`keepEarlyUpdate`), so nothing that matters is lost however many arrive. At most a few sessions
-        // are kept, the newest: a slow load's replay cannot crowd out a fallback session's own updates.
-        if (typeof sessionId === "string" && (kind === "config_option_update" || kind === "current_mode_update")) {
-            const before = this.earlyOptionUpdates.get(sessionId) ?? [];
-            const kept = keepEarlyUpdate(before, update, this.options.process.scrub);
+        // Only the kinds startup uses, and only the ones it can read, are kept; anything else is dropped as it arrives.
+        const read = startupReadOf(params.update, this.options.process.scrub);
 
-            // An update that changes nothing leaves the map alone: it must not push out a session that holds real updates.
-            if (kept === before) {
-                return;
-            }
+        if (read === undefined) {
+            return;
+        }
 
-            this.earlyOptionUpdates.delete(sessionId);
-            this.earlyOptionUpdates.set(sessionId, kept);
+        if (this.startupPhase !== "loading") {
+            this.retainStartupRead(params.sessionId, read);
 
-            // A map keeps insertion order, and deleting while iterating is safe: the oldest go first.
-            for (const key of this.earlyOptionUpdates.keys()) {
-                if (this.earlyOptionUpdates.size <= 4) {
-                    break;
-                }
+            return;
+        }
 
-                this.earlyOptionUpdates.delete(key);
-            }
+        if (params.sessionId === this.options.resumeSessionId) {
+            this.applyStartupRead(params.sessionId, read);
         }
     }
 
     private onNotification(method: string, params: unknown): void {
-        if (method === METHOD.sessionUpdate && this.agentSessionId === "" && isRecord(params) && isRecord(params.update)) {
-            this.keepEarly(params.sessionId, params.update);
+        // While the session opens its id is not known yet, and an agent may send its options before it answers.
+        if (this.agentSessionId === "" && this.status === "starting" && method === METHOD.sessionUpdate && isRecord(params) && isRecord(params.update)) {
+            this.takeStartupUpdate(params);
 
             return;
         }
@@ -940,9 +1241,28 @@ export class AgentSession {
                 this.observeDelta(turn, "thought", false);
                 break;
             }
-            case "config_option_update":
+            case "config_option_update": {
+                const configOptions = configOptionsOf(update.configOptions, this.options.process.scrub);
+
+                if (configOptions !== undefined) {
+                    this.markConfigChanges(this.offered.configOptions, configOptions);
+                    this.offered = { ...this.offered, configOptions };
+                    this.reportOptions();
+                }
+
+                return;
+            }
             case "current_mode_update": {
-                this.onOptionsUpdate(update);
+                const offered = withCurrentMode(this.offered, update.currentModeId, this.options.process.scrub);
+
+                // A mode id the agent did not name validly changes nothing, so it does not supersede a change in flight.
+                if (offered !== this.offered) {
+                    // A mode option among the agent's options moved too, so an answer that lists it earlier must not put it back.
+                    this.markConfigChanges(this.offered.configOptions, offered.configOptions);
+                    this.offered = offered;
+                    this.markChanged("mode");
+                    this.reportOptions();
+                }
 
                 return;
             }
@@ -950,6 +1270,16 @@ export class AgentSession {
             case "tool_call_update": {
                 this.upsertTool(turn, update);
                 break;
+            }
+            case "usage_update": {
+                // Not the window's business: the usage goes to the backend, which shows it in the thread's context meter.
+                const usage = usageOf(update, this.options.process.scrub);
+
+                if (usage !== undefined) {
+                    this.observe((observer) => observer.sessionState?.(this.id, { usage }));
+                }
+
+                return;
             }
             default: {
                 return;

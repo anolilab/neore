@@ -87,3 +87,97 @@ export const addApprovalChainSource = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/** The options a row stored under `agentOptions` (the read path that is retired), in its own shape. */
+interface LegacyAgentOptions {
+    configOptions?: { category?: string; choices: { name: string; value: string }[]; currentValue: string; id: string; name: string }[];
+    modes?: { available: { name: string; value: string }[]; current: string };
+}
+
+/**
+ * The agent's options moved to the state the session row holds now (`agentState`, `optionResult`). A row that stored
+ * `agentOptions` keeps them: they fill the fields its `agentState` lacks (its `agentOptionsAt` the state's time, when it has
+ * no `agentStateAt`). A field the state already holds is newer and stands, empty lists included. Then `agentOptions` and
+ * `agentOptionsAt` are dropped, since the schema no longer declares them.
+ */
+export const dropAgentOptionFields = defineMigration({
+    id: "drop-agent-option-fields",
+    table: "acpSessions",
+    up: (document) => {
+        const row: Record<string, unknown> = { ...document };
+        const legacy = row.agentOptions as LegacyAgentOptions | undefined;
+
+        if (legacy !== undefined) {
+            const legacyState = {
+                ...(legacy.configOptions !== undefined && { configOptions: legacy.configOptions }),
+                ...(legacy.modes !== undefined && {
+                    modes: {
+                        available: legacy.modes.available.map((mode) => {
+                            return { id: mode.value, name: mode.name };
+                        }),
+                        current: legacy.modes.current,
+                    },
+                }),
+            };
+            // A usage-only state keeps no options, so the legacy ones are its only copy: they fill only the fields it lacks.
+            const agentState = { ...legacyState, ...(row.agentState as Record<string, unknown> | undefined) };
+
+            if (Object.keys(agentState).length > 0) {
+                row.agentState = agentState;
+
+                if (row.agentStateAt === undefined && typeof row.agentOptionsAt === "number") {
+                    row.agentStateAt = row.agentOptionsAt;
+                }
+            }
+        }
+
+        delete row.agentOptions;
+        delete row.agentOptionsAt;
+
+        return row as typeof document;
+    },
+});
+
+/** The event #580 posted for a session's options (`session_options`), as a stored chunk still holds it. */
+type LegacySessionOptions = {
+    kind: "session_options";
+    options?: {
+        configOptions?: unknown[];
+        modes?: { available: { name: string; value: string }[]; current: string };
+    };
+};
+
+/**
+ * A stored `session_options` chunk becomes the `session_state` event that carries the same options now. Its option lists keep
+ * their shape. A mode's identifier is `id` in `session_state` (`value` in the old list). The old event held no time, so the
+ * chunk's creation time stands in for it. Chunks of other events are left as they are.
+ */
+export const sessionOptionsToSessionState = defineMigration({
+    id: "session-options-to-session-state",
+    table: "persistentChunks",
+    up: (document) => {
+        const { _creationTime: created, event } = document as unknown as { _creationTime?: number; event?: LegacySessionOptions | { kind: string } };
+
+        if (event === undefined || event.kind !== "session_options") {
+            return undefined;
+        }
+
+        const { options = {} } = event as LegacySessionOptions;
+        const { modes } = options;
+        const converted = {
+            at: typeof created === "number" ? created : 0,
+            kind: "session_state",
+            ...(options.configOptions !== undefined && { configOptions: options.configOptions }),
+            ...(modes !== undefined && {
+                modes: {
+                    available: modes.available.map((mode) => {
+                        return { id: mode.value, name: mode.name };
+                    }),
+                    current: modes.current,
+                },
+            }),
+        };
+
+        return { ...document, event: converted } as typeof document;
+    },
+});

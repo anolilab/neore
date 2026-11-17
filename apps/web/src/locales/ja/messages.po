@@ -582,6 +582,13 @@ msgstr "{0} / {1}"
 msgid "{0} of {1} (latest messages only)"
 msgstr "{0} / {1}（最新のメッセージのみ）"
 
+#. placeholder {0}: formatTokenCount(usedTokens, i18n.locale)
+#. placeholder {1}: formatTokenCount(contextWindow, i18n.locale)
+#. placeholder {2}: formatPercent(percentage, i18n.locale)
+#: src/features/chat/thread/context-usage-meter.tsx:118
+msgid "{0} of {1} {usedTokens, plural, one {token used} other {tokens used}} ({2}%)"
+msgstr "{0} / {1} トークンを使用 ({2}%)"
+
 #. placeholder {0}: String(run.nextIndex)
 #. placeholder {1}: String(run.caseCount)
 #: src/features/evals/components/run-detail.tsx:204
@@ -604,8 +611,8 @@ msgstr "{1} 件中 {0} 件のタスクが完了"
 #. placeholder {1}: formatTokenCount(contextWindow)
 #. placeholder {2}: percentage.toFixed(1)
 #: src/features/chat/thread/composer-context-count.tsx:118
-msgid "{0} of {1} tokens used ({2}%)"
-msgstr "{1} トークン中 {0} トークン使用（{2}%）"
+#~ msgid "{0} of {1} tokens used ({2}%)"
+#~ msgstr "{1} トークン中 {0} トークン使用（{2}%）"
 
 #. placeholder {0}: parallelSelectedIds.size
 #: src/components/model-picker/model-picker.tsx:1392
@@ -625,7 +632,7 @@ msgstr "{0} / {maxReferences} 個を選択中"
 #. placeholder {0}: offer.agentLabel
 #. placeholder {1}: offer.deviceName
 #. placeholder {2}: offer.folderLabel
-#: src/features/develop/components/guide-tab.tsx:180
+#: src/features/develop/components/guide-tab.tsx:181
 msgid "{0} on {1}, in {2}"
 msgstr "{2} の {1} 上の {0}"
 
@@ -708,6 +715,12 @@ msgstr "{0} を再開しました。"
 #: src/features/skills/components/bundle-export-dialog.tsx:199
 msgid "{0}, {1} participants. Its participants are included as skills."
 msgstr "{0}、参加者 {1} 人。参加者はスキルとして含まれます。"
+
+#. placeholder {0}: formatTokenCount(usedTokens, i18n.locale)
+#. placeholder {1}: formatTokenCount(contextWindow, i18n.locale)
+#: src/features/chat/thread/context-usage-meter.tsx:77
+msgid "{0}/{1} {usedTokens, plural, one {token used} other {tokens used}} ({percent}%)"
+msgstr ""
 
 #. placeholder {0}: String(percent)
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:113
@@ -973,7 +986,7 @@ msgid "{hostLabel} is not connected."
 msgstr "{hostLabel} に接続されていません。"
 
 #. placeholder {0}: current.leftOut
-#: src/features/develop/components/guide-tab.tsx:223
+#: src/features/develop/components/guide-tab.tsx:224
 msgid "{hostLabel} lists only part of this change; {0} files are not in the guide."
 msgstr "{hostLabel} はこの変更の一部しか一覧に表示していません。{0} 個のファイルはガイドに含まれていません。"
 
@@ -1794,7 +1807,7 @@ msgstr "ゲストのメッセージは目標として送信できません。"
 msgid "A guest's message is sent through a hosted model only. Pick one and send it again."
 msgstr "ゲストのメッセージはホスト型モデルでのみ送信されます。モデルを選んでもう一度送信してください。"
 
-#: src/features/develop/components/guide-tab.tsx:101
+#: src/features/develop/components/guide-tab.tsx:102
 msgid "A guide for this {requestNoun} is already being written."
 msgstr "この{requestNoun}のガイドはすでに作成中です。"
 
@@ -1817,6 +1830,10 @@ msgstr "ロックされたチャットにはゲストリンクを作成できま
 
 #: src/features/marketing/use-cases/visuals/messaging-visual.tsx:14
 msgid "A message arrives from a chat app, a dot travels down to the agent, and the reply appears in the same chat."
+msgstr ""
+
+#: src/features/chat/host/host-options.tsx:225
+msgid "a mode is changed on the computer, not from here"
 msgstr ""
 
 #: src/features/evals/components/run-dialog.tsx:176
@@ -2569,7 +2586,7 @@ msgstr "スレッドに追加しました"
 msgid "Added to your review"
 msgstr "自分のレビューに追加しました"
 
-#: src/features/develop/components/guide-tab.tsx:129
+#: src/features/develop/components/guide-tab.tsx:130
 msgid "Added to your review. Nothing is posted until you submit the review."
 msgstr "自分のレビューに追加しました。レビューを送信するまで何も投稿されません。"
 
@@ -2874,7 +2891,7 @@ msgstr "エージェント機能"
 msgid "Agent Modules"
 msgstr "エージェントモジュール"
 
-#: src/features/chat/host/host-options.tsx:39
+#: src/features/chat/host/host-options.tsx:316
 msgid "Agent options"
 msgstr "エージェントのオプション"
 
@@ -3316,7 +3333,7 @@ msgstr "1 時間許可"
 msgid "Allow for today"
 msgstr "今日は許可"
 
-#: src/features/chat/host/host-composer.tsx:161
+#: src/features/chat/host/host-composer.tsx:163
 msgid "Allow once"
 msgstr "一度だけ許可"
 
@@ -5514,7 +5531,7 @@ msgstr "カナダ"
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
 #: src/features/chat/host/diff-comment-form.tsx:81
-#: src/features/chat/host/host-composer.tsx:856
+#: src/features/chat/host/host-composer.tsx:859
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
 #: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
 #: src/features/chat/pins/pin-item.tsx:283
@@ -6072,7 +6089,7 @@ msgstr "画像の安全性を確認しています..."
 msgid "Checking the code…"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:1017
+#: src/features/chat/host/host-composer.tsx:1036
 msgid "Checking whether a message sent now interrupts the reply or waits behind it."
 msgstr "今送信するメッセージが返信を中断するか、その後ろで待つかを確認しています。"
 
@@ -7754,7 +7771,7 @@ msgstr "コンテキスト"
 msgid "Context / Instructions"
 msgstr "コンテキスト / 指示"
 
-#: src/features/chat/thread/composer-context-count.tsx:125
+#: src/features/chat/thread/context-usage-meter.tsx:125
 msgid "Context nearly full. Consider starting a new conversation."
 msgstr "コンテキストがほぼいっぱいです。新しい会話を始めることをおすすめします。"
 
@@ -7772,15 +7789,15 @@ msgid "Context that never resets"
 msgstr "リセットされないコンテキスト"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:197
-#: src/features/chat/thread/composer-context-count.tsx:116
+#: src/features/chat/thread/context-usage-meter.tsx:116
 msgid "Context Usage"
 msgstr "コンテキスト使用量"
 
-#: src/features/chat/thread/composer-context-count.tsx:127
+#: src/features/chat/thread/context-usage-meter.tsx:127
 msgid "Context usage is high."
 msgstr "コンテキスト使用量が多くなっています。"
 
-#: src/features/chat/thread/composer-context-count.tsx:122
+#: src/features/chat/thread/context-usage-meter.tsx:122
 msgid "Context window is full. Start a new conversation to continue."
 msgstr "コンテキストウィンドウがいっぱいです。続けるには新しい会話を始めてください。"
 
@@ -7794,7 +7811,7 @@ msgstr "コンテキストを考慮した生成"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
 #: src/features/auth/components/device-code-parts.tsx:189
-#: src/features/chat/host/host-composer.tsx:808
+#: src/features/chat/host/host-composer.tsx:811
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "続行"
@@ -7811,7 +7828,7 @@ msgstr "中断された返信を続ける"
 msgid "Continue the same thread"
 msgstr "同じスレッドで続ける"
 
-#: src/features/chat/host/host-composer.tsx:802
+#: src/features/chat/host/host-composer.tsx:805
 msgid "Continue where you left off."
 msgstr "前回の続きから再開します。"
 
@@ -8177,6 +8194,11 @@ msgstr "モデル別のコスト"
 msgid "Cost cap (USD)"
 msgstr "コスト上限（USD）"
 
+#. placeholder {0}: formatReportedCost(usage.cost, i18n.locale)
+#: src/features/chat/host/host-composer.tsx:956
+msgid "Cost reported by the agent: {0}"
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:1145
 msgid "Cost-effective chain-of-thought capability"
 msgstr "コスト効率の良い思考の連鎖機能"
@@ -8523,7 +8545,7 @@ msgstr "{0} を取得できませんでした：{1}"
 msgid "Could not reach the server to start generating. Check your connection and try again."
 msgstr "生成を開始するためにサーバーに接続できませんでした。接続を確認して、もう一度お試しください。"
 
-#: src/features/chat/host/host-send-errors.ts:23
+#: src/features/chat/host/host-send-errors.ts:25
 msgid "Could not reach the server. Try again."
 msgstr "サーバーに接続できませんでした。もう一度お試しください。"
 
@@ -8607,11 +8629,15 @@ msgstr "要約を保存できなかったため、何も送信されていませ
 msgid "Could not save this. Try again."
 msgstr "保存できませんでした。もう一度お試しください。"
 
+#: src/features/chat/host/host-options.tsx:253
+msgid "Could not send the change."
+msgstr ""
+
 #: src/features/sub-agents/components/worker-composer.tsx:69
 msgid "Could not send the message."
 msgstr "メッセージを送信できませんでした。"
 
-#: src/features/chat/host/host-composer.tsx:760
+#: src/features/chat/host/host-composer.tsx:763
 msgid "Could not send your answer."
 msgstr "回答を送信できませんでした。"
 
@@ -8658,7 +8684,7 @@ msgstr "会話を停止できませんでした"
 msgid "Could not stop the reply. Please try again."
 msgstr "返信を停止できませんでした。もう一度お試しください。"
 
-#: src/features/chat/host/host-composer.tsx:317
+#: src/features/chat/host/host-composer.tsx:319
 msgid "Could not stop the reply. Your message is queued; send it next when you are ready."
 msgstr "返信を停止できませんでした。メッセージはキューに入っています。準備ができたら次に送信してください。"
 
@@ -9475,7 +9501,7 @@ msgstr "{0} ラウンドにわたって討論します。"
 msgid "Debug an error or review my code..."
 msgstr "エラーのデバッグやコードレビューなど..."
 
-#: src/features/chat/host/host-composer.tsx:166
+#: src/features/chat/host/host-composer.tsx:168
 #: src/features/chat/thread/request-secret-prompt.tsx:494
 msgid "Decline"
 msgstr "拒否"
@@ -11198,7 +11224,7 @@ msgstr "エッジに沿った生成"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:141
 #: src/features/canvas/canvas-panel.tsx:767
-#: src/features/chat/host/host-composer.tsx:899
+#: src/features/chat/host/host-composer.tsx:902
 #: src/features/chat/thread-list/group-header.tsx:138
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
 #: src/features/chat/thread/message-item.tsx:396
@@ -11322,12 +11348,12 @@ msgstr "プロンプトを編集"
 msgid "Edit Provider"
 msgstr "プロバイダーを編集"
 
-#: src/features/chat/host/host-composer.tsx:823
+#: src/features/chat/host/host-composer.tsx:826
 msgid "Edit queued message"
 msgstr "キューのメッセージを編集"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:892
+#: src/features/chat/host/host-composer.tsx:895
 msgid "Edit queued message {0}"
 msgstr "キューのメッセージ {0} を編集"
 
@@ -14488,7 +14514,7 @@ msgstr "例：「Python のベストプラクティスを重視する」「プ�
 msgid "For example: \"Keep titles under four words\", \"Write titles in German\", or \"Start with a verb\"."
 msgstr "例：「タイトルは 4 語以内にする」「タイトルはドイツ語で書く」「動詞で始める」。"
 
-#: src/features/develop/components/guide-tab.tsx:160
+#: src/features/develop/components/guide-tab.tsx:161
 msgid "For example: look hard at error handling, skip the generated files."
 msgstr "例：エラー処理を重点的に確認し、生成されたファイルは省略する。"
 
@@ -16008,7 +16034,7 @@ msgstr ""
 msgid "Here they are: planning, budget and next steps."
 msgstr "計画、予算、今後のステップについては次のとおりです。"
 
-#: src/features/chat/host/host-composer.tsx:980
+#: src/features/chat/host/host-composer.tsx:999
 msgid "Hidden characters were removed from your message."
 msgstr "メッセージから非表示の文字を削除しました。"
 
@@ -16930,7 +16956,7 @@ msgid "in {0, plural, one {# file} other {# files}}"
 msgstr "{0, plural, other {# 個のファイル}}内"
 
 #. placeholder {0}: request.folder
-#: src/features/chat/host/host-composer.tsx:152
+#: src/features/chat/host/host-composer.tsx:154
 msgid "In {0}"
 msgstr "{0} 内"
 
@@ -17268,8 +17294,8 @@ msgstr "中断して再開"
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr "中断して再開 — 現在の返信を停止して、これを送信します"
 
-#: src/features/chat/host/host-composer.tsx:690
-#: src/features/chat/host/host-composer.tsx:1003
+#: src/features/chat/host/host-composer.tsx:693
+#: src/features/chat/host/host-composer.tsx:1022
 msgid "Interrupt and send"
 msgstr "中断して送信"
 
@@ -17506,7 +17532,7 @@ msgstr "課題が割り当てられました"
 msgid "Issue tracking and project management"
 msgstr "課題管理とプロジェクト管理"
 
-#: src/features/develop/components/guide-tab.tsx:98
+#: src/features/develop/components/guide-tab.tsx:99
 msgid "It does not exist, or your {hostLabel} account cannot see it."
 msgstr "存在しないか、お使いの {hostLabel} アカウントでは表示できません。"
 
@@ -19877,7 +19903,7 @@ msgstr "メッセージ入力"
 msgid "Message selection"
 msgstr "メッセージの選択"
 
-#: src/features/chat/host/host-composer.tsx:995
+#: src/features/chat/host/host-composer.tsx:1014
 msgid "Message the agent on your computer"
 msgstr "お使いのコンピュータ上のエージェントにメッセージを送る"
 
@@ -19889,7 +19915,7 @@ msgstr "ワーカーにメッセージを送る"
 msgid "Message the worker..."
 msgstr "ワーカーにメッセージを送る..."
 
-#: src/features/chat/host/host-composer.tsx:954
+#: src/features/chat/host/host-composer.tsx:973
 msgid "Message to the coding agent"
 msgstr "コーディングエージェントへのメッセージ"
 
@@ -20201,7 +20227,7 @@ msgstr "月"
 msgid "Mobile app icon"
 msgstr "モバイルアプリアイコン"
 
-#: src/features/chat/host/host-options.tsx:32
+#: src/features/chat/host/host-options.tsx:144
 #: src/features/chat/thread/composer.tsx:222
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
@@ -20220,6 +20246,7 @@ msgstr "モード {0}、{1} 上。作成しても何も開始されません。"
 msgid "Mode:"
 msgstr "モード:"
 
+#: src/features/chat/host/host-options.tsx:144
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
@@ -20300,7 +20327,7 @@ msgstr "モデルタブ"
 
 #. placeholder {0}: modelDefinition.name
 #. placeholder {0}: selectedModel?.name || model
-#: src/features/chat/thread/composer-context-count.tsx:120
+#: src/features/chat/thread/composer-context-count.tsx:35
 #: src/features/prompts/components/prompt-form-dialog.tsx:450
 msgid "Model: {0}"
 msgstr "モデル：{0}"
@@ -21104,7 +21131,7 @@ msgstr "Neore はこれらを最新の状態に保ち、誰かがあなたにレ
 msgid "Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on."
 msgstr "このコンピュータの Neore は古いため、エージェントが使用できません。再び有効にするには、そこでアプリを更新してください。"
 
-#: src/features/chat/host/host-send-errors.ts:17
+#: src/features/chat/host/host-send-errors.ts:19
 msgid "Neore on your computer is out of date. Update it, then try again."
 msgstr "お使いのコンピュータの Neore が古くなっています。更新してから、もう一度お試しください。"
 
@@ -21116,7 +21143,7 @@ msgstr ""
 msgid "Neore version not reported"
 msgstr "Neore のバージョンが報告されていません"
 
-#: src/features/develop/components/guide-tab.tsx:173
+#: src/features/develop/components/guide-tab.tsx:174
 msgid "Neore, from the diff"
 msgstr "Neore（差分から）"
 
@@ -21519,6 +21546,10 @@ msgstr "アクティブなセッションが見つかりません。もう一度
 msgid "No additional users have access to this thread."
 msgstr "このスレッドにアクセスできる他のユーザーはいません。"
 
+#: src/features/chat/host/host-options.tsx:304
+msgid "No answer came for the change to {changeName}. Check the agent before changing it again."
+msgstr ""
+
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:31
 msgid "No aperture selected"
 msgstr "絞りが選択されていません"
@@ -21705,7 +21736,7 @@ msgstr "焦点距離が選択されていません"
 msgid "No goal"
 msgstr "目標なし"
 
-#: src/features/develop/components/guide-tab.tsx:209
+#: src/features/develop/components/guide-tab.tsx:210
 msgid "No guide"
 msgstr "ガイドなし"
 
@@ -22834,7 +22865,7 @@ msgstr "ここから追加できるのは、チャットの所有者のみです
 msgid "Only the owner of a chat can compact it."
 msgstr "チャットを圧縮できるのは所有者のみです。"
 
-#: src/features/chat/context-reset/use-clear-context.ts:71
+#: src/features/chat/context-reset/use-clear-context.ts:73
 msgid "Only the owner of a chat can start a new context."
 msgstr "新しいコンテキストを開始できるのはチャットの所有者だけです。"
 
@@ -23125,7 +23156,7 @@ msgstr "タスクを開く"
 msgid "Open terminal"
 msgstr "ターミナルを開く"
 
-#: src/features/develop/components/guide-tab.tsx:201
+#: src/features/develop/components/guide-tab.tsx:202
 msgid "Open the agent's conversation"
 msgstr "エージェントの会話を開く"
 
@@ -24382,7 +24413,7 @@ msgstr ""
 msgid "Permission mode: {0}"
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:773
+#: src/features/chat/host/host-composer.tsx:776
 msgid "Permission requests from the agent"
 msgstr "エージェントからの権限リクエスト"
 
@@ -25842,7 +25873,7 @@ msgstr "使用状況の分析とコストを照会"
 msgid "Question"
 msgstr "質問"
 
-#: src/features/chat/host/host-composer.tsx:692
+#: src/features/chat/host/host-composer.tsx:695
 msgid "Queue"
 msgstr "キュー"
 
@@ -25864,16 +25895,16 @@ msgstr "メッセージを待機列に追加 — 現在の返信が終わると�
 msgid "Queued"
 msgstr "待機中"
 
-#: src/features/chat/host/host-composer.tsx:351
+#: src/features/chat/host/host-composer.tsx:354
 #: src/features/chat/thread/composer-prompt-queue.tsx:774
 msgid "Queued messages"
 msgstr "待機中のメッセージ"
 
-#: src/features/chat/host/host-composer.tsx:943
+#: src/features/chat/host/host-composer.tsx:946
 msgid "Queued messages go out in order once the reply ends."
 msgstr "キュー内のメッセージは、返信が終わると順番に送信されます。"
 
-#: src/features/chat/host/host-composer.tsx:354
+#: src/features/chat/host/host-composer.tsx:357
 msgid "Queued messages: {queuedTotal}"
 msgstr "待機中のメッセージ: {queuedTotal}"
 
@@ -26759,7 +26790,7 @@ msgstr "サインイン状態を保持"
 
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:195
 #: ../../packages/ui/src/components/combobox.tsx:304
-#: src/features/chat/host/host-composer.tsx:917
+#: src/features/chat/host/host-composer.tsx:920
 #: src/features/chat/sharing/thread-share-button.tsx:300
 #: src/features/chat/sharing/thread-share-button.tsx:372
 #: src/features/chat/thread/composer-input.tsx:342
@@ -26947,7 +26978,7 @@ msgid "Remove provider?"
 msgstr "プロバイダーを削除しますか？"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:903
+#: src/features/chat/host/host-composer.tsx:906
 msgid "Remove queued message {0}"
 msgstr "キューのメッセージ {0} を削除"
 
@@ -27501,7 +27532,7 @@ msgstr "検索：ヒット {0} · MRR {1} · 適合率 {2} · 再現率 {3}"
 msgid "retry"
 msgstr "再試行"
 
-#: src/features/chat/host/host-composer.tsx:932
+#: src/features/chat/host/host-composer.tsx:935
 #: src/features/chat/thread/chat-error.tsx:56
 #: src/features/chat/thread/request-secret-prompt.tsx:475
 #: src/features/chat/translation/message-translation.tsx:88
@@ -28111,7 +28142,7 @@ msgstr "サウジアラビア"
 #: src/features/auth/components/settings/security/change-email-card.tsx:135
 #: src/features/auth/components/settings/security/change-password-card.tsx:248
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
-#: src/features/chat/host/host-composer.tsx:845
+#: src/features/chat/host/host-composer.tsx:848
 #: src/features/chat/pins/pin-item.tsx:284
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:181
@@ -28981,7 +29012,7 @@ msgid "Semi-realistic visual style"
 msgstr "セミリアルなビジュアルスタイル"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:430
-#: src/features/chat/host/host-composer.tsx:687
+#: src/features/chat/host/host-composer.tsx:690
 #: src/features/sub-agents/components/worker-composer.tsx:118
 msgid "Send"
 msgstr "送信"
@@ -29058,17 +29089,17 @@ msgstr "メッセージの送信方法"
 msgid "Send messages to the AI bot via Telegram. Conversations appear as threads in your chat list."
 msgstr "Telegram 経由で AI ボットにメッセージを送信できます。会話はチャット一覧にスレッドとして表示されます。"
 
-#: src/features/chat/host/host-composer.tsx:874
+#: src/features/chat/host/host-composer.tsx:877
 #: src/features/chat/thread/composer-prompt-queue.tsx:793
 msgid "Send next"
 msgstr "次を送信"
 
-#: src/features/chat/host/host-composer.tsx:887
+#: src/features/chat/host/host-composer.tsx:890
 msgid "Send now"
 msgstr "今すぐ送信"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:880
+#: src/features/chat/host/host-composer.tsx:883
 msgid "Send queued message {0} now"
 msgstr "キュー内のメッセージ {0} を今すぐ送信"
 
@@ -29669,7 +29700,7 @@ msgstr "サインイン"
 msgid "Sign In Again"
 msgstr "再度サインイン"
 
-#: src/features/chat/host/host-send-errors.ts:14
+#: src/features/chat/host/host-send-errors.ts:16
 msgid "Sign in again to send."
 msgstr "送信するには、もう一度サインインしてください。"
 
@@ -30851,7 +30882,7 @@ msgstr "インポートを開始しています..."
 msgid "Starting test drive…"
 msgstr "試用を開始しています…"
 
-#: src/features/chat/host/host-composer.tsx:788
+#: src/features/chat/host/host-composer.tsx:791
 msgid "Starting the agent on your computer. A message you send now goes out once it is up."
 msgstr "お使いのコンピュータでエージェントを起動しています。今送信したメッセージは、起動後に送信されます。"
 
@@ -30972,7 +31003,7 @@ msgstr "株式"
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:231
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/host/host-composer.tsx:1007
+#: src/features/chat/host/host-composer.tsx:1026
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:113
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
@@ -31551,7 +31582,7 @@ msgstr "候補があります。右矢印キーで確定します"
 msgid "suggestions"
 msgstr "提案"
 
-#: src/features/develop/components/guide-tab.tsx:230
+#: src/features/develop/components/guide-tab.tsx:231
 #: src/features/develop/components/guide-view.tsx:113
 msgid "Suggestions"
 msgstr "提案"
@@ -32422,7 +32453,7 @@ msgstr "タイ"
 msgid "Thanks for rating"
 msgstr "評価ありがとうございます"
 
-#: src/features/develop/components/guide-tab.tsx:109
+#: src/features/develop/components/guide-tab.tsx:110
 msgid "That agent session has ended."
 msgstr "そのエージェントセッションは終了しました。"
 
@@ -32430,11 +32461,11 @@ msgstr "そのエージェントセッションは終了しました。"
 msgid "That comment is already gone."
 msgstr "そのコメントはすでに存在しません。"
 
-#: src/features/develop/components/guide-tab.tsx:105
+#: src/features/develop/components/guide-tab.tsx:106
 msgid "That computer is busy. Try again in a moment."
 msgstr "そのコンピュータはビジー状態です。しばらくしてからもう一度お試しください。"
 
-#: src/features/develop/components/guide-tab.tsx:106
+#: src/features/develop/components/guide-tab.tsx:107
 msgid "That computer is not online."
 msgstr "そのコンピュータはオンラインではありません。"
 
@@ -32447,7 +32478,7 @@ msgstr ""
 msgid "That did not work. Please try again."
 msgstr "うまくいきませんでした。もう一度お試しください。"
 
-#: src/features/develop/components/guide-tab.tsx:145
+#: src/features/develop/components/guide-tab.tsx:146
 msgid "That did not work. Try again."
 msgstr "うまくいきませんでした。もう一度お試しください。"
 
@@ -32484,7 +32515,7 @@ msgstr "そのメッセージは送信中です。"
 msgid "That message is no longer waiting."
 msgstr "そのメッセージはもう保留中ではありません。"
 
-#: src/features/chat/host/host-send-errors.ts:21
+#: src/features/chat/host/host-send-errors.ts:23
 msgid "That message is too long to send from here."
 msgstr "そのメッセージは長すぎて、ここから送信できません。"
 
@@ -32498,15 +32529,19 @@ msgstr "そのメッセージはすでに送信されています。"
 msgid "That passcode is not right."
 msgstr "パスコードが正しくありません。"
 
-#: src/features/chat/host/host-composer.tsx:763
+#: src/features/chat/host/host-composer.tsx:766
 msgid "That request is no longer waiting."
 msgstr "そのリクエストはもう待機していません。"
 
-#: src/features/develop/components/guide-tab.tsx:132
+#: src/features/chat/host/host-options.tsx:226
+msgid "that session no longer exists"
+msgstr ""
+
+#: src/features/develop/components/guide-tab.tsx:133
 msgid "That suggestion cannot be added any more."
 msgstr "その提案はもう追加できません。"
 
-#: src/features/develop/components/guide-tab.tsx:131
+#: src/features/develop/components/guide-tab.tsx:132
 msgid "That suggestion is gone."
 msgstr "その提案は存在しなくなりました。"
 
@@ -32514,13 +32549,19 @@ msgstr "その提案は存在しなくなりました。"
 msgid "The {requestNoun} changed while the guide was being written. Write it again."
 msgstr "ガイドの作成中に{requestNoun}が変更されました。もう一度作成してください。"
 
-#: src/features/develop/components/guide-tab.tsx:130
+#: src/features/develop/components/guide-tab.tsx:131
 msgid "The {requestNoun} has a newer commit. Write the guide again before adding its comments."
 msgstr "{requestNoun}に新しいコミットがあります。コメントを追加する前に、ガイドをもう一度作成してください。"
 
 #: src/features/settings/components/chat/api-keys-settings.tsx:260
 msgid "The 43-character EncodingAESKey (message encryption must be set to safe mode)"
 msgstr "43 文字の EncodingAESKey（メッセージの暗号化を安全モードに設定する必要があります）"
+
+#. placeholder {0}: changed.name
+#. placeholder {1}: nameOfValue(changed, answered.valueId)
+#: src/features/chat/host/host-options.tsx:285
+msgid "The agent answered late: {0} is now {1}."
+msgstr ""
 
 #: src/features/marketing/use-cases/use-case-data.ts:63
 msgid "The agent asks before a risky action"
@@ -32530,15 +32571,62 @@ msgstr ""
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "エージェントはこのデバイスに何も要求できなくなります。アクティビティログは期限切れになるまで残ります。"
 
+#. placeholder {0}: nameOfValue(changed, answered.valueId)
+#. placeholder {1}: changed.name
+#. placeholder {2}: nameOfValue(changed, changed.current)
+#: src/features/chat/host/host-options.tsx:294
+msgid "The agent confirmed {0}, but {1} still shows {2}. Check the agent before changing it again."
+msgstr ""
+
+#. placeholder {0}: change.name
+#. placeholder {1}: change.valueName
+#. placeholder {2}: change.name
+#: src/features/chat/host/host-options.tsx:297
+msgid "The agent confirmed: {0} is now {1}, but no longer lists {2}."
+msgstr ""
+
+#. placeholder {0}: changed?.name ?? ""
+#. placeholder {1}: nameOfValue(changed, answered.valueId)
+#: src/features/chat/host/host-options.tsx:302
+msgid "The agent confirmed: {0} is now {1}."
+msgstr ""
+
+#. placeholder {0}: changed?.name ?? ""
+#. placeholder {1}: nameOfValue(changed, answered?.valueId ?? "")
+#: src/features/chat/host/host-options.tsx:275
+msgid "The agent confirmed. Waiting for {0} to show {1}."
+msgstr ""
+
+#: src/features/chat/host/host-options.tsx:227
+msgid "the agent did not accept the change"
+msgstr ""
+
+#: src/features/chat/host/host-options.tsx:228
+msgid "the agent did not answer"
+msgstr ""
+
+#: src/features/chat/host/host-options.tsx:229
+msgid "the agent did not apply the change"
+msgstr ""
+
+#. placeholder {0}: refusalText(answered.reason)
+#: src/features/chat/host/host-options.tsx:301
+msgid "The agent did not change {changeName}: {0}"
+msgstr ""
+
+#: src/features/chat/host/host-options.tsx:230
+msgid "the agent does not offer that choice"
+msgstr ""
+
 #: src/features/develop/components/guide-tab.tsx:67
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "エージェントがガイドを作成せずに終了しました。もう一度作成してください。"
 
-#: src/features/chat/host/host-send-errors.ts:20
+#: src/features/chat/host/host-send-errors.ts:22
 msgid "The agent is still opening its session. Try again in a moment."
 msgstr "エージェントはまだセッションを開いています。しばらくしてからもう一度お試しください。"
 
-#: src/features/chat/host/host-send-errors.ts:22
+#: src/features/chat/host/host-send-errors.ts:24
 msgid "The agent is still working on the last message."
 msgstr "エージェントはまだ最後のメッセージを処理中です。"
 
@@ -32558,7 +32646,7 @@ msgstr "エージェントループは体系的なタスク実行のため常に
 msgid "The agent made no file changes."
 msgstr "エージェントはファイルを変更しませんでした。"
 
-#: src/features/develop/components/guide-tab.tsx:196
+#: src/features/develop/components/guide-tab.tsx:197
 msgid "The agent on your computer is reading the change…"
 msgstr "お使いのコンピュータ上のエージェントが変更を読み取っています…"
 
@@ -32570,6 +32658,10 @@ msgstr "AI は会話から学習して応答をパーソナライズし、毎晩
 #: src/features/settings/connectors/connector-card.tsx:210
 msgid "The AI will lose access to {0}, and the access token is revoked at the provider where possible."
 msgstr "AI は {0} にアクセスできなくなり、可能な場合はプロバイダー側でアクセストークンが取り消されます。"
+
+#: src/features/chat/host/host-options.tsx:233
+msgid "the app restarted before the agent answered, so the change may or may not have been made"
+msgstr "エージェントが応答する前にアプリが再起動したため、変更が行われたかどうかは不明です"
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:28
 msgid "The archive contains an unsafe file path."
@@ -32627,6 +32719,10 @@ msgstr "このレビューを開始してから、変更に新しいコミット
 msgid "The change is too large to show in full."
 msgstr "変更が大きすぎるため、すべてを表示できません。"
 
+#: src/features/chat/host/host-options.tsx:240
+msgid "the change was refused"
+msgstr ""
+
 #: src/features/tasks/components/task-form-dialog.tsx:294
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "チャットエージェントがツールを使ってタスクを処理します。スキルに従わせることもできます。"
@@ -32639,7 +32735,7 @@ msgstr "貼り付けの準備ができる前にチャットが切り替わった
 msgid "The chat shows a card with the tool name, the server it comes from, and a \"Show what it will send\" section with the exact input."
 msgstr ""
 
-#: src/features/chat/host/host-composer.tsx:930
+#: src/features/chat/host/host-composer.tsx:933
 msgid "The chat's state could not be read, so queued messages wait."
 msgstr "チャットの状態を読み取れなかったため、キューのメッセージは待機します。"
 
@@ -32692,7 +32788,7 @@ msgstr "接続は完了しませんでした：{reason}"
 msgid "The connection was not completed."
 msgstr "接続は完了しませんでした。"
 
-#: src/features/chat/context-reset/use-clear-context.ts:73
+#: src/features/chat/context-reset/use-clear-context.ts:75
 msgid "The conversation is being condensed. Try again in a moment."
 msgstr "会話を要約しています。少し待ってからもう一度お試しください。"
 
@@ -32715,6 +32811,10 @@ msgstr "説明が途中で切れています。"
 #: src/features/download/components/download-page.tsx:71
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "デスクトップアプリは macOS、Windows、Linux で動作します。インストーラーは GitHub のデスクトップリリースに添付され、そのリリースが公開されるとそこに表示されます。"
+
+#: src/features/chat/host/host-options.tsx:235
+msgid "the device was removed"
+msgstr ""
 
 #: src/features/chat/thread/host-changes.tsx:126
 msgid "The diff as it was when the turn ended. Later edits to these files are not part of it."
@@ -32819,8 +32919,8 @@ msgstr "ゲストリンクを読み込めませんでした。"
 msgid "The guest link was replaced or has ended."
 msgstr "ゲストリンクは置き換えられたか、終了しています。"
 
-#: src/features/develop/components/guide-tab.tsx:118
-#: src/features/develop/components/guide-tab.tsx:121
+#: src/features/develop/components/guide-tab.tsx:119
+#: src/features/develop/components/guide-tab.tsx:122
 msgid "The guide could not be started."
 msgstr "ガイドを開始できませんでした。"
 
@@ -32844,6 +32944,10 @@ msgstr "利用可能な最高品質の AI 動画モデル"
 msgid "The host"
 msgstr "ホスト"
 
+#: src/features/chat/host/host-options.tsx:236
+msgid "the host did not answer"
+msgstr ""
+
 #: src/features/develop/components/thread-pull-requests.tsx:70
 msgid "The host did not answer. Try again."
 msgstr "ホストから応答がありませんでした。もう一度お試しください。"
@@ -32851,6 +32955,10 @@ msgstr "ホストから応答がありませんでした。もう一度お試し
 #: src/features/develop/components/watched-repositories.tsx:65
 msgid "The host did not answer. Trying again later."
 msgstr "ホストから応答がありませんでした。後でもう一度試します。"
+
+#: src/features/chat/host/host-options.tsx:237
+msgid "the host did not change the option"
+msgstr ""
 
 #: src/features/develop/components/thread-pull-requests.tsx:73
 msgid "The host has no pull request at that address."
@@ -32924,7 +33032,7 @@ msgstr "前回の削除リクエストは失敗しました。もう一度リク
 msgid "the last time"
 msgstr "でサインインしました"
 
-#: src/features/chat/host/host-composer.tsx:798
+#: src/features/chat/host/host-composer.tsx:801
 msgid "The last turn stopped before it finished."
 msgstr "前回のターンは完了する前に停止しました。"
 
@@ -33030,7 +33138,7 @@ msgstr "Anthropic の最新フロンティアの推論と能力を必要とす�
 msgid "The most review rounds before it stops"
 msgstr "停止するまでの最大レビューラウンド数"
 
-#: src/features/develop/components/guide-tab.tsx:107
+#: src/features/develop/components/guide-tab.tsx:108
 msgid "The Neore app on that computer is out of date. Update it, then try again."
 msgstr "そのコンピュータの Neore アプリが古くなっています。更新してから、もう一度お試しください。"
 
@@ -33092,7 +33200,7 @@ msgstr "プロンプトがケースの入力に、この回答が期待される
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "これらのリクエストはプロバイダーから直接請求されます。モデルの価格がわかる場合は、独自キー利用時の通常のプラットフォーム手数料がクレジットで請求されます。"
 
-#: src/features/chat/host/host-composer.tsx:938
+#: src/features/chat/host/host-composer.tsx:941
 msgid "The queue is paused. Send next to go on with the queued messages."
 msgstr "キューは一時停止中です。「次を送信」を押すと、キューのメッセージの送信を続けます。"
 
@@ -33120,7 +33228,7 @@ msgstr "返信はまだ実行中です。返信が完了したら追加してく
 msgid "The reply is still running. Try again when it finishes."
 msgstr "返信はまだ実行中です。完了してからもう一度お試しください。"
 
-#: src/features/chat/host/host-composer.tsx:316
+#: src/features/chat/host/host-composer.tsx:318
 msgid "The reply stopped, but the stop did not reach the computer, so the agent may still be running. Send next once it has stopped."
 msgstr "返信は停止しましたが、停止がコンピューターに届かなかったため、エージェントはまだ動いている可能性があります。停止したら「次を送信」を押してください。"
 
@@ -33451,7 +33559,7 @@ msgstr "この変更は大きすぎて、ガイドを作成できません。"
 msgid "This change, or your instructions, are too large for that computer to take in one message."
 msgstr "この変更またはあなたの指示が大きすぎて、そのコンピュータは 1 通のメッセージで受け取れません。"
 
-#: src/features/chat/host/host-send-errors.ts:24
+#: src/features/chat/host/host-send-errors.ts:26
 msgid "This chat belongs to a worker. Send it messages from its own message box."
 msgstr "このチャットはワーカーのものです。ワーカー自身のメッセージボックスからメッセージを送ってください。"
 
@@ -33463,11 +33571,11 @@ msgstr "このチャットは圧縮できません。"
 msgid "This chat cannot have a guest link."
 msgstr "このチャットにはゲストリンクを作成できません。"
 
-#: src/features/chat/context-reset/use-clear-context.ts:74
+#: src/features/chat/context-reset/use-clear-context.ts:76
 msgid "This chat cannot start a new context."
 msgstr "このチャットでは新しいコンテキストを開始できません。"
 
-#: src/features/chat/host/host-send-errors.ts:15
+#: src/features/chat/host/host-send-errors.ts:17
 msgid "This chat could not be found."
 msgstr "このチャットが見つかりませんでした。"
 
@@ -33483,7 +33591,7 @@ msgstr "このチャットはロックされています"
 msgid "This chat is locked. Unlock it to see its details."
 msgstr ""
 
-#: src/features/chat/host/host-send-errors.ts:13
+#: src/features/chat/host/host-send-errors.ts:14
 msgid "This chat is locked. Unlock it to send."
 msgstr "このチャットはロックされています。送信するにはロックを解除してください。"
 
@@ -33536,6 +33644,10 @@ msgstr "このコンピューター"
 #: src/features/chat/thread/agent-switch-divider.tsx:20
 msgid "This computer did not resume its own session, so the conversation was handed over"
 msgstr "このコンピュータは自身のセッションを再開しなかったため、会話を引き継ぎました"
+
+#: src/features/chat/host/host-options.tsx:217
+msgid "This computer is no longer paired."
+msgstr ""
 
 #: src/features/devices/components/devices-settings.tsx:587
 msgid "This computer is not paired yet."
@@ -33650,7 +33762,7 @@ msgstr "このファイルは大きすぎる（{0} KB）ため、ブラウザー
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "このファイルは大きすぎ（約 {0} トークン）、モデルのコンテキストウィンドウを超えています。モデルがこのファイルを適切に処理できない可能性があります。"
 
-#: src/features/develop/components/guide-tab.tsx:217
+#: src/features/develop/components/guide-tab.tsx:218
 msgid "This guide was written for an earlier commit. The {requestNoun} has changed since: write it again to see the change as it is now."
 msgstr "このガイドは以前のコミットに対して作成されました。その後{requestNoun}が変更されています。現在の変更を確認するには、もう一度作成してください。"
 
@@ -33863,7 +33975,7 @@ msgstr "このリポジトリの URL は長すぎます。"
 msgid "This repository was not found."
 msgstr "このリポジトリが見つかりませんでした。"
 
-#: src/features/chat/host/host-composer.tsx:155
+#: src/features/chat/host/host-composer.tsx:157
 msgid "This request was too long to show whole. You can decline it here; to allow it, answer on your computer."
 msgstr "このリクエストは長すぎて全体を表示できません。ここで拒否できます。許可するには、お使いのコンピュータで回答してください。"
 
@@ -33895,10 +34007,18 @@ msgstr "このサーバーのアドレスが変更されました。以下のア
 msgid "This server's registry entry asks for the values below. They fill in the URL and headers."
 msgstr "このサーバーのレジストリエントリでは、以下の値が求められます。URL とヘッダーに入力されます。"
 
-#: src/features/chat/host/host-composer.tsx:793
-#: src/features/chat/host/host-send-errors.ts:19
+#: src/features/chat/host/host-options.tsx:213
+msgid "This session has ended."
+msgstr ""
+
+#: src/features/chat/host/host-composer.tsx:796
+#: src/features/chat/host/host-send-errors.ts:21
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr "このセッションは終了しました。デスクトップアプリで新しいセッションを開始してください。"
+
+#: src/features/chat/host/host-options.tsx:238
+msgid "this session is not open"
+msgstr ""
 
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:509
 msgid "This sheet appears to be empty."
@@ -33932,7 +34052,7 @@ msgstr "このサブエージェントの実行は利用できなくなりまし
 msgid "This task has not run yet."
 msgstr "このタスクはまだ実行されていません。"
 
-#: src/features/chat/host/host-composer.tsx:834
+#: src/features/chat/host/host-composer.tsx:837
 msgid "This text is only hidden characters, so there is nothing to save."
 msgstr "このテキストは非表示の文字だけなので、保存する内容がありません。"
 
@@ -34408,7 +34528,7 @@ msgstr "ファイルが多すぎます"
 msgid "Too many messages. Please try again later."
 msgstr "メッセージが多すぎます。後でもう一度お試しください。"
 
-#: src/features/chat/context-reset/use-clear-context.ts:72
+#: src/features/chat/context-reset/use-clear-context.ts:74
 msgid "Too many new contexts in a short while. Try again in a minute."
 msgstr "短時間に新しいコンテキストを開始しすぎました。1分後にもう一度お試しください。"
 
@@ -36781,6 +36901,10 @@ msgstr "{device} で承認待ち"
 msgid "Waiting for output…"
 msgstr "出力を待っています…"
 
+#: src/features/chat/host/host-options.tsx:306
+msgid "Waiting for the agent to change {changeName} to {changeValueName}."
+msgstr ""
+
 #: src/features/chat/thread/streaming-placeholder.tsx:624
 msgid "Waiting for the agent…"
 msgstr "エージェントを待っています…"
@@ -37111,7 +37235,7 @@ msgstr "エージェントに何をさせますか？"
 msgid "What should the AI call you?"
 msgstr "AI にどう呼んでほしいですか？"
 
-#: src/features/develop/components/guide-tab.tsx:153
+#: src/features/develop/components/guide-tab.tsx:154
 msgid "What should the guide pay attention to?"
 msgstr "ガイドで何に注目すべきですか？"
 
@@ -37214,7 +37338,7 @@ msgstr "アシスタントはどんなときにこのスキルを使うべきで
 msgid "Where each run goes"
 msgstr "各実行の保存先"
 
-#: src/features/develop/components/guide-tab.tsx:165
+#: src/features/develop/components/guide-tab.tsx:166
 msgid "Where the guide is written"
 msgstr "ガイドの作成先"
 
@@ -37413,7 +37537,7 @@ msgstr "製品発表用の動画の説明文を書く"
 msgid "Write code with AI, run it in the sandbox, and document results — all in one thread."
 msgstr "AI でコードを書き、サンドボックスで実行し、結果をドキュメント化 — すべて 1 つのスレッドで。"
 
-#: src/features/develop/components/guide-tab.tsx:186
+#: src/features/develop/components/guide-tab.tsx:187
 msgid "Write it again"
 msgstr "もう一度作成"
 
@@ -37433,7 +37557,7 @@ msgstr "コードを書いて..."
 msgid "Write something"
 msgstr "何か書いてください"
 
-#: src/features/develop/components/guide-tab.tsx:186
+#: src/features/develop/components/guide-tab.tsx:187
 msgid "Write the guide"
 msgstr "ガイドを作成"
 
@@ -37447,7 +37571,7 @@ msgstr "入力するか、「/」でコマンドを表示…"
 msgid "Writing"
 msgstr "ライティング"
 
-#: src/features/develop/components/guide-tab.tsx:196
+#: src/features/develop/components/guide-tab.tsx:197
 msgid "Writing the guide…"
 msgstr "ガイドを作成中…"
 
@@ -37605,6 +37729,11 @@ msgstr "ゲストとして閲覧中です。拡張機能を接続するには、
 msgid "You are currently impersonating a user"
 msgstr "現在ユーザーになりすましています"
 
+#: src/features/chat/context-reset/use-clear-context.ts:71
+#: src/features/chat/host/host-send-errors.ts:13
+msgid "You are no longer a member of this chat's organization, so its agent cannot run."
+msgstr ""
+
 #: src/features/develop/components/watched-repositories.tsx:172
 msgid "You are not watching any repository."
 msgstr "リポジトリを監視していません。"
@@ -37619,7 +37748,7 @@ msgstr "オフラインです。ネットワークが戻ると Neore が再接�
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "オフラインです。メッセージはここに残ります。オンラインに戻ったら送信してください。"
 
-#: src/features/chat/host/host-send-errors.ts:18
+#: src/features/chat/host/host-send-errors.ts:20
 msgid "You are sending too fast. Wait a moment."
 msgstr "送信が速すぎます。少し待ってください。"
 
@@ -37888,7 +38017,7 @@ msgstr "このコンピューター"
 msgid "Your computer is busy. Try again in a moment."
 msgstr "お使いのコンピュータはビジー状態です。しばらくしてからもう一度お試しください。"
 
-#: src/features/chat/host/host-send-errors.ts:16
+#: src/features/chat/host/host-send-errors.ts:18
 msgid "Your computer is offline. Open Neore on it and try again."
 msgstr "お使いのコンピュータはオフラインです。そこで Neore を開いて、もう一度お試しください。"
 
@@ -37909,7 +38038,7 @@ msgid "Your daily brief"
 msgstr "あなたの Daily Brief"
 
 #: src/features/develop/components/guide-tab.tsx:69
-#: src/features/develop/components/guide-tab.tsx:99
+#: src/features/develop/components/guide-tab.tsx:100
 msgid "Your daily limit for AI requests is used up."
 msgstr "AI リクエストの 1 日の上限を使い切りました。"
 
@@ -38004,6 +38133,12 @@ msgstr "次のメッセージから自動で消えるチャットが始まりま
 msgid "Your notes could not be loaded. They are still there; try again in a moment."
 msgstr "メッセージを読み込めませんでした。メッセージは残っています。少ししてからもう一度お試しください。"
 
+#: src/features/chat/context-reset/use-clear-context.ts:72
+#: src/features/chat/host/host-send-errors.ts:15
+#: src/features/develop/components/guide-tab.tsx:98
+msgid "Your organization does not allow agents on your computer."
+msgstr ""
+
 #: src/features/home/components/home-page.tsx:142
 msgid "Your overview could not be loaded."
 msgstr "概要を読み込めませんでした。"
@@ -38041,11 +38176,11 @@ msgstr "過去30日間のこのプロジェクトでのあなたの返信、ト�
 msgid "Your review"
 msgstr "あなたのレビュー"
 
-#: src/features/develop/components/guide-tab.tsx:134
+#: src/features/develop/components/guide-tab.tsx:135
 msgid "Your review already holds as many comments as {hostLabel} takes in one review."
 msgstr "レビューには、{hostLabel} が 1 回のレビューで受け付ける上限までコメントが含まれています。"
 
-#: src/features/develop/components/guide-tab.tsx:133
+#: src/features/develop/components/guide-tab.tsx:134
 msgid "Your review is being submitted. Try again when it is done."
 msgstr "レビューを送信中です。完了してからもう一度お試しください。"
 

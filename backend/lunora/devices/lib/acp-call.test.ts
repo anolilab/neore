@@ -14,7 +14,7 @@ vi.stubEnv("ENCRYPTION_KEY", btoa(String.fromCodePoint(...keyBytes)));
 const { default: schema } = await import("../../schema");
 const { encryptKey } = await import("../../lib/encryption");
 const { createAcpCall, createAcpCancelCall } = await import("./acp-call");
-const { ACP_CLAIM_WINDOW_MS, MAX_OPEN_ACP_CALLS_PER_DEVICE } = await import("./constants");
+const { ACP_CLAIM_WINDOW_MS, MAX_OPEN_ACP_CALLS_PER_DEVICE, MAX_OPEN_ACP_SET_CONFIGS_PER_DEVICE } = await import("./constants");
 
 const OWNER = "owner";
 const NOW = 1_000_000_000;
@@ -68,6 +68,46 @@ beforeEach(async () => {
 
 afterEach(() => {
     harness.close();
+});
+
+describe("createAcpCall for an option change", () => {
+    // A change needs the computer to be online (only a Stop may wait for it), so the device has been seen just now.
+    const seen = async () => await harness.run(async (ctx: any) => await ctx.db.patch("devices", deviceId, { lastSeenAt: NOW }));
+    const change = async () =>
+        await harness.run(
+            async (ctx: any) =>
+                await createAcpCall(
+                    ctx,
+                    {
+                        deviceId: deviceId as never,
+                        input: { optionId: "model", valueId: "deep" },
+                        kind: "acp_set_config",
+                        threadId: threadId as never,
+                        userId: OWNER,
+                    },
+                    NOW,
+                ),
+        );
+
+    it("is not refused while the send budget is spent: an option change has a budget of its own", async () => {
+        await seen();
+
+        for (let index = 0; index < MAX_OPEN_ACP_CALLS_PER_DEVICE; index += 1) {
+            await insertCall({ toolName: "acp_send" });
+        }
+
+        expect(await change()).toHaveProperty("callId");
+    });
+
+    it("is refused as busy once its own budget is spent", async () => {
+        await seen();
+
+        for (let index = 0; index < MAX_OPEN_ACP_SET_CONFIGS_PER_DEVICE; index += 1) {
+            await insertCall({ toolName: "acp_set_config" });
+        }
+
+        expect(await change()).toEqual({ error: "busy" });
+    });
 });
 
 describe("createAcpCancelCall", () => {

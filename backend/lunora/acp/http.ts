@@ -30,7 +30,7 @@ import { inSystemShard, systemRunners } from "../lib/http-shard";
 import { threadShardFor } from "../lib/thread-shard";
 import { MAX_LENGTH } from "../lib/validators";
 import { INGEST_FLOOD_LIMIT_PER_MINUTE, MAX_EVENTS_PER_POST, MAX_INGEST_BYTES, MAX_MEDIA_PER_TURN } from "./lib/constants";
-import { vAgentOptions, vHostEvent } from "./validators";
+import { vHostEvent } from "./validators";
 
 const json = (body: unknown, status: number): Response => Response.json(body, { status });
 
@@ -196,12 +196,6 @@ const withValidReport = (raw: unknown, deviceId: string, logged: { done: boolean
     return { ...raw, capabilities: unknownCapabilityReport(0) };
 };
 
-/**
- * Options that do not validate, where they belong (right after the `session_open` of a session-level post): left out of the
- * post, never the session's open, and the options stored before stay. Anywhere else the post is refused as malformed.
- */
-const isInvalidOptions = (raw: unknown): boolean => isRecord(raw) && raw.kind === "session_options" && !vAgentOptions.safeParse(raw.options).ok;
-
 type MediaEvent = Extract<Infer<typeof vHostEvent>, { kind: "media" }>;
 
 const withoutStorage = ({ contentType, kind, name, reference, size, uploadId }: MediaEvent): MediaEvent => {
@@ -242,8 +236,10 @@ const readPost = (payload: Record<string, unknown>, deviceId: string): Post | nu
     const logged = { done: false };
 
     for (const raw of payload.events) {
-        if (threadId === undefined && events.length === 1 && events[0]?.kind === "session_open" && isInvalidOptions(raw)) {
-            console.warn(`[acp] device ${deviceId} sent options that do not validate; left out`);
+        // A desktop released before the options moved to `session_state` posts a `session_options` event after its
+        // `session_open`. It is accepted and dropped here, before the schema: the post is not refused, and the options are
+        // never stored from this event (the report that follows carries them).
+        if (typeof raw === "object" && raw !== null && (raw as { kind?: unknown }).kind === "session_options") {
             continue;
         }
 

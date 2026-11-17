@@ -14,13 +14,43 @@ import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { vCapabilityReport } from "../lib/capability-report";
-import type { vAgentOptions } from "./validators";
-import { vAcpSessionStatus, vHostEvent } from "./validators";
+import type { AgentState } from "./lib/agent-state";
+import { vAcpOptionResult, vAcpSessionStatus, vAgentUsage, vHostEvent } from "./validators";
 
 const BATCH = 200;
 
-/** Sessions per export page: a row is a few hundred bytes, and up to about 8 KB with the agent's options' current values. */
+/**
+ * Sessions read per export page. Lunora charges a page's reads against a 32 MiB transaction limit, and a row's agent state is the
+ * largest part of it (the desktop's report, up to about 128 KiB as sent): 50 rows keep one read far below that limit, where 500
+ * could exceed it before the byte budget (`SESSION_PAGE_BYTES`) cut the page.
+ */
 const SESSION_PAGE = 50;
+
+/** The JSON a page of sessions may take, so a page stays far under the 1 MiB a step may keep. */
+const SESSION_PAGE_BYTES = 400_000;
+
+/** The UTF-8 bytes a value takes as JSON: the budgets are bytes, so a page of multi-byte text stays under the step's limit. */
+const ENCODER = new TextEncoder();
+const jsonBytes = (value: unknown): number => ENCODER.encode(JSON.stringify(value)).length;
+
+/** The leading rows whose JSON fits the budget. Always at least one, so a page makes progress. */
+const rowsWithinBudget = <Row>(rows: ReadonlyArray<Row>, budget: number): Row[] => {
+    const kept: Row[] = [];
+    let used = 0;
+
+    for (const row of rows) {
+        const size = jsonBytes(row);
+
+        if (kept.length > 0 && used + size > budget) {
+            break;
+        }
+
+        kept.push(row);
+        used += size;
+    }
+
+    return kept;
+};
 
 /** Chunk rows read per query while scanning a stream for events. */
 const CHUNK_PAGE = 200;
@@ -32,11 +62,25 @@ const CHUNK_PAGE = 200;
 const SCAN_BUDGET = 1000;
 const EVENT_BYTES_BUDGET = 400_000;
 
+/**
+ * What the export keeps of the agent's state: its usage, and the current value of each option and of the legacy model and
+ * mode states. The choices are left out: a list of models can be large enough to fail an export that otherwise fits
+ * (`SESSION_PAGE_BYTES`, the export limit).
+ */
+const vExportAgentState = v.object({
+    configOptions: v.optional(v.array(v.object({ category: v.optional(v.string()), currentValue: v.string(), id: v.string(), name: v.string() }))),
+    models: v.optional(v.object({ current: v.string() })),
+    modes: v.optional(v.object({ current: v.string() })),
+    usage: v.optional(vAgentUsage),
+});
+
 const vExportSession = v.object({
     agentKey: v.string(),
     agentLabel: v.string(),
-    // The value each of the agent's options had (its whole list of choices is the agent's, not the person's).
-    agentOptions: v.optional(v.array(v.object({ id: v.string(), name: v.string(), value: v.string() }))),
+    // What the agent reported about its own context use and cost (`session_state`), as the thread's context meter showed it.
+    agentState: v.optional(vExportAgentState),
+    // When the agent's report was observed: the time the stored values are dated by.
+    agentStateAt: v.optional(v.number()),
     capabilities: v.optional(vCapabilityReport),
     createdAt: v.number(),
     folderLabel: v.string(),
@@ -44,13 +88,15 @@ const vExportSession = v.object({
     importState: v.optional(v.union(v.literal("importing"), v.literal("done"))),
     lastEventAt: v.optional(v.number()),
     nativeSessionId: v.optional(v.string()),
+    // The last option change the person made on this session, and how it ended (`acp/lib/calls.ts`).
+    optionResult: v.optional(vAcpOptionResult),
     status: vAcpSessionStatus,
     threadId: v.string(),
 });
 
 /**
  * The report without the agent's list of models: it is the agent's offer, not the person's data, and up to 64 entries of a
- * few hundred bytes would push a page past what a workflow step may keep. The model the session ran is in `agentOptions`.
+ * few hundred bytes would push a page past what a workflow step may keep. The model the session ran is in its agent state.
  */
 const withoutModelList = (report: Infer<typeof vCapabilityReport>): Infer<typeof vCapabilityReport> => {
     if (report.groups.identity?.models === undefined) {
@@ -60,22 +106,49 @@ const withoutModelList = (report: Infer<typeof vCapabilityReport>): Infer<typeof
     return { ...report, groups: { ...report.groups, identity: { ...report.groups.identity, models: undefined } } };
 };
 
-/** The current value of each option the agent offered; for an agent with only the legacy mode list, its mode. */
-const exportedOptions = (options: Infer<typeof vAgentOptions>): { id: string; name: string; value: string }[] => [
-    ...(options.configOptions ?? []).map((option) => {
-        return { id: option.id, name: option.name, value: option.currentValue };
-    }),
-    ...(options.modes === undefined ? [] : [{ id: "mode", name: "Mode", value: options.modes.current }]),
-];
-
-/** Where the next page starts: in the sessions (`page` is the table cursor), or in the host streams' events (`page` is the stream cursor, `seq` the last chunk already read). */
+/** Where the next page starts: in the sessions (`after` and `afterAt` are the last session exported, by its key), or in the host streams' events (`page` is the stream cursor, `seq` the last chunk already read). */
 const vExportCursor = v.object({
+    // The last session exported, by id and creation time: the next page starts after that key, so a session deleted meanwhile
+    // cannot shift the rest.
+    after: v.optional(v.string()),
+    afterAt: v.optional(v.number()),
     page: v.optional(v.string()),
     phase: v.union(v.literal("sessions"), v.literal("events")),
     seq: v.optional(v.number()),
 });
 
 type ExportCursor = Infer<typeof vExportCursor>;
+
+/** Sessions are paged in creation order, the id breaking a tie in the creation time, so the key of a session is total. */
+const compareSessionKeys = (a: { _creationTime: number; _id: string }, b: { _creationTime: number; _id: string }): number => {
+    if (a._creationTime !== b._creationTime) {
+        return a._creationTime - b._creationTime;
+    }
+
+    if (a._id === b._id) {
+        return 0;
+    }
+
+    return a._id < b._id ? -1 : 1;
+};
+
+/** Whether a session comes after the key (creation time, then id) of the last one exported. */
+const isAfterKey = (row: { _creationTime: number; _id: string }, at: number, id: string): boolean =>
+    row._creationTime > at || (row._creationTime === at && row._id > id);
+
+/** The export's share of an agent state (`vExportAgentState`): usage and each option's current value, without its choices. */
+const exportedAgentState = (state: AgentState): Infer<typeof vExportAgentState> => {
+    return {
+        ...(state.configOptions !== undefined && {
+            configOptions: state.configOptions.map(({ category, currentValue, id, name }) => {
+                return { ...(category !== undefined && { category }), currentValue, id, name };
+            }),
+        }),
+        ...(state.models !== undefined && { models: { current: state.models.current } }),
+        ...(state.modes !== undefined && { modes: { current: state.modes.current } }),
+        ...(state.usage !== undefined && { usage: state.usage }),
+    };
+};
 
 /**
  * One page of a user's coding-agent export: sessions first, then the tool, permission and turn-end events of their
@@ -95,43 +168,66 @@ export const collectAcpSessionsForExport = internalQuery
     )
     .query(async ({ args: { cursor, userId }, ctx }) => {
         if (cursor === undefined || cursor.phase === "sessions") {
-            const { continueCursor, isDone, page } = await ctx.db.acpSessions.findMany({ cursor: cursor?.page, limit: SESSION_PAGE, where: { userId } });
+            // Keyset paging: the page starts after the last session exported, by its creation time and id. A position counted
+            // from the start would move when a session before it is deleted, and skip one.
+            const after = cursor?.after;
+            const afterAt = cursor?.afterAt;
+            const fetched = await ctx.db.acpSessions.findMany({
+                limit: SESSION_PAGE,
+                orderBy: [{ _creationTime: "asc" }],
+                where: { userId, ...(afterAt !== undefined && { _creationTime: { gte: afterAt } }) },
+            });
+            const pending = (
+                after === undefined || afterAt === undefined ? fetched.page : fetched.page.filter((row) => isAfterKey(row, afterAt, after))
+            ).toSorted(compareSessionKeys);
+
+            // Labels and times only: no device id, no path ever reaches the backend.
+            const rows = pending.map(
+                ({
+                    agentKey,
+                    agentLabel,
+                    agentState,
+                    agentStateAt,
+                    capabilities,
+                    createdAt,
+                    folderLabel,
+                    importedTurns,
+                    importState,
+                    lastEventAt,
+                    nativeSessionId,
+                    optionResult,
+                    status,
+                    threadId,
+                }) => {
+                    return {
+                        agentKey,
+                        agentLabel,
+                        createdAt,
+                        folderLabel,
+                        status,
+                        threadId: threadId as string,
+                        ...(agentState !== undefined && { agentState: exportedAgentState(agentState) }),
+                        ...(agentStateAt !== undefined && { agentStateAt }),
+                        ...(capabilities !== undefined && { capabilities: withoutModelList(capabilities) }),
+                        ...(importedTurns !== undefined && { importedTurns }),
+                        ...(importState !== undefined && { importState }),
+                        ...(lastEventAt !== undefined && { lastEventAt }),
+                        ...(nativeSessionId !== undefined && { nativeSessionId }),
+                        ...(optionResult !== undefined && { optionResult }),
+                    };
+                },
+            );
+
+            // A row can hold up to 128 KiB of agent state, so a page is also cut by bytes: the rest of the rows come next, after
+            // the last one taken. A full page may have rows after it too.
+            const sessions = rowsWithinBudget(rows, SESSION_PAGE_BYTES);
+            const lastTaken = pending[sessions.length - 1];
+            const more = lastTaken !== undefined && (sessions.length < pending.length || fetched.page.length === SESSION_PAGE);
 
             return {
                 events: [],
-                next: isDone ? { phase: "events" as const } : { page: continueCursor ?? undefined, phase: "sessions" as const },
-                // Labels and times only: no device id, no path ever reaches the backend.
-                sessions: page.map(
-                    ({
-                        agentKey,
-                        agentLabel,
-                        agentOptions,
-                        capabilities,
-                        createdAt,
-                        folderLabel,
-                        importedTurns,
-                        importState,
-                        lastEventAt,
-                        nativeSessionId,
-                        status,
-                        threadId,
-                    }) => {
-                        return {
-                            agentKey,
-                            agentLabel,
-                            createdAt,
-                            folderLabel,
-                            status,
-                            threadId: threadId as string,
-                            ...(capabilities !== undefined && { capabilities: withoutModelList(capabilities) }),
-                            ...(agentOptions !== undefined && { agentOptions: exportedOptions(agentOptions) }),
-                            ...(importedTurns !== undefined && { importedTurns }),
-                            ...(importState !== undefined && { importState }),
-                            ...(lastEventAt !== undefined && { lastEventAt }),
-                            ...(nativeSessionId !== undefined && { nativeSessionId }),
-                        };
-                    },
-                ),
+                next: more ? { after: lastTaken._id, afterAt: lastTaken._creationTime, phase: "sessions" as const } : { phase: "events" as const },
+                sessions,
             };
         }
 
@@ -192,7 +288,7 @@ const collectHostEvents = async (ctx: QueryCtx, userId: string, cursor: ExportCu
                     continue;
                 }
 
-                const size = JSON.stringify(event).length;
+                const size = jsonBytes(event);
 
                 // A page always takes its first event, so one over the budget by itself still goes out.
                 if (events.length > 0 && bytes + size > EVENT_BYTES_BUDGET) {
@@ -243,7 +339,7 @@ export const collectAcpSessionPages = async (
     do {
         const page = await readPage(cursor);
 
-        bytes += JSON.stringify(page).length;
+        bytes += jsonBytes(page);
 
         if (bytes > maxBytes) {
             throw new LunoraError("PAYLOAD_TOO_LARGE", "The coding-agent history is larger than the export limit");
