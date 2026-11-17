@@ -22,7 +22,7 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { throwForbidden } from "../lib/error-helpers";
 import { systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
-import { allocateCohort, COHORT_SIZE } from "./cohorts";
+import { COHORT_SIZE, insertContributor } from "./cohorts";
 
 /** Members one call walks, at most, once the group it is in has closed: well inside a Worker invocation's subrequest budget. */
 export const MAX_MEMBERS_PER_CALL = 25;
@@ -683,12 +683,7 @@ export const reconcileOrganizationContributor = internalMutation
 
         if (row) {
             if (entries.length === 0) {
-                await ctx.db.insert("usageOrganizationContributors", {
-                    cohort: await allocateCohort(ctx, organizationId),
-                    createdAt: row.at,
-                    organizationId,
-                    userId,
-                });
+                await insertContributor(ctx, { createdAt: row.at, organizationId, userId });
             }
 
             // Two entries for one member (two first replies booked at once) would each count the member; one is kept.

@@ -6,8 +6,11 @@
  *
  * Each booking claims the next slot under its organization (`usageOrganizationCohortSlots`), and takes cohort `slot / COHORT_SIZE`. The slot's
  * unique key is the claim: two bookings that read the same top slot both insert the same next one, the database accepts one, and the other
- * reads again and takes the slot after. So every slot is taken once, and no cohort gains a member after the next one has opened. Slots are
- * never reused, even when a contributor's entry is removed, so a removal leaves a cohort short but never refills it.
+ * reads again and takes the slot after. So every slot is taken once, and no cohort gains a member after the next one has opened.
+ *
+ * The slot and the contributor row are separate writes. If the contributor row fails after the slot is claimed, the slot is released, so no
+ * cohort is left short of a member it can never get. Slots are never reused otherwise, so a contributor's removal leaves a cohort short but
+ * never refills it.
  */
 import type { MutationCtx } from "../_generated/server";
 import { isUniqueViolation } from "../lib/error-helpers";
@@ -21,10 +24,10 @@ const MAX_SLOT_TRIES = 8;
 export const cohortOfBooking = (slot: number): number => Math.floor(slot / COHORT_SIZE);
 
 /**
- * Claims the next booking slot under an organization and returns its cohort. Runs in the caller's mutation, so the contributor row written next
- * carries the cohort of the slot it claimed.
+ * Claims the next booking slot under an organization. Returns the cohort it falls in and the claim's row, so a failed contributor row can
+ * release it.
  */
-export const allocateCohort = async (ctx: MutationCtx, organizationId: string): Promise<number> => {
+const claimSlot = async (ctx: MutationCtx, organizationId: string) => {
     for (let attempt = 1; ; attempt += 1) {
         const top = await ctx.db.usageOrganizationCohortSlots.findFirst({
             consistency: "primary",
@@ -34,13 +37,40 @@ export const allocateCohort = async (ctx: MutationCtx, organizationId: string): 
         const slot = (top?.slot ?? -1) + 1;
 
         try {
-            await ctx.db.insert("usageOrganizationCohortSlots", { organizationId, slot });
+            const claim = await ctx.db.insert("usageOrganizationCohortSlots", { organizationId, slot });
 
-            return cohortOfBooking(slot);
+            return { claim, cohort: cohortOfBooking(slot) };
         } catch (error) {
             if (!isUniqueViolation(error) || attempt >= MAX_SLOT_TRIES) {
                 throw error;
             }
         }
+    }
+};
+
+/** Claims the next booking slot under an organization and returns its cohort. */
+export const allocateCohort = async (ctx: MutationCtx, organizationId: string): Promise<number> => {
+    const { cohort } = await claimSlot(ctx, organizationId);
+
+    return cohort;
+};
+
+/**
+ * Books a contributor into the next slot's cohort. If the contributor row fails, the slot is released, so it leaves no hole in its cohort;
+ * a release that fails too leaves the hole, which only withholds that cohort's totals.
+ */
+export const insertContributor = async (ctx: MutationCtx, row: { createdAt: number; organizationId: string; userId: string }): Promise<void> => {
+    const { claim, cohort } = await claimSlot(ctx, row.organizationId);
+
+    try {
+        await ctx.db.insert("usageOrganizationContributors", { ...row, cohort });
+    } catch (error) {
+        try {
+            await ctx.db.delete("usageOrganizationCohortSlots", claim);
+        } catch {
+            // The claim stays: its cohort is short by this member, which withholds that cohort rather than exposing it.
+        }
+
+        throw error;
     }
 };
