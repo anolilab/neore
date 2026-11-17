@@ -22,6 +22,7 @@ import { authAction, rateLimit } from "../lib/crpc";
 import { throwForbidden } from "../lib/error-helpers";
 import { systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
+import { allocateCohort, COHORT_SIZE } from "./cohorts";
 
 /** Members one call walks, at most, once the group it is in has closed: well inside a Worker invocation's subrequest budget. */
 export const MAX_MEMBERS_PER_CALL = 25;
@@ -42,7 +43,7 @@ const SCOPE_BATCH = 10;
  * The members in one group. A group is fixed by its place in the organization's member order, not by who was active in the period, so no
  * change of period start can swap the members a total covers. A group is shown only when no member of it was active, or all of them were.
  */
-export const MIN_MEMBERS_PER_GROUP = 5;
+export const MIN_MEMBERS_PER_GROUP = COHORT_SIZE;
 
 /**
  * Splits a walk's members into fixed groups of `MIN_MEMBERS_PER_GROUP`, in walk order. `closed` holds the full groups; `open` holds the
@@ -597,7 +598,12 @@ export const reconcileOrganizationContributor = internalMutation
 
         if (row) {
             if (entries.length === 0) {
-                await ctx.db.insert("usageOrganizationContributors", { createdAt: row.at, organizationId, userId });
+                await ctx.db.insert("usageOrganizationContributors", {
+                    cohort: await allocateCohort(ctx, organizationId),
+                    createdAt: row.at,
+                    organizationId,
+                    userId,
+                });
             }
 
             // Two entries for one member (two first replies booked at once) would each count the member; one is kept.

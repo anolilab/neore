@@ -33,6 +33,7 @@ import { runAfterOnShard, runAfterWithRetry } from "../lib/shard-scheduler";
 import { MAX_LENGTH } from "../lib/validators";
 import { readableProject, readableProjectGrantsMeasured, readableProjectTitles, type ProjectTitleGrant } from "../projects/functions";
 import { retentionExpiryOf } from "../gdpr/retention";
+import { allocateCohort } from "./cohorts";
 import { deletionUnderwayOnPrimary, PROJECT_POSITION, TITLE_ID_BYTES, TITLE_PIECE_BYTES, USAGE_TITLE_STEP } from "./gdpr";
 import { leadThreadOf } from "../sub-agents/worker-thread";
 import type { Attribution, AttributionIncrement, ReplyUsageArgs, RollupIncrement } from "./activity-logic";
@@ -241,6 +242,7 @@ const bookContributor = async (ctx: MutationCtx, reply: { at: number; organizati
 
         try {
             await ctx.db.insert("usageOrganizationContributors", {
+                cohort: await allocateCohort(ctx, reply.organizationId),
                 createdAt: reply.at,
                 organizationId: reply.organizationId,
                 userId: reply.userId,
