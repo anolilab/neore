@@ -43,22 +43,35 @@ interface SendInput {
     submit: (args: { kind: FeedbackKind; message: string; pagePath?: string; uploadIds: string[] }) => Promise<unknown>;
 }
 
-/** Downscales and uploads each image, then sends the feedback with their upload ids. `false` when any step failed. */
-const sendFeedback = async ({ images, kind, message, pagePath, submit }: SendInput): Promise<boolean> => {
+const MAX_FEEDBACK_IMAGE_MB = Math.floor(MAX_FEEDBACK_IMAGE_BYTES / 1024 / 1024);
+
+type SendResult = { kind: "failed" } | { kind: "sent" } | { kind: "too-large"; position: number };
+
+/**
+ * Downscales every image first: one still over the server's limit (a GIF or a transparent PNG is never re-encoded)
+ * is named before anything is uploaded or sent, so a retry cannot fail the same way. Then uploads them and sends the
+ * feedback with their upload ids.
+ */
+const sendFeedback = async ({ images, kind, message, pagePath, submit }: SendInput): Promise<SendResult> => {
     try {
+        const prepared = await Promise.all(images.map(async (image) => await downscaleOversizedImage(image.file)));
+        const oversized = prepared.findIndex((file) => file.size > MAX_FEEDBACK_IMAGE_BYTES);
+
+        if (oversized !== -1) {
+            return { kind: "too-large", position: oversized + 1 };
+        }
+
         const uploadIds: string[] = [];
 
-        for (const image of images) {
-            const prepared = await downscaleOversizedImage(image.file);
-
-            uploadIds.push(await uploadFile(prepared, { contentType: prepared.type }));
+        for (const file of prepared) {
+            uploadIds.push(await uploadFile(file, { contentType: file.type }));
         }
 
         await submit({ kind, message, pagePath, uploadIds });
 
-        return true;
+        return { kind: "sent" };
     } catch {
-        return false;
+        return { kind: "failed" };
     }
 };
 
@@ -78,7 +91,7 @@ const SendFeedbackDialog: FC<SendFeedbackDialogProperties> = ({ onOpenChange, op
     const [includePage, setIncludePage] = useState(true);
     const [sending, setSending] = useState(false);
     const [pickerKey, setPickerKey] = useState(0);
-    const [sendFailed, setSendFailed] = useState(false);
+    const [sendError, setSendError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const kindLabelId = useId();
     const messageId = useId();
@@ -151,15 +164,23 @@ const SendFeedbackDialog: FC<SendFeedbackDialogProperties> = ({ onOpenChange, op
 
     const handleSend = async () => {
         setSending(true);
-        setSendFailed(false);
+        setSendError(null);
 
-        const sent = await sendFeedback({ images, kind, message: message.trim(), pagePath: includePage ? pathname : undefined, submit });
+        const result = await sendFeedback({ images, kind, message: message.trim(), pagePath: includePage ? pathname : undefined, submit });
 
         setSending(false);
 
-        if (!sent) {
-            // Kept in the dialog, beside the text the user may want to send again.
-            setSendFailed(true);
+        // Kept in the dialog, beside the text the user may want to send again.
+        if (result.kind === "too-large") {
+            setSendError(
+                t`Attachment ${result.position} is over ${MAX_FEEDBACK_IMAGE_MB} MB and could not be made smaller. Remove it or attach a smaller image.`,
+            );
+
+            return;
+        }
+
+        if (result.kind === "failed") {
+            setSendError(t`Your feedback could not be sent. Please try again.`);
 
             return;
         }
@@ -234,11 +255,13 @@ const SendFeedbackDialog: FC<SendFeedbackDialogProperties> = ({ onOpenChange, op
                                     <img alt={t`Attachment ${index + 1}`} className="size-16 rounded-md border object-cover" src={image.previewUrl} />
                                     <button
                                         aria-label={t`Remove attachment ${index + 1}`}
-                                        className="bg-background absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full border"
+                                        className="group absolute -top-5 -right-5 flex size-11 items-center justify-center"
                                         onClick={() => removeImage(image)}
                                         type="button"
                                     >
-                                        <X aria-hidden="true" className="size-3" />
+                                        <span className="bg-background group-focus-visible:ring-ring flex size-6 items-center justify-center rounded-full border group-focus-visible:ring-2">
+                                            <X aria-hidden="true" className="size-3" />
+                                        </span>
                                     </button>
                                 </li>
                             ))}
@@ -267,7 +290,7 @@ const SendFeedbackDialog: FC<SendFeedbackDialogProperties> = ({ onOpenChange, op
                             type="file"
                         />
                         <p className="text-muted-foreground text-xs">
-                            {t`Large photos are made smaller before sending (up to ${Math.floor(MAX_FEEDBACK_IMAGE_BYTES / 1024 / 1024)} MB each).`}
+                            {t`Large photos are made smaller before sending; each image can be up to ${MAX_FEEDBACK_IMAGE_MB} MB.`}
                         </p>
                     </div>
 
@@ -279,11 +302,11 @@ const SendFeedbackDialog: FC<SendFeedbackDialogProperties> = ({ onOpenChange, op
                         </label>
                     </div>
 
-                    {sendFailed ? (
+                    {sendError === null ? null : (
                         <p className="text-destructive text-sm" role="alert">
-                            {t`Your feedback could not be sent. Please try again.`}
+                            {sendError}
                         </p>
-                    ) : null}
+                    )}
 
                     <DialogFooter>
                         <Button disabled={sending} onClick={() => onOpenChange(false)} type="button" variant="outline">

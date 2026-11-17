@@ -63,24 +63,32 @@ export const collectFeedbackForExport = internalQuery
         };
     });
 
-/** Past this many rows the export marks the feedback as cut rather than reading on. */
-export const FEEDBACK_EXPORT_CAP = 5000;
+/**
+ * The most the export reads of the user's feedback, out of the action's shared read budget (`gdpr/read-budget.ts`).
+ * Past it the feedback is marked as cut, never dropped silently; a page of up to {@link BATCH} rows may run over it.
+ */
+export const FEEDBACK_READ_BYTES = 4 * 1024 * 1024;
 
 type FeedbackExportPage = { continueCursor?: string; feedback: unknown[] };
 
-/** Every page of the user's feedback, read through `readPage` until the last one or {@link FEEDBACK_EXPORT_CAP}. */
+const bytesOf = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+
+/** Every page of the user's feedback, read through `readPage` until the last one or `maxBytes` read. */
 export const collectAllFeedback = async (
     readPage: (cursor: string | undefined) => Promise<FeedbackExportPage>,
-): Promise<{ feedback: unknown[]; truncated: boolean }> => {
+    maxBytes: number = FEEDBACK_READ_BYTES,
+): Promise<{ readBytes: number; section: { feedback: unknown[]; truncated: boolean } }> => {
     const feedback: unknown[] = [];
     let cursor: string | undefined;
+    let readBytes = 0;
 
     do {
         const page = await readPage(cursor);
 
         feedback.push(...page.feedback);
+        readBytes += bytesOf(page.feedback);
         cursor = page.continueCursor;
-    } while (cursor !== undefined && feedback.length < FEEDBACK_EXPORT_CAP);
+    } while (cursor !== undefined && readBytes < maxBytes);
 
-    return { feedback, truncated: cursor !== undefined };
+    return { readBytes, section: { feedback, truncated: cursor !== undefined } };
 };

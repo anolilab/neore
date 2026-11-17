@@ -604,8 +604,12 @@ export const generateExportFile = internalAction
             projectDetailsReadBudget(earlierReadBytes),
         );
         const projectRepositories = { projectRepositories: repositories.projectRepositories };
+        // What the user sent through "Send feedback", read here a page per query within its own cap (`feedback/gdpr.ts`).
+        const feedback = await collectAllFeedback(
+            async (cursor) => await context.runQuery(internal.feedback.gdpr.collectFeedbackForExport, { cursor, userId: args.userId }),
+        );
         // The projects read for their details count too: a row is read whole, however little of it is exported.
-        const triggerReadBytes = triggerReadBudget(earlierReadBytes + repositories.readBytes);
+        const triggerReadBytes = triggerReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes);
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
@@ -619,10 +623,7 @@ export const generateExportFile = internalAction
             evals: args.evals ?? { datasets: [] },
             exportDate: new Date().toISOString(),
             exportVersion: "1.0",
-            // What the user sent through "Send feedback", read here a page per query (`feedback/gdpr.ts`).
-            feedback: await collectAllFeedback(
-                async (cursor) => await context.runQuery(internal.feedback.gdpr.collectFeedbackForExport, { cursor, userId: args.userId }),
-            ),
+            feedback: feedback.section,
             files: args.files,
             knowledgeCollections: activity?.knowledgeCollections ?? [],
             memories: args.memories ?? { digests: [], memories: [] },

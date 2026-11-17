@@ -2375,7 +2375,7 @@ msgstr "Añadir filtro"
 msgid "Add Header"
 msgstr "Añadir encabezado"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:252
+#: src/features/feedback/components/send-feedback-dialog.tsx:272
 msgid "Add images"
 msgstr ""
 
@@ -4232,8 +4232,13 @@ msgid "Attachment (hidden)"
 msgstr "Adjunto (oculto)"
 
 #. placeholder {0}: index + 1
-#: src/features/feedback/components/send-feedback-dialog.tsx:237
+#: src/features/feedback/components/send-feedback-dialog.tsx:255
 msgid "Attachment {0}"
+msgstr ""
+
+#. placeholder {0}: result.position
+#: src/features/feedback/components/send-feedback-dialog.tsx:176
+msgid "Attachment {0} is over {MAX_FEEDBACK_IMAGE_MB} MB and could not be made smaller. Remove it or attach a smaller image."
 msgstr ""
 
 #: src/features/chat/thread/thread-minimap.tsx:73
@@ -5567,7 +5572,7 @@ msgstr "Canadá"
 #: src/features/evals/components/import-cases-dialog.tsx:113
 #: src/features/evals/components/run-dialog.tsx:282
 #: src/features/evals/components/save-eval-case-action.tsx:137
-#: src/features/feedback/components/send-feedback-dialog.tsx:285
+#: src/features/feedback/components/send-feedback-dialog.tsx:313
 #: src/features/knowledge/components/collection-dialog.tsx:97
 #: src/features/knowledge/components/collection-picker.tsx:112
 #: src/features/local-models/components/ollama-model-manager.tsx:300
@@ -16718,7 +16723,7 @@ msgstr "imágenes"
 msgid "Images"
 msgstr "Imágenes"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:232
+#: src/features/feedback/components/send-feedback-dialog.tsx:250
 msgid "Images ({MAX_FEEDBACK_IMAGES} at most)"
 msgstr ""
 
@@ -17071,7 +17076,7 @@ msgstr "Secciones de la bandeja de entrada"
 msgid "Inception's diffusion-based language model"
 msgstr "El modelo de lenguaje basado en difusión de Inception"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:278
+#: src/features/feedback/components/send-feedback-dialog.tsx:300
 msgid "Include the page you are on"
 msgstr ""
 
@@ -18028,7 +18033,11 @@ msgstr "Grande"
 
 #. placeholder {0}: Math.floor(MAX_FEEDBACK_IMAGE_BYTES / 1024 / 1024)
 #: src/features/feedback/components/send-feedback-dialog.tsx:271
-msgid "Large photos are made smaller before sending (up to {0} MB each)."
+#~ msgid "Large photos are made smaller before sending (up to {0} MB each)."
+#~ msgstr ""
+
+#: src/features/feedback/components/send-feedback-dialog.tsx:293
+msgid "Large photos are made smaller before sending; each image can be up to {MAX_FEEDBACK_IMAGE_MB} MB."
 msgstr ""
 
 #: src/features/canvas/components/design-preset-selector.tsx:80
@@ -22857,7 +22866,7 @@ msgstr "Solo se incluye parte de este periodo."
 msgid "Only participants you @mention answer."
 msgstr "Solo responden los participantes que @menciones."
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:116
+#: src/features/feedback/components/send-feedback-dialog.tsx:124
 msgid "Only PNG, JPEG, WebP or GIF images can be attached, four at most."
 msgstr ""
 
@@ -26921,7 +26930,7 @@ msgid "Remove All Files"
 msgstr "Quitar todos los archivos"
 
 #. placeholder {0}: index + 1
-#: src/features/feedback/components/send-feedback-dialog.tsx:239
+#: src/features/feedback/components/send-feedback-dialog.tsx:257
 msgid "Remove attachment {0}"
 msgstr ""
 
@@ -29069,7 +29078,7 @@ msgstr "Estilo visual semirrealista"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:430
 #: src/features/chat/host/host-composer.tsx:707
-#: src/features/feedback/components/send-feedback-dialog.tsx:289
+#: src/features/feedback/components/send-feedback-dialog.tsx:317
 #: src/features/sub-agents/components/worker-composer.tsx:118
 msgid "Send"
 msgstr "Enviar"
@@ -29118,7 +29127,7 @@ msgstr "botón de enviar"
 msgid "Send during a coding agent's turn"
 msgstr "Enviar durante el turno de un agente de programación"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:181
+#: src/features/feedback/components/send-feedback-dialog.tsx:199
 #: src/features/layout/components/nav-user.tsx:268
 msgid "Send feedback"
 msgstr ""
@@ -29203,7 +29212,7 @@ msgstr "Enviando tu mensaje y esperando la respuesta"
 
 #: src/features/chat/guest-links/guest-page.tsx:274
 #: src/features/chat/thread/streaming-placeholder.tsx:617
-#: src/features/feedback/components/send-feedback-dialog.tsx:289
+#: src/features/feedback/components/send-feedback-dialog.tsx:317
 msgid "Sending…"
 msgstr "Enviando…"
 
@@ -32236,7 +32245,7 @@ msgstr "Indica a la IA cómo redactar los títulos que da a las conversaciones n
 msgid "Tell the assistant exactly what to do. Use {VARIABLE_PLACEHOLDER} for inputs."
 msgstr "Dile al asistente exactamente qué hacer. Usa {VARIABLE_PLACEHOLDER} para las entradas."
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:182
+#: src/features/feedback/components/send-feedback-dialog.tsx:200
 msgid "Tell us about an idea or a problem. You can paste or drop screenshots too."
 msgstr ""
 
@@ -32520,7 +32529,7 @@ msgstr "Tailandia"
 msgid "Thanks for rating"
 msgstr "Gracias por tu valoración"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:170
+#: src/features/feedback/components/send-feedback-dialog.tsx:188
 msgid "Thanks! Your feedback was sent."
 msgstr ""
 
@@ -37268,7 +37277,7 @@ msgstr "Lo que aprendí ({0})"
 msgid "What is {0} best for?"
 msgstr "¿Para qué es mejor {0}?"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:197
+#: src/features/feedback/components/send-feedback-dialog.tsx:215
 msgid "What is it about?"
 msgstr ""
 
@@ -38137,11 +38146,11 @@ msgstr "Tu borrador se conserva. No se añadió el prompt del enlace."
 msgid "Your export will include: profile, settings, conversations, files metadata, prompts, and usage history. The download link expires in 7 days."
 msgstr "Tu exportación incluirá: perfil, ajustes, conversaciones, metadatos de archivos, prompts e historial de uso. El enlace de descarga caduca en 7 días."
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:217
+#: src/features/feedback/components/send-feedback-dialog.tsx:235
 msgid "Your feedback"
 msgstr ""
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:165
+#: src/features/feedback/components/send-feedback-dialog.tsx:183
 msgid "Your feedback could not be sent. Please try again."
 msgstr ""
 

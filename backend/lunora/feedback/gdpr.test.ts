@@ -3,12 +3,26 @@
  * export: the user's own only, and past one batch (130 > 100, and not a
  * multiple of it, so "one page" cannot pass for "everything").
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { deleteUserIntegrations } from "../gdpr/steps/residual-deletion-steps";
 import schema from "../schema";
 import { collectAllFeedback, collectFeedbackForExport } from "./gdpr";
+
+const deletedKeys = vi.hoisted(() => [] as string[]);
+
+vi.mock("../lib/storage-cleanup", async (importOriginal) => {
+    return {
+        ...(await importOriginal<object>()),
+        scheduleObjectDeletion: async (_ctx: unknown, keys: string[]) => {
+            deletedKeys.push(...keys);
+        },
+    };
+});
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -40,6 +54,7 @@ const countFor = async (userId: string): Promise<number> =>
     });
 
 beforeEach(() => {
+    deletedKeys.length = 0;
     harness = lunoraTest(schema as never);
 });
 
@@ -48,7 +63,7 @@ afterEach(() => {
 });
 
 describe("feedback in GDPR flows", () => {
-    it("deletes every feedback row of the user and nobody else's", async () => {
+    it("deletes every feedback row of the user and its images, and nobody else's", async () => {
         await seed(A, MANY);
         await seed(B, 1);
 
@@ -64,13 +79,15 @@ describe("feedback in GDPR flows", () => {
 
         expect(await countFor(A)).toBe(0);
         expect(await countFor(B)).toBe(1);
+        expect(new Set(deletedKeys).size).toBe(MANY);
+        expect(deletedKeys.every((key) => key.startsWith(`feedback/${A}/`))).toBe(true);
     });
 
     it("exports every row of the user, oldest first, without the storage keys", async () => {
         await seed(A, MANY);
         await seed(B, 1);
 
-        const exported = await collectAllFeedback(
+        const { section: exported } = await collectAllFeedback(
             async (cursor) => await harness.run(async (ctx: any) => await ctx.runQuery(collectFeedbackForExport, { cursor, userId: A })),
         );
 
@@ -79,5 +96,28 @@ describe("feedback in GDPR flows", () => {
         expect(exported.feedback[0]).toMatchObject({ createdAt: 0, images: [{ contentType: "image/png", size: 10 }], kind: "idea" });
         expect(JSON.stringify(exported)).not.toContain(B);
         expect(JSON.stringify(exported)).not.toContain("feedback/");
+    });
+});
+
+describe("feedback in the export file", () => {
+    it("stops past its read cap and marks the feedback as cut", async () => {
+        await seed(A, MANY);
+
+        const { readBytes, section } = await collectAllFeedback(
+            async (cursor) => await harness.run(async (ctx: any) => await ctx.runQuery(collectFeedbackForExport, { cursor, userId: A })),
+            1,
+        );
+
+        expect(section.truncated).toBe(true);
+        expect(section.feedback.length).toBeLessThan(MANY);
+        expect(readBytes).toBeGreaterThan(0);
+    });
+
+    // Read from source: the export action needs storage and a workflow to run.
+    it("is written into the export and counted before the trigger history", () => {
+        const source = readFileSync(join(import.meta.dirname, "../gdpr/steps.ts"), "utf8");
+
+        expect(source).toContain("feedback: feedback.section");
+        expect(source).toContain("triggerReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes)");
     });
 });
