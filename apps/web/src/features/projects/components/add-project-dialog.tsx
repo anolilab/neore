@@ -369,7 +369,11 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
 
             // Said plainly when the registration is still there, so it is not reported as undone.
             return {
-                error: new Error(revoked.ok ? "device: the person declined the pairing" : "device: declined, but its registration could not be removed"),
+                error: new Error(
+                    revoked.ok
+                        ? "device: the person declined the pairing"
+                        : "device: the pairing was not completed, and its registration could not be removed; remove it under Devices",
+                ),
                 ok: false,
             };
         }

@@ -49,6 +49,7 @@ const EMPTY: Block = { hostName: null, identityCount: 0, identityFile: null, pat
 
 const MULTIPLE_IDENTITIES = "This host has more than one IdentityFile in ~/.ssh/config, which Neore does not support.";
 const RELATIVE_IDENTITY = "This host has a relative IdentityFile in ~/.ssh/config, which Neore does not support.";
+const NO_KEY_FILES = "This host sets IdentityFile none in ~/.ssh/config, which Neore cannot honour.";
 const PROXY = "This host uses ProxyJump or ProxyCommand in ~/.ssh/config, which Neore does not support.";
 const MATCH_RULE = "This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate.";
 
@@ -147,9 +148,13 @@ const settingOf = (key: string, value: string, home: string): Partial<Block> => 
         case "identityfile": {
             const file = firstWord(value);
 
-            // `none` names no key file, so the transport passes none, as for a host without an IdentityFile line.
-            if (file === null || file.toLowerCase() === "none") {
+            if (file === null) {
                 return {};
+            }
+
+            // `none` suppresses key files, and the transport cannot express that: it would fall back to the default keys.
+            if (file.toLowerCase() === "none") {
+                return { reason: NO_KEY_FILES };
             }
 
             // `~user/...` names another user's home, which the reader does not expand; ssh's own `~` is the only one handled.
@@ -289,7 +294,8 @@ const readLines = (text: string, home: string): Parsed => {
             // Settings under a Match line apply to the hosts its criteria select, which this reader does not evaluate: they count only when they set a key the transport uses.
             const rule = matchRules.at(-1);
 
-            if (rule !== undefined && TRANSPORT_KEYS.has(key ?? "")) {
+            // An Include under a Match line can set any of them, so it counts as well.
+            if (rule !== undefined && (key === "include" || TRANSPORT_KEYS.has(key ?? ""))) {
                 rule.relevant = true;
             }
         } else if (!(key === "include" && current === 0)) {

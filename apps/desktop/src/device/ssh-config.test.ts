@@ -68,6 +68,10 @@ describe("parseSshConfig", () => {
         expect(parse("Host a\n  IdentityFile ~alice/.ssh/id\n")[0]?.disabledReason).toContain("IdentityFile");
     });
 
+    it("disables a host under a Match rule whose Include could set a transport key", () => {
+        expect(parse("Host a\n  Match all\n  Include account.conf\n")).toMatchObject([{ disabledReason: expect.stringContaining("Match") }]);
+    });
+
     it("connects directly for ProxyJump none, and honours the first ProxyJump value in file order", () => {
         expect(parse("Host a\n  ProxyJump none\n")[0]?.disabledReason).toBeNull();
         expect(parse("Host a\n  ProxyJump none\nHost *\n  ProxyJump bastion\n")[0]?.disabledReason).toBeNull();
@@ -186,15 +190,16 @@ describe("parseSshConfig", () => {
     it("leaves a host enabled when a Match rule's criteria cannot select it, and when it sets no key the transport uses", () => {
         expect(parse("Host a\n  HostName a.example.com\nMatch originalhost *.example.com\n  Port 2200\n").map((host) => host.disabledReason)).toEqual([null]);
         expect(parse("Host a\n  HostName a.example.com\nMatch host a originalhost b\n  Port 2200\n").map((host) => host.disabledReason)).toEqual([null]);
-        expect(parse("Host a\nMatch all\n  ForwardAgent yes\n  Include other.conf\n").map((host) => host.disabledReason)).toEqual([null]);
+        // An Include under the rule may set a user or key, so the rule counts; a rule with only a setting the transport does not use does not.
+        expect(parse("Host a\nMatch all\n  ForwardAgent yes\n").map((host) => host.disabledReason)).toEqual([null]);
     });
 
     it("keeps an alias with a bang after its first character, since only a leading ! negates", () => {
         expect(parse("Host build!legacy\n  Port 2200\n").map((host) => [host.alias, host.disabledReason])).toEqual([["build!legacy", null]]);
     });
 
-    it("treats IdentityFile none as no key file rather than a relative path", () => {
-        expect(parse("Host a\n  IdentityFile none\n")).toMatchObject([{ disabledReason: null, identityFile: null }]);
+    it("disables a host whose IdentityFile is none, since the transport cannot suppress its key files", () => {
+        expect(parse("Host a\n  IdentityFile none\n")).toMatchObject([{ disabledReason: expect.stringContaining("IdentityFile none") }]);
     });
 
     it("disables the hosts a Match rule it cannot evaluate could apply to", () => {
