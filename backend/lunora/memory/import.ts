@@ -34,8 +34,8 @@ import {
 import { MEMORY_TYPES } from "./taxonomy";
 
 /**
- * Existing memories a save dedupes against. Wider than extraction's 50, so a repeat
- * import of a full paste finds every row it wrote the first time.
+ * Existing memories the near-match dedup reads (`getActiveMemoriesForUser`: by type, then
+ * newest). Wider than extraction's 50; an exact repeat past it is still caught by the save.
  */
 const IMPORT_DEDUP_WINDOW = 1000;
 
@@ -203,7 +203,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
         return result;
     }
 
-    const savedIds = await ctx.runMutation(internal.memory.functions.saveMemoryBatch, {
+    const savedIds = await ctx.runMutation(internal.memory.functions.saveImportedMemoryBatch, {
         memories: toSave.map(({ fact, supersedes }) => {
             return {
                 botId: undefined,
@@ -218,16 +218,19 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
                 userId: args.userId,
             };
         }),
+        userId: args.userId,
     });
+    const known = savedIds.filter((memoryId) => memoryId === null).length;
 
-    result.added = savedIds.length;
+    result.added = savedIds.length - known;
+    result.alreadyKnown += known;
 
     // The vectors are a retrieval aid: a failure leaves the rows found by keyword search.
     try {
         const withVector = savedIds.flatMap((memoryId, index) => {
             const vector = toSave[index]?.embedding;
 
-            return vector && vector.length > 0 ? [{ memoryId, vector }] : [];
+            return memoryId && vector && vector.length > 0 ? [{ memoryId, vector }] : [];
         });
 
         if (withVector.length > 0) {

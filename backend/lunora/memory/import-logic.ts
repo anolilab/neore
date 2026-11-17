@@ -55,7 +55,8 @@ const SENSITIVE_RES: ReadonlyArray<RegExp> = [
 
 export const looksSensitive = (line: string): boolean => SENSITIVE_RES.some((re) => re.test(line));
 
-const dedupKey = (line: string): string => line.toLowerCase().replaceAll(WHITESPACE_RE, " ");
+/** Two lines that differ only in case or spacing are the same fact. */
+export const importDedupKey = (line: string): string => line.toLowerCase().replaceAll(WHITESPACE_RE, " ");
 
 /** One line as stored: wrapping removed, whitespace collapsed, capped. Empty when nothing is left. */
 export const cleanImportLine = (raw: string): string =>
@@ -74,11 +75,11 @@ export const splitImportedText = (text: string): { cut: number; dropped: number;
     for (const raw of text.slice(0, IMPORT_MAX_INPUT_CHARS).split(LINE_BREAK_RE)) {
         const line = cleanImportLine(raw);
 
-        if (line.length < IMPORT_MIN_FACT_CHARS || seen.has(dedupKey(line))) {
+        if (line.length < IMPORT_MIN_FACT_CHARS || seen.has(importDedupKey(line))) {
             continue;
         }
 
-        seen.add(dedupKey(line));
+        seen.add(importDedupKey(line));
 
         if (looksSensitive(line)) {
             dropped += 1;
@@ -100,8 +101,8 @@ export const sanitizeImportedFacts = (facts: ReadonlyArray<ImportedFact>): Impor
     for (const fact of facts) {
         const memory = cleanImportLine(fact.memory);
 
-        if (memory.length >= IMPORT_MIN_FACT_CHARS && !looksSensitive(memory) && !seen.has(dedupKey(memory)) && kept.length < IMPORT_MAX_FACTS) {
-            seen.add(dedupKey(memory));
+        if (memory.length >= IMPORT_MIN_FACT_CHARS && !looksSensitive(memory) && !seen.has(importDedupKey(memory)) && kept.length < IMPORT_MAX_FACTS) {
+            seen.add(importDedupKey(memory));
             kept.push({ memory, type: fact.type });
         }
     }

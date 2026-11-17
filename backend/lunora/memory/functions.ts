@@ -9,7 +9,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { memoryLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
 import { withoutUndefined } from "../lib/patch";
-import type { ImportApp } from "./import-logic";
+import { type ImportApp, importDedupKey } from "./import-logic";
 import { lastConfirmedOf, type MemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { requireOwnedThread } from "../agent/thread-read-access";
@@ -486,6 +486,45 @@ export const saveMemoryBatch = internalMutation
 
         for (const mem of args.memories) {
             memoryIds.push(await insertMemory(ctx, mem, now));
+        }
+
+        return memoryIds;
+    });
+
+/** Active rows the import's last check reads: far past the action's dedup window. */
+const IMPORT_EXACT_CHECK_ROWS = 5000;
+
+/**
+ * Imported rows, minus any whose text the user already has (that row is confirmed and its
+ * place is `null`). It runs in the mutation because one shard's mutations run one at a time:
+ * a second save of the same paste sees what the first wrote, and a repeat past the action's
+ * dedup window is still found.
+ */
+export const saveImportedMemoryBatch = internalMutation
+    .input({ memories: v.array(v.object({ ...vMemoryInsertFields })), userId: v.string() })
+    .output(v.array(v.union(v.id("memories"), v.null())))
+    .mutation(async ({ args, ctx }) => {
+        const { now } = ctx;
+        const active = await ctx.db
+            .query("memories")
+            .withIndex("by_userId_supersededBy", (q) => q.eq("userId", args.userId).eq("supersededBy", null as never))
+            .take(IMPORT_EXACT_CHECK_ROWS);
+        const byText = new Map(active.filter((row) => !row.botId).map((row) => [importDedupKey(row.memory), row._id]));
+        const memoryIds: (Id<"memories"> | null)[] = [];
+
+        for (const mem of args.memories) {
+            const key = importDedupKey(mem.memory);
+            const known = byText.get(key);
+
+            if (known) {
+                await ctx.db.patch("memories", known, { lastConfirmedAt: now });
+                memoryIds.push(null);
+            } else {
+                const memoryId = await insertMemory(ctx, { ...mem, userId: args.userId }, now);
+
+                byText.set(key, memoryId);
+                memoryIds.push(memoryId);
+            }
         }
 
         return memoryIds;

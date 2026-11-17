@@ -964,6 +964,7 @@ export interface InternalApiTypes {
             markMemorySupersededByCompression: FunctionReference<"mutation", { memoryId: Id<"memories">; userId: string }, void>;
             recordRetrievedMemories: FunctionReference<"mutation", { memories: Array<{ memoryId: string; score: number }>; messageId: Id<"messages">; userId: string }, null>;
             retryMemoryVectorDelete: FunctionReference<"mutation", { attempt: number; embeddingId: string; memoryId: string; userId: string }, null>;
+            saveImportedMemoryBatch: FunctionReference<"mutation", { memories: Array<{ botId?: string; confidence?: number; importance?: number; importedFrom?: "chatgpt" | "claude" | "gemini" | "other"; memory: string; source?: "auto" | "manual" | "compressed" | "reflection" | "imported"; supersedes?: Id<"memories">; threadId?: Id<"threads">; type: "identity" | "preference" | "context" | "activity" | "experience"; userId: string }>; userId: string }, Array<Id<"memories"> | null>>;
             saveMemory: FunctionReference<"mutation", { botId?: string; confidence?: number; importance?: number; importedFrom?: "chatgpt" | "claude" | "gemini" | "other"; memory: string; source?: "auto" | "manual" | "compressed" | "reflection" | "imported"; supersedes?: Id<"memories">; threadId?: Id<"threads">; type: "identity" | "preference" | "context" | "activity" | "experience"; userId: string }, Id<"memories">>;
             saveMemoryBatch: FunctionReference<"mutation", { memories: Array<{ botId?: string; confidence?: number; importance?: number; importedFrom?: "chatgpt" | "claude" | "gemini" | "other"; memory: string; source?: "auto" | "manual" | "compressed" | "reflection" | "imported"; supersedes?: Id<"memories">; threadId?: Id<"threads">; type: "identity" | "preference" | "context" | "activity" | "experience"; userId: string }> }, Array<Id<"memories">>>;
             updateMemoryInternal: FunctionReference<"mutation", { confidence?: number; embeddingId?: string; importance?: number; lastConfirmedAt?: number; memory?: string; memoryId: Id<"memories"> }, void>;
@@ -2344,6 +2345,7 @@ export const internal: InternalApiTypes = {
             markMemorySupersededByCompression: { __lunoraRef: "memory_functions:markMemorySupersededByCompression" },
             recordRetrievedMemories: { __lunoraRef: "memory_functions:recordRetrievedMemories" },
             retryMemoryVectorDelete: { __lunoraRef: "memory_functions:retryMemoryVectorDelete" },
+            saveImportedMemoryBatch: { __lunoraRef: "memory_functions:saveImportedMemoryBatch" },
             saveMemory: { __lunoraRef: "memory_functions:saveMemory" },
             saveMemoryBatch: { __lunoraRef: "memory_functions:saveMemoryBatch" },
             updateMemoryInternal: { __lunoraRef: "memory_functions:updateMemoryInternal" },

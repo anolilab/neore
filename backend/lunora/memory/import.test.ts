@@ -10,8 +10,8 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { importFacts, labelImportedText } from "./import";
 
-const { embedMany, generateText, registry } = vi.hoisted(() => {
-    return { embedMany: vi.fn(), generateText: vi.fn(), registry: new Map<string, unknown>() };
+const { embedMany, generateText, registry, searchVectors } = vi.hoisted(() => {
+    return { embedMany: vi.fn(), generateText: vi.fn(), registry: new Map<string, unknown>(), searchVectors: vi.fn() };
 });
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
@@ -42,9 +42,22 @@ vi.mock("../lib/services", () => {
 vi.mock("../agent/client/search", () => {
     return { embedMany };
 });
+// The harness has no vector index: the search reads the stored vector rows instead.
+vi.mock("../agent/vector/index", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("../agent/vector/index")>()), searchVectors };
+});
+vi.mock("../chat/lib/gateway-embedding-model", () => {
+    return {
+        createGatewayEmbeddingModel: () => {
+            return {};
+        },
+        embeddingModelAllowed: () => true,
+    };
+});
 
 const USER = "user-a";
 const MEMORY_OFF_RE = /Turn on memory/;
+const ITEM_RE = /item (\d+)/;
 // Distinct enough wording per row that text dedup never merges two of them.
 const FACTS = Array.from({ length: 60 }, (_, index) => {
     return { memory: `The user owns collection item ${String(index)} named ${"xyz".repeat((index % 7) + 1)}${String(index * 31)}`, type: "context" as const };
@@ -64,6 +77,7 @@ const save = async (facts: ReadonlyArray<{ memory: string; type: "context" | "id
 
 beforeAll(async () => {
     registerModule(registry, "memory_functions", await import("./functions"));
+    registerModule(registry, "agent_vector", await import("../agent/vector/index"));
 });
 
 beforeEach(() => {
@@ -75,6 +89,7 @@ afterEach(() => {
     harness.close();
     embedMany.mockReset();
     generateText.mockReset();
+    searchVectors.mockReset();
 });
 
 describe("importing another assistant's memory", () => {
@@ -121,6 +136,65 @@ describe("importing another assistant's memory", () => {
         expect(generateText.mock.calls[1]?.[0].prompt).toContain(
             "<existing_memory>The user lives in Berlin near the river with a garden and bikes daily</existing_memory>",
         );
+    });
+
+    it("finds an exact repeat the near-match window no longer reads", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+        // The window reads by type first: a thousand preferences push the one activity row out of it.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user ran a marathon in Porto", type: "activity", userId: USER });
+
+            for (let index = 0; index < 1000; index += 1) {
+                await ctx.db.insert("memories", { memory: `Preference number ${String(index)} of the user`, type: "preference", userId: USER });
+            }
+        });
+
+        expect(await save([{ memory: "The user ran a marathon in Porto", type: "context" }])).toStrictEqual({ added: 0, alreadyKnown: 1, updated: 0 });
+        expect(await memories()).toHaveLength(1001);
+    });
+
+    it("saves a paste once when two saves of it run at the same time", async () => {
+        expect.assertions(1);
+
+        await setMemoryEnabled(true);
+
+        await Promise.all([save(FACTS.slice(0, 10)), save(FACTS.slice(0, 10))]);
+
+        expect(await memories()).toHaveLength(10);
+    });
+
+    it("stores each fact's vector and confirms a reworded repeat by it", async () => {
+        expect.assertions(3);
+
+        await setMemoryEnabled(true);
+        // One axis per item number: a reworded fact has the same vector as its original.
+        const vectorOf = (text: string) => Array.from({ length: 128 }, (_, axis) => (axis === Number(ITEM_RE.exec(text)?.[1]) ? 1 : 0));
+        const reworded = FACTS.slice(0, 5).map((_, index) => {
+            return { memory: `Collection item ${String(index)} belongs to them`, type: "context" as const };
+        });
+
+        embedMany.mockImplementation(async (_ctx: unknown, { values }: { values: string[] }) => {
+            return { embeddings: values.map((value) => vectorOf(value)) };
+        });
+        searchVectors.mockImplementation(async (_ctx: unknown, vector: number[]) => {
+            const rows = await harness.run(async (ctx: any) => await ctx.db.query("embeddings_128").collect());
+
+            return rows
+                .map((row: { _id: string; vector: number[] }) => {
+                    return { _id: row._id, _score: row.vector.reduce((sum, value, axis) => sum + value * (vector[axis] ?? 0), 0) };
+                })
+                .toSorted((a: { _score: number }, b: { _score: number }) => b._score - a._score);
+        });
+
+        await save(FACTS.slice(0, 5));
+
+        const saved: { embeddingId?: string }[] = await memories();
+
+        expect(saved.every((row) => row.embeddingId)).toBe(true);
+        expect(await save(reworded)).toStrictEqual({ added: 0, alreadyKnown: 5, updated: 0 });
+        expect(searchVectors).toHaveBeenCalledTimes(5);
     });
 
     it("adds nothing when the same long list is imported again", async () => {

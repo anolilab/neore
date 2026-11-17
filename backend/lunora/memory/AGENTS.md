@@ -21,6 +21,7 @@
   **Import** (`memory/import*.ts`): another assistant's memory, pasted. Lines are
   split by the pure parser and stored as pasted (the model labels `type`; only a
   belief-revision UPDATE rewords a row), so a repeat import is the same text and
-  dedup confirms it; dedup reads
-  a 1000-row window, not extraction's 50. Rows are `source: "imported"` with
+  dedup confirms it. Near-match dedup reads a 1000-row window (type first, then newest), not
+  extraction's 50; the save (`saveImportedMemoryBatch`) re-checks exact text in the mutation, so
+  a repeat past the window or a second tab saving the same paste confirms, not adds. Rows are `source: "imported"` with
   `importedFrom`; both actions refuse while memory is off.
