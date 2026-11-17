@@ -2133,6 +2133,9 @@ importers:
       '@tiptap/extension-color':
         specifier: catalog:tiptap
         version: 3.33.0(@tiptap/extension-text-style@3.33.0(@tiptap/core@3.33.0(@tiptap/pm@3.33.0)))
+      '@tiptap/extension-emoji':
+        specifier: 3.33.0
+        version: 3.33.0(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/pm@3.33.0)(@tiptap/suggestion@3.33.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/pm@3.33.0))
       '@tiptap/extension-highlight':
         specifier: catalog:tiptap
         version: 3.33.0(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))
