@@ -173,11 +173,14 @@ describe("owned projects in the GDPR export", () => {
 
         const { projects } = await ownedFor(A);
 
-        expect(projects).toMatchObject([
-            { path: "/home/a/app", sharingEnabled: false, title: "with folder" },
-            { sharingEnabled: false, title: "no folder" },
-        ]);
+        // Rows created in the same millisecond share a _creationTime, so the order between them is not asserted.
         expect(projects).toHaveLength(2);
+        expect(projects).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ path: "/home/a/app", sharingEnabled: false, title: "with folder" }),
+                expect.objectContaining({ sharingEnabled: false, title: "no folder" }),
+            ]),
+        );
     });
 
     it("pages two projects to a query and reports the rows' read cost, the rows counted whole", async () => {

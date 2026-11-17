@@ -108,6 +108,7 @@ const ALIAS_FORBIDDEN = /[\s!*?]/u;
 
 /** Control, format (bidi overrides, zero-width) and line or paragraph separator characters: a native prompt would show another folder. */
 const UNSAFE_PATH_CHARACTER = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+const NETWORK_OR_DEVICE_PATH = /^[\\/]{2}/u;
 
 /**
  * A folder the add-project picker names: absolute, no control or format characters, at most 1024 bytes. `local` is this computer's rule for
@@ -126,7 +127,7 @@ export const readMachinePath = (value: unknown, local: boolean, allowEmpty = fal
 
     // On Windows `isAbsolute` also accepts UNC and device paths (`\\host\share`, `\\?\`), which name network or device targets.
     // Any mix of the two separators at the start (`\\`, `//`, `\/`, `/\`) starts one.
-    const networkOrDevice = local && /^[\\/]{2}/u.test(folder);
+    const networkOrDevice = local && NETWORK_OR_DEVICE_PATH.test(folder);
 
     if (networkOrDevice || !(local ? path.isAbsolute(folder) : folder.startsWith("/"))) {
         throw new Error("device: path must be absolute");
