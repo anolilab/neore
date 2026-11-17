@@ -45055,6 +45055,283 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#run_webhooks_functions:getRunWebhook": {
+      "post": {
+        "description": "Invoke the `query` `run_webhooks_functions:getRunWebhook` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "run_webhooks_functions:getRunWebhook",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "run_webhooks_functions:getRunWebhook",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "configured",
+                    "enabled"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: run_webhooks_functions:getRunWebhook",
+        "tags": [
+          "run-webhooks"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
+    "/_lunora/rpc#run_webhooks_functions:rotateRunWebhookSecret": {
+      "post": {
+        "description": "Invoke the `mutation` `run_webhooks_functions:rotateRunWebhookSecret` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "run_webhooks_functions:rotateRunWebhookSecret",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "run_webhooks_functions:rotateRunWebhookSecret",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "secret": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "secret"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: run_webhooks_functions:rotateRunWebhookSecret",
+        "tags": [
+          "run-webhooks"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#run_webhooks_functions:saveRunWebhook": {
+      "post": {
+        "description": "Invoke the `mutation` `run_webhooks_functions:saveRunWebhook` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "run_webhooks_functions:saveRunWebhook",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "enabled",
+                      "url"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "run_webhooks_functions:saveRunWebhook",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "secret": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: run_webhooks_functions:saveRunWebhook",
+        "tags": [
+          "run-webhooks"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
+    "/_lunora/rpc#run_webhooks_functions:sendRunWebhookTest": {
+      "post": {
+        "description": "Invoke the `action` `run_webhooks_functions:sendRunWebhookTest` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "run_webhooks_functions:sendRunWebhookTest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "run_webhooks_functions:sendRunWebhookTest",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "durationMs": {
+                      "type": "number"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "status": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "durationMs",
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: run_webhooks_functions:sendRunWebhookTest",
+        "tags": [
+          "run-webhooks"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#saas_notification_functions:listNotifications": {
       "post": {
         "description": "Invoke the `query` `saas_notification_functions:listNotifications` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -63654,6 +63931,10 @@
     {
       "description": "Saved prompt templates, their history, and the prompt optimizer actions.",
       "name": "prompts"
+    },
+    {
+      "description": "The user's outbound run webhook: a signed POST to their URL, with a send-test check. Run events join it in a later part.",
+      "name": "run-webhooks"
     },
     {
       "description": "Gateway usage views and budget-alert notification rules for the settings dashboard.",

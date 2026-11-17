@@ -585,6 +585,10 @@ for a schema table that is neither policed nor listed:
 | `prompts_functions.togglePromptFavorite` | mutation | authMutation + RL | prompts | row.userId == caller | ok |
 | `prompts_functions.updatePrompt` | mutation | authMutation + RL | promptHistory, prompts | row.userId == caller | ok |
 | `prompts_functions.updateThreadVariable` | mutation | authMutation + RL | threadVariables, threads | owner helper; row.userId == caller | **fixed** (medium) — thread must be the caller's before a row is created |
+| `run_webhooks_functions.getRunWebhook` | query | authQuery | — | caller-scoped (ctx.user); returns the URL and the switch, never the secret | ok — new |
+| `run_webhooks_functions.rotateRunWebhookSecret` | mutation | authMutation + RL | runWebhooks | row.userId == caller; the new secret is returned once and the old one stops at once | ok — new; rate limit `runWebhooks/update` |
+| `run_webhooks_functions.saveRunWebhook` | mutation | authMutation + RL | runWebhooks | row.userId == caller; the URL must be https, carry no credentials and no private literal address (`runWebhookUrlProblem`); the secret is created with the first save only and returned once | ok — new; rate limit `runWebhooks/update` |
+| `run_webhooks_functions.sendRunWebhookTest` | action | authAction + RL | runWebhooks | row.userId == caller; one signed test POST to the saved https URL, redirects not followed, response body not read, only the status and time returned | ok — new; rate limit `runWebhooks/test` |
 | `saas_notification_functions.listNotifications` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `saas_notification_functions.markNotificationsRead` | mutation | authMutation | — | caller-scoped (ctx.user) | ok |
 | `saas_usage_functions.createMyNotificationRule` | action | authAction | — | caller-scoped (ctx.user) | ok |

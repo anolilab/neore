@@ -1264,6 +1264,19 @@ export const reviewDrafts = sqliteTable("reviewDrafts", {
     by_user_and_pull: index("by_user_and_pull").on(t.userId, t.hostOrigin, t.repository, t.number),
 }));
 
+export const runWebhooks = sqliteTable("runWebhooks", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    createdAt: real("createdAt").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull(),
+    secretCiphertext: text("secretCiphertext").notNull(),
+    updatedAt: real("updatedAt").notNull(),
+    url: text("url").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_userId: index("by_userId").on(t.userId),
+}));
+
 export const sandboxActions = sqliteTable("sandboxActions", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
