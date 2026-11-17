@@ -229,6 +229,47 @@ describe("a session's terminals", () => {
         expect(await answerTo(agent, 6)).toMatchObject({ result: { exitCode: 0, signal: null } });
     });
 
+    it("reports a running terminal's output to its tool row when the agent reads it", async () => {
+        const tools: unknown[] = [];
+        const observer: SessionObserver = {
+            permissionRequested: () => {},
+            permissionResolved: () => {},
+            sessionEnded: () => {},
+            sessionOpened: () => {},
+            text: () => {},
+            thought: () => {},
+            tool: (_session, _turn, tool) => {
+                tools.push(tool);
+            },
+            turnEnded: () => {},
+            turnStarted: () => {},
+        };
+        const { host } = fakeHost();
+        const { agent, session } = await open({ gate: allow([]), host, observer });
+
+        await busy(agent, session);
+        create(agent, 5);
+
+        const created = await answerTo(agent, 5);
+        const { terminalId } = created.result as { terminalId: string };
+
+        agent.say({
+            method: "session/update",
+            params: { sessionId: "sess_1", update: { content: [{ terminalId, type: "terminal" }], kind: "execute", sessionUpdate: "tool_call", status: "in_progress", title: "npm test", toolCallId: "call_1" } },
+        });
+        await expect.poll(() => tools.length).toBe(1);
+
+        agent.say({ id: 6, method: "terminal/output", params: { sessionId: "sess_1", terminalId } });
+        await answerTo(agent, 6);
+        await expect.poll(() => tools.length).toBe(2);
+        expect(tools[1]).toMatchObject({ id: "call_1", output: "building...\nok" });
+        expect(tools[1]).not.toHaveProperty("exit");
+
+        agent.say({ id: 7, method: "terminal/output", params: { sessionId: "sess_1", terminalId } });
+        await answerTo(agent, 7);
+        expect(tools).toHaveLength(2);
+    });
+
     it("ends a command that finishes starting after its turn was cancelled and a queued turn began", async () => {
         let startedWith: (id: number) => void = () => {};
         // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` is not in this package's TypeScript lib

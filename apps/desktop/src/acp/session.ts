@@ -354,7 +354,7 @@ export class AgentSession {
                 || process.platform === "win32"
                 || !options.terminals.available(options.folder)
                 ? undefined
-                : new SessionTerminals(options.terminals, (terminalId) => this.onTerminalEnded(terminalId));
+                : new SessionTerminals(options.terminals, (terminalId) => this.onTerminalPrinted(terminalId));
         this.connection = new JsonRpcConnection(options.process.stdout, options.process.stdin, {
             notification: (method, params) => this.onNotification(method, params),
             request: (method, params) => this.onRequest(method, params),
@@ -1234,12 +1234,13 @@ export class AgentSession {
             const terminalId = this.toolTerminal.get(tool.id);
             // A call that ran in a terminal shows what the terminal printed and how it ended, once it has.
             const ended = terminalId === undefined ? undefined : this.terminals?.result(terminalId);
-            // A terminal that printed nothing (or was released before its output was read) keeps what the call's own content showed.
-            const fromTerminal = ended === undefined || ended.output === "" ? undefined : cutTerminal(ended, this.options.process.secretLength);
+            // A running terminal shows what the agent last read of it; one that printed nothing keeps what the call's own content showed.
+            const shown = terminalId === undefined ? undefined : this.terminals?.printed(terminalId);
+            const fromTerminal = shown === undefined || shown.output === "" ? undefined : cutTerminal(shown, this.options.process.secretLength);
             const printed = fromTerminal ?? this.toolOutput.get(tool.id);
             // While the call runs, its own text may end in the middle of a configured value that the next update completes: that edge
             // is held back, as the reply text is. Once the call is final, or its terminal has ended, the text is final and shown whole.
-            const running = (tool.status === "pending" || tool.status === "in_progress") && fromTerminal === undefined;
+            const running = (tool.status === "pending" || tool.status === "in_progress") && (ended === undefined || ended.output === "");
             const holdback = running ? Math.max(0, this.options.process.secretLength - 1) : 0;
             const output = printed === undefined ? undefined : outputTail(printed, scrub, holdback);
             const exit = ended === undefined ? undefined : exitReport(ended.exit);
@@ -1749,7 +1750,12 @@ export class AgentSession {
                 return {};
             }
             case METHOD.terminalOutput: {
+                const before = terminals.printed(params.terminalId as string)?.output;
                 const { exitStatus, output, truncated } = terminals.output(params.terminalId as string);
+
+                if (output !== before) {
+                    this.onTerminalPrinted(params.terminalId as string);
+                }
 
                 return { output, truncated, ...exitStatus !== null && { exitStatus } };
             }
@@ -1823,8 +1829,8 @@ export class AgentSession {
         }
     }
 
-    /** A terminal ended: each tool call that shows it is reported again, with its output and how it ended. */
-    private onTerminalEnded(terminalId: string): void {
+    /** A terminal printed more or ended: each tool call that shows it is reported again, with its output and, once it ended, how. */
+    private onTerminalPrinted(terminalId: string): void {
         for (const [toolId, shown] of this.toolTerminal) {
             const tool = shown === terminalId ? this.tools.get(toolId) : undefined;
 

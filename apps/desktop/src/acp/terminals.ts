@@ -213,6 +213,8 @@ interface OpenTerminal {
     /** The core's handle is released: the core forgets it, so its output can no longer be read. */
     freed: boolean;
     handle: number;
+    /** What the running command had printed when the agent last read its output, for the tool row that shows it. */
+    printed?: { output: string; truncated: boolean };
     released: boolean;
     /** Settles once the command's result is recorded and its tool rows are told; set when the terminal is opened. */
     reported?: Promise<void>;
@@ -302,7 +304,11 @@ export class SessionTerminals {
             return { exitStatus: terminal.ended.exit, output: terminal.ended.output, truncated: terminal.ended.truncated };
         }
 
-        return this.host.output(terminal.handle);
+        const read = this.host.output(terminal.handle);
+
+        terminal.printed = { output: read.output, truncated: read.truncated };
+
+        return read;
     }
 
     /** How the command ended, once it has. Asking again does not start another wait in the core: each one holds a thread there. */
@@ -346,6 +352,13 @@ export class SessionTerminals {
     /** How a terminal the session made ended, and what it printed; undefined while it runs or for an id it never made. */
     public result(terminalId: string): OpenTerminal["ended"] {
         return this.open.get(terminalId)?.ended;
+    }
+
+    /** What a terminal printed: its result once it ended, else what the agent last read while it ran. */
+    public printed(terminalId: string): { output: string; truncated: boolean } | undefined {
+        const terminal = this.open.get(terminalId);
+
+        return terminal?.ended ?? terminal?.printed;
     }
 
     /** The turn was cancelled: the commands that turn started and are still running are killed, and no other turn's. */
