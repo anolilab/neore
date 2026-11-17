@@ -41,9 +41,6 @@ export const MERGE_PAGE_SIZE = 100;
 /** The guest's own copy of these is dropped: the new account already has its seeded row. */
 const KEEP_NEW_USERS = new Set(["aiUserPreferences", "userSettings"]);
 
-/** Tables that can hold the new account's row beside the guest's on a shared shard: only the guest's rows are cleared. */
-const OWNER_SCOPED_CLEAR = new Set([...KEEP_NEW_USERS, "runWebhooks"]);
-
 /** Ephemeral bookkeeping that is not the guest's content. */
 const NOT_MOVED = new Set(["cronRuns", "idempotencyClaims", "rateLimits"]);
 
@@ -125,22 +122,30 @@ export const listShardRowsPage = internalQuery
         return { continueCursor, isDone, page };
     });
 
+/** The column a user-sharded table is sharded on, which names the row's owner. Undefined for a table that is not user-sharded. */
+const shardOwnerField = (table: string): string | undefined => {
+    const shardMode = (schema as unknown as { tables: Record<string, { shardMode?: { field?: string; kind?: string } }> }).tables[table]?.shardMode;
+
+    return shardMode?.kind === "shardBy" ? shardMode.field : undefined;
+};
+
 /**
- * On the GUEST's shard: the ids of the first page of `table` — for the delete pass. With `ownedBy`, only that user's
- * rows: `userSettings` and `aiUserPreferences` (the tables the new account keeps its own row of) are cleared of the
- * guest's row alone, so a shard that also holds the new account's row (one shard serving both, as local routing can)
- * keeps it. Every other table is listed whole, as before.
+ * On the GUEST's shard: the ids of the first page of `table` — for the delete pass. With `ownedBy`, only that user's rows,
+ * so a shard that also holds the new account's rows (one shard serving both, as local routing can) keeps them. A table that
+ * is not user-sharded has no owner to filter on and is listed whole.
  */
 export const listShardRowIds = internalQuery
     .input({ ownedBy: v.optional(v.string()), table: v.string() })
     .output(v.array(v.string()))
     .query(async ({ args, ctx }) => {
-        if (args.ownedBy !== undefined) {
+        const ownerField = shardOwnerField(args.table);
+
+        if (args.ownedBy !== undefined && ownerField !== undefined) {
             const facades = ctx.db as unknown as Record<
                 string,
-                { findMany: (options: { limit: number; where: { userId: string } }) => Promise<{ page: Record<string, unknown>[] }> }
+                { findMany: (options: { limit: number; where: Record<string, string> }) => Promise<{ page: Record<string, unknown>[] }> }
             >;
-            const { page } = await facades[args.table]!.findMany({ limit: MERGE_PAGE_SIZE, where: { userId: args.ownedBy } });
+            const { page } = await facades[args.table]!.findMany({ limit: MERGE_PAGE_SIZE, where: { [ownerField]: args.ownedBy } });
 
             return page.map((row) => row._id as string);
         }
@@ -209,12 +214,28 @@ export const importShardRows = internalMutation
         let imported = 0;
 
         for (const row of args.rows as Record<string, unknown>[]) {
-            if ((await db.get(args.table, row._id as string)) !== null) {
+            const id = row._id as string;
+            const existing = (await db.get(args.table, id)) as Record<string, unknown> | null;
+
+            if (existing === null) {
+                await db.insert(args.table, rewriteOwner(row, args.from, args.to), { allowExplicitId: true });
+                imported += 1;
+
                 continue;
             }
 
-            await db.insert(args.table, rewriteOwner(row, args.from, args.to), { allowExplicitId: true });
-            imported += 1;
+            // The guest's own row, already on this shard under its id (a shared shard): re-own it in place, so the same id is
+            // never written twice. A row already re-owned has no guest field left, and is skipped.
+            const guestFields = Object.fromEntries(
+                Object.entries(existing)
+                    .filter(([key, value]) => key !== "_id" && value === args.from)
+                    .map(([key]) => [key, args.to]),
+            );
+
+            if (Object.keys(guestFields).length > 0) {
+                await db.patch(args.table, id, guestFields);
+                imported += 1;
+            }
         }
 
         return { imported };
@@ -312,7 +333,7 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
         let emptied = false;
 
         for (let round = 0; round < MAX_ROUNDS_PER_TABLE; round += 1) {
-            const ids: string[] = await call(references.listIds, OWNER_SCOPED_CLEAR.has(table) ? { ownedBy: from, table } : { table }, from);
+            const ids: string[] = await call(references.listIds, { ownedBy: from, table }, from);
 
             if (ids.length === 0) {
                 emptied = true;
