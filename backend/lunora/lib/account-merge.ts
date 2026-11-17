@@ -213,7 +213,14 @@ export const importShardRows = internalMutation
 
         let imported = 0;
 
+        // On a user-sharded table only the guest's own rows are theirs to move: a shared shard lists every user's rows too.
+        const ownerField = shardOwnerField(args.table);
+
         for (const row of args.rows as Record<string, unknown>[]) {
+            if (ownerField !== undefined && row[ownerField] !== args.from) {
+                continue;
+            }
+
             const id = row._id as string;
             const existing = (await db.get(args.table, id)) as Record<string, unknown> | null;
 
@@ -225,7 +232,12 @@ export const importShardRows = internalMutation
             }
 
             // The guest's own row, already on this shard under its id (a shared shard): re-own it in place, so the same id is
-            // never written twice. A row already re-owned has no guest field left, and is skipped.
+            // never written twice. A row already re-owned has no guest field left, and is skipped. Only a row whose owner field
+            // names the guest is re-owned: another field naming the guest says nothing about who owns the row.
+            if (ownerField === undefined || existing[ownerField] !== args.from) {
+                continue;
+            }
+
             const guestFields = Object.fromEntries(
                 Object.entries(existing)
                     .filter(([key, value]) => key !== "_id" && value === args.from)

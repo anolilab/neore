@@ -525,6 +525,59 @@ describe("a shard that holds both accounts' rows", () => {
             harness.close();
         }
     });
+
+    it("leaves another user's comment alone when the guest resolved it, on a shared shard", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const result = await harness.run(async (context: any) => {
+                const pageId = await context.db.insert("pages", {
+                    contentRevision: 0,
+                    createdAt: 0,
+                    order: 0,
+                    revision: 0,
+                    title: "Plan",
+                    updatedAt: 0,
+                    userId: "user",
+                });
+                const ownId = await context.db.insert("pageComments", {
+                    authorName: "New",
+                    body: "theirs",
+                    commentId: "c-own",
+                    createdAt: 0,
+                    pageId,
+                    resolvedBy: "guest",
+                    status: "resolved",
+                    userId: "user",
+                });
+
+                await context.runMutation(importShardRows, {
+                    from: "guest",
+                    rows: [
+                        {
+                            _id: ownId,
+                            authorName: "New",
+                            body: "theirs",
+                            commentId: "c-own",
+                            createdAt: 0,
+                            pageId,
+                            resolvedBy: "guest",
+                            status: "resolved",
+                            userId: "user",
+                        },
+                    ],
+                    table: "pageComments",
+                    to: "user",
+                });
+
+                return { ownId, stored: await context.db.get("pageComments", ownId) };
+            });
+
+            expect(result.stored).toMatchObject({ resolvedBy: "guest", userId: "user" });
+        } finally {
+            harness.close();
+        }
+    });
 });
 
 describe("clearing the guest's settings", () => {
