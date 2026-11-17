@@ -15,6 +15,7 @@ import path from "node:path";
 import { EarlySends } from "./early-sends";
 import type { RunningTurn } from "./ingest";
 import { HostPoster } from "./ingest";
+import type { SleepLock } from "./keep-awake";
 import { AcpManager } from "./manager";
 import type { PermissionGate } from "./permission";
 import type { RemoteAgents } from "./remote-process";
@@ -42,6 +43,8 @@ export interface ServerAgentsOptions {
     remote: RemoteAgents;
     /** The paired servers. */
     servers: () => ServerRecord[];
+    /** The one sleep lock the computer's managers share (`keep-awake.ts`): a server's turn keeps the computer awake too. */
+    sleepLock?: SleepLock;
     /** Where the posters keep the turns that are running. */
     userData: string;
 }
@@ -68,10 +71,20 @@ export interface ServerRuntime {
 export class ServerAgents {
     private readonly runtimes = new Map<string, ServerRuntime>();
 
+    /** Servers whose removal is under way: no command may start a turn on them until the runtime is gone. */
+    private readonly removing = new Set<string>();
+
+    /** The removal of each server that is under way: an overlapping call joins it instead of running a second one. */
+    private readonly removals = new Map<string, Promise<void>>();
+
     public constructor(private readonly options: ServerAgentsOptions) {}
 
     /** The runtime of a paired server; throws for any other device, so no command can conjure one. */
     public get(deviceId: string): ServerRuntime {
+        if (this.removing.has(deviceId)) {
+            throw new Error("that server is being removed");
+        }
+
         const existing = this.runtimes.get(deviceId);
 
         if (existing !== undefined) {
@@ -94,6 +107,21 @@ export class ServerAgents {
         return this.options.servers().some((server) => server.deviceId === deviceId);
     }
 
+    /**
+     * The poster that ends a held turn of a server. While the server is being removed, the runtime's poster carries the end:
+     * the removal flushes it before stopping. Otherwise it is the server's poster as any command gets it, which builds the
+     * runtime after a restart.
+     */
+    public posterForEnd(deviceId: string): HostPoster {
+        const runtime = this.runtimes.get(deviceId);
+
+        if (runtime !== undefined && this.removing.has(deviceId)) {
+            return runtime.poster;
+        }
+
+        return this.get(deviceId).poster;
+    }
+
     /** Ends the sessions the person's approvals for a server no longer cover. */
     public async closeUnapproved(deviceId: string, view: Pick<AcpView, "agents" | "consents">): Promise<void> {
         await this.runtimes.get(deviceId)?.acp.closeUnapproved(view);
@@ -105,27 +133,18 @@ export class ServerAgents {
      * secret, which is deleted right after). Call BEFORE the core removes the server. An end that cannot reach the
      * backend in time stays in the server's file, which nothing reads once the server is gone.
      */
-    public async remove(deviceId: string): Promise<void> {
-        const runtime = this.runtimes.get(deviceId);
+    public remove(deviceId: string): Promise<void> {
+        const inFlight = this.removals.get(deviceId);
 
-        if (runtime === undefined) {
-            return;
+        if (inFlight !== undefined) {
+            return inFlight;
         }
 
-        await runtime.acp.closeUnapproved({ agents: [], consents: [] });
+        const removal = this.runRemoval(deviceId);
 
-        const deadline = Date.now() + REMOVAL_FLUSH_MS;
+        this.removals.set(deviceId, removal);
 
-        while (runtime.poster.busy && Date.now() < deadline) {
-            // eslint-disable-next-line no-await-in-loop -- the posts go out on timers of their own; this only waits for them
-            await new Promise((resolve) => {
-                setTimeout(resolve, REMOVAL_POLL_MS);
-            });
-        }
-
-        await runtime.poster.persisted();
-        runtime.poster.stop();
-        this.runtimes.delete(deviceId);
+        return removal;
     }
 
     /** Ends and forgets every server with a runtime: the computer is being unpaired. */
@@ -207,6 +226,58 @@ export class ServerAgents {
         }
     }
 
+    private async runRemoval(deviceId: string): Promise<void> {
+        try {
+            await this.drop(deviceId);
+        } finally {
+            this.removals.delete(deviceId);
+        }
+    }
+
+    /** One removal of a server: `remove` runs it once and joins it while it is under way. */
+    private async drop(deviceId: string): Promise<void> {
+        const runtime = this.runtimes.get(deviceId);
+
+        if (runtime === undefined) {
+            return;
+        }
+
+        // Before the first wait: a start that resumes while the sessions close must already be refused, or it spawns outside the sweep.
+        runtime.acp.refuse();
+        this.removing.add(deviceId);
+
+        try {
+            await runtime.acp.closeUnapproved({ agents: [], consents: [] });
+
+            const deadline = Date.now() + REMOVAL_FLUSH_MS;
+
+            await runtime.poster.persisted();
+
+            while (runtime.poster.busy && Date.now() < deadline) {
+                // eslint-disable-next-line no-await-in-loop -- the posts go out on timers of their own; this only waits for them
+                await new Promise((resolve) => {
+                    setTimeout(resolve, REMOVAL_POLL_MS);
+                });
+                // eslint-disable-next-line no-await-in-loop -- the state is persisted again after each wait
+                await runtime.poster.persisted();
+            }
+        } catch (error) {
+            // The removal failed: the runtime is kept with its poster and its unfinished turns, and starts are allowed again, so
+            // the server works as before and a later removal can run.
+            runtime.acp.reopen();
+
+            throw error;
+        } finally {
+            this.removing.delete(deviceId);
+        }
+
+        // No await from the loop's last check of `busy` to here: nothing can be queued in between. Nothing may still run on the
+        // dropped runtime (this also releases its sleep-lock source), and a later start for the server gets a new runtime.
+        runtime.poster.stop();
+        runtime.acp.retire();
+        this.runtimes.delete(deviceId);
+    }
+
     private record(deviceId: string): ServerRecord {
         const server = this.options.servers().find((candidate) => candidate.deviceId === deviceId);
 
@@ -251,6 +322,7 @@ export class ServerAgents {
 
                 return JSON.parse(options.core.acpHostSpawnPlan(deviceId, agentKey, folder)) as SpawnPlan;
             },
+            sleepLock: options.sleepLock,
             spawn: options.remote.spawner(deviceId),
         });
         const early = new EarlySends({

@@ -525,12 +525,14 @@ export class AgentSession {
         // Right after a cancelled turn the agent may still flush that turn's output: a prompt waits out the pause.
         if (this.status === "busy" || Date.now() < this.settleUntil) {
             this.queue.push({ prompt, turnId });
-            this.options.onChange();
 
+            // Busy is set before the window is told, so a sleep lock that reads the status sees the queued turn at once.
             if (this.status !== "busy") {
                 this.status = "busy";
                 this.startNextAfter(sleep(this.settleUntil - Date.now()));
             }
+
+            this.options.onChange();
 
             return { position: this.queue.length, status: "queued" };
         }
