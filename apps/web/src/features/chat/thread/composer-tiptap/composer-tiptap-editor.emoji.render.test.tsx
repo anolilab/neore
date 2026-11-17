@@ -6,7 +6,7 @@
  */
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createRef } from "react";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ComposerTiptapEditorRef } from "./composer-tiptap-editor";
 import { loadEmojiIndex } from "./emoji-shortcode/emoji-index";
@@ -75,6 +75,11 @@ const { ComposerTiptapEditor } = await import("./composer-tiptap-editor");
 
 const EMOJI_FOUND = /emoji found/;
 
+/** A ResizeObserver with nothing to observe: jsdom has no layout, so the composer's size never changes here. */
+const ResizeObserverStub = function ResizeObserverStub() {
+    return { disconnect: () => {}, observe: () => {}, unobserve: () => {} };
+};
+
 const renderEditor = () => {
     const ref = createRef<ComposerTiptapEditorRef>();
 
@@ -111,6 +116,11 @@ describe("composer emoji shortcodes", () => {
         Range.prototype.getBoundingClientRect = () => new DOMRect();
         // The list keeps the highlighted row in view; jsdom has no layout to scroll.
         Element.prototype.scrollIntoView = () => {};
+    });
+
+    beforeEach(() => {
+        // The composer re-measures as it grows; jsdom has no layout to observe. Set before each test: globals are restored after it.
+        vi.stubGlobal("ResizeObserver", ResizeObserverStub);
     });
 
     it("opens the list as the shortcode is typed and names its highlighted row on the editable", async () => {

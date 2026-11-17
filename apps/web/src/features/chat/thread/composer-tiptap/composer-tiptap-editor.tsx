@@ -589,11 +589,19 @@ const ComposerTiptapEditor = ({
         globalThis.addEventListener("scroll", schedule, { capture: true, passive: true });
         globalThis.addEventListener("resize", schedule);
 
+        // A long shortcode that wraps grows the composer upward, with no scroll or resize: its own size change re-measures it.
+        const observer = new ResizeObserver(schedule);
+
+        if (editorContainerRef.current) {
+            observer.observe(editorContainerRef.current);
+        }
+
         return () => {
             if (frame !== undefined) {
                 cancelAnimationFrame(frame);
             }
 
+            observer.disconnect();
             globalThis.removeEventListener("scroll", schedule, { capture: true });
             globalThis.removeEventListener("resize", schedule);
         };
