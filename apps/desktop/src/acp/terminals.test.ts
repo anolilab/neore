@@ -18,7 +18,12 @@ describe("the line a terminal runs", () => {
     });
 
     it("shows the variables the agent sets in front of it", () => {
-        expect(shownLine("make", [["CI", "1"], ["MSG", "a b"]])).toBe("env CI=1 MSG='a b' sh -c make");
+        expect(
+            shownLine("make", [
+                ["CI", "1"],
+                ["MSG", "a b"],
+            ]),
+        ).toBe("env CI=1 MSG='a b' sh -c make");
         expect(shownLine("make", [])).toBe("make");
         // Set for the whole run: a compound line shows the variables on the shell, not on its first command alone.
         expect(shownLine("true; git push", [["PATH", "/shared/bin"]])).toBe("env PATH=/shared/bin sh -c 'true; git push'");
@@ -56,7 +61,12 @@ describe(createRequestOf, () => {
             { command: "ls", env: [{ name: "BIG", value: "v".repeat(8193) }] },
             { command: "x".repeat(4001) },
             // The line fits, but not with the variables in front of it: the person must read whole what they allow.
-            { command: "ls", env: Array.from({ length: 10 }, (_, index) => { return { name: `V${String(index)}`, value: "v".repeat(400) }; }) },
+            {
+                command: "ls",
+                env: Array.from({ length: 10 }, (_, index) => {
+                    return { name: `V${String(index)}`, value: "v".repeat(400) };
+                }),
+            },
         ]) {
             expect(() => createRequestOf(params)).toThrow();
         }
@@ -68,7 +78,8 @@ describe(createRequestOf, () => {
     });
 
     it("ignores an output limit that is not a positive whole number", () => {
-        expect(createRequestOf({ command: "ls", outputByteLimit: -1 })).not.toHaveProperty("outputByteLimit");
+        expect(() => createRequestOf({ command: "ls", outputByteLimit: -1 })).toThrow("the output limit is a positive whole number of bytes");
+        expect(() => createRequestOf({ command: "ls", outputByteLimit: 0 })).toThrow("the output limit is a positive whole number of bytes");
     });
 });
 
@@ -83,7 +94,12 @@ describe(SessionTerminals, () => {
             kill: vi.fn(),
             output: vi.fn(),
             release,
-            start: vi.fn(async () => await new Promise<number>((resolve) => { resolvers.push(resolve); })),
+            start: vi.fn(
+                async () =>
+                    await new Promise<number>((resolve) => {
+                        resolvers.push(resolve);
+                    }),
+            ),
             wait: vi.fn(async () => await new Promise<never>(() => {})),
         };
 

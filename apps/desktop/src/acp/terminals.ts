@@ -111,7 +111,7 @@ export const coreTerminals = (core: TerminalCore): TerminalHost => {
 };
 
 /** A word as the shell reads it back unchanged: bare when it is plainly safe, else in single quotes. */
-export const shellQuote = (word: string): string => PLAIN_WORD.test(word) ? word : `'${word.replaceAll("'", String.raw`'\''`)}'`;
+export const shellQuote = (word: string): string => (PLAIN_WORD.test(word) ? word : `'${word.replaceAll("'", String.raw`'\''`)}'`);
 
 /**
  * The line the shell runs: the agent's `command` as it sent it (agents often send a whole shell line there) and each
@@ -124,9 +124,7 @@ export const terminalLine = (command: string, args: ReadonlyArray<string>): stri
  * are shown as `env` sets them for the shell that runs the line: they reach every command in it.
  */
 export const shownLine = (line: string, env: ReadonlyArray<[string, string]>): string =>
-    env.length === 0
-        ? line
-        : ["env", ...env.map(([name, value]) => `${name}=${shellQuote(value)}`), "sh", "-c", shellQuote(line)].join(" ");
+    env.length === 0 ? line : ["env", ...env.map(([name, value]) => `${name}=${shellQuote(value)}`), "sh", "-c", shellQuote(line)].join(" ");
 
 /** The variables a `terminal/create` sets, checked. Throws `INVALID_PARAMS` for one the shell could not take as named. */
 const envOf = (env: unknown): [string, string][] => {
@@ -154,7 +152,9 @@ const envOf = (env: unknown): [string, string][] => {
 };
 
 /** A `terminal/create` request, checked: what to run, where, and with which variables. Throws `INVALID_PARAMS` otherwise. */
-export const createRequestOf = (params: Record<string, unknown>): { cwd?: string; env: [string, string][]; line: string; outputByteLimit?: number; shown: string } => {
+export const createRequestOf = (
+    params: Record<string, unknown>,
+): { cwd?: string; env: [string, string][]; line: string; outputByteLimit?: number; shown: string } => {
     const { args, command, cwd, env, outputByteLimit } = params;
 
     if (typeof command !== "string" || command.trim() === "") {
@@ -167,6 +167,11 @@ export const createRequestOf = (params: Record<string, unknown>): { cwd?: string
 
     if (cwd !== undefined && cwd !== null && (typeof cwd !== "string" || !cwd.startsWith("/"))) {
         throw new RpcError(INVALID_PARAMS, "the working folder is an absolute path");
+    }
+
+    // A limit that is not a positive whole number is refused, not dropped: dropping it would approve the command under the default cap.
+    if (outputByteLimit !== undefined && outputByteLimit !== null && !(Number.isSafeInteger(outputByteLimit) && (outputByteLimit as number) > 0)) {
+        throw new RpcError(INVALID_PARAMS, "the output limit is a positive whole number of bytes");
     }
 
     const variables = envOf(env);
@@ -189,8 +194,8 @@ export const createRequestOf = (params: Record<string, unknown>): { cwd?: string
         env: variables,
         line,
         shown,
-        ...typeof cwd === "string" && { cwd },
-        ...typeof outputByteLimit === "number" && Number.isSafeInteger(outputByteLimit) && outputByteLimit > 0 && { outputByteLimit },
+        ...(typeof cwd === "string" && { cwd }),
+        ...(typeof outputByteLimit === "number" && { outputByteLimit }),
     };
 };
 
@@ -381,7 +386,12 @@ export class SessionTerminals {
         const reports: Promise<void>[] = [];
 
         for (const terminal of this.open.values()) {
-            if ((terminal.cancelled === true || terminal.released === true) && terminal.turnId === turnId && terminal.ended === undefined && terminal.reported !== undefined) {
+            if (
+                (terminal.cancelled === true || terminal.released === true) &&
+                terminal.turnId === turnId &&
+                terminal.ended === undefined &&
+                terminal.reported !== undefined
+            ) {
                 reports.push(terminal.reported);
             }
         }
