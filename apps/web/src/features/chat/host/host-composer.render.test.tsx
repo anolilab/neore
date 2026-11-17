@@ -2197,6 +2197,17 @@ describe("the agent's slash commands", () => {
         expect(harness.calls).toEqual([]);
     });
 
+    it("does not pick a command for Alt+Enter, which keeps its usual meaning", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+        fireEvent.keyDown(box, { altKey: true, key: "Enter" });
+
+        expect(box.value).not.toBe("/resume ");
+    });
+
     it("brings the active command into view as the arrows move it", async () => {
         const scroll = vi.fn();
 

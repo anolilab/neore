@@ -587,6 +587,13 @@ export class HostPoster implements SessionObserver {
             return;
         }
 
+        // A failed post waits out its own backoff, as the timed flush does: the close does not repost it at once. The timed flush sends it.
+        const retryAt = this.stateRetryAt.get(sessionId);
+
+        if (retryAt !== undefined && retryAt > this.now()) {
+            return;
+        }
+
         await this.postReport(sessionId, pending, deviceId);
     }
 

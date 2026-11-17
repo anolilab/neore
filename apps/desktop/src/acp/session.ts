@@ -1293,9 +1293,14 @@ export class AgentSession {
             return true;
         }
 
+        // The count is checked first: a full buffer drops the update without serialising it.
+        if (this.earlyUpdates.length >= MAX_EARLY_UPDATES) {
+            return false;
+        }
+
         const bytes = Buffer.byteLength(JSON.stringify(params));
 
-        if (this.earlyUpdates.length >= MAX_EARLY_UPDATES || this.earlyBytes + bytes > MAX_EARLY_BYTES) {
+        if (this.earlyBytes + bytes > MAX_EARLY_BYTES) {
             return false;
         }
 

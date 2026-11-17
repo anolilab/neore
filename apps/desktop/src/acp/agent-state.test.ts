@@ -50,6 +50,13 @@ describe("usageOf", () => {
 });
 
 describe("availableCommandsOf", () => {
+    it("does not offer a name with a hidden character, which the prompt cleaning would change", () => {
+        const hidden = { description: "Hidden", name: "re\u{200B}view" };
+        const visible = { description: "Visible", name: "review" };
+
+        expect(availableCommandsOf({ availableCommands: [hidden, visible] }, plain)?.map((command) => command.name)).toEqual(["review"]);
+    });
+
     it("reads no more than 1000 entries, valid or not, so a long list of malformed ones stays bounded", () => {
         const malformed: Record<string, string>[] = [];
         const blanks: Record<string, string>[] = [];
@@ -99,7 +106,9 @@ describe("availableCommandsOf", () => {
     });
 
     it("drops an entry whose name is longer than 4096 characters, since a cut name would name another command", () => {
-        expect(availableCommandsOf({ availableCommands: [{ name: "n".repeat(4097) }, { name: "short" }] }, plain)).toEqual([{ description: "", name: "short" }]);
+        expect(availableCommandsOf({ availableCommands: [{ name: "n".repeat(4097) }, { name: "short" }] }, plain)).toEqual([
+            { description: "", name: "short" },
+        ]);
     });
 
     it("reads the commands with their description and input hint", () => {
@@ -124,7 +133,9 @@ describe("availableCommandsOf", () => {
     });
 
     it("skips entries without a usable name", () => {
-        expect(availableCommandsOf({ availableCommands: [null, 3, { name: "" }, { description: "x" }, { name: "ok" }] }, plain)).toEqual([{ description: "", name: "ok" }]);
+        expect(availableCommandsOf({ availableCommands: [null, 3, { name: "" }, { description: "x" }, { name: "ok" }] }, plain)).toEqual([
+            { description: "", name: "ok" },
+        ]);
     });
 
     it("cuts the list and each text to its bound", () => {
@@ -134,7 +145,8 @@ describe("availableCommandsOf", () => {
 
         expect(availableCommandsOf({ availableCommands: many }, plain)).toHaveLength(100);
 
-        const [long] = availableCommandsOf({ availableCommands: [{ description: "d".repeat(500), input: { hint: "h".repeat(500) }, name: "n".repeat(64) }] }, plain) ?? [];
+        const [long] =
+            availableCommandsOf({ availableCommands: [{ description: "d".repeat(500), input: { hint: "h".repeat(500) }, name: "n".repeat(64) }] }, plain) ?? [];
 
         expect(long?.name).toHaveLength(64);
         expect(long?.description).toHaveLength(300);
@@ -173,7 +185,15 @@ describe("availableCommandsOf", () => {
         const scrub = (text: string) => text.replaceAll("SECRET", "***");
 
         expect(
-            availableCommandsOf({ availableCommands: [{ description: "uses SECRET", input: { hint: "SECRET" }, name: "SECRETcmd" }, { description: "uses SECRET", name: "ok" }] }, scrub),
+            availableCommandsOf(
+                {
+                    availableCommands: [
+                        { description: "uses SECRET", input: { hint: "SECRET" }, name: "SECRETcmd" },
+                        { description: "uses SECRET", name: "ok" },
+                    ],
+                },
+                scrub,
+            ),
         ).toEqual([{ description: "uses ***", name: "ok" }]);
     });
 });

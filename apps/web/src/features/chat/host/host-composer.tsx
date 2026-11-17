@@ -801,11 +801,10 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         // Shift+Enter and Shift+Tab keep their usual meaning (a newline, the previous control), Ctrl/Cmd+Enter still sends, and an
         // arrow with a modifier (Shift extends the selection) is the textarea's, even while the menu is open.
         const arrow = event.key === "ArrowDown" || event.key === "ArrowUp";
-        const menuKey =
-            SLASH_KEYS.has(event.key) &&
-            !(event.shiftKey && (event.key === "Enter" || event.key === "Tab")) &&
-            !((event.ctrlKey || event.metaKey) && event.key === "Enter") &&
-            !(arrow && (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey));
+        const modified = event.shiftKey || event.altKey || event.ctrlKey || event.metaKey;
+        // Enter and Tab with any modifier keep their usual meaning (Shift+Enter a newline, Ctrl/Cmd/Alt+Enter the send), and so does an arrow
+        // with a modifier, which the textarea uses to extend the selection.
+        const menuKey = SLASH_KEYS.has(event.key) && !((event.key === "Enter" || event.key === "Tab") && modified) && !(arrow && modified);
 
         if (menuOpen && !event.nativeEvent.isComposing && menuKey) {
             event.preventDefault();

@@ -55,6 +55,9 @@ export const vAgentUsage = v.object({
 const WHITESPACE = /\s/u;
 
 /** The slash commands an agent advertised. The desktop cuts its own lists to these bounds (`agent-state.ts`): keep them in step. */
+// The characters the prompt cleaning removes (see `packages/ai` hidden text): a name holding one would be sent as another name.
+const HIDDEN_NAME_CHARS = /[\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}\u{2028}\u{2029}]/u;
+
 export const vAgentCommands = v
     .array(
         v.object({
@@ -64,7 +67,8 @@ export const vAgentCommands = v
                 .string()
                 .min(1)
                 .max(64)
-                .check((name) => !WHITESPACE.test(name), { message: "A command name has no spaces" }),
+                .check((name) => !WHITESPACE.test(name), { message: "A command name has no spaces" })
+                .check((name) => !HIDDEN_NAME_CHARS.test(name), { message: "A command name has no hidden characters" }),
         }),
     )
     .max(100);

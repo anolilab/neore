@@ -45,6 +45,8 @@ export const usageOf = (update: Record<string, unknown>, scrub: (text: string) =
 // The bounds of `vAgentCommands` in backend/lunora/acp/validators.ts: keep them in step.
 /** A whitespace character: a command name holding one is not a single token. */
 const WHITESPACE = /\s/u;
+// A name the prompt cleaning would change (a control, a format or a default-ignorable character) is not offered: it would be sent as another name.
+const HIDDEN_NAME_CHARS = /[\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}\u{2028}\u{2029}]/u;
 
 const MAX_COMMANDS = 100;
 const MAX_COMMAND_NAME_CHARS = 64;
@@ -74,7 +76,7 @@ const commandOf = (value: unknown, scrub: (text: string) => string): AgentComman
 
     const name = scrub(value.name);
 
-    if (name === "" || name !== value.name || name.length > MAX_COMMAND_NAME_CHARS || WHITESPACE.test(name)) {
+    if (name === "" || name !== value.name || name.length > MAX_COMMAND_NAME_CHARS || WHITESPACE.test(name) || HIDDEN_NAME_CHARS.test(name)) {
         return undefined;
     }
 
