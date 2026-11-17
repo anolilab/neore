@@ -550,10 +550,10 @@ const ComposerTiptapEditor = ({
         () => false,
     );
 
-    // The `:shortcode` list. It waits while another popup is open, since each takes the keys while it shows, and while the
-    // composer is disabled.
+    // The `:shortcode` list. It waits while another popup is open, since each takes the keys while it shows, while the
+    // composer is disabled, and in Vim normal mode, where Enter and Escape are the Vim keys.
     const emoji = useEmojiShortcode({
-        enabled: suggestions && !disabled && !slashMatch && !fileMentionMatch && !variableMatch,
+        enabled: suggestions && !disabled && vimMode !== "normal" && !slashMatch && !fileMentionMatch && !variableMatch,
         focused: emojiEditorFocused,
         match: emojiMatchState,
         onReplace: handleReplace,

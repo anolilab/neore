@@ -29,10 +29,15 @@ vi.mock("@lingui/core/macro", () => {
     };
 });
 
+// A test that needs the Vim setting on sets it here, and clears it after.
+const settings = vi.hoisted(() => {
+    return { data: null as { composerVimMode?: boolean } | null };
+});
+
 vi.mock("@/features/auth/hooks/use-user-settings", () => {
     return {
         useUserSettings: () => {
-            return { data: null };
+            return { data: settings.data };
         },
     };
 });
@@ -347,5 +352,26 @@ describe("composer emoji shortcodes", () => {
         });
 
         expect(screen.queryByRole("listbox", { name: "Emoji suggestions" })).toBeNull();
+    });
+
+    it("does not open in Vim normal mode, where Enter and Escape are the Vim keys", async () => {
+        settings.data = { composerVimMode: true };
+
+        try {
+            const { ref } = renderEditor();
+
+            await waitFor(() => {
+                expect(ref.current?.getEditor()).toBeTruthy();
+            });
+            fireEvent.keyDown(ref.current!.getEditor()!.view.dom, { key: "Escape" });
+
+            expect(screen.getByText("-- NORMAL --")).toBeTruthy();
+
+            await typeText(ref, ":dog");
+
+            expect(screen.queryByRole("listbox", { name: "Emoji suggestions" })).toBeNull();
+        } finally {
+            settings.data = null;
+        }
     });
 });
