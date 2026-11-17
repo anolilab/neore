@@ -36,12 +36,12 @@ describe("parseSshConfig", () => {
     });
 
     it("disables a host with more than one IdentityFile, in one block or across blocks, since the transport takes one key", () => {
-        expect(parse("Host a\n  IdentityFile /k/one\n  IdentityFile /k/two\n")[0]?.disabledReason).toMatch(/more than one IdentityFile/u);
-        expect(parse("Host *\n  IdentityFile /k/all\nHost a\n  IdentityFile /k/one\n")[0]?.disabledReason).toMatch(/more than one IdentityFile/u);
+        expect(parse("Host a\n  IdentityFile /k/one\n  IdentityFile /k/two\n")[0]?.disabledReason).toContain("more than one IdentityFile");
+        expect(parse("Host *\n  IdentityFile /k/all\nHost a\n  IdentityFile /k/one\n")[0]?.disabledReason).toContain("more than one IdentityFile");
     });
 
     it("disables a host whose IdentityFile is relative, since ssh resolves it somewhere this reader does not know", () => {
-        expect(parse("Host a\n  IdentityFile keys/id\n")[0]?.disabledReason).toMatch(/relative IdentityFile/u);
+        expect(parse("Host a\n  IdentityFile keys/id\n")[0]?.disabledReason).toContain("relative IdentityFile");
     });
 
     it("expands a leading ~ in IdentityFile", () => {
@@ -61,13 +61,13 @@ describe("parseSshConfig", () => {
     });
 
     it("disables a host whose IdentityFile names another user's home, which the reader does not expand", () => {
-        expect(parse("Host a\n  IdentityFile ~alice/.ssh/id\n")[0]?.disabledReason).toMatch(/IdentityFile/u);
+        expect(parse("Host a\n  IdentityFile ~alice/.ssh/id\n")[0]?.disabledReason).toContain("IdentityFile");
     });
 
     it("connects directly for ProxyJump none, and honours the first ProxyJump value in file order", () => {
         expect(parse("Host a\n  ProxyJump none\n")[0]?.disabledReason).toBeNull();
         expect(parse("Host a\n  ProxyJump none\nHost *\n  ProxyJump bastion\n")[0]?.disabledReason).toBeNull();
-        expect(parse("Host *\n  ProxyJump bastion\nHost a\n  ProxyJump none\n")[0]?.disabledReason).toMatch(/ProxyJump/u);
+        expect(parse("Host *\n  ProxyJump bastion\nHost a\n  ProxyJump none\n")[0]?.disabledReason).toContain("ProxyJump");
     });
 
     it("disables a host that uses Include, ProxyJump or ProxyCommand, with a reason", () => {

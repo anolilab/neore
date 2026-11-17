@@ -23,9 +23,9 @@ export interface SshHost {
 
 interface Block {
     hostName: string | null;
-    identityFile: string | null;
     /** How many applicable `IdentityFile` lines set a key; ssh uses all of them, so more than one disables the host. */
     identityCount: number;
+    identityFile: string | null;
     /** The `Host` patterns of the block; the block before the first `Host` line holds `*`, as ssh applies it to every host. */
     patterns: string[];
     port: number | null;
@@ -42,6 +42,8 @@ const KEY_END = /[\s=]/u;
 const LINE_BREAK = /\r?\n/u;
 const DIGITS = /^\d+$/u;
 const SPACE = /\s/u;
+/** `~user/...` or `~user`, not `~` or `~/...`: another user's home. */
+const OTHER_USER_HOME = /^~[^/]/u;
 
 const EMPTY: Block = { hostName: null, identityCount: 0, identityFile: null, patterns: [], port: null, proxy: null, reason: null, user: null };
 
@@ -79,7 +81,7 @@ const words = (value: string): string[] => {
 
         if (char === '"') {
             quoted = !quoted;
-            word = word ?? "";
+            word ??= "";
         } else if (!quoted && char === "\\" && index + 1 < text.length) {
             index += 1;
             word = (word ?? "") + text.charAt(index);
@@ -149,7 +151,7 @@ const settingOf = (key: string, value: string, home: string): Partial<Block> => 
             }
 
             // `~user/...` names another user's home, which the reader does not expand; ssh's own `~` is the only one handled.
-            if (file.includes("%") || (file.startsWith("~") && file !== "~" && !file.startsWith("~/"))) {
+            if (file.includes("%") || OTHER_USER_HOME.test(file)) {
                 return { reason: unsupported(key) };
             }
 
@@ -161,16 +163,16 @@ const settingOf = (key: string, value: string, home: string): Partial<Block> => 
         case "include": {
             return { reason: unsupported(key) };
         }
-        case "proxycommand":
-        case "proxyjump": {
-            // `none` turns proxying off, so the host connects directly; any other value needs a jump or command the transport cannot make.
-            return { proxy: firstWord(value)?.toLowerCase() === "none" ? "direct" : "unsupported" };
-        }
         case "port": {
             const port = parsePort(firstWord(value) ?? "");
 
             // An invalid value is kept as 0 so that no later Port fills it in; the host is disabled.
             return port === null ? { port: 0, reason: "This host has an invalid Port in ~/.ssh/config." } : { port };
+        }
+        case "proxycommand":
+        case "proxyjump": {
+            // `none` turns proxying off, so the host connects directly; any other value needs a jump or command the transport cannot make.
+            return { proxy: firstWord(value)?.toLowerCase() === "none" ? "direct" : "unsupported" };
         }
         case "user": {
             return { user: firstWord(value) };

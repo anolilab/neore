@@ -433,6 +433,7 @@ describe("validators", () => {
         expect(() => readMachinePath(String.raw`\\host\share\dir`, true)).toThrow("must be absolute");
         expect(() => readMachinePath(String.raw`\\?\C:\dir`, true)).toThrow("must be absolute");
         expect(() => readMachinePath(String.raw`\/host\share`, true)).toThrow("must be absolute");
+
         // Only Windows has UNC and device paths; on POSIX a leading `//` or `/\` is an ordinary absolute path.
         if (path.sep === "\\") {
             expect(() => readMachinePath("//host/share", true)).toThrow("must be absolute");
@@ -441,6 +442,7 @@ describe("validators", () => {
             expect(readMachinePath("//host/share", true)).toBe("//host/share");
             expect(readMachinePath(String.raw`/\project`, true)).toBe(String.raw`/\project`);
         }
+
         expect(readMachinePath("/home/me/app", true)).toBe("/home/me/app");
     });
 
