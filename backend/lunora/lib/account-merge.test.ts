@@ -433,6 +433,32 @@ describe("importShardRows for runWebhooks", () => {
         expect(rows[0]).toMatchObject({ url: "https://example.com/guest", userId: "user" });
     });
 
+    it("re-owns the guest's row in place on a shard that already holds it, under the same id", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            const result = await harness.run(async (context: any) => {
+                const guestId = await context.db.insert("runWebhooks", webhook({ url: "https://example.com/guest", userId: "guest" }));
+
+                await context.runMutation(importShardRows, {
+                    from: "guest",
+                    rows: [{ ...webhook({ url: "https://example.com/guest", userId: "guest" }), _id: guestId }],
+                    table: "runWebhooks",
+                    to: "user",
+                });
+
+                const stored = await context.db.query("runWebhooks").take(MERGE_PAGE_SIZE);
+
+                return { guestId, stored };
+            });
+
+            expect(result.stored).toHaveLength(1);
+            expect(result.stored[0]).toMatchObject({ _id: result.guestId, url: "https://example.com/guest", userId: "user" });
+        } finally {
+            harness.close();
+        }
+    });
+
     it("keeps the new account's own webhook and copies no second one beside it", async () => {
         const rows = await run(
             [webhook({ _id: "g1", url: "https://example.com/guest", userId: "guest" })],
@@ -483,6 +509,7 @@ describe("clearing the guest's settings", () => {
         );
 
         expect(listIdCalls.find((args) => args.table === "userSettings")).toEqual({ ownedBy: "guest", table: "userSettings" });
+        expect(listIdCalls.find((args) => args.table === "runWebhooks")).toEqual({ ownedBy: "guest", table: "runWebhooks" });
         expect(listIdCalls.find((args) => args.table === "threads")).toEqual({ table: "threads" });
     });
 });

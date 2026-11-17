@@ -41,6 +41,9 @@ export const MERGE_PAGE_SIZE = 100;
 /** The guest's own copy of these is dropped: the new account already has its seeded row. */
 const KEEP_NEW_USERS = new Set(["aiUserPreferences", "userSettings"]);
 
+/** Tables that can hold the new account's row beside the guest's on a shared shard: only the guest's rows are cleared. */
+const OWNER_SCOPED_CLEAR = new Set([...KEEP_NEW_USERS, "runWebhooks"]);
+
 /** Ephemeral bookkeeping that is not the guest's content. */
 const NOT_MOVED = new Set(["cronRuns", "idempotencyClaims", "rateLimits"]);
 
@@ -309,7 +312,7 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
         let emptied = false;
 
         for (let round = 0; round < MAX_ROUNDS_PER_TABLE; round += 1) {
-            const ids: string[] = await call(references.listIds, KEEP_NEW_USERS.has(table) ? { ownedBy: from, table } : { table }, from);
+            const ids: string[] = await call(references.listIds, OWNER_SCOPED_CLEAR.has(table) ? { ownedBy: from, table } : { table }, from);
 
             if (ids.length === 0) {
                 emptied = true;
