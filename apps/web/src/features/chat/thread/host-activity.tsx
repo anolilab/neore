@@ -252,7 +252,7 @@ export const HostToolCalls: FC<{ tools: HostToolRow[] }> = ({ tools }) => {
     const { t } = useLingui();
     const { announcement } = useToolWords();
     const [announced, setAnnounced] = useState(() => {
-        return { finished: new Set(tools.filter((tool) => FINISHED.has(tool.status)).map((tool) => tool.id)), text: "" };
+        return { finished: new Set(tools.filter((tool) => FINISHED.has(tool.status)).map((tool) => tool.id)), seq: 0, text: "" };
     });
     const newlyFinished = tools.filter((tool) => FINISHED.has(tool.status) && !announced.finished.has(tool.id));
 
@@ -260,6 +260,7 @@ export const HostToolCalls: FC<{ tools: HostToolRow[] }> = ({ tools }) => {
     if (newlyFinished.length > 0) {
         setAnnounced({
             finished: new Set([...announced.finished, ...newlyFinished.map((tool) => tool.id)]),
+            seq: announced.seq + 1,
             text: newlyFinished.map((tool) => announcement(tool)).join(" "),
         });
     }
@@ -268,7 +269,8 @@ export const HostToolCalls: FC<{ tools: HostToolRow[] }> = ({ tools }) => {
         <>
             {/* Said once, when a call reaches its outcome; the output streams past it, so it is not part of this announcement. */}
             <span aria-live="polite" className="sr-only" role="status">
-                {announced.text}
+                {/* A new element for each announcement: a sentence the same as the last one is still a change the region reads out. */}
+                <span key={announced.seq}>{announced.text}</span>
             </span>
             {tools.length > 0 && (
                 <section aria-label={t`The agent's tool calls`} className="mb-4">
@@ -284,15 +286,10 @@ export const HostToolCalls: FC<{ tools: HostToolRow[] }> = ({ tools }) => {
 };
 
 /** Everything the running turn reports, in the order a reader takes it in: the plan, then what it ran. */
-export const HostActivity: FC<{ activity: HostActivityBody | undefined }> = ({ activity }) => {
-    if (activity === undefined) {
-        return null;
-    }
-
-    return (
-        <>
-            {activity.plan !== undefined && <HostPlan entries={activity.plan} />}
-            {activity.tools !== undefined && <HostToolCalls tools={activity.tools} />}
-        </>
-    );
-};
+// Mounted for the whole streaming turn, so a call that finishes after the turn starts is announced; the list waits for its tools.
+export const HostActivity: FC<{ activity: HostActivityBody | undefined }> = ({ activity }) => (
+    <>
+        {activity?.plan !== undefined && <HostPlan entries={activity.plan} />}
+        <HostToolCalls tools={activity?.tools ?? []} />
+    </>
+);

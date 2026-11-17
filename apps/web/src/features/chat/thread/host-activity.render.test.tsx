@@ -7,7 +7,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HostToolRow } from "./host-activity";
-import { HostPlan, HostToolCalls } from "./host-activity";
+import { HostActivity, HostPlan, HostToolCalls } from "./host-activity";
 
 const reader = vi.hoisted(() => {
     return { locale: "en" };
@@ -81,6 +81,29 @@ describe("a coding agent's plan", () => {
 });
 
 describe("a coding agent's tool calls", () => {
+    it("announces a call that finishes after the turn starts, even when its first report is already finished", () => {
+        const { rerender } = render(<HostActivity activity={undefined} />);
+
+        rerender(<HostActivity activity={{ tools: [{ id: "c1", output: "", status: "completed", title: "Run tests", toolKind: "execute" }] }} />);
+
+        expect(screen.getByRole("status").textContent).toContain("Run tests");
+    });
+
+    it("reads out a second call that finishes with the same outcome as the first", () => {
+        const done = (id: string): HostToolRow => {
+            return { id, output: "", status: "completed", title: "Run tests", toolKind: "execute" };
+        };
+        const { rerender } = render(<HostToolCalls tools={[done("c1")]} />);
+        // The announcement is a new element each time; Testing Library has no query for that identity.
+        // eslint-disable-next-line testing-library/no-node-access -- the region's child element is what changes between announcements
+        const first = screen.getByRole("status").firstElementChild;
+
+        rerender(<HostToolCalls tools={[done("c1"), done("c2")]} />);
+
+        // eslint-disable-next-line testing-library/no-node-access -- see above
+        expect(screen.getByRole("status").firstElementChild).not.toBe(first);
+    });
+
     it("lets a long title wrap instead of cutting it off", () => {
         render(<HostToolCalls tools={[running("", "cargo test -p neore-device-core --features keychain -- acp_terminal::tests::runs_an_allowed")]} />);
 
