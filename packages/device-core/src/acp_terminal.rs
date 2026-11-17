@@ -215,20 +215,20 @@ fn pin(folder: &Path) -> Result<(Option<std::fs::File>, PathBuf), String> {
 const REDACTED: &str = "[redacted]";
 /// A known value shorter than this is not searched for: it would strike ordinary characters out of the command.
 const MIN_KNOWN_SECRET_BYTES: usize = 4;
-const SECRET_FLAGS: [&str; 6] = [
-    "--token",
-    "--password",
-    "--api-key",
-    "--secret",
-    "-u",
-    "--user",
-];
+const SECRET_FLAGS: [&str; 2] = ["-u", "--user"];
 const SECRET_NAME_PARTS: [&str; 5] = ["TOKEN", "SECRET", "PASSWORD", "KEY", "CREDENTIAL"];
+/// Parts of a flag or header name, each matched inside one of its `-`/`_`-separated words, that mark its value secret.
+/// `auth` is matched apart from these so that `--author` stays readable, and only in a flag or header name.
+const SECRET_WORD_PARTS: [&str; 6] = ["token", "secret", "password", "passwd", "credential", "key"];
 const AUTH_SCHEMES: [&str; 4] = ["bearer", "basic", "token", "digest"];
+/// Programs whose `-p` glued to a value (`-pVALUE`) is a password.
+const GLUED_PASSWORD_PROGRAMS: [&str; 3] = ["mysql", "mysqldump", "mariadb"];
+const COMMAND_SEPARATORS: [&str; 5] = ["&&", "||", ";", "|", "&"];
 
 /// The command line as the audit log keeps it: every known secret value, and the value of each credential-shaped
-/// argument (an `Authorization:` header, a `Bearer` token, a `--token`-like flag, a `*TOKEN*=`-like assignment), is
-/// replaced with `[redacted]`. A quoted value spanning several words has each of its words replaced.
+/// argument (an `Authorization:`-like header, a `Bearer` token, a `--auth-token`-like flag, a `*TOKEN*=`-like assignment,
+/// the `-pVALUE` of a MySQL client), is replaced with `[redacted]`. A quoted value spanning several words has each of
+/// its words replaced.
 fn redact_command(line: &str, known: &[&str]) -> String {
     let mut known: Vec<&str> = known
         .iter()
@@ -246,6 +246,7 @@ fn redact_command(line: &str, known: &[&str]) -> String {
 
     let mut out = String::with_capacity(text.len());
     let mut redact_next = false;
+    let mut glued_password = false;
     let mut open_quote: Option<char> = None;
     let mut rest = text.as_str();
 
@@ -290,12 +291,26 @@ fn redact_command(line: &str, known: &[&str]) -> String {
             continue;
         }
 
+        if COMMAND_SEPARATORS.contains(&core) || core.ends_with(';') {
+            glued_password = false;
+        } else if GLUED_PASSWORD_PROGRAMS.contains(&core.rsplit('/').next().unwrap_or(core)) {
+            glued_password = true;
+        }
+
         if lower == "bearer"
             || lower.ends_with("authorization:")
-            || SECRET_FLAGS.contains(&lower.as_str())
+            || lower.strip_suffix(':').is_some_and(is_secret_header)
+            || is_secret_flag(&lower)
         {
             redact_next = true;
             out.push_str(word);
+        } else if glued_password && core.starts_with("-p") && core.len() > "-p".len() {
+            let lead = word.len() - word.trim_start_matches(['"', '\'']).len();
+            let (head, value) = word.split_at(lead + "-p".len());
+
+            open_quote = opens_quote(value);
+            out.push_str(head);
+            out.push_str(&redacted(value));
         } else if let Some(split) = value_start(word, &lower) {
             let (head, value) = word.split_at(split);
 
@@ -386,9 +401,15 @@ fn value_start(word: &str, lower: &str) -> Option<usize> {
         return value_at(at + "authorization:".len());
     }
 
-    for flag in SECRET_FLAGS {
-        if lower.starts_with(flag) && lower[flag.len()..].starts_with('=') {
-            return value_at(flag.len() + 1);
+    if let Some(colon) = lower.find(':') {
+        if is_secret_header(&lower[..colon]) {
+            return value_at(colon + 1);
+        }
+    }
+
+    if let Some(eq) = lower.find('=') {
+        if is_secret_flag(&lower[..eq]) {
+            return value_at(eq + 1);
         }
     }
 
@@ -402,6 +423,32 @@ fn value_start(word: &str, lower: &str) -> Option<usize> {
         && SECRET_NAME_PARTS.iter().any(|part| upper.contains(part)))
     .then_some(())
     .and_then(|()| value_at(eq + 1))
+}
+
+/// Whether a lowercased word is a flag whose value is a credential: `-u`, `--user`, or a name such as `--auth-token`.
+fn is_secret_flag(lower: &str) -> bool {
+    let name = lower.trim_start_matches('-');
+
+    SECRET_FLAGS.contains(&lower) || (name.len() < lower.len() && has_secret_part(name, &["auth"]))
+}
+
+/// Whether a lowercased name is a header carrying a credential, such as `x-api-key` or `cookie`.
+fn is_secret_header(name: &str) -> bool {
+    has_secret_part(name, &["auth", "cookie"])
+}
+
+/// Whether `name` is made of `-`/`_`-separated words and one of them names a credential.
+fn has_secret_part(name: &str, extra: &[&str]) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        && name.split(['-', '_']).any(|part| {
+            SECRET_WORD_PARTS.iter().any(|secret| part.contains(secret))
+                || extra
+                    .iter()
+                    .any(|secret| part.contains(secret) && !matches!(part, "author" | "authors"))
+        })
 }
 
 fn unquoted(word: &str) -> &str {
@@ -704,6 +751,67 @@ mod tests {
             redact_command("echo hunter22 && psql -p 5432", &["hunter22", "5"]),
             "echo [redacted] && psql -p 5432"
         );
+    }
+
+    #[test]
+    fn redacts_the_value_of_a_flag_named_like_a_credential() {
+        for (line, shown) in [
+            (
+                "tool --auth-token=tok --access-token tok --verbose",
+                "tool --auth-token=[redacted] --access-token [redacted] --verbose",
+            ),
+            (
+                "tool --client_secret='two words' --DB-PASSWD tok -v",
+                "tool --client_secret='[redacted] [redacted]' --DB-PASSWD [redacted] -v",
+            ),
+            (
+                "git log --author=alice --verbose x",
+                "git log --author=alice --verbose x",
+            ),
+        ] {
+            assert_eq!(redact_command(line, &[]), shown);
+        }
+    }
+
+    #[test]
+    fn redacts_the_value_of_a_header_named_like_a_credential() {
+        for (line, shown) in [
+            (
+                "curl -H 'X-Api-Key: tok' https://x.test",
+                "curl -H 'X-Api-Key: [redacted]' https://x.test",
+            ),
+            (
+                "curl -H X-Auth-Token:tok -H \"Cookie: tok\" x",
+                "curl -H X-Auth-Token:[redacted] -H \"Cookie: [redacted]\" x",
+            ),
+            (
+                "curl -H 'Content-Type: application/json' x",
+                "curl -H 'Content-Type: application/json' x",
+            ),
+        ] {
+            assert_eq!(redact_command(line, &[]), shown);
+        }
+    }
+
+    #[test]
+    fn redacts_a_password_glued_to_the_p_flag_of_a_mysql_client() {
+        for (line, shown) in [
+            (
+                "mysql -u root -ptok db",
+                "mysql -u [redacted] -p[redacted] db",
+            ),
+            (
+                "/usr/bin/mariadb -p'two words' db",
+                "/usr/bin/mariadb -p'[redacted] [redacted]' db",
+            ),
+            (
+                "mysql -p db && mkdir -pv out",
+                "mysql -p db && mkdir -pv out",
+            ),
+            ("tar -pxf a.tar", "tar -pxf a.tar"),
+        ] {
+            assert_eq!(redact_command(line, &[]), shown);
+        }
     }
 
     #[test]
