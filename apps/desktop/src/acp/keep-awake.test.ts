@@ -257,6 +257,54 @@ describe("the sleep lock", () => {
         expect(blocker.starts).toBe(2);
     });
 
+    it("checks the inhibitor on output updates at most once per interval, not on every update", () => {
+        vi.useFakeTimers();
+
+        try {
+            const live = new Set<number>();
+            let checks = 0;
+            let starts = 0;
+            const lock = new SleepLock(
+                {
+                    isStarted: (id) => {
+                        checks += 1;
+
+                        return live.has(id);
+                    },
+                    start: () => {
+                        starts += 1;
+                        live.add(starts);
+
+                        return starts;
+                    },
+                    stop: (id) => {
+                        live.delete(id);
+                    },
+                },
+                () => undefined,
+                5000,
+            );
+            const source = {};
+
+            lock.report(source, true);
+
+            const afterStart = checks;
+
+            for (let update = 0; update < 10; update += 1) {
+                lock.report(source, true);
+            }
+
+            expect(checks - afterStart).toBe(1);
+
+            vi.advanceTimersByTime(5000);
+            lock.report(source, true);
+
+            expect(checks - afterStart).toBe(2);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("does not ask the platform again for sources that start during the pause after a failed start", () => {
         vi.useFakeTimers();
 

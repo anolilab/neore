@@ -17,6 +17,9 @@ export interface SleepBlocker {
 /** How long a failed start or stop waits before the platform is asked again. */
 const RETRY_MS = 5000;
 
+/** How often an output update checks the inhibitor the platform holds. */
+const VERIFY_MS = 5000;
+
 export class SleepLock {
     /** The sources that have a turn running now. A set, so a report that repeats changes nothing. */
     private readonly running = new Set<object>();
@@ -30,6 +33,9 @@ export class SleepLock {
 
     /** The state the last failed call was made for: during the pause, the platform is not asked again for that state. */
     private failedWanted = false;
+
+    /** Until when an output update does not check the inhibitor again. */
+    private verifyAt = 0;
 
     public constructor(
         private readonly blocker: SleepBlocker,
@@ -57,12 +63,20 @@ export class SleepLock {
             return;
         }
 
-        // An output update repeats the state: it asks the platform only when the inhibitor does not match the turns. The
-        // check also takes back an inhibitor the platform dropped during the turn.
-        const held = this.blockerId !== undefined && this.blocker.isStarted(this.blockerId);
+        // An output update repeats the state. It checks the inhibitor at most once per `VERIFY_MS`, so a streamed update does
+        // not ask the platform each time; the check takes back an inhibitor the platform dropped during the turn.
+        if (!changed) {
+            if (Date.now() < this.verifyAt) {
+                return;
+            }
 
-        if (!changed && held === wanted) {
-            return;
+            this.verifyAt = Date.now() + VERIFY_MS;
+
+            const held = this.blockerId !== undefined && this.blocker.isStarted(this.blockerId);
+
+            if (held === wanted) {
+                return;
+            }
         }
 
         this.sync();
