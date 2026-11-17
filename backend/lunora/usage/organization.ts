@@ -65,6 +65,13 @@ export const groupMembers = <Member extends { active: boolean }>(members: Readon
 };
 
 /**
+ * Whether a full group's sums are released: not withheld (see {@link pageWithheld}), and no member read past the ledger's ceiling. A
+ * truncated member is withheld with the group, so no response says which member had more rows than the read takes.
+ */
+export const groupReleased = (group: ReadonlyArray<{ active: boolean; truncated?: boolean }>): boolean =>
+    !pageWithheld(group) && group.every((member) => member.truncated !== true);
+
+/**
  * Whether a group's sums (or the trailing members') are withheld: some of its members were active in the period, but fewer than
  * {@link MIN_MEMBERS_PER_GROUP}. The sum of a few active members, with the rest quiet, is one person's spend. A group where nobody was
  * active shows nothing to hide.
@@ -268,7 +275,7 @@ export const openOrganizationCursor = async (organizationId: string, since: numb
 };
 
 export const getOrganizationProjectUsage = authAction
-    .use(rateLimit("library/read"))
+    .use(rateLimit("usage/organization"))
     .input({ cursor: v.optional(v.string().max(MAX_LENGTH.cursor)), organizationId: v.string().max(MAX_LENGTH.id), since: v.number() })
     .output(
         v.object({
@@ -386,7 +393,7 @@ export const getOrganizationProjectUsage = authAction
         // A full group is shown when none of its members was active or all were; a group with some active members is withheld whole. The
         // trailing members are shown only when none of them was active.
         const { closed, open } = groupMembers(walked);
-        const releasedGroups = closed.filter((group) => !pageWithheld(group));
+        const releasedGroups = closed.filter((group) => groupReleased(group));
         const groupsWithheld = releasedGroups.length < closed.length;
         const openWithheld = pageWithheld(open);
         const shown = [...releasedGroups.flat(), ...(openWithheld ? [] : open)];
@@ -460,7 +467,9 @@ export const getOrganizationProjectUsage = authAction
                 .toSorted((a, b) => b.costMicrodollars - a.costMicrodollars || b.replies - a.replies || a.title.localeCompare(b.title)),
             ...(smallReleased && small.replies > 0 && { small }),
             ...(removed.replies > 0 && { removed }),
-            truncated: projectsCut || openWithheld || groupsWithheld || someWithheld || shown.some((member) => member.truncated),
+            // A member's own truncation is never copied out: it would show that one member had more rows than the read takes. Their group is
+            // withheld instead, which says only that some group is partial.
+            truncated: projectsCut || openWithheld || groupsWithheld || someWithheld,
         };
     });
 
