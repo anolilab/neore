@@ -17,6 +17,7 @@ import { HookRunner } from "./hooks/runner";
 import type { HooksView } from "./hooks/types";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { JsonRpcConnection } from "./jsonrpc";
+import type { SleepLock } from "./keep-awake";
 import type { PermissionGate } from "./permission";
 import { declineGate } from "./permission";
 import type { PortView, StopResult, StopTarget } from "./ports/ports";
@@ -72,6 +73,8 @@ export interface ManagerOptions {
     onChange: () => void;
     /** `device-core`'s `acpSpawnPlan`, parsed. Throws when the agent or folder is not allowed. */
     plan: (agentKey: string, folder: string | null) => SpawnPlan;
+    /** Held while any of this manager's turns runs, so the computer does not sleep mid-turn (`keep-awake.ts`). */
+    sleepLock?: SleepLock;
     spawn: Spawner;
     startupTimeoutMs?: number;
     /** The core's terminals (`terminals.ts`), offered to agents whose folder is on this computer. Without it, none is. */
@@ -99,6 +102,9 @@ export class AcpManager {
     private readonly inUse = new Map<string, Set<Promise<unknown>>>();
 
     private readonly processes = new Set<AgentProcess>();
+
+    /** Set when the manager is dropped with its server: no start may spawn on it from then on. */
+    private retired = false;
 
     /** The hook runner of each session that has one; it lives and dies with the session. */
     private readonly runners = new Map<string, HookRunner>();
@@ -273,7 +279,7 @@ export class AcpManager {
                         ? undefined
                         : { ended: () => runner?.stop(), turnEnded: () => runner?.turnEnded(), turnStarted: () => runner?.turnStarted() },
                 log: this.options.log,
-                onChange: () => this.changed(),
+                onChange: () => this.sessionChanged(),
                 process: child,
                 startupTimeoutMs: this.options.startupTimeoutMs,
                 terminals: this.options.terminals,
@@ -535,6 +541,25 @@ export class AcpManager {
                 // One group that cannot be signalled must not spare the others.
             }
         }
+
+        // The turns die with their agents, so this manager no longer keeps the computer awake.
+        this.options.sleepLock?.report(this, false);
+    }
+
+    /** Refuses every new start from now on: a start still waiting on a closing session must not spawn once the runtime is dropped. */
+    public refuse(): void {
+        this.retired = true;
+    }
+
+    /** Lets starts through again, for a removal that failed and kept the runtime. */
+    public reopen(): void {
+        this.retired = false;
+    }
+
+    /** Refuses new starts and ends everything still running: the runtime is being dropped. */
+    public retire(): void {
+        this.refuse();
+        this.killAll();
     }
 
     private refuseHeld(agentKey: string): void {
@@ -547,6 +572,10 @@ export class AcpManager {
     private refuseStart(agentKey: string): void {
         // Again: a sign-out can have begun while the superseded sessions were closing.
         this.refuseHeld(agentKey);
+
+        if (this.retired) {
+            throw new Error("that server is being removed");
+        }
 
         if (this.summaries().filter((session) => session.status !== "ended").length >= MAX_SESSIONS) {
             throw new Error(`at most ${String(MAX_SESSIONS)} agents at once; close one first`);
@@ -589,6 +618,15 @@ export class AcpManager {
             this.changeTimer = undefined;
             this.options.onChange();
         }, CHANGE_INTERVAL_MS);
+    }
+
+    /**
+     * A session's status changed. The sleep lock is set now, not on the coalesced timer: a turn that starts must hold the
+     * computer awake before it can be put to sleep, and the release must not wait either.
+     */
+    private sessionChanged(): void {
+        this.changed();
+        this.options.sleepLock?.report(this, this.summaries().some((summary) => summary.status === "busy"));
     }
 
     private spawn(plan: SpawnPlan, agentKey: string): AgentProcess {

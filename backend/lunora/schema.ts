@@ -31,6 +31,7 @@ import {
     vDeviceTransport,
 } from "./devices/validators";
 import { embed } from "./embed";
+import { vFeedbackKind } from "./feedback/validators";
 import {
     vEvalCheck,
     vEvalCheckResult,
@@ -1070,6 +1071,26 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_user_and_status", ["userId", "status"])
         .index("by_dataset_and_createdAt", ["datasetId", "createdAt"]),
+
+    /**
+     * What a user sent through "Send feedback": a kind, their text, up to
+     * `MAX_FEEDBACK_IMAGES` images (R2 keys under `feedback/<userId>/`) and,
+     * when they agreed, the path of the page it was sent from.
+     */
+    feedback: defineTable({
+        createdAt: v.number(),
+        images: v.array(v.object({ contentType: v.string(), key: v.string(), size: v.number() })),
+        kind: vFeedbackKind,
+        message: v.string(),
+        pagePath: v.optional(v.string()),
+        userId: v.string(),
+    })
+        // `.global()`, not `.shardBy("userId")`: read across users by the admins.
+        .global()
+        .index("by_userId", ["userId"])
+        // One user's rows oldest first, for the export; the admins read across users by time.
+        .index("by_userId_createdAt", ["userId", "createdAt"])
+        .index("by_createdAt", ["createdAt"]),
 
     files: defineTable({
         chatId: v.optional(v.string()),

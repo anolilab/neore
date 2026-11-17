@@ -61,6 +61,7 @@ import { purgeObject } from "../../usage/gdpr";
 import { eraseKnowledgeForUser, eraseProjectKnowledgeForProject } from "../../knowledge/gdpr";
 import { eraseProjectRepositories, eraseProjectRepositoriesForUser } from "../../projects/gdpr";
 import { eraseBotsForUser } from "../../bots/gdpr";
+import { eraseFeedbackForUser } from "../../feedback/gdpr";
 import { eraseTriggersForUser } from "../../triggers/gdpr";
 import { eraseSandboxSessionsForUser } from "../../sandbox/gdpr";
 import { eraseMessengerConnectionsForUser } from "../../messenger/gdpr";
@@ -361,6 +362,8 @@ export const deleteUserIntegrations = internalMutation
         const fileLinks = await eraseChatFileThreadsForUser(context, userId);
         const triggers = await eraseTriggersForUser(context, userId);
         const bots = await eraseBotsForUser(context, userId);
+        // The feedback the user sent, with its images (`feedback/gdpr.ts`).
+        const feedback = await eraseFeedbackForUser(context, userId);
         const sessions = await eraseSandboxSessionsForUser(context, userId);
 
         return {
@@ -373,6 +376,7 @@ export const deleteUserIntegrations = internalMutation
                 fileLinks.hasMore ||
                 triggers.hasMore ||
                 bots.hasMore ||
+                feedback.hasMore ||
                 sessions.hasMore,
         };
     });

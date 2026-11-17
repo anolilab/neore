@@ -14,7 +14,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { BrowserWindow as BrowserWindowInstance, IpcMainInvokeEvent, WebContents } from "electron";
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, powerSaveBlocker } from "electron";
 
 import type { AcpCommand, AppliedCall } from "../acp/commands";
 import { HELD, HostCommands, isAcpEnvelope } from "../acp/commands";
@@ -23,6 +23,7 @@ import { HookApprovals } from "../acp/hooks/approvals";
 import { AcpImporter } from "../acp/import";
 import { HostPoster } from "../acp/ingest";
 import { AgentInstaller } from "../acp/install";
+import { SleepLock } from "../acp/keep-awake";
 import { AcpManager } from "../acp/manager";
 import { coreGate } from "../acp/permission";
 import { acpSupported, spawnAgent } from "../acp/process";
@@ -346,6 +347,18 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         return consent === undefined ? undefined : { folderId: consent.folderId, folderLabel: consent.folderLabel };
     };
 
+    /** One sleep lock for every manager on this computer and its servers: a turn anywhere keeps the computer awake. */
+    const sleepLock = new SleepLock(
+        {
+            isStarted: (id) => powerSaveBlocker.isStarted(id),
+            start: () => powerSaveBlocker.start("prevent-app-suspension"),
+            stop: (id) => {
+                powerSaveBlocker.stop(id);
+            },
+        },
+        (message) => console.error(message),
+    );
+
     const requireAcp = (): AcpManager => {
         const core = requireCore();
 
@@ -363,6 +376,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             observer: host,
             onChange: () => send(state.local?.webContents, LOCAL_EVENT.acp),
             plan: (agentKey, folder) => JSON.parse(core.acpSpawnPlan(agentKey, folder)) as SpawnPlan,
+            sleepLock,
             spawn: spawnAgent,
             // Run by the core in the shell sandbox, after a once-only prompt in this computer's window.
             terminals: coreTerminals(core),
@@ -424,6 +438,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
                 (JSON.parse(core.settingsGet()) as SettingsView).hosts.map((host) => {
                     return { acpAgents: host.acpAgents, acpConsents: host.acpConsents, deviceId: host.deviceId, name: host.name };
                 }),
+            sleepLock,
             userData: app.getPath("userData"),
         });
 
@@ -434,7 +449,22 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     const posterFor = (deviceId: string | undefined): HostPoster => {
         const servers = requireServers();
 
-        return deviceId !== undefined && servers.isServer(deviceId) ? servers.get(deviceId).poster : requireHost(requireCore());
+        return deviceId !== undefined && servers.isServer(deviceId) ? servers.posterForEnd(deviceId) : requireHost(requireCore());
+    };
+
+    /**
+     * The poster that ends a held turn, or none when its server's runtime has already ended. The receipt replay calls the
+     * callbacks that end held turns one after another: a throw here would stop it, so the missing poster is logged instead and
+     * the receipt still completes.
+     */
+    const posterOfHeld = (deviceId: string | undefined): HostPoster | undefined => {
+        try {
+            return posterFor(deviceId);
+        } catch (error) {
+            console.error(`[acp-host] a held turn could not be ended: ${error instanceof Error ? error.message : String(error)}`);
+
+            return undefined;
+        }
     };
 
     /** Opens the session the backend asked for; the command's receipt stays open until it has opened or failed, and the messages held for it follow. */
@@ -509,12 +539,13 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         state.commands ??= new HostCommands({
             apply: applyCommand,
             core: requireCore(),
-            interrupted: (held) => posterFor(held.deviceId).endLapsedTurn(held.sessionId, held.turnId, held.threadId, { reason: "interrupted" }),
-            lapsed: (held) => posterFor(held.deviceId).endLapsedTurn(held.sessionId, held.turnId, held.threadId, { error: NEVER_OPENED, reason: "failed" }),
+            interrupted: (held) => posterOfHeld(held.deviceId)?.endLapsedTurn(held.sessionId, held.turnId, held.threadId, { reason: "interrupted" }),
+            lapsed: (held) =>
+                posterOfHeld(held.deviceId)?.endLapsedTurn(held.sessionId, held.turnId, held.threadId, { error: NEVER_OPENED, reason: "failed" }),
             log: (message) => console.error(message),
             receiptFile: path.join(app.getPath("userData"), "acp-host-receipts.json"),
             refused: (held, reason) =>
-                posterFor(held.deviceId).endLapsedTurn(held.sessionId, held.turnId, held.threadId, {
+                posterOfHeld(held.deviceId)?.endLapsedTurn(held.sessionId, held.turnId, held.threadId, {
                     error: `the message was not sent: ${reason}`.slice(0, 1000),
                     reason: "failed",
                 }),
@@ -570,6 +601,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         // Synchronous: `will-quit` cannot await, and an agent left behind would outlive the app.
         state.acp?.killAll();
         state.servers?.killAll();
+        sleepLock.release();
         state.host?.stop();
         state.servers?.stop();
         state.transport?.stop();
