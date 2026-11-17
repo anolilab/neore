@@ -1,4 +1,5 @@
 import { stripHiddenText } from "@neore/ai/utils";
+import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { withUnlockProofBody } from "@neore/client-runtime";
 import type { QueryClient } from "@tanstack/react-query";
@@ -23,7 +24,7 @@ import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
 import { AppError } from "@/lib/errors";
 import { providerLogger } from "@/lib/logger";
-import type { useCRPC } from "@/lib/lunora/crpc";
+import type { useCRPC, useLunora } from "@/lib/lunora/crpc";
 
 import { DEFAULT_MESSAGE_OPTS } from "../constants/query-options";
 import { fetchWithDeadline } from "../lib/fetch-with-deadline";
@@ -83,6 +84,7 @@ export interface SendMessageEnv extends ChatActionBase {
     isMountedRef: RefObject<boolean>;
     kickOffMedia: KickOffMedia;
     localTarget: ReturnType<typeof useLocalModelTurn>["target"];
+    lunora: ReturnType<typeof useLunora>;
     model: string;
     navigate: ReturnType<typeof useNavigate>;
     newChatsTemporary: boolean;
@@ -149,6 +151,18 @@ export const holdSendForSignIn = (text: string, { guestMessageId }: SendMessageO
 };
 
 /**
+ * Files a new thread in the project the composer chip picked. A failed move leaves the thread outside the project; the
+ * send itself has already started and is not held for it.
+ */
+const fileNewThreadInProject = (lunora: ReturnType<typeof useLunora>, threadId: string, projectId: string): void => {
+    void lunora
+        .mutation(api.projects.functions.moveThreadToProject, { projectId: projectId as Id<"projects">, threadId: threadId as Id<"threads"> })
+        .catch((error: unknown) => {
+            providerLogger.error("[ChatProvider] Could not file the new thread in its project", error);
+        });
+};
+
+/**
  * One user turn, local or through the gateway; `runSendMessage` marks the thread around it and gathers its `report`.
  */
 const runSendMessageBody = async (
@@ -184,6 +198,7 @@ const runSendMessageBody = async (
         isMountedRef,
         kickOffMedia,
         localTarget,
+        lunora,
         messagesRef,
         model,
         navigate,
@@ -319,6 +334,11 @@ const runSendMessageBody = async (
 
                 if (createdThread) {
                     trackEvent("thread_created", { mode: "text", model });
+
+                    if (pendingSettings?.projectId && !newChatTemporaryFields(pendingSettings, newChatsTemporary)) {
+                        fileNewThreadInProject(lunora, savedThreadId, pendingSettings.projectId);
+                    }
+
                     setTransitioningMessage({ text, threadId: savedThreadId });
                     navigate({ params: { threadId: savedThreadId }, state: { isNewThread: true } as HistoryState, to: "/chat/$threadId" });
                 }
@@ -581,6 +601,12 @@ const runSendMessageBody = async (
 
             // Navigate to new thread if we just created one
             if (isCreatingNewThread && data.threadId) {
+                // The chip's project: the create request takes none, so the thread is filed once its id is back. Not for a
+                // temporary chat, which the backend keeps out of every project.
+                if (pendingSettings?.projectId && requestBody.temporary !== true) {
+                    fileNewThreadInProject(lunora, data.threadId, pendingSettings.projectId);
+                }
+
                 // Prime caches for both individual thread query AND composite query
                 // This prevents expensive re-fetches during route loading
                 const optimisticThread = {

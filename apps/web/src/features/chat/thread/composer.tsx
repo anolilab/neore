@@ -68,6 +68,7 @@ import ComposerLanguageSelector from "./composer-language-selector";
 import ComposerMCPSelector from "./composer-mcp-selector";
 import ComposerModelSelector from "./composer-model-selector";
 import ComposerThreadPermissionMode, { usePermissionModeSaving } from "./composer-permission-mode";
+import ComposerProjectHint from "./composer-project-hint";
 import ComposerReferencesButton from "./composer-references-button";
 import ComposerResearchDepth from "./composer-research-depth";
 import ComposerSearchMode from "./composer-search-mode";
@@ -705,6 +706,9 @@ const Composer: FC<ComposerProps> = ({
                             {!minimal && isEnableFollowupSuggestions && !isImageModel && !isVideoModel && !isAudioModel && !isStreaming && !isSubmitting && (
                                 <ComposerFollowupSuggestions />
                             )}
+
+                            {/* Project hint for a new thread's first message - not in a comparison fan-out, which files nothing */}
+                            {!minimal && !onSubmitOverride && !isStreaming && !isSubmitting && <ComposerProjectHint />}
 
                             {/* Search suggestions while typing - only in search modes */}
                             {composerMode === "text" && searchMode !== "chat" && !isStreaming && !isSubmitting && <ComposerSearchSuggestions />}

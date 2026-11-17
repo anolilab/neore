@@ -14413,6 +14413,16 @@ msgstr "File \"{fileName}\" deleted successfully"
 msgid "File access and AI-powered universal search across work apps"
 msgstr "File access and AI-powered universal search across work apps"
 
+#. placeholder {0}: project.title
+#: src/features/chat/thread/composer-project-hint.tsx:58
+msgid "File in {0}"
+msgstr "File in {0}"
+
+#. placeholder {0}: project.title
+#: src/features/chat/thread/composer-project-hint.tsx:58
+msgid "Will file in {0}"
+msgstr "Will file in {0}"
+
 #: src/features/workflow/types/index.ts:489
 msgid "File input"
 msgstr "File input"
