@@ -37,7 +37,7 @@ import { patchRow } from "../lib/patch";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
-import { planActivityUpdate } from "../memory/reflection-logic";
+import { planActivityUpdate, resolveTimeZone } from "../memory/reflection-logic";
 import { chargeRound, hasRoundAllowance, loadTaskAccount, taskAccessProblem } from "../tasks/account";
 import type { BriefInputs } from "./daily-brief-logic";
 import {
@@ -67,14 +67,17 @@ const loadUserSettings = async (ctx: Pick<MutationCtx, "db">, userId: string) =>
 
 const loadState = async (ctx: Pick<MutationCtx, "db">, userId: string) => await ctx.db.dailyBriefState.findFirst({ where: { userId } });
 
-/** Records activity and makes sure the next morning's run is scheduled. Cheap when nothing changed. */
-const ensureScheduled = async (ctx: MutationCtx, userId: string, timeZone: string | undefined): Promise<void> => {
+/**
+ * Records activity and makes sure the next morning's run is scheduled. Cheap
+ * when nothing changed. Returns when the pending run fires.
+ */
+const ensureScheduled = async (ctx: MutationCtx, userId: string, timeZone: string | undefined): Promise<number | undefined> => {
     const now = Date.now();
     const state = await loadState(ctx, userId);
     const plan = planActivityUpdate(state ?? undefined, now);
 
     if (!plan.recordActivity && !plan.schedule) {
-        return;
+        return state?.scheduledFor;
     }
 
     let scheduled: { scheduledFor: number; scheduledJobId: string } | undefined;
@@ -91,6 +94,8 @@ const ensureScheduled = async (ctx: MutationCtx, userId: string, timeZone: strin
     } else {
         await ctx.db.insert("dailyBriefState", { lastActiveAt: now, userId, ...scheduled });
     }
+
+    return scheduled?.scheduledFor ?? state?.scheduledFor;
 };
 
 /** Scheduled by `afterRun` after an interactive reply. A no-op for users who have not opted in. */
@@ -111,11 +116,15 @@ export const noteDailyBriefActivity = internalMutation
         return null;
     });
 
-/** The settings toggle. Turning it on schedules the next morning's brief right away. */
+/**
+ * The settings toggle and the home page's offer. Turning it on schedules the
+ * next morning's brief right away and returns when it arrives, with the zone
+ * it was planned in, so the caller can show the time the user will see it.
+ */
 export const setDailyBriefEnabled = authMutation
     .use(rateLimit("notifications/update"))
     .input({ enabled: v.boolean() })
-    .output(v.null())
+    .output(v.union(v.null(), v.object({ nextBriefAt: v.number(), timeZone: v.string() })))
     .mutation(async ({ args: { enabled }, ctx }) => {
         const { userId } = ctx.user;
 
@@ -127,11 +136,30 @@ export const setDailyBriefEnabled = authMutation
 
         await saveUserSettings(ctx.db, settings, userId, { dailyBriefEnabled: enabled }, ctx.user.activeOrganization?.id ?? null);
 
-        if (enabled) {
-            await ensureScheduled(ctx, userId, settings?.timezone);
-        }
+        const nextBriefAt = enabled ? await ensureScheduled(ctx, userId, settings?.timezone) : undefined;
 
         ctx.log.event("notifications.set_daily_brief_enabled", { enabled });
+
+        return nextBriefAt === undefined ? null : { nextBriefAt, timeZone: resolveTimeZone(settings?.timezone) };
+    });
+
+/** "Not now" on the home page's offer: stored, so the offer never comes back. Turns nothing on or off. */
+export const dismissDailyBriefOffer = authMutation
+    .use(rateLimit("notifications/update"))
+    .input({})
+    .output(v.null())
+    .mutation(async ({ ctx }) => {
+        const { userId } = ctx.user;
+
+        if (await isAccountDeletionUnderway(ctx, userId)) {
+            return null;
+        }
+
+        const settings = await loadUserSettings(ctx, userId);
+
+        if (settings?.dailyBriefOfferDismissedAt === undefined) {
+            await saveUserSettings(ctx.db, settings, userId, { dailyBriefOfferDismissedAt: Date.now() }, ctx.user.activeOrganization?.id ?? null);
+        }
 
         return null;
     });

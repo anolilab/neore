@@ -503,6 +503,7 @@ for a schema table that is neither policed nor listed:
 | `messenger_functions.regeneratePairingCode` | mutation | authMutation + RL | messengerConnections | row.userId == caller | ok — new; owner-only, rate-limited; code returned once, stored as SHA-256 |
 | `messenger_functions.updateConnectionReplyTools` | mutation | authMutation + RL | messengerConnections | row.userId == caller | ok — new; owner-only, rate-limited; groups normalised to a fixed list (`messenger/lib/reply-tools.ts`) |
 | `messenger_functions.updateConnectionStatus` | mutation | authMutation + RL | — | row.userId == caller | ok |
+| `notifications_daily_brief.dismissDailyBriefOffer` | mutation | authMutation + RL | userSettings | caller-scoped (ctx.user) | ok — new |
 | `notifications_daily_brief.setDailyBriefEnabled` | mutation | authMutation + RL | userSettings, dailyBriefState | caller-scoped (ctx.user) | ok — new |
 | `notifications_task_email.setTaskEmailEnabled` | mutation | authMutation + RL | userSettings | caller-scoped (ctx.user) | ok — new |
 | `notifications_functions.getNotificationInbox` | query | authQuery | notifications | caller-scoped (ctx.user) | ok — new |

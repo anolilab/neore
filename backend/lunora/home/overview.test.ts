@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import schema from "../schema";
-import { getHomeOverview } from "./overview";
+import { dismissDailyBriefOffer, setDailyBriefEnabled } from "../notifications/daily-brief";
+import { BRIEF_OFFER_MIN_THREADS, getHomeOverview } from "./overview";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -209,5 +210,78 @@ describe("getHomeOverview", () => {
             subAgents: [],
             unreadCount: 0,
         });
+    });
+});
+
+describe("the one-time Daily Brief offer", () => {
+    const asUser = () => harness.withIdentity({ userId: USER } as never);
+
+    const seedThreads = async (count: number) =>
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < count; index += 1) {
+                await ctx.db.insert("threads", { status: "regular", title: `Chat ${String(index)}`, updatedAt: Date.now(), userId: USER });
+            }
+        });
+
+    const settings = async () => await harness.run(async (ctx: any) => await ctx.db.userSettings.findFirst({ where: { userId: USER } }));
+
+    const offered = async (): Promise<boolean> => {
+        const result = await overview(USER);
+
+        return result.dailyBriefOffer;
+    };
+
+    it("waits until the user has a few chats", async () => {
+        await seedThreads(BRIEF_OFFER_MIN_THREADS - 1);
+
+        expect(await offered()).toBe(false);
+
+        await seedThreads(1);
+
+        expect(await offered()).toBe(true);
+    });
+
+    it("is never shown to someone who already turned it on or off", async () => {
+        await seedThreads(BRIEF_OFFER_MIN_THREADS);
+
+        for (const enabled of [true, false]) {
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.userSettings.findFirst({ where: { userId: USER } });
+
+                await (row
+                    ? ctx.db.patch("userSettings", row._id, { dailyBriefEnabled: enabled })
+                    : ctx.db.insert("userSettings", { dailyBriefEnabled: enabled, userId: USER }));
+            });
+
+            expect(await offered()).toBe(false);
+        }
+    });
+
+    it('"Not now" is stored, turns nothing on, and the offer does not come back', async () => {
+        await seedThreads(BRIEF_OFFER_MIN_THREADS);
+        await asUser().mutation(dismissDailyBriefOffer as never, {} as never);
+
+        const row = await settings();
+
+        expect(row?.dailyBriefOfferDismissedAt).toEqual(expect.any(Number));
+        expect(row?.dailyBriefEnabled).toBeUndefined();
+        expect(await offered()).toBe(false);
+    });
+
+    it('"Turn it on" enables it and says when the first brief arrives', async () => {
+        await seedThreads(BRIEF_OFFER_MIN_THREADS);
+        await harness.run(async (ctx: any) => await ctx.db.insert("userSettings", { timezone: "Europe/Berlin", userId: USER }));
+
+        const result = (await asUser().mutation(setDailyBriefEnabled as never, { enabled: true } as never)) as { nextBriefAt: number; timeZone: string };
+        const localHour = Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hour12: false, timeZone: "Europe/Berlin" }).format(result.nextBriefAt));
+
+        expect(result.timeZone).toBe("Europe/Berlin");
+        expect(result.nextBriefAt).toBeGreaterThan(Date.now());
+        expect(localHour).toBe(7);
+
+        const row = await settings();
+
+        expect(row?.dailyBriefEnabled).toBe(true);
+        expect(await offered()).toBe(false);
     });
 });

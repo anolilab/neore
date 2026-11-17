@@ -50,7 +50,10 @@ vi.mock("@/lib/lunora/crpc", () => {
 
     return {
         useCRPC: () => {
-            return { home: { overview: { getHomeOverview: overview } }, notifications: { daily_brief: { setDailyBriefEnabled: mutation } } };
+            return {
+                home: { overview: { getHomeOverview: overview } },
+                notifications: { daily_brief: { dismissDailyBriefOffer: mutation, setDailyBriefEnabled: mutation } },
+            };
         },
     };
 });
@@ -99,6 +102,7 @@ describe("home page sub-agents", () => {
             approvals: [],
             codingAgents: [],
             dailyBriefEnabled: true,
+            dailyBriefOffer: false,
             notifications: [],
             recentThreads: [],
             reviews: [],

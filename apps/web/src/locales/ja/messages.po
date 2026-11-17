@@ -688,7 +688,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} 個のツール: {1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:217
+#: src/features/home/components/home-page.tsx:219
 msgid "{0} unread"
 msgstr "未読 {0} 件"
 
@@ -1750,7 +1750,7 @@ msgstr ""
 msgid "a change is waiting to be read"
 msgstr "読み取り待ちの変更があります"
 
-#: src/features/home/components/home-page.tsx:166
+#: src/features/home/components/home-page.tsx:168
 msgid "A chat is waiting for your answer"
 msgstr "チャットがあなたの回答を待っています"
 
@@ -2375,7 +2375,7 @@ msgstr "フィルターを追加"
 msgid "Add Header"
 msgstr "ヘッダーを追加"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:331
+#: src/features/feedback/components/send-feedback-dialog.tsx:334
 msgid "Add images"
 msgstr ""
 
@@ -3184,7 +3184,7 @@ msgstr "すべてのカテゴリ"
 msgid "All changes saved"
 msgstr "すべての変更を保存しました"
 
-#: src/features/home/components/home-page.tsx:258
+#: src/features/home/components/home-page.tsx:239
 msgid "All chats"
 msgstr "すべてのチャット"
 
@@ -4126,7 +4126,7 @@ msgstr "返信を中断せずにサイドクエスチョンをする"
 msgid "Ask all models anything..."
 msgstr "すべてのモデルに何でも質問..."
 
-#: src/features/home/components/home-page.tsx:92
+#: src/features/home/components/home-page.tsx:93
 msgid "Ask anything to start a new chat…"
 msgstr "何でも質問して新しいチャットを始めましょう…"
 
@@ -4236,7 +4236,7 @@ msgid "Attachment (hidden)"
 msgstr "添付ファイル（非表示）"
 
 #. placeholder {0}: index + 1
-#: src/features/feedback/components/send-feedback-dialog.tsx:307
+#: src/features/feedback/components/send-feedback-dialog.tsx:310
 msgid "Attachment {0}"
 msgstr ""
 
@@ -5576,7 +5576,7 @@ msgstr "カナダ"
 #: src/features/evals/components/import-cases-dialog.tsx:113
 #: src/features/evals/components/run-dialog.tsx:282
 #: src/features/evals/components/save-eval-case-action.tsx:137
-#: src/features/feedback/components/send-feedback-dialog.tsx:372
+#: src/features/feedback/components/send-feedback-dialog.tsx:385
 #: src/features/knowledge/components/collection-dialog.tsx:97
 #: src/features/knowledge/components/collection-picker.tsx:112
 #: src/features/local-models/components/ollama-model-manager.tsx:300
@@ -5835,6 +5835,10 @@ msgstr "変化（ポイント）"
 #: src/features/canvas/components/canvas-toolbar.tsx:66
 msgid "Change colors"
 msgstr "色を変更"
+
+#: src/features/home/components/daily-brief-offer.tsx:69
+msgid "Change it in settings"
+msgstr ""
 
 #: src/features/chat/lock/thread-lock-dialog.tsx:150
 #: src/features/chat/thread-list/thread-node.tsx:887
@@ -8658,6 +8662,10 @@ msgstr "要約を保存できなかったため、何も送信されていませ
 msgid "Could not save this. Try again."
 msgstr "保存できませんでした。もう一度お試しください。"
 
+#: src/features/home/components/daily-brief-offer.tsx:79
+msgid "Could not save your answer. Try again."
+msgstr ""
+
 #: src/features/chat/host/host-options.tsx:256
 msgid "Could not send the change."
 msgstr ""
@@ -8731,8 +8739,12 @@ msgid "Could not switch the model. Please try again."
 msgstr "モデルを切り替えられませんでした。もう一度お試しください。"
 
 #: src/features/home/components/home-page.tsx:241
-msgid "Could not turn on the Daily Brief."
-msgstr "Daily Brief をオンにできませんでした。"
+#~ msgid "Could not turn on the Daily Brief."
+#~ msgstr "Daily Brief をオンにできませんでした。"
+
+#: src/features/home/components/daily-brief-offer.tsx:79
+msgid "Could not turn on the Daily Brief. Try again."
+msgstr ""
 
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:50
 msgid "Could not undo. Please try again."
@@ -9374,16 +9386,25 @@ msgstr "チェコ語（チェコ共和国）"
 msgid "Czech Republic"
 msgstr "チェコ共和国"
 
+#: src/features/home/components/daily-brief-offer.tsx:59
 #: src/features/notifications/components/notification-settings.tsx:224
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:57
 msgid "Daily Brief"
 msgstr "Daily Brief"
 
+#: src/features/home/components/daily-brief-offer.tsx:66
+msgid "Daily Brief is on. It arrives each morning."
+msgstr ""
+
+#. placeholder {0}: formatArrival(scheduled, i18n.locale)
+#: src/features/home/components/daily-brief-offer.tsx:65
+msgid "Daily Brief is on. Your first one arrives {0}."
+msgstr ""
+
 #: src/features/notifications/components/notification-settings.tsx:111
 msgid "Daily Brief turned off"
 msgstr "Daily Brief をオフにしました"
 
-#: src/features/home/components/home-page.tsx:242
 #: src/features/notifications/components/notification-settings.tsx:112
 msgid "Daily Brief turned on"
 msgstr "Daily Brief をオンにしました"
@@ -15275,9 +15296,13 @@ msgstr "ドイツ語（スイス）"
 msgid "Germany"
 msgstr "ドイツ"
 
+#: src/features/home/components/daily-brief-offer.tsx:75
+msgid "Get a short summary each morning of what finished, what needs you and what is still running."
+msgstr ""
+
 #: src/features/home/components/home-page.tsx:234
-msgid "Get a short summary here every morning."
-msgstr "毎朝ここに短いまとめが届きます。"
+#~ msgid "Get a short summary here every morning."
+#~ msgstr "毎朝ここに短いまとめが届きます。"
 
 #: src/features/notifications/components/notification-settings.tsx:193
 msgid "Get a system notification when a task finishes or something needs your approval, even with the app closed."
@@ -16727,7 +16752,7 @@ msgstr "画像"
 msgid "Images"
 msgstr "画像"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:302
+#: src/features/feedback/components/send-feedback-dialog.tsx:305
 msgid "Images ({MAX_FEEDBACK_IMAGES} at most)"
 msgstr ""
 
@@ -17080,7 +17105,7 @@ msgstr "受信トレイのセクション"
 msgid "Inception's diffusion-based language model"
 msgstr "Inception の拡散ベースの言語モデル"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:359
+#: src/features/feedback/components/send-feedback-dialog.tsx:367
 msgid "Include the page you are on"
 msgstr ""
 
@@ -18040,7 +18065,7 @@ msgstr "大"
 #~ msgid "Large photos are made smaller before sending (up to {0} MB each)."
 #~ msgstr ""
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:352
+#: src/features/feedback/components/send-feedback-dialog.tsx:355
 msgid "Large photos are made smaller before sending; each image can be up to {MAX_FEEDBACK_IMAGE_MB} MB."
 msgstr ""
 
@@ -21079,7 +21104,7 @@ msgid "Needs review"
 msgstr "要レビュー"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
-#: src/features/home/components/home-page.tsx:159
+#: src/features/home/components/home-page.tsx:161
 msgid "Needs you"
 msgstr "対応が必要"
 
@@ -21640,7 +21665,7 @@ msgstr "カメラが選択されていません"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "まだケースがありません。手動で追加するか、CSV または JSONL ファイルをインポートするか、チャットのターンを「評価ケースとして保存」で保存してください。"
 
-#: src/features/home/components/home-page.tsx:265
+#: src/features/home/components/home-page.tsx:246
 msgid "No chats yet. Start one above."
 msgstr "まだチャットはありません。上から始めましょう。"
 
@@ -22186,7 +22211,7 @@ msgstr "ツールはありません。"
 msgid "No triggers yet"
 msgstr "トリガーはまだありません"
 
-#: src/features/home/components/home-page.tsx:224
+#: src/features/home/components/home-page.tsx:226
 msgid "No unread notifications."
 msgstr "未読の通知はありません。"
 
@@ -22382,6 +22407,10 @@ msgstr "未測定"
 msgid "Not merged"
 msgstr "未マージ"
 
+#: src/features/home/components/daily-brief-offer.tsx:87
+msgid "Not now"
+msgstr ""
+
 #: src/features/devices/components/device-scope.tsx:125
 msgid "Not offered in any chat until you choose a project."
 msgstr "プロジェクトを選択するまで、どのチャットにも提供されません。"
@@ -22458,7 +22487,7 @@ msgstr "ここには何もありません。"
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "そのアドレスで待ち受けているサーバーがありません。Ollama または LM Studio のサーバーを起動し、ポートを確認して、URL が /v1 で終わっていることを確認してください。"
 
-#: src/features/home/components/home-page.tsx:180
+#: src/features/home/components/home-page.tsx:182
 msgid "Nothing is running right now."
 msgstr "現在実行中のものはありません。"
 
@@ -22466,7 +22495,7 @@ msgstr "現在実行中のものはありません。"
 msgid "Nothing is saved, installed or enabled until you choose to save."
 msgstr "保存を選択するまで、何も保存、インストール、有効化されません。"
 
-#: src/features/home/components/home-page.tsx:161
+#: src/features/home/components/home-page.tsx:163
 msgid "Nothing is waiting on you."
 msgstr "対応待ちのものはありません。"
 
@@ -22482,7 +22511,7 @@ msgstr "通知"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "通知ワークフロー、チャネル、受信者の設定"
 
-#: src/features/home/components/home-page.tsx:221
+#: src/features/home/components/home-page.tsx:223
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:199
@@ -25944,9 +25973,9 @@ msgstr "メッセージを待機列に追加"
 msgid "Queue message — sends when the current reply finishes"
 msgstr "メッセージを待機列に追加 — 現在の返信が終わると送信されます"
 
-#: src/features/home/components/home-page.tsx:111
-#: src/features/home/components/home-page.tsx:184
-#: src/features/home/components/home-page.tsx:192
+#: src/features/home/components/home-page.tsx:112
+#: src/features/home/components/home-page.tsx:186
+#: src/features/home/components/home-page.tsx:194
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
 #: src/features/sub-agents/components/worker-list.tsx:83
 #: src/features/sub-agents/components/worker-run-log.tsx:29
@@ -26438,7 +26467,7 @@ msgstr "リベースしてマージ"
 msgid "Recent"
 msgstr "最近"
 
-#: src/features/home/components/home-page.tsx:262
+#: src/features/home/components/home-page.tsx:243
 msgid "Recent chats"
 msgstr "最近のチャット"
 
@@ -26934,7 +26963,7 @@ msgid "Remove All Files"
 msgstr "すべてのファイルを削除"
 
 #. placeholder {0}: index + 1
-#: src/features/feedback/components/send-feedback-dialog.tsx:309
+#: src/features/feedback/components/send-feedback-dialog.tsx:312
 msgid "Remove attachment {0}"
 msgstr ""
 
@@ -27724,7 +27753,7 @@ msgid "Review submitted"
 msgstr "レビューを送信しました"
 
 #. placeholder {0}: task.title
-#: src/features/home/components/home-page.tsx:171
+#: src/features/home/components/home-page.tsx:173
 msgid "Review task: {0}"
 msgstr "タスクを確認：{0}"
 
@@ -28053,10 +28082,10 @@ msgstr "ワークフローを実行すると、ここに実行履歴が表示さ
 
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
-#: src/features/home/components/home-page.tsx:114
-#: src/features/home/components/home-page.tsx:178
-#: src/features/home/components/home-page.tsx:184
-#: src/features/home/components/home-page.tsx:192
+#: src/features/home/components/home-page.tsx:115
+#: src/features/home/components/home-page.tsx:180
+#: src/features/home/components/home-page.tsx:186
+#: src/features/home/components/home-page.tsx:194
 #: src/features/settings/components/chat/trigger-settings.tsx:184
 #: src/features/tasks/components/task-detail-dialog.tsx:138
 #: src/features/tasks/components/task-status.tsx:20
@@ -29082,7 +29111,7 @@ msgstr "セミリアルなビジュアルスタイル"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:430
 #: src/features/chat/host/host-composer.tsx:707
-#: src/features/feedback/components/send-feedback-dialog.tsx:376
+#: src/features/feedback/components/send-feedback-dialog.tsx:389
 #: src/features/sub-agents/components/worker-composer.tsx:118
 msgid "Send"
 msgstr "送信"
@@ -29216,7 +29245,8 @@ msgstr "メッセージを送信して返信を待っています"
 
 #: src/features/chat/guest-links/guest-page.tsx:274
 #: src/features/chat/thread/streaming-placeholder.tsx:617
-#: src/features/feedback/components/send-feedback-dialog.tsx:376
+#: src/features/feedback/components/send-feedback-dialog.tsx:379
+#: src/features/feedback/components/send-feedback-dialog.tsx:389
 msgid "Sending…"
 msgstr "送信中…"
 
@@ -30795,7 +30825,7 @@ msgstr "メッセージをピン留めするには会話を始めてください
 msgid "Start a conversation, generate images, write a document in canvas, run code — no tab-switching, no copy-pasting between apps."
 msgstr "会話を始めて、画像を生成し、キャンバスでドキュメントを書き、コードを実行 — タブの切り替えもアプリ間のコピー&ペーストも不要です。"
 
-#: src/features/home/components/home-page.tsx:81
+#: src/features/home/components/home-page.tsx:82
 msgid "Start a new chat"
 msgstr "新しいチャットを開始"
 
@@ -30825,7 +30855,7 @@ msgstr "新しい一時チャットを開始（{0}）"
 msgid "Start building"
 msgstr "構築を始める"
 
-#: src/features/home/components/home-page.tsx:95
+#: src/features/home/components/home-page.tsx:96
 msgid "Start chat"
 msgstr "チャットを開始"
 
@@ -35086,6 +35116,10 @@ msgstr "トルコ語（トルコ）"
 msgid "Turn any GitHub repository into a remote MCP endpoint"
 msgstr "任意の GitHub リポジトリをリモート MCP エンドポイントに変換"
 
+#: src/features/home/components/daily-brief-offer.tsx:84
+msgid "Turn it on"
+msgstr ""
+
 #: src/features/develop/components/merge-panel.tsx:126
 msgid "Turn off"
 msgstr "オフにする"
@@ -35103,8 +35137,8 @@ msgstr "自動マージをオフにしますか？"
 #~ msgstr ""
 
 #: src/features/home/components/home-page.tsx:249
-msgid "Turn on Daily Brief"
-msgstr "Daily Brief をオンにする"
+#~ msgid "Turn on Daily Brief"
+#~ msgstr "Daily Brief をオンにする"
 
 #: src/features/chat/goal/composer-goal.tsx:62
 #~ msgid "Turn on run until done"
@@ -35573,7 +35607,7 @@ msgstr ""
 msgid "Untitled"
 msgstr "無題"
 
-#: src/features/home/components/home-page.tsx:270
+#: src/features/home/components/home-page.tsx:251
 msgid "Untitled chat"
 msgstr "無題のチャット"
 
@@ -37028,14 +37062,14 @@ msgid "Waiting for your answer"
 msgstr "あなたの回答を待っています"
 
 #. placeholder {0}: approval.threadTitle
-#: src/features/home/components/home-page.tsx:166
+#: src/features/home/components/home-page.tsx:168
 msgid "Waiting for your answer in {0}"
 msgstr "{0} であなたの回答を待っています"
 
 #: src/features/chat/thread-list/thread-node.tsx:617
 #: src/features/chat/thread-list/thread-node.tsx:624
 #: src/features/chat/thread/tool-approval.tsx:78
-#: src/features/home/components/home-page.tsx:114
+#: src/features/home/components/home-page.tsx:115
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:57
 msgid "Waiting for your approval"
@@ -37281,7 +37315,7 @@ msgstr "学んだこと（{0}）"
 msgid "What is {0} best for?"
 msgstr "{0} が最も得意なことは？"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:265
+#: src/features/feedback/components/send-feedback-dialog.tsx:267
 msgid "What is it about?"
 msgstr ""
 
@@ -38154,7 +38188,7 @@ msgstr "下書きは保持されています。リンクのプロンプトは追
 msgid "Your export will include: profile, settings, conversations, files metadata, prompts, and usage history. The download link expires in 7 days."
 msgstr "エクスポートには、プロフィール、設定、会話、ファイルのメタデータ、プロンプト、利用履歴が含まれます。ダウンロードリンクの有効期限は 7 日間です。"
 
-#: src/features/feedback/components/send-feedback-dialog.tsx:286
+#: src/features/feedback/components/send-feedback-dialog.tsx:289
 msgid "Your feedback"
 msgstr ""
 

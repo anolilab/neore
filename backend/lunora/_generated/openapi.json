@@ -34696,6 +34696,9 @@
                     "dailyBriefEnabled": {
                       "type": "boolean"
                     },
+                    "dailyBriefOffer": {
+                      "type": "boolean"
+                    },
                     "notifications": {
                       "items": {
                         "properties": {
@@ -34936,6 +34939,7 @@
                     "approvals",
                     "codingAgents",
                     "dailyBriefEnabled",
+                    "dailyBriefOffer",
                     "notifications",
                     "recentThreads",
                     "reviews",
@@ -38301,6 +38305,61 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#notifications_daily_brief:dismissDailyBriefOffer": {
+      "post": {
+        "description": "Invoke the `mutation` `notifications_daily_brief:dismissDailyBriefOffer` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "notifications_daily_brief:dismissDailyBriefOffer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {},
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "notifications_daily_brief:dismissDailyBriefOffer",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "null"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "mutation: notifications_daily_brief:dismissDailyBriefOffer",
+        "tags": [
+          "notifications"
+        ],
+        "x-lunora-function-kind": "mutation"
+      }
+    },
     "/_lunora/rpc#notifications_daily_brief:setDailyBriefEnabled": {
       "post": {
         "description": "Invoke the `mutation` `notifications_daily_brief:setDailyBriefEnabled` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -38345,7 +38404,26 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "null"
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "properties": {
+                        "nextBriefAt": {
+                          "type": "number"
+                        },
+                        "timeZone": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "nextBriefAt",
+                        "timeZone"
+                      ],
+                      "type": "object"
+                    }
+                  ]
                 }
               }
             },

@@ -4,18 +4,19 @@ import { useLingui } from "@lingui/react/macro";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Textarea } from "@neore/ui/components/textarea";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowUp, Bot, ListChecks, MessageSquare, ShieldQuestion, Sparkles, Workflow } from "lucide-react";
 import type { FC, FormEvent, ReactNode } from "react";
 import { useId, useState } from "react";
-import { toast } from "sonner";
 
 import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
 import NotificationList from "@/features/notifications/components/notification-list";
 import useNotificationInbox from "@/features/notifications/hooks/use-notification-inbox";
 import { formatRelativeTime } from "@/features/notifications/lib/relative-time";
 import { useCRPC } from "@/lib/lunora/crpc";
+
+import DailyBriefOffer from "./daily-brief-offer";
 
 const Section: FC<{ action?: ReactNode; children: ReactNode; count?: number; icon: ReactNode; title: string }> = ({ action, children, count, icon, title }) => {
     const headingId = useId();
@@ -116,7 +117,6 @@ const HomePage: FC = () => {
     const crpc = useCRPC();
     const { data: overview, isError, isFetching, isLoading, refetch } = useQuery(crpc.home.overview.getHomeOverview.queryOptions({}));
     const { markRead } = useNotificationInbox({ enabled: false });
-    const enableBrief = useMutation(crpc.notifications.daily_brief.setDailyBriefEnabled.mutationOptions());
     const ago = (timestamp: number) => formatRelativeTime(timestamp, i18n.locale);
 
     const needsYouCount = (overview?.approvals.length ?? 0) + (overview?.reviews.length ?? 0);
@@ -153,6 +153,8 @@ const HomePage: FC = () => {
                     </Button>
                 </div>
             )}
+
+            {overview && <DailyBriefOffer offered={overview.dailyBriefOffer} />}
 
             {overview && (
                 <div className="grid gap-4 md:grid-cols-2">
@@ -229,27 +231,6 @@ const HomePage: FC = () => {
                                 }
                             }}
                         />
-                        {!overview.dailyBriefEnabled && (
-                            <div className="flex items-center justify-between gap-3 border-t px-4 pt-3 text-sm">
-                                <span className="text-muted-foreground">{t`Get a short summary here every morning.`}</span>
-                                <Button
-                                    disabled={enableBrief.isPending}
-                                    onClick={() =>
-                                        enableBrief.mutate(
-                                            { enabled: true },
-                                            {
-                                                onError: () => toast.error(t`Could not turn on the Daily Brief.`),
-                                                onSuccess: () => toast.success(t`Daily Brief turned on`),
-                                            },
-                                        )
-                                    }
-                                    size="sm"
-                                    variant="outline"
-                                >
-                                    {t`Turn on Daily Brief`}
-                                </Button>
-                            </div>
-                        )}
                     </Section>
 
                     <Section
