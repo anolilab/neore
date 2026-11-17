@@ -6492,6 +6492,112 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#admin_cleanup:getShardFootprint": {
+      "post": {
+        "description": "Invoke the `action` `admin_cleanup:getShardFootprint` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "admin_cleanup:getShardFootprint",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "cursor": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "admin_cleanup:getShardFootprint",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "abandonedShards": {
+                      "type": "number"
+                    },
+                    "approxBytes": {
+                      "type": "number"
+                    },
+                    "continueCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "incompleteShards": {
+                      "type": "number"
+                    },
+                    "isDone": {
+                      "type": "boolean"
+                    },
+                    "messageRows": {
+                      "type": "number"
+                    },
+                    "pendingShards": {
+                      "type": "number"
+                    },
+                    "shards": {
+                      "type": "number"
+                    },
+                    "threads": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "abandonedShards",
+                    "approxBytes",
+                    "continueCursor",
+                    "incompleteShards",
+                    "isDone",
+                    "messageRows",
+                    "pendingShards",
+                    "shards",
+                    "threads"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: admin_cleanup:getShardFootprint",
+        "tags": [
+          "admin"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#admin_cleanup:listCleanupLogs": {
       "post": {
         "description": "Invoke the `query` `admin_cleanup:listCleanupLogs` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -27456,6 +27562,128 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "hostActivity": {
+                      "properties": {
+                        "plan": {
+                          "items": {
+                            "properties": {
+                              "content": {
+                                "type": "string"
+                              },
+                              "priority": {
+                                "anyOf": [
+                                  {
+                                    "const": "high",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "medium",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "low",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "status": {
+                                "anyOf": [
+                                  {
+                                    "const": "pending",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "in_progress",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "completed",
+                                    "type": "string"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "content",
+                              "priority",
+                              "status"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "tools": {
+                          "items": {
+                            "properties": {
+                              "exit": {
+                                "properties": {
+                                  "code": {
+                                    "type": "number"
+                                  },
+                                  "signal": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [],
+                                "type": "object"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "output": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "anyOf": [
+                                  {
+                                    "const": "pending",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "in_progress",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "completed",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "failed",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "cancelled",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "declined",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "toolKind": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "status",
+                              "title",
+                              "toolKind"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "tools"
+                      ],
+                      "type": "object"
+                    },
                     "hostState": {
                       "anyOf": [
                         {

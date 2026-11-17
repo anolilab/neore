@@ -2022,6 +2022,44 @@ describe("a permission request from the agent", () => {
         expect(screen.getByRole("button", { name: "Decline" })).toBeTruthy();
     });
 
+    it("shows a terminal command with its folder, and offers allow once and decline for it", async () => {
+        mount({
+            ...withRequest(),
+            "acp.remote.getHostPendingPermissions": [
+                {
+                    command: "npm test",
+                    folder: "neore",
+                    options: [
+                        { kind: "allow_once", name: "Allow once", optionId: "allow" },
+                        { kind: "reject_once", name: "Decline", optionId: "decline" },
+                    ],
+                    requestId: "r1",
+                    tool: "Run a command in a terminal",
+                },
+            ],
+        });
+
+        expect(await screen.findByText("Run a command in a terminal")).toBeTruthy();
+        expect(screen.getByText("npm test")).toBeTruthy();
+        expect(screen.getByText("In neore")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Allow once" }));
+
+        await waitFor(() =>
+            expect(harness.calls).toContainEqual(["acp.remote.answerHostPermission", { optionId: "allow", requestId: "r1", threadId: "thread-1" }]),
+        );
+    });
+
+    it("offers only a decline for another request the computer allows alone", async () => {
+        mount({
+            ...withRequest(),
+            "acp.remote.getHostPendingPermissions": [{ command: "rm -rf build", options: [OPTIONS[1]], requestId: "r1", tool: "Run a command" }],
+        });
+
+        expect(await screen.findByText("rm -rf build")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Allow once" })).toBeNull();
+        expect(screen.getByRole("button", { name: "Decline" })).toBeTruthy();
+    });
+
     it("answers with the agent's own option id for that request", async () => {
         mount(withRequest());
 

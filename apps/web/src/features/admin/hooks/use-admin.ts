@@ -297,6 +297,25 @@ export const useGatewayAnalytics = (period: "24h" | "7d" = "24h") => {
     });
 };
 
+/**
+ * One page of the shard footprint census (`getShardFootprint`): totals for the shards on that page.
+ * Pass the previous page's `continueCursor` to measure the next shards.
+ */
+export const useShardFootprint = (cursor?: string) => {
+    const measure = useAction(api.admin.cleanup.getShardFootprint);
+
+    return useQuery({
+        queryFn: () => measure(cursor === undefined ? {} : { cursor }),
+        queryKey: ["admin", "shardFootprint", cursor ?? null],
+        refetchOnReconnect: false,
+        refetchOnWindowFocus: false,
+        retry: 1,
+        // Stale at once: a new dashboard visit measures again rather than showing an earlier visit's totals.
+        // Focus and reconnect refetches stay off (above), so a visit is the only thing that re-runs the scan.
+        staleTime: 0,
+    });
+};
+
 // =============================================================================
 // Feedback
 // =============================================================================
