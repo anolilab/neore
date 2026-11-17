@@ -107,6 +107,14 @@ export class ServerAgents {
         return this.options.servers().some((server) => server.deviceId === deviceId);
     }
 
+    /**
+     * The poster that ends a held turn of a server, which must still post while the server is being removed (the removal
+     * refuses commands, not the end of a turn already held). It never makes a runtime: a server with none gets the refusal.
+     */
+    public posterForEnd(deviceId: string): HostPoster {
+        return this.runtimes.get(deviceId)?.poster ?? this.get(deviceId).poster;
+    }
+
     /** Ends the sessions the person's approvals for a server no longer cover. */
     public async closeUnapproved(deviceId: string, view: Pick<AcpView, "agents" | "consents">): Promise<void> {
         await this.runtimes.get(deviceId)?.acp.closeUnapproved(view);

@@ -446,7 +446,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     const posterFor = (deviceId: string | undefined): HostPoster => {
         const servers = requireServers();
 
-        return deviceId !== undefined && servers.isServer(deviceId) ? servers.get(deviceId).poster : requireHost(requireCore());
+        return deviceId !== undefined && servers.isServer(deviceId) ? servers.posterForEnd(deviceId) : requireHost(requireCore());
     };
 
     /** Opens the session the backend asked for; the command's receipt stays open until it has opened or failed, and the messages held for it follow. */
