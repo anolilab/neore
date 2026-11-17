@@ -264,18 +264,6 @@ const ComposerTiptapEditor = ({
         [updateEditorRect],
     );
 
-    // Emoji shortcode state change handler
-    const handleEmojiStateChange = useCallback(
-        (match: EmojiShortcodeMatch | null) => {
-            setEmojiMatch(match);
-
-            if (match) {
-                updateEditorRect();
-            }
-        },
-        [updateEditorRect],
-    );
-
     // Keep placeholder in a ref so the Placeholder extension can read the latest value
     // without recreating the editor on every cycle.
     const placeholderRef = useRef(placeholder);
@@ -375,9 +363,8 @@ const ComposerTiptapEditor = ({
             VariableAutocomplete.configure({
                 onStateChange: handleVariableStateChange,
             }),
-            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             EmojiShortcode.configure({
-                onStateChange: handleEmojiStateChange,
+                onStateChange: setEmojiMatch,
             }),
             // Inert until `requestCompletion` is set: it only draws what it is handed.
             GhostCompletion,
@@ -636,7 +623,8 @@ const ComposerTiptapEditor = ({
     const requestCompletionRef = useRef(requestCompletion);
     const lastAnnouncedAtRef = useRef<number | null>(null);
     const hasCompletionSource = Boolean(requestCompletion);
-    const isPopupOpen = Boolean(slashMatch || fileMentionMatch || variableMatch || emojiOpen);
+    // A shortcode being typed counts as a popup, open or not yet, so the ghost does not finish it while it is typed.
+    const isPopupOpen = Boolean(slashMatch || fileMentionMatch || variableMatch || emojiOpen || (suggestions && emojiMatchState));
     const ghostAnnouncementText = t`Suggestion available, press Right Arrow to accept`;
 
     useEffect(() => {
