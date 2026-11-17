@@ -4,6 +4,7 @@
  * Hooks for admin operations using Lunora queries and mutations.
  * Provides type-safe access to admin functions with TanStack Query integration.
  */
+import type { ReturnOf } from "@lunora/react";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
@@ -312,5 +313,29 @@ export const useShardFootprint = (cursor?: string) => {
         // Stale at once: a new dashboard visit measures again rather than showing an earlier visit's totals.
         // Focus and reconnect refetches stay off (above), so a visit is the only thing that re-runs the scan.
         staleTime: 0,
+    });
+};
+
+// =============================================================================
+// Feedback
+// =============================================================================
+
+export type AdminFeedbackPage = ReturnOf<typeof api.feedback.admin.listFeedback>;
+export type AdminFeedbackItem = AdminFeedbackPage["page"][number];
+export type FeedbackKind = AdminFeedbackItem["kind"];
+
+/**
+ * How often an open feedback page reads again. The list is not live (`NEVER_LIVE` in `crpc.tsx`), so this is what
+ * brings in rows sent since, and it renews the signed image URLs long before their 12 hours run out.
+ */
+export const ADMIN_FEEDBACK_REFETCH_INTERVAL_MS = 5 * 60_000;
+
+/** One page of the feedback users sent, newest first; `cursor` is the previous page's `continueCursor`. */
+export const useAdminFeedback = (options: { cursor: string | null; kind?: FeedbackKind; limit: number }) => {
+    const crpc = useCRPC();
+
+    return useQuery({
+        ...crpc.feedback.admin.listFeedback.queryOptions({ cursor: options.cursor, kind: options.kind, limit: options.limit }),
+        refetchInterval: ADMIN_FEEDBACK_REFETCH_INTERVAL_MS,
     });
 };

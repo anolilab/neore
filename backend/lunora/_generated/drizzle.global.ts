@@ -231,6 +231,7 @@ export const feedback = sqliteTable("feedback", {
     by_userId: index("by_userId").on(t.userId),
     by_userId_createdAt: index("by_userId_createdAt").on(t.userId, t.createdAt),
     by_createdAt: index("by_createdAt").on(t.createdAt),
+    by_kind_createdAt: index("by_kind_createdAt").on(t.kind, t.createdAt),
 }));
 
 export const invitation = sqliteTable("invitation", {

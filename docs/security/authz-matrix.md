@@ -450,6 +450,7 @@ for a schema table that is neither policed nor listed:
 | `evals_functions.startRun` | mutation | authMutation + RL | evalDatasets, evalRuns, knowledgeFiles, skills | owner helper | ok |
 | `evals_functions.updateCase` | mutation | authMutation + RL | evalCases | owner helper | ok |
 | `evals_functions.updateDataset` | mutation | authMutation + RL | evalDatasets | owner helper | ok |
+| `feedback_admin.listFeedback` | query | adminQuery | feedback, user | admin role; the admin RLS scope is what reads across users past the owner-only `feedback` policy; images return as short-lived signed URLs, never their storage keys; page size clamped to 50 | ok — new |
 | `feedback_functions.submitFeedback` | action | authAction + RL | feedback (via internal insert) | caller-scoped (ctx.user); upload ids resolve only under the caller's own staging key; still images only, size and count capped | ok — new |
 | `file.getChatFileExtraction` | query | authQuery | chatFileAccess, chatFiles | caller's own `chatFileAccess` grant on the id, else `null` (same as missing); returns the extraction STATUS only, never the text | ok — new |
 | `file.getChatFileImageUrl` | query | authQuery | chatFileAccess, chatFiles | caller's own `chatFileAccess` grant on the id, else `null` (same as missing); returns a short-lived signed display URL, never the storage key | ok — new |

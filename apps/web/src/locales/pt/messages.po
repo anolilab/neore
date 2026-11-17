@@ -688,7 +688,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} ferramentas: {1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:222
+#: src/features/home/components/home-page.tsx:223
 msgid "{0} unread"
 msgstr "{0} não lidas"
 
@@ -1750,7 +1750,7 @@ msgstr ""
 msgid "a change is waiting to be read"
 msgstr "há uma alteração aguardando leitura"
 
-#: src/features/home/components/home-page.tsx:171
+#: src/features/home/components/home-page.tsx:172
 msgid "A chat is waiting for your answer"
 msgstr "Um chat está aguardando sua resposta"
 
@@ -2646,9 +2646,9 @@ msgstr "Ajustar"
 #: src/features/chat/sharing/thread-share-button.tsx:323
 #: src/features/layout/components/sidebar-shortcut.tsx:268
 #: src/features/layout/lib/dashboard-page-names.ts:12
-#: src/routes/admin/route.tsx:51
-#: src/routes/admin/route.tsx:70
-#: src/routes/admin/route.tsx:81
+#: src/routes/admin/route.tsx:56
+#: src/routes/admin/route.tsx:76
+#: src/routes/admin/route.tsx:87
 msgid "Admin"
 msgstr "Admin"
 
@@ -2931,7 +2931,7 @@ msgstr "Pontuações agregadas das duas execuções"
 msgid "AI"
 msgstr "IA"
 
-#: src/routes/admin/route.tsx:67
+#: src/routes/admin/route.tsx:73
 msgid "AI Chat"
 msgstr "Chat de IA"
 
@@ -3184,7 +3184,7 @@ msgstr "Todas as categorias"
 msgid "All changes saved"
 msgstr "Todas as alterações salvas"
 
-#: src/features/home/components/home-page.tsx:242
+#: src/features/home/components/home-page.tsx:243
 msgid "All chats"
 msgstr "Todos os chats"
 
@@ -3216,6 +3216,10 @@ msgstr "Todos os ícones"
 #: src/features/download/components/download-page.tsx:101
 msgid "All installers"
 msgstr "Todos os instaladores"
+
+#: src/features/admin/components/feedback-admin-page.tsx:168
+msgid "All kinds"
+msgstr "Todos os tipos"
 
 #: src/features/chat/thread/composer-mcp-selector.tsx:125
 msgid "All MCP servers active"
@@ -3723,7 +3727,7 @@ msgstr "Chave de API criada"
 #: src/features/settings/components/chat/api-keys-settings.tsx:554
 #: src/features/settings/lib/settings-navigation.ts:96
 #: src/features/settings/lib/settings-navigation.ts:104
-#: src/routes/admin/route.tsx:55
+#: src/routes/admin/route.tsx:61
 msgid "API Keys"
 msgstr "Chaves de API"
 
@@ -4215,6 +4219,10 @@ msgstr "Imagem anexada"
 #~ msgid "Attached image {0}"
 #~ msgstr ""
 
+#: src/features/admin/components/feedback-admin-page.tsx:69
+msgid "Attached images"
+msgstr "Imagens anexadas"
+
 #: src/features/chat/thread/ask-user-prompt.tsx:231
 msgid "Attached:"
 msgstr "Anexado:"
@@ -4298,7 +4306,7 @@ msgstr "áudio e vídeo"
 #: src/features/admin/components/audit-log-card.tsx:130
 #: src/features/layout/lib/dashboard-page-names.ts:18
 #: src/routes/admin/route.tsx:34
-#: src/routes/admin/route.tsx:52
+#: src/routes/admin/route.tsx:57
 msgid "Audit Log"
 msgstr "Log de auditoria"
 
@@ -6381,8 +6389,8 @@ msgstr "Limpar dados"
 msgid "Clean title slide"
 msgstr "Slide de título limpo"
 
-#: src/routes/admin/route.tsx:44
-#: src/routes/admin/route.tsx:53
+#: src/routes/admin/route.tsx:49
+#: src/routes/admin/route.tsx:58
 msgid "Cleanup"
 msgstr "Limpeza"
 
@@ -10115,6 +10123,10 @@ msgstr "Excluir com os arquivos"
 #: src/features/prompts/components/prompt-list.tsx:257
 msgid "Deleted {0, plural, one {# prompt} other {# prompts}}"
 msgstr "{0, plural, one {# prompt excluído} other {# prompts excluídos}}"
+
+#: src/features/admin/components/feedback-admin-page.tsx:49
+msgid "Deleted user"
+msgstr "Usuário excluído"
 
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:16
 msgid "Deletes 3 files in /drafts"
@@ -14121,6 +14133,21 @@ msgstr "Recursos: {0}"
 msgid "Feed image"
 msgstr "Imagem de feed"
 
+#: src/features/admin/components/feedback-admin-page.tsx:139
+#: src/features/admin/components/feedback-admin-page.tsx:154
+#: src/routes/admin/route.tsx:39
+#: src/routes/admin/route.tsx:59
+msgid "Feedback"
+msgstr "Feedback"
+
+#: src/features/admin/components/feedback-admin-page.tsx:132
+msgid "Feedback could not be loaded."
+msgstr "Não foi possível carregar o feedback."
+
+#: src/features/admin/components/feedback-admin-page.tsx:181
+msgid "Feedback pages"
+msgstr "Páginas de feedback"
+
 #: src/features/chat/thread/widgets/weather-widget.tsx:186
 msgid "Feels like {feelsLike}{temporaryUnit}"
 msgstr "Sensação térmica de {feelsLike}{temporaryUnit}"
@@ -14283,6 +14310,11 @@ msgstr "Cineastas que criam vídeos cinematográficos com forte foco em narrativ
 #: src/features/admin/components/audit-log-card.tsx:136
 msgid "Filter by action"
 msgstr "Filtrar por ação"
+
+#: src/features/admin/components/feedback-admin-page.tsx:164
+#: src/features/admin/components/feedback-admin-page.tsx:165
+msgid "Filter by kind"
+msgstr "Filtrar por tipo"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:718
 msgid "Filter by mode"
@@ -15025,7 +15057,7 @@ msgid "Gamma"
 msgstr "Gama"
 
 #: src/features/marketing/components/gateway-navbar.tsx:43
-#: src/routes/admin/route.tsx:54
+#: src/routes/admin/route.tsx:60
 msgid "Gateway"
 msgstr "Gateway"
 
@@ -16567,9 +16599,10 @@ msgstr "Ícone"
 msgid "Icon URL (Optional)"
 msgstr "URL do ícone (opcional)"
 
+#: src/features/admin/components/feedback-admin-page.tsx:23
 #: src/features/feedback/components/send-feedback-dialog.tsx:28
 msgid "Idea"
-msgstr ""
+msgstr "Ideia"
 
 #: src/features/marketing/components/landing-page.tsx:236
 msgid "Idea to finished output, one thread"
@@ -16579,6 +16612,7 @@ msgstr "Da ideia ao resultado final, em uma só conversa"
 msgid "Ideal for simple classification and extraction"
 msgstr "Ideal para classificação e extração simples"
 
+#: src/features/admin/components/feedback-admin-page.tsx:169
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:69
 msgid "Ideas"
 msgstr "Ideias"
@@ -16646,6 +16680,14 @@ msgstr "ilustração"
 #: src/routes/(chat)/workflow/gallery.tsx:21
 msgid "Image"
 msgstr "Imagem"
+
+#: src/features/admin/components/feedback-admin-page.tsx:84
+msgid "Image {position} could not be loaded"
+msgstr "Não foi possível carregar a imagem {position}"
+
+#: src/features/admin/components/feedback-admin-page.tsx:72
+msgid "Image {position} from {senderName}"
+msgstr "Imagem {position} de {senderName}"
 
 #: src/features/marketing/components/landing-page.tsx:211
 msgid "Image & Video"
@@ -18852,6 +18894,10 @@ msgstr "Carregando editor..."
 #: src/features/pages/components/page-editor.tsx:40
 msgid "Loading editor…"
 msgstr "Carregando editor…"
+
+#: src/features/admin/components/feedback-admin-page.tsx:119
+msgid "Loading feedback"
+msgstr "Carregando feedback"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:344
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:65
@@ -21117,7 +21163,7 @@ msgid "Needs review"
 msgstr "Precisa de revisão"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:550
-#: src/features/home/components/home-page.tsx:164
+#: src/features/home/components/home-page.tsx:165
 msgid "Needs you"
 msgstr "Precisa de você"
 
@@ -21482,6 +21528,10 @@ msgstr "Novos cadastros de usuários por dia"
 msgid "New Workflow"
 msgstr "Novo fluxo de trabalho"
 
+#: src/features/admin/components/feedback-admin-page.tsx:184
+msgid "Newer"
+msgstr "Mais recentes"
+
 #: src/features/marketing/data/models-data.ts:1115
 msgid "newest"
 msgstr "mais novo"
@@ -21678,7 +21728,7 @@ msgstr "Nenhuma câmera selecionada"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "Ainda não há casos. Adicione um manualmente, importe um arquivo CSV ou JSONL ou salve uma interação do chat com \"Salvar como caso de avaliação\"."
 
-#: src/features/home/components/home-page.tsx:249
+#: src/features/home/components/home-page.tsx:250
 msgid "No chats yet. Start one above."
 msgstr "Nenhum chat ainda. Comece um acima."
 
@@ -21802,6 +21852,14 @@ msgstr "Sem expiração"
 #: src/features/develop/components/checks-tab.tsx:138
 msgid "No failures in the checks shown."
 msgstr "Nenhuma falha nas verificações exibidas."
+
+#: src/features/admin/components/feedback-admin-page.tsx:136
+msgid "No feedback of this kind"
+msgstr "Nenhum feedback deste tipo"
+
+#: src/features/admin/components/feedback-admin-page.tsx:136
+msgid "No feedback yet"
+msgstr "Nenhum feedback ainda"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-sort-menu.tsx:264
 msgid "No fields found."
@@ -21934,6 +21992,7 @@ msgid "No models installed yet."
 msgstr "Nenhum modelo instalado ainda."
 
 #: src/features/admin/components/admin-dashboard-stats.tsx:246
+#: src/features/admin/components/feedback-admin-page.tsx:49
 #: src/features/admin/components/user-cell.tsx:72
 msgid "No name"
 msgstr "Sem nome"
@@ -22224,7 +22283,7 @@ msgstr "Nenhuma ferramenta."
 msgid "No triggers yet"
 msgstr "Nenhum gatilho ainda"
 
-#: src/features/home/components/home-page.tsx:229
+#: src/features/home/components/home-page.tsx:230
 msgid "No unread notifications."
 msgstr "Nenhuma notificação não lida."
 
@@ -22500,7 +22559,7 @@ msgstr "Nada aqui."
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "Nada está respondendo nesse endereço. Inicie o servidor do Ollama ou do LM Studio, confira a porta e verifique se a URL termina em /v1."
 
-#: src/features/home/components/home-page.tsx:185
+#: src/features/home/components/home-page.tsx:186
 msgid "Nothing is running right now."
 msgstr "Nada está em execução agora."
 
@@ -22508,7 +22567,7 @@ msgstr "Nada está em execução agora."
 msgid "Nothing is saved, installed or enabled until you choose to save."
 msgstr "Nada é salvo, instalado ou ativado até você escolher salvar."
 
-#: src/features/home/components/home-page.tsx:166
+#: src/features/home/components/home-page.tsx:167
 msgid "Nothing is waiting on you."
 msgstr "Nada está esperando por você."
 
@@ -22524,7 +22583,7 @@ msgstr "Notificação"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "Fluxos de notificação, canais e preferências de destinatários"
 
-#: src/features/home/components/home-page.tsx:226
+#: src/features/home/components/home-page.tsx:227
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:199
@@ -22571,8 +22630,8 @@ msgstr "Arquitetura inovadora de modelo de linguagem baseada em difusão"
 msgid "NSFW Content Review"
 msgstr "Revisão de conteúdo NSFW"
 
-#: src/routes/admin/route.tsx:39
-#: src/routes/admin/route.tsx:56
+#: src/routes/admin/route.tsx:44
+#: src/routes/admin/route.tsx:62
 msgid "NSFW Review"
 msgstr "Revisão NSFW"
 
@@ -22705,6 +22764,7 @@ msgid "old lines {text}"
 msgstr "linhas antigas {text}"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:45
+#: src/features/admin/components/feedback-admin-page.tsx:196
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:643
 msgid "Older"
 msgstr "Mais antigas"
@@ -23859,6 +23919,8 @@ msgid "Original system prompt"
 msgstr "Prompt de sistema original"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:171
+#: src/features/admin/components/feedback-admin-page.tsx:24
+#: src/features/admin/components/feedback-admin-page.tsx:171
 #: src/features/feedback/components/send-feedback-dialog.tsx:30
 #: src/features/settings/components/chat/models-settings.tsx:521
 msgid "Other"
@@ -25423,9 +25485,14 @@ msgstr "Pro é o seu plano pessoal: todos os modelos e 1.000 mensagens por dia."
 msgid "Pro models need a Pro plan. On a free plan the run stops before it starts."
 msgstr "Os modelos Pro exigem um plano Pro. Em um plano gratuito, a execução é interrompida antes de começar."
 
+#: src/features/admin/components/feedback-admin-page.tsx:25
 #: src/features/feedback/components/send-feedback-dialog.tsx:29
 msgid "Problem"
-msgstr ""
+msgstr "Problema"
+
+#: src/features/admin/components/feedback-admin-page.tsx:170
+msgid "Problems"
+msgstr "Problemas"
 
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:29
 msgid "Process a text file with AI to extract key points, then generate an image based on the summary"
@@ -25992,8 +26059,8 @@ msgid "Queue message — sends when the current reply finishes"
 msgstr "Colocar mensagem na fila — será enviada quando a resposta atual terminar"
 
 #: src/features/home/components/home-page.tsx:113
-#: src/features/home/components/home-page.tsx:189
-#: src/features/home/components/home-page.tsx:197
+#: src/features/home/components/home-page.tsx:190
+#: src/features/home/components/home-page.tsx:198
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
 #: src/features/sub-agents/components/worker-list.tsx:83
 #: src/features/sub-agents/components/worker-run-log.tsx:29
@@ -26485,7 +26552,7 @@ msgstr "Rebase e mesclagem"
 msgid "Recent"
 msgstr "Recentes"
 
-#: src/features/home/components/home-page.tsx:246
+#: src/features/home/components/home-page.tsx:247
 msgid "Recent chats"
 msgstr "Chats recentes"
 
@@ -26712,6 +26779,7 @@ msgid "Refining the draft…"
 msgstr "Refinando o rascunho…"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:221
+#: src/features/admin/components/feedback-admin-page.tsx:161
 msgid "Refresh"
 msgstr "Atualizar"
 
@@ -27771,7 +27839,7 @@ msgid "Review submitted"
 msgstr "Revisão enviada"
 
 #. placeholder {0}: task.title
-#: src/features/home/components/home-page.tsx:176
+#: src/features/home/components/home-page.tsx:177
 msgid "Review task: {0}"
 msgstr "Revisar tarefa: {0}"
 
@@ -28101,9 +28169,9 @@ msgstr "Execute seu fluxo de trabalho para ver o histórico de execuções aqui.
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
 #: src/features/home/components/home-page.tsx:116
-#: src/features/home/components/home-page.tsx:183
-#: src/features/home/components/home-page.tsx:189
-#: src/features/home/components/home-page.tsx:197
+#: src/features/home/components/home-page.tsx:184
+#: src/features/home/components/home-page.tsx:190
+#: src/features/home/components/home-page.tsx:198
 #: src/features/settings/components/chat/trigger-settings.tsx:184
 #: src/features/tasks/components/task-detail-dialog.tsx:138
 #: src/features/tasks/components/task-status.tsx:20
@@ -29297,6 +29365,15 @@ msgstr "Enviada pelo proprietário"
 #: src/features/sub-agents/components/worker-run-log.tsx:35
 msgid "Sent by you"
 msgstr "Enviado por você"
+
+#: src/features/admin/components/feedback-admin-page.tsx:60
+#~ msgid "Sent from"
+#~ msgstr ""
+
+#. placeholder {0}: item.pagePath
+#: src/features/admin/components/feedback-admin-page.tsx:62
+msgid "Sent from <0>{0}</0>"
+msgstr "Enviado de <0>{0}</0>"
 
 #: src/features/devices/components/device-tool-call.tsx:197
 msgid "Sent to {device}…"
@@ -35625,7 +35702,7 @@ msgstr ""
 msgid "Untitled"
 msgstr "Sem título"
 
-#: src/features/home/components/home-page.tsx:254
+#: src/features/home/components/home-page.tsx:255
 msgid "Untitled chat"
 msgstr "Chat sem título"
 
@@ -36239,7 +36316,7 @@ msgstr "Nome de usuário: @{platformUsername}"
 
 #: src/features/layout/lib/dashboard-page-names.ts:42
 #: src/routes/admin/route.tsx:29
-#: src/routes/admin/route.tsx:57
+#: src/routes/admin/route.tsx:63
 msgid "Users"
 msgstr "Usuários"
 
@@ -37080,7 +37157,7 @@ msgid "Waiting for your answer"
 msgstr "Aguardando sua resposta"
 
 #. placeholder {0}: approval.threadTitle
-#: src/features/home/components/home-page.tsx:171
+#: src/features/home/components/home-page.tsx:172
 msgid "Waiting for your answer in {0}"
 msgstr "Aguardando sua resposta em {0}"
 
@@ -37408,6 +37485,10 @@ msgstr "O que enviar e como distinguir uma resposta boa de uma ruim."
 #: src/features/settings/components/chat/event-trigger-fields.tsx:189
 msgid "What to watch"
 msgstr "O que monitorar"
+
+#: src/features/admin/components/feedback-admin-page.tsx:155
+msgid "What users sent from the app, newest first"
+msgstr "O que os usuários enviaram pelo app, os mais recentes primeiro"
 
 #: src/features/settings/lib/settings-keywords.ts:107
 msgid "what we store"
