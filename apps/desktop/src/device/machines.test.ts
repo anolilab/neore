@@ -183,17 +183,20 @@ describe("browse", () => {
     it("asks before every listing of a folder on this computer, a continuation page included, and lists nothing when declined", async () => {
         const { deps, machines } = setup();
 
-        mkdirSync(path.join(root, "a"));
-        await machines.browse("desk-1", root);
-        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringContaining(root) }));
+        // The real path: a root under a symlink (macOS /var) would be a second prompt, which another test covers.
+        const real = realpathSync(root);
+
+        mkdirSync(path.join(real, "a"));
+        await machines.browse("desk-1", real);
+        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringContaining(real) }));
         expect(deps.confirm).toHaveBeenCalledTimes(1);
 
-        await machines.browse("desk-1", root, "a");
+        await machines.browse("desk-1", real, "a");
         expect(deps.confirm).toHaveBeenCalledTimes(2);
 
         const declined = setup({ answer: false });
 
-        await expect(declined.machines.browse("desk-1", root, "a")).rejects.toThrow("declined");
+        await expect(declined.machines.browse("desk-1", real, "a")).rejects.toThrow("declined");
         expect(declined.deps.confirm).toHaveBeenCalledTimes(1);
     });
 

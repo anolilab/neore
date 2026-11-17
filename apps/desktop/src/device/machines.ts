@@ -127,22 +127,29 @@ const resolveOrNull = async (folder: string): Promise<string | null> => {
 };
 
 const browseLocal = async (requested: string, after: string | undefined, approve: (folder: string) => Promise<void>): Promise<MachineFolderPage> => {
-    // The lookup comes first, but its answer is given only after the person says yes. The prompt names the folder that would be
-    // listed (the resolved one; for a missing folder, the normalised request), so what is approved is what gets listed.
-    const resolved = await resolveOrNull(requested);
+    // Asked before anything is looked up: the prompt names the request as it normalises (no `..`), which is what the person can read.
+    const lexical = readMachinePath(path.resolve(requested), true);
 
-    await approve(resolved ?? path.resolve(requested));
+    await approve(lexical);
+
+    const resolved = await resolveOrNull(requested);
 
     if (resolved === null) {
         throw new Error("device: that folder was not found");
     }
 
-    // Looked up again after the answer: a folder swapped for a link while the prompt was open is not the one approved.
+    // A symlink or a name that resolves elsewhere: the person is shown the real folder before it is listed. The resolved name is
+    // checked the same way the prompt's name is, since a link target can carry characters that would disguise the prompt.
+    const folder = readMachinePath(resolved, true);
+
+    if (folder !== lexical) {
+        await approve(folder);
+    }
+
+    // Looked up again after the answers: a folder swapped for a link while the prompts were open is not the one approved.
     if (await resolveOrNull(requested) !== resolved) {
         throw new Error("device: that folder changed while it was being approved; try again");
     }
-
-    const folder = resolved;
 
     // Only the page and one more name are kept, so a folder of a million entries costs one page of memory.
     const kept: string[] = [];
@@ -389,7 +396,8 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
             }
 
             // The prompt names the folder that gets created: a symlink in the path is followed, so the resolved path is shown and created.
-            const target = existing === null ? await resolveNewPath(folder) : folder;
+            // A link target can carry characters that would disguise the prompt, so the resolved name is checked as the request is.
+            const target = readMachinePath(existing === null ? await resolveNewPath(folder) : folder, true);
 
             if (existing === null && !await ask({ detail: `Folder: ${JSON.stringify(target)}`, message: "Create a new folder on this computer?" })) {
                 throw declined();
