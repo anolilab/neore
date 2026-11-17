@@ -278,31 +278,38 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
     );
 
     // The content mounts only while the dialog is open, so every opening starts at step 1 with a fresh list.
-    useEffect(() => {
-        let cancelled = false;
+    const loadMachines = useCallback(async (): Promise<void> => {
+        const bridge = getAddProjectBridge();
+        const result = await attempt(async () => (bridge === undefined ? [] : bridge.listAddProjectMachines()));
 
-        const load = async (): Promise<void> => {
-            const bridge = getAddProjectBridge();
-            const result = await attempt(async () => (bridge === undefined ? [] : bridge.listAddProjectMachines()));
-
-            if (cancelled) {
-                return;
-            }
-
-            if (result.ok) {
-                setMachines(result.value);
-            } else {
-                setMachines([]);
-                setError(describeFailure(result.error));
-            }
-        };
-
-        load().catch(() => {});
-
-        return () => {
-            cancelled = true;
-        };
+        if (result.ok) {
+            setMachines(result.value);
+        } else {
+            setMachines([]);
+            setError(describeFailure(result.error));
+        }
     }, [describeFailure, setError]);
+
+    useEffect(() => {
+        loadMachines().catch(() => {});
+    }, [loadMachines]);
+
+    // A pairing begun before this picker opened finishes after it, and the instance that started it may be gone. Reload
+    // when it ends, so the rows show the server as paired.
+    const pairingWasOpen = useRef(pairingHost !== null);
+
+    useEffect(() => {
+        if (pairingHost !== null) {
+            pairingWasOpen.current = true;
+
+            return;
+        }
+
+        if (pairingWasOpen.current) {
+            pairingWasOpen.current = false;
+            loadMachines().catch(() => {});
+        }
+    }, [loadMachines, pairingHost]);
 
     // Focus moves to the step title when the step changes.
     const step = machine === null ? 1 : 2;
