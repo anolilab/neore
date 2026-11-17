@@ -1086,10 +1086,15 @@ describe("releaseDeviceCall", () => {
 });
 
 describe("revokeDevice", () => {
-    const remainingOn = async (deviceId: string) =>
-        (await harness.run(
-            async (ctx: any) => (await ctx.db.projects.findMany({ limit: 1000, where: { machineId: deviceId, userId: ownerId } })).page.length,
-        )) as number;
+    const remainingOn = async (deviceId: string) => {
+        const count = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.projects.findMany({ limit: 1000, where: { machineId: deviceId, userId: ownerId } });
+
+            return page.length;
+        });
+
+        return count as number;
+    };
     // The harness does not dispatch scheduled jobs, so a test runs the clearing body with the job's own args.
     const clearScheduled = async (args: unknown) => await harness.run(async (ctx: any) => await ctx.runMutation(internals.clearDeviceProjects, args as never));
     // Only the clear job is picked: the revoke may schedule other work.
