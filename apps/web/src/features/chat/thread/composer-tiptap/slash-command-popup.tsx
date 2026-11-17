@@ -47,6 +47,8 @@ interface SlashCommandPopupProps {
     models: GatewayModel[];
     /** Called to dismiss the popup (e.g., after selecting a model) */
     onDismiss: () => void;
+    /** Reports whether the menu is showing. A slash with nothing to list shows none, so the composer may open another list. */
+    onOpenChange?: (open: boolean) => void;
     /** Called to replace the slash text range in the editor */
     onReplace: (from: number, to: number, replacement: string) => void;
     /** The editor's whole text now; a `/clear` that finished reads it, so an edit the menu has not seen yet is not cut. */
@@ -144,6 +146,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
     match,
     models,
     onDismiss,
+    onOpenChange,
     onReplace,
     readDraft,
     warm = false,
@@ -282,6 +285,10 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
 
     const itemCount = items.length;
     const isOpen = match !== null && itemCount > 0;
+
+    useEffect(() => {
+        onOpenChange?.(isOpen);
+    }, [isOpen, onOpenChange]);
 
     // Reset the highlight when the item list changes. Adjusted during render
     // rather than through an effect so the popup never paints one frame with a

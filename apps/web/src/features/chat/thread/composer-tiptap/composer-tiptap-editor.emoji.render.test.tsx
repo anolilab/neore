@@ -354,6 +354,17 @@ describe("composer emoji shortcodes", () => {
         expect(screen.queryByRole("listbox", { name: "Emoji suggestions" })).toBeNull();
     });
 
+    it("opens for a shortcode after a slash command, whose menu has nothing to show here", async () => {
+        const { ref } = renderEditor();
+
+        await typeText(ref, "/compact :dog");
+
+        const options = await optionsOf();
+        const expected = searchEmojiShortcodes(await loadEmojiIndex(), "dog");
+
+        expect(options[0]!.textContent).toContain(`:${expected[0]!.shortcode}:`);
+    });
+
     it("does not open in Vim normal mode, where Enter and Escape are the Vim keys", async () => {
         settings.data = { composerVimMode: true };
 

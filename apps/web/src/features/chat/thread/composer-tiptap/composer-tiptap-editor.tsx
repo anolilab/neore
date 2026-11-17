@@ -206,6 +206,8 @@ const ComposerTiptapEditor = ({
 
     // Popup state
     const [slashMatchState, setSlashMatch] = useState<SlashCommandMatch | null>(null);
+    // Whether the slash menu shows: a slash with nothing to list shows nothing, so it must not hold the emoji list back.
+    const [slashOpen, setSlashOpen] = useState(false);
     const [fileMentionMatchState, setFileMentionMatch] = useState<FileMentionMatch | null>(null);
     const [variableMatchState, setVariableMatch] = useState<VariableAutocompleteMatch | null>(null);
     const [emojiMatchState, setEmojiMatch] = useState<EmojiShortcodeMatch | null>(null);
@@ -553,7 +555,7 @@ const ComposerTiptapEditor = ({
     // The `:shortcode` list. It waits while another popup is open, since each takes the keys while it shows, while the
     // composer is disabled, and in Vim normal mode, where Enter and Escape are the Vim keys.
     const emoji = useEmojiShortcode({
-        enabled: suggestions && !disabled && vimMode !== "normal" && !slashMatch && !fileMentionMatch && !variableMatch,
+        enabled: suggestions && !disabled && vimMode !== "normal" && !slashOpen && !fileMentionMatch && !variableMatch,
         focused: emojiEditorFocused,
         match: emojiMatchState,
         onReplace: handleReplace,
@@ -768,6 +770,7 @@ const ComposerTiptapEditor = ({
                 match={slashMatch}
                 models={models}
                 onDismiss={handleDismissSlash}
+                onOpenChange={setSlashOpen}
                 onReplace={handleReplace}
                 readDraft={readDraft}
                 warm={suggestionsWarm}
