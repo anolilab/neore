@@ -66,7 +66,8 @@ const isRoot = (path: string): boolean => path === "/" || DRIVE_ROOT.test(path);
 
 /** The folder that holds `path`, or null at a root or for an empty path. */
 export const parentPath = (path: string): string | null => {
-    const trimmed = trimTrailing(path.trim());
+    // Only separators are stripped, as for lastSegment: a folder named with spaces has a parent, and it is not the root.
+    const trimmed = trimTrailing(path);
 
     if (trimmed === "" || isRoot(trimmed)) {
         return null;

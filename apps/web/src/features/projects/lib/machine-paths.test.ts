@@ -40,6 +40,7 @@ describe("parentPath", () => {
     it.each([
         ["/home/me/app", "/home/me"],
         ["/home/me/app/", "/home/me"],
+        ["/home/me/ ", "/home/me"],
         ["/home", "/"],
         ["/", null],
         ["", null],

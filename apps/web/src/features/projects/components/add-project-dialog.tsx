@@ -330,15 +330,15 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
         titleReference.current?.focus();
     }, [step]);
 
-    // Opening a folder replaces the row that was activated, so focus goes to the list the folder shows.
-    const listingPath = listing?.path;
+    // A new listing, or a further page of one, replaces the row that was activated (Show more included, once the last page has
+    // no next), so focus goes to the list it shows.
     const folderListReference = useRef<HTMLUListElement>(null);
 
     useEffect(() => {
-        if (listingPath !== undefined) {
+        if (listing !== null) {
             folderListReference.current?.focus();
         }
-    }, [listingPath]);
+    }, [listing]);
 
     /** Pairs an ssh host as the Add a server form does: probe, register a device, pair it in the shell. Declining undoes the device. */
     const pairServer = async (bridge: AddProjectMachinesBridge, sshAlias: string, spec: MachineServerSpec): Promise<Attempt<AddProjectMachine>> => {

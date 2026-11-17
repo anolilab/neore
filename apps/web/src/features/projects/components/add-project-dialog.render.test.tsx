@@ -326,7 +326,26 @@ describe("AddProjectDialog pairing and browsing guards", () => {
         await waitFor(() => expect((screen.getByLabelText("Folder path") as HTMLInputElement).value).toBe("/home/me/app"));
 
         // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
-        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("list", { name: "Folders" })));
+        expect(document.activeElement).toBe(await screen.findByRole("list", { name: "Folders" }));
+    });
+
+    it("keeps focus in the folder list when Show more loads the last page, which removes the button", async () => {
+        const device = installBridge();
+
+        render(<AddProjectDialog onClose={noop} onCreateNew={noop} open />);
+        fireEvent.click(await screen.findByRole("button", { name: THIS_COMPUTER }));
+        await waitFor(() => expect((screen.getByLabelText("Folder path") as HTMLInputElement).value).toBe("/home/me"));
+
+        device.browseMachineFolders.mockImplementationOnce(async () => ({ ...page("/home/me"), next: "app", entries: [{ name: "app" }] }) as never);
+        fireEvent.click(await screen.findByRole("button", { name: "docs" }));
+        await screen.findByRole("button", { name: "Show more folders" });
+
+        device.browseMachineFolders.mockImplementationOnce(async () => page("/home/me") as never);
+        fireEvent.click(screen.getByRole("button", { name: "Show more folders" }));
+        await waitFor(() => expect(screen.queryByRole("button", { name: "Show more folders" })).toBeNull());
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
+        expect(document.activeElement).toBe(await screen.findByRole("list", { name: "Folders" }));
     });
 
     it("keeps the row locked until the machine list has refreshed after pairing", async () => {
