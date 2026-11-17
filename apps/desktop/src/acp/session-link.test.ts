@@ -15,6 +15,7 @@ describe("a session link after its poster stops", () => {
             const link = new SessionLink("s1", INFO, {
                 bound: () => {},
                 deviceId: () => "dev1",
+                flushReport: async () => {},
                 now: () => 1000,
                 random: () => 0.5,
                 released: () => {},

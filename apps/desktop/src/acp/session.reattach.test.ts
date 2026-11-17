@@ -6,6 +6,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import type { SessionStatePatch } from "./host-events";
 import type { HostSessionInfo, SessionObserver } from "./ingest";
 import { AcpManager } from "./manager";
 import { spawnAgent } from "./process";
@@ -14,7 +15,7 @@ import { Scratch } from "./testing/harness";
 let scratch: Scratch;
 let manager: AcpManager;
 let opened: HostSessionInfo[];
-let states: unknown[];
+let states: SessionStatePatch[];
 
 const observer: SessionObserver = {
     permissionRequested: () => {},
@@ -145,5 +146,23 @@ describe("a start that forks a session", () => {
         expect(methods()).toContain("session/fork");
         expect(methods()).toContain("session/new");
         expect(opened[0]).toMatchObject({ fork: { forked: false, reason: "fork_failed" }, nativeSessionId: "fake-session-1" });
+    });
+});
+
+describe("a resumed session with a long history", () => {
+    it("still shows the agent's commands, though they arrive after more replayed updates than the early buffer holds", async () => {
+        await startWith({ FAKE_AGENT_REPLAY_BURST: "1", FAKE_AGENT_SESSIONS: "load" }, "s-new");
+
+        const commands = states.flatMap((patch) => patch.availableCommands?.map((command) => command.name) ?? []);
+
+        expect(commands).toContain("review");
+    });
+
+    it("still shows the agent's commands when the replayed history alone fills the early buffer's bytes", async () => {
+        await startWith({ FAKE_AGENT_REPLAY_BYTES: "1", FAKE_AGENT_SESSIONS: "load" }, "s-new");
+
+        const commands = states.flatMap((patch) => patch.availableCommands?.map((command) => command.name) ?? []);
+
+        expect(commands).toContain("review");
     });
 });

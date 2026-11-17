@@ -51,8 +51,31 @@ export const vAgentUsage = v.object({
     used: v.number().check((count) => Number.isSafeInteger(count) && count >= 0, { message: "Counts are non-negative integers" }),
 });
 
+/** A whitespace character: a command name holding one is not a single token in the draft. */
+const WHITESPACE = /\s/u;
+
+/** The slash commands an agent advertised. The desktop cuts its own lists to these bounds (`agent-state.ts`): keep them in step. */
+// The characters the prompt cleaning removes (see `packages/ai` hidden text): a name holding one would be sent as another name.
+const HIDDEN_NAME_CHARS = /[\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}\u{2028}\u{2029}]/u;
+
+export const vAgentCommands = v
+    .array(
+        v.object({
+            description: v.string().max(300),
+            hint: v.optional(v.string().max(200)),
+            name: v
+                .string()
+                .min(1)
+                .max(64)
+                .check((name) => !WHITESPACE.test(name), { message: "A command name has no spaces" })
+                .check((name) => !HIDDEN_NAME_CHARS.test(name), { message: "A command name has no hidden characters" }),
+        }),
+    )
+    .max(100);
+
 /** What an agent reported about itself outside its turns, as stored on the session row (`session_state`). */
 export const vAcpAgentState = v.object({
+    availableCommands: v.optional(vAgentCommands),
     // The options the agent offers (model, reasoning effort, mode, ...): at most 20, each with at most 100 choices. Each of
     // configOptions, modes and models is present on its own and replaced whole.
     configOptions: v.optional(
@@ -148,6 +171,7 @@ export const vHostEvent = v.union(
     // the reports, so an older one arriving late is dropped (`applySessionState`).
     v.object({
         at: v.number().check((at) => Number.isSafeInteger(at) && at >= 0, { message: "Invalid time" }),
+        availableCommands: v.optional(vAgentCommands),
         configOptions: v.optional(
             v
                 .array(
