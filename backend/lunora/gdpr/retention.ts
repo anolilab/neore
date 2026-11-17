@@ -83,6 +83,10 @@ export const pruneRetainedActivity = internalMutation
         const woken = expiresAt === undefined ? true : await noteShardDue(ctx, Math.max(expiresAt, now + RETENTION_WAKE_FLOOR_MS));
 
         if (!timed || !woken) {
+            // The throw rolls back this shard's deletes, but the census is global and keeps any write that landed: a later expiry there would
+            // skip the restored rows. So the census points at now, and the retry prunes them.
+            await setRetentionDue(ctx, now);
+
             throw new LunoraError("INTERNAL", "The shard's retention wake could not be written; the prune is retried");
         }
 

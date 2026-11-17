@@ -464,8 +464,14 @@ export const getOrganizationProjectUsage = authAction
         };
     });
 
-/** Ledger rows one export read takes. */
-const EXPORT_REPLY_PAGE = 500;
+/** Ledger rows one export read takes, newest first. */
+const EXPORT_REPLY_PAGE = 2000;
+
+/**
+ * Export reads one ledger export makes, at most: with {@link EXPORT_REPLY_PAGE} rows a read, this covers far more rows than the export's byte
+ * budget holds, and bounds the subrequests the account export makes on a member's shard.
+ */
+export const MAX_EXPORT_REPLY_PAGES = 20;
 
 /**
  * One page of the user's organization ledger for the account export: each reply's instant, cost and tokens, and the organization and
@@ -488,8 +494,15 @@ export const collectOrganizationRepliesForExport = internalQuery
         }),
     )
     .query(async ({ args: { cursor, userId }, ctx }) => {
-        // From the primary, as the other export reads are: a replica that lags a reply just recorded would leave it out of the export.
-        const result = await ctx.db.usageOrganizationReplies.findMany({ consistency: "primary", cursor, limit: EXPORT_REPLY_PAGE, where: { userId } });
+        // From the primary, as the other export reads are: a replica that lags a reply just recorded would leave it out of the export. Newest
+        // first, so the collector can stop reading once the budget is full, instead of reading the whole ledger to find its newest rows.
+        const result = await ctx.db.usageOrganizationReplies.findMany({
+            consistency: "primary",
+            cursor,
+            limit: EXPORT_REPLY_PAGE,
+            orderBy: [{ at: "desc" }],
+            where: { userId },
+        });
 
         return {
             cursor: result.isDone ? null : result.continueCursor,
@@ -506,42 +519,48 @@ export const collectOrganizationRepliesForExport = internalQuery
     });
 
 /**
- * The ledger rows for the export, the newest that fit a byte budget, in reply-time order. The rows are read a page at a time and ordered by
- * their instant, since they are not stored in that order; past the budget the oldest are cut, and `cut` says so, as the trigger history is
- * cut: the export still succeeds, and says what it left out. The budget is the JSON array of the rows, `[` and `]` included.
+ * The ledger rows for the export, the newest that fit a byte budget, in reply-time order. The reader returns the newest rows first, a page
+ * at a time, and the collector stops once the budget is full or after `maxPages` reads, whichever comes first. Past either, the oldest rows
+ * are cut, and `cut` says so, as the trigger history is cut: the export still succeeds, and says what it left out. The budget is the JSON
+ * array of the rows, `[` and `]` included.
  */
 export const collectOrganizationReplyPages = async <Row extends { at: number }>(
     read: (cursor: string | null) => Promise<{ cursor: string | null; rows: Row[] }>,
     maxBytes: number,
+    maxPages: number = MAX_EXPORT_REPLY_PAGES,
 ): Promise<{ cut: boolean; rows: Row[] }> => {
-    const all: Row[] = [];
+    const encoder = new TextEncoder();
+    // Newest first: the rows are added as they are read, and reversed into reply-time order at the end.
+    const kept: Row[] = [];
+    let bytes = 2;
     let cursor: string | null = null;
+    let pages = 0;
 
     do {
         const page = await read(cursor);
 
-        all.push(...page.rows);
-        cursor = page.cursor;
-    } while (cursor !== null);
+        pages += 1;
 
-    all.sort((a, b) => a.at - b.at);
+        const newestFirst = page.rows.toSorted((a, b) => b.at - a.at);
 
-    // From the newest back, while the array fits: a row after the first kept one brings its comma.
-    const encoder = new TextEncoder();
-    const kept: Row[] = [];
-    let bytes = 2;
+        for (const row of newestFirst) {
+            // A row after the first kept one brings its comma.
+            const size = encoder.encode(JSON.stringify(row)).byteLength + (kept.length > 0 ? 1 : 0);
 
-    for (let index = all.length - 1; index >= 0; index -= 1) {
-        const row = all[index] as Row;
-        const size = encoder.encode(JSON.stringify(row)).byteLength + (kept.length > 0 ? 1 : 0);
+            if (bytes + size > maxBytes) {
+                return { cut: true, rows: kept.toReversed() };
+            }
 
-        if (bytes + size > maxBytes) {
-            return { cut: true, rows: kept.toReversed() };
+            bytes += size;
+            kept.push(row);
         }
 
-        bytes += size;
-        kept.push(row);
-    }
+        cursor = page.cursor;
+
+        if (cursor !== null && pages >= maxPages) {
+            return { cut: true, rows: kept.toReversed() };
+        }
+    } while (cursor !== null);
 
     return { cut: false, rows: kept.toReversed() };
 };
