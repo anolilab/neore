@@ -205,10 +205,21 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
                 const revision = await runBeliefRevision(model, similar.memory, fact.memory, REVISION_MAX_OUTPUT_TOKENS);
 
                 // The merged text is model output over pasted text: held to the paste's rules, or the fact is saved as new.
-                memory = cleanImportLine(revision.mergedMemory ?? "");
-                action = revision.action === "UPDATE" && (memory.length < IMPORT_MIN_FACT_CHARS || looksSensitive(memory)) ? "ADD" : revision.action;
+                // A merge too long to store whole is not cut, which would drop what it merged.
+                const merged = revision.mergedMemory?.trim() ?? "";
+
+                memory = cleanImportLine(merged);
+                action =
+                    revision.action === "UPDATE" && (merged.length > IMPORT_MAX_FACT_CHARS || memory.length < IMPORT_MIN_FACT_CHARS || looksSensitive(memory))
+                        ? "ADD"
+                        : revision.action;
             } catch (error) {
                 console.error("[memory/import] Belief revision failed, saving as new:", error);
+
+                // No model for this user: the rest of the save does not ask again.
+                if (!model) {
+                    revisions = IMPORT_MAX_REVISIONS;
+                }
             }
         }
 
@@ -333,7 +344,10 @@ export const labelImportedText = async (ctx: ActionCtx, userId: string, text: st
         maxOutputTokens: LABEL_MAX_OUTPUT_TOKENS,
         model,
         output: Output.object({
-            schema: z.object({ keep: z.array(z.object({ line: z.int().min(1).max(IMPORT_MAX_FACTS), type: z.enum(MEMORY_TYPES) })).max(IMPORT_MAX_FACTS) }),
+            schema: z.object({
+                // A line number out of range is dropped by `applyImportLabels`, not a reason to refuse the whole answer.
+                keep: z.array(z.object({ line: z.int(), type: z.enum(MEMORY_TYPES) })).max(IMPORT_MAX_FACTS),
+            }),
         }),
         prompt: buildImportLabelPrompt(lines),
         system: IMPORT_LABEL_SYSTEM_PROMPT,

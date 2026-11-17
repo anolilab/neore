@@ -59,6 +59,7 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
     const appLabelId = useId();
     const pasteId = useId();
     const factsHeadingId = useId();
+    const tooLongId = useId();
     const [open, setOpen] = useState(false);
     const [app, setApp] = useState<ImportApp>("chatgpt");
     const [text, setText] = useState("");
@@ -141,6 +142,7 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
     };
 
     const kept = preview?.facts.filter((_, index) => !unchecked.has(index)) ?? [];
+    const tooLong = text.length > MAX_PASTE_CHARS;
 
     return (
         <Dialog onOpenChange={setOpen} open={open}>
@@ -199,14 +201,23 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
                             </div>
                             <div className="space-y-1">
                                 <label className="text-sm font-medium" htmlFor={pasteId}>{t`3. Paste its answer`}</label>
+                                {/* No `maxLength`: the browser would drop the end of a long paste without a word. Read-only while a
+                                    preview runs, so the facts it returns belong to the text on screen. */}
                                 <Textarea
+                                    aria-describedby={tooLong ? tooLongId : undefined}
+                                    aria-invalid={tooLong}
                                     className="min-h-32 text-sm"
                                     id={pasteId}
-                                    maxLength={MAX_PASTE_CHARS}
                                     onChange={(event) => setText(event.target.value)}
+                                    readOnly={isPreviewing}
                                     spellCheck={false}
                                     value={text}
                                 />
+                                {tooLong && (
+                                    <p className="text-destructive text-xs" id={tooLongId}>
+                                        {t`This is longer than ${MAX_PASTE_CHARS} characters. Paste it in parts and bring in each one.`}
+                                    </p>
+                                )}
                             </div>
                         </>
                     )}
@@ -254,7 +265,9 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
                     <DialogFooter>
                         {preview ? (
                             <>
+                                {/* Not while a save runs: its answer closes the dialog and would drop a newer paste. */}
                                 <Button
+                                    disabled={isSaving}
                                     onClick={() => {
                                         focusNext.current = pasteId;
                                         setPreview(undefined);
@@ -268,7 +281,7 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
                                 </Button>
                             </>
                         ) : (
-                            <Button disabled={isPreviewing || text.trim().length === 0} onClick={() => runPreview({ text })}>
+                            <Button disabled={isPreviewing || tooLong || text.trim().length === 0} onClick={() => runPreview({ text })}>
                                 {isPreviewing ? t`Reading…` : t`Preview`}
                             </Button>
                         )}

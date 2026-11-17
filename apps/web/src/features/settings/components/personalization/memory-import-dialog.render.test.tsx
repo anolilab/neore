@@ -39,6 +39,7 @@ vi.mock("@/lib/lunora/crpc", () => {
 });
 
 const LIKES_TEA_RE = /likes tea/;
+const TOO_LONG_RE = /longer than 20000 characters/;
 
 const openDialog = (memoryEnabled: boolean, onEnableMemory: () => Promise<void> = async () => undefined) => {
     render(
@@ -120,6 +121,17 @@ describe("memory import dialog", () => {
         await waitFor(() => expect(calls.save).toHaveBeenCalledOnce());
 
         expect(calls.save.mock.calls[0]?.[0]).toStrictEqual({ app: "gemini", facts: [{ memory: "The user is a nurse", type: "identity" }] });
+    });
+
+    it("says a paste is too long instead of cutting it, and offers no preview of it", async () => {
+        expect.assertions(2);
+
+        openDialog(true);
+
+        fireEvent.change(await screen.findByLabelText("3. Paste its answer"), { target: { value: "x".repeat(20_001) } });
+
+        expect(screen.getByText(TOO_LONG_RE)).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Preview" }).hasAttribute("disabled")).toBe(true);
     });
 
     it("returns focus to the paste field on Back", async () => {

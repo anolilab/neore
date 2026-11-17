@@ -263,6 +263,26 @@ describe("importing another assistant's memory", () => {
         expect(rows.some((row) => row.memory.includes("hunter22"))).toBe(false);
     });
 
+    it("saves a fact as new instead of cutting a merge too long to store", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user banks with a small cooperative bank in Bremen", type: "context", userId: USER });
+        });
+        generateText.mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: `The user banks in Bremen ${"and much more ".repeat(60)}` } });
+
+        expect(await save([{ memory: "The user banks with a small cooperative bank in Bremen now", type: "context" }])).toStrictEqual({
+            added: 1,
+            alreadyKnown: 0,
+            updated: 0,
+        });
+
+        const rows: { memory: string }[] = await memories();
+
+        expect(rows.map((row) => row.memory)).toContain("The user banks with a small cooperative bank in Bremen");
+    });
+
     it("does not count a bot's memory as the user's own", async () => {
         expect.assertions(1);
 
