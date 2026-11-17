@@ -2,9 +2,10 @@
  * A read-only reader for the simple keys of `~/.ssh/config`. The transport runs `ssh -F /dev/null`, so nothing in
  * that file applies by itself: the keys read here are passed to `ssh` explicitly, resolved as ssh would: blocks in file
  * order (settings before the first `Host` line first), the first value of a key wins, and a block applies to an alias
- * when one of its `Host` patterns matches it and no negated pattern does. What the reader cannot honour
- * (a `Match` rule it cannot tie to other hosts, `Include` in a `Host` block, `ProxyJump`, `ProxyCommand`, a malformed
- * `Port`) makes a host disabled instead of being guessed at.
+ * when one of its `Host` patterns matches it and no negated pattern does. `IdentityFile` is the exception: ssh adds every
+ * applicable one, and the transport takes one key, so a host with more than one is disabled. What the reader cannot
+ * honour (a `Match` rule it cannot tie to other hosts, `Include` in a `Host` block, `ProxyJump`, `ProxyCommand`, a
+ * relative `IdentityFile`, a malformed `Port`) makes a host disabled instead of being guessed at.
  */
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -23,6 +24,8 @@ export interface SshHost {
 interface Block {
     hostName: string | null;
     identityFile: string | null;
+    /** How many applicable `IdentityFile` lines set a key; ssh uses all of them, so more than one disables the host. */
+    identityCount: number;
     /** The `Host` patterns of the block; the block before the first `Host` line holds `*`, as ssh applies it to every host. */
     patterns: string[];
     port: number | null;
@@ -38,7 +41,11 @@ const LINE_BREAK = /\r?\n/u;
 const DIGITS = /^\d+$/u;
 const SPACE = /\s/u;
 
-const EMPTY: Block = { hostName: null, identityFile: null, patterns: [], port: null, reason: null, user: null };
+const EMPTY: Block = { hostName: null, identityCount: 0, identityFile: null, patterns: [], port: null, reason: null, user: null };
+
+const MULTIPLE_IDENTITIES = "This host has more than one IdentityFile in ~/.ssh/config, which Neore does not support.";
+const RELATIVE_IDENTITY = "This host has a relative IdentityFile in ~/.ssh/config, which Neore does not support.";
+const MATCH_RULE = "This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate.";
 
 /** Drops a trailing `# comment`: a `#` that starts the text or follows a space, outside quotes. */
 const stripComment = (value: string): string => {
@@ -102,7 +109,18 @@ const settingOf = (key: string, value: string, home: string): Partial<Block> => 
         case "identityfile": {
             const file = firstWord(value);
 
-            return file?.includes("%") ? { reason: unsupported(key) } : { identityFile: file === null ? null : expandHome(file, home) };
+            if (file === null) {
+                return {};
+            }
+
+            if (file.includes("%")) {
+                return { reason: unsupported(key) };
+            }
+
+            const expanded = expandHome(file, home);
+
+            // A relative key is resolved by ssh against a place this reader does not know, so the host is disabled rather than guessed at.
+            return path.isAbsolute(expanded) ? { identityCount: 1, identityFile: expanded } : { identityCount: 1, reason: RELATIVE_IDENTITY };
         }
         case "include":
         case "proxycommand":
@@ -125,11 +143,12 @@ const settingOf = (key: string, value: string, home: string): Partial<Block> => 
     }
 };
 
-/** The first value of a key wins, as in ssh. */
+/** The first value of a key wins, as in ssh; the IdentityFile lines are counted, not merged. */
 const mergeFirst = (block: Block, patch: Partial<Block>): Block => {
     return {
         ...block,
         hostName: block.hostName ?? patch.hostName ?? null,
+        identityCount: block.identityCount + (patch.identityCount ?? 0),
         identityFile: block.identityFile ?? patch.identityFile ?? null,
         port: block.port ?? patch.port ?? null,
         reason: block.reason ?? patch.reason ?? null,
@@ -249,7 +268,7 @@ export const parseSshConfig = (text: string, home: string): SshHost[] => {
 
         hosts.push({
             alias,
-            disabledReason: effective.reason ?? (usesMatch ? "This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate." : null),
+            disabledReason: effective.reason ?? (effective.identityCount > 1 ? MULTIPLE_IDENTITIES : null) ?? (usesMatch ? MATCH_RULE : null),
             hostName: effective.hostName,
             identityFile: effective.identityFile,
             port: effective.port === 0 ? null : effective.port,

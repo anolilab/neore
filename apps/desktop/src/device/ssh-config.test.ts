@@ -30,9 +30,18 @@ describe("parseSshConfig", () => {
     });
 
     it("reads keys in any case, with = or quotes, and takes the first value of a key", () => {
-        const [host] = parse("host box\n  hostname=a.example.com\n  HostName b.example.com\n  IdentityFile \"/k/one\"\n  IdentityFile /k/two\n");
+        const [host] = parse("host box\n  hostname=a.example.com\n  HostName b.example.com\n  IdentityFile \"/k/one\"\n");
 
-        expect(host).toMatchObject({ hostName: "a.example.com", identityFile: "/k/one" });
+        expect(host).toMatchObject({ disabledReason: null, hostName: "a.example.com", identityFile: "/k/one" });
+    });
+
+    it("disables a host with more than one IdentityFile, in one block or across blocks, since the transport takes one key", () => {
+        expect(parse("Host a\n  IdentityFile /k/one\n  IdentityFile /k/two\n")[0]?.disabledReason).toMatch(/more than one IdentityFile/u);
+        expect(parse("Host *\n  IdentityFile /k/all\nHost a\n  IdentityFile /k/one\n")[0]?.disabledReason).toMatch(/more than one IdentityFile/u);
+    });
+
+    it("disables a host whose IdentityFile is relative, since ssh resolves it somewhere this reader does not know", () => {
+        expect(parse("Host a\n  IdentityFile keys/id\n")[0]?.disabledReason).toMatch(/relative IdentityFile/u);
     });
 
     it("expands a leading ~ in IdentityFile", () => {
@@ -208,7 +217,7 @@ describe("readSshConfig", () => {
             return "Host box\n";
         });
 
-        expect(asked).toBe("/home/me/.ssh/config");
+        expect(asked).toBe(join(HOME, ".ssh", "config"));
         expect(hosts).toHaveLength(1);
     });
 });
