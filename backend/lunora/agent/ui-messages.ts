@@ -72,6 +72,8 @@ export type UIMessage<METADATA = unknown, DATA_PARTS extends UIDataTypes = UIDat
     memoryUsage?: { count: number; messageId: string };
     model?: string;
     order: number;
+    /** The run that wrote this reply (`schema.ts`, `replyId`): one reply, one run. */
+    replyId?: string;
     /** Group chat: the participant (skill id) that wrote this reply; `agentName` is its name. */
     speakerSkillId?: string;
     status: UIStatus;
@@ -468,6 +470,7 @@ const createAssistantUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataT
         key: `${firstMessage.threadId}-${firstMessage.order}-${firstMessage.stepOrder}`,
         order: firstMessage.order,
         ...(firstMessage.speakerSkillId && { speakerSkillId: firstMessage.speakerSkillId }),
+        ...(firstMessage.replyId && { replyId: firstMessage.replyId }),
         ...memoryUsageOf(group),
         ...hostChangesOf(group),
         stepOrder: firstMessage.stepOrder,
@@ -640,6 +643,8 @@ const createAssistantUIMessage = <METADATA = unknown, DATA_PARTS extends UIDataT
                     const toolName = contentPart.toolName as keyof TOOLS & string;
                     const toolPart: ToolUIPart<TOOLS> = message.streaming
                         ? {
+                              // The real MCP names ride here too, so a live step is labelled as the saved one is.
+                              callProviderMetadata: withNeoreLabel(message.providerMetadata as ProviderMetadata | undefined, contentPart.providerOptions),
                               input: contentPart.input as DeepPartial<TOOLS[keyof TOOLS & string]["input"]>,
                               providerExecuted: contentPart.providerExecuted,
                               state: "input-streaming",
@@ -877,9 +882,16 @@ const withNeoreLabel = (
     metadata: ProviderMetadata | undefined,
     partOptions: Record<string, Record<string, unknown>> | undefined,
 ): ProviderMetadata | undefined => {
-    const label = partOptions?.neore;
+    // A `neore` entry in the message-wide metadata belongs to whichever call labelled it: a call
+    // reads only its own label, so an earlier MCP call's name is never handed to a later one.
+    const rest: Record<string, unknown> = { ...metadata };
 
-    return label ? ({ ...metadata, neore: label } as ProviderMetadata) : metadata;
+    delete rest.neore;
+
+    const label = partOptions?.neore;
+    const merged = label ? { ...rest, neore: label } : rest;
+
+    return Object.keys(merged).length > 0 ? (merged as ProviderMetadata) : undefined;
 };
 
 export const combineUIMessages = (messages: UIMessage[]): UIMessage[] => {

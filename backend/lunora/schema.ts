@@ -96,6 +96,8 @@ export const streamingMessagesFieldsWithoutState = {
     order: v.number(),
     provider: v.optional(v.string()),
     providerOptions: v.optional(v.record(v.string(), v.record(v.string(), v.any()))),
+    // The run's stream id (`persistentStreams`), which the saved rows of the reply carry as `replyId`.
+    runStreamId: v.optional(v.string()),
     stepOrder: v.number(),
     threadId: v.id("threads"),
     userId: v.optional(v.string()),
@@ -1528,6 +1530,9 @@ export const schema = defineSchema({
         providerOptions: v.optional(v.any()),
         reasoning: v.optional(v.string()),
         reasoningDetails: v.optional(v.any()),
+        // The run that wrote the row (its stream id). Every row of one reply shares it, so a call keeps its identity
+        // when the reply's rows are merged, and a regenerated or group reply, which has its own run, is told apart.
+        replyId: v.optional(v.string()),
         // Memories injected into the system prompt for this reply — the "why was
         // this used" view (`memory/functions.ts#getMessageMemoryUsage`).
         retrievedMemories: v.optional(v.array(v.object({ memoryId: v.string(), score: v.number() }))),

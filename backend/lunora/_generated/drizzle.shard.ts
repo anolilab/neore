@@ -857,6 +857,7 @@ export const messages = sqliteTable("messages", {
     providerOptions: text("providerOptions"),
     reasoning: text("reasoning"),
     reasoningDetails: text("reasoningDetails"),
+    replyId: text("replyId"),
     retrievedMemories: text("retrievedMemories", { mode: "json" }).$type<Array<{ memoryId: string; score: number }>>(),
     sources: text("sources"),
     speakerSkillId: text("speakerSkillId"),

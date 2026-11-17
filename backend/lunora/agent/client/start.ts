@@ -24,6 +24,7 @@ import type { Message, MessageDoc } from "../validators";
 import { type ToolCtx as ToolContext, wrapTools } from "./create-tool";
 import type { Agent } from "./index";
 import saveInputMessages from "./save-input-messages";
+import { applyStepLabels } from "./step-labels";
 import { embedMessages, fetchContextWithPrompt } from "./search";
 import type { ActionCtx as ActionContext, AgentComponent, Config, Options } from "./types";
 
@@ -292,6 +293,23 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
                 "object" in toSave
                     ? await serializeObjectResult(context_, toSave.object, activeModel)
                     : await serializeNewMessagesInStep(context_, toSave.step, activeModel, mediaOwner);
+
+            // The run labels its MCP calls as they are written, so a live step reads as the saved one does.
+            const labelContent = options.labelStepContent;
+
+            if (labelContent) {
+                serialized.messages = applyStepLabels(serialized.messages, labelContent);
+            }
+
+            // Each row names the run that wrote it, so the reader can tell one reply's rows from another's.
+            const replyId = options.runHold?.streamId;
+
+            if (replyId) {
+                serialized.messages = serialized.messages.map((row) => {
+                    return { ...row, replyId };
+                });
+            }
+
             const embeddings = await embedMessages(
                 context_,
                 { threadId, ...options, userId },

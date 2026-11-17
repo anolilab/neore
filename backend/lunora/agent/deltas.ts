@@ -29,6 +29,8 @@ export const blankUIMessage = <METADATA = unknown>(streamMessage: StreamMessage 
         status: statusFromStreamStatus(streamMessage.status),
         stepOrder: streamMessage.stepOrder,
         text: "",
+        // The run's id, so the live row names the reply the saved rows will (`replyId`); a call keeps one key across the swap.
+        ...(streamMessage.runStreamId && { replyId: streamMessage.runStreamId }),
         ...(streamMessage.metadata && { metadata: streamMessage.metadata }),
     };
 };

@@ -36466,6 +36466,11 @@ msgstr "DeepSeek の最新世代の汎用チャット機能を求めるユーザ
 msgid "Uses AI SDK Text-to-Speech"
 msgstr "AI SDK のテキスト読み上げを使用"
 
+#. placeholder {0}: newest.toolName
+#: src/features/chat/thread/turn-step-announcement.tsx:48
+msgid "Using {0}"
+msgstr "{0} を使用中"
+
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:227
 msgid "Using an authenticator app like"
 msgstr "次のいずれかの認証アプリで"
