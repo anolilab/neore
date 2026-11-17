@@ -70,6 +70,11 @@ const AdminShardFootprintRow = () => {
         setCursor(current.continueCursor);
     };
 
+    // Re-measures the page that failed; the measured pages before it are kept.
+    const retryPage = () => {
+        page.refetch();
+    };
+
     return (
         <Card>
             <CardHeader>
@@ -114,6 +119,11 @@ const AdminShardFootprintRow = () => {
                     {!finished && page.data !== undefined ? (
                         <Button disabled={page.isFetching} onClick={measureNext} type="button">
                             {t`Measure more shards`}
+                        </Button>
+                    ) : null}
+                    {page.isError ? (
+                        <Button disabled={page.isFetching} onClick={retryPage} type="button" variant="outline">
+                            {t`Try again`}
                         </Button>
                     ) : null}
                     {finished ? <p className="text-muted-foreground text-sm">{t`All shards measured.`}</p> : null}

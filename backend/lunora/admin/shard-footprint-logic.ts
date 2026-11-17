@@ -1,5 +1,5 @@
 /**
- * Pure helpers for the shard footprint measurement (`shard-footprint.ts`).
+ * Pure helpers for the shard footprint measurement in `admin/cleanup.ts`.
  *
  * A measurement reads a shard one page per call. Message rows are read in index order
  * (`by_threadId_order_stepOrder`), so one thread's rows are contiguous: the scan carries

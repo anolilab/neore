@@ -3,7 +3,7 @@
  * and the largest list stays capped at {@link LARGEST_THREAD_COUNT}.
  */
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import { addMessageRow, FOOTPRINT_PAGE_SIZE, LARGEST_THREAD_COUNT, startFootprint } from "./shard-footprint-logic";
@@ -15,18 +15,6 @@ const OWNER = "user-owner";
 const BIG_THREAD_ROWS = 10_000;
 const SMALL_THREAD_COUNT = 30;
 const SMALL_THREAD_ROWS = 3;
-/** Generous: seeding 10,000 rows takes a few seconds on the in-memory store. */
-const SEED_TIMEOUT_MS = 60_000;
-
-let harness: Harness;
-
-beforeEach(() => {
-    harness = lunoraTest(schema as never);
-});
-
-afterEach(() => {
-    harness.close();
-});
 
 /** Row counts of the small threads: {@link SMALL_THREAD_COUNT} threads of {@link SMALL_THREAD_ROWS} rows each. */
 const smallThreadRows = (): number[] => {
@@ -40,7 +28,7 @@ const smallThreadRows = (): number[] => {
 };
 
 /** Seeds one thread per entry of `rowsPerThread` and returns the thread ids in that order. */
-const seedShard = (rowsPerThread: number[]) =>
+const seedShard = (harness: Harness, rowsPerThread: number[]) =>
     harness.run(async (ctx: any) => {
         const threadIds: string[] = [];
 
@@ -65,7 +53,7 @@ const seedShard = (rowsPerThread: number[]) =>
     });
 
 /** Calls the measurement page by page, as a caller does, and records the rows each call read. */
-const measureShard = () =>
+const measureShard = (harness: Harness) =>
     harness.run(async (ctx: any) => {
         const pageRows: number[] = [];
         let state: unknown;
@@ -84,49 +72,77 @@ const measureShard = () =>
         throw new Error("the measurement did not finish");
     });
 
-describe("measureShardPage", () => {
-    it(
-        "reports the 10,000-row thread as the largest",
-        async () => {
-            const [bigThread] = await seedShard([BIG_THREAD_ROWS, ...smallThreadRows()]);
-            const { state } = await measureShard();
+describe("measureShardPage on a shard with a 10,000-row thread", () => {
+    // Seeding 10,000 rows is the slow part, so the shard is seeded and measured once for both tests below.
+    let harness: Harness;
+    let bigThread: string;
+    let measured: Awaited<ReturnType<typeof measureShard>>;
 
-            expect(state.largest[0]).toEqual({ rows: BIG_THREAD_ROWS, threadId: bigThread });
-            expect(state.messageRows).toBe(BIG_THREAD_ROWS + SMALL_THREAD_COUNT * SMALL_THREAD_ROWS);
-            expect(state.threads).toBe(SMALL_THREAD_COUNT + 1);
-            expect(state.approxBytes).toBeGreaterThan(state.messageRows);
-        },
-        SEED_TIMEOUT_MS,
-    );
+    beforeAll(async () => {
+        harness = lunoraTest(schema as never);
 
-    it(
-        "reads at most one page per call and continues by cursor until done",
-        async () => {
-            await seedShard([BIG_THREAD_ROWS, ...smallThreadRows()]);
-            const { pageRows } = await measureShard();
-            const threadPages = Math.ceil((SMALL_THREAD_COUNT + 1) / FOOTPRINT_PAGE_SIZE);
-            const messagePages = Math.ceil((BIG_THREAD_ROWS + SMALL_THREAD_COUNT * SMALL_THREAD_ROWS) / FOOTPRINT_PAGE_SIZE);
+        const threadIds = await seedShard(harness, [BIG_THREAD_ROWS, ...smallThreadRows()]);
 
-            // Calls that read nothing (a page that ends exactly on a boundary) are ignored.
-            expect(Math.max(...pageRows)).toBeLessThanOrEqual(FOOTPRINT_PAGE_SIZE);
-            expect(pageRows.filter((rows) => rows > 0)).toHaveLength(threadPages + messagePages);
-        },
-        SEED_TIMEOUT_MS,
-    );
+        bigThread = threadIds[0] as string;
+        measured = await measureShard(harness);
+    });
 
-    it(
-        "keeps the largest list at the cap, biggest first",
-        async () => {
-            // Threads with 1 to 25 rows: the cap keeps the 20 biggest.
-            await seedShard(Array.from({ length: 25 }, (_, index) => index + 1));
-            const { state } = await measureShard();
+    afterAll(() => {
+        harness.close();
+    });
 
-            expect(state.largest).toHaveLength(LARGEST_THREAD_COUNT);
-            expect(state.largest[0]?.rows).toBe(25);
-            expect(state.largest.at(-1)?.rows).toBe(6);
-        },
-        SEED_TIMEOUT_MS,
-    );
+    it("reports the 10,000-row thread as the largest", () => {
+        const { state } = measured;
+
+        expect(state.largest[0]).toEqual({ rows: BIG_THREAD_ROWS, threadId: bigThread });
+        expect(state.messageRows).toBe(BIG_THREAD_ROWS + SMALL_THREAD_COUNT * SMALL_THREAD_ROWS);
+        expect(state.threads).toBe(SMALL_THREAD_COUNT + 1);
+        expect(state.approxBytes).toBeGreaterThan(state.messageRows);
+    });
+
+    it("reads at most one page per call and continues by cursor until done", () => {
+        const { pageRows } = measured;
+        const threadPages = Math.ceil((SMALL_THREAD_COUNT + 1) / FOOTPRINT_PAGE_SIZE);
+        const messagePages = Math.ceil((BIG_THREAD_ROWS + SMALL_THREAD_COUNT * SMALL_THREAD_ROWS) / FOOTPRINT_PAGE_SIZE);
+
+        // Calls that read nothing (a page that ends exactly on a boundary) are ignored.
+        expect(Math.max(...pageRows)).toBeLessThanOrEqual(FOOTPRINT_PAGE_SIZE);
+        expect(pageRows.filter((rows) => rows > 0)).toHaveLength(threadPages + messagePages);
+    });
+});
+
+describe("measureShardPage on small shards", () => {
+    let harness: Harness;
+
+    beforeEach(() => {
+        harness = lunoraTest(schema as never);
+    });
+
+    afterEach(() => {
+        harness.close();
+    });
+
+    it("counts a thread with no messages in the stored size", async () => {
+        await seedShard(harness, [0]);
+        const { state } = await measureShard(harness);
+
+        expect(state.threads).toBe(1);
+        expect(state.messageRows).toBe(0);
+        expect(state.approxBytes).toBeGreaterThan(0);
+    });
+
+    it("keeps the largest list at the cap, biggest first", async () => {
+        // Threads with 1 to 25 rows: the cap keeps the 20 biggest.
+        await seedShard(
+            harness,
+            Array.from({ length: 25 }, (_, index) => index + 1),
+        );
+        const { state } = await measureShard(harness);
+
+        expect(state.largest).toHaveLength(LARGEST_THREAD_COUNT);
+        expect(state.largest[0]?.rows).toBe(25);
+        expect(state.largest.at(-1)?.rows).toBe(6);
+    });
 });
 
 describe("scan state", () => {

@@ -345,12 +345,18 @@ export const measureShardPage = internalQuery
 
         if (state.phase === "threads") {
             const page = await ctx.db.query("threads").paginate({ cursor: state.cursor, numItems: FOOTPRINT_PAGE_SIZE });
+            let threadBytes = 0;
+
+            for (const thread of page.page) {
+                threadBytes += approxRowBytes(thread);
+            }
 
             return {
                 done: false,
                 pageRows: page.page.length,
                 state: {
                     ...state,
+                    approxBytes: state.approxBytes + threadBytes,
                     cursor: page.isDone ? null : page.continueCursor,
                     phase: page.isDone ? "messages" : "threads",
                     threads: state.threads + page.page.length,
@@ -400,14 +406,18 @@ interface ShardMeasure {
 const measureShard = async (shardKey: string): Promise<ShardMeasure> => {
     let state: FootprintState | undefined;
 
-    for (let pages = 0; pages < MAX_PAGES_PER_SHARD; pages += 1) {
-        const result = await callOnShard(internal.admin.cleanup.measureShardPage, state ? { state } : {}, { shardKey });
+    try {
+        for (let pages = 0; pages < MAX_PAGES_PER_SHARD; pages += 1) {
+            const result = await callOnShard(internal.admin.cleanup.measureShardPage, state ? { state } : {}, { shardKey });
 
-        state = result.state;
+            state = result.state;
 
-        if (result.done) {
-            return { complete: true, state };
+            if (result.done) {
+                return { complete: true, state };
+            }
         }
+    } catch {
+        // A shard that fails counts as incomplete, so one bad shard does not drop the other totals on its page.
     }
 
     return { complete: false, state: state ?? startFootprint() };
@@ -454,6 +464,12 @@ export const getShardFootprint = adminAction
                 totals.incompleteShards += 1;
             }
         }
+
+        ctx.log.event("admin.shard_footprint_measured", {
+            incompleteShards: totals.incompleteShards,
+            isDone: totals.isDone,
+            shards: totals.shards,
+        });
 
         return totals;
     });

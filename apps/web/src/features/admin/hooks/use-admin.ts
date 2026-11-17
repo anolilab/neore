@@ -306,7 +306,10 @@ export const useShardFootprint = (cursor?: string) => {
     return useQuery({
         queryFn: () => measure(cursor === undefined ? {} : { cursor }),
         queryKey: ["admin", "shardFootprint", cursor ?? null],
+        refetchOnReconnect: false,
+        refetchOnWindowFocus: false,
         retry: 1,
-        staleTime: 60_000,
+        // A page's counts are a snapshot of one measurement: refetching on focus or reconnect would re-run the scan.
+        staleTime: Infinity,
     });
 };
