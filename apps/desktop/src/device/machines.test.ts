@@ -143,6 +143,19 @@ describe("connect", () => {
         expect(box?.spec).toEqual({ address: "box.example.com", identityFile: "/k/id", name: "box", port: 2222, user: "deploy" });
     });
 
+    it("disables a server whose user starts with a dash, even when its address is valid", () => {
+        const [, box] = setup({ hosts: [], ssh: [ssh("box", { user: "-deploy" })] }).machines.list();
+
+        expect(box).toMatchObject({ disabledReason: expect.stringContaining("cannot connect"), status: "disabled" });
+    });
+
+    it("cuts a long emoji alias to the name limit in UTF-16 units, without splitting a character", () => {
+        const [, box] = setup({ hosts: [], ssh: [ssh("😀".repeat(60), { hostName: "box.example.com" })] }).machines.list();
+
+        expect(box?.spec?.name).toBe("😀".repeat(40));
+        expect(box?.spec?.name?.length).toBeLessThanOrEqual(80);
+    });
+
     it("names a pairing with an alias longer than the 80-character limit, cut to the limit", () => {
         const alias = "a".repeat(120);
         const [, box] = setup({ hosts: [], ssh: [ssh(alias)] }).machines.list();

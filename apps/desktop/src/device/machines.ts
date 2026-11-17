@@ -81,7 +81,23 @@ const PAIRABLE_USER = /^[\w.-]{1,32}$/u;
 const LEADING_DASH_OR_DOT = /^[-.]/u;
 const NOT_PAIRABLE = "Neore cannot connect to this server: its name, address or user is not one it accepts.";
 
-const pairable = (spec: MachineServerSpec): boolean => PAIRABLE_ADDRESS.test(spec.address) && PAIRABLE_USER.test(spec.user) && !LEADING_DASH_OR_DOT.test(spec.address + spec.user);
+const pairable = (spec: MachineServerSpec): boolean =>
+    PAIRABLE_ADDRESS.test(spec.address) && PAIRABLE_USER.test(spec.user) && !LEADING_DASH_OR_DOT.test(spec.address) && !LEADING_DASH_OR_DOT.test(spec.user);
+
+/** The longest prefix of `text` that is at most `max` UTF-16 units, cut between code points so no surrogate pair is split. */
+const prefixWithin = (text: string, max: number): string => {
+    let out = "";
+
+    for (const character of text) {
+        if (out.length + character.length > max) {
+            break;
+        }
+
+        out += character;
+    }
+
+    return out;
+};
 
 /** Whether the picker can connect to this alias at all: the same rule the IPC validator applies to it. */
 const aliasUsable = (alias: string): boolean => {
@@ -282,7 +298,7 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         return {
             address: entry.hostName ?? entry.alias,
             identityFile: entry.identityFile,
-            name: [...entry.alias].slice(0, MAX_SERVER_NAME).join(""),
+            name: prefixWithin(entry.alias, MAX_SERVER_NAME),
             port: entry.port ?? 22,
             user: entry.user ?? dependencies.username(),
         };
