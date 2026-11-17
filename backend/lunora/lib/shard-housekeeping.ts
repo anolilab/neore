@@ -163,13 +163,16 @@ export const noteShardActivity = async (ctx: CensusCtx, shardKey: string | undef
  * Tell the root tick that `shardKey` (default: this shard) has timed work due
  * at `dueAt`. Keeps the EARLIEST due time; {@link runShardTick} resets it.
  */
-export const noteShardDue = async (ctx: CensusCtx, dueAt: number, shardKey: string | undefined = currentUserShard()): Promise<void> => {
+export const noteShardDue = async (ctx: CensusCtx, dueAt: number, shardKey: string | undefined = currentUserShard()): Promise<boolean> => {
     if (shardKey === undefined) {
-        return;
+        return true;
     }
 
-    await bestEffort("noteShardDue", async () => {
-        const row = await censusRow(ctx, shardKey);
+    // Whether the wake was written: a caller that must not lose it (the retention prune) acts on a failure.
+    return await bestEffort("noteShardDue", async () => {
+        // From the primary: a stale row that still shows an earlier due time would skip the write, and the dispatch that cleared it would
+        // then leave this shard with no wake.
+        const row = await censusRow(ctx, shardKey, "primary");
 
         if (!row) {
             await ctx.db.insert("shardActivity", { lastActiveAt: Date.now(), nextDueAt: dueAt, shardKey });
@@ -179,6 +182,102 @@ export const noteShardDue = async (ctx: CensusCtx, dueAt: number, shardKey: stri
 
         if (row.nextDueAt === undefined || dueAt < row.nextDueAt) {
             await ctx.db.patch("shardActivity", row._id, { nextDueAt: dueAt });
+        }
+    });
+};
+
+/**
+ * The census's retained-rows time when the shard holds none. A plain number, not an absent field: clearing a field means replacing the
+ * whole census row from values read earlier, which can drop a wake written in between, while setting a number is a single field write.
+ */
+export const NO_RETENTION_DUE = Number.MAX_SAFE_INTEGER;
+
+/**
+ * Records when `shardKey`'s retained rows next expire (`gdpr/retention.ts`), or `NO_RETENTION_DUE` for none (`undefined` means the same).
+ * The tick prunes only once this has come, so a tick for other work reads just this row. A write that fails leaves the old time: the tick
+ * then prunes early, which is harmless.
+ */
+export const setRetentionDue = async (ctx: CensusCtx, dueAt: number | undefined, shardKey: string | undefined = currentUserShard()): Promise<boolean> => {
+    if (shardKey === undefined) {
+        return true;
+    }
+
+    const next = dueAt ?? NO_RETENTION_DUE;
+
+    // Whether the time was written: the prune acts on a failure, so the tick re-arms the shard.
+    return await bestEffort("setRetentionDue", async () => {
+        const row = await censusRow(ctx, shardKey, "primary");
+
+        if (!row) {
+            if (next !== NO_RETENTION_DUE) {
+                await ctx.db.insert("shardActivity", { lastActiveAt: Date.now(), retentionDueAt: next, shardKey });
+            }
+
+            return;
+        }
+
+        // Clearing never drops a later time: a prune that found no rows in its snapshot must not clear a time a reply has since brought
+        // forward, which is still ahead. A time already past is the one this prune served, so it is cleared.
+        const stored = row.retentionDueAt;
+
+        if (next === NO_RETENTION_DUE && stored !== undefined && stored !== NO_RETENTION_DUE && stored > Date.now()) {
+            return;
+        }
+
+        await ctx.db.patch("shardActivity", row._id, { retentionDueAt: next });
+    });
+};
+
+/**
+ * Brings `shardKey`'s retained-rows time forward to `dueAt` if it is later (or unset): a new row expires long after the rows already
+ * there, so it must not push the time back. The prune sets the exact time (`setRetentionDue`).
+ */
+export const noteRetentionDueAt = async (ctx: CensusCtx, dueAt: number, shardKey: string | undefined = currentUserShard()): Promise<void> => {
+    if (shardKey === undefined) {
+        return;
+    }
+
+    await bestEffort("noteRetentionDueAt", async () => {
+        const row = await censusRow(ctx, shardKey, "primary");
+
+        if (!row) {
+            await ctx.db.insert("shardActivity", { lastActiveAt: Date.now(), retentionDueAt: dueAt, shardKey });
+
+            return;
+        }
+
+        if (row.retentionDueAt === undefined || dueAt < row.retentionDueAt) {
+            await ctx.db.patch("shardActivity", row._id, { retentionDueAt: dueAt });
+        }
+    });
+};
+
+/**
+ * A reply's retained rows, expiring at `dueAt`: brings the shard's wake and its retained-rows time forward to it, if either is later (or
+ * unset). One census read covers both, where two calls read it twice.
+ */
+export const noteRetentionWake = async (ctx: CensusCtx, dueAt: number, shardKey: string | undefined = currentUserShard()): Promise<void> => {
+    if (shardKey === undefined) {
+        return;
+    }
+
+    await bestEffort("noteRetentionWake", async () => {
+        const row = await censusRow(ctx, shardKey, "primary");
+
+        if (!row) {
+            await ctx.db.insert("shardActivity", { lastActiveAt: Date.now(), nextDueAt: dueAt, retentionDueAt: dueAt, shardKey });
+
+            return;
+        }
+
+        const wake = row.nextDueAt === undefined || dueAt < row.nextDueAt;
+        const retention = row.retentionDueAt === undefined || dueAt < row.retentionDueAt;
+
+        if (wake || retention) {
+            await ctx.db.patch("shardActivity", row._id, {
+                ...(wake && { nextDueAt: dueAt }),
+                ...(retention && { retentionDueAt: dueAt }),
+            });
         }
     });
 };
@@ -375,11 +474,38 @@ export const runShardTick = internalMutation
     .output(v.null())
     .mutation(async ({ ctx }) => {
         // Also schedules `checkDueTasks` (see `triggers/schedule.ts`).
-        await ctx.runMutation(internal.triggers.schedule.checkDueTriggers, {});
+        // A failure here must not stop the retention prune or the re-arming below: the shard is then armed for now, as a reap that failed is.
+        const triggersChecked = await bestEffort("checkDueTriggers", async () => {
+            await ctx.runMutation(internal.triggers.schedule.checkDueTriggers, {});
+        });
+
         // The export runs due on this shard (`usage/gdpr.ts`): the tick reaches an idle shard, so its runs are not left to the daily sweep.
         await bestEffort("sweepUsageExportPieces", async () => {
             await ctx.runMutation(internal.usage.gdpr.sweepUsageExportPieces, {});
         });
+        // The retained rows past their window (`gdpr/retention.ts`): a dormant shard gets no housekeeping visit, so its rows expire here, when
+        // the census wakes it for them. Pruned only once the census says they have expired, so a tick for other work reads just that row. A
+        // census read that fails prunes now, which is harmless.
+        const shardKey = currentUserShard();
+        // The shard's retained rows' time, read here; a read that fails is taken as due, so the rows are not left for it.
+        const retention = await (async () => {
+            try {
+                const census = shardKey === undefined ? undefined : await censusRow(ctx, shardKey, "primary");
+
+                return { at: census?.retentionDueAt, failed: false };
+            } catch {
+                return { at: undefined, failed: true };
+            }
+        })();
+        const retentionDue = retention.failed || (retention.at !== undefined && retention.at !== NO_RETENTION_DUE && retention.at <= ctx.now);
+        // Not yet due: the time is a wake of its own, so the shard is not left with none once this tick's other work is done.
+        const retentionLater = !retentionDue && retention.at !== undefined && retention.at !== NO_RETENTION_DUE ? retention.at : undefined;
+        const pruned = retentionDue
+            ? await bestEffort("pruneRetainedActivity", async () => {
+                  await ctx.runMutation(internal.gdpr.retention.pruneRetainedActivity, {});
+              })
+            : true;
+
         // Event watchers whose next check is due; their checks run as actions. A failure here must not stop the reaping
         // and the re-arming below, or the shard's other schedules stall with it.
         await bestEffort("dispatchDueEventTriggers", async () => {
@@ -441,11 +567,13 @@ export const runShardTick = internalMutation
             task?.nextRunAt,
             repoPoll?.nextPollAt,
             exportRunRead?.deleteAt,
+            retentionLater,
             ...stuckChecks.map((row) => row?.stuckCheckAt),
         ].filter((at): at is number => at !== undefined);
 
-        // The dispatch cleared this shard's due time; a reap or an export-run read that failed recorded no next time, so try again.
-        if (!reaped || exportRunRead === undefined) {
+        // The dispatch cleared this shard's due time; a reap, a retention prune or an export-run read that failed recorded no next time, so
+        // try again.
+        if (!reaped || !pruned || !triggersChecked || exportRunRead === undefined) {
             candidates.push(now);
         }
 

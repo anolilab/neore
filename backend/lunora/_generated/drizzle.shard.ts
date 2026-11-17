@@ -1938,6 +1938,22 @@ export const usageExportRuns = sqliteTable("usageExportRuns", {
     by_requestId: index("by_requestId").on(t.requestId),
 }));
 
+export const usageOrganizationReplies = sqliteTable("usageOrganizationReplies", {
+    _id: text("_id").primaryKey(),
+    _creationTime: integer("_creationTime").notNull(),
+    at: real("at").notNull(),
+    costMicrodollars: real("costMicrodollars").notNull(),
+    organizationId: text("organizationId").notNull(),
+    projectKey: text("projectKey").notNull(),
+    replyKey: text("replyKey").notNull(),
+    tokens: real("tokens").notNull(),
+    userId: text("userId").notNull(),
+}, (t) => ({
+    by_organization_and_at: index("by_organization_and_at").on(t.organizationId, t.at),
+    by_at: index("by_at").on(t.at),
+    by_user_and_reply: index("by_user_and_reply").on(t.userId, t.replyKey),
+}));
+
 export const usageReplies = sqliteTable("usageReplies", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),

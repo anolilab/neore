@@ -38743,3 +38743,28 @@ msgstr "Zurigo"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ punti"
+
+
+#: src/features/home/components/home-page.tsx:241
+msgid "Could not turn on the Daily Brief."
+msgstr "Impossibile attivare il Daily Brief."
+
+#: src/features/home/components/home-page.tsx:234
+msgid "Get a short summary here every morning."
+msgstr "Ricevi qui un breve riepilogo ogni mattina."
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:134
+msgid "Projects no longer in the organization"
+msgstr "Progetti non più presenti nell'organizzazione"
+
+#: src/features/home/components/home-page.tsx:249
+msgid "Turn on Daily Brief"
+msgstr "Attiva il Daily Brief"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:160
+msgid "Whose usage"
+msgstr "Utilizzo di chi"
+
+#: src/features/settings/components/chat/usage-project-breakdown.tsx:155
+msgid "Your organization's projects, summed over every member, for the selected period"
+msgstr "I progetti della tua organizzazione, sommati tra tutti i membri, per il periodo selezionato"

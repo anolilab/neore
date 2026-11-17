@@ -53,7 +53,9 @@ export const readableProject = async (
     // NON-active organization is invisible to the guarded `ctx.db` until the org is admitted.
     const found = await systemDb(context).projects.findFirst({ where: { _id: projectId }, ...consistency });
 
-    const isMember: MembershipCheck = async (organizationId) => (await getMemberByOrganizationAndUser(context, organizationId, userId)) !== null;
+    // From the primary when the decision is for a change: a lagging membership replica could still admit a member who has left.
+    const isMember: MembershipCheck = async (organizationId) =>
+        (await getMemberByOrganizationAndUser(context, organizationId, userId, primary ? "primary" : undefined)) !== null;
 
     if (!found || !(await mayReadProject(found, userId, isMember))) {
         return null;
