@@ -82,6 +82,12 @@ describe("list", () => {
         expect(first?.disabledReason).toContain("Pair");
     });
 
+    it("pairs an ssh host whose HostName differs from the saved address only in case", () => {
+        const rows = setup({ ssh: [ssh("build", { hostName: "BUILD.Example.com" })] }).machines.list();
+
+        expect(rows[1]).toMatchObject({ id: "srv-1", status: "connected" });
+    });
+
     it("says not connected for a paired server that is down", () => {
         const rows = setup({ hosts: [server({ connected: false })] }).machines.list();
 

@@ -165,8 +165,22 @@ describe("parseSshConfig", () => {
         expect(parse("Host 😀 # production\n").map((host) => host.alias)).toEqual(["😀"]);
     });
 
+    it("leaves a host enabled when a Match rule's criteria cannot select it, and when it sets no key the transport uses", () => {
+        expect(parse("Host a\n  HostName a.example.com\nMatch originalhost *.example.com\n  Port 2200\n").map((host) => host.disabledReason)).toEqual([null]);
+        expect(parse("Host a\n  HostName a.example.com\nMatch host a originalhost b\n  Port 2200\n").map((host) => host.disabledReason)).toEqual([null]);
+        expect(parse("Host a\nMatch all\n  ForwardAgent yes\n  Include other.conf\n").map((host) => host.disabledReason)).toEqual([null]);
+    });
+
+    it("keeps an alias with a bang after its first character, since only a leading ! negates", () => {
+        expect(parse("Host build!legacy\n  Port 2200\n").map((host) => [host.alias, host.disabledReason])).toEqual([["build!legacy", null]]);
+    });
+
+    it("treats IdentityFile none as no key file rather than a relative path", () => {
+        expect(parse("Host a\n  IdentityFile none\n")).toMatchObject([{ disabledReason: null, identityFile: null }]);
+    });
+
     it("disables the hosts a Match rule it cannot evaluate could apply to", () => {
-        for (const rule of ["host *", "user deploy", "originalhost *.example.com", "host a,!b", "localuser me", "all", "canonical"]) {
+        for (const rule of ["host *", "user deploy", "host a,!b", "localuser me", "all", "canonical"]) {
             const hosts = parse(`Host a\n  HostName a.example.com\nMatch ${rule}\n  Port 2200\n`);
 
             expect(hosts.map((host) => host.disabledReason !== null), rule).toEqual([true]);

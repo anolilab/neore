@@ -4,7 +4,7 @@
  * order (settings before the first `Host` line first), the first value of a key wins, and a block applies to an alias
  * when one of its `Host` patterns matches it and no negated pattern does. `IdentityFile` is the exception: ssh adds every
  * applicable one, and the transport takes one key, so a host with more than one is disabled. What the reader cannot
- * honour (a `Match` rule it cannot tie to other hosts, `Include` in a `Host` block, `ProxyJump`, `ProxyCommand`, a
+ * honour (a `Match` rule whose criteria can select the host and that sets a key the transport uses, `Include` in a `Host` block, `ProxyJump`, `ProxyCommand`, a
  * relative `IdentityFile`, a malformed `Port`) makes a host disabled instead of being guessed at.
  */
 import { readFileSync } from "node:fs";
@@ -33,7 +33,8 @@ interface Block {
     user: string | null;
 }
 
-const WILDCARD = /[!*?]/u;
+// A leading `!` negates a pattern; anywhere else `!` is a literal character of an alias, as in `build!legacy`.
+const WILDCARD = /[*?]/u;
 const GLOB_SPECIAL = /[$()+.\\[\]^{|}]/gu;
 const KEY_END = /[\s=]/u;
 const WORD = /"([^"]*)"|(\S+)/gu;
@@ -109,7 +110,8 @@ const settingOf = (key: string, value: string, home: string): Partial<Block> => 
         case "identityfile": {
             const file = firstWord(value);
 
-            if (file === null) {
+            // `none` names no key file, so the transport passes none, as for a host without an IdentityFile line.
+            if (file === null || file.toLowerCase() === "none") {
                 return {};
             }
 
@@ -156,27 +158,36 @@ const mergeFirst = (block: Block, patch: Partial<Block>): Block => {
     };
 };
 
-/**
- * What a `Match` line can apply to: the host patterns of `host` / `originalhost` criteria, or anything at all when it
- * has a criterion this reader cannot evaluate (`user`, `exec`, `all`, `final`, ...) or a negated host pattern.
- */
-const readMatch = (value: string): { anything: boolean; patterns: string[] } => {
+/** One criterion of a `Match` line: the names of `host` or `originalhost`, or `other` for one this reader cannot evaluate (`user`, `exec`, `all`, a negated name, ...). */
+interface MatchCriterion {
+    keyword: "host" | "originalhost" | "other";
+    names: string[];
+}
+
+/** A `Match` line, and whether it sets a key the transport uses before the next Host or Match line. */
+interface MatchRule {
+    criteria: MatchCriterion[];
+    relevant: boolean;
+}
+
+/** The criteria of a `Match` line; one this reader cannot evaluate makes the whole line `other`, which can select any host. */
+const readMatch = (value: string): MatchCriterion[] => {
     const tokens = words(value);
-    const patterns: string[] = [];
+    const criteria: MatchCriterion[] = [];
 
     for (let index = 0; index < tokens.length; index += 1) {
         const keyword = (tokens[index] ?? "").toLowerCase();
-        const list = (tokens[index + 1] ?? "").split(",").filter(Boolean);
+        const names = (tokens[index + 1] ?? "").split(",").filter(Boolean);
 
-        if ((keyword !== "host" && keyword !== "originalhost") || list.length === 0 || list.some((name) => name.startsWith("!"))) {
-            return { anything: true, patterns: [] };
+        if ((keyword !== "host" && keyword !== "originalhost") || names.length === 0 || names.some((name) => name.startsWith("!"))) {
+            return [{ keyword: "other", names: [] }];
         }
 
-        patterns.push(...list);
+        criteria.push({ keyword: keyword === "host" ? "host" : "originalhost", names });
         index += 1;
     }
 
-    return { anything: tokens.length === 0, patterns };
+    return criteria.length === 0 ? [{ keyword: "other", names: [] }] : criteria;
 };
 
 const globMatches = (pattern: string, name: string): boolean => {
@@ -204,14 +215,15 @@ const appliesTo = (block: Block, alias: string): boolean => {
 
 interface Parsed {
     blocks: Block[];
-    matchesAnything: boolean;
-    matchPatterns: string[];
+    matchRules: MatchRule[];
 }
+
+/** The keys the transport passes to ssh: a Match rule that sets none of them changes nothing the picker uses. */
+const TRANSPORT_KEYS = new Set(["hostname", "identityfile", "port", "proxycommand", "proxyjump", "user"]);
 
 const readLines = (text: string, home: string): Parsed => {
     const blocks: Block[] = [{ ...EMPTY, patterns: ["*"] }];
-    const matchPatterns: string[] = [];
-    let matchesAnything = false;
+    const matchRules: MatchRule[] = [];
     // The index of the block that settings belong to: 0 is the global block before the first Host line; a Match block holds settings of its own, none of them a Host's.
     let current = 0;
 
@@ -228,30 +240,45 @@ const readLines = (text: string, home: string): Parsed => {
             blocks.push({ ...EMPTY, patterns: words(parts.value) });
             current = blocks.length - 1;
         } else if (key === "match") {
-            const match = readMatch(parts.value);
-
+            matchRules.push({ criteria: readMatch(parts.value), relevant: false });
             current = -1;
-            matchesAnything ||= match.anything;
-            matchPatterns.push(...match.patterns);
-        } else if (blocks[current] !== undefined && !(key === "include" && current === 0)) {
+        } else if (current === -1) {
+            // Settings under a Match line apply to the hosts its criteria select, which this reader does not evaluate: they count only when they set a key the transport uses.
+            const rule = matchRules.at(-1);
+
+            if (rule !== undefined && TRANSPORT_KEYS.has(key ?? "")) {
+                rule.relevant = true;
+            }
+        } else if (!(key === "include" && current === 0)) {
             // An Include before the first Host line adds blocks of its own, which this reader never sees; it is no reason to disable a host.
             blocks[current] = mergeFirst(blocks[current], settingOf(parts.key, parts.value, home));
         }
     }
 
-    return { blocks, matchesAnything, matchPatterns };
+    return { blocks, matchRules };
 };
 
 /** OpenSSH compares `Match host` and `Match originalhost` names without regard to case, unlike `Host` patterns. */
 const matchesMatchName = (pattern: string, name: string): boolean => globMatches(pattern.toLowerCase(), name.toLowerCase());
 
+/** Whether one criterion can hold for an alias: `host` tests the resolved host name, `originalhost` the alias as typed. */
+const criterionMayMatch = (criterion: MatchCriterion, alias: string, hostName: string): boolean => {
+    if (criterion.keyword === "other") {
+        return true;
+    }
+
+    const name = criterion.keyword === "host" ? hostName : alias;
+
+    return criterion.names.some((pattern) => matchesMatchName(pattern, name));
+};
+
 /** Parses the text of an ssh config. Pure, so it is tested without a file. */
 export const parseSshConfig = (text: string, home: string): SshHost[] => {
-    const { blocks, matchesAnything, matchPatterns } = readLines(text, home);
+    const { blocks, matchRules } = readLines(text, home);
     const hosts: SshHost[] = [];
 
     // Wildcard patterns are not hosts; they only contribute settings. An alias a line names twice is listed once, and one its own line negates is not listed.
-    const listed = blocks.flatMap((block) => block.patterns.filter((alias) => !WILDCARD.test(alias) && appliesTo(block, alias)));
+    const listed = blocks.flatMap((block) => block.patterns.filter((alias) => !WILDCARD.test(alias) && !alias.startsWith("!") && appliesTo(block, alias)));
 
     const aliases = [...new Set(listed)];
 
@@ -264,7 +291,7 @@ export const parseSshConfig = (text: string, home: string): SshHost[] => {
             }
         }
 
-        const usesMatch = matchesAnything || matchPatterns.some((pattern) => matchesMatchName(pattern, alias) || (effective.hostName !== null && matchesMatchName(pattern, effective.hostName)));
+        const usesMatch = matchRules.some((rule) => rule.relevant && rule.criteria.every((criterion) => criterionMayMatch(criterion, alias, effective.hostName ?? alias)));
 
         hosts.push({
             alias,

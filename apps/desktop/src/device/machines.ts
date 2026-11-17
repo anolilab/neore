@@ -182,7 +182,7 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
             .settings()
             .hosts.find(
                 (host) =>
-                    host.address === (entry.hostName ?? entry.alias) &&
+                    host.address.toLowerCase() === (entry.hostName ?? entry.alias).toLowerCase() &&
                     host.port === (entry.port ?? 22) &&
                     host.user === (entry.user ?? dependencies.username()) &&
                     (host.identityFile ?? null) === entry.identityFile,
