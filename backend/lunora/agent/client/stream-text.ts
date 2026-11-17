@@ -107,6 +107,8 @@ const _doStreamText = async <TOOLS extends ToolSet, OUTPUT extends Output<any, a
                       order,
                       provider: getProviderName(args.model),
                       providerOptions: args.providerOptions,
+                      // The run's stream id: the live row and the rows the run saves name the same reply.
+                      runStreamId: options.runHold?.streamId,
                       stepOrder,
                       threadId,
                       userId,

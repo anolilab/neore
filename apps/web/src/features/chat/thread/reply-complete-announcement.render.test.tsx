@@ -6,7 +6,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import ReplyCompleteAnnouncement from "./reply-complete-announcement";
 
 const chat = vi.hoisted(() => {
-    return { messages: [] as { id: string; role: string; status: string; text: string }[], isStreaming: false, threadId: "thread-1" };
+    return {
+        messages: [] as { id: string; role: string; status: string; text: string }[],
+        isStreaming: false,
+        threadId: "thread-1",
+    };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -51,7 +55,7 @@ describe("reply complete announcement", () => {
         expect(region().textContent).toBe("");
     });
 
-    it("announces once when a streamed reply finishes, not per chunk, and never the text", () => {
+    it("announces once when a streamed reply finishes, not per chunk, with the start of its text", () => {
         const view = render(<ReplyCompleteAnnouncement />);
 
         setChat(true, [reply("old"), reply("new", "streaming")]);
@@ -62,11 +66,36 @@ describe("reply complete announcement", () => {
 
         setChat(false, [reply("old"), reply("new")]);
         view.rerender(<ReplyCompleteAnnouncement />);
-        expect(region().textContent).toBe("Reply complete");
-        expect(region().textContent).not.toContain("hi");
+        expect(region().textContent).toBe("Reply complete: hi");
+        expect(region().textContent).not.toContain("a longer chunk");
 
         view.rerender(<ReplyCompleteAnnouncement />);
+        expect(region().textContent).toBe("Reply complete: hi");
+    });
+
+    it("says only the phrase for a reply with no text, such as a tool-only reply", () => {
+        const view = render(<ReplyCompleteAnnouncement />);
+
+        setChat(true, [reply("old"), reply("new", "streaming")]);
+        view.rerender(<ReplyCompleteAnnouncement />);
+        setChat(false, [reply("old"), { ...reply("new"), text: "" }]);
+        view.rerender(<ReplyCompleteAnnouncement />);
+
         expect(region().textContent).toBe("Reply complete");
+    });
+
+    it("cuts a long reply to a short snippet at a word boundary", () => {
+        const view = render(<ReplyCompleteAnnouncement />);
+        const long = `${"word ".repeat(80)}end`;
+
+        setChat(true, [reply("old"), reply("new", "streaming")]);
+        view.rerender(<ReplyCompleteAnnouncement />);
+        setChat(false, [reply("old"), { ...reply("new"), text: long }]);
+        view.rerender(<ReplyCompleteAnnouncement />);
+
+        expect(region().textContent?.startsWith("Reply complete: word word")).toBe(true);
+        expect(region().textContent?.endsWith("…")).toBe(true);
+        expect(region().textContent?.length).toBeLessThan(230);
     });
 
     it("clears while the next reply streams so its completion is announced again", () => {
@@ -76,7 +105,7 @@ describe("reply complete announcement", () => {
         view.rerender(<ReplyCompleteAnnouncement />);
         setChat(false, [reply("old"), reply("a")]);
         view.rerender(<ReplyCompleteAnnouncement />);
-        expect(region().textContent).toBe("Reply complete");
+        expect(region().textContent).toBe("Reply complete: hi");
 
         setChat(true, [reply("old"), reply("a"), reply("b", "streaming")]);
         view.rerender(<ReplyCompleteAnnouncement />);
@@ -84,7 +113,7 @@ describe("reply complete announcement", () => {
 
         setChat(false, [reply("old"), reply("a"), reply("b")]);
         view.rerender(<ReplyCompleteAnnouncement />);
-        expect(region().textContent).toBe("Reply complete");
+        expect(region().textContent).toBe("Reply complete: hi");
     });
 
     it("stays silent for history, a failed reply, and a thread switch", () => {
@@ -103,7 +132,7 @@ describe("reply complete announcement", () => {
         view.rerender(<ReplyCompleteAnnouncement />);
         setChat(false, [reply("old"), reply("n2")]);
         view.rerender(<ReplyCompleteAnnouncement />);
-        expect(region().textContent).toBe("Reply complete");
+        expect(region().textContent).toBe("Reply complete: hi");
 
         act(() => {
             chat.threadId = "thread-2";

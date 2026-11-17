@@ -232,6 +232,7 @@ export class DeltaStreamer<T> {
             order: number;
             provider?: string;
             providerOptions?: ProviderOptions;
+            runStreamId?: string;
             stepOrder: number;
             threadId: string;
             userId?: string;

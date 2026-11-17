@@ -181,6 +181,7 @@ for (const path of [
     "./completion-sound",
     "./composer-prompt-queue",
     "./reply-complete-announcement",
+    "./turn-step-announcement",
     "./composer-long-text-prompt",
 ]) {
     vi.doMock(path, () => {

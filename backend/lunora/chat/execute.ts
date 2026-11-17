@@ -69,6 +69,7 @@ import { loadModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./
 import { defaultModelUnderRules, readsImagesAndCallsTools } from "../lib/utility-model";
 import { injectsSkillText } from "./lib/low-risk-approval";
 import { closeMCPClientsThenSettle } from "./lib/mcp-tools";
+import { labelMcpToolCalls } from "./lib/mcp-tool-labels";
 import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
 import { MAX_LENGTH } from "../lib/validators";
 import { resolveAutoModel, shouldRouteAuto } from "./lib/auto-model";
@@ -708,6 +709,7 @@ export const runStreamingAgent = internalAction
                 const result = await threadObject.streamText(streamTextArgs, {
                     admittedRun: true,
                     // The step's rows land only while this run holds the stream: `addMessages` checks it in its own transaction.
+                    labelStepContent: (content) => labelMcpToolCalls(content, toolResult.mcpLabels, toolResult.autoApprovals),
                     runHold: { epoch: runEpoch, streamId },
                     statelessMode: threadStatelessMode,
                     takeSteer: steering.takeSteer,
