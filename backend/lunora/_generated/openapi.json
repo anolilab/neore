@@ -33619,6 +33619,104 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#feedback_functions:submitFeedback": {
+      "post": {
+        "description": "Invoke the `action` `feedback_functions:submitFeedback` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "feedback_functions:submitFeedback",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "kind": {
+                        "anyOf": [
+                          {
+                            "const": "idea",
+                            "type": "string"
+                          },
+                          {
+                            "const": "problem",
+                            "type": "string"
+                          },
+                          {
+                            "const": "other",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "pagePath": {
+                        "type": "string"
+                      },
+                      "uploadIds": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "message",
+                      "uploadIds"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "feedback_functions:submitFeedback",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "feedbackId": {
+                      "description": "Id<\"feedback\">",
+                      "type": "string",
+                      "x-lunora-table": "feedback"
+                    }
+                  },
+                  "required": [
+                    "feedbackId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: feedback_functions:submitFeedback",
+        "tags": [
+          "feedback"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#file:finalizeChatUpload": {
       "post": {
         "description": "Invoke the `action` `file:finalizeChatUpload` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -63712,6 +63810,10 @@
     {
       "description": "Eval datasets and runs: cases run one at a time against a skill, a model or knowledge retrieval, then judged.",
       "name": "evals"
+    },
+    {
+      "description": "Feedback a user sends from the app: an idea, a problem or anything else, with optional images.",
+      "name": "feedback"
     },
     {
       "description": "Operations declared in `lunora/file`.",

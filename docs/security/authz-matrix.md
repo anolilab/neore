@@ -450,6 +450,7 @@ for a schema table that is neither policed nor listed:
 | `evals_functions.startRun` | mutation | authMutation + RL | evalDatasets, evalRuns, knowledgeFiles, skills | owner helper | ok |
 | `evals_functions.updateCase` | mutation | authMutation + RL | evalCases | owner helper | ok |
 | `evals_functions.updateDataset` | mutation | authMutation + RL | evalDatasets | owner helper | ok |
+| `feedback_functions.submitFeedback` | action | authAction + RL | feedback (via internal insert) | caller-scoped (ctx.user); upload ids resolve only under the caller's own staging key; still images only, size and count capped | ok — new |
 | `file.getChatFileExtraction` | query | authQuery | chatFileAccess, chatFiles | caller's own `chatFileAccess` grant on the id, else `null` (same as missing); returns the extraction STATUS only, never the text | ok — new |
 | `file.getChatFileImageUrl` | query | authQuery | chatFileAccess, chatFiles | caller's own `chatFileAccess` grant on the id, else `null` (same as missing); returns a short-lived signed display URL, never the storage key | ok — new |
 | `file.finalizeChatUpload` | action | authAction + RL | chatFiles, chatFileAccess (via `storeFile`) | key rebuilt under the CALLER's staging prefix from `uploadId`, else answered as expired; an object stamped for another purpose is refused; real size (per-kind cap), type (allowlist) and leading bytes re-checked; grant written for the caller only | ok — the bytes arrive on the TUS upload route (see HTTP routes) |

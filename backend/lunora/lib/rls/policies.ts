@@ -191,6 +191,7 @@ const OWNER_TABLES = [
     "evalDatasets",
     "evalResults",
     "evalRuns",
+    "feedback",
     "folders",
     "gatewayNotifications",
     "gatewayUsageDeductions",

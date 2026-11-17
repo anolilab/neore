@@ -687,6 +687,7 @@ class AppBuilder<Env extends object> {
             ["evalDatasets", { mode: { field: "userId", kind: "shardBy" } }],
             ["evalResults", { mode: { field: "userId", kind: "shardBy" } }],
             ["evalRuns", { mode: { field: "userId", kind: "shardBy" } }],
+            ["feedback", { mode: { kind: "global" } }],
             ["files", { mode: { field: "userId", kind: "shardBy" } }],
             ["folders", { mode: { field: "userId", kind: "shardBy" } }],
             ["followupSuggestions", { mode: { kind: "root" } }],

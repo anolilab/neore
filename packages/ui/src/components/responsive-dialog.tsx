@@ -24,20 +24,21 @@ import { IsMobileContext } from "./responsive-dialog-context";
  * Responsive dialog root. Renders a centered Dialog on desktop and
  * a bottom-sheet Drawer on mobile (< 768px).
  *
- * Accepts the same props as Dialog — on mobile only `open` and
- * `onOpenChange` are forwarded to the Drawer.
+ * Accepts the same props as Dialog — on mobile only `open`,
+ * `onOpenChange` and `dismissible` are forwarded to the Drawer.
+ * `dismissible={false}` keeps a swipe or an outside click from closing it.
  */
-const Dialog = ({ children, onOpenChange, open, ...props }: React.PropsWithChildren<DialogProps>) => {
+const Dialog = ({ children, dismissible, onOpenChange, open, ...props }: React.PropsWithChildren<DialogProps & { dismissible?: boolean }>) => {
     const isMobile = useMediaMatch(MOBILE_BREAKPOINT_QUERY);
 
     return (
         <IsMobileContext value={!!isMobile}>
             {isMobile ? (
-                <Drawer onOpenChange={onOpenChange} open={open}>
+                <Drawer dismissible={dismissible} onOpenChange={onOpenChange} open={open}>
                     {children}
                 </Drawer>
             ) : (
-                <BaseDialog onOpenChange={onOpenChange} open={open} {...props}>
+                <BaseDialog disablePointerDismissal={dismissible === false} onOpenChange={onOpenChange} open={open} {...props}>
                     {children}
                 </BaseDialog>
             )}

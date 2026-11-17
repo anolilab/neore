@@ -8,6 +8,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { SleepLock } from "./keep-awake";
 import { AcpManager } from "./manager";
 import { spawnAgent } from "./process";
 import { openNewSession } from "./protocol";
@@ -546,5 +547,103 @@ describe("a sign-out of an agent", () => {
         finish.open();
         await hold;
         target.killAll();
+    });
+});
+
+describe("keeping the computer awake during a turn", () => {
+    it("holds a sleep inhibitor from a turn's start to its end, and releases it when the agent is killed", async () => {
+        const live = new Set<number>();
+        let next = 1;
+        const lock = new SleepLock({
+            isStarted: (id) => live.has(id),
+            start: () => {
+                const id = next;
+
+                next += 1;
+                live.add(id);
+
+                return id;
+            },
+            stop: (id) => {
+                live.delete(id);
+            },
+        });
+        const awake = new AcpManager({
+            appVersion: "9.9.9",
+            onChange: () => {},
+            plan: (key, folder) => scratch.plan({}, folder),
+            sleepLock: lock,
+            spawn: spawnAgent,
+            startupTimeoutMs: 8000,
+        });
+
+        try {
+            const id = await awake.startSession("fake", "Fake", scratch.work);
+
+            expect(live.size).toBe(0);
+
+            awake.send(id, "slow");
+            expect(live.size).toBe(1);
+
+            await expect.poll(() => awake.snapshot(id).status, { timeout: 8000 }).toBe("idle");
+            expect(live.size).toBe(0);
+
+            awake.send(id, "hang");
+            expect(live.size).toBe(1);
+
+            awake.killAll();
+            expect(live.size).toBe(0);
+        } finally {
+            awake.killAll();
+        }
+    });
+
+    it("holds the inhibitor for a prompt sent during the pause after a cancel, from the moment it is queued", async () => {
+        const live = new Set<number>();
+        let next = 1;
+        const lock = new SleepLock({
+            isStarted: (id) => live.has(id),
+            start: () => {
+                const id = next;
+
+                next += 1;
+                live.add(id);
+
+                return id;
+            },
+            stop: (id) => {
+                live.delete(id);
+            },
+        });
+        const awake = new AcpManager({
+            appVersion: "9.9.9",
+            onChange: () => {},
+            plan: (key, folder) => scratch.plan({}, folder),
+            sleepLock: lock,
+            spawn: spawnAgent,
+            startupTimeoutMs: 8000,
+        });
+
+        try {
+            const id = await awake.startSession("fake", "Fake", scratch.work);
+
+            awake.send(id, "tool");
+            expect(live.size).toBe(1);
+
+            awake.cancelTurn(id, awake.snapshot(id).turns[0].id);
+            await expect.poll(() => awake.snapshot(id).turns[0]?.stopReason, { timeout: 8000 }).toBe("cancelled");
+            expect(live.size).toBe(0);
+
+            // The session is idle for the pause after the cancel: a prompt sent now waits for it, and holds the lock at once.
+            const queued = awake.send(id, "echo after");
+
+            expect(queued.status).toBe("queued");
+            expect(live.size).toBe(1);
+
+            await expect.poll(() => awake.snapshot(id).status, { timeout: 8000 }).toBe("idle");
+            expect(live.size).toBe(0);
+        } finally {
+            awake.killAll();
+        }
     });
 });
