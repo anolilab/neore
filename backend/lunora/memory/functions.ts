@@ -697,10 +697,12 @@ export const getMemoriesByEmbeddingIds = internalQuery
                 return {
                     _creationTime: memory._creationTime,
                     _id: memory._id as string,
+                    botId: memory.botId,
                     confidence: memory.confidence,
                     embeddingId,
                     importance: memory.importance,
                     memory: memory.memory,
+                    pinned: memory.pinned === true,
                     type: memory.type,
                 };
             }),

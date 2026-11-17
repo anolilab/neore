@@ -75,6 +75,25 @@ const memories = async () => await harness.run(async (ctx: any) => await ctx.db.
 const save = async (facts: ReadonlyArray<{ memory: string; type: "context" | "identity" }>) =>
     await harness.action(async (ctx: any) => await importFacts(ctx, { app: "gemini", facts, userId: USER }));
 
+// One axis per item number: a reworded fact has the same vector as its original.
+const vectorOf = (text: string) => Array.from({ length: 128 }, (_, axis) => (axis === Number(ITEM_RE.exec(text)?.[1]) ? 1 : 0));
+
+/** Embeds by item number and searches the stored vector rows, as the harness has no vector index. */
+const useFakeVectors = () => {
+    embedMany.mockImplementation(async (_ctx: unknown, { values }: { values: string[] }) => {
+        return { embeddings: values.map((value) => vectorOf(value)) };
+    });
+    searchVectors.mockImplementation(async (_ctx: unknown, vector: number[]) => {
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("embeddings_128").collect());
+
+        return rows
+            .map((row: { _id: string; vector: number[] }) => {
+                return { _id: row._id, _score: row.vector.reduce((sum, value, axis) => sum + value * (vector[axis] ?? 0), 0) };
+            })
+            .toSorted((a: { _score: number }, b: { _score: number }) => b._score - a._score);
+    });
+};
+
 beforeAll(async () => {
     registerModule(registry, "memory_functions", await import("./functions"));
     registerModule(registry, "agent_vector", await import("../agent/vector/index"));
@@ -269,23 +288,10 @@ describe("importing another assistant's memory", () => {
         expect.assertions(3);
 
         await setMemoryEnabled(true);
-        // One axis per item number: a reworded fact has the same vector as its original.
-        const vectorOf = (text: string) => Array.from({ length: 128 }, (_, axis) => (axis === Number(ITEM_RE.exec(text)?.[1]) ? 1 : 0));
+        useFakeVectors();
+
         const reworded = FACTS.slice(0, 5).map((_, index) => {
             return { memory: `Collection item ${String(index)} belongs to them`, type: "context" as const };
-        });
-
-        embedMany.mockImplementation(async (_ctx: unknown, { values }: { values: string[] }) => {
-            return { embeddings: values.map((value) => vectorOf(value)) };
-        });
-        searchVectors.mockImplementation(async (_ctx: unknown, vector: number[]) => {
-            const rows = await harness.run(async (ctx: any) => await ctx.db.query("embeddings_128").collect());
-
-            return rows
-                .map((row: { _id: string; vector: number[] }) => {
-                    return { _id: row._id, _score: row.vector.reduce((sum, value, axis) => sum + value * (vector[axis] ?? 0), 0) };
-                })
-                .toSorted((a: { _score: number }, b: { _score: number }) => b._score - a._score);
         });
 
         await save(FACTS.slice(0, 5));
@@ -295,6 +301,25 @@ describe("importing another assistant's memory", () => {
         expect(saved.every((row) => row.embeddingId)).toBe(true);
         expect(await save(reworded)).toStrictEqual({ added: 0, alreadyKnown: 5, updated: 0 });
         expect(searchVectors).toHaveBeenCalledTimes(5);
+    });
+
+    it("confirms a reworded repeat by its vector when the row is past the near-match window", async () => {
+        expect.assertions(1);
+
+        await setMemoryEnabled(true);
+        useFakeVectors();
+        // The window reads by type first: a thousand preferences push the one activity row out of it.
+        await harness.run(async (ctx: any) => {
+            const embeddingId = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: vectorOf("item 7") });
+
+            await ctx.db.insert("memories", { embeddingId, memory: "The user owns collection item 7 named teal", type: "activity", userId: USER });
+
+            for (let index = 0; index < 1000; index += 1) {
+                await ctx.db.insert("memories", { memory: `Preference number ${String(index)} of the user`, type: "preference", userId: USER });
+            }
+        });
+
+        expect(await save([{ memory: "Collection item 7 belongs to them", type: "context" }])).toStrictEqual({ added: 0, alreadyKnown: 1, updated: 0 });
     });
 
     it("adds nothing when the same long list is imported again", async () => {

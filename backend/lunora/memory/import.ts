@@ -13,12 +13,13 @@ import z from "zod/v4";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
+import { searchVectors } from "../agent/vector/index";
 import { validateVectorDimension, type VectorDimension } from "../agent/vector/tables";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { authAction, rateLimit } from "../lib/crpc";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel, NO_ALLOWED_UTILITY_MODEL_MESSAGE, NoAllowedUtilityModelError } from "../lib/utility-model";
-import { findSimilarMemoryByJaccard, findSimilarMemoryByVector, getMemoryEmbeddingModel, MEMORY_EMBEDDING_MODEL_NAME, runBeliefRevision } from "./extract";
+import { findSimilarMemoryByJaccard, getMemoryEmbeddingModel, MEMORY_EMBEDDING_MODEL_NAME, runBeliefRevision } from "./extract";
 import {
     applyImportLabels,
     buildImportLabelPrompt,
@@ -94,6 +95,50 @@ const embedFacts = async (ctx: ActionCtx, userId: string, rules: ModelFilterRule
     return texts.map(() => null);
 };
 
+type ExistingMemory = { _id: string; confidence?: number | null; embeddingId?: string; memory: string; pinned?: boolean };
+
+/**
+ * The user's memory closest to the fact's vector, if it is a near-match (cosine 0.85, as
+ * extraction uses). A row past the window is read by its vector id and joins `existing`, so
+ * later facts and the pinned check see it too.
+ */
+const findSimilarByVector = async (ctx: ActionCtx, userId: string, embedding: number[], existing: ExistingMemory[]) => {
+    // An empty window means the user has no memories yet: nothing to search.
+    if (existing.length === 0) {
+        return null;
+    }
+
+    validateVectorDimension(embedding.length);
+
+    const [best] = await searchVectors(ctx, embedding, {
+        dimension: embedding.length,
+        limit: 1,
+        model: MEMORY_EMBEDDING_MODEL_NAME,
+        searchAllMessagesForUserId: userId,
+        table: "memories",
+    });
+
+    if (!best || best._score < 0.85) {
+        return null;
+    }
+
+    let row = existing.find((memory) => memory.embeddingId === best._id);
+
+    if (!row) {
+        const [found] = await ctx.runQuery(internal.memory.functions.getMemoriesByEmbeddingIds, { embeddingIds: [best._id], userId });
+
+        // A bot's memory shares the user's vectors but is not the user's own.
+        if (!found || found.botId) {
+            return null;
+        }
+
+        row = found;
+        existing.push(found);
+    }
+
+    return { confidence: row.confidence ?? undefined, id: row._id as Id<"memories">, memory: row.memory, score: best._score };
+};
+
 interface ImportResult {
     added: number;
     alreadyKnown: number;
@@ -139,7 +184,13 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
         }
 
         const embedding = embeddings[index] ?? null;
-        let similar = embedding ? await findSimilarMemoryByVector(ctx, args.userId, embedding, existing).catch(() => null) : null;
+        let similar = embedding
+            ? await findSimilarByVector(ctx, args.userId, embedding, existing).catch((error: unknown) => {
+                  console.warn("[memory/import] Vector dedup failed, deduping by text:", error);
+
+                  return null;
+              })
+            : null;
 
         similar ??= findSimilarMemoryByJaccard(fact.memory, existing);
 

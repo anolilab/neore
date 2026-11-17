@@ -754,7 +754,7 @@ interface SimilarMemoryResult {
  * Find similar memory using vector cosine similarity.
  * Returns the best match if cosine score >= 0.85.
  */
-export const findSimilarMemoryByVector = async (
+const findSimilarMemoryByVector = async (
     context: ActionContext,
     userId: string,
     factEmbedding: number[],
