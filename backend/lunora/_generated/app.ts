@@ -788,7 +788,7 @@ class AppBuilder<Env extends object> {
             ["usageExportPieces", { mode: { field: "userId", kind: "shardBy" } }],
             ["usageExportProjects", { mode: { field: "userId", kind: "shardBy" } }],
             ["usageExportRuns", { mode: { field: "userId", kind: "shardBy" } }],
-            ["usageOrganizationCohorts", { mode: { kind: "global" } }],
+            ["usageOrganizationCohortSlots", { mode: { kind: "global" } }],
             ["usageOrganizationContributors", { mode: { kind: "global" } }],
             ["usageOrganizationReplies", { mode: { field: "userId", kind: "shardBy" } }],
             ["usageReplies", { mode: { field: "userId", kind: "shardBy" } }],

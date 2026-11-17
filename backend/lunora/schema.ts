@@ -3655,13 +3655,14 @@ export const schema = defineSchema({
         .index("by_deleteAt", ["deleteAt"])
         .index("by_userId", ["userId"])
         .index("by_requestId", ["requestId"]),
-    // The number of contributors ever booked under an organization, which places the next one in its cohort (`usage/cohorts.ts`).
-    usageOrganizationCohorts: defineTable({
-        booked: v.number(),
+    // One claimed booking slot per contributor booked under an organization (`usage/cohorts.ts`). The unique slot is the claim: two bookings
+    // cannot take the same one. Holds no user, so it carries no one's usage.
+    usageOrganizationCohortSlots: defineTable({
         organizationId: v.string(),
+        slot: v.number(),
     })
         .global()
-        .index("by_organization", ["organizationId"], { unique: true }),
+        .index("by_organization_and_slot", ["organizationId", "slot"], { unique: true }),
 
     // Everyone with ledger rows under an organization, whether or not they are still a member: the organization view lists these, so a
     // member who leaves keeps counting. Global, so the live path, the view and erasure reach it from any shard.

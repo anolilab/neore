@@ -731,13 +731,13 @@ export const twoFactor = sqliteTable("twoFactor", {
     userId: index("userId").on(t.userId),
 }));
 
-export const usageOrganizationCohorts = sqliteTable("usageOrganizationCohorts", {
+export const usageOrganizationCohortSlots = sqliteTable("usageOrganizationCohortSlots", {
     _id: text("_id").primaryKey(),
     _creationTime: integer("_creationTime").notNull(),
-    booked: real("booked").notNull(),
     organizationId: text("organizationId").notNull(),
+    slot: real("slot").notNull(),
 }, (t) => ({
-    by_organization: uniqueIndex("by_organization").on(t.organizationId),
+    by_organization_and_slot: uniqueIndex("by_organization_and_slot").on(t.organizationId, t.slot),
 }));
 
 export const usageOrganizationContributors = sqliteTable("usageOrganizationContributors", {
