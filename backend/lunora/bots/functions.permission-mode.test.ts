@@ -112,12 +112,8 @@ describe("a new chat with a bot", () => {
         await as(OWNER).mutation(setThreadPermissionMode as never, { mode: "full", threadId } as never);
 
         expect(await modeOf("threads", threadId)).toBe("full");
-    });
-
-    it("keeps the default when the bot has no mode", async () => {
-        const threadId = await chatWith(await botWith());
-
-        expect(await modeOf("threads", threadId)).toBeUndefined();
+        // A bot with no mode leaves its chats on the default.
+        expect(await modeOf("threads", await chatWith(await botWith()))).toBeUndefined();
     });
 });
 

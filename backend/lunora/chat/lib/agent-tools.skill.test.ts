@@ -356,6 +356,28 @@ describe("buildAgentTools MCP permission keys", () => {
         expect((tools["mcp_my_server__delete"] as { needsApproval?: unknown }).needsApproval).toBe(true);
     });
 
+    it("builds a headless run under its bot's supervised mode, and no wider under full", async () => {
+        const headless = async (unattendedMode?: "full" | "supervised") =>
+            Object.keys(
+                (
+                    await buildAgentTools(fakeCtx(), {
+                        headless: true,
+                        model: "test-model",
+                        organizationId: null,
+                        searchMode: "web",
+                        ...(unattendedMode && { unattendedMode }),
+                        userId: "user",
+                    })
+                ).tools,
+            );
+
+        const plain = await headless();
+
+        expect(plain).toContain("webSearch");
+        expect(await headless("supervised")).not.toContain("webSearch");
+        expect(await headless("full")).toStrictEqual(plain);
+    });
+
     it("applies each server's own annotations to its default", async () => {
         const { tools } = await build();
 
