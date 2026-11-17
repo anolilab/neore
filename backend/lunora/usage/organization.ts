@@ -71,6 +71,13 @@ export const groupByCohort = <Member extends { cohort: number }>(members: Readon
  */
 export const withoutLastCohort = <Member extends { cohort: number }>(members: ReadonlyArray<Member>): Member[] => {
     const last = members.at(-1)?.cohort;
+    const inLast = members.filter((member) => member.cohort === last);
+
+    // A cohort holds at most COHORT_SIZE contributors (one per unique slot), so a full one has been read whole.
+    if (inLast.length >= COHORT_SIZE) {
+        return [...members];
+    }
+
     const earlier = members.filter((member) => member.cohort !== last);
 
     return earlier.length > 0 ? earlier : [...members];
