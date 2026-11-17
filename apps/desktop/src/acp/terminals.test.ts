@@ -35,10 +35,14 @@ describe(createRequestOf, () => {
         expect(createRequestOf({ args: ["x"], command: " ls ", cwd: "/work", env: [{ name: "A", value: "1" }], outputByteLimit: 500 })).toEqual({
             cwd: "/work",
             env: [["A", "1"]],
-            line: "ls x",
+            line: "ls  x",
             outputByteLimit: 500,
-            shown: "env A=1 sh -c 'ls x'",
+            shown: "env A=1 sh -c 'ls  x'",
         });
+    });
+
+    it("keeps the space after a trailing backslash, which is part of the argument it ends", () => {
+        expect(createRequestOf({ command: "printf foo\\ " }).line).toBe("printf foo\\ ");
     });
 
     it("refuses what it cannot run as asked", () => {

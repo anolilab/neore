@@ -66,7 +66,7 @@ const KILLED_TERMINAL_WAIT_MS = 2000;
 
 /** How a terminal ended, as the tool event carries it. */
 const exitReport = (exit: TerminalExitStatus): TerminalExit => {
-    return { ...exit.exitCode !== null && { code: exit.exitCode }, ...exit.signal !== null && { signal: exit.signal } };
+    return { ...(exit.exitCode !== null && { code: exit.exitCode }), ...(exit.signal !== null && { signal: exit.signal }) };
 };
 
 /** A call this host ended itself; whatever the agent sends later does not change it. */
@@ -230,7 +230,7 @@ const keptFormOf = (kind: string, params: Record<string, unknown>, scrub: (text:
     }
 
     const wire = availableCommands.map((command) => {
-        return { description: command.description, name: command.name, ...command.hint !== undefined && { input: { hint: command.hint } } };
+        return { description: command.description, name: command.name, ...(command.hint !== undefined && { input: { hint: command.hint } }) };
     });
 
     return { ...params, update: { ...params.update, availableCommands: wire } };
@@ -348,11 +348,8 @@ export class AgentSession {
         // The capability is offered only where the core could start a terminal here (a sandbox, and the folder shared with this
         // computer's tools). Otherwise the agent runs its commands itself rather than being asked to approve a command that cannot
         // start. Windows is out too: a terminal's working folder is a POSIX path here.
-        this.terminals
-            = options.terminals === undefined
-                || options.folderIsRemote === true
-                || process.platform === "win32"
-                || !options.terminals.available(options.folder)
+        this.terminals =
+            options.terminals === undefined || options.folderIsRemote === true || process.platform === "win32" || !options.terminals.available(options.folder)
                 ? undefined
                 : new SessionTerminals(options.terminals, (terminalId) => this.onTerminalPrinted(terminalId));
         this.connection = new JsonRpcConnection(options.process.stdout, options.process.stdin, {
@@ -496,7 +493,10 @@ export class AgentSession {
         };
 
         try {
-            answer = optionId === undefined ? await setMode(this.connection, this.agentSessionId, valueId, undefined, onLate) : await setConfigOption(this.connection, this.agentSessionId, optionId, valueId, undefined, onLate);
+            answer =
+                optionId === undefined
+                    ? await setMode(this.connection, this.agentSessionId, valueId, undefined, onLate)
+                    : await setConfigOption(this.connection, this.agentSessionId, optionId, valueId, undefined, onLate);
         } catch (error) {
             // The agent's own words can quote its environment: only a fixed phrase leaves, and the cause stays out of it.
             const timedOut = (error as Error).message === "the agent did not answer";
@@ -744,7 +744,7 @@ export class AgentSession {
         const next = listed === undefined ? withOptionValue(this.offered, optionId, valueId).configOptions : this.merged(listed, previous, optionId, since);
 
         this.markConfigChanges(previous, next);
-        this.offered = { ...this.offered, ...next !== undefined && { configOptions: next } };
+        this.offered = { ...this.offered, ...(next !== undefined && { configOptions: next }) };
 
         return listed === undefined || listed.find((option) => option.id === optionId)?.currentValue === valueId;
     }
@@ -1242,7 +1242,9 @@ export class AgentSession {
             const printed = fromTerminal ?? this.toolOutput.get(tool.id);
             // While the call runs, its own text may end in the middle of a configured value that the next update completes: that edge
             // is held back, as the reply text is. Once the call is final, or its terminal has ended, the text is final and shown whole.
-            const running = (tool.status === "pending" || tool.status === "in_progress") && (ended === undefined || ended.output === "");
+            // A call marked done while its terminal still runs is running too: its printed tail can still grow.
+            const terminalRunning = terminalId !== undefined && ended === undefined;
+            const running = (terminalRunning || tool.status === "pending" || tool.status === "in_progress") && (ended === undefined || ended.output === "");
             const holdback = running ? Math.max(0, this.options.process.secretLength - 1) : 0;
             const output = printed === undefined ? undefined : outputTail(printed, scrub, holdback);
             const exit = ended === undefined ? undefined : exitReport(ended.exit);
@@ -1253,8 +1255,8 @@ export class AgentSession {
                     kind: scrub(tool.kind),
                     status: tool.status,
                     title: tool.title,
-                    ...output !== undefined && { output },
-                    ...exit !== undefined && { exit },
+                    ...(output !== undefined && { output }),
+                    ...(exit !== undefined && { exit }),
                 }),
             );
         }
@@ -1415,7 +1417,8 @@ export class AgentSession {
      */
     private keepStartupUpdate(params: Record<string, unknown>): void {
         const { resumeSessionId } = this.options;
-        const counts = resumeSessionId === undefined || (this.startupPhase === "loading" ? params.sessionId === resumeSessionId : params.sessionId !== resumeSessionId);
+        const counts =
+            resumeSessionId === undefined || (this.startupPhase === "loading" ? params.sessionId === resumeSessionId : params.sessionId !== resumeSessionId);
 
         if (!counts) {
             return;
@@ -1760,7 +1763,7 @@ export class AgentSession {
                     this.onTerminalPrinted(params.terminalId as string);
                 }
 
-                return { output, truncated, ...exitStatus !== null && { exitStatus } };
+                return { output, truncated, ...(exitStatus !== null && { exitStatus }) };
             }
             case METHOD.terminalRelease: {
                 terminals.release(params.terminalId as string);
@@ -1802,7 +1805,7 @@ export class AgentSession {
             sessionId: this.agentSessionId,
             toolCall: {
                 kind: "execute",
-                rawInput: { command: shown, ...cwd !== undefined && { cwd } },
+                rawInput: { command: shown, ...(cwd !== undefined && { cwd }) },
                 title: "Run a command in a terminal",
                 toolCallId: `terminal-${randomUUID()}`,
             },
@@ -1814,14 +1817,17 @@ export class AgentSession {
         }
 
         try {
-            const terminalId = await terminals.create({
-                agentKey: this.options.agentKey,
-                env,
-                folder: this.options.folder,
-                line,
-                ...cwd !== undefined && { cwd },
-                ...outputByteLimit !== undefined && { outputByteLimit },
-            }, requester?.id);
+            const terminalId = await terminals.create(
+                {
+                    agentKey: this.options.agentKey,
+                    env,
+                    folder: this.options.folder,
+                    line,
+                    ...(cwd !== undefined && { cwd }),
+                    ...(outputByteLimit !== undefined && { outputByteLimit }),
+                },
+                requester?.id,
+            );
 
             // The asking turn was cancelled while the command was starting, and `killTurn` ran before it existed: it ends here.
             // Once the turn has ended, a queued turn is current, and a reset `cancelRequested` no longer says anything about it.

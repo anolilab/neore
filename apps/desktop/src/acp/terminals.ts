@@ -176,7 +176,8 @@ export const createRequestOf = (
 
     const variables = envOf(env);
 
-    const line = terminalLine(command.trim(), (args as string[] | null | undefined) ?? []);
+    // Only leading whitespace goes: a trailing space after a backslash is part of the shell argument it ends.
+    const line = terminalLine(command.trimStart(), (args as string[] | null | undefined) ?? []);
 
     const shown = shownLine(line, variables);
 
