@@ -100,6 +100,7 @@
         "@tiptap/extension-character-count": "catalog:tiptap",
         "@tiptap/extension-code-block-lowlight": "catalog:tiptap",
         "@tiptap/extension-color": "catalog:tiptap",
+        "@tiptap/extension-emoji": "catalog:tiptap",
         "@tiptap/extension-highlight": "catalog:tiptap",
         "@tiptap/extension-image": "catalog:tiptap",
         "@tiptap/extension-link": "catalog:tiptap",

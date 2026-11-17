@@ -37,6 +37,19 @@ msgstr "-- 普通 --"
 msgid ", unread"
 msgstr "，未读"
 
+#: src/features/chat/thread/composer-tiptap/emoji-shortcode-popup.tsx:48
+msgid "Emoji suggestions"
+msgstr ""
+
+#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:134
+msgid "No emoji found"
+msgstr ""
+
+#. placeholder {0}: suggestions.length
+#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:134
+msgid "{0, plural, one {# emoji} other {# emoji}} found"
+msgstr ""
+
 #: src/features/sub-agents/components/sub-agent-approvals.tsx:63
 msgid "… ({omitted, plural, one {# more character not shown} other {# more characters not shown}}; approving runs the whole call)"
 msgstr "…（{omitted, plural, other {还有 # 个字符未显示}}；批准将执行整个调用）"
