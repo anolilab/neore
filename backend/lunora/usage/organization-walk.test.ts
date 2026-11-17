@@ -10,6 +10,7 @@ import schema from "../schema";
 import {
     CURSOR_TTL_MS,
     groupMembers,
+    groupReleased,
     MIN_MEMBERS_PER_GROUP,
     openOrganizationCursor,
     organizationUsageScope,
@@ -70,6 +71,23 @@ describe("groupMembers", () => {
         expect(groupMembers(allQuiet).closed.map((group) => group.map((entry) => entry.index))).toEqual(
             groupMembers(allActive).closed.map((group) => group.map((entry) => entry.index)),
         );
+    });
+});
+
+describe("groupReleased", () => {
+    it("withholds a group whose member read past the ledger's ceiling, so no response says which member it was", () => {
+        const group = Array.from({ length: MIN_MEMBERS_PER_GROUP }, (_, index) => {
+            return { active: true, truncated: index === 2 };
+        });
+
+        expect(groupReleased(group)).toBe(false);
+        expect(
+            groupReleased(
+                group.map((entry) => {
+                    return { ...entry, truncated: false };
+                }),
+            ),
+        ).toBe(true);
     });
 });
 

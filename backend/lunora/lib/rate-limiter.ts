@@ -637,6 +637,10 @@ export const RATE_LIMIT_CONFIGS = {
     // A backfill walks the whole history, so it is rare by design.
     "usage/backfill:free": Ratelimit.fixedWindow(2, HOUR),
     "usage/backfill:premium": Ratelimit.fixedWindow(5, HOUR),
+    // The organization usage walk (`usage/organization.ts`): one call per page of its members, so a large organization's view takes many.
+    // Its own budget, so prompt and skill library reads do not spend it.
+    "usage/organization:free": Ratelimit.fixedWindow(150, MINUTE),
+    "usage/organization:premium": Ratelimit.fixedWindow(450, MINUTE),
     // Vault limits
     "vault/delete:free": Ratelimit.fixedWindow(10, MINUTE),
     "vault/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
