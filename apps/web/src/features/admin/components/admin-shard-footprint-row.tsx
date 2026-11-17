@@ -117,11 +117,10 @@ const AdminShardFootprintRow = () => {
                     <p className="text-muted-foreground text-sm">{t`Some shards were only partly measured; their counts are lower bounds.`}</p>
                 ) : null}
                 <div className="flex flex-wrap items-center gap-3">
-                    {page.isFetching ? (
-                        <p aria-live="polite" className="text-muted-foreground text-sm" role="status">
-                            {t`Measuring…`}
-                        </p>
-                    ) : null}
+                    {/* Always mounted, so screen readers announce the change when measuring starts and ends. */}
+                    <p aria-live="polite" className="text-muted-foreground text-sm" role="status">
+                        {page.isFetching ? t`Measuring…` : null}
+                    </p>
                     {!finished && page.data !== undefined ? (
                         <Button disabled={page.isFetching} onClick={measureNext} type="button">
                             {t`Measure more shards`}
@@ -132,7 +131,7 @@ const AdminShardFootprintRow = () => {
                             {t`Try again`}
                         </Button>
                     ) : null}
-                    {finished ? <p className="text-muted-foreground text-sm">{t`All shards measured.`}</p> : null}
+                    {finished && totals.abandonedShards === 0 ? <p className="text-muted-foreground text-sm">{t`All shards measured.`}</p> : null}
                 </div>
             </CardContent>
         </Card>

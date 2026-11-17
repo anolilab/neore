@@ -249,6 +249,25 @@ describe("census scheduling", () => {
         expect(calls).toBe(3 + 2 * (PAGES_NEEDED - 1));
     });
 
+    it("marks a shard that read successfully earlier in the call, so a later failure restarts its count", async () => {
+        const entries = fakeEntries(1);
+        let reads = 0;
+        const readPage = async (entry: ScanEntry) => {
+            reads += 1;
+
+            if (reads === 2) {
+                throw new Error("late failure");
+            }
+
+            return await fakePage(entry);
+        };
+
+        await runScanRounds(entries, readPage, MAX_SHARD_CALLS_PER_ACTION);
+
+        expect(entries[0]?.status).toBe("failed");
+        expect(entries[0]?.succeeded).toBe(true);
+    });
+
     it("round-trips the census cursor through its opaque encoding and rejects anything else", () => {
         const cursor: CensusCursor = {
             census: "census-cursor",

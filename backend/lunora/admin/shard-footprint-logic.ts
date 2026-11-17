@@ -154,6 +154,8 @@ export interface ScanEntry {
     shardKey: string;
     state: FootprintState;
     status: "active" | "done" | "failed";
+    /** True once any page of the shard has read successfully in this call. */
+    succeeded?: boolean;
 }
 
 /**
@@ -186,6 +188,7 @@ export const runScanRounds = async (
                     const result = await readPage(entry);
 
                     entry.state = result.state;
+                    entry.succeeded = true;
                     entry.status = result.done ? "done" : "active";
                 } catch (error) {
                     entry.errorName = error instanceof Error ? error.name : "unknown";

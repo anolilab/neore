@@ -557,7 +557,8 @@ export const getShardFootprint = adminAction
                 totals.messageRows += entry.state.messageRows;
                 totals.threads += entry.state.threads;
             } else if (entry.status === "failed") {
-                const failures = (failuresBefore.get(entry.shardKey) ?? 0) + 1;
+                // A page that read earlier in this call resets the count, so only the failures since then count.
+                const failures = (entry.succeeded ? 0 : (failuresBefore.get(entry.shardKey) ?? 0)) + 1;
 
                 failureNames.push(entry.errorName ?? "unknown");
 
