@@ -529,10 +529,13 @@ export const saveImportedMemoryBatch = internalMutation
             if (known) {
                 await ctx.db.patch("memories", known, { lastConfirmedAt: now });
 
-                // The fact still contradicts the row the action matched: that row ends, in favour of the one found here.
-                if (mem.supersedes && mem.supersedes !== known) {
-                    await ctx.db.patch("memories", mem.supersedes, { supersededBy: known, updatedAt: now });
-                    retire(mem.supersedes);
+                // The fact still contradicts the row the action matched: that row ends, in favour of the one found
+                // here — unless another save ended it meanwhile.
+                const contradicted = mem.supersedes && mem.supersedes !== known ? await ctx.db.get("memories", mem.supersedes) : null;
+
+                if (contradicted && !contradicted.supersededBy && contradicted.userId === args.userId) {
+                    await ctx.db.patch("memories", contradicted._id, { supersededBy: known, updatedAt: now });
+                    retire(contradicted._id);
                 }
 
                 memoryIds.push(null);

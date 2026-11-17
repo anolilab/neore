@@ -99,44 +99,42 @@ type ExistingMemory = { _id: string; confidence?: number | null; embeddingId?: s
 
 /**
  * The user's memory closest to the fact's vector, if it is a near-match (cosine 0.85, as
- * extraction uses). A row past the window is read by its vector id and joins `existing`, so
- * later facts and the pinned check see it too.
+ * extraction uses). Hits are walked best first: a bot's row (it shares the user's vectors) or
+ * one this save superseded is passed over, not taken as "no match". A row past the window is
+ * read by its vector id and joins `existing`, so later facts and the pinned check see it too.
  */
-const findSimilarByVector = async (ctx: ActionCtx, userId: string, embedding: number[], existing: ExistingMemory[]) => {
-    // An empty window means the user has no memories yet: nothing to search.
-    if (existing.length === 0) {
-        return null;
-    }
-
+const findSimilarByVector = async (ctx: ActionCtx, userId: string, embedding: number[], existing: ExistingMemory[], retired: ReadonlySet<string>) => {
     validateVectorDimension(embedding.length);
 
-    const [best] = await searchVectors(ctx, embedding, {
+    const results = await searchVectors(ctx, embedding, {
         dimension: embedding.length,
-        limit: 1,
+        limit: 5,
         model: MEMORY_EMBEDDING_MODEL_NAME,
         searchAllMessagesForUserId: userId,
         table: "memories",
     });
+    const hits = results.filter((hit) => hit._score >= 0.85);
+    const missing = hits.map((hit) => hit._id as string).filter((id) => existing.every((memory) => memory.embeddingId !== id));
+    const read = missing.length > 0 ? await ctx.runQuery(internal.memory.functions.getMemoriesByEmbeddingIds, { embeddingIds: missing, userId }) : [];
 
-    if (!best || best._score < 0.85) {
-        return null;
-    }
+    for (const hit of hits) {
+        let row: ExistingMemory | undefined = existing.find((memory) => memory.embeddingId === hit._id);
 
-    let row = existing.find((memory) => memory.embeddingId === best._id);
+        if (!row) {
+            const found = read.find((memory) => memory.embeddingId === hit._id);
 
-    if (!row) {
-        const [found] = await ctx.runQuery(internal.memory.functions.getMemoriesByEmbeddingIds, { embeddingIds: [best._id], userId });
+            if (!found || found.botId || retired.has(found._id)) {
+                continue;
+            }
 
-        // A bot's memory shares the user's vectors but is not the user's own.
-        if (!found || found.botId) {
-            return null;
+            row = found;
+            existing.push(found);
         }
 
-        row = found;
-        existing.push(found);
+        return { confidence: row.confidence ?? undefined, id: row._id as Id<"memories">, memory: row.memory, score: hit._score };
     }
 
-    return { confidence: row.confidence ?? undefined, id: row._id as Id<"memories">, memory: row.memory, score: best._score };
+    return null;
 };
 
 interface ImportResult {
@@ -174,6 +172,8 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
     // New facts join the dedup list, so two near-identical lines in one paste save once. Only a
     // near-exact repeat is dropped: the user checked both, so a merely similar one is kept.
     const added: { _id: string; memory: string }[] = [];
+    // Rows a fact of this save superseded: still active until the save, but no longer a match.
+    const retired = new Set<string>();
 
     let revisions = 0;
 
@@ -185,7 +185,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
 
         const embedding = embeddings[index] ?? null;
         let similar = embedding
-            ? await findSimilarByVector(ctx, args.userId, embedding, existing).catch((error: unknown) => {
+            ? await findSimilarByVector(ctx, args.userId, embedding, existing, retired).catch((error: unknown) => {
                   console.warn("[memory/import] Vector dedup failed, deduping by text:", error);
 
                   return null;
@@ -246,8 +246,12 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
             toSave.push({ embedding, fact, supersedes: action === "SUPERSEDE" ? similar?.id : undefined });
             added.push({ _id: String(index), memory: fact.memory });
 
-            if (action === "SUPERSEDE" && match) {
-                existing.splice(existing.indexOf(match), 1);
+            if (action === "SUPERSEDE" && similar) {
+                retired.add(similar.id);
+
+                if (match) {
+                    existing.splice(existing.indexOf(match), 1);
+                }
             }
         }
     }

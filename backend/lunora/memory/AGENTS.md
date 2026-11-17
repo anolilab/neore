@@ -23,7 +23,8 @@
   belief-revision UPDATE rewords a row), so a repeat import is the same text and
   dedup confirms it. Near-match dedup reads a 1000-row window (type first, then newest), not
   extraction's 50; the save (`saveImportedMemoryBatch`) re-checks exact text in the mutation, so
-  a repeat past the window or a second tab saving the same paste confirms, not adds. A vector hit
-  past the window is read by its embedding id (`getMemoriesByEmbeddingIds`), never a bot's row. An import never revises a pinned row,
+  a repeat past the window or a second tab saving the same paste confirms, not adds. Vector hits
+  are walked best first; one past the window is read by its embedding id (`getMemoriesByEmbeddingIds`),
+  and a bot's row or one this save superseded is passed over. An import never revises a pinned row,
   and a merged text that fails the paste's rules saves the fact as new. Rows are `source: "imported"` with
   `importedFrom`; both actions refuse while memory is off.

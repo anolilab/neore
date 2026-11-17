@@ -30,7 +30,7 @@ export interface ImportedFact {
 /** Bullets, numbering ("1." but not "1.5"), checkboxes and markdown emphasis that wrap a line, stacked or not. */
 const LINE_PREFIX_RE = /^(?:(?:[-*•·–>#]+|\d{1,3}[.)](?=\s)|\[[ x]\])\s*)+/iu;
 /** A forged data tag of the labelling or the belief-revision prompt: removed so it cannot close the block it sits in. */
-const DATA_TAG_RE = /<\/?(?:pasted_memories|existing_memory|new_fact)\b[^>]*>/giu;
+const DATA_TAG_RE = /<\/?(?:pasted_memories|existing_memory|new_fact)\b[^>]*>?/giu;
 const EMPHASIS_RE = /\*\*|__|`/g;
 const WHITESPACE_RE = /\s+/g;
 const LINE_BREAK_RE = /\r?\n/;

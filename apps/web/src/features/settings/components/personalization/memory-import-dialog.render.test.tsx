@@ -121,4 +121,18 @@ describe("memory import dialog", () => {
 
         expect(calls.save.mock.calls[0]?.[0]).toStrictEqual({ app: "gemini", facts: [{ memory: "The user is a nurse", type: "identity" }] });
     });
+
+    it("returns focus to the paste field on Back", async () => {
+        expect.assertions(1);
+
+        calls.preview.mockResolvedValue({ cut: 0, dropped: 0, facts: [{ memory: "The user is a nurse", type: "identity" }] });
+
+        openDialog(true);
+
+        fireEvent.change(await screen.findByLabelText("3. Paste its answer"), { target: { value: "The user is a nurse" } });
+        fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+        fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+
+        await waitFor(() => expect(document.activeElement?.tagName).toBe("TEXTAREA"));
+    });
 });

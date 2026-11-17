@@ -94,6 +94,15 @@ const useFakeVectors = () => {
     });
 };
 
+/** A stored vector at cosine 0.9 to `item <n>`: a near-match that goes to belief revision, not a duplicate. */
+const nearVectorOf = (item: number) => {
+    const vector = Array.from({ length: 128 }, (_, axis): number => (axis === item ? 0.9 : 0));
+
+    vector[127] = Math.sqrt(1 - 0.81);
+
+    return vector;
+};
+
 beforeAll(async () => {
     registerModule(registry, "memory_functions", await import("./functions"));
     registerModule(registry, "agent_vector", await import("../agent/vector/index"));
@@ -299,6 +308,9 @@ describe("importing another assistant's memory", () => {
         const saved: { embeddingId?: string }[] = await memories();
 
         expect(saved.every((row) => row.embeddingId)).toBe(true);
+
+        searchVectors.mockClear();
+
         expect(await save(reworded)).toStrictEqual({ added: 0, alreadyKnown: 5, updated: 0 });
         expect(searchVectors).toHaveBeenCalledTimes(5);
     });
@@ -320,6 +332,60 @@ describe("importing another assistant's memory", () => {
         });
 
         expect(await save([{ memory: "Collection item 7 belongs to them", type: "context" }])).toStrictEqual({ added: 0, alreadyKnown: 1, updated: 0 });
+    });
+
+    it("does not match a later fact by vector to a row an earlier fact superseded", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+        useFakeVectors();
+        await harness.run(async (ctx: any) => {
+            const embeddingId = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: nearVectorOf(3) });
+
+            await ctx.db.insert("memories", { embeddingId, memory: "The user keeps collection item 3 in the hall", type: "context", userId: USER });
+            // Keeps the window from emptying once the row above is superseded.
+            await ctx.db.insert("memories", { memory: "The user has a cat named Mo", type: "identity", userId: USER });
+        });
+        generateText.mockResolvedValueOnce({ output: { action: "SUPERSEDE" } }).mockResolvedValueOnce({ output: { action: "IGNORE" } });
+
+        expect(
+            await save([
+                { memory: "The user keeps collection item 3 in the hall now", type: "context" },
+                { memory: "Collection item 3 is in their hallway", type: "context" },
+            ]),
+        ).toStrictEqual({ added: 2, alreadyKnown: 0, updated: 0 });
+        expect(generateText).toHaveBeenCalledOnce();
+    });
+
+    it("passes over a bot's vector hit to the user's own row past the window", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+        useFakeVectors();
+        await harness.run(async (ctx: any) => {
+            const botId = await ctx.db.insert("bots", {
+                computerEnabled: false,
+                createdAt: 1,
+                instructions: "",
+                model: "m",
+                name: "Ada",
+                updatedAt: 1,
+                userId: USER,
+            });
+            const botVector = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: vectorOf("item 9") });
+            const ownVector = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: nearVectorOf(9) });
+
+            await ctx.db.insert("memories", { botId, embeddingId: botVector, memory: "Collection item 9 is a blue vase", type: "context", userId: USER });
+            await ctx.db.insert("memories", { embeddingId: ownVector, memory: "The user owns collection item 9, a blue vase", type: "activity", userId: USER });
+
+            for (let index = 0; index < 1000; index += 1) {
+                await ctx.db.insert("memories", { memory: `Preference number ${String(index)} of the user`, type: "preference", userId: USER });
+            }
+        });
+        generateText.mockResolvedValueOnce({ output: { action: "IGNORE" } });
+
+        expect(await save([{ memory: "Collection item 9 is the user's blue vase", type: "context" }])).toStrictEqual({ added: 0, alreadyKnown: 1, updated: 0 });
+        expect(generateText.mock.calls[0]?.[0].prompt).toContain("<existing_memory>The user owns collection item 9, a blue vase</existing_memory>");
     });
 
     it("adds nothing when the same long list is imported again", async () => {
