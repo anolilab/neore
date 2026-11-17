@@ -76,7 +76,8 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
                     <button
                         aria-label={t`${formatTokenCount(usedTokens, i18n.locale)}/${formatTokenCount(contextWindow, i18n.locale)} ${plural(usedTokens, { one: "token used", other: "tokens used" })} (${percent}%)`}
                         className={cn(
-                            "flex items-center gap-1.5 text-xs transition-colors",
+                            // 24px tall: the smallest target WCAG 2.5.8 asks for; the ring and text stay centred within it.
+                            "flex min-h-6 items-center gap-1.5 text-xs transition-colors",
                             isCriticalUsage && "text-destructive",
                             isHighUsage && !isCriticalUsage && "text-warning",
                             !isHighUsage && "text-muted-foreground",

@@ -36,7 +36,7 @@ import { patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { MAX_LENGTH } from "../lib/validators";
-import { confirmedOf, mergeAgentState, sameOptionFields, settledBy } from "./lib/agent-state";
+import { confirmedOf, mergeAgentState, sameReportedFields, settledBy } from "./lib/agent-state";
 import { MAX_EVENTS_PER_POST } from "./lib/constants";
 import { endLiveHostTurns, finishHostTurn } from "./lib/finish";
 import { isHostRunThread } from "./lib/host-thread";
@@ -231,7 +231,7 @@ const applySessionState = async (
     // A usage report that leaves the cost out keeps the cost reported before: the agent's cost is cumulative.
     const usage = event.usage === undefined ? undefined : withKeptCost(event.usage, session.agentState?.usage);
     const usageChanged = usage !== undefined && !sameUsage(usage, session.agentState?.usage);
-    const changed = usageChanged || !sameOptionFields(session.agentState, event);
+    const changed = usageChanged || !sameReportedFields(session.agentState, event);
 
     // An option change refused without a known outcome is settled by the agent's own report of its value (a late answer, or a
     // restart before the answer was recorded): the record then says it was confirmed.

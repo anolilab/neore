@@ -181,3 +181,21 @@ export const sessionOptionsToSessionState = defineMigration({
         return { ...document, event: converted } as typeof document;
     },
 });
+
+/**
+ * The agent's advertised commands (`availableCommands`) joined the state a session row holds. The field is optional and a
+ * row written before it simply has none, so nothing is rewritten: the migration only records the new shape in the baseline.
+ */
+export const addAgentCommandsToSessions = defineMigration({
+    id: "add-agent-commands-acp-sessions",
+    table: "acpSessions",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});
+
+/** The same additive change for the stored `session_state` events: an optional `availableCommands`, nothing rewritten. */
+export const addAgentCommandsToChunks = defineMigration({
+    id: "add-agent-commands-persistent-chunks",
+    table: "persistentChunks",
+    up: () => undefined,
+});

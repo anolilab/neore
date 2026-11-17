@@ -28,7 +28,7 @@ const LEGACY_LIST_BYTE_BUDGET = 32 * 1024;
 const bytesOf = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).length;
 
 /** The longest prefix of `items` whose JSON array fits in `budget` bytes. */
-const fitPrefix = <T>(items: ReadonlyArray<T>, budget: number): T[] => {
+export const fitPrefix = <T>(items: ReadonlyArray<T>, budget: number): T[] => {
     const kept: T[] = [];
     let used = 2; // the brackets
 

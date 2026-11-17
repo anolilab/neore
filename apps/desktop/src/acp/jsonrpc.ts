@@ -25,7 +25,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 
 /** A write to a dead child's stdin fails with EPIPE: the agent exited before it read its input. */
 const exitedBeforeInput = (error: Error): Error =>
-    (error as NodeJS.ErrnoException).code === "EPIPE" ? new Error("the agent exited before reading its input") : error;
+    (error as NodeJS.ErrnoException).code === "EPIPE" ? new Error("the agent exited before reading its input", { cause: error }) : error;
 
 export class JsonRpcConnection {
     private readonly pending = new Map<number, Pending>();
