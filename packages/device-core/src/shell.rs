@@ -496,10 +496,10 @@ fn parent_from_stat(stat: &[u8]) -> Option<(u32, bool)> {
     Some((parent, !matches!(state, "Z" | "X")))
 }
 
-/// Kills `pid` if its parent is still `parent`. Through a pidfd where there is one, so the check and the signal name the
-/// same process even if `pid` is reused in between.
+/// Sends `signal` to `pid` if its parent is still `parent`. Through a pidfd where there is one, so the check and the signal name
+/// the same process even if `pid` is reused in between.
 #[cfg(target_os = "linux")]
-fn kill_child_of(pid: u32, parent: u32) {
+fn signal_child_of(pid: u32, parent: u32, signal: libc::c_int) {
     // SAFETY: plain syscalls with integer arguments and a null `siginfo`; the descriptor is closed once.
     unsafe {
         let fd = libc::syscall(libc::SYS_pidfd_open, pid as libc::pid_t, 0) as libc::c_int;
@@ -507,7 +507,7 @@ fn kill_child_of(pid: u32, parent: u32) {
 
         if fd < 0 {
             if still {
-                libc::kill(pid as libc::pid_t, libc::SIGKILL);
+                libc::kill(pid as libc::pid_t, signal);
             }
 
             return;
@@ -517,7 +517,7 @@ fn kill_child_of(pid: u32, parent: u32) {
             libc::syscall(
                 libc::SYS_pidfd_send_signal,
                 fd,
-                libc::SIGKILL,
+                signal,
                 std::ptr::null::<libc::siginfo_t>(),
                 0,
             );
@@ -577,15 +577,15 @@ fn process_parent(pid: u32) -> Option<(u32, bool)> {
     (read == size).then_some((info.pbsi_ppid, info.pbsi_status != libc::SZOMB))
 }
 
-/// Kills `pid` if its parent is still `parent`. macOS has no pidfd, so the check and the signal name `pid`, not a
+/// Sends `signal` to `pid` if its parent is still `parent`. macOS has no pidfd, so the check and the signal name `pid`, not a
 /// process: one that exits and whose pid is taken by a new process of the same parent between the two would be hit.
 /// An accepted risk: the window is two syscalls, and the parent is a stopped process of the run.
 #[cfg(target_os = "macos")]
-fn kill_child_of(pid: u32, parent: u32) {
+fn signal_child_of(pid: u32, parent: u32, signal: libc::c_int) {
     if process_parent(pid).is_some_and(|(now, _)| now == parent) {
         // SAFETY: a plain syscall with integer arguments.
         unsafe {
-            libc::kill(pid as libc::pid_t, libc::SIGKILL);
+            libc::kill(pid as libc::pid_t, signal);
         }
     }
 }
@@ -616,12 +616,9 @@ fn kill_descendants(root: u32) {
         // Every process in the tree is stopped before any is killed. Killing a child first lets its parent run on until its own
         // kill lands, and a parent that does so can still act: a shell whose `sleep` was killed runs its next command. A stopped
         // process runs nothing, and its parent cannot exit to re-parent it while it is stopped, so the parent check still holds.
-        for &(pid, _) in &tree {
+        for &(pid, parent) in &tree {
             if !dead.contains(&pid) {
-                // SAFETY: a plain signal to a pid found under this run's root.
-                unsafe {
-                    libc::kill(pid as libc::pid_t, libc::SIGSTOP);
-                }
+                signal_child_of(pid, parent, libc::SIGSTOP);
             }
         }
 
@@ -629,7 +626,7 @@ fn kill_descendants(root: u32) {
         for (pid, parent) in tree.into_iter().rev() {
             // By parent too: one re-parented after a walk found it was not signalled, and is tried again under its new parent.
             if !dead.contains(&pid) && signalled.insert((pid, parent)) {
-                kill_child_of(pid, parent);
+                signal_child_of(pid, parent, libc::SIGKILL);
                 found = true;
             }
         }
