@@ -19,6 +19,12 @@ describe("loadEmojiIndex", () => {
         expect(results.length).toBeLessThanOrEqual(8);
     });
 
+    it("finds the thumbs up for :+1 under its shortest shortcode", async () => {
+        const [first] = searchEmojiShortcodes(await loadEmojiIndex(), "+1");
+
+        expect(first).toMatchObject({ emoji: "👍", shortcode: "+1" });
+    });
+
     it("finds the dog emoji by its shortcode", async () => {
         const [first] = searchEmojiShortcodes(await loadEmojiIndex(), "dog");
 

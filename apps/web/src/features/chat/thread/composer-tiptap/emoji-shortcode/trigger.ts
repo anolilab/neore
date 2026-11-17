@@ -3,6 +3,7 @@
  *
  * The colon must start the text or follow whitespace, so `12:40`, `https://…`, `::` in code and `word:word` never open
  * the list. The query after it must be at least two letters or digits, and may hold nothing else but `_`, `+` and `-`.
+ * The two reactions everyone types, `+1` and `-1`, are the one exception: they have a single digit.
  */
 
 /** A shortcode being typed: `startOffset` is where its colon sits in the text, `query` what follows it, lower-cased. */
@@ -17,6 +18,8 @@ export const MIN_SHORTCODE_ALPHANUMERICS = 2;
 const WHITESPACE_RE = /\s/;
 const SHORTCODE_CHARS_RE = /^[\w+-]*$/;
 const ALPHANUMERIC_RE = /[a-z0-9]/gi;
+// `:+1:` and `:-1:` are the thumbs up and down; they are too short for the two-character minimum.
+const REACTION_QUERIES: ReadonlySet<string> = new Set(["-1", "+1"]);
 
 /** The shortcode the caret is in, from the text before it in the caret's block; `null` when the caret is in none. */
 export const findEmojiShortcodeQuery = (textBefore: string): EmojiShortcodeQuery | null => {
@@ -36,7 +39,7 @@ export const findEmojiShortcodeQuery = (textBefore: string): EmojiShortcodeQuery
         return null;
     }
 
-    if ((query.match(ALPHANUMERIC_RE)?.length ?? 0) < MIN_SHORTCODE_ALPHANUMERICS) {
+    if ((query.match(ALPHANUMERIC_RE)?.length ?? 0) < MIN_SHORTCODE_ALPHANUMERICS && !REACTION_QUERIES.has(query)) {
         return null;
     }
 

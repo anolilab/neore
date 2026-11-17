@@ -12,6 +12,9 @@ describe("findEmojiShortcodeQuery", () => {
         [":thumbs_up", "thumbs_up", 0],
         [":speed-boat", "speed-boat", 0],
         [":123", "123", 0],
+        [":+1", "+1", 0],
+        [":-1", "-1", 0],
+        ["hi :+1", "+1", 3],
     ])("opens for %j with query %j", (text, query, startOffset) => {
         expect(findEmojiShortcodeQuery(text)).toEqual({ query, startOffset });
     });
@@ -20,7 +23,9 @@ describe("findEmojiShortcodeQuery", () => {
         ["empty text", ""],
         ["a lone colon", ":"],
         ["one letter", ":d"],
-        ["one digit and a sign", ":+1"],
+        ["a sign alone", ":+"],
+        ["one digit with another sign", ":++1"],
+        ["one digit and a sign reversed", ":1+"],
         ["only separators", ":_-"],
         ["a space after the colon", ": dog"],
         ["a space ending the query", ":dog "],
