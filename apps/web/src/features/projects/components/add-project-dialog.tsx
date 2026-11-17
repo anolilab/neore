@@ -102,8 +102,8 @@ interface AddProjectContentProps extends Omit<AddProjectDialogProps, "open"> {
 const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, pairingHost, setPairingHost }: AddProjectContentProps) => {
     const { t } = useLingui();
     const crpc = useCRPC();
-    const { mutateAsync: createProject } = useMutation(crpc.projects.functions.createProject.mutationOptions());
-    const { mutateAsync: registerDevice } = useMutation(crpc.devices.functions.registerDevice.mutationOptions());
+    const { mutateAsync: createProject } = useMutation({ ...crpc.projects.functions.createProject.mutationOptions(), networkMode: "always" });
+    const { mutateAsync: registerDevice } = useMutation({ ...crpc.devices.functions.registerDevice.mutationOptions(), networkMode: "always" });
     const { mutateAsync: revokeDevice } = useMutation(crpc.devices.functions.revokeDevice.mutationOptions());
     const titleReference = useRef<HTMLHeadingElement>(null);
 
@@ -328,6 +328,16 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
     useEffect(() => {
         titleReference.current?.focus();
     }, [step]);
+
+    // Opening a folder replaces the row that was activated, so focus goes to the list the folder shows.
+    const listingPath = listing?.path;
+    const folderListReference = useRef<HTMLUListElement>(null);
+
+    useEffect(() => {
+        if (listingPath !== undefined) {
+            folderListReference.current?.focus();
+        }
+    }, [listingPath]);
 
     /** Pairs an ssh host as the Add a server form does: probe, register a device, pair it in the shell. Declining undoes the device. */
     const pairServer = async (bridge: AddProjectMachinesBridge, sshAlias: string, spec: MachineServerSpec): Promise<Attempt<AddProjectMachine>> => {
@@ -605,7 +615,7 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
                                 {t`Press Enter to open the folder. A folder that does not exist is created.`}
                             </p>
                         </form>
-                        <ul aria-label={t`Folders`} className="max-h-72 space-y-1 overflow-y-auto">
+                        <ul aria-label={t`Folders`} className="max-h-72 space-y-1 overflow-y-auto" ref={folderListReference} tabIndex={-1}>
                             {parent !== null && (
                                 <li>
                                     <button

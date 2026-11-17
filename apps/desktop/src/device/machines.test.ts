@@ -131,6 +131,13 @@ describe("connect", () => {
         expect(box?.spec).toEqual({ address: "box.example.com", identityFile: "/k/id", name: "box", port: 2222, user: "deploy" });
     });
 
+    it("names a pairing with an alias longer than the 80-character limit, cut to the limit", () => {
+        const alias = "a".repeat(120);
+        const [, box] = setup({ hosts: [], ssh: [ssh(alias)] }).machines.list();
+
+        expect(box?.spec?.name).toBe("a".repeat(80));
+    });
+
     it("uses the local user and port 22 in the pairing when the config names neither", () => {
         const [, box] = setup({ hosts: [], ssh: [ssh("box", { hostName: null, user: null })] }).machines.list();
 
@@ -148,6 +155,13 @@ describe("connect", () => {
 });
 
 describe("browse", () => {
+    it("asks only about a folder that exists, so a missing one is refused without a prompt", async () => {
+        const { deps, machines } = setup();
+
+        await expect(machines.browse("desk-1", path.join(root, "missing"))).rejects.toThrow("not found");
+        expect(deps.confirm).not.toHaveBeenCalled();
+    });
+
     it("asks before every listing of a folder on this computer, a continuation page included, and lists nothing when declined", async () => {
         const { deps, machines } = setup();
 
@@ -456,7 +470,7 @@ describe("validators", () => {
         expect(() => readMachinePath("srv/app", false)).toThrow("must be absolute");
         expect(() => readMachinePath("../x", true)).toThrow("must be absolute");
         expect(() => readMachinePath("/a\0b", false)).toThrow("device: path is invalid");
-        expect(() => readMachinePath(`/${"a".repeat(1024)}`, false)).toThrow("device: path is invalid");
+        expect(() => readMachinePath(`/${"a".repeat(1000)}`, false)).toThrow("device: path is invalid");
         expect(() => readMachinePath(`/${"é".repeat(600)}`, false)).toThrow("device: path is invalid");
         expect(() => readMachinePath("/a\u{202E}b", false)).toThrow("device: path is invalid");
         expect(() => readMachinePath("/a\u{2066}b", true)).toThrow("device: path is invalid");

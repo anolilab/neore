@@ -316,6 +316,19 @@ describe("AddProjectDialog pairing and browsing guards", () => {
         expect(createProject).toHaveBeenCalledWith(expect.objectContaining({ path: "/home/me/work " }));
     });
 
+    it("moves focus to the folder list once a folder opens, so keyboard focus is not lost", async () => {
+        installBridge();
+        render(<AddProjectDialog onClose={noop} onCreateNew={noop} open />);
+        fireEvent.click(await screen.findByRole("button", { name: THIS_COMPUTER }));
+        await waitFor(() => expect((screen.getByLabelText("Folder path") as HTMLInputElement).value).toBe("/home/me"));
+
+        fireEvent.click(await screen.findByRole("button", { name: "app" }));
+        await waitFor(() => expect((screen.getByLabelText("Folder path") as HTMLInputElement).value).toBe("/home/me/app"));
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
+        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("list", { name: "Folders" })));
+    });
+
     it("keeps the row locked until the machine list has refreshed after pairing", async () => {
         const device = installBridge();
         const refresh = deferred<typeof machines>();

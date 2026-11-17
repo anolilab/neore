@@ -103,7 +103,8 @@ export const readServerPath = (value: unknown): string => {
     return text(value, "path", 4096);
 };
 
-const MAX_MACHINE_PATH_BYTES = 1024;
+/** The longest folder path: a server root may be at most 1000 bytes (the core), so one limit serves both sides. */
+const MAX_MACHINE_PATH_BYTES = 1000;
 /** Whitespace and wildcards, and a leading `!` (negation); `!` elsewhere is a literal character, as in `build!legacy`. */
 const ALIAS_FORBIDDEN = /[\s*?]/u;
 
@@ -112,7 +113,7 @@ const UNSAFE_PATH_CHARACTER = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
 const NETWORK_OR_DEVICE_PATH = /^[\\/]{2}/u;
 
 /**
- * A folder the add-project picker names: absolute, no control or format characters, at most 1024 bytes. `local` is this computer's rule for
+ * A folder the add-project picker names: absolute, no control or format characters, at most 1000 bytes. `local` is this computer's rule for
  * "absolute" (drive letters on Windows); a server's paths are POSIX. An empty path is allowed only when `allowEmpty`.
  */
 export const readMachinePath = (value: unknown, local: boolean, allowEmpty = false): string => {

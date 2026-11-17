@@ -73,6 +73,9 @@ const rootLimit = (): string => `device: this server already has ${MAX_SERVER_RO
 
 const declined = (): Error => new Error("device: the person declined");
 
+/** The longest name a native pairing accepts (`readHostSpec`); a longer SSH alias is cut for the name only. */
+const MAX_SERVER_NAME = 80;
+
 const requireConnected = (host: HostView): HostView => {
     if (!host.connected) {
         throw new Error("device: connect the server first");
@@ -110,7 +113,7 @@ const insertSmallest = (sorted: string[], name: string, size: number): void => {
 };
 
 /** Directory names of a folder on this computer; a symlink is neither a directory nor a file here, as on a server. */
-const browseLocal = async (requested: string, after?: string): Promise<MachineFolderPage> => {
+const browseLocal = async (requested: string, after: string | undefined, approve: (folder: string) => Promise<void>): Promise<MachineFolderPage> => {
     let folder: string;
 
     try {
@@ -118,6 +121,9 @@ const browseLocal = async (requested: string, after?: string): Promise<MachineFo
     } catch {
         throw new Error("device: that folder was not found");
     }
+
+    // Asked for the folder as it resolved, and only once it exists: a missing folder has nothing to list.
+    await approve(folder);
 
     // Only the page and one more name are kept, so a folder of a million entries costs one page of memory.
     const kept: string[] = [];
@@ -236,7 +242,7 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
         return {
             address: entry.hostName ?? entry.alias,
             identityFile: entry.identityFile,
-            name: entry.alias,
+            name: [...entry.alias].slice(0, MAX_SERVER_NAME).join(""),
             port: entry.port ?? 22,
             user: entry.user ?? dependencies.username(),
         };
@@ -304,11 +310,11 @@ export const createAddProjectMachines = (dependencies: MachineDependencies): Add
             const local = folder === "" ? dependencies.home() : folder;
 
             // Every page asks: a continuation is only a cursor a page can send, so it cannot stand in for the person's yes.
-            if (!await ask({ detail: `Folder: ${JSON.stringify(local)}`, message: "List the folders in this folder on this computer?" })) {
-                throw declined();
-            }
-
-            return browseLocal(local, after);
+            return browseLocal(local, after, async (listed) => {
+                if (!await ask({ detail: `Folder: ${JSON.stringify(listed)}`, message: "List the folders in this folder on this computer?" })) {
+                    throw declined();
+                }
+            });
         }
 
         const host = requireConnected(machine.host);
