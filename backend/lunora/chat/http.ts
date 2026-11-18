@@ -9,6 +9,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { isHostRunThread } from "../acp/lib/host-thread";
 import { getFile } from "../agent/client";
+import { attachWindowOpen } from "../agent/file-attach-claim";
 import { requestSignIn } from "../auth/lib/request-sign-in";
 import { getCurrentUserInternal } from "../auth/lib/helper";
 import type { BetterAuthUser } from "../auth/lib/types";
@@ -407,13 +408,17 @@ const workerThreadResponse = (): Response =>
 /** The answer to a request that writes into a locked thread without a valid proof. */
 const threadLockedResponse = (): Response => Response.json({ code: THREAD_LOCKED_CODE, error: "This chat is locked." }, { status: 403 });
 
-/** What an attach's gate decided: a refusal to answer with, or nothing, and in either case a `release` to call once the attach is done. */
+/**
+ * What an attach's gate decided: a refusal to answer with, or nothing. `assertWindow` throws before a save that the claim can no
+ * longer cover (`attachWindowOpen`). `release` ends the claim once the attach is done.
+ */
 interface FileAttach {
+    assertWindow: () => void;
     refusal?: Response;
     release: () => Promise<void>;
 }
 
-const noFileAttach: FileAttach = { release: async () => undefined };
+const noFileAttach: FileAttach = { assertWindow: () => undefined, release: async () => undefined };
 
 /**
  * Checks an attach's files on the CALLER's shard and holds the attach's claim there until `release` (`agent/file-attach-claim.ts`).
@@ -452,26 +457,43 @@ const beginFileAttach = async (
         });
 
         if (attach.gated.length > 0) {
-            return { refusal: Response.json({ error: "File not found" }, { status: 404 }), release: noFileAttach.release };
+            return { ...noFileAttach, refusal: Response.json({ error: "File not found" }, { status: 404 }) };
         }
 
         const { claimedAt } = attach;
 
         if (claimedAt === undefined) {
-            return { refusal: Response.json({ error: "Could not attach the file" }, { status: 400 }), release: noFileAttach.release };
+            return { ...noFileAttach, refusal: Response.json({ error: "Could not attach the file" }, { status: 400 }) };
         }
 
         return {
+            assertWindow: () => {
+                if (!attachWindowOpen(claimedAt)) {
+                    throw new LunoraError("CONFLICT", "This attach ran past its safe window. Send it again.");
+                }
+            },
             release: async () => {
-                await caller.runMutation(internal.agent.files.endFileAttach, { claimedAt, requestId, userId }).catch((error: unknown) => {
-                    chatLogger.error("[chat] Could not release a file attach's claim; it lapses on its own", error);
-                });
+                const pending = caller
+                    .runMutation(internal.agent.files.endFileAttach, { claimedAt, requestId, userId })
+                    .then(() => undefined)
+                    .catch((error: unknown) => {
+                        chatLogger.error("[chat] Could not release a file attach's claim; it lapses on its own", error);
+                    });
+
+                // The message is saved before the release runs, so the response need not wait for it when the host can keep it alive.
+                if (context.waitUntil) {
+                    context.waitUntil(pending);
+
+                    return;
+                }
+
+                await pending;
             },
         };
     } catch (error) {
         chatLogger.error("Error checking attached files on the caller's shard:", error);
 
-        return { refusal: Response.json({ error: "Could not attach the file" }, { status: 400 }), release: noFileAttach.release };
+        return { ...noFileAttach, refusal: Response.json({ error: "Could not attach the file" }, { status: 400 }) };
     }
 };
 
@@ -609,7 +631,14 @@ export const runChatStart = async (
         return await inShard(
             context,
             shardKey,
-            async (shardCtx) => await runChatStartOnShard(shardCtx, body, signingSecret, { origin, pageContext, user, userId }),
+            async (shardCtx) =>
+                await runChatStartOnShard(shardCtx, body, signingSecret, {
+                    assertAttachWindow: fileAttach.assertWindow,
+                    origin,
+                    pageContext,
+                    user,
+                    userId,
+                }),
         );
     } finally {
         await fileAttach.release();
@@ -680,11 +709,14 @@ const runChatStartOnShard = async (
     body: ChatStartBody,
     signingSecret: string,
     {
+        assertAttachWindow,
         origin,
         pageContext,
         user,
         userId,
     }: {
+        /** Throws before a save the file attach's claim can no longer cover (`FileAttach.assertWindow`). */
+        assertAttachWindow: () => void;
         origin: "outside_agent" | undefined;
         pageContext: ReturnType<typeof parsePageContext>;
         user: BetterAuthUser;
@@ -832,6 +864,9 @@ const runChatStartOnShard = async (
         const attachThreadId = body.threadId && body.threadId !== "default" ? body.threadId : undefined;
 
         try {
+            // A late read is refused as well as a late save: a file read past the claim's window is never used (`FileAttach.assertWindow`).
+            assertAttachWindow();
+
             const fileResults = await Promise.all(
                 body.fileIds.map(async (fileId) => {
                     const { extractedText, file, filePart, imagePart } = await getFile(context as HttpActionCtx & { storage: Signer }, fileId, {
@@ -1379,6 +1414,9 @@ const runChatStartOnShard = async (
         const attachmentFileIds = body.fileIds && body.fileIds.length > 0 ? body.fileIds : undefined;
         // A send with a client id saves in the mutation that checks its claim and records the ids on it.
         const savePrompt = async (): Promise<{ messageId: string }> => {
+            // The attachments are saved below: refused rather than saved once the file's claim can no longer hold a lock back.
+            assertAttachWindow();
+
             if (startClaim !== undefined) {
                 return await context.runMutation(internal.chat.start_claim.saveStartPrompt, {
                     claim: startClaim,
@@ -1439,7 +1477,15 @@ const runChatStartOnShard = async (
         // request before anything is saved, rather than leaving a chat a later run would cap by a broader space.
         const threadOrganizationId = await sessionOrganizationPromise;
 
-        // New thread: batched creation
+        // New thread: batched creation. Its attachments are saved with it, so the file's claim must still cover the save.
+        try {
+            assertAttachWindow();
+        } catch (error) {
+            await releaseStartClaim();
+
+            throw error;
+        }
+
         const result = await context
             .runMutation(internal.chat.functions.createThreadWithInitialMessage, {
                 // A plain hosted text thread only: a guest, a media thread and a custom endpoint have nothing to route.
@@ -1559,16 +1605,16 @@ const runChatStartOnShard = async (
  * edit has answered, so the claim covers the file reads and the save.
  */
 export const editMessageHttpAction = async (context: HttpActionCtx, request: Request) => {
-    const holder: { release?: () => Promise<void> } = {};
+    const holder: { attach?: FileAttach } = {};
 
     try {
         return await editMessageAttached(context, request, holder);
     } finally {
-        await holder.release?.();
+        await holder.attach?.release();
     }
 };
 
-const editMessageAttached = async (context: HttpActionCtx, request: Request, holder: { release?: () => Promise<void> }) => {
+const editMessageAttached = async (context: HttpActionCtx, request: Request, holder: { attach?: FileAttach }) => {
     const { content, fileIds, messageId, unlockProof } = (await request.json()) as {
         content: ({ text: string; type: "text" } | { image: string; type: "image" } | { data: string; filename?: string; mimeType?: string; type: "file" })[];
         fileIds?: string[];
@@ -1677,7 +1723,7 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
             return fileAttach.refusal;
         }
 
-        holder.release = fileAttach.release;
+        holder.attach = fileAttach;
 
         // An edit of a guest's note the owner sent on is still the guest's words: it keeps the mark and the note's id.
         const guestNoteId = guestNoteIdOfMessage(message.message as Parameters<typeof guestNoteIdOfMessage>[0]);
@@ -1727,6 +1773,9 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
         // Add file parts if fileIds are provided
         if (fileIds && fileIds.length > 0) {
             try {
+                // A late read is refused as well as a late save (`FileAttach.assertWindow`).
+                holder.attach?.assertWindow();
+
                 // Process files in parallel for better performance
                 const fileResults = await Promise.all(
                     fileIds.map(async (fileId) => {
@@ -1836,6 +1885,9 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
                 { headers: { "Content-Type": "application/json" }, status: 403 },
             );
         }
+
+        // The edit's attachments are saved with it: refused rather than saved once the file's claim can no longer hold a lock back.
+        holder.attach?.assertWindow();
 
         const editedMessageId = await context.runMutation(internal.agent.branches.saveEditedSibling, {
             fileIds: fileIds as Id<"chatFiles">[] | undefined,

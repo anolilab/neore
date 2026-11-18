@@ -19,6 +19,18 @@ export const FILE_ATTACH_SCOPE = "file-attach";
 /** A normal attach takes well under this; a crashed one stops blocking locks after it. */
 export const FILE_ATTACH_TTL_MS = 2 * 60 * 1000;
 
+/**
+ * Time kept back from the claim's end. A save may start only inside `TTL - margin`, so it lands before the claim lapses even with
+ * its own round trip and the clock skew between shards.
+ */
+export const FILE_ATTACH_SAVE_MARGIN_MS = 20 * 1000;
+
+/**
+ * Whether an attach that holds the claim taken at `claimedAt` may still save its message. Once it may not, a lock can commit
+ * (the claim no longer holds it), so the save must not happen: the caller refuses the attach instead.
+ */
+export const attachWindowOpen = (claimedAt: number, now: number = Date.now()): boolean => now < claimedAt + FILE_ATTACH_TTL_MS - FILE_ATTACH_SAVE_MARGIN_MS;
+
 /** Whether the caller holds an attach in flight: locking their chats waits until none is. */
 export const fileAttachInFlight = async (context: Pick<QueryCtx, "db">, userId: string): Promise<boolean> =>
     await hasClaimWithPrefix(context, FILE_ATTACH_SCOPE, `${userId}:`);
