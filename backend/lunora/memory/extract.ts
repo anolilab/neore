@@ -406,6 +406,9 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
         // Rows this run has planned a revision for: their stored vector is of the old text, so a later fact compares by words,
         // and against their revised text.
         const revisedIds = new Set<Id<"memories">>();
+        // Rows this run has already confirmed or superseded: a later fact does not match them, so no later revision can
+        // change a row an earlier decision is waiting to write against its text.
+        const decidedIds = new Set<string>();
 
         for (const [i, extractedFact] of extractedFacts.entries()) {
             const fact = extractedFact!;
@@ -418,6 +421,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             const factEmbedding = factEmbeddings[i] ?? null;
 
             // Find similar existing memory — vector first, then Jaccard fallback
+            const candidates = existingMemories.filter((memory) => !decidedIds.has(memory._id));
             let similarMemory: SimilarMemoryResult | null = null;
 
             if (factEmbedding) {
@@ -425,7 +429,8 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                     similarMemory = await findSimilarMemoryByVector(ctx, {
                         botId: args.botId,
                         embedding: factEmbedding,
-                        existing: existingMemories,
+                        existing: candidates,
+                        retired: decidedIds,
                         userId: args.userId,
                     });
                 } catch (error) {
@@ -438,7 +443,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             }
 
             if (!similarMemory) {
-                similarMemory = findSimilarMemoryByJaccard(fact.memory, existingMemories);
+                similarMemory = findSimilarMemoryByJaccard(fact.memory, candidates);
             }
 
             if (!similarMemory) {
@@ -461,6 +466,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             if (similarMemory.score >= 0.95) {
                 // Near-exact duplicate — nothing new, but the fact was stated again.
                 memoriesToConfirm.push({ base: similarMemory.memory, embedding: factEmbedding, fact, memoryId: similarMemory.id });
+                decidedIds.add(similarMemory.id);
                 continue;
             }
 
@@ -503,6 +509,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                     }
                     case "IGNORE": {
                         memoriesToConfirm.push({ base: similarMemory.memory, embedding: factEmbedding, fact, memoryId: similarMemory.id });
+                        decidedIds.add(similarMemory.id);
                         break;
                     }
                     case "SUPERSEDE": {
@@ -519,6 +526,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                             userId: args.userId,
                         });
                         factEmbeddingsToSave.push(factEmbedding);
+                        decidedIds.add(similarMemory.id);
                         break;
                     }
                     case "UPDATE": {
