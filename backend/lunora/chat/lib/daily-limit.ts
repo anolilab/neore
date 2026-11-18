@@ -84,3 +84,32 @@ export const chargeDailyLimit = async (
 
     return result.ok ? { ok: true } : { ok: false, retryAfter: result.retryAfter };
 };
+
+/**
+ * Gives back the one unit `chargeDailyLimit` took for a send that was then refused (the file window closed before its save).
+ * A charge that took nothing (a platform admin, a tier without the kind) gives back nothing. `chargeKey` is the keyed send's
+ * key, so its claim goes with the unit (`chat/daily-charge.ts#refundDailyCharge`).
+ */
+export const refundDailyLimit = async (
+    context: Pick<HttpActionCtx, "runMutation">,
+    user: LimitedUser & Pick<BetterAuthUser, "_id">,
+    kind: DailyLimitKind,
+    { chargeKey }: { chargeKey?: string } = {},
+): Promise<void> => {
+    if (isPlatformAdmin(user)) {
+        return;
+    }
+
+    const key = dailyLimitKeyOf(kind, dailyLimitTierOf(user));
+
+    if (!key) {
+        return;
+    }
+
+    await context.runMutation(internal.chat.daily_charge.refundDailyCharge, {
+        ...(chargeKey !== undefined && { chargeKey }),
+        count: 1,
+        identifier: user._id,
+        key,
+    });
+};

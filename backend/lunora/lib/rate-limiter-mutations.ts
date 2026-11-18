@@ -4,10 +4,33 @@
  * via ctx.runMutation so rate limits can be enforced from actions too.
  */
 import { v } from "lunorash/server";
+import { availableAt, createDbStore } from "lunorash/ratelimit";
 
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { createRatelimit, RATE_LIMIT_CONFIGS } from "./rate-limiter";
+
+/**
+ * Gives back `count` units that {@link applyLimit} took from a fixed window, for a send that was then refused. The window's
+ * remaining count goes up by `count`, capped at its rate. A window that rolled over since the charge is already full, so the
+ * refund adds nothing there. Written to the same row the limiter reads (`neore:<key>:<identifier>`, `lunorash/ratelimit`).
+ */
+export const refundLimitUnits = async (
+    ctx: Pick<MutationCtx, "db">,
+    { count, identifier, key }: { count: number; identifier: string; key: string },
+): Promise<void> => {
+    const config = (RATE_LIMIT_CONFIGS as Record<string, (typeof RATE_LIMIT_CONFIGS)[keyof typeof RATE_LIMIT_CONFIGS] | undefined>)[key];
+
+    if (!config) {
+        return;
+    }
+
+    const store = createDbStore({ db: ctx.db as never });
+    const storageKey = `${encodeURIComponent(key)}:${encodeURIComponent(`neore:${key}:${identifier}`)}`;
+    const current = availableAt(config, await store.get(storageKey), Date.now());
+
+    await store.set(storageKey, { ts: current.ts, value: Math.min(config.capacity ?? config.rate, current.value + count) });
+};
 
 /** The charge {@link applyRateLimit} makes, as a plain function for a mutation that charges in its own transaction. */
 export const applyLimit = async (

@@ -15,7 +15,7 @@ import { getMembersByUserId, getOrganization, getUser } from "../auth/lib/better
 import { resolveUserPlan } from "../auth/lib/plan";
 import { claimOnce, releaseClaim } from "../lib/claim-once";
 import { createRatelimit } from "../lib/rate-limiter";
-import { applyLimit } from "../lib/rate-limiter-mutations";
+import { applyLimit, refundLimitUnits } from "../lib/rate-limiter-mutations";
 import { MAX_LENGTH } from "../lib/validators";
 import { dailyLimitKeyOf, dailyLimitTierOf } from "./lib/daily-limit";
 
@@ -110,4 +110,22 @@ export const chargeDailyLimitOnce = internalMutation
         }
 
         return { ok, ...(retryAfter !== undefined && { retryAfter }) };
+    });
+
+/**
+ * Undoes a charge for a send that was then refused, after the units were taken: the window gets its units back
+ * (`refundLimitUnits`). A keyed charge's claim goes too, so the send's retry is charged normally rather than found already
+ * charged, which would leave the send that succeeds uncharged.
+ */
+export const refundDailyCharge = internalMutation
+    .input({ chargeKey: v.optional(v.string().max(MAX_LENGTH.long)), count: v.number(), identifier: v.string(), key: v.string() })
+    .output(v.null())
+    .mutation(async ({ args: { chargeKey, count, identifier, key }, ctx }) => {
+        if (chargeKey !== undefined) {
+            await releaseClaim(ctx, DAILY_CHARGE_SCOPE, chargeKey);
+        }
+
+        await refundLimitUnits(ctx, { count, identifier, key });
+
+        return null;
     });
