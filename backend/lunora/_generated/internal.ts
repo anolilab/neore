@@ -85,14 +85,20 @@ export interface InternalApiTypes {
             default: FunctionReference<"action", { fileId: Id<"chatFiles">; mediaType: string; storageId: string }, void>;
             extractDocumentText: FunctionReference<"action", { fileId: Id<"chatFiles">; mediaType: string; storageId: string }, void>;
         };
+        file_attach_thread: {
+            claimThreadAttach: FunctionReference<"mutation", { requestId: string; threadId: Id<"threads">; unlockProof?: string; userId: string }, { claimedAt?: number; outcome: "denied" | "locked" | "ok" }>;
+            endThreadAttach: FunctionReference<"mutation", { claimedAt: number; requestId: string; threadId: Id<"threads"> }, null>;
+        };
         file_link_backfill: {
             backfillChatFileLinks: FunctionReference<"mutation", { cursor?: string; threadId: Id<"threads"> }, null>;
             backfillUnindexedFileLinks: FunctionReference<"mutation", {}, null>;
         };
         files: {
             addFile: FunctionReference<"mutation", { filename?: string; hash: string; mediaType: string; storageId: string; userId?: string }, { fileId: Id<"chatFiles">; storageId: string }>;
+            beginFileAttach: FunctionReference<"mutation", { fileIds: Array<Id<"chatFiles">>; requestId: string; threadId?: Id<"threads">; unlockProof?: string; userId: string }, { claimedAt?: number; gated: Array<Id<"chatFiles">> }>;
             copyFile: FunctionReference<"mutation", { fileId: Id<"chatFiles"> }, null>;
             deleteFiles: FunctionReference<"mutation", { fileIds: Array<Id<"chatFiles">>; force?: boolean }, Array<Id<"chatFiles">>>;
+            endFileAttach: FunctionReference<"mutation", { claimedAt: number; requestId: string; userId: string }, null>;
             getFileForUser: FunctionReference<"query", { fileId: Id<"chatFiles">; threadId?: Id<"threads">; unlockProof?: string; userId: string }, { _id: Id<"chatFiles">; extractedText?: string; extractionStatus?: "pending" | "processing" | "completed" | "failed" | "unsupported"; filename?: string; hash: string; mediaType: string; storageId: string } | null>;
             getFilesToDelete: FunctionReference<"query", { paginationOpts: { cursor: unknown; endCursor?: unknown; id?: number; maximumRowsRead?: number; numItems: number } }, { continueCursor: string | null; isDone: boolean; page: import("lunorash/server/data-model").LoadWith<import("./dataModel.js").DataModel, import("./dataModel.js").Relations, "chatFiles", {}, undefined>[]; }>;
             getOwnedStorageKeys: FunctionReference<"query", { keys: Array<string>; userId: string }, Array<string>>;
@@ -519,6 +525,7 @@ export interface InternalApiTypes {
         };
         start_claim: {
             claimChatStart: FunctionReference<"mutation", { clientMessageId: string; fingerprint: string; streams: boolean; userId: string }, { claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { outcome: "mismatch" } | { error: string; outcome: "refused" } | { messageId: string; model?: string; outcome: "duplicate"; streamId?: string; streamUnclaimed?: boolean; threadId: string; titleJobs?: { claim: { claimedAt: number; key: string }; jobs: Array<"category" | "title"> } } | { claim: { claimedAt: number; key: string }; messageId: string; model?: string; newThread?: boolean; outcome: "resume"; threadId: string }>;
+            peekChatStart: FunctionReference<"query", { clientMessageId: string; userId: string }, { saved: boolean }>;
             recordStartTitlesScheduled: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; jobs: Array<"category" | "title">; messageId: string }, null>;
             releaseChatStart: FunctionReference<"mutation", { claim: { claimedAt: number; key: string } }, null>;
             saveStartPrompt: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; fileIds?: Array<string>; messageContent: Array<Record<string, unknown>>; model: string; parentId?: string; threadId: string }, { messageId: string }>;
@@ -1469,14 +1476,20 @@ export const internal: InternalApiTypes = {
             default: { __lunoraRef: "agent_extraction:default" },
             extractDocumentText: { __lunoraRef: "agent_extraction:extractDocumentText" },
         },
+        file_attach_thread: {
+            claimThreadAttach: { __lunoraRef: "agent_file_attach_thread:claimThreadAttach" },
+            endThreadAttach: { __lunoraRef: "agent_file_attach_thread:endThreadAttach" },
+        },
         file_link_backfill: {
             backfillChatFileLinks: { __lunoraRef: "agent_file_link_backfill:backfillChatFileLinks" },
             backfillUnindexedFileLinks: { __lunoraRef: "agent_file_link_backfill:backfillUnindexedFileLinks" },
         },
         files: {
             addFile: { __lunoraRef: "agent_files:addFile" },
+            beginFileAttach: { __lunoraRef: "agent_files:beginFileAttach" },
             copyFile: { __lunoraRef: "agent_files:copyFile" },
             deleteFiles: { __lunoraRef: "agent_files:deleteFiles" },
+            endFileAttach: { __lunoraRef: "agent_files:endFileAttach" },
             getFileForUser: { __lunoraRef: "agent_files:getFileForUser" },
             getFilesToDelete: { __lunoraRef: "agent_files:getFilesToDelete" },
             getOwnedStorageKeys: { __lunoraRef: "agent_files:getOwnedStorageKeys" },
@@ -1903,6 +1916,7 @@ export const internal: InternalApiTypes = {
         },
         start_claim: {
             claimChatStart: { __lunoraRef: "chat_start_claim:claimChatStart" },
+            peekChatStart: { __lunoraRef: "chat_start_claim:peekChatStart" },
             recordStartTitlesScheduled: { __lunoraRef: "chat_start_claim:recordStartTitlesScheduled" },
             releaseChatStart: { __lunoraRef: "chat_start_claim:releaseChatStart" },
             saveStartPrompt: { __lunoraRef: "chat_start_claim:saveStartPrompt" },
