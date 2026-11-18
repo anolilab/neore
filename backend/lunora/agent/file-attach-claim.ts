@@ -10,6 +10,8 @@
  * The claim lapses after {@link FILE_ATTACH_TTL_MS} if its release never lands, so a crashed attach cannot block locking for long.
  * An attach that runs past that window is no longer covered: the TTL is the bound, and it is set well above a normal attach.
  */
+import { LunoraError } from "lunorash/server";
+
 import type { QueryCtx } from "../_generated/server";
 import { hasClaimWithPrefix } from "../lib/claim-once";
 
@@ -47,3 +49,9 @@ export const MAX_ATTACHED_FILES = 20;
 
 /** Whether a message's file list is within {@link MAX_ATTACHED_FILES}. */
 export const attachCountWithinCap = (fileIds: ReadonlyArray<string>): boolean => fileIds.length <= MAX_ATTACHED_FILES;
+
+/** The message of the refusal an attach gets when its safe window closed before the save (`attachWindowOpen`). */
+export const ATTACH_WINDOW_EXPIRED_MESSAGE = "This attach ran past its safe window. Send it again.";
+
+/** Whether a thrown error is that window refusal, so the route answers it as a retryable conflict. */
+export const isAttachWindowExpired = (error: unknown): boolean => error instanceof LunoraError && error.message === ATTACH_WINDOW_EXPIRED_MESSAGE;

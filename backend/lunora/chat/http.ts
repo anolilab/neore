@@ -9,7 +9,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { isHostRunThread } from "../acp/lib/host-thread";
 import { getFile } from "../agent/client";
-import { attachCountWithinCap, attachWindowOpen, MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
+import { ATTACH_WINDOW_EXPIRED_MESSAGE, attachCountWithinCap, attachWindowOpen, isAttachWindowExpired, MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
 import { requestSignIn } from "../auth/lib/request-sign-in";
 import { getCurrentUserInternal } from "../auth/lib/helper";
 import type { BetterAuthUser } from "../auth/lib/types";
@@ -408,6 +408,9 @@ const workerThreadResponse = (): Response =>
 /** The answer to a request that writes into a locked thread without a valid proof. */
 const threadLockedResponse = (): Response => Response.json({ code: THREAD_LOCKED_CODE, error: "This chat is locked." }, { status: 403 });
 
+/** The answer to an attach whose safe window closed before its save: a conflict the client can retry, not a server error. */
+const attachWindowExpiredResponse = (): Response => Response.json({ error: ATTACH_WINDOW_EXPIRED_MESSAGE }, { status: 409 });
+
 /**
  * What an attach's gate decided: a refusal to answer with, or nothing. `assertWindow` throws before a save that the claim can no
  * longer cover (`attachWindowOpen`). `release` ends the claim once the attach is done.
@@ -544,7 +547,7 @@ const beginFileAttach = async (
         return {
             assertWindow: () => {
                 if (!attachWindowOpen(claimedAt)) {
-                    throw new LunoraError("CONFLICT", "This attach ran past its safe window. Send it again.");
+                    throw new LunoraError("CONFLICT", ATTACH_WINDOW_EXPIRED_MESSAGE);
                 }
             },
             release: async () => {
@@ -637,7 +640,7 @@ const isSavedResend = async (
     shardKey: Awaited<ReturnType<typeof threadShardFor>>,
     { clientMessageId, fileIds, userId }: { clientMessageId: string | undefined; fileIds: string[] | undefined; userId: string },
 ): Promise<boolean> => {
-    if (clientMessageId === undefined || fileIds === undefined || fileIds.length === 0) {
+    if (clientMessageId === undefined || !Array.isArray(fileIds) || fileIds.length === 0) {
         return false;
     }
 
@@ -758,6 +761,12 @@ export const runChatStart = async (
                 await threadAttach.release();
             }
         });
+    } catch (error) {
+        if (isAttachWindowExpired(error)) {
+            return attachWindowExpiredResponse();
+        }
+
+        throw error;
     } finally {
         await fileAttach.release();
     }
@@ -1010,6 +1019,10 @@ const runChatStartOnShard = async (
                 }
             }
         } catch (error) {
+            if (isAttachWindowExpired(error)) {
+                return attachWindowExpiredResponse();
+            }
+
             if ((error as { code?: unknown }).code === "NOT_FOUND") {
                 return Response.json({ error: "File not found" }, { status: 404 });
             }
@@ -1956,6 +1969,10 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
                     }
                 }
             } catch (error) {
+                if (isAttachWindowExpired(error)) {
+                    return attachWindowExpiredResponse();
+                }
+
                 if ((error as { code?: unknown }).code === "NOT_FOUND") {
                     return Response.json({ error: "File not found" }, { headers: { "Content-Type": "application/json" }, status: 404 });
                 }
@@ -2100,6 +2117,10 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
             },
         );
     } catch (error) {
+        if (isAttachWindowExpired(error)) {
+            return attachWindowExpiredResponse();
+        }
+
         chatLogger.error("Error editing message:", error);
 
         const errorMessage = userFacingError(error)?.message ?? "Failed to edit message";
