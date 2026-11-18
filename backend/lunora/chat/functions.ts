@@ -3472,6 +3472,72 @@ export const searchMessages = authQuery
         };
     });
 
+/** A prompt the person sent, as the composer's Ctrl+R search lists it (`composer-prompt-search.tsx`). */
+const vSentPrompt = v.object({
+    createdAt: v.optional(v.number()),
+    messageId: v.string(),
+    text: v.string(),
+    threadId: v.string(),
+    threadTitle: v.string(),
+});
+
+/** Index hits read before the role filter and the newest-first sort. A hit past this window is not searched. */
+const SENT_PROMPT_WINDOW = 400;
+const SENT_PROMPT_LIMIT = 50;
+
+/**
+ * The caller's own sent prompts that match `searchQuery`, newest first, at most 50. It reads the message text index
+ * through `textSearch`, which drops every locked thread (no proof is passed), so a locked chat's prompt never lists.
+ * Word match only: the index has no prefix match. Trashed threads and other people's threads are dropped too.
+ */
+export const searchSentPrompts = authQuery
+    .input({ searchQuery: v.string().max(MAX_LENGTH.short) })
+    .output(v.object({ prompts: v.array(vSentPrompt) }))
+    .query(async ({ args: { searchQuery }, ctx: context }) => {
+        const { userId } = context.user;
+        const text = searchQuery.trim();
+
+        if (!text) {
+            return { prompts: [] };
+        }
+
+        const { messages: hits } = await context.runQuery(internal.agent.messages.textSearch, {
+            limit: SENT_PROMPT_WINDOW,
+            searchAllMessagesForUserId: userId,
+            text,
+        });
+        const sent = hits.filter((message) => (message.message as { role?: string } | undefined)?.role === "user" && (message.text ?? "").trim() !== "");
+        const threadIds = [...new Set(sent.map((message) => message.threadId))];
+        const threads = await Promise.all(
+            threadIds.map((threadId) => context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> }).catch(() => null)),
+        );
+        const titles = new Map<string, string>();
+
+        for (const [index, threadId] of threadIds.entries()) {
+            const thread = threads[index];
+
+            if (thread && thread.userId === userId && !thread.deleted && !isThreadLocked(thread)) {
+                titles.set(threadId, thread.title ?? DEFAULT_THREAD_TITLE);
+            }
+        }
+
+        const prompts = sent
+            .filter((message) => titles.has(message.threadId))
+            .toSorted((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0) || b.order - a.order || b.stepOrder - a.stepOrder)
+            .slice(0, SENT_PROMPT_LIMIT)
+            .map((message) => {
+                return {
+                    createdAt: message.createdAt,
+                    messageId: message._id as string,
+                    text: message.text ?? "",
+                    threadId: message.threadId,
+                    threadTitle: titles.get(message.threadId) ?? "",
+                };
+            });
+
+        return { prompts };
+    });
+
 /**
  * Shared rate-limit check used by all prompt-optimizer actions.
  * Reuses the existing `chat/promptImprovement` family so the per-user budget

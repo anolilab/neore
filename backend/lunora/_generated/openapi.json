@@ -21818,6 +21818,101 @@
         "x-lunora-function-kind": "query"
       }
     },
+    "/_lunora/rpc#chat_functions:searchSentPrompts": {
+      "post": {
+        "description": "Invoke the `query` `chat_functions:searchSentPrompts` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "chat_functions:searchSentPrompts",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "searchQuery": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "searchQuery"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "chat_functions:searchSentPrompts",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "prompts": {
+                      "items": {
+                        "properties": {
+                          "createdAt": {
+                            "type": "number"
+                          },
+                          "messageId": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "threadId": {
+                            "type": "string"
+                          },
+                          "threadTitle": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "messageId",
+                          "text",
+                          "threadId",
+                          "threadTitle"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "prompts"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "query: chat_functions:searchSentPrompts",
+        "tags": [
+          "chat"
+        ],
+        "x-lunora-function-kind": "query"
+      }
+    },
     "/_lunora/rpc#chat_functions:searchThreads": {
       "post": {
         "description": "Invoke the `query` `chat_functions:searchThreads` over the Lunora RPC envelope (POST /_lunora/rpc).",

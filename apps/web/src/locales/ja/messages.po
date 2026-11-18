@@ -25,30 +25,17 @@ msgstr " · モデル: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, other {# 行}}、{1, plural, other {# 列}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:639
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:765
 msgid "-- INSERT --"
 msgstr "-- 挿入 --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:639
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:765
 msgid "-- NORMAL --"
 msgstr "-- ノーマル --"
 
 #: src/features/notifications/components/notification-list.tsx:115
 msgid ", unread"
 msgstr "、未読"
-
-#: src/features/chat/thread/composer-tiptap/emoji-shortcode-popup.tsx:48
-msgid "Emoji suggestions"
-msgstr ""
-
-#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:134
-msgid "No emoji found"
-msgstr ""
-
-#. placeholder {0}: suggestions.length
-#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:134
-msgid "{0, plural, one {# emoji} other {# emoji}} found"
-msgstr ""
 
 #: src/features/sub-agents/components/sub-agent-approvals.tsx:63
 msgid "… ({omitted, plural, one {# more character not shown} other {# more characters not shown}}; approving runs the whole call)"
@@ -74,23 +61,23 @@ msgstr "「{0}」は依存タスクの完了後に開始されます"
 msgid "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
 msgstr "\"{badLogin}\" は有効なログイン名ではありません。ログイン名は英字または数字で始まり、{0} 文字以内で、英数字と単独のハイフンまたはアンダースコアのみ使用できます。"
 
-#: src/features/chat/thread/composer-input.tsx:628
+#: src/features/chat/thread/composer-input.tsx:649
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "「{fileName}」は添付できません。このファイル形式はサポートされていません。"
 
-#: src/features/chat/thread/composer-input.tsx:621
+#: src/features/chat/thread/composer-input.tsx:642
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "「{fileName}」を添付できませんでした。内容がファイル形式と一致しません。"
 
-#: src/features/chat/thread/composer-input.tsx:623
+#: src/features/chat/thread/composer-input.tsx:644
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "「{fileName}」をアップロードできませんでした。接続を確認して、もう一度お試しください。"
 
-#: src/features/chat/thread/composer-input.tsx:626
+#: src/features/chat/thread/composer-input.tsx:647
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "「{fileName}」は大きすぎます。ドキュメントは最大 {maxMegabytes} MB までです。"
 
-#: src/features/chat/thread/composer-input.tsx:627
+#: src/features/chat/thread/composer-input.tsx:648
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "「{fileName}」は大きすぎます。この種類のファイルは最大 {maxMegabytes} MB までです。"
 
@@ -216,6 +203,11 @@ msgstr "{0, plural, other {# 件のチェックが失敗しています}}"
 #: src/features/develop/components/checks-tab.tsx:91
 msgid "{0, plural, one {# check is still running} other {# checks are still running}}"
 msgstr "{0, plural, other {# 件のチェックがまだ実行中です}}"
+
+#. placeholder {0}: suggestions.length
+#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:162
+msgid "{0, plural, one {# emoji} other {# emoji}} found"
+msgstr ""
 
 #. placeholder {0}: files.length
 #: src/features/chat/thread/host-changes.tsx:53
@@ -654,6 +646,11 @@ msgstr "{2} の {1} 上の {0}"
 msgid "{0} pinned"
 msgstr "ピン留め {0} 件"
 
+#. placeholder {0}: prompts.length
+#: src/features/chat/thread/composer-prompt-search.tsx:80
+msgid "{0} prompts found"
+msgstr ""
+
 #. placeholder {0}: String(data.regressed)
 #. placeholder {1}: String(data.improved)
 #. placeholder {2}: String(data.unchanged)
@@ -988,7 +985,7 @@ msgstr "{handoff} クレジット"
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr "{hiddenColumns, plural, other {他 # 列は表示されていません。}}"
 
-#: src/features/chat/thread/composer-input-area.tsx:184
+#: src/features/chat/thread/composer-input-area.tsx:187
 msgid "{hiddenRemoved, plural, one {# invisible character was removed from your message.} other {# invisible characters were removed from your message.}}"
 msgstr "{hiddenRemoved, plural, other {メッセージから # 個の不可視文字を削除しました。}}"
 
@@ -2352,10 +2349,10 @@ msgstr "モデルを 1 つ以上追加してください（「モデルを取得
 msgid "Add at least one model id"
 msgstr "モデル ID を 1 つ以上追加してください"
 
-#: src/features/chat/thread/composer-input-area.tsx:224
-#: src/features/chat/thread/composer-input-area.tsx:258
-#: src/features/chat/thread/composer-input-area.tsx:265
-#: src/features/chat/thread/composer-input-area.tsx:279
+#: src/features/chat/thread/composer-input-area.tsx:227
+#: src/features/chat/thread/composer-input-area.tsx:261
+#: src/features/chat/thread/composer-input-area.tsx:268
+#: src/features/chat/thread/composer-input-area.tsx:282
 #: src/features/chat/thread/edit-composer.tsx:132
 msgid "Add attachment"
 msgstr "添付ファイルを追加"
@@ -5791,7 +5788,7 @@ msgstr "キャプション"
 msgid "Caption text"
 msgstr "キャプションテキスト"
 
-#: src/features/chat/thread/composer-input-area.tsx:253
+#: src/features/chat/thread/composer-input-area.tsx:256
 msgid "Capture screen"
 msgstr "画面をキャプチャ"
 
@@ -6573,7 +6570,7 @@ msgstr "メッセージのピンアイコンをクリックすると、ここに
 msgid "Click the star on any model in All models to add it here."
 msgstr "「すべてのモデル」で任意のモデルの星をクリックすると、ここに追加されます。"
 
-#: src/features/chat/thread/composer-input.tsx:316
+#: src/features/chat/thread/composer-input.tsx:318
 msgid "Click to edit"
 msgstr "クリックして編集"
 
@@ -7019,7 +7016,7 @@ msgstr "コマンドは {SKILL_SLUG_MAX} 文字以内で入力してください
 msgid "Command Palette"
 msgstr "コマンドパレット"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:537
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:544
 msgid "Commands"
 msgstr "コマンド"
 
@@ -7383,7 +7380,7 @@ msgstr "コンテキストを圧縮しています..."
 msgid "Computer"
 msgstr "コンピュータ"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:64
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:66
 msgid "Condense older messages for the model"
 msgstr "モデル向けに古いメッセージを要約します"
 
@@ -8027,8 +8024,8 @@ msgstr "このリストに表示されていないファイルの会話と保留
 msgid "Conversations on lines this diff no longer shows"
 msgstr "この差分に表示されなくなった行の会話"
 
-#: src/features/chat/thread/composer-input.tsx:812
-#: src/features/chat/thread/composer-input.tsx:1553
+#: src/features/chat/thread/composer-input.tsx:833
+#: src/features/chat/thread/composer-input.tsx:1574
 msgid "Conversion failed"
 msgstr "変換に失敗しました"
 
@@ -8354,7 +8351,7 @@ msgstr "{0} を添付できませんでした。ほかのファイルは添付�
 msgid "Could not attach {0}. Try those again."
 msgstr "{0} を添付できませんでした。もう一度お試しください。"
 
-#: src/features/chat/thread/composer-input.tsx:1575
+#: src/features/chat/thread/composer-input.tsx:1596
 msgid "Could not attach the chat"
 msgstr "チャットを添付できませんでした"
 
@@ -8638,11 +8635,11 @@ msgstr "生成を開始するためにサーバーに接続できませんでし
 msgid "Could not reach the server. Try again."
 msgstr "サーバーに接続できませんでした。もう一度お試しください。"
 
-#: src/features/chat/thread/composer-input.tsx:1578
+#: src/features/chat/thread/composer-input.tsx:1599
 msgid "Could not read that chat"
 msgstr "そのチャットを読み込めませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1579
+#: src/features/chat/thread/composer-input.tsx:1600
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "そのチャットを読み込めませんでした。ロックされている場合は、先にロックを解除してください。"
 
@@ -9382,7 +9379,7 @@ msgstr "カスタマーメッセージングとサポートのプラットフォ
 msgid "Customization"
 msgstr "カスタマイズ"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:133
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:134
 msgid "Customize"
 msgstr "カスタマイズ"
 
@@ -11064,7 +11061,7 @@ msgstr "ここにファイルをドラッグ"
 msgid "Draw an image"
 msgstr "画像を描く"
 
-#: src/features/chat/thread/composer-input-area.tsx:247
+#: src/features/chat/thread/composer-input-area.tsx:250
 msgid "Draw image"
 msgstr "画像を描く"
 
@@ -11086,7 +11083,7 @@ msgstr "ファイルをドロップするか、クリックしてアップロー
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1763
+#: src/features/chat/thread/composer-input.tsx:1787
 msgid "Drop files here"
 msgstr "ここにファイルをドロップ"
 
@@ -11395,8 +11392,8 @@ msgstr "コレクションを編集"
 msgid "Edit comment"
 msgstr "コメントを編集"
 
-#: src/features/chat/thread/composer-input.tsx:323
-#: src/features/chat/thread/composer-input.tsx:335
+#: src/features/chat/thread/composer-input.tsx:325
+#: src/features/chat/thread/composer-input.tsx:337
 msgid "Edit content"
 msgstr "内容を編集"
 
@@ -11781,6 +11778,10 @@ msgstr "メール："
 msgid "Emboss"
 msgstr "エンボス"
 
+#: src/features/chat/thread/composer-tiptap/emoji-shortcode-popup.tsx:59
+msgid "Emoji suggestions"
+msgstr ""
+
 #. placeholder {0}: provider.name
 #. placeholder {0}: skill.name
 #: src/features/settings/components/chat/custom-providers-settings.tsx:393
@@ -12104,6 +12105,10 @@ msgstr "組織のスラッグを入力"
 #: src/features/develop/components/thread-pull-requests.tsx:91
 msgid "Enter pull requests as owner/name#123."
 msgstr "プルリクエストは owner/name#123 の形式で入力してください。"
+
+#: src/features/chat/thread/composer-prompt-search.tsx:96
+msgid "Enter puts the prompt in the composer. It is not sent."
+msgstr ""
 
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:199
 msgid "Enter seed..."
@@ -13088,7 +13093,7 @@ msgid "Failed to attach collection"
 msgstr "コレクションを添付できませんでした"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1404
+#: src/features/chat/thread/composer-input.tsx:1425
 msgid "Failed to attach file"
 msgstr "ファイルを添付できませんでした"
 
@@ -13498,7 +13503,7 @@ msgstr "エクスポートをリクエストできませんでした"
 msgid "Failed to reset to defaults"
 msgstr "既定にリセットできませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1436
+#: src/features/chat/thread/composer-input.tsx:1457
 msgid "Failed to restore attachment"
 msgstr "添付ファイルを復元できませんでした"
 
@@ -14421,8 +14426,8 @@ msgstr "フィルターのパス"
 msgid "Filter rules updated"
 msgstr "フィルタールールを更新しました"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:139
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:145
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:140
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:146
 msgid "Filter shortcuts"
 msgstr "ショートカットを絞り込む"
 
@@ -15572,7 +15577,7 @@ msgstr "前のページへ"
 msgid "Go to Prompts"
 msgstr "プロンプトへ移動"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:344
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:364
 msgid "Go to reply"
 msgstr "返信に移動"
 
@@ -17344,7 +17349,7 @@ msgstr "入力トークン"
 msgid "Input:"
 msgstr "入力:"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:62
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:64
 msgid "Insert a saved prompt"
 msgstr "保存したプロンプトを挿入"
 
@@ -17356,7 +17361,7 @@ msgstr "右に列を挿入"
 msgid "Insert column before"
 msgstr "左に列を挿入"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:601
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:608
 msgid "Insert Prompt"
 msgstr "プロンプトを挿入"
 
@@ -17475,11 +17480,11 @@ msgstr "生成前に考えるインテリジェントな動画モデル"
 msgid "Intensity"
 msgstr "強度"
 
-#: src/features/chat/thread/composer-input-area.tsx:340
+#: src/features/chat/thread/composer-input-area.tsx:344
 msgid "Interrupt and restart"
 msgstr "中断して再開"
 
-#: src/features/chat/thread/composer-input-area.tsx:356
+#: src/features/chat/thread/composer-input-area.tsx:360
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr "中断して再開 — 現在の返信を停止して、これを送信します"
 
@@ -17651,11 +17656,11 @@ msgstr "招待先："
 msgid "Invites"
 msgstr "招待"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:63
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:65
 msgid "Invoke a skill"
 msgstr "スキルを呼び出す"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:634
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:641
 msgid "Invoke Skill"
 msgstr "スキルを呼び出す"
 
@@ -17951,7 +17956,7 @@ msgstr "キーファイル（任意、絶対パス）"
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
 #: src/features/chat/signed-out/signed-out-chat.tsx:153
 #: src/features/chat/thread-list/thread-list-header.tsx:145
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:125
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:126
 #: src/features/workflow/components/canvas/workflow-controls.tsx:374
 msgid "Keyboard shortcuts"
 msgstr "キーボードショートカット"
@@ -19334,7 +19339,7 @@ msgstr "長いテキストが検出されました"
 msgid "Long text generation in images"
 msgstr "画像内の長文テキスト生成"
 
-#: src/features/chat/thread/composer-input.tsx:888
+#: src/features/chat/thread/composer-input.tsx:909
 msgid "Long text was attached as a file."
 msgstr "長いテキストをファイルとして添付しました。"
 
@@ -19739,6 +19744,10 @@ msgstr "レイアウトと構造を合わせる"
 msgid "Matching messages"
 msgstr "一致するメッセージ"
 
+#: src/features/chat/thread/composer-prompt-search.tsx:117
+msgid "Matching prompts"
+msgstr ""
+
 #: src/features/chat/tags/thread-categories.ts:16
 #: src/features/chat/tags/thread-category-filter.tsx:22
 msgid "Math"
@@ -20096,8 +20105,8 @@ msgstr "{hostLabel} 上でマージされました。"
 msgid "Merging…"
 msgstr "マージ中…"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:294
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:471
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:310
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:632
 msgid "Message"
 msgstr "メッセージ"
 
@@ -21915,6 +21924,10 @@ msgstr "ペアリングされたデバイスはありません。"
 msgid "No diff data available for this version"
 msgstr "このバージョンの差分データはありません"
 
+#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:162
+msgid "No emoji found"
+msgstr ""
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:395
 msgid "No enabled MCP servers."
 msgstr "有効な MCP サーバーはありません。"
@@ -22223,7 +22236,7 @@ msgstr "まだ応答がありません"
 msgid "No results"
 msgstr "結果なし"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:662
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:669
 msgid "No results found"
 msgstr "結果が見つかりません"
 
@@ -22240,6 +22253,10 @@ msgstr "結果が見つかりません。"
 msgid "No runs yet. Start one to score every case."
 msgstr "実行はまだありません。実行を開始してすべてのケースを採点しましょう。"
 
+#: src/features/chat/thread/composer-prompt-search.tsx:78
+msgid "No sent prompts match \"{searched}\"."
+msgstr ""
+
 #: src/features/admin/components/user-sessions-dialog.tsx:134
 msgid "No sessions found"
 msgstr "セッションが見つかりません"
@@ -22252,7 +22269,7 @@ msgstr "スプレッドシートにシートが見つかりません"
 msgid "No shortcuts found"
 msgstr "ショートカットが見つかりません"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:172
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:173
 msgid "No shortcuts match \"{query}\"."
 msgstr "「{query}」に一致するショートカットはありません。"
 
@@ -26138,11 +26155,11 @@ msgstr "質問"
 msgid "Queue"
 msgstr "キュー"
 
-#: src/features/chat/thread/composer-input-area.tsx:367
+#: src/features/chat/thread/composer-input-area.tsx:371
 msgid "Queue message"
 msgstr "メッセージを待機列に追加"
 
-#: src/features/chat/thread/composer-input-area.tsx:386
+#: src/features/chat/thread/composer-input-area.tsx:390
 msgid "Queue message — sends when the current reply finishes"
 msgstr "メッセージを待機列に追加 — 現在の返信が終わると送信されます"
 
@@ -26428,7 +26445,7 @@ msgstr "読み取り専用プレビュー - 編集するにはフォークして
 msgid "Read-only shared conversation"
 msgstr "読み取り専用の共有会話"
 
-#: src/features/chat/thread/composer-input.tsx:280
+#: src/features/chat/thread/composer-input.tsx:282
 msgid "Reading \"{attachmentName}\"…"
 msgstr "「{attachmentName}」を読み込んでいます…"
 
@@ -27055,10 +27072,10 @@ msgstr "サインイン状態を保持"
 #: src/features/chat/host/host-composer.tsx:1033
 #: src/features/chat/sharing/thread-share-button.tsx:300
 #: src/features/chat/sharing/thread-share-button.tsx:372
-#: src/features/chat/thread/composer-input.tsx:342
-#: src/features/chat/thread/composer-input.tsx:354
-#: src/features/chat/thread/composer-input.tsx:408
-#: src/features/chat/thread/composer-input.tsx:417
+#: src/features/chat/thread/composer-input.tsx:344
+#: src/features/chat/thread/composer-input.tsx:356
+#: src/features/chat/thread/composer-input.tsx:410
+#: src/features/chat/thread/composer-input.tsx:419
 #: src/features/devices/components/devices-settings.tsx:334
 #: src/features/devices/components/devices-settings.tsx:340
 #: src/features/projects/components/project-form-dialog.tsx:265
@@ -27440,7 +27457,7 @@ msgstr "選択した期間のスキルまたはエージェントごとの返信
 msgid "Reply"
 msgstr "返信"
 
-#: src/features/chat/thread/reply-complete-announcement.tsx:81
+#: src/features/chat/thread/reply-complete-announcement.tsx:93
 msgid "Reply complete"
 msgstr "返信が完了しました"
 
@@ -27836,11 +27853,11 @@ msgstr "今すぐ再試行"
 msgid "Retry the device check"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:431
+#: src/features/chat/thread/composer-input.tsx:433
 msgid "Retry upload"
 msgstr "アップロードを再試行"
 
-#: src/features/chat/thread/composer-input.tsx:426
+#: src/features/chat/thread/composer-input.tsx:428
 msgid "Retry upload of {attachmentName}"
 msgstr "{attachmentName} のアップロードを再試行"
 
@@ -28655,7 +28672,7 @@ msgstr "スコア"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "期待される回答またはルーブリックに照らして、各回答を 0〜100% で採点します。ケースごとに小規模なモデル呼び出しが追加されます。"
 
-#: src/features/chat/thread/composer-input.tsx:1363
+#: src/features/chat/thread/composer-input.tsx:1384
 msgid "Screen capture failed. Please try again."
 msgstr "画面のキャプチャに失敗しました。もう一度お試しください。"
 
@@ -28857,6 +28874,16 @@ msgstr "検索結果"
 msgid "Search Results ({0})"
 msgstr "検索結果（{0}）"
 
+#: src/features/chat/thread/composer-prompt-search.tsx:95
+#: src/features/chat/thread/composer-prompt-search.tsx:99
+#: src/features/chat/thread/composer-prompt-search.tsx:112
+msgid "Search sent prompts"
+msgstr ""
+
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:95
+msgid "Search sent prompts (in the composer)"
+msgstr ""
+
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:175
 msgid "Search servers…"
 msgstr "サーバーを検索…"
@@ -28956,6 +28983,10 @@ msgstr "検索..."
 #: src/features/chat/thread/find/thread-find-bar.tsx:184
 msgid "Searched the latest messages only"
 msgstr "最新のメッセージのみを検索しました"
+
+#: src/features/chat/thread/composer-prompt-search.tsx:76
+msgid "Searching"
+msgstr ""
 
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:929
 msgid "Searching..."
@@ -29350,12 +29381,12 @@ msgid "Send Magic Link"
 msgstr "マジックリンクを送信"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:169
-#: src/features/chat/thread/composer-input-area.tsx:179
-#: src/features/chat/thread/composer-input-area.tsx:421
+#: src/features/chat/thread/composer-input-area.tsx:182
+#: src/features/chat/thread/composer-input-area.tsx:425
 msgid "Send message"
 msgstr "メッセージを送信"
 
-#: src/features/chat/thread/composer-input-area.tsx:179
+#: src/features/chat/thread/composer-input-area.tsx:182
 msgid "Send message ({sendShortcut})"
 msgstr "メッセージを送信（{sendShortcut}）"
 
@@ -31040,7 +31071,7 @@ msgstr "新しいチャットを開始（{0}）"
 msgid "Start a new chat to get started"
 msgstr "新しいチャットを始めましょう"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:65
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:67
 msgid "Start a new context: earlier messages are no longer sent to the model"
 msgstr "新しいコンテキストを開始: 以前のメッセージはモデルに送信されなくなります"
 
@@ -31255,11 +31286,11 @@ msgstr "ステータス"
 msgid "Status Page"
 msgstr "ステータスページ"
 
-#: src/features/chat/thread/composer-input-area.tsx:357
+#: src/features/chat/thread/composer-input-area.tsx:361
 msgid "Steer — the current reply reads this at its next step"
 msgstr "ステアリング: 現在の返信は次のステップでこれを読み取ります"
 
-#: src/features/chat/thread/composer-input-area.tsx:340
+#: src/features/chat/thread/composer-input-area.tsx:344
 msgid "Steer the reply"
 msgstr "返信をステアリング"
 
@@ -31340,8 +31371,8 @@ msgstr "ブラウザセッションを停止"
 
 #: src/features/chat/thread-list/thread-node.tsx:633
 #: src/features/chat/thread-list/thread-node.tsx:655
-#: src/features/chat/thread/composer-input-area.tsx:394
-#: src/features/chat/thread/composer-input-area.tsx:407
+#: src/features/chat/thread/composer-input-area.tsx:398
+#: src/features/chat/thread/composer-input-area.tsx:411
 msgid "Stop generating"
 msgstr "生成を停止"
 
@@ -31886,7 +31917,7 @@ msgstr "おすすめ"
 msgid "Suggested answers"
 msgstr "回答の候補"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:513
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:651
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "候補があります。右矢印キーで確定します"
 
@@ -32040,7 +32071,7 @@ msgstr "渦巻くボケ、ヴィンテージ"
 msgid "Switch Account"
 msgstr "アカウントを切り替え"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:61
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:63
 msgid "Switch AI model"
 msgstr "AI モデルを切り替え"
 
@@ -32056,7 +32087,7 @@ msgstr "OpenAI、Google、Anthropic などを 1 つのパラメーターで切�
 msgid "switch model"
 msgstr "モデルを切り替え"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:558
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:565
 msgid "Switch Model"
 msgstr "モデルを切り替え"
 
@@ -32667,7 +32698,7 @@ msgstr "テキストの方向を LTR に設定しました"
 msgid "Text direction set to RTL"
 msgstr "テキストの方向を RTL に設定しました"
 
-#: src/features/chat/thread/composer-input.tsx:316
+#: src/features/chat/thread/composer-input.tsx:318
 msgid "Text document"
 msgstr "テキストドキュメント"
 
@@ -33059,7 +33090,7 @@ msgstr ""
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "チャットエージェントがツールを使ってタスクを処理します。スキルに従わせることもできます。"
 
-#: src/features/chat/thread/composer-input.tsx:988
+#: src/features/chat/thread/composer-input.tsx:1009
 msgid "The chat changed before the paste was ready, so it was not inserted."
 msgstr "貼り付けの準備ができる前にチャットが切り替わったため、挿入されませんでした。"
 
@@ -33095,8 +33126,8 @@ msgstr ""
 msgid "The comparison could not be loaded."
 msgstr "比較を読み込めませんでした。"
 
-#: src/features/chat/thread/composer-input.tsx:996
-#: src/features/chat/thread/composer-input.tsx:1018
+#: src/features/chat/thread/composer-input.tsx:1017
+#: src/features/chat/thread/composer-input.tsx:1039
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "貼り付けの準備ができる前に入力欄がロックされたため、挿入されませんでした。"
 
@@ -33352,7 +33383,7 @@ msgstr "インポートしたファイルは空のようです。"
 msgid "The improved prompt will appear here..."
 msgstr "改善されたプロンプトがここに表示されます..."
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:127
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:128
 msgid "The keys you have set now."
 msgstr "現在設定しているキーです。"
 
@@ -33503,7 +33534,7 @@ msgstr "ページには相手のバージョンが表示されています。残
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "ページ、すべてのサブページ、コメント、バージョン履歴が削除されます。この操作は元に戻せません。"
 
-#: src/features/chat/thread/composer-input.tsx:1044
+#: src/features/chat/thread/composer-input.tsx:1065
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "貼り付けたテキストを添付できず、挿入もされませんでした。"
 
@@ -33665,7 +33696,7 @@ msgstr "2 つのパスコードが一致しません。"
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "モダンな AI アプリケーションのための統合 LLM ゲートウェイ。"
 
-#: src/features/chat/thread/composer-input.tsx:622
+#: src/features/chat/thread/composer-input.tsx:643
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "「{fileName}」のアップロードの有効期限が切れました。もう一度添付してください。"
 
@@ -34750,7 +34781,7 @@ msgstr "要素パレットの表示を切り替え"
 msgid "Toggle interactivity"
 msgstr "インタラクティブ操作を切り替え"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:95
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:96
 msgid "Toggle left sidebar"
 msgstr "左サイドバーを切り替え"
 
@@ -34773,7 +34804,7 @@ msgstr "メニューの切り替え"
 msgid "Toggle property panel"
 msgstr "プロパティパネルの表示を切り替え"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:96
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:97
 msgid "Toggle right sidebar"
 msgstr "右サイドバーを切り替え"
 
@@ -35448,14 +35479,18 @@ msgstr "もう一度入力"
 msgid "Type to search"
 msgstr "入力して検索"
 
+#: src/features/chat/thread/composer-prompt-search.tsx:72
+msgid "Type to search the prompts you have sent."
+msgstr ""
+
 #: src/features/chat/thread/ask-user-prompt.tsx:269
 #: src/features/chat/thread/ask-user-questions.tsx:64
 msgid "Type your answer…"
 msgstr "回答を入力…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1753
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:197
+#: src/features/chat/thread/composer-input.tsx:1777
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:210
 msgid "Type your message..."
 msgstr "メッセージを入力..."
 
@@ -35624,7 +35659,7 @@ msgstr "下線"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:890
+#: src/features/chat/thread/composer-input.tsx:911
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "元に戻す"
@@ -35867,7 +35902,7 @@ msgstr "あらゆるライブラリやフレームワークの最新ドキュメ
 msgid "Update Duration"
 msgstr "期間を更新"
 
-#: src/features/chat/thread/composer-input.tsx:1610
+#: src/features/chat/thread/composer-input.tsx:1631
 msgid "Update failed"
 msgstr "更新に失敗しました"
 
@@ -36055,18 +36090,18 @@ msgstr "CSV をアップロードし、Python で分析してグラフをエク�
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "ドキュメントをナレッジベースにアップロードし、コレクションにまとめます。AI は関連するコンテキストを検索し、使用したパッセージを引用します。"
 
-#: src/features/chat/thread/composer-input.tsx:423
-#: src/features/chat/thread/composer-input.tsx:667
-#: src/features/chat/thread/composer-input.tsx:1531
+#: src/features/chat/thread/composer-input.tsx:425
+#: src/features/chat/thread/composer-input.tsx:688
+#: src/features/chat/thread/composer-input.tsx:1552
 msgid "Upload failed"
 msgstr "アップロードに失敗しました"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1524
+#: src/features/chat/thread/composer-input.tsx:1545
 msgid "Upload failed: {0}"
 msgstr "アップロードに失敗しました: {0}"
 
-#: src/features/chat/thread/composer-input-area.tsx:242
+#: src/features/chat/thread/composer-input-area.tsx:245
 msgid "Upload file"
 msgstr "ファイルをアップロード"
 
@@ -36112,7 +36147,7 @@ msgstr "アップロード済み"
 msgid "Uploaded {fileName}"
 msgstr "{fileName} をアップロードしました"
 
-#: src/features/chat/thread/composer-input.tsx:360
+#: src/features/chat/thread/composer-input.tsx:362
 msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} をアップロードしています"
 
@@ -36467,7 +36502,7 @@ msgid "Uses AI SDK Text-to-Speech"
 msgstr "AI SDK のテキスト読み上げを使用"
 
 #. placeholder {0}: newest.toolName
-#: src/features/chat/thread/turn-step-announcement.tsx:48
+#: src/features/chat/thread/turn-step-announcement.tsx:55
 msgid "Using {0}"
 msgstr "{0} を使用中"
 
@@ -37271,10 +37306,10 @@ msgstr "オーナーの回答を待っています"
 msgid "Waiting for the owner to approve"
 msgstr "オーナーの承認を待っています"
 
-#: src/features/chat/thread/composer-input-area.tsx:367
-#: src/features/chat/thread/composer-input-area.tsx:386
-#: src/features/chat/thread/composer-input-area.tsx:421
-#: src/features/chat/thread/composer-input-area.tsx:435
+#: src/features/chat/thread/composer-input-area.tsx:371
+#: src/features/chat/thread/composer-input-area.tsx:390
+#: src/features/chat/thread/composer-input-area.tsx:425
+#: src/features/chat/thread/composer-input-area.tsx:439
 msgid "Waiting for uploads to complete…"
 msgstr "アップロードの完了を待っています…"
 
@@ -38099,8 +38134,8 @@ msgstr "リポジトリを監視していません。"
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "オフラインです。ネットワークが戻ると Neore が再接続します。"
 
-#: src/features/chat/thread/composer-input.tsx:1102
-#: src/features/chat/thread/composer-input.tsx:1178
+#: src/features/chat/thread/composer-input.tsx:1123
+#: src/features/chat/thread/composer-input.tsx:1199
 #: src/features/chat/thread/composer-prompt-queue.tsx:112
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "オフラインです。メッセージはここに残ります。オンラインに戻ったら送信してください。"
@@ -38432,12 +38467,12 @@ msgid "Your First Chat"
 msgstr "はじめてのチャット"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:732
+#: src/features/chat/thread/composer-input.tsx:753
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "入力が大きく（約 {0} トークン）、モデルのコンテキストウィンドウのかなりの部分を消費します。"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:725
+#: src/features/chat/thread/composer-input.tsx:746
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "入力が大きすぎ（約 {0} トークン）、モデルのコンテキストウィンドウを超えています。送信するには、メッセージを短くするか添付ファイルを削除してください。"
 
