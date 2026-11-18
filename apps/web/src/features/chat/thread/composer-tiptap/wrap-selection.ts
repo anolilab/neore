@@ -7,27 +7,42 @@ type Marker = "`" | "*" | "_";
 
 const MARKERS: ReadonlySet<string> = new Set(["*", "_", "`"]);
 
+const WORD_CHARACTER = /[\p{L}\p{N}]/u;
+
 const isMarker = (typed: string): typed is Marker => MARKERS.has(typed);
 
+/** The text a wrap puts around the selected body: the opening and closing delimiters, and the body as Markdown. */
+interface Wrap {
+    body: string;
+    close: string;
+    open: string;
+}
+
 /**
- * The delimiters a marker wraps `body` in. The composer sends its text as Markdown and its bold, italic and code marks
- * are off, so the delimiters are the formatting.
+ * The wrap a marker makes of `body`. The composer sends its text as Markdown and its bold, italic and code marks are off,
+ * so the delimiters are the formatting. `insideWord` is whether the selection touches a letter or digit on either side.
  */
-const delimitersFor = (marker: Marker, body: string): [string, string] => {
+const wrapFor = (marker: Marker, body: string, insideWord: boolean): Wrap => {
     if (marker === "`") {
         // A fence longer than any backtick run in the code keeps it one code span; a space pads a backtick at an edge.
-        const longestRun = Math.max(0, ...Array.from(body.matchAll(/`+/g), (run) => run[0].length));
+        let longestRun = 0;
+
+        for (const run of body.matchAll(/`+/g)) {
+            longestRun = Math.max(longestRun, run[0].length);
+        }
+
         const fence = "`".repeat(longestRun + 1);
         const pad = body.startsWith("`") || body.endsWith("`") ? " " : "";
 
-        return [`${fence}${pad}`, `${pad}${fence}`];
+        return { body, close: `${pad}${fence}`, open: `${fence}${pad}` };
     }
 
-    if (marker === "*") {
-        return ["**", "**"];
-    }
+    // Markdown opens and closes an underscore emphasis only at a word's edge, so inside a word an asterisk does the job.
+    const character = marker === "_" && !insideWord ? "_" : "*";
+    const delimiter = marker === "*" ? "**" : character;
 
-    return ["_", "_"];
+    // A copy of the delimiter character inside the text would end the emphasis early, so it is escaped.
+    return { body: body.split(character).join(`\\${character}`), close: delimiter, open: delimiter };
 };
 
 /**
@@ -71,10 +86,15 @@ export const wrapSelection = (state: EditorState, from: number, to: number, type
 
     const lead = selected.indexOf(body);
     const trail = selected.slice(lead + body.length);
-    const [open, close] = delimitersFor(typed, body);
-    const transaction = state.tr.insertText(`${selected.slice(0, lead)}${open}${body}${close}${trail}`, from, to);
-    const innerStart = from + lead + open.length;
-    const innerEnd = innerStart + body.length;
+    const { parent } = $from;
+    const before = $from.parentOffset > 0 ? parent.textBetween($from.parentOffset - 1, $from.parentOffset) : "";
+    const after = $to.parentOffset < parent.content.size ? parent.textBetween($to.parentOffset, $to.parentOffset + 1) : "";
+    // Only a letter or digit that touches the wrapped text itself makes it a word; the spaces around it do not.
+    const insideWord = (lead === 0 && WORD_CHARACTER.test(before)) || (trail.length === 0 && WORD_CHARACTER.test(after));
+    const wrap = wrapFor(typed, body, insideWord);
+    const transaction = state.tr.insertText(`${selected.slice(0, lead)}${wrap.open}${wrap.body}${wrap.close}${trail}`, from, to);
+    const innerStart = from + lead + wrap.open.length;
+    const innerEnd = innerStart + wrap.body.length;
     const backward = state.selection.anchor === to && state.selection.head === from;
 
     return transaction.setSelection(

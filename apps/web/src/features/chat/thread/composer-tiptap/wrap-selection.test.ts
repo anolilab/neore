@@ -240,6 +240,53 @@ describe("wrapSelection edge cases", () => {
         expect(text(editor)).toBe("x `` `ab `` y");
     });
 
+    it("uses asterisks for italic inside a word, where an underscore would not render", () => {
+        const editor = editorWith("<p>foobarbaz</p>");
+
+        select(editor, 4, 7);
+        wrapSelectionOnTextInput(editor.view, 4, 7, "_");
+
+        expect(text(editor)).toBe("foo*bar*baz");
+    });
+
+    it("keeps the underscore for italic at a word's edge", () => {
+        const editor = editorWith("<p>foo bar baz</p>");
+
+        select(editor, 5, 8);
+        wrapSelectionOnTextInput(editor.view, 5, 8, "_");
+
+        expect(text(editor)).toBe("foo _bar_ baz");
+    });
+
+    it("escapes a copy of the delimiter inside the bold text, so it stays text", () => {
+        const editor = editorWith("<p>a * b</p>");
+
+        select(editor, 3, 4);
+        wrapSelectionOnTextInput(editor.view, 3, 4, "*");
+
+        expect(text(editor)).toBe(String.raw`a **\*** b`);
+        expect(selectedText(editor)).toBe(String.raw`\*`);
+    });
+
+    it("escapes an underscore inside the italic text, and keeps the selection over the escaped text", () => {
+        const editor = editorWith("<p>x a_b y</p>");
+
+        select(editor, 3, 6);
+        wrapSelectionOnTextInput(editor.view, 3, 6, "_");
+
+        expect(text(editor)).toBe(String.raw`x _a\_b_ y`);
+        expect(selectedText(editor)).toBe(String.raw`a\_b`);
+    });
+
+    it("wraps a selection with very many backtick runs in code without a stack overflow", () => {
+        const runs = "`a".repeat(150_000);
+        const editor = editorWith(`<p>x ${runs} y</p>`);
+        const end = 3 + runs.length;
+
+        expect(wrapSelectionOnTextInput(editor.view, 3, end, "`")).toBe(true);
+        expect(text(editor).startsWith("x `` `a")).toBe(true);
+    });
+
     it("keeps a backward selection backward after the wrap", () => {
         const editor = editorWith("<p>hello world</p>");
 
