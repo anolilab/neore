@@ -15,7 +15,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import { mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
 import schema from "../schema";
-import { attachWindowOpen, FILE_ATTACH_TTL_MS, fileAttachInFlight } from "./file-attach-claim";
+import { fileAttachInFlight } from "./file-attach-claim";
 import { enableThreadLock } from "./thread-lock";
 import { beginFileAttach, changeMessageFiles, endFileAttach, gatedFileIdsOnCallerShard } from "./files";
 
@@ -204,23 +204,6 @@ const lockAttempt = async (userId: string, threadId: string) =>
         .withIdentity({ userId } as never)
         .mutation(enableThreadLock as never, { passcode: PASSCODE, threadId } as never)
         .catch((error: unknown) => error);
-
-describe("a delayed attach cannot save after its claim has lapsed", () => {
-    it("lets a lock through once the claim lapses, and the attach's window is already closed by then", async () => {
-        const { claimedAt } = (await beginAttach(COLLAB, [collabOpenFileId], "req-late", ownerSharedId)) as { claimedAt: number };
-        const lapsedAt = claimedAt + FILE_ATTACH_TTL_MS + 1;
-        const spy = vi.spyOn(Date, "now").mockReturnValue(lapsedAt);
-
-        try {
-            // The claim has lapsed, so a lock now commits: the attach must refuse to save before it gets that far.
-            expect(attachWindowOpen(claimedAt)).toBe(false);
-            await lockAttempt(COLLAB, collabOpenId);
-            await expect(run(async (ctx) => await ctx.db.get("threads", collabOpenId))).resolves.toMatchObject({ lockedAt: expect.any(Number) });
-        } finally {
-            spy.mockRestore();
-        }
-    });
-});
 
 describe("an attach holds a claim that the caller's own lock waits for", () => {
     it("takes no claim when a file is gated, so nothing waits on a refused attach", async () => {

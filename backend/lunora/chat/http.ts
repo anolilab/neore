@@ -438,6 +438,11 @@ const beginFileAttach = async (
         userId,
     }: { fileIds: string[] | undefined; threadId: string | undefined; unlockProof: string | undefined; userId: string },
 ): Promise<FileAttach> => {
+    // The body is untrusted JSON: a list that is not one is refused here, as a bad attach, before anything is read.
+    if (fileIds !== undefined && !Array.isArray(fileIds)) {
+        return { ...noFileAttach, refusal: Response.json({ error: "Could not attach the file" }, { status: 400 }) };
+    }
+
     const ids = (fileIds ?? []).filter((fileId) => isValidDocumentIdFormat(fileId)) as Id<"chatFiles">[];
 
     if (ids.length === 0) {
@@ -1319,6 +1324,15 @@ const runChatStartOnShard = async (
 
     // A resumed send was charged by its first try.
     if (contentType === "text" && !resumed) {
+        // Before the charge, not only before the save: a send out of its file window is refused without taking quota.
+        try {
+            assertAttachWindow();
+        } catch (error) {
+            await releaseGuestSend();
+
+            throw error;
+        }
+
         // A keyed send is charged once per send: a retry after a failed save, which gave its claim back, is not charged again.
         const chargeKey =
             body.clientMessageId === undefined || startFingerprint === undefined ? undefined : startChargeKey(userId, body.clientMessageId, startFingerprint);
@@ -1877,6 +1891,9 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
         // An edit regenerates the reply, so it spends the same daily message quota
         // as `/chat/start` — it used to be an uncounted way to generate.
         // Charged after every refusal above (hidden-only text, a missing file, a non-prompt), so a refused edit costs nothing.
+        // Before the charge, not only before the save: an edit out of its file window is refused without taking quota.
+        holder.attach?.assertWindow();
+
         const editLimit = await chargeDailyLimit(context, user, "Text");
 
         if (!editLimit.ok) {
