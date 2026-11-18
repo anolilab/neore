@@ -8056,7 +8056,7 @@ msgid "Conversations on lines this diff no longer shows"
 msgstr "Conversations on lines this diff no longer shows"
 
 #: src/features/chat/thread/composer-input.tsx:817
-#: src/features/chat/thread/composer-input.tsx:1624
+#: src/features/chat/thread/composer-input.tsx:1649
 msgid "Conversion failed"
 msgstr "Conversion failed"
 
@@ -8382,7 +8382,7 @@ msgstr "Could not attach {0}. The other files were attached; try those again."
 msgid "Could not attach {0}. Try those again."
 msgstr "Could not attach {0}. Try those again."
 
-#: src/features/chat/thread/composer-input.tsx:1646
+#: src/features/chat/thread/composer-input.tsx:1671
 msgid "Could not attach the chat"
 msgstr "Could not attach the chat"
 
@@ -8666,11 +8666,11 @@ msgstr "Could not reach the server to start generating. Check your connection an
 msgid "Could not reach the server. Try again."
 msgstr "Could not reach the server. Try again."
 
-#: src/features/chat/thread/composer-input.tsx:1649
+#: src/features/chat/thread/composer-input.tsx:1674
 msgid "Could not read that chat"
 msgstr "Could not read that chat"
 
-#: src/features/chat/thread/composer-input.tsx:1650
+#: src/features/chat/thread/composer-input.tsx:1675
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Could not read that chat. If it is locked, unlock it first."
 
@@ -11118,7 +11118,7 @@ msgstr "Drop file or click to upload"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1836
+#: src/features/chat/thread/composer-input.tsx:1861
 msgid "Drop files here"
 msgstr "Drop files here"
 
@@ -13120,7 +13120,7 @@ msgid "Failed to attach collection"
 msgstr "Failed to attach collection"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1475
+#: src/features/chat/thread/composer-input.tsx:1500
 msgid "Failed to attach file"
 msgstr "Failed to attach file"
 
@@ -13530,7 +13530,7 @@ msgstr "Failed to request export"
 msgid "Failed to reset to defaults"
 msgstr "Failed to reset to defaults"
 
-#: src/features/chat/thread/composer-input.tsx:1507
+#: src/features/chat/thread/composer-input.tsx:1532
 msgid "Failed to restore attachment"
 msgstr "Failed to restore attachment"
 
@@ -28719,7 +28719,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 
-#: src/features/chat/thread/composer-input.tsx:1434
+#: src/features/chat/thread/composer-input.tsx:1459
 msgid "Screen capture failed. Please try again."
 msgstr "Screen capture failed. Please try again."
 
@@ -29424,7 +29424,7 @@ msgstr "Send Magic Link"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:169
 #: src/features/chat/thread/composer-input-area.tsx:182
-#: src/features/chat/thread/composer-input-area.tsx:203
+#: src/features/chat/thread/composer-input-area.tsx:427
 msgid "Send message"
 msgstr "Send message"
 
@@ -29483,7 +29483,7 @@ msgstr "Send verification code"
 msgid "Send Verification Code"
 msgstr "Send Verification Code"
 
-#: src/features/chat/thread/composer-input-area.tsx:203
+#: src/features/chat/thread/composer-input-area.tsx:204
 msgid "Send when uploads finish"
 msgstr "Send when uploads finish"
 
@@ -33764,7 +33764,7 @@ msgstr "The unified LLM gateway for modern AI applications."
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "The upload of \"{fileName}\" expired. Please attach it again."
 
-#: src/features/chat/thread/composer-input.tsx:1400
+#: src/features/chat/thread/composer-input.tsx:1412
 msgid "The uploads finished, but the message was not sent. Press send to send it."
 msgstr "The uploads finished, but the message was not sent. Press send to send it."
 
@@ -35595,7 +35595,7 @@ msgid "Type your answer…"
 msgstr "Type your answer…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1826
+#: src/features/chat/thread/composer-input.tsx:1851
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:201
 msgid "Type your message..."
 msgstr "Type your message..."
@@ -36008,7 +36008,7 @@ msgstr "Up-to-date docs for any library or framework"
 msgid "Update Duration"
 msgstr "Update Duration"
 
-#: src/features/chat/thread/composer-input.tsx:1681
+#: src/features/chat/thread/composer-input.tsx:1706
 msgid "Update failed"
 msgstr "Update failed"
 
@@ -36198,12 +36198,12 @@ msgstr "Upload documents to your knowledge base and group them into collections.
 
 #: src/features/chat/thread/composer-input.tsx:426
 #: src/features/chat/thread/composer-input.tsx:672
-#: src/features/chat/thread/composer-input.tsx:1602
+#: src/features/chat/thread/composer-input.tsx:1627
 msgid "Upload failed"
 msgstr "Upload failed"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1595
+#: src/features/chat/thread/composer-input.tsx:1620
 msgid "Upload failed: {0}"
 msgstr "Upload failed: {0}"
 
@@ -38239,7 +38239,7 @@ msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "You are offline. Neore will reconnect when the network is back."
 
 #: src/features/chat/thread/composer-input.tsx:1107
-#: src/features/chat/thread/composer-input.tsx:1202
+#: src/features/chat/thread/composer-input.tsx:1204
 #: src/features/chat/thread/composer-prompt-queue.tsx:112
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "You are offline. Your message stays here; send it once you are back online."
@@ -38609,7 +38609,7 @@ msgstr "Your location (e.g., \"New York, USA\", \"Berlin, Germany\")."
 msgid "Your message"
 msgstr "Your message"
 
-#: src/features/chat/thread/composer-input.tsx:1386
+#: src/features/chat/thread/composer-input.tsx:1388
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 

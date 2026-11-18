@@ -4,25 +4,38 @@ import { settleUploadWait, startUploadWait } from "./upload-send-wait";
 
 type Status = "pending" | "uploading" | "complete" | "error";
 
-/** A draft's attachments from `[id, status]` pairs; each file is named `<id>.txt`. */
-const file = (id: string, status: Status) => {
-    return { id, name: `${id}.txt`, status };
+/** A draft's attachment; each file is named `<id>.txt`. */
+const file = (id: string, status: Status, fileId?: string) => {
+    return { fileId, id, name: `${id}.txt`, status };
 };
 
 const files = (...list: [string, Status][]) => list.map(([id, status]) => file(id, status));
 
-/** The draft pressed on: two uploads running, "a" and "b", and the text "see files". */
-const pressed = startUploadWait({ attachments: files(["a", "uploading"], ["b", "pending"]), text: "see files" }, "thread-1");
+const reference = (id: string) => {
+    return { id };
+};
+
+/** The draft pressed on: two uploads running, "a" and "b", the text "see files" and no reference image. */
+const pressed = startUploadWait({ attachments: files(["a", "uploading"], ["b", "pending"]), references: [], text: "see files" }, "thread-1");
 
 /** What the settle step sees for the draft now, in the chat "thread-1". */
-const settleNow = (attachments: ReturnType<typeof files>, text = "see files", threadId = "thread-1") =>
-    settleUploadWait(pressed, { attachments, text }, threadId);
+const settleNow = (attachments: ReturnType<typeof files>, text = "see files", references: ReturnType<typeof reference>[] = []) =>
+    settleUploadWait(pressed, { attachments, references, text }, "thread-1");
 
 describe("startUploadWait", () => {
     it("waits on the draft's uploads that are not complete, and remembers the draft pressed on", () => {
-        const wait = startUploadWait({ attachments: files(["a", "complete"], ["b", "uploading"], ["c", "pending"]), text: "see files" }, "thread-1");
+        const draft = { attachments: [file("a", "complete", "f1"), file("b", "uploading")], references: [reference("r1")], text: "see files" };
 
-        expect(wait).toStrictEqual({ attachmentIds: ["b", "c"], draftIds: ["a", "b", "c"], text: "see files", threadId: "thread-1" });
+        expect(startUploadWait(draft, "thread-1")).toStrictEqual({
+            attachmentIds: ["b"],
+            pressedAttachments: [
+                { fileId: "f1", id: "a" },
+                { fileId: undefined, id: "b" },
+            ],
+            referenceIds: ["r1"],
+            text: "see files",
+            threadId: "thread-1",
+        });
     });
 });
 
@@ -56,7 +69,24 @@ describe("settleUploadWait", () => {
         expect(settleNow(files(["a", "uploading"]))).toStrictEqual({ kind: "edited" });
     });
 
+    it("ends as edited when a reference image was added while the uploads ran", () => {
+        expect(settleNow(files(["a", "complete"], ["b", "complete"]), "see files", [reference("r1")])).toStrictEqual({ kind: "edited" });
+    });
+
+    it("ends as edited when a file that had finished is replaced by another upload", () => {
+        const done = startUploadWait({ attachments: [file("a", "complete", "f1"), file("b", "uploading")], references: [], text: "see files" }, "thread-1");
+        const replaced = settleUploadWait(
+            done,
+            { attachments: [file("a", "complete", "f2"), file("b", "complete", "f3")], references: [], text: "see files" },
+            "thread-1",
+        );
+
+        expect(replaced).toStrictEqual({ kind: "edited" });
+    });
+
     it("cancels quietly when the chat changed while the send waited", () => {
-        expect(settleNow(files(["a", "complete"], ["b", "complete"]), "see files", "thread-2")).toStrictEqual({ kind: "cancelled" });
+        expect(
+            settleUploadWait(pressed, { attachments: files(["a", "complete"], ["b", "complete"]), references: [], text: "see files" }, "thread-2"),
+        ).toStrictEqual({ kind: "cancelled" });
     });
 });

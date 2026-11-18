@@ -16,6 +16,7 @@ import type { ComposerInputAreaRef } from "./composer-input-area";
 const harness = vi.hoisted(() => {
     return {
         sendMessage: vi.fn(async () => undefined),
+        isStreaming: false,
         showError: vi.fn(),
         showInfo: vi.fn(),
     };
@@ -57,7 +58,7 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
             return { cancelStream: vi.fn(), jwtToken: "", sendMessage: harness.sendMessage };
         },
         useChatIsStreaming: () => {
-            return { isStreaming: false, sseStreamState: null };
+            return { isStreaming: harness.isStreaming, sseStreamState: null };
         },
         useChatLunora: () => {
             return {};
@@ -193,6 +194,7 @@ describe("ComposerInput send during an upload", () => {
     });
 
     afterEach(() => {
+        harness.isStreaming = false;
         useChatUIStore.getState().clearComposer();
         useChatUIStore.getState().setIsSubmitting(false);
         vi.clearAllMocks();
@@ -312,6 +314,57 @@ describe("ComposerInput send during an upload", () => {
             expect(harness.showInfo).toHaveBeenCalledWith(editedMessage);
         });
         expect(harness.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("sends nothing when a reference image is added while the uploads run, and says so", async () => {
+        const id = addUpload("uploading");
+
+        renderComposer();
+        pressSend();
+
+        useChatUIStore.getState().setAttachedReferences([{ id: "r1", mimeType: "image/png", url: "blob:r1" }]);
+        useChatUIStore.getState().updateAttachment(id, { fileId: "file-1", status: "complete" });
+
+        await waitFor(() => {
+            expect(harness.showInfo).toHaveBeenCalledWith(editedMessage);
+        });
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("sends nothing when a finished file is replaced while another upload runs, and says so", async () => {
+        const done = addUpload("uploading");
+
+        useChatUIStore.getState().updateAttachment(done, { fileId: "file-1", status: "complete" });
+
+        const running = addUpload("uploading");
+
+        renderComposer();
+        pressSend();
+
+        useChatUIStore.getState().updateAttachment(done, { fileId: "file-2" });
+        useChatUIStore.getState().updateAttachment(running, { fileId: "file-3", status: "complete" });
+
+        await waitFor(() => {
+            expect(harness.showInfo).toHaveBeenCalledWith(editedMessage);
+        });
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("says so and keeps the draft when the uploads finish while a reply streams and there is no queue", async () => {
+        harness.isStreaming = true;
+
+        const id = addUpload("uploading");
+
+        renderComposer();
+        pressSend();
+
+        useChatUIStore.getState().updateAttachment(id, { fileId: "file-1", status: "complete" });
+
+        await waitFor(() => {
+            expect(harness.showInfo).toHaveBeenCalledWith("The uploads finished, but the message was not sent. Press send to send it.");
+        });
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+        expect(useChatUIStore.getState().composerText).toBe("see notes");
     });
 
     it("says so and keeps the draft when the uploads finish while the composer is locked", async () => {

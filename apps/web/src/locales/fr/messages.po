@@ -75,7 +75,7 @@ msgstr "Impossible d’envoyer « {fileName} ». Vérifiez votre connexion et r�
 
 #: src/features/chat/thread/composer-input.tsx:1143
 msgid "\"{fileName}\" could not be uploaded. Remove it to send."
-msgstr ""
+msgstr "Impossible d'envoyer \"{fileName}\". Supprimez-le pour envoyer."
 
 #: src/features/chat/thread/composer-input.tsx:631
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
@@ -8024,7 +8024,7 @@ msgid "Conversations on lines this diff no longer shows"
 msgstr "Conversations sur des lignes que ce diff n’affiche plus"
 
 #: src/features/chat/thread/composer-input.tsx:817
-#: src/features/chat/thread/composer-input.tsx:1624
+#: src/features/chat/thread/composer-input.tsx:1649
 msgid "Conversion failed"
 msgstr "Échec de la conversion"
 
@@ -8350,7 +8350,7 @@ msgstr "Impossible de joindre {0}. Les autres fichiers ont été joints ; réess
 msgid "Could not attach {0}. Try those again."
 msgstr "Impossible de joindre {0}. Réessayez."
 
-#: src/features/chat/thread/composer-input.tsx:1646
+#: src/features/chat/thread/composer-input.tsx:1671
 msgid "Could not attach the chat"
 msgstr "Impossible de joindre la discussion"
 
@@ -8634,11 +8634,11 @@ msgstr "Impossible de joindre le serveur pour lancer la génération. Vérifiez 
 msgid "Could not reach the server. Try again."
 msgstr "Impossible de joindre le serveur. Réessayez."
 
-#: src/features/chat/thread/composer-input.tsx:1649
+#: src/features/chat/thread/composer-input.tsx:1674
 msgid "Could not read that chat"
 msgstr "Impossible de lire cette discussion"
 
-#: src/features/chat/thread/composer-input.tsx:1650
+#: src/features/chat/thread/composer-input.tsx:1675
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Impossible de lire cette discussion. Si elle est verrouillée, déverrouillez-la d'abord."
 
@@ -11082,7 +11082,7 @@ msgstr "Déposez un fichier ou cliquez pour l’importer"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1836
+#: src/features/chat/thread/composer-input.tsx:1861
 msgid "Drop files here"
 msgstr "Déposez les fichiers ici"
 
@@ -13088,7 +13088,7 @@ msgid "Failed to attach collection"
 msgstr "Impossible de joindre la collection"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1475
+#: src/features/chat/thread/composer-input.tsx:1500
 msgid "Failed to attach file"
 msgstr "Impossible de joindre le fichier"
 
@@ -13498,7 +13498,7 @@ msgstr "Impossible de demander l’export"
 msgid "Failed to reset to defaults"
 msgstr "Impossible de rétablir les valeurs par défaut"
 
-#: src/features/chat/thread/composer-input.tsx:1507
+#: src/features/chat/thread/composer-input.tsx:1532
 msgid "Failed to restore attachment"
 msgstr "Impossible de restaurer la pièce jointe"
 
@@ -28659,7 +28659,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Note chaque réponse de 0 à 100 % par rapport à la réponse attendue ou à la grille d’évaluation. Ajoute un petit appel de modèle par cas."
 
-#: src/features/chat/thread/composer-input.tsx:1434
+#: src/features/chat/thread/composer-input.tsx:1459
 msgid "Screen capture failed. Please try again."
 msgstr "La capture d’écran a échoué. Veuillez réessayer."
 
@@ -29355,7 +29355,7 @@ msgstr "Envoyer le lien magique"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:169
 #: src/features/chat/thread/composer-input-area.tsx:182
-#: src/features/chat/thread/composer-input-area.tsx:203
+#: src/features/chat/thread/composer-input-area.tsx:427
 msgid "Send message"
 msgstr "Envoyer le message"
 
@@ -29414,9 +29414,9 @@ msgstr "Envoyer le code de vérification"
 msgid "Send Verification Code"
 msgstr "Envoyer le code de vérification"
 
-#: src/features/chat/thread/composer-input-area.tsx:203
+#: src/features/chat/thread/composer-input-area.tsx:204
 msgid "Send when uploads finish"
-msgstr ""
+msgstr "Envoyer une fois les envois terminés"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:416
 msgid "Send: {snippet}"
@@ -29425,7 +29425,7 @@ msgstr "Envoyer : {snippet}"
 #: src/features/chat/thread/composer-input-area.tsx:204
 #: src/features/chat/thread/composer-input-area.tsx:457
 msgid "Sending once uploads finish…"
-msgstr ""
+msgstr "Envoi une fois les envois terminés…"
 
 #: src/features/chat/voice-mode/voice-mode-button.tsx:88
 msgid "Sending your message and waiting for the reply"
@@ -33682,9 +33682,9 @@ msgstr "La passerelle LLM unifiée pour les applications d’IA modernes."
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "L’envoi de « {fileName} » a expiré. Veuillez le joindre à nouveau."
 
-#: src/features/chat/thread/composer-input.tsx:1400
+#: src/features/chat/thread/composer-input.tsx:1412
 msgid "The uploads finished, but the message was not sent. Press send to send it."
-msgstr ""
+msgstr "Les envois sont terminés, mais le message n'a pas été envoyé. Appuyez sur Envoyer pour l'envoyer."
 
 #: src/features/admin/components/impersonate-user-dialog.tsx:73
 msgid "The user will not be notified of the impersonation"
@@ -35471,7 +35471,7 @@ msgid "Type your answer…"
 msgstr "Saisissez votre réponse…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1826
+#: src/features/chat/thread/composer-input.tsx:1851
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:201
 msgid "Type your message..."
 msgstr "Saisissez votre message..."
@@ -35884,7 +35884,7 @@ msgstr "Documentation à jour pour n’importe quelle bibliothèque ou framework
 msgid "Update Duration"
 msgstr "Modifier la durée"
 
-#: src/features/chat/thread/composer-input.tsx:1681
+#: src/features/chat/thread/composer-input.tsx:1706
 msgid "Update failed"
 msgstr "Échec de la mise à jour"
 
@@ -36074,12 +36074,12 @@ msgstr "Importez des documents dans votre base de connaissances et regroupez-les
 
 #: src/features/chat/thread/composer-input.tsx:426
 #: src/features/chat/thread/composer-input.tsx:672
-#: src/features/chat/thread/composer-input.tsx:1602
+#: src/features/chat/thread/composer-input.tsx:1627
 msgid "Upload failed"
 msgstr "Échec de l’importation"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1595
+#: src/features/chat/thread/composer-input.tsx:1620
 msgid "Upload failed: {0}"
 msgstr "Échec du téléversement : {0}"
 
@@ -38115,7 +38115,7 @@ msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "Vous êtes hors ligne. Neore se reconnectera dès que le réseau sera de retour."
 
 #: src/features/chat/thread/composer-input.tsx:1107
-#: src/features/chat/thread/composer-input.tsx:1202
+#: src/features/chat/thread/composer-input.tsx:1204
 #: src/features/chat/thread/composer-prompt-queue.tsx:112
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "Vous êtes hors ligne. Votre message reste ici ; envoyez-le dès que vous êtes de nouveau en ligne."
@@ -38485,9 +38485,9 @@ msgstr "Votre localisation (ex. : « Paris, France », « Berlin, Allemagne »).
 msgid "Your message"
 msgstr "Votre message"
 
-#: src/features/chat/thread/composer-input.tsx:1386
+#: src/features/chat/thread/composer-input.tsx:1388
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
-msgstr ""
+msgstr "Votre message a changé pendant les envois, il n'a donc pas été envoyé. Appuyez sur Envoyer pour l'envoyer."
 
 #: src/features/chat/core/context/chat-context.tsx:717
 msgid "Your message contains inappropriate content that cannot be sent."

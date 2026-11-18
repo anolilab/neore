@@ -1182,7 +1182,9 @@ const ComposerInput = ({
 
             // Not sent yet: it waits for these uploads and goes out once they finish, if the draft stays as it is (see the
             // effect after the auto-submit).
-            setUploadWait(startUploadWait({ attachments: draftAttachments, text: draftText }, threadId));
+            setUploadWait(
+                startUploadWait({ attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, text: draftText }, threadId),
+            );
 
             return;
         }
@@ -1373,7 +1375,7 @@ const ComposerInput = ({
             return;
         }
 
-        const outcome = settleUploadWait(uploadWait, { attachments, text }, threadId);
+        const outcome = settleUploadWait(uploadWait, { attachments, references: attachedReferences, text }, threadId);
 
         if (outcome.kind === "waiting") {
             return;
@@ -1395,8 +1397,18 @@ const ComposerInput = ({
             }
 
             case "send": {
-                // A locked composer or a send already in flight cannot take this message now: say so, and keep the draft.
-                if (disabled || useChatUIStore.getState().isSubmitting) {
+                // A locked composer, a send already in flight, or a reply streaming with no queue to wait in: the message
+                // cannot go now. Say so, and keep the draft.
+                const intent = composerSubmitIntent({
+                    hasAttachments: attachments.length > 0,
+                    isComparisonValid,
+                    isStreaming: isStreaming || isSendStarting(threadId),
+                    isThreadComposer,
+                    text,
+                    threadId,
+                });
+
+                if (disabled || useChatUIStore.getState().isSubmitting || intent === "wait") {
                     showInfo(t`The uploads finished, but the message was not sent. Press send to send it.`);
                 } else {
                     handleSubmit();
@@ -1410,7 +1422,20 @@ const ComposerInput = ({
                 break;
             }
         }
-    }, [attachments, disabled, handleSubmit, notifyFailedUpload, t, text, threadId, uploadWait]);
+    }, [
+        attachedReferences,
+        attachments,
+        disabled,
+        handleSubmit,
+        isComparisonValid,
+        isStreaming,
+        isThreadComposer,
+        notifyFailedUpload,
+        t,
+        text,
+        threadId,
+        uploadWait,
+    ]);
 
     // Handle cancel/stop
     // A manual stop pauses the queue: the chips stay, nothing auto-sends.

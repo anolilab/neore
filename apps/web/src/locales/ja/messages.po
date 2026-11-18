@@ -75,7 +75,7 @@ msgstr "「{fileName}」をアップロードできませんでした。接続�
 
 #: src/features/chat/thread/composer-input.tsx:1143
 msgid "\"{fileName}\" could not be uploaded. Remove it to send."
-msgstr ""
+msgstr "\"{fileName}\" をアップロードできませんでした。送信するには削除してください。"
 
 #: src/features/chat/thread/composer-input.tsx:631
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
@@ -8024,7 +8024,7 @@ msgid "Conversations on lines this diff no longer shows"
 msgstr "この差分に表示されなくなった行の会話"
 
 #: src/features/chat/thread/composer-input.tsx:817
-#: src/features/chat/thread/composer-input.tsx:1624
+#: src/features/chat/thread/composer-input.tsx:1649
 msgid "Conversion failed"
 msgstr "変換に失敗しました"
 
@@ -8350,7 +8350,7 @@ msgstr "{0} を添付できませんでした。ほかのファイルは添付�
 msgid "Could not attach {0}. Try those again."
 msgstr "{0} を添付できませんでした。もう一度お試しください。"
 
-#: src/features/chat/thread/composer-input.tsx:1646
+#: src/features/chat/thread/composer-input.tsx:1671
 msgid "Could not attach the chat"
 msgstr "チャットを添付できませんでした"
 
@@ -8634,11 +8634,11 @@ msgstr "生成を開始するためにサーバーに接続できませんでし
 msgid "Could not reach the server. Try again."
 msgstr "サーバーに接続できませんでした。もう一度お試しください。"
 
-#: src/features/chat/thread/composer-input.tsx:1649
+#: src/features/chat/thread/composer-input.tsx:1674
 msgid "Could not read that chat"
 msgstr "そのチャットを読み込めませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1650
+#: src/features/chat/thread/composer-input.tsx:1675
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "そのチャットを読み込めませんでした。ロックされている場合は、先にロックを解除してください。"
 
@@ -11082,7 +11082,7 @@ msgstr "ファイルをドロップするか、クリックしてアップロー
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1836
+#: src/features/chat/thread/composer-input.tsx:1861
 msgid "Drop files here"
 msgstr "ここにファイルをドロップ"
 
@@ -13088,7 +13088,7 @@ msgid "Failed to attach collection"
 msgstr "コレクションを添付できませんでした"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1475
+#: src/features/chat/thread/composer-input.tsx:1500
 msgid "Failed to attach file"
 msgstr "ファイルを添付できませんでした"
 
@@ -13498,7 +13498,7 @@ msgstr "エクスポートをリクエストできませんでした"
 msgid "Failed to reset to defaults"
 msgstr "既定にリセットできませんでした"
 
-#: src/features/chat/thread/composer-input.tsx:1507
+#: src/features/chat/thread/composer-input.tsx:1532
 msgid "Failed to restore attachment"
 msgstr "添付ファイルを復元できませんでした"
 
@@ -28659,7 +28659,7 @@ msgstr "スコア"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "期待される回答またはルーブリックに照らして、各回答を 0〜100% で採点します。ケースごとに小規模なモデル呼び出しが追加されます。"
 
-#: src/features/chat/thread/composer-input.tsx:1434
+#: src/features/chat/thread/composer-input.tsx:1459
 msgid "Screen capture failed. Please try again."
 msgstr "画面のキャプチャに失敗しました。もう一度お試しください。"
 
@@ -29355,7 +29355,7 @@ msgstr "マジックリンクを送信"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:169
 #: src/features/chat/thread/composer-input-area.tsx:182
-#: src/features/chat/thread/composer-input-area.tsx:203
+#: src/features/chat/thread/composer-input-area.tsx:427
 msgid "Send message"
 msgstr "メッセージを送信"
 
@@ -29414,9 +29414,9 @@ msgstr "確認コードを送信"
 msgid "Send Verification Code"
 msgstr "確認コードを送信"
 
-#: src/features/chat/thread/composer-input-area.tsx:203
+#: src/features/chat/thread/composer-input-area.tsx:204
 msgid "Send when uploads finish"
-msgstr ""
+msgstr "アップロード完了後に送信"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:416
 msgid "Send: {snippet}"
@@ -29425,7 +29425,7 @@ msgstr "送信: {snippet}"
 #: src/features/chat/thread/composer-input-area.tsx:204
 #: src/features/chat/thread/composer-input-area.tsx:457
 msgid "Sending once uploads finish…"
-msgstr ""
+msgstr "アップロード完了後に送信中…"
 
 #: src/features/chat/voice-mode/voice-mode-button.tsx:88
 msgid "Sending your message and waiting for the reply"
@@ -33682,9 +33682,9 @@ msgstr "モダンな AI アプリケーションのための統合 LLM ゲート
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "「{fileName}」のアップロードの有効期限が切れました。もう一度添付してください。"
 
-#: src/features/chat/thread/composer-input.tsx:1400
+#: src/features/chat/thread/composer-input.tsx:1412
 msgid "The uploads finished, but the message was not sent. Press send to send it."
-msgstr ""
+msgstr "アップロードは完了しましたが、メッセージは送信されていません。送信ボタンを押して送信してください。"
 
 #: src/features/admin/components/impersonate-user-dialog.tsx:73
 msgid "The user will not be notified of the impersonation"
@@ -35471,7 +35471,7 @@ msgid "Type your answer…"
 msgstr "回答を入力…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1826
+#: src/features/chat/thread/composer-input.tsx:1851
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:201
 msgid "Type your message..."
 msgstr "メッセージを入力..."
@@ -35884,7 +35884,7 @@ msgstr "あらゆるライブラリやフレームワークの最新ドキュメ
 msgid "Update Duration"
 msgstr "期間を更新"
 
-#: src/features/chat/thread/composer-input.tsx:1681
+#: src/features/chat/thread/composer-input.tsx:1706
 msgid "Update failed"
 msgstr "更新に失敗しました"
 
@@ -36074,12 +36074,12 @@ msgstr "ドキュメントをナレッジベースにアップロードし、コ
 
 #: src/features/chat/thread/composer-input.tsx:426
 #: src/features/chat/thread/composer-input.tsx:672
-#: src/features/chat/thread/composer-input.tsx:1602
+#: src/features/chat/thread/composer-input.tsx:1627
 msgid "Upload failed"
 msgstr "アップロードに失敗しました"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1595
+#: src/features/chat/thread/composer-input.tsx:1620
 msgid "Upload failed: {0}"
 msgstr "アップロードに失敗しました: {0}"
 
@@ -38115,7 +38115,7 @@ msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "オフラインです。ネットワークが戻ると Neore が再接続します。"
 
 #: src/features/chat/thread/composer-input.tsx:1107
-#: src/features/chat/thread/composer-input.tsx:1202
+#: src/features/chat/thread/composer-input.tsx:1204
 #: src/features/chat/thread/composer-prompt-queue.tsx:112
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "オフラインです。メッセージはここに残ります。オンラインに戻ったら送信してください。"
@@ -38485,9 +38485,9 @@ msgstr "所在地（例：「アメリカ、ニューヨーク」「ドイツ、
 msgid "Your message"
 msgstr "あなたのメッセージ"
 
-#: src/features/chat/thread/composer-input.tsx:1386
+#: src/features/chat/thread/composer-input.tsx:1388
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
-msgstr ""
+msgstr "アップロード中にメッセージが変更されたため、送信されませんでした。送信ボタンを押して送信してください。"
 
 #: src/features/chat/core/context/chat-context.tsx:717
 msgid "Your message contains inappropriate content that cannot be sent."

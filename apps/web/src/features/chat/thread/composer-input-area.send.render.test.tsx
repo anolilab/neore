@@ -44,7 +44,7 @@ describe("send button while attachments upload", () => {
 
     it("stays enabled during an upload, and says it will send when the uploads finish", () => {
         const { onSubmit } = renderArea({ isUploading: true });
-        const send = screen.getByRole("button", { name: "Send when uploads finish" }) as HTMLButtonElement;
+        const send = screen.getByRole("button", { name: "Send message" }) as HTMLButtonElement;
 
         expect(send.disabled).toBe(false);
 
@@ -55,7 +55,7 @@ describe("send button while attachments upload", () => {
 
     it("shows the pending state once a send waits for the uploads", () => {
         renderArea({ isSendWaiting: true, isUploading: true, value: "see the file" });
-        const send = screen.getByRole("button", { name: "Sending once uploads finish…" }) as HTMLButtonElement;
+        const send = screen.getByRole("button", { name: "Send message" }) as HTMLButtonElement;
 
         expect(send.disabled).toBe(false);
     });

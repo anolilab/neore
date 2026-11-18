@@ -200,8 +200,8 @@ const ComposerInputArea = ({
     // A draft with only a finished attachment is sendable, so it needs the send control as much as typed text does.
     const canSend = !isEmpty || hasCompletedAttachments;
     // A send pressed during an upload waits for it, and the button says so until the send goes out.
-    const uploadingSendLabel = isUploading ? t`Send when uploads finish` : t`Send message`;
-    const sendLabel = isSendWaiting ? t`Sending once uploads finish…` : uploadingSendLabel;
+    // The send keeps its name while uploads run. The tooltip says what the press does, and the status region announces a wait.
+    const uploadTooltip = isSendWaiting ? t`Sending once uploads finish…` : t`Send when uploads finish`;
     // Over the cap the handlers refuse to send; the buttons say so instead of doing nothing.
     const isOverCap = value.length > MAX_PROMPT_CHARS;
     const lengthNoticeId = useId();
@@ -424,7 +424,7 @@ const ComposerInputArea = ({
                                     render={
                                         <button
                                             aria-describedby={overCapDescription}
-                                            aria-label={sendLabel}
+                                            aria-label={t`Send message`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "default" }),
                                                 "my-2 size-[34px]",
@@ -438,7 +438,7 @@ const ComposerInputArea = ({
                                         </button>
                                     }
                                 />
-                                <TooltipContent side="bottom">{isUploading ? sendLabel : sendTooltip}</TooltipContent>
+                                <TooltipContent side="bottom">{isUploading ? uploadTooltip : sendTooltip}</TooltipContent>
                             </Tooltip>
                         )}
                     </>
