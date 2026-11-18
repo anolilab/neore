@@ -148,7 +148,6 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
 
     for (const [index, fact] of facts.entries()) {
         const embedding = embeddings[index] ?? null;
-        // A fact is matched by vector while the budget lasts; otherwise, and when it has no vector, by words over the wide window.
         const vectorAllowed = embedding !== null && lookups < IMPORT_MAX_VECTOR_LOOKUPS;
 
         if (!vectorAllowed) {

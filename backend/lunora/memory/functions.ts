@@ -636,7 +636,6 @@ export const saveImportedMemoryBatch = internalMutation
             outcomes[index] = { memoryId: target._id, status: "updated" };
         }
 
-        // Confirmations that cannot apply are inserted below, after the facts, in this same write.
         const unconfirmed: { index: number; memory: string; type: MemoryType }[] = [];
 
         for (const [index, { base, memory, memoryId, type }] of args.confirms.entries()) {
