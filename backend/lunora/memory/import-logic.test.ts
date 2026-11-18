@@ -62,6 +62,10 @@ describe(looksSensitive, () => {
         expect(looksSensitive("The user's account number is 123456789012")).toBe(true);
         expect(looksSensitive("acct #1234567 at the local bank")).toBe(true);
         expect(looksSensitive("Routing 021000021")).toBe(true);
+        expect(looksSensitive("The routing number is 021000021")).toBe(true);
+        expect(looksSensitive("Bank account: 12345678")).toBe(true);
+        expect(looksSensitive("Kontonummer 12345678")).toBe(true);
+        expect(looksSensitive("SWIFT code 12345678")).toBe(true);
     });
 
     it("drops a pasted private key, header and body, after the line cleaning", () => {

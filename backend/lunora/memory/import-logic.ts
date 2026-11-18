@@ -67,8 +67,8 @@ const SENSITIVE_RES: ReadonlyArray<RegExp> = [
     /\b(?:password|passwort|passcode|api[ _-]?key|secret|token|pin)\b\s*(?:is|:|=)\s*\S+/i,
     // A shorter account, routing or card number, when the line says that is what it is ("account number",
     // "acct #", "IBAN"): a date or a count beside the word ("an account opened on 2024-03-15") is not one.
-    /\b(?:account|acct|konto|card)\s*(?:number|num|no|nr|#)[\s.#:]*(?:is\s+)?\d(?:[ -]?\d){5,}/i,
-    /\b(?:routing|sort code|iban|bic|swift)[\s.#:]*(?:is\s+)?\d(?:[ -]?\d){5,}/i,
+    /\b(?:account|acct|konto|card)\s*(?:number|nummer|num|no|nr|#|:)[\s.#:]*(?:is\s+)?\d(?:[ -]?\d){5,}/i,
+    /\b(?:routing|sort code|iban|bic|swift)(?:\s*(?:number|nummer|no|code))?[\s.#:]*(?:is\s+)?\d(?:[ -]?\d){5,}/i,
 ];
 
 export const looksSensitive = (line: string): boolean => SENSITIVE_RES.some((re) => re.test(line));
