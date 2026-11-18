@@ -182,6 +182,34 @@ describe("memory import dialog", () => {
         expect(screen.queryByRole("checkbox")).toBeNull();
     });
 
+    it("stays open while a save runs, so its answer cannot drop a later paste", async () => {
+        expect.hasAssertions();
+
+        let released = false;
+
+        calls.preview.mockResolvedValue({ cut: 0, dropped: 0, facts: [{ memory: "The user is a nurse", type: "identity" }] });
+        // Answers only once released.
+        calls.save.mockImplementation(async () => {
+            await vi.waitUntil(() => released);
+
+            return { added: 1, alreadyKnown: 0, updated: 0 };
+        });
+
+        openDialog(true);
+
+        fireEvent.change(await screen.findByLabelText("3. Paste its answer"), { target: { value: "The user is a nurse" } });
+        fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+        fireEvent.click(await screen.findByRole("button", { name: "Save 1 memory" }));
+        await waitFor(() => expect(calls.save).toHaveBeenCalledOnce());
+        fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+
+        await expect(waitFor(() => expect(screen.queryByRole("dialog")).toBeNull(), { timeout: 300 })).rejects.toThrow();
+
+        released = true;
+
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
     it("returns focus to the paste field on Back", async () => {
         expect.assertions(1);
 

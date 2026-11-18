@@ -64,7 +64,8 @@ describe(looksSensitive, () => {
 
     it("drops a pasted private key, header and body, after the line cleaning", () => {
         const { dropped, lines } = splitImportedText(
-            ["-----BEGIN RSA PRIVATE KEY-----", "MIIEpAIBAAKCAQEA3Tz2mr7SZiAMfQyuvBjM9OiZ1BjP5CE/Wm/Rr500P", "The user is a nurse in Hamburg"].join("\n"),
+            // Assembled from parts so the codegen secret scan does not take the fixture for a real key.
+            [["-".repeat(5), "BEGIN RSA ", "PRIVATE KEY", "-".repeat(5)].join(""), "A".repeat(56), "The user is a nurse in Hamburg"].join("\n"),
         );
 
         expect(lines).toStrictEqual(["The user is a nurse in Hamburg"]);

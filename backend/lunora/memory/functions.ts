@@ -527,7 +527,7 @@ export const saveImportedMemoryBatch = internalMutation
             v.object({
                 memory: v.string(),
                 merge: v.optional(v.object({ base: v.string(), confidence: v.number(), memory: v.string(), memoryId: v.id("memories") })),
-                supersedes: v.optional(v.id("memories")),
+                supersede: v.optional(v.object({ base: v.string(), memoryId: v.id("memories") })),
                 type: vMemoryType,
             }),
         ),
@@ -601,9 +601,11 @@ export const saveImportedMemoryBatch = internalMutation
             const key = importDedupKey(mem.memory);
             const known = byText.get(key);
             // The row the action planned to supersede ends only while it is still the user's own active, unpinned
-            // row: another save may have ended or removed it, or the user pinned it, meanwhile.
-            const planned = mem.supersedes ? await ctx.db.get("memories", mem.supersedes) : null;
-            const supersedes = ownActive(planned) && planned.pinned !== true && planned._id !== known ? planned._id : undefined;
+            // row with the text the decision read: another save may have ended, removed or edited it, or the user
+            // pinned it, meanwhile. Otherwise the fact is saved beside it.
+            const planned = mem.supersede ? await ctx.db.get("memories", mem.supersede.memoryId) : null;
+            const supersedes =
+                ownActive(planned) && planned.pinned !== true && planned.memory === mem.supersede?.base && planned._id !== known ? planned._id : undefined;
 
             if (known) {
                 await ctx.db.patch("memories", known, { lastConfirmedAt: now });

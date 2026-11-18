@@ -389,6 +389,33 @@ describe("importing another assistant's memory", () => {
         expect(rows).toHaveLength(3);
     });
 
+    it("does not supersede a row edited while the save ran", async () => {
+        expect.assertions(3);
+
+        await setMemoryEnabled(true);
+
+        const rowId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER }),
+        );
+
+        generateText.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("memories", rowId, { memory: "The user lives in Berlin near the river with a garden" });
+            });
+
+            return { output: { action: "SUPERSEDE" } };
+        });
+
+        await save([{ memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" }]);
+
+        const rows = await memories();
+
+        expect(rows).toHaveLength(2);
+        expect(rows.find((row: { _id: string }) => row._id === rowId)?.supersededBy).toBeUndefined();
+        expect(rows.find((row: { _id: string }) => row._id !== rowId)?.supersedes).toBeUndefined();
+    });
+
     it("saves the fact as new when its merge row was edited while the save ran", async () => {
         expect.assertions(3);
 

@@ -154,6 +154,11 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
     return (
         <Dialog
             onOpenChange={(next) => {
+                // Stays open while a save runs: its answer closes the dialog, and would drop a paste made after a reopen.
+                if (!next && isSaving) {
+                    return;
+                }
+
                 setOpen(next);
 
                 // Closing drops the preview: reopening starts from the paste, never from facts checked earlier.

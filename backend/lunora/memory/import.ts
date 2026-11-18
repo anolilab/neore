@@ -97,7 +97,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
         embedding: number[] | null;
         fact: ImportedFact;
         merge?: { base: string; confidence: number; memory: string; memoryId: Id<"memories"> };
-        supersedes?: Id<"memories">;
+        supersede?: { base: string; memoryId: Id<"memories"> };
     }[] = [];
     const toConfirm: { base: string; memoryId: Id<"memories"> }[] = [];
     // Rows a fact of this save superseded: still active until the save, but no longer a match.
@@ -167,7 +167,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
                 match.memory = memory;
             }
         } else {
-            planned.push({ embedding, fact, supersedes: action === "SUPERSEDE" ? similar?.id : undefined });
+            planned.push({ embedding, fact, supersede: action === "SUPERSEDE" && similar ? { base: similar.memory, memoryId: similar.id } : undefined });
 
             if (action === "SUPERSEDE" && similar) {
                 retired.add(similar.id);
@@ -186,8 +186,8 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
     const outcomes = await ctx.runMutation(internal.memory.functions.saveImportedMemoryBatch, {
         app: args.app,
         confirms: toConfirm,
-        facts: planned.map(({ fact, merge, supersedes }) => {
-            return { memory: fact.memory, merge, supersedes, type: fact.type };
+        facts: planned.map(({ fact, merge, supersede }) => {
+            return { memory: fact.memory, merge, supersede, type: fact.type };
         }),
         userId: args.userId,
     });
