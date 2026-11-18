@@ -46,11 +46,12 @@ import {
     findSimilarMemoryByJaccard,
     findSimilarMemoryByVector,
     getMemoryEmbeddingModel,
+    linkMemoryVectors,
     MEMORY_EMBEDDING_MODEL_NAME,
     saveMemoryVectors,
     type SimilarMemoryResult,
 } from "./dedup";
-import { MEMORY_TYPE_GUIDE, MEMORY_TYPES, type MemoryType } from "./taxonomy";
+import { lastConfirmedOf, MEMORY_TYPE_GUIDE, MEMORY_TYPES, type MemoryType } from "./taxonomy";
 
 // ============================================================================
 // Prompts
@@ -382,6 +383,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             memory: string;
             source: "auto";
             supersedes: Id<"memories"> | undefined;
+            supersedesBase?: string;
             threadId: Id<"threads"> | undefined;
             type: MemoryType;
             userId: string;
@@ -389,13 +391,24 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
         const factEmbeddingsToSave: (number[] | null)[] = [];
 
         const memoriesToUpdate: {
+            base: string;
+            botId: string | undefined;
             confidence: number;
+            embedding: number[] | null;
+            fact: z.infer<typeof extractedFactSchema>;
             memory: string;
             memoryId: Id<"memories">;
         }[] = [];
 
-        // Existing memories the conversation restated — reconfirmed, not duplicated.
-        const memoriesToConfirm: Id<"memories">[] = [];
+        // Existing memories the conversation restated — reconfirmed, not duplicated. Each keeps the text it matched and its fact,
+        // so a confirmation that no longer applies is saved as new.
+        const memoriesToConfirm: { base: string; embedding: number[] | null; fact: z.infer<typeof extractedFactSchema>; memoryId: Id<"memories"> }[] = [];
+        // Rows this run has planned a revision for: their stored vector is of the old text, so a later fact compares by words,
+        // and against their revised text.
+        const revisedIds = new Set<Id<"memories">>();
+        // Rows this run has already confirmed or superseded: a later fact does not match them, so no later revision can
+        // change a row an earlier decision is waiting to write against its text.
+        const decidedIds = new Set<string>();
 
         for (const [i, extractedFact] of extractedFacts.entries()) {
             const fact = extractedFact!;
@@ -408,6 +421,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             const factEmbedding = factEmbeddings[i] ?? null;
 
             // Find similar existing memory — vector first, then Jaccard fallback
+            const candidates = existingMemories.filter((memory) => !decidedIds.has(memory._id));
             let similarMemory: SimilarMemoryResult | null = null;
 
             if (factEmbedding) {
@@ -415,7 +429,8 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                     similarMemory = await findSimilarMemoryByVector(ctx, {
                         botId: args.botId,
                         embedding: factEmbedding,
-                        existing: existingMemories,
+                        existing: candidates,
+                        retired: decidedIds,
                         userId: args.userId,
                     });
                 } catch (error) {
@@ -423,8 +438,12 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                 }
             }
 
+            if (similarMemory && revisedIds.has(similarMemory.id)) {
+                similarMemory = null;
+            }
+
             if (!similarMemory) {
-                similarMemory = findSimilarMemoryByJaccard(fact.memory, existingMemories);
+                similarMemory = findSimilarMemoryByJaccard(fact.memory, candidates);
             }
 
             if (!similarMemory) {
@@ -446,7 +465,25 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
 
             if (similarMemory.score >= 0.95) {
                 // Near-exact duplicate — nothing new, but the fact was stated again.
-                memoriesToConfirm.push(similarMemory.id);
+                memoriesToConfirm.push({ base: similarMemory.memory, embedding: factEmbedding, fact, memoryId: similarMemory.id });
+                decidedIds.add(similarMemory.id);
+                continue;
+            }
+
+            // A pinned memory is never revised: a near-match of one is kept beside it.
+            if (similarMemory.pinned) {
+                memoriesToSave.push({
+                    botId: args.botId,
+                    confidence: fact.confidence,
+                    importance: fact.importance,
+                    memory: fact.memory,
+                    source: "auto",
+                    supersedes: undefined,
+                    threadId: args.threadId,
+                    type: fact.type,
+                    userId: args.userId,
+                });
+                factEmbeddingsToSave.push(factEmbedding);
                 continue;
             }
 
@@ -471,7 +508,8 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                         break;
                     }
                     case "IGNORE": {
-                        memoriesToConfirm.push(similarMemory.id);
+                        memoriesToConfirm.push({ base: similarMemory.memory, embedding: factEmbedding, fact, memoryId: similarMemory.id });
+                        decidedIds.add(similarMemory.id);
                         break;
                     }
                     case "SUPERSEDE": {
@@ -482,17 +520,50 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                             memory: fact.memory,
                             source: "auto",
                             supersedes: similarMemory.id,
+                            supersedesBase: similarMemory.memory,
                             threadId: args.threadId,
                             type: fact.type,
                             userId: args.userId,
                         });
                         factEmbeddingsToSave.push(factEmbedding);
+                        decidedIds.add(similarMemory.id);
                         break;
                     }
                     case "UPDATE": {
                         if (revision.mergedMemory) {
+                            // The row now reads as the merged text for the rest of this run, so a later fact is revised against it.
+                            const confidence = Math.max(fact.confidence, similarMemory.confidence ?? 50);
+                            const working = existingMemories.find((row) => row._id === similarMemory.id);
+
+                            if (working) {
+                                working.memory = revision.mergedMemory;
+                                working.confidence = confidence;
+                            } else {
+                                // A row found by vector past the window joins the working set, so later facts match its revised words.
+                                const row = await ctx.runQuery(internal.memory.functions.getMemoryById, { memoryId: similarMemory.id });
+
+                                if (row) {
+                                    existingMemories.push({
+                                        _id: row._id,
+                                        confidence,
+                                        createdAt: row._creationTime,
+                                        embeddingId: row.embeddingId ?? undefined,
+                                        importance: row.importance ?? undefined,
+                                        lastConfirmedAt: lastConfirmedOf(row),
+                                        memory: revision.mergedMemory,
+                                        pinned: row.pinned === true,
+                                        type: row.type,
+                                    });
+                                }
+                            }
+
+                            revisedIds.add(similarMemory.id);
                             memoriesToUpdate.push({
-                                confidence: Math.max(fact.confidence, similarMemory.confidence ?? 50),
+                                base: similarMemory.memory,
+                                botId: args.botId,
+                                confidence,
+                                embedding: factEmbedding,
+                                fact,
                                 memory: revision.mergedMemory,
                                 memoryId: similarMemory.id,
                             });
@@ -521,7 +592,69 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             }
         }
 
-        // 6. Batch save new memories
+        // 6. Revisions first: a supersession planned against a revised row then sees the text the row committed.
+        // A revision that cannot apply, or fails, saves its fact as new.
+        for (const update of memoriesToUpdate) {
+            let applied = false;
+
+            try {
+                applied = await ctx.runMutation(internal.memory.functions.reviseExtractedMemory, {
+                    base: update.base,
+                    botId: update.botId,
+                    confidence: update.confidence,
+                    lastConfirmedAt: now,
+                    memory: update.memory,
+                    memoryId: update.memoryId,
+                    userId: args.userId,
+                });
+            } catch (error) {
+                console.error("[memory/extract] Revision failed, saving as new:", error);
+            }
+
+            if (!applied) {
+                memoriesToSave.push({
+                    botId: args.botId,
+                    confidence: update.fact.confidence,
+                    importance: update.fact.importance,
+                    memory: update.fact.memory,
+                    source: "auto",
+                    supersedes: undefined,
+                    threadId: args.threadId,
+                    type: update.fact.type,
+                    userId: args.userId,
+                });
+                factEmbeddingsToSave.push(update.embedding);
+            }
+        }
+
+        // 7. Confirmations apply only while their row still reads as the text the fact matched; one that does not is saved as new.
+        if (memoriesToConfirm.length > 0) {
+            const unconfirmed = await ctx.runMutation(internal.memory.functions.confirmMemories, {
+                confirms: memoriesToConfirm.map(({ base, memoryId }) => {
+                    return { base, memoryId };
+                }),
+                userId: args.userId,
+            });
+
+            for (const index of unconfirmed) {
+                const { embedding, fact } = memoriesToConfirm[index]!;
+
+                memoriesToSave.push({
+                    botId: args.botId,
+                    confidence: fact.confidence,
+                    importance: fact.importance,
+                    memory: fact.memory,
+                    source: "auto",
+                    supersedes: undefined,
+                    threadId: args.threadId,
+                    type: fact.type,
+                    userId: args.userId,
+                });
+                factEmbeddingsToSave.push(embedding);
+            }
+        }
+
+        // 8. One save for every new memory, fallbacks included.
         if (memoriesToSave.length > 0) {
             const savedIds = await ctx.runMutation(internal.memory.functions.saveMemoryBatch, {
                 memories: memoriesToSave,
@@ -531,27 +664,13 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                 ctx,
                 args.userId,
                 savedIds.map((memoryId, index) => {
-                    return { memoryId, vector: factEmbeddingsToSave[index] ?? null };
+                    return { memoryId, text: memoriesToSave[index]?.memory ?? "", vector: factEmbeddingsToSave[index] ?? null };
                 }),
                 "[memory/extract]",
             );
         }
 
-        // 7. Apply updates to existing memories
-        for (const update of memoriesToUpdate) {
-            await ctx.runMutation(internal.memory.functions.updateMemoryInternal, {
-                confidence: update.confidence,
-                lastConfirmedAt: now,
-                memory: update.memory,
-                memoryId: update.memoryId,
-            });
-        }
-
-        if (memoriesToConfirm.length > 0) {
-            await ctx.runMutation(internal.memory.functions.confirmMemories, { memoryIds: memoriesToConfirm, userId: args.userId });
-        }
-
-        // 8. Trigger session compression if thread memory count is growing large.
+        // 9. Trigger session compression if thread memory count is growing large.
         // Compression stays inside one scope: a bot's rows compress into that bot's rows.
         if (args.threadId && memoriesToSave.length > 0) {
             // Its own scheduled job, so it gets its own budget and is not cut off when this action returns.
@@ -586,22 +705,6 @@ export const regenerateMemoryEmbedding = internalAction
 
         if (!memory || memory.userId !== args.userId) {
             return;
-        }
-
-        // Delete stale embedding so it doesn't produce misleading search results
-        if (memory.embeddingId) {
-            try {
-                await ctx.runMutation(internal.agent.vector.deleteBatch, {
-                    // `memories.embeddingId` is a plain `v.string()` column, so the row id has
-                    // to be re-branded here. Memory embeddings are 1024-dim
-                    // (bge-m3 — see MEMORY_EMBEDDING_MODEL_NAME), so the vector
-                    // row lives in `embeddings_1024`. `ctx.db.asId` is not usable: this runs in
-                    // an action context.
-                    ids: [memory.embeddingId as Id<"embeddings_1024">],
-                });
-            } catch {
-                // Not fatal — embedding may already be gone
-            }
         }
 
         // Generate and save a fresh embedding for the updated text
@@ -649,11 +752,14 @@ export const regenerateMemoryEmbedding = internalAction
                 ],
             });
 
+            // Linked only while the row still reads as the text just embedded: an edit meanwhile schedules its own re-embed.
             if (embeddingId) {
-                await ctx.runMutation(internal.memory.functions.updateMemoryInternal, {
-                    embeddingId: embeddingId as string,
-                    memoryId: args.memoryId,
-                });
+                await linkMemoryVectors(
+                    ctx,
+                    args.userId,
+                    [{ embeddingId: embeddingId as string, memoryId: args.memoryId, text: memory.memory }],
+                    "[memory/extract]",
+                );
             }
         } catch (error) {
             console.error("[memory/extract] Embedding regeneration failed:", error);

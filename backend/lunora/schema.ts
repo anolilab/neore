@@ -1475,7 +1475,9 @@ export const schema = defineSchema({
         .index("by_userId_supersededBy", ["userId", "supersededBy"])
         // A scope's rows read directly: the user's own (`botId` null) or one bot's. `type` keeps
         // the type-first order the old by_userId_type read had, so a window still keeps preferences.
-        .index("by_userId_botId", ["userId", "botId", "type"]),
+        .index("by_userId_botId", ["userId", "botId", "type"])
+        // The same scope, active rows only: superseded history never enters a read. `supersededBy` is null for an active row.
+        .index("by_userId_botId_active", ["userId", "botId", "supersededBy", "type"]),
 
     // One nightly-reflection digest ("what I learned today") per run. See `memory/reflection.ts`.
     memoryDigests: defineTable({

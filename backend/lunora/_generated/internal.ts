@@ -961,7 +961,7 @@ export interface InternalApiTypes {
             regenerateMemoryEmbedding: FunctionReference<"action", { memoryId: Id<"memories">; userId: string }, void>;
         };
         functions: {
-            confirmMemories: FunctionReference<"mutation", { memoryIds: Array<Id<"memories">>; userId: string }, null>;
+            confirmMemories: FunctionReference<"mutation", { confirms: Array<{ base: string; memoryId: Id<"memories"> }>; userId: string }, Array<number>>;
             getActiveMemoriesForUser: FunctionReference<"query", { botId?: string; includeUserWide?: boolean; limit?: number; userId: string }, { _id: Id<"memories">; confidence: number | undefined; createdAt: number; embeddingId: string | undefined; importance: number | undefined; lastConfirmedAt: number; memory: string; pinned: boolean; type: "context" | "identity" | "preference" | "activity" | "experience"; }[]>;
             getMemoriesByEmbeddingIds: FunctionReference<"query", { embeddingIds: Array<string>; userId: string }, { _creationTime: number; _id: string; botId: Id<"bots"> | undefined; confidence: number | undefined; embeddingId: string; importance: number | undefined; memory: string; pinned: boolean; type: "context" | "identity" | "preference" | "activity" | "experience"; }[]>;
             getMemoryByEmbeddingId: FunctionReference<"query", { embeddingId: string }, { _id: Id<"memories">; confidence: number | undefined; importance: number | undefined; memory: string; supersededBy: Id<"memories"> | undefined; type: "context" | "identity" | "preference" | "activity" | "experience"; } | null>;
@@ -969,12 +969,14 @@ export interface InternalApiTypes {
             isMemoryEnabled: FunctionReference<"query", { userId: string }, boolean>;
             isThreadLockedForMemory: FunctionReference<"query", { threadId: Id<"threads"> }, boolean>;
             isThreadTemporary: FunctionReference<"query", { threadId: Id<"threads"> }, boolean>;
+            linkMemoryEmbeddings: FunctionReference<"mutation", { links: Array<{ embeddingId: string; memoryId: Id<"memories">; text: string }>; userId: string }, null>;
             markMemorySupersededByCompression: FunctionReference<"mutation", { memoryId: Id<"memories">; userId: string }, void>;
             recordRetrievedMemories: FunctionReference<"mutation", { memories: Array<{ memoryId: string; score: number }>; messageId: Id<"messages">; userId: string }, null>;
             retryMemoryVectorDelete: FunctionReference<"mutation", { attempt: number; embeddingId: string; memoryId: string; userId: string }, null>;
-            saveImportedMemoryBatch: FunctionReference<"mutation", { app: "chatgpt" | "claude" | "gemini" | "other"; confirms: Array<{ base: string; memoryId: Id<"memories"> }>; facts: Array<{ memory: string; merge?: { base: string; confidence: number; memory: string; memoryId: Id<"memories"> }; supersede?: { base: string; memoryId: Id<"memories"> }; type: "identity" | "preference" | "context" | "activity" | "experience" }>; userId: string }, Array<{ memoryId: Id<"memories">; status: "added" | "known" | "updated" }>>;
+            reviseExtractedMemory: FunctionReference<"mutation", { base: string; botId?: string; confidence: number; lastConfirmedAt: number; memory: string; memoryId: Id<"memories">; userId: string }, boolean>;
+            saveImportedMemoryBatch: FunctionReference<"mutation", { app: "chatgpt" | "claude" | "gemini" | "other"; confirms: Array<{ base: string; memory: string; memoryId: Id<"memories">; type: "identity" | "preference" | "context" | "activity" | "experience" }>; facts: Array<{ memory: string; merge?: { base: string; confidence: number; memory: string; memoryId: Id<"memories"> }; supersede?: { base: string; memoryId: Id<"memories"> }; type: "identity" | "preference" | "context" | "activity" | "experience" }>; userId: string }, { confirms: Array<{ memoryId: Id<"memories">; status: "added" | "known" | "updated" }>; facts: Array<{ memoryId: Id<"memories">; status: "added" | "known" | "updated" }> }>;
             saveMemory: FunctionReference<"mutation", { botId?: string; confidence?: number; importance?: number; importedFrom?: "chatgpt" | "claude" | "gemini" | "other"; memory: string; source?: "auto" | "manual" | "compressed" | "reflection" | "imported"; supersedes?: Id<"memories">; threadId?: Id<"threads">; type: "identity" | "preference" | "context" | "activity" | "experience"; userId: string }, Id<"memories">>;
-            saveMemoryBatch: FunctionReference<"mutation", { memories: Array<{ botId?: string; confidence?: number; importance?: number; importedFrom?: "chatgpt" | "claude" | "gemini" | "other"; memory: string; source?: "auto" | "manual" | "compressed" | "reflection" | "imported"; supersedes?: Id<"memories">; threadId?: Id<"threads">; type: "identity" | "preference" | "context" | "activity" | "experience"; userId: string }> }, Array<Id<"memories">>>;
+            saveMemoryBatch: FunctionReference<"mutation", { memories: Array<{ botId?: string; confidence?: number; importance?: number; importedFrom?: "chatgpt" | "claude" | "gemini" | "other"; memory: string; source?: "auto" | "manual" | "compressed" | "reflection" | "imported"; supersedes?: Id<"memories">; threadId?: Id<"threads">; type: "identity" | "preference" | "context" | "activity" | "experience"; userId: string; supersedesBase?: string }> }, Array<Id<"memories">>>;
             updateMemoryInternal: FunctionReference<"mutation", { confidence?: number; embeddingId?: string; importance?: number; lastConfirmedAt?: number; memory?: string; memoryId: Id<"memories"> }, void>;
         };
         gdpr: {
@@ -2358,9 +2360,11 @@ export const internal: InternalApiTypes = {
             isMemoryEnabled: { __lunoraRef: "memory_functions:isMemoryEnabled" },
             isThreadLockedForMemory: { __lunoraRef: "memory_functions:isThreadLockedForMemory" },
             isThreadTemporary: { __lunoraRef: "memory_functions:isThreadTemporary" },
+            linkMemoryEmbeddings: { __lunoraRef: "memory_functions:linkMemoryEmbeddings" },
             markMemorySupersededByCompression: { __lunoraRef: "memory_functions:markMemorySupersededByCompression" },
             recordRetrievedMemories: { __lunoraRef: "memory_functions:recordRetrievedMemories" },
             retryMemoryVectorDelete: { __lunoraRef: "memory_functions:retryMemoryVectorDelete" },
+            reviseExtractedMemory: { __lunoraRef: "memory_functions:reviseExtractedMemory" },
             saveImportedMemoryBatch: { __lunoraRef: "memory_functions:saveImportedMemoryBatch" },
             saveMemory: { __lunoraRef: "memory_functions:saveMemory" },
             saveMemoryBatch: { __lunoraRef: "memory_functions:saveMemoryBatch" },

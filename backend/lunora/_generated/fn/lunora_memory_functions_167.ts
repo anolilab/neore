@@ -8,15 +8,19 @@ import * as lunora_memory_functions_167 from "../../memory/functions.js";
 installCompiledValidatorMap(lunora_memory_functions_167.confirmMemories.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (!Array.isArray(source["memoryIds"])) return DEFER;
-const __arr1 = new Array(source["memoryIds"].length);
-for (let __i1 = 0; __i1 < source["memoryIds"].length; __i1++) {
-const __e1 = source["memoryIds"][__i1];
-if (typeof __e1 !== "string") return DEFER;
-__arr1[__i1] = __e1;
+if (!Array.isArray(source["confirms"])) return DEFER;
+const __arr1 = new Array(source["confirms"].length);
+for (let __i1 = 0; __i1 < source["confirms"].length; __i1++) {
+const __e1 = source["confirms"][__i1];
+if (typeof __e1 !== "object" || __e1 === null || Array.isArray(__e1)) return DEFER;
+if (Object.getPrototypeOf(__e1) !== Object.prototype && Object.getPrototypeOf(__e1) !== null) return DEFER;
+if (typeof __e1["base"] !== "string") return DEFER;
+if (typeof __e1["memoryId"] !== "string") return DEFER;
+const __obj2 = { "base": __e1["base"], "memoryId": __e1["memoryId"] };
+__arr1[__i1] = __obj2;
 }
 if (typeof source["userId"] !== "string") return DEFER;
-return { "memoryIds": __arr1, "userId": source["userId"] };
+return { "confirms": __arr1, "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_memory_functions_167.getActiveMemoriesForUser.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
@@ -88,6 +92,24 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "threadId": source["threadId"] };
 });
+installCompiledValidatorMap(lunora_memory_functions_167.linkMemoryEmbeddings.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (!Array.isArray(source["links"])) return DEFER;
+const __arr1 = new Array(source["links"].length);
+for (let __i1 = 0; __i1 < source["links"].length; __i1++) {
+const __e1 = source["links"][__i1];
+if (typeof __e1 !== "object" || __e1 === null || Array.isArray(__e1)) return DEFER;
+if (Object.getPrototypeOf(__e1) !== Object.prototype && Object.getPrototypeOf(__e1) !== null) return DEFER;
+if (typeof __e1["embeddingId"] !== "string") return DEFER;
+if (typeof __e1["memoryId"] !== "string") return DEFER;
+if (typeof __e1["text"] !== "string") return DEFER;
+const __obj2 = { "embeddingId": __e1["embeddingId"], "memoryId": __e1["memoryId"], "text": __e1["text"] };
+__arr1[__i1] = __obj2;
+}
+if (typeof source["userId"] !== "string") return DEFER;
+return { "links": __arr1, "userId": source["userId"] };
+});
 installCompiledValidatorMap(lunora_memory_functions_167.listUserMemories.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
@@ -124,6 +146,24 @@ __arr1[__i1] = __obj2;
 if (typeof source["messageId"] !== "string") return DEFER;
 if (typeof source["userId"] !== "string") return DEFER;
 return { "memories": __arr1, "messageId": source["messageId"], "userId": source["userId"] };
+});
+installCompiledValidatorMap(lunora_memory_functions_167.reviseExtractedMemory.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["base"] !== "string") return DEFER;
+let __has1 = false;
+let __val1;
+if (source["botId"] !== undefined) {
+if (typeof source["botId"] !== "string") return DEFER;
+__val1 = source["botId"];
+__has1 = true;
+}
+if (typeof source["confidence"] !== "number" || !Number.isFinite(source["confidence"])) return DEFER;
+if (typeof source["lastConfirmedAt"] !== "number" || !Number.isFinite(source["lastConfirmedAt"])) return DEFER;
+if (typeof source["memory"] !== "string") return DEFER;
+if (typeof source["memoryId"] !== "string") return DEFER;
+if (typeof source["userId"] !== "string") return DEFER;
+return { "base": source["base"], ...(__has1 ? { "botId": __val1 } : {}), "confidence": source["confidence"], "lastConfirmedAt": source["lastConfirmedAt"], "memory": source["memory"], "memoryId": source["memoryId"], "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_memory_functions_167.updateMemoryInternal.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;

@@ -29,4 +29,16 @@
   walks hits best first, reads one past the window by its embedding id, and passes over a row of another
   scope (user vs bot) or one this save superseded. An import never revises a pinned row,
   and a merged text that fails the paste's rules saves the fact as new. Rows are `source: "imported"` with
-  `importedFrom`; both actions refuse while memory is off.
+  `importedFrom`; both actions refuse while memory is off. The whole save is ONE write: a confirmation that
+  cannot apply is inserted by that write, and a row the save confirmed or reworded is never superseded by a later
+  fact of the same save. A merge whose text another own row holds confirms that row. Vector lookups are capped per
+  save (`IMPORT_MAX_VECTOR_LOOKUPS`); the 1000-row window is widened to 5000 rows once, the first time a fact must
+  be matched by words.
+- **Extraction** never revises a pinned row (a near-match is saved beside it). Its write runs in order: revisions
+  (`reviseExtractedMemory`, which re-embeds in the same write and applies only while the row reads as the decided
+  text), then confirmations (`confirmMemories`, same check), then ONE save of every new memory, with the fallbacks
+  of unapplied revisions and confirmations. A supersession applies only while its target still reads as the text
+  the decision read (`saveMemoryBatch`, `supersedesBase`). A row revised earlier in one run is matched by words
+  against its revised text, and carries the confidence its revision set.
+- **Vectors link only while the row reads as the embedded text** (`linkMemoryEmbeddings`, via `linkMemoryVectors`
+  in `dedup.ts`): the mutation deletes a vector it does not keep (rejected, or replaced) through the retrying delete.
