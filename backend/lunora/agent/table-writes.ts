@@ -66,6 +66,20 @@ export type TemporaryThreadPatch = Partial<Pick<Doc<"temporaryThreads">, "skillD
 export const insertThread = async (db: Database, row: NewRow<"threads">): Promise<Id<"threads">> =>
     await db.insert("threads", { ...row, createdAt: row.createdAt ?? Date.now() });
 
+/** Remembers the runner a host thread in a personal project started on (`acp/lib/project-runner.ts`). The row is its owner's, so no other member reads it. */
+export const setProjectRunnerDefault = async (
+    db: Database,
+    project: Doc<"projects">,
+    runner: { agentKey: string; deviceId: string; folderId: string },
+): Promise<void> => {
+    await patchRow(db, "projects", project, {
+        runnerAgentKey: runner.agentKey,
+        runnerDeviceId: runner.deviceId,
+        runnerFolderId: runner.folderId,
+        runnerKind: "host",
+    });
+};
+
 /**
  * The row a write that puts a thread back to `running`, or records a finished reply (`lastReplyAt`), must leave:
  * `awaitingInput` belongs to the pause that just ended. Every such write funnels through here or `agent/threads.ts#updateThread`, so no call site has to

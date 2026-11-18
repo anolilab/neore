@@ -825,6 +825,88 @@ describe("a continue from the web", () => {
     });
 });
 
+describe("a project remembers its runner", () => {
+    const startIn = async (projectId: string, device: Device, clientId: string, overrides: Record<string, unknown> = {}) =>
+        await as(ownerId).mutation(
+            remote.startHostSession as never,
+            { agentKey: "claude", clientId, deviceId: device.deviceId, folderId: "f1", projectId, ...overrides } as never,
+        );
+
+    const defaultOf = async (projectId: string, userId = ownerId) => await as(userId).query(remote.getProjectRunnerDefault as never, { projectId } as never);
+
+    const insertProject = async (fields: Record<string, unknown>): Promise<string> =>
+        (await run(async (ctx) => await ctx.db.insert("projects", { createdAt: 0, title: "Billing", ...fields }))) as string;
+
+    const projectRow = async (projectId: string): Promise<Row | null> => await run(async (ctx) => await ctx.db.get("projects", projectId as never));
+
+    it("preselects the computer and agent of the last host thread started in the project, and the next one starts on them", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+
+        expect(await defaultOf(projectId)).toBeNull();
+
+        const first = (await startIn(projectId, device, "tap-p1")) as { threadId: string };
+
+        expect(await row(first.threadId)).toMatchObject({ projectId, runner: "host" });
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+
+        const preselected = (await defaultOf(projectId)) as Row;
+        const second = (await as(ownerId).mutation(remote.startHostSession as never, { ...preselected, clientId: "tap-p2", projectId } as never)) as {
+            started: boolean;
+            threadId: string;
+        };
+
+        expect(second.started).toBe(true);
+        expect(await row(second.threadId)).toMatchObject({ projectId, runner: "host" });
+    });
+
+    it("keeps an organization project's default on the starter's own settings, out of a member's reach", async () => {
+        activeOrganization.current = { id: "org-a", name: "Org", role: "member", slug: null };
+        const member = await insertUser();
+
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: member });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ organizationId: "org-a", userId: ownerId });
+
+        await startIn(projectId, device, "tap-o1");
+
+        const stored = await projectRow(projectId);
+
+        expect(stored?.runnerKind).toBeUndefined();
+        expect(await defaultOf(projectId)).toEqual({ agentKey: "claude", deviceId: device.deviceId, folderId: "f1" });
+        expect(await defaultOf(projectId, member)).toBeNull();
+    });
+
+    it("offers no default once the computer stops offering that agent and folder", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: ownerId });
+
+        await startIn(projectId, device, "tap-p3");
+        await run(async (ctx) => await ctx.db.patch("devices", device.deviceId as never, { acpOffers: [] }));
+
+        expect(await defaultOf(projectId)).toBeNull();
+    });
+
+    it("refuses to file a thread into another person's project, and starts nothing", async () => {
+        const device = await pairedDevice(ownerId);
+        const projectId = await insertProject({ userId: await insertUser() });
+
+        await expect(startIn(projectId, device, "tap-p4")).rejects.toThrow(NOT_FOUND);
+        expect(await rows("acpSessions")).toHaveLength(0);
+    });
+});
+
 describe("an organization's cap on coding agents", () => {
     const start = async (deviceId: string, clientId = "tap-org") =>
         await as(ownerId).mutation(remote.startHostSession as never, { agentKey: "claude", clientId, deviceId, folderId: "f1" } as never);

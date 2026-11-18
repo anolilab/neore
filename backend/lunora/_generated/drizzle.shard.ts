@@ -2016,6 +2016,7 @@ export const userSettings = sqliteTable("userSettings", {
     nickname: text("nickname"),
     onboardingCompleted: integer("onboardingCompleted", { mode: "boolean" }),
     profession: text("profession"),
+    projectRunnerDefaults: text("projectRunnerDefaults", { mode: "json" }).$type<Record<string, { agentKey: string; deviceId: string; folderId: string }>>(),
     resumeInterruptedRuns: integer("resumeInterruptedRuns", { mode: "boolean" }),
     resumeLastChat: integer("resumeLastChat", { mode: "boolean" }),
     searchDomainBlocklist: text("searchDomainBlocklist", { mode: "json" }).$type<Array<string>>(),

@@ -23,8 +23,10 @@ import { withdrawSend } from "./lib/withdraw";
 import { isHostRunThread } from "./lib/host-thread";
 import { hostOrganizationRefusal } from "./lib/organization-cap";
 import { sessionOfThread } from "./lib/sessions";
+import { projectRunnerOf, rememberProjectRunner, runnerStillOffered } from "./lib/project-runner";
 import { offerOf, startFailureMessage, webSessionId } from "./lib/start";
 import { openHostSession } from "./lib/start-session";
+import { readableProject, writableProject } from "../projects/functions";
 import { fitsIdBytes, vPendingPermission } from "./validators";
 
 /** A double tap, or a retry after a lost answer, within this is the same start. */
@@ -105,6 +107,8 @@ export interface StartHostSessionInput {
     folderId: string;
     /** The caller's verified active organization (`ctx.user.activeOrganization`), unset in the personal space. */
     organizationId?: string;
+    /** The project the thread is filed under; the start then remembers its runner there (`lib/project-runner.ts`). */
+    projectId?: Id<"projects">;
 }
 
 /** The body of {@link startHostSession}, callable from another mutation that starts an agent for its own purpose. */
@@ -114,6 +118,13 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
 
     if (!device?.encryptedSecret || !offer) {
         throw new LunoraError("BAD_REQUEST", "That agent is not approved for that folder on this computer. Approve it in the desktop app first.");
+    }
+
+    // Checked before the claim: a project the caller may not file into refuses the start and gives nothing up.
+    const project = args.projectId ? await writableProject(ctx, args.projectId, userId) : null;
+
+    if (args.projectId && !project) {
+        throw new LunoraError("FORBIDDEN", "Project not found or access denied");
     }
 
     if (!isDeviceOnline(device, ctx.now)) {
@@ -142,6 +153,7 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
         createdBy: userId,
         mode: "text",
         model: offer.agentKey,
+        ...(project && { projectId: project._id }),
         ...(args.organizationId && { organizationId: args.organizationId }),
         runner: "host",
         status: "active",
@@ -156,6 +168,14 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
     if ("error" in call) {
         // Throwing rolls the thread and the session back with the claim.
         throw new LunoraError("BAD_REQUEST", startFailureMessage(call.error));
+    }
+
+    if (project) {
+        await rememberProjectRunner(ctx, project, userId, args.organizationId ?? null, {
+            agentKey: offer.agentKey,
+            deviceId: args.deviceId as string,
+            folderId: args.folderId,
+        });
     }
 
     return { started: true, threadId: threadId as string };
@@ -173,6 +193,7 @@ export const startHostSession = authMutation
         clientId: v.string().max(MAX_LENGTH.id),
         deviceId: v.id("devices"),
         folderId: v.string().max(128),
+        projectId: v.optional(v.id("projects")),
     })
     .output(v.object({ started: v.boolean(), threadId: v.optional(v.string()) }))
     .mutation(async ({ args, ctx }) => {
@@ -181,6 +202,29 @@ export const startHostSession = authMutation
         ctx.log.event("acp.start_host_session", { started: result.started });
 
         return result;
+    });
+
+/**
+ * The computer and agent a new thread in `projectId` starts on by default for the caller: the runner its last host
+ * thread used, or null when there is none, or the computer no longer is the caller's or no longer offers that pair.
+ */
+export const getProjectRunnerDefault = authQuery
+    .input({ projectId: v.id("projects") })
+    .output(v.union(v.object({ agentKey: v.string(), deviceId: v.string(), folderId: v.string() }), v.null()))
+    .query(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        const project = await readableProject(ctx, args.projectId, userId);
+
+        if (!project) {
+            return null;
+        }
+
+        const settings = project.organizationId ? await ctx.db.userSettings.findFirst({ where: { userId } }) : null;
+        const runner = projectRunnerOf(project, settings);
+        const deviceId = runner ? ctx.db.normalizeId("devices", runner.deviceId) : null;
+        const device = deviceId ? await ctx.db.devices.findFirst({ where: { _id: deviceId, userId } }) : null;
+
+        return runner && runnerStillOffered(device, runner) ? runner : null;
     });
 
 /**
