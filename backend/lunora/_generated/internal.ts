@@ -85,6 +85,10 @@ export interface InternalApiTypes {
             default: FunctionReference<"action", { fileId: Id<"chatFiles">; mediaType: string; storageId: string }, void>;
             extractDocumentText: FunctionReference<"action", { fileId: Id<"chatFiles">; mediaType: string; storageId: string }, void>;
         };
+        file_attach_thread: {
+            claimThreadAttach: FunctionReference<"mutation", { requestId: string; threadId: Id<"threads">; unlockProof?: string; userId: string }, { claimedAt?: number; outcome: "denied" | "locked" | "ok" }>;
+            endThreadAttach: FunctionReference<"mutation", { claimedAt: number; requestId: string; threadId: Id<"threads"> }, null>;
+        };
         file_link_backfill: {
             backfillChatFileLinks: FunctionReference<"mutation", { cursor?: string; threadId: Id<"threads"> }, null>;
             backfillUnindexedFileLinks: FunctionReference<"mutation", {}, null>;
@@ -520,6 +524,7 @@ export interface InternalApiTypes {
         };
         start_claim: {
             claimChatStart: FunctionReference<"mutation", { clientMessageId: string; fingerprint: string; streams: boolean; userId: string }, { claim: { claimedAt: number; key: string }; outcome: "claimed" } | { outcome: "in_progress" } | { outcome: "mismatch" } | { error: string; outcome: "refused" } | { messageId: string; model?: string; outcome: "duplicate"; streamId?: string; streamUnclaimed?: boolean; threadId: string; titleJobs?: { claim: { claimedAt: number; key: string }; jobs: Array<"category" | "title"> } } | { claim: { claimedAt: number; key: string }; messageId: string; model?: string; newThread?: boolean; outcome: "resume"; threadId: string }>;
+            peekChatStart: FunctionReference<"query", { clientMessageId: string; userId: string }, { saved: boolean }>;
             recordStartTitlesScheduled: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; jobs: Array<"category" | "title">; messageId: string }, null>;
             releaseChatStart: FunctionReference<"mutation", { claim: { claimedAt: number; key: string } }, null>;
             saveStartPrompt: FunctionReference<"mutation", { claim: { claimedAt: number; key: string }; fileIds?: Array<string>; messageContent: Array<Record<string, unknown>>; model: string; parentId?: string; threadId: string }, { messageId: string }>;
@@ -1467,6 +1472,10 @@ export const internal: InternalApiTypes = {
             default: { __lunoraRef: "agent_extraction:default" },
             extractDocumentText: { __lunoraRef: "agent_extraction:extractDocumentText" },
         },
+        file_attach_thread: {
+            claimThreadAttach: { __lunoraRef: "agent_file_attach_thread:claimThreadAttach" },
+            endThreadAttach: { __lunoraRef: "agent_file_attach_thread:endThreadAttach" },
+        },
         file_link_backfill: {
             backfillChatFileLinks: { __lunoraRef: "agent_file_link_backfill:backfillChatFileLinks" },
             backfillUnindexedFileLinks: { __lunoraRef: "agent_file_link_backfill:backfillUnindexedFileLinks" },
@@ -1902,6 +1911,7 @@ export const internal: InternalApiTypes = {
         },
         start_claim: {
             claimChatStart: { __lunoraRef: "chat_start_claim:claimChatStart" },
+            peekChatStart: { __lunoraRef: "chat_start_claim:peekChatStart" },
             recordStartTitlesScheduled: { __lunoraRef: "chat_start_claim:recordStartTitlesScheduled" },
             releaseChatStart: { __lunoraRef: "chat_start_claim:releaseChatStart" },
             saveStartPrompt: { __lunoraRef: "chat_start_claim:saveStartPrompt" },

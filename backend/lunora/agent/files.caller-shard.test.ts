@@ -16,6 +16,7 @@ import type { Id } from "../_generated/dataModel";
 import { mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
 import schema from "../schema";
 import { fileAttachInFlight } from "./file-attach-claim";
+import { claimThreadAttach, endThreadAttach } from "./file-attach-thread";
 import { enableThreadLock } from "./thread-lock";
 import { beginFileAttach, changeMessageFiles, endFileAttach, gatedFileIdsOnCallerShard } from "./files";
 
@@ -241,6 +242,34 @@ describe("an attach holds a claim that the caller's own lock waits for", () => {
 
         await lockAttempt(OWNER, ownerSharedId);
 
+        await expect(run(async (ctx) => await ctx.db.get("threads", ownerSharedId))).resolves.toMatchObject({ lockedAt: expect.any(Number) });
+    });
+});
+
+const claimThread = async (userId: string, threadId: string, requestId: string) =>
+    await run(async (ctx) => await ctx.runMutation(claimThreadAttach as never, { requestId, threadId, userId }));
+
+describe("an attach into a chat holds that chat's lock off until its save", () => {
+    it("holds no claim on a locked chat when no proof is given", async () => {
+        await expect(claimThread(OWNER, ownerLockedId, "thread-locked")).resolves.toEqual({ outcome: "locked" });
+    });
+
+    it("holds no claim for a collaborator who was not granted the chat", async () => {
+        await expect(claimThread(COLLAB, ownerSharedId, "thread-denied")).resolves.toEqual({ outcome: "denied" });
+    });
+
+    it("refuses the owner's lock of the chat while an attach into it is held, and lets the lock through after the release", async () => {
+        const { claimedAt, outcome } = (await claimThread(OWNER, ownerSharedId, "thread-held")) as { claimedAt: number; outcome: string };
+
+        expect(outcome).toBe("ok");
+        await expect(lockAttempt(OWNER, ownerSharedId)).resolves.toMatchObject({
+            code: "CONFLICT",
+            message: expect.stringContaining("attached to this chat"),
+        });
+
+        await run(async (ctx) => await ctx.runMutation(endThreadAttach as never, { claimedAt, requestId: "thread-held", threadId: ownerSharedId }));
+
+        await lockAttempt(OWNER, ownerSharedId);
         await expect(run(async (ctx) => await ctx.db.get("threads", ownerSharedId))).resolves.toMatchObject({ lockedAt: expect.any(Number) });
     });
 });

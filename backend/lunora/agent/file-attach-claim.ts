@@ -34,3 +34,16 @@ export const attachWindowOpen = (claimedAt: number, now: number = Date.now()): b
 /** Whether the caller holds an attach in flight: locking their chats waits until none is. */
 export const fileAttachInFlight = async (context: Pick<QueryCtx, "db">, userId: string): Promise<boolean> =>
     await hasClaimWithPrefix(context, FILE_ATTACH_SCOPE, `${userId}:`);
+
+/** The claim scope of an attach held on the thread's OWNER shard (`agent/file-attach-thread.ts`). Keys are `<threadId>:<request id>`. */
+export const FILE_ATTACH_THREAD_SCOPE = "file-attach-thread";
+
+/** Whether an attach into `threadId` is in flight on this shard: locking the chat waits until none is. */
+export const fileAttachInThread = async (context: Pick<QueryCtx, "db">, threadId: string): Promise<boolean> =>
+    await hasClaimWithPrefix(context, FILE_ATTACH_THREAD_SCOPE, `${threadId}:`);
+
+/** Most files one message may attach. Each is read and checked on both shards before its save. */
+export const MAX_ATTACHED_FILES = 20;
+
+/** Whether a message's file list is within {@link MAX_ATTACHED_FILES}. */
+export const attachCountWithinCap = (fileIds: ReadonlyArray<string>): boolean => fileIds.length <= MAX_ATTACHED_FILES;

@@ -9,7 +9,7 @@ import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import { isHostRunThread } from "../acp/lib/host-thread";
 import { getFile } from "../agent/client";
-import { attachWindowOpen } from "../agent/file-attach-claim";
+import { attachCountWithinCap, attachWindowOpen, MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
 import { requestSignIn } from "../auth/lib/request-sign-in";
 import { getCurrentUserInternal } from "../auth/lib/helper";
 import type { BetterAuthUser } from "../auth/lib/types";
@@ -420,6 +420,71 @@ interface FileAttach {
 
 const noFileAttach: FileAttach = { assertWindow: () => undefined, release: async () => undefined };
 
+/** An attach's hold on the thread's OWNER shard: the claim that keeps the chat's lock waiting for the save (`agent/file-attach-thread.ts`). */
+interface ThreadAttach {
+    refusal?: Response;
+    release: () => Promise<void>;
+}
+
+const noThreadAttach: ThreadAttach = { release: async () => undefined };
+
+/**
+ * Takes the attach's claim on the THREAD's shard, in the transaction that checks the thread's access and lock, so the chat's
+ * lock cannot commit between that check and the save. Runs inside the thread's shard. Only an attach of files into an existing
+ * thread holds one; a regenerate saves no files, so it holds none. A failed claim refuses the attach (fail closed).
+ */
+const beginThreadAttach = async (
+    shardCtx: HttpActionCtx,
+    {
+        fileIds,
+        regenerate,
+        threadId,
+        unlockProof,
+        userId,
+    }: { fileIds: string[] | undefined; regenerate: boolean; threadId: string | undefined; unlockProof: string | undefined; userId: string },
+): Promise<ThreadAttach> => {
+    const ids = (fileIds ?? []).filter((fileId) => isValidDocumentIdFormat(fileId));
+
+    if (threadId === undefined || regenerate || ids.length === 0) {
+        return noThreadAttach;
+    }
+
+    const requestId = crypto.randomUUID();
+
+    try {
+        const claim = await shardCtx.runMutation(internal.agent.file_attach_thread.claimThreadAttach, {
+            requestId,
+            threadId: threadId as Id<"threads">,
+            ...(unlockProof !== undefined && { unlockProof }),
+            userId,
+        });
+
+        if (claim.outcome === "locked") {
+            return { refusal: threadLockedResponse(), release: async () => undefined };
+        }
+
+        if (claim.outcome === "denied" || claim.claimedAt === undefined) {
+            return { refusal: Response.json({ error: "Thread not found" }, { status: 404 }), release: async () => undefined };
+        }
+
+        const { claimedAt } = claim;
+
+        return {
+            release: async () => {
+                await shardCtx
+                    .runMutation(internal.agent.file_attach_thread.endThreadAttach, { claimedAt, requestId, threadId: threadId as Id<"threads"> })
+                    .catch((error: unknown) => {
+                        chatLogger.error("[chat] Could not release a file attach's thread claim; it lapses on its own", error);
+                    });
+            },
+        };
+    } catch (error) {
+        chatLogger.error("Error claiming the chat for a file attach:", error);
+
+        return { refusal: Response.json({ error: "Could not attach the file" }, { status: 400 }), release: async () => undefined };
+    }
+};
+
 /**
  * Checks an attach's files on the CALLER's shard and holds the attach's claim there until `release` (`agent/file-attach-claim.ts`).
  *
@@ -441,6 +506,11 @@ const beginFileAttach = async (
     // The body is untrusted JSON: a list that is not one is refused here, as a bad attach, before anything is read.
     if (fileIds !== undefined && !Array.isArray(fileIds)) {
         return { ...noFileAttach, refusal: Response.json({ error: "Could not attach the file" }, { status: 400 }) };
+    }
+
+    // Each file is read and checked on both shards, so a message's list is capped before any of them is.
+    if (fileIds !== undefined && !attachCountWithinCap(fileIds)) {
+        return { ...noFileAttach, refusal: Response.json({ error: `A message can attach at most ${MAX_ATTACHED_FILES} files` }, { status: 400 }) };
     }
 
     const ids = (fileIds ?? []).filter((fileId) => isValidDocumentIdFormat(fileId)) as Id<"chatFiles">[];
@@ -558,6 +628,28 @@ const hostRunThreadResponse = (): Response =>
 /** How long a send waits before it tries its failed `afterOwnerMessage` call once more. */
 const AFTER_SAVE_RETRY_MS = 5000;
 
+/**
+ * Whether this send is a resend of one whose prompt is already saved on the thread's shard. Its files were checked and read by that
+ * send, so a resend checks and reads none. Read-only: the send's own claim (`claimChatStart`) still decides the answer.
+ */
+const isSavedResend = async (
+    context: HttpActionCtx,
+    shardKey: Awaited<ReturnType<typeof threadShardFor>>,
+    { clientMessageId, fileIds, userId }: { clientMessageId: string | undefined; fileIds: string[] | undefined; userId: string },
+): Promise<boolean> => {
+    if (clientMessageId === undefined || fileIds === undefined || fileIds.length === 0) {
+        return false;
+    }
+
+    const probe = await inShard(
+        context,
+        shardKey,
+        async (shardCtx) => await shardCtx.runQuery(internal.chat.start_claim.peekChatStart, { clientMessageId, userId }),
+    );
+
+    return probe.saved;
+};
+
 export const runChatStart = async (
     context: HttpActionCtx,
     rawBody: ChatStartBody,
@@ -617,34 +709,55 @@ export const runChatStart = async (
     // The thread's shard: the caller's own, or — in a thread shared with them —
     // its owner's, where the thread, its messages and this run's stream live.
     // Everything below runs there.
+    const shardKey = await threadShardFor(context, userId, body.threadId);
+
+    // A resend of a saved send checks and reads no files again: the first send did, and a retry must not now fail on a file whose
+    // chat has since been locked.
+    const resend = await isSavedResend(context, shardKey, { clientMessageId: body.clientMessageId, fileIds: body.fileIds, userId });
+
     // A file from the caller's own locked chat is refused here, on the caller's shard, before the thread's shard is entered.
     // The attach's claim is held until the send has answered, so a lock of the caller's chat waits for the attach's save.
-    const fileAttach = await beginFileAttach(context, {
-        fileIds: body.fileIds,
-        threadId: body.threadId === "default" ? undefined : body.threadId,
-        unlockProof: body.unlockProof,
-        userId,
-    });
+    const fileAttach = resend
+        ? noFileAttach
+        : await beginFileAttach(context, {
+              fileIds: body.fileIds,
+              threadId: body.threadId === "default" ? undefined : body.threadId,
+              unlockProof: body.unlockProof,
+              userId,
+          });
 
     if (fileAttach.refusal) {
         return fileAttach.refusal;
     }
 
     try {
-        const shardKey = await threadShardFor(context, userId, body.threadId);
+        return await inShard(context, shardKey, async (shardCtx) => {
+            // The chat's claim is taken before its access check and held until the send has answered, so its lock waits for the save.
+            const threadAttach = await beginThreadAttach(shardCtx, {
+                fileIds: body.fileIds,
+                regenerate: body.regenerate === true,
+                threadId: body.threadId === "default" ? undefined : body.threadId,
+                unlockProof: body.unlockProof,
+                userId,
+            });
 
-        return await inShard(
-            context,
-            shardKey,
-            async (shardCtx) =>
-                await runChatStartOnShard(shardCtx, body, signingSecret, {
+            if (threadAttach.refusal) {
+                return threadAttach.refusal;
+            }
+
+            try {
+                return await runChatStartOnShard(shardCtx, body, signingSecret, {
                     assertAttachWindow: fileAttach.assertWindow,
                     origin,
                     pageContext,
+                    resend,
                     user,
                     userId,
-                }),
-        );
+                });
+            } finally {
+                await threadAttach.release();
+            }
+        });
     } finally {
         await fileAttach.release();
     }
@@ -717,6 +830,7 @@ const runChatStartOnShard = async (
         assertAttachWindow,
         origin,
         pageContext,
+        resend,
         user,
         userId,
     }: {
@@ -724,6 +838,8 @@ const runChatStartOnShard = async (
         assertAttachWindow: () => void;
         origin: "outside_agent" | undefined;
         pageContext: ReturnType<typeof parsePageContext>;
+        /** A resend of a saved send: its files are neither checked nor read again (`isSavedResend`). */
+        resend: boolean;
         user: BetterAuthUser;
         userId: NonNullable<BetterAuthUser["_id"]>;
     },
@@ -865,7 +981,7 @@ const runChatStartOnShard = async (
     // (`agent_files.getFileForUser`); one they may not refuses the request —
     // it used to attach any id at all, and even a failed lookup was only
     // logged, so the ids still reached the saved message's `fileIds`.
-    if (body.fileIds && body.fileIds.length > 0) {
+    if (!resend && body.fileIds && body.fileIds.length > 0) {
         const attachThreadId = body.threadId && body.threadId !== "default" ? body.threadId : undefined;
 
         try {
@@ -1619,16 +1735,17 @@ const runChatStartOnShard = async (
  * edit has answered, so the claim covers the file reads and the save.
  */
 export const editMessageHttpAction = async (context: HttpActionCtx, request: Request) => {
-    const holder: { attach?: FileAttach } = {};
+    const holder: { attach?: FileAttach; threadAttach?: ThreadAttach } = {};
 
     try {
         return await editMessageAttached(context, request, holder);
     } finally {
         await holder.attach?.release();
+        await holder.threadAttach?.release();
     }
 };
 
-const editMessageAttached = async (context: HttpActionCtx, request: Request, holder: { attach?: FileAttach }) => {
+const editMessageAttached = async (context: HttpActionCtx, request: Request, holder: { attach?: FileAttach; threadAttach?: ThreadAttach }) => {
     const { content, fileIds, messageId, unlockProof } = (await request.json()) as {
         content: ({ text: string; type: "text" } | { image: string; type: "image" } | { data: string; filename?: string; mimeType?: string; type: "file" })[];
         fileIds?: string[];
@@ -1706,6 +1823,15 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
         // so a message id cannot be probed (a locked chat's included).
         if (!thread || thread.userId !== userId) {
             return Response.json({ error: "Message not found" }, { headers: { "Content-Type": "application/json" }, status: 404 });
+        }
+
+        // The chat's claim is taken with its access check, so the chat's lock waits for the edit's save (`beginThreadAttach`).
+        const threadAttach = await beginThreadAttach(context, { fileIds, regenerate: false, threadId, unlockProof, userId });
+
+        holder.threadAttach = threadAttach;
+
+        if (threadAttach.refusal) {
+            return threadAttach.refusal;
         }
 
         // An edit writes a sibling prompt and a reply into the thread: a locked chat needs its proof.
