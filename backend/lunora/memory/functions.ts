@@ -924,7 +924,7 @@ export const getActiveMemoriesForUser = internalQuery
         // Each scope keeps up to `limit` of its own, so a busy bot cannot push the user's memories out. Merged in
         // the order each index yields: type descending, then newest first.
         const memories = perScope
-            .flatMap((rows) => rows.filter((m) => !m.supersededBy).slice(0, limit))
+            .flatMap((rows) => rows.slice(0, limit))
             .toSorted((a, b) => {
                 if (a.type !== b.type) {
                     return a.type < b.type ? 1 : -1;

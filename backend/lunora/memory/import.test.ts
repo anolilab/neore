@@ -859,7 +859,9 @@ describe("import limits", () => {
             alreadyKnown: 1,
             updated: 0,
         });
-        expect((await rowOf(bees))?.lastConfirmedAt).toBeTypeOf("number");
+        const row = await rowOf(bees);
+
+        expect(row?.lastConfirmedAt).toBeTypeOf("number");
     });
 
     it("looks up at most ten facts by vector in one save", async () => {
