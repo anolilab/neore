@@ -51,7 +51,8 @@ const LINE_PREFIX_RE = /^(?:(?:[-*•·–>#]+|\d{1,3}[.)](?=\s)|\[[ x]\])\s*)+/
 const DATA_TAG_RE = /<\/?(?:pasted_memories|existing_memory|new_fact)\b[^>]*>?/giu;
 const EMPHASIS_RE = /\*\*|__|`/g;
 const WHITESPACE_RE = /\s+/g;
-const LINE_BREAK_RE = /\r?\n/;
+// Windows, Unix and old Mac line endings: a bare carriage return separates facts too.
+const LINE_BREAK_RE = /\r\n?|\n/;
 
 /**
  * Shapes that are a secret or sensitive identifier whatever words surround them:

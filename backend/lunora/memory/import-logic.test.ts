@@ -3,6 +3,14 @@ import { describe, expect, it } from "vitest";
 import { applyImportLabels, buildImportLabelPrompt, IMPORT_MAX_FACTS, looksSensitive, sanitizeImportedFacts, splitImportedText } from "./import-logic";
 
 describe(splitImportedText, () => {
+    it("splits on a bare carriage return as on a line feed", () => {
+        expect(splitImportedText("The user is a nurse in Hamburg\rThe user likes green tea\r\nThe user owns a bike").lines).toStrictEqual([
+            "The user is a nurse in Hamburg",
+            "The user likes green tea",
+            "The user owns a bike",
+        ]);
+    });
+
     it("keeps a short Chinese or Japanese fact that a Latin line that short would not make", () => {
         expect(splitImportedText("用户是一名护士。\nユーザーは東京在住\nToo short").lines).toStrictEqual(["用户是一名护士。", "ユーザーは東京在住"]);
     });
