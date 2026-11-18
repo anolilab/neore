@@ -2001,7 +2001,7 @@ msgstr ""
 msgid "A run's thread is filed in this project. Moving the task to another project starts a new thread."
 msgstr "El hilo de cada ejecución se guarda en este proyecto. Mover la tarea a otro proyecto inicia un hilo nuevo."
 
-#: src/features/settings/components/chat/bots-settings.tsx:141
+#: src/features/settings/components/chat/bots-settings.tsx:225
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "Un sandbox que el bot conserva entre chats. Se pausa cuando está inactivo y no se factura mientras está en pausa."
 
@@ -4442,6 +4442,7 @@ msgstr "auto"
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
+#: src/features/settings/components/chat/bots-settings.tsx:58
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Auto"
 msgstr "Auto"
@@ -5153,11 +5154,11 @@ msgstr "Bosnio"
 msgid "Bosnian (Bosnia)"
 msgstr "Bosnio (Bosnia)"
 
-#: src/features/settings/components/chat/bots-settings.tsx:76
+#: src/features/settings/components/chat/bots-settings.tsx:137
 msgid "Bot created"
 msgstr "Bot creado"
 
-#: src/features/settings/components/chat/bots-settings.tsx:100
+#: src/features/settings/components/chat/bots-settings.tsx:171
 msgid "Bot deleted"
 msgstr "Bot eliminado"
 
@@ -6060,7 +6061,7 @@ msgstr "chat"
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
 #: src/features/settings/components/account/account-settings.tsx:340
-#: src/features/settings/components/chat/bots-settings.tsx:172
+#: src/features/settings/components/chat/bots-settings.tsx:262
 #: src/features/settings/lib/settings-keywords.ts:33
 #: src/features/settings/lib/settings-navigation.ts:98
 msgid "Chat"
@@ -7451,7 +7452,7 @@ msgid "Compressing context..."
 msgstr "Comprimiendo el contexto..."
 
 #: src/features/auth/components/device-code-parts.tsx:76
-#: src/features/settings/components/chat/bots-settings.tsx:140
+#: src/features/settings/components/chat/bots-settings.tsx:224
 msgid "Computer"
 msgstr "Ordenador"
 
@@ -8463,6 +8464,10 @@ msgstr "No se pudo cambiar Auto. Inténtalo de nuevo."
 msgid "Could not change push notifications. Try again."
 msgstr "No se pudieron cambiar las notificaciones push. Inténtalo de nuevo."
 
+#: src/features/settings/components/chat/bots-settings.tsx:159
+msgid "Could not change the bot's permission mode."
+msgstr "No se pudo cambiar el modo de permisos del bot."
+
 #: src/features/chat/model-settings/use-model-combobox.ts:283
 #: src/features/chat/model-settings/use-model-combobox.ts:307
 msgid "Could not change the model. Please try again."
@@ -8544,7 +8549,7 @@ msgstr "No se pudo copiar; selecciona el texto"
 msgid "Could not create a collection for this import. Try again."
 msgstr "No se pudo crear una colección para esta importación. Inténtalo de nuevo."
 
-#: src/features/settings/components/chat/bots-settings.tsx:78
+#: src/features/settings/components/chat/bots-settings.tsx:139
 msgid "Could not create the bot."
 msgstr "No se pudo crear el bot."
 
@@ -8557,7 +8562,7 @@ msgstr "No se pudo crear el chat de grupo"
 msgid "Could not create the page"
 msgstr "No se pudo crear la página"
 
-#: src/features/settings/components/chat/bots-settings.tsx:102
+#: src/features/settings/components/chat/bots-settings.tsx:173
 msgid "Could not delete the bot."
 msgstr "No se pudo eliminar el bot."
 
@@ -8849,7 +8854,7 @@ msgstr "No se pudo cerrar la sesión"
 msgid "Could not snooze the thread. Please try again."
 msgstr "No se pudo posponer el hilo. Inténtalo de nuevo."
 
-#: src/features/settings/components/chat/bots-settings.tsx:88
+#: src/features/settings/components/chat/bots-settings.tsx:149
 msgid "Could not start a chat with this bot."
 msgstr "No se pudo iniciar un chat con este bot."
 
@@ -9044,7 +9049,7 @@ msgstr "Crea y gestiona claves de API para acceder a tu cuenta de forma program�
 msgid "Create API Key"
 msgstr "Crear clave de API"
 
-#: src/features/settings/components/chat/bots-settings.tsx:150
+#: src/features/settings/components/chat/bots-settings.tsx:234
 msgid "Create bot"
 msgstr "Crear bot"
 
@@ -9991,8 +9996,8 @@ msgstr "Delega tareas en Devin, el ingeniero de software con IA"
 #: src/features/prompts/components/prompt-list-view.tsx:227
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:709
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:848
-#: src/features/settings/components/chat/bots-settings.tsx:181
-#: src/features/settings/components/chat/bots-settings.tsx:190
+#: src/features/settings/components/chat/bots-settings.tsx:271
+#: src/features/settings/components/chat/bots-settings.tsx:280
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
 #: src/features/settings/components/chat/trigger-settings.tsx:1096
 #: src/features/skills/components/skill-list.tsx:307
@@ -10019,7 +10024,7 @@ msgstr "¿Eliminar “{pendingDeleteTitle}”?"
 #. placeholder {0}: model.name
 #. placeholder {0}: server.name
 #: src/features/local-models/components/ollama-model-manager.tsx:265
-#: src/features/settings/components/chat/bots-settings.tsx:175
+#: src/features/settings/components/chat/bots-settings.tsx:265
 #: src/features/settings/components/chat/mcp/server-list.tsx:171
 #: src/features/skills/components/skill-item.tsx:189
 msgid "Delete {0}"
@@ -10033,7 +10038,7 @@ msgstr "Eliminar {0} usuarios"
 #. placeholder {0}: deleting.name
 #. placeholder {0}: pendingDelete?.name ?? ""
 #: src/features/local-models/components/ollama-model-manager.tsx:342
-#: src/features/settings/components/chat/bots-settings.tsx:200
+#: src/features/settings/components/chat/bots-settings.tsx:290
 msgid "Delete {0}?"
 msgstr "¿Eliminar {0}?"
 
@@ -10504,7 +10509,7 @@ msgstr "Describe tu flujo de trabajo... p. ej., \"Genera una imagen a partir de 
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
 #: src/features/prompts/components/variable-definitions.tsx:122
-#: src/features/settings/components/chat/bots-settings.tsx:117
+#: src/features/settings/components/chat/bots-settings.tsx:188
 #: src/features/skills/components/bundle-import-dialog.tsx:115
 #: src/features/skills/components/bundle-import-dialog.tsx:148
 #: src/features/skills/components/skill-builder-diff.tsx:28
@@ -15185,6 +15190,7 @@ msgstr "Video en alta definición a 1080p completo"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
 #: src/features/chat/thread/composer-permission-mode.tsx:42
+#: src/features/settings/components/chat/bots-settings.tsx:59
 msgid "Full access"
 msgstr "Acceso completo"
 
@@ -16240,7 +16246,7 @@ msgstr "Modo de voz manos libres — habla y las respuestas se leen en voz alta"
 msgid "Hands-free voice updated"
 msgstr "Voz del modo manos libres actualizada"
 
-#: src/features/settings/components/chat/bots-settings.tsx:168
+#: src/features/settings/components/chat/bots-settings.tsx:252
 msgid "Has a computer"
 msgstr "Tiene un ordenador"
 
@@ -17548,7 +17554,7 @@ msgstr "instrucciones"
 msgid "instructions"
 msgstr "instrucciones"
 
-#: src/features/settings/components/chat/bots-settings.tsx:126
+#: src/features/settings/components/chat/bots-settings.tsx:197
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:155
@@ -19309,7 +19315,7 @@ msgstr "Cargando..."
 #: src/features/chat/thread/request-secret-prompt.tsx:478
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
-#: src/features/settings/components/chat/bots-settings.tsx:158
+#: src/features/settings/components/chat/bots-settings.tsx:242
 #: src/routes/auth/extension.tsx:68
 msgid "Loading…"
 msgstr "Cargando…"
@@ -20612,7 +20618,7 @@ msgstr "Modo:"
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
-#: src/features/settings/components/chat/bots-settings.tsx:135
+#: src/features/settings/components/chat/bots-settings.tsx:206
 #: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:407
 #: src/features/workflow/components/nodes/ai-node.tsx:34
@@ -21207,7 +21213,7 @@ msgstr "nombre"
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
-#: src/features/settings/components/chat/bots-settings.tsx:113
+#: src/features/settings/components/chat/bots-settings.tsx:184
 #: src/features/settings/components/chat/custom-providers-settings.tsx:494
 #: src/features/settings/components/chat/mcp/server-form.tsx:194
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
@@ -21584,7 +21590,7 @@ msgstr "Nuevo"
 msgid "New Azure Bots are single-tenant: set the Teams Tenant ID key, or replies cannot authenticate."
 msgstr "Los Azure Bots nuevos son de un solo inquilino: configura la clave Teams Tenant ID o las respuestas no podrán autenticarse."
 
-#: src/features/settings/components/chat/bots-settings.tsx:111
+#: src/features/settings/components/chat/bots-settings.tsx:182
 msgid "New bot"
 msgstr "Nuevo bot"
 
@@ -21628,6 +21634,10 @@ msgstr "Los chats nuevos empiezan como permanentes"
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:65
 msgid "New chats start temporary"
 msgstr "Los chats nuevos empiezan como temporales"
+
+#: src/features/settings/components/chat/bots-settings.tsx:157
+msgid "New chats with this bot start in the chosen mode"
+msgstr "Los chats nuevos con este bot empiezan en el modo elegido"
 
 #: src/features/knowledge/components/collection-dialog.tsx:52
 #: src/features/knowledge/components/collection-picker.tsx:93
@@ -21940,7 +21950,7 @@ msgstr "No se encontraron registros de auditoría"
 msgid "No bot"
 msgstr "Sin bot"
 
-#: src/features/settings/components/chat/bots-settings.tsx:161
+#: src/features/settings/components/chat/bots-settings.tsx:245
 msgid "No bots yet."
 msgstr "Aún no hay bots."
 
@@ -24816,8 +24826,14 @@ msgid "Permission Level"
 msgstr "Nivel de permiso"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:89
+#: src/features/settings/components/chat/bots-settings.tsx:210
 msgid "Permission mode"
 msgstr ""
+
+#. placeholder {0}: bot.name
+#: src/features/settings/components/chat/bots-settings.tsx:256
+msgid "Permission mode for {0}"
+msgstr "Modo de permisos de {0}"
 
 #. placeholder {0}: labels[mode]
 #: src/features/chat/thread/composer-permission-mode.tsx:63
@@ -32176,6 +32192,7 @@ msgid "Superior understanding of complex visual concepts"
 msgstr "Comprensión superior de conceptos visuales complejos"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:43
+#: src/features/settings/components/chat/bots-settings.tsx:60
 msgid "Supervised"
 msgstr ""
 
@@ -33234,7 +33251,7 @@ msgstr "El asistente pide un secreto"
 msgid "The assistant needs a secret"
 msgstr "El asistente necesita un secreto"
 
-#: src/features/settings/components/chat/bots-settings.tsx:191
+#: src/features/settings/components/chat/bots-settings.tsx:281
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr "El bot y su ordenador se eliminan. Sus chats se conservan, como chats normales."
 
@@ -33646,6 +33663,10 @@ msgstr "El registro MCP no está disponible ahora mismo. Se muestran servidores 
 #: src/features/chat/guest-links/guest-page.tsx:98
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "No se pudo enviar el mensaje. Comprueba tu conexión e inténtalo de nuevo."
+
+#: src/features/settings/components/chat/bots-settings.tsx:212
+msgid "The mode each new chat with this bot starts in. You can still change it per chat. Scheduled runs use it only when it asks more."
+msgstr "El modo en el que empieza cada chat nuevo con este bot. Puedes seguir cambiándolo en cada chat. Las ejecuciones programadas lo usan solo cuando pide más confirmaciones."
 
 #: src/features/marketing/use-cases/use-case-data.ts:56
 msgid "The model asks to use a tool you set to Ask. The run stops before the tool executes."
@@ -38613,7 +38634,7 @@ msgstr "Tu recurso de Azure OpenAI: punto de conexión, versión de la API y nom
 msgid "Your background, preferences, or location to help the AI understand you better"
 msgstr "Tu formación, preferencias o ubicación, para que la IA te entienda mejor"
 
-#: src/features/settings/components/chat/bots-settings.tsx:155
+#: src/features/settings/components/chat/bots-settings.tsx:239
 msgid "Your bots"
 msgstr "Tus bots"
 
