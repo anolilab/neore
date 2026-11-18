@@ -9,6 +9,7 @@ import { deleteBotConnectorAccess } from "../connectors/access";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
+import { SUB_AGENT_MAX_DEPTH } from "../sub-agents/logic";
 import { isTaskModelAllowed } from "../tasks/logic";
 
 const vPermissionMode = v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"));
@@ -225,19 +226,36 @@ export const getBotForRun = internalQuery
 
 /**
  * The permission mode of the bot an unattended run belongs to: the bot it names, else the bot of the thread it continues (a task's
- * round on a bot's chat), or `null` when neither leads to a bot of the caller's. Internal: `chat/lib/headless-run.ts`.
+ * round on a bot's chat), or `null` when neither leads to a bot of the caller's. A sub-agent child's thread names no bot, so the
+ * chain is followed up to its lead, at most one step per nesting level. Internal: `chat/lib/headless-run.ts`, `chat/lib/agent-run.ts`.
  */
 export const getBotPermissionModeForRun = internalQuery
     .input({ botId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.optional(v.string().max(MAX_LENGTH.id)), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.union(vPermissionMode, v.null()))
     .query(async ({ args: { botId, threadId, userId }, ctx }) => {
         let id = botId;
+        let next = id === undefined ? threadId : undefined;
 
-        if (id === undefined && threadId !== undefined) {
-            const normalized = ctx.db.normalizeId("threads", threadId);
+        for (let step = 0; next !== undefined && step <= SUB_AGENT_MAX_DEPTH; step += 1) {
+            const normalized = ctx.db.normalizeId("threads", next);
             const thread = normalized ? await ctx.db.get("threads", normalized) : null;
 
-            id = thread?.userId === userId ? thread.botId : undefined;
+            if (thread?.userId !== userId) {
+                break;
+            }
+
+            id = thread.botId;
+
+            const childOf: string = next;
+            const run =
+                id === undefined
+                    ? await ctx.db
+                          .query("subAgentRuns")
+                          .withIndex("by_childThreadId", (q) => q.eq("childThreadId", childOf))
+                          .first()
+                    : null;
+
+            next = run?.userId === userId ? run.parentThreadId : undefined;
         }
 
         const bot = id === undefined ? null : await ctx.db.get("bots", id as Id<"bots">);

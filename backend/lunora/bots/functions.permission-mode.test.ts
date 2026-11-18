@@ -140,6 +140,32 @@ describe("the bot's mode for an unattended run", () => {
         expect(await read({ botId, userId: STRANGER })).toBeNull();
         expect(await read({ threadId, userId: STRANGER })).toBeNull();
     });
+
+    it("is read for a sub-agent child's thread through its chain's lead, at any depth", async () => {
+        const lead = await chatWith(await botWith("supervised"));
+        const childOf = async (parentThreadId: string, userId = OWNER) =>
+            (await harness.run(async (ctx: any) => {
+                const childThreadId = await ctx.db.insert("threads", { status: "active", title: "Child", userId });
+
+                await ctx.db.insert("subAgentRuns", {
+                    childThreadId,
+                    createdAt: 0,
+                    depth: 1,
+                    parentThreadId,
+                    status: "running",
+                    task: "t",
+                    updatedAt: 0,
+                    userId,
+                });
+
+                return childThreadId;
+            })) as string;
+        const nested = await childOf(await childOf(lead));
+
+        expect(await read({ threadId: nested, userId: OWNER })).toBe("supervised");
+        // A thread that leads to no bot reads none.
+        expect(await read({ threadId: await childOf(await chatWith(await botWith())), userId: OWNER })).toBeNull();
+    });
 });
 
 describe("setting a bot's mode", () => {

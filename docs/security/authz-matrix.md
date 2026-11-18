@@ -295,7 +295,7 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.continueThread` | action | authAction + RL | threads | thread access (owner/grant) | accepted — rate-limited; advisor: no maxOutputTokens bound |
 | `chat_functions.convertTemporaryToPermanent` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.createExtensionPairing` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
-| `chat_functions.createThread` | mutation | authMutation + RL | projects, teamMember | org membership/role; row.userId == caller; botId must be a bot the caller owns | **fixed** (low) — organizationId must be the active org |
+| `chat_functions.createThread` | mutation | authMutation + RL | projects, teamMember | org membership/role; row.userId == caller; botId must be a bot the caller owns; the new chat takes the bot's permission mode, except `full` while impersonating | **fixed** (low) — organizationId must be the active org |
 | `chat_functions.createThreadRelationshipPublic` | mutation | authMutation + RL | threads | row.userId == caller (both ends) | **fixed** (critical) — both threads must be the caller's; a link to a stranger's thread was a read grant on it |
 | `chat_functions.deleteThread` | mutation | authMutation + RL | threads | refused while impersonating; row.userId == caller; the public API route (`DELETE /api/v1/threads/{id}`) refuses a host-run thread with 409 before calling it | ok |
 | `chat_functions.deleteThreads` | mutation | authMutation + RL | — | refused while impersonating (the whole call); row.userId == caller | ok |

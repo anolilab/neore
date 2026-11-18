@@ -119,6 +119,11 @@ export interface HeadlessRunOptions {
     memory: boolean;
     model: string;
     /**
+     * The thread whose bot's mode the run's tools take, when the run starts a thread of its own: a sub-agent child's lead. A run
+     * that continues a thread reads it from that thread. Never stamped on the new thread.
+     */
+    modeThreadId?: string;
+    /**
      * Called right before the model is asked, after the model, keys, tools and thread are ready: the
      * point from which a failure means the run reached the model (and may have been billed). A caller
      * that must give something back when a run never started tells the two apart with it.
@@ -268,12 +273,13 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
     const continuedThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
     const buildsTools = options.tools === "headless" && allowTools;
     // The bot's mode: stamped on a new thread of the bot, and the run's tools take it where it asks more. Read for the bot the run
-    // names, else for the bot of the thread it continues. A failed read fails closed: this run's tools, and a new thread of the bot,
-    // are supervised, so a later chat there never starts wider than the bot asks; the owner can widen the thread.
+    // names, else for the bot of the thread it continues or of `modeThreadId`. A failed read fails closed: this run's tools, and a new
+    // thread of the bot, are supervised, so a later chat there never starts wider than the bot asks; the owner can widen the thread.
+    const modeThreadId = continuedThreadId ?? options.modeThreadId;
     const botMode =
-        options.botId !== undefined || (buildsTools && continuedThreadId !== undefined)
+        options.botId !== undefined || (buildsTools && modeThreadId !== undefined)
             ? await ctx
-                  .runQuery(internal.bots.functions.getBotPermissionModeForRun, { botId: options.botId, threadId: continuedThreadId, userId })
+                  .runQuery(internal.bots.functions.getBotPermissionModeForRun, { botId: options.botId, threadId: modeThreadId, userId })
                   .catch((error: unknown) => {
                       console.warn("[headless-run] bot permission mode unavailable, using supervised", error);
 
