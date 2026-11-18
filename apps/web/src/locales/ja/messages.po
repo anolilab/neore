@@ -234,6 +234,11 @@ msgstr "{0, plural, other {# 枚}}"
 msgid "{0, plural, one {# issue found} other {# issues found}}"
 msgstr "{0, plural, other {# 件の問題が見つかりました}}"
 
+#. placeholder {0}: preview.dropped
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:234
+msgid "{0, plural, one {# line was left out as not about you or sensitive.} other {# lines were left out as not about you or sensitive.}}"
+msgstr ""
+
 #. placeholder {0}: stats.lines
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:757
 msgid "{0, plural, one {# line} other {# lines}}"
@@ -259,6 +264,11 @@ msgstr "{0, plural, other {# 件のメッセージ}}"
 #: src/features/settings/components/chat/native-providers-settings.tsx:414
 msgid "{0, plural, one {# model} other {# models}}"
 msgstr "{0, plural, other {# 個のモデル}}"
+
+#. placeholder {0}: preview.cut
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:241
+msgid "{0, plural, one {# more line was past the limit.} other {# more lines were past the limit.}}"
+msgstr ""
 
 #. placeholder {0}: data.omittedTargets
 #: src/features/evals/components/model-comparison.tsx:102
@@ -368,6 +378,16 @@ msgstr "{0, plural, other {# 個のモデル}}"
 #: src/components/model-picker/model-picker-button.tsx:160
 msgid "{0, plural, one {Comparing # model} other {Comparing # models}}"
 msgstr "{0, plural, other {# 個のモデルを比較中}}"
+
+#. placeholder {0}: kept.length
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:281
+msgid "{0, plural, one {Save # memory} other {Save # memories}}"
+msgstr ""
+
+#. placeholder {0}: result.added
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:100
+msgid "{0, plural, one {Saved # new memory} other {Saved # new memories}}"
+msgstr ""
 
 #. placeholder {0}: results.length - MAX_VISIBLE
 #: src/features/chat/thread/widgets/image-search-gallery.tsx:89
@@ -545,7 +565,7 @@ msgid "{0} lines"
 msgstr "{0} 行"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:175
+#: src/features/settings/components/personalization/memory-settings.tsx:182
 msgid "{0} memories"
 msgstr "{0} 件のメモリ"
 
@@ -642,7 +662,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{2} の {1} 上の {0}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:176
+#: src/features/settings/components/personalization/memory-settings.tsx:183
 msgid "{0} pinned"
 msgstr "ピン留め {0} 件"
 
@@ -1592,6 +1612,10 @@ msgstr "1:1（正方形）"
 msgid "1:1 ratio"
 msgstr "1:1 比率"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:172
+msgid "1. Which assistant?"
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:250
 msgid "10 seconds"
 msgstr "10 秒"
@@ -1623,6 +1647,10 @@ msgstr "16:9 比率"
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:56
 msgid "1970s glass, dreamlike"
 msgstr "1970 年代のレンズ、夢のような描写"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:196
+msgid "2. Send it this prompt"
+msgstr ""
 
 #: src/features/marketing/components/landing-page.tsx:979
 msgid "20 free messages a day to start. No credit card required. Upgrade when you're ready, cancel anytime."
@@ -1676,6 +1704,10 @@ msgstr "2 倍スクイーズ、青いフレア"
 msgid "3:4"
 msgstr "3:4"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:204
+msgid "3. Paste its answer"
+msgstr ""
+
 #: src/features/admin/components/ban-user-dialog.tsx:31
 msgid "30 days"
 msgstr "30 日"
@@ -1711,6 +1743,10 @@ msgstr "3D 深度推定"
 #: src/features/workflow/components/nodes/video-node.tsx:28
 msgid "4:3"
 msgstr "4:3"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:229
+msgid "4. Choose what to keep"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:1449
 msgid "400B parameter MoE with 13B active per token"
@@ -2462,17 +2498,6 @@ msgstr "パスキーを追加"
 msgid "Add picked frame as image node"
 msgstr "選択したフレームを画像ノードとして追加"
 
-#: src/features/chat/thread-list/thread-list-header.tsx:126
-#: src/features/chat/thread-list/thread-list-header.tsx:136
-#: src/features/projects/components/add-project-dialog.tsx:687
-msgid "Add project"
-msgstr ""
-
-#. placeholder {0}: rowName(machine)
-#: src/features/projects/components/add-project-dialog.tsx:510
-msgid "Add project on {0}"
-msgstr ""
-
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:487
 msgid "Add prompt"
 msgstr "プロンプトを追加"
@@ -2646,10 +2671,6 @@ msgstr "追加："
 msgid "Adding documents… {0} of {1}"
 msgstr "ドキュメントを追加中… {0} / {1}"
 
-#: src/features/projects/components/add-project-dialog.tsx:521
-msgid "Adding the project…"
-msgstr ""
-
 #: src/features/devices/components/devices-settings.tsx:452
 msgid "Adding the server was cancelled on this computer."
 msgstr "このコンピュータでサーバーの追加がキャンセルされました。"
@@ -2659,7 +2680,6 @@ msgid "Adding your earlier replies…"
 msgstr "以前の返信を追加しています…"
 
 #: src/features/chat/aside/aside-panel.tsx:168
-#: src/features/projects/components/add-project-dialog.tsx:687
 msgid "Adding…"
 msgstr "追加中…"
 
@@ -3195,7 +3215,7 @@ msgid "All"
 msgstr "すべて"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:197
+#: src/features/settings/components/personalization/memory-settings.tsx:204
 msgid "All ({0})"
 msgstr "すべて（{0}）"
 
@@ -3632,6 +3652,10 @@ msgstr "この日数の間アクティブでない匿名ユーザーは削除の
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:343
 msgid "Another action already uses this key combination. Change or clear one of them to save."
 msgstr "このキーの組み合わせは、すでに別のアクションで使われています。保存するには、どちらかを変更またはクリアしてください。"
+
+#: src/features/settings/components/personalization/memory-import-apps.ts:14
+msgid "Another assistant"
+msgstr ""
 
 #: src/features/evals/components/run-detail.tsx:51
 msgid "Answer"
@@ -4201,6 +4225,10 @@ msgstr "何でも聞いてください..."
 msgid "Ask something without interrupting the reply. The question and the answer stay here unless you add them to the thread."
 msgstr "返信を中断せずに質問できます。質問と回答は、スレッドに追加しない限りここに残ります。"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:157
+msgid "Ask your other assistant to list what it remembers, paste its answer, and choose which facts to keep. The pasted text is only read as a list of facts."
+msgstr ""
+
 #: src/features/chat/thread/composer-image-settings.tsx:152
 #: src/features/chat/thread/composer-video-settings.tsx:108
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:128
@@ -4620,7 +4648,7 @@ msgstr "Azure ポータル → OpenAI リソース → キーとエンドポイ�
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:394
 #: src/features/pages/components/page-version-panel.tsx:89
-#: src/features/projects/components/add-project-dialog.tsx:684
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:278
 msgid "Back"
 msgstr "戻る"
 
@@ -5224,6 +5252,11 @@ msgstr "明るさ"
 msgid "Bring Forward"
 msgstr "前面へ移動"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:152
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:156
+msgid "Bring in what another AI knows about you"
+msgstr ""
+
 #: src/features/marketing/components/tutorials-page.tsx:117
 msgid "Bring your own API keys for AI providers and tools. Manage encrypted keys in settings."
 msgstr "AI プロバイダーやツールにご自身の API キーを使用できます。暗号化されたキーを設定で管理します。"
@@ -5646,7 +5679,6 @@ msgstr "カナダ"
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
-#: src/features/projects/components/add-project-dialog.tsx:678
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:395
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
@@ -5662,8 +5694,8 @@ msgstr "カナダ"
 #: src/features/settings/components/chat/usage-settings.tsx:573
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
-#: src/features/settings/components/personalization/memory-item.tsx:141
-#: src/features/settings/components/personalization/memory-settings.tsx:246
+#: src/features/settings/components/personalization/memory-item.tsx:147
+#: src/features/settings/components/personalization/memory-settings.tsx:253
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -5724,10 +5756,6 @@ msgstr "選択をキャンセル"
 #: src/features/workflow/components/canvas/workflow-controls.tsx:50
 msgid "Cancelled"
 msgstr "キャンセル済み"
-
-#: src/features/projects/components/add-project-dialog.tsx:148
-msgid "Cancelled on this computer."
-msgstr ""
 
 #: src/features/settings/components/privacy/data-export.tsx:108
 msgid "Cancelling..."
@@ -6317,10 +6345,6 @@ msgstr "検索モードを選択"
 msgid "Choose the camera system for your shot"
 msgstr "撮影に使うカメラシステムを選択します"
 
-#: src/features/projects/components/add-project-dialog.tsx:513
-msgid "Choose the project's folder, or type a path."
-msgstr ""
-
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:355
 msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 msgstr "アシスタントが自動で使えるツール、承認が必要なツール、無効にするツールを選択します。"
@@ -6494,11 +6518,11 @@ msgstr "すべてクリア"
 msgid "Clear All"
 msgstr "すべてクリア"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:236
+#: src/features/settings/components/personalization/memory-settings.tsx:243
 msgid "Clear All Memories"
 msgstr "すべてのメモリを消去"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:240
+#: src/features/settings/components/personalization/memory-settings.tsx:247
 msgid "Clear all memories?"
 msgstr "すべてのメモリを消去しますか？"
 
@@ -6545,7 +6569,7 @@ msgstr "タグフィルターをクリア"
 msgid "Clear the queue"
 msgstr "キューをクリア"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:132
+#: src/features/settings/components/personalization/memory-settings.tsx:133
 msgid "Cleared {count} memories"
 msgstr "{count} 件のメモリを消去しました"
 
@@ -6630,10 +6654,6 @@ msgstr "クリップボード"
 #: src/features/settings/lib/settings-keywords.ts:32
 msgid "clock"
 msgstr "時計"
-
-#: src/features/projects/components/add-project-dialog.tsx:675
-msgid "Clone or create new…"
-msgstr ""
 
 #: ../../packages/ui/src/components/ai-elements/artifact.tsx:31
 #: ../../packages/ui/src/components/countdown-toast-card.tsx:192
@@ -7627,10 +7647,6 @@ msgstr "最新の状態に保つには、ホストに接続してください。
 msgid "Connect third-party services to extend AI capabilities with your data and tools."
 msgstr "サードパーティのサービスを接続して、あなたのデータやツールで AI の機能を拡張します。"
 
-#: src/features/projects/components/add-project-dialog.tsx:164
-msgid "Connect this server first."
-msgstr ""
-
 #: src/features/settings/components/chat/mcp-settings.tsx:409
 msgid "Connect to Model Context Protocol servers to extend AI capabilities with external tools."
 msgstr "Model Context Protocol サーバーに接続して、外部ツールで AI の機能を拡張します。"
@@ -7663,7 +7679,6 @@ msgstr "メッセンジャープラットフォームを接続すると、Telegr
 msgid "Connect your own Telegram, WhatsApp, Slack or Discord bot to Neore and message your agent from the app you already use."
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:181
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:24
 #: src/features/settings/connectors/connector-card.tsx:74
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:172
@@ -7701,10 +7716,6 @@ msgstr "{0} に接続済み"
 #: src/routes/auth/extension.tsx:91
 msgid "Connected. You can close this window."
 msgstr "接続しました。このウィンドウは閉じてかまいません。"
-
-#: src/features/projects/components/add-project-dialog.tsx:518
-msgid "Connecting {pairingHost}…"
-msgstr ""
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:392
 msgid "Connecting to your MCP servers..."
@@ -8205,6 +8216,10 @@ msgstr "メッセージをコピー"
 msgid "Copy object"
 msgstr "オブジェクトをコピー"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:200
+msgid "Copy prompt"
+msgstr ""
+
 #: src/features/prompts/components/prompt-item.tsx:240
 #: src/features/prompts/components/prompt-item.tsx:266
 msgid "Copy Prompt"
@@ -8463,6 +8478,10 @@ msgstr "自動コピーできませんでした。招待リンク：{inviteLink}
 msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr "自動コピーできませんでした。公開リンク：{publicLink}"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:115
+msgid "Could not copy the prompt"
+msgstr ""
+
 #: src/features/chat/thread/copy-prompt-link-action.tsx:69
 msgid "Could not copy the prompt link. Your browser did not allow access to the clipboard."
 msgstr "プロンプトのリンクをコピーできませんでした。ブラウザがクリップボードへのアクセスを許可しませんでした。"
@@ -8677,6 +8696,10 @@ msgstr "そのチャットを読み込めませんでした"
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "そのチャットを読み込めませんでした。ロックされている場合は、先にロックを解除してください。"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:85
+msgid "Could not read the pasted list"
+msgstr ""
+
 #: src/features/onboarding/components/setup-checklist.tsx:216
 msgid "Could not read your devices, so the steps cannot be checked yet. The links still work."
 msgstr ""
@@ -8730,6 +8753,10 @@ msgstr "Daily Brief の設定を保存できませんでした。"
 #: src/features/notifications/components/notification-settings.tsx:103
 msgid "Could not save the email setting."
 msgstr "メール設定を保存できませんでした。"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:97
+msgid "Could not save the memories"
+msgstr ""
 
 #: src/components/model-picker/model-picker.tsx:1036
 msgid "Could not save the new order for {label}"
@@ -9055,6 +9082,8 @@ msgid "Create PR"
 msgstr "PR を作成"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:147
+#: src/features/chat/thread-list/thread-list-header.tsx:126
+#: src/features/chat/thread-list/thread-list-header.tsx:136
 msgid "Create project"
 msgstr "プロジェクトを作成"
 
@@ -9125,15 +9154,6 @@ msgstr "最初のワークフローを作成して、AI タスクを視覚的に
 #: src/features/skills/components/skill-item.tsx:80
 msgid "Created"
 msgstr "作成日"
-
-#. placeholder {0}: created.value.path
-#: src/features/projects/components/add-project-dialog.tsx:246
-msgid "Created {0}"
-msgstr ""
-
-#: src/features/projects/components/add-project-dialog.tsx:245
-#~ msgid "Created {path}"
-#~ msgstr ""
 
 #: src/features/skills/components/bundle-import-dialog.tsx:151
 msgid "Created switched off."
@@ -9994,7 +10014,7 @@ msgstr "アカウントを削除"
 msgid "Delete alert \"{ruleName}\""
 msgstr "アラート「{ruleName}」を削除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:247
+#: src/features/settings/components/personalization/memory-settings.tsx:254
 msgid "Delete All"
 msgstr "すべて削除"
 
@@ -10051,7 +10071,7 @@ msgstr "グループと子要素を削除"
 msgid "Delete Logo"
 msgstr "ロゴを削除"
 
-#: src/features/settings/components/personalization/memory-item.tsx:117
+#: src/features/settings/components/personalization/memory-item.tsx:123
 msgid "Delete memory"
 msgstr "メモリを削除"
 
@@ -11480,7 +11500,7 @@ msgstr "MCP サーバーを編集"
 msgid "Edit me"
 msgstr "編集してください"
 
-#: src/features/settings/components/personalization/memory-item.tsx:113
+#: src/features/settings/components/personalization/memory-item.tsx:119
 msgid "Edit memory"
 msgstr "メモリを編集"
 
@@ -11877,7 +11897,7 @@ msgstr "フォローアップの提案を有効化"
 msgid "Enable for Next Chat"
 msgstr "次のチャットで有効化"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:163
+#: src/features/settings/components/personalization/memory-settings.tsx:167
 msgid "Enable memory"
 msgstr "メモリを有効化"
 
@@ -13069,6 +13089,10 @@ msgstr "ファクトチェック"
 msgid "Fact check: Does sugar cause hyperactivity in children?"
 msgstr "ファクトチェック：砂糖は子どもの多動を引き起こしますか？"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:247
+msgid "Facts to save"
+msgstr ""
+
 #: src/features/evals/components/model-comparison.tsx:90
 #: src/features/evals/components/run-detail.tsx:39
 msgid "Fail"
@@ -13154,7 +13178,7 @@ msgstr "タグの色を変更できませんでした"
 msgid "Failed to clear filter rules"
 msgstr "フィルタールールをクリアできませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:128
+#: src/features/settings/components/personalization/memory-settings.tsx:129
 msgid "Failed to clear memories"
 msgstr "メモリを消去できませんでした"
 
@@ -13247,7 +13271,7 @@ msgstr "ファイルを削除できませんでした。もう一度お試しく
 msgid "Failed to delete files"
 msgstr "ファイルを削除できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:100
+#: src/features/settings/components/personalization/memory-settings.tsx:101
 msgid "Failed to delete memory"
 msgstr "メモリを削除できませんでした"
 
@@ -13761,8 +13785,8 @@ msgstr "キーボードショートカットを更新できませんでした"
 msgid "Failed to update MCP server"
 msgstr "MCP サーバーを更新できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:111
-#: src/features/settings/components/personalization/memory-settings.tsx:119
+#: src/features/settings/components/personalization/memory-settings.tsx:112
+#: src/features/settings/components/personalization/memory-settings.tsx:120
 msgid "Failed to update memory"
 msgstr "メモリを更新できませんでした"
 
@@ -13790,7 +13814,7 @@ msgstr "プルリクエストの設定を更新できませんでした"
 msgid "Failed to update reply tools"
 msgstr "返信ツールを更新できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:145
+#: src/features/settings/components/personalization/memory-settings.tsx:144
 msgid "Failed to update setting"
 msgstr "設定を更新できませんでした"
 
@@ -14450,7 +14474,7 @@ msgstr "種類で絞り込み"
 msgid "Filter condition"
 msgstr "フィルター条件"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:183
+#: src/features/settings/components/personalization/memory-settings.tsx:190
 msgid "Filter memories by type"
 msgstr "種類でメモリを絞り込み"
 
@@ -14653,14 +14677,6 @@ msgstr "チャットにフォーカス: {title}"
 #: src/features/settings/lib/settings-keywords.ts:40
 msgid "Focus Search"
 msgstr "検索にフォーカス"
-
-#: src/features/projects/components/add-project-dialog.tsx:600
-msgid "Folder path"
-msgstr ""
-
-#: src/features/projects/components/add-project-dialog.tsx:619
-msgid "Folders"
-msgstr ""
 
 #: src/features/appearance/components/appearance-controls.tsx:118
 msgid "Follow my system (default)"
@@ -15662,10 +15678,6 @@ msgstr "ボールトへ移動"
 #: src/features/pages/components/page-invite-accept.tsx:46
 msgid "Go to your pages"
 msgstr "ページ一覧へ移動"
-
-#: src/features/projects/components/add-project-dialog.tsx:623
-msgid "Go up to {parent}"
-msgstr ""
 
 #: src/features/chat/goal/composer-goal.tsx:75
 #: src/features/chat/goal/goal-notes.tsx:70
@@ -17091,6 +17103,10 @@ msgstr "Notion のページを {added} 件インポートしました。"
 msgid "Imported as /{0}."
 msgstr "/{0} としてインポートしました。"
 
+#: src/features/settings/components/personalization/memory-item.tsx:96
+msgid "Imported from {importedFromLabel}"
+msgstr ""
+
 #. placeholder {0}: result.slug
 #: src/features/skills/components/skill-import-dialog.tsx:147
 msgid "Imported skill \"{0}\""
@@ -18277,7 +18293,7 @@ msgid "Last activity {lastActivityAgo}"
 msgstr "最終アクティビティ {lastActivityAgo}"
 
 #. placeholder {0}: relativeTime(memory.lastConfirmedAt)
-#: src/features/settings/components/personalization/memory-item.tsx:90
+#: src/features/settings/components/personalization/memory-item.tsx:95
 msgid "Last confirmed {0}"
 msgstr "最終確認 {0}"
 
@@ -18841,6 +18857,10 @@ msgstr "リスト"
 msgid "List all available models and pricing"
 msgstr "利用可能なすべてのモデルと料金を一覧表示"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:80
+msgid "List everything you remember about me from our past conversations and your saved memory. Write one fact per line, in the third person, starting with \"The user\" (for example: \"The user works as a nurse in Hamburg.\"). Where you know when you learned a fact, add the date in brackets at the end of its line. Leave out passwords, keys, account numbers and health details. Write no introduction, headings or comments."
+msgstr ""
+
 #: src/features/prompts/components/prompt-list.tsx:560
 msgid "List view"
 msgstr "リスト表示"
@@ -19033,10 +19053,6 @@ msgstr "ファイルを読み込み中"
 #: src/features/develop/components/files-tab.tsx:426
 msgid "Loading files…"
 msgstr "ファイルを読み込み中…"
-
-#: src/features/projects/components/add-project-dialog.tsx:519
-msgid "Loading folders…"
-msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:358
 msgid "Loading image editor..."
@@ -19428,10 +19444,6 @@ msgstr "LINE チャネルの Messaging API タブにある長期のチャネル�
 msgid "Longest the answer may take, in milliseconds"
 msgstr "回答にかけられる最大時間（ミリ秒）"
 
-#: src/features/projects/components/add-project-dialog.tsx:534
-msgid "Looking for machines…"
-msgstr ""
-
 #: src/features/local-models/components/ollama-model-manager.tsx:166
 msgid "Looking for Ollama at {baseUrl}…"
 msgstr "{baseUrl} で Ollama を探しています…"
@@ -19513,10 +19525,6 @@ msgstr "Mach-O バイナリ"
 
 #: src/features/auth/components/device-code-parts.tsx:122
 msgid "Machine"
-msgstr ""
-
-#: src/features/projects/components/add-project-dialog.tsx:538
-msgid "Machines"
 msgstr ""
 
 #: src/features/local-models/components/local-setup-guide.tsx:76
@@ -20040,7 +20048,7 @@ msgid "memories"
 msgstr "メモリ"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:209
+#: src/features/settings/components/personalization/memory-settings.tsx:216
 msgid "Memories"
 msgstr "メモリ"
 
@@ -20058,7 +20066,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "この返信で使用したメモリ（{0}）"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:156
+#: src/features/settings/components/personalization/memory-settings.tsx:160
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "メモリ"
@@ -20067,15 +20075,15 @@ msgstr "メモリ"
 msgid "Memory — what the agent keeps across chats"
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-settings.tsx:104
+#: src/features/settings/components/personalization/memory-settings.tsx:105
 msgid "Memory deleted"
 msgstr "メモリを削除しました"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:138
+#: src/features/settings/components/personalization/memory-settings.tsx:142
 msgid "Memory disabled"
 msgstr "メモリを無効にしました"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:138
+#: src/features/settings/components/personalization/memory-settings.tsx:142
 msgid "Memory enabled"
 msgstr "メモリを有効にしました"
 
@@ -20087,7 +20095,11 @@ msgstr ""
 msgid "Memory is off until you turn it on. Temporary chats and locked chats are never mined for memories."
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-item.tsx:125
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:162
+msgid "Memory is off. Turn it on to bring in memories; nothing is saved while it is off."
+msgstr ""
+
+#: src/features/settings/components/personalization/memory-item.tsx:131
 msgid "Memory text"
 msgstr "メモリの内容"
 
@@ -20095,7 +20107,7 @@ msgstr "メモリの内容"
 msgid "Memory the agent keeps across chats"
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-item.tsx:79
+#: src/features/settings/components/personalization/memory-item.tsx:84
 msgid "Memory type"
 msgstr "メモリの種類"
 
@@ -21999,6 +22011,10 @@ msgstr "まだ実行されていません"
 msgid "No expiration"
 msgstr "有効期限なし"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:245
+msgid "No facts found in the pasted text."
+msgstr ""
+
 #: src/features/develop/components/checks-tab.tsx:138
 msgid "No failures in the checks shown."
 msgstr "表示されているチェックに失敗はありません。"
@@ -22026,10 +22042,6 @@ msgstr "ナレッジベースにはまだファイルがありません。上か
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:53
 msgid "No focal length selected"
 msgstr "焦点距離が選択されていません"
-
-#: src/features/projects/components/add-project-dialog.tsx:655
-msgid "No folders in here."
-msgstr ""
 
 #: src/features/tasks/components/task-form-dialog.tsx:383
 #: src/features/tasks/components/task-form-dialog.tsx:395
@@ -22102,11 +22114,11 @@ msgstr "MCP サーバーが設定されていません。サーバーを追加�
 msgid "No members in this team yet"
 msgstr "このチームにはまだメンバーがいません"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:225
+#: src/features/settings/components/personalization/memory-settings.tsx:232
 msgid "No memories of this type."
 msgstr "この種類のメモリはありません。"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:226
+#: src/features/settings/components/personalization/memory-settings.tsx:233
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "メモリはまだありません。AI は会話から自動的に学習を始めます。"
 
@@ -24318,10 +24330,6 @@ msgstr ""
 msgid "Pair one in Settings"
 msgstr "設定でペアリングしてください"
 
-#: src/features/projects/components/add-project-dialog.tsx:208
-msgid "Pair this computer with your account first (Settings → Devices)."
-msgstr ""
-
 #: src/features/auth/components/device-approval.tsx:203
 msgid "Pair this machine?"
 msgstr ""
@@ -24861,10 +24869,6 @@ msgstr "受信トレイから 1 つ選ぶと、内容を読めます。"
 msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
 msgstr "共有するスキル、スケジュール、Webhook、グループチャットを選んで、1 つの Markdown ファイルにまとめます。API キー、Webhook のシークレット、コネクタのトークンなどの認証情報は含まれません。アカウント ID や組織 ID も含まれません。"
 
-#: src/features/projects/components/add-project-dialog.tsx:513
-msgid "Pick the computer or server the project's folder is on."
-msgstr ""
-
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:212
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
 msgstr "画像を最大 {maxReferences} 枚選択してください。選択した順番でモデルに渡されます。"
@@ -24912,7 +24916,7 @@ msgstr "ピン留め"
 msgid "Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own."
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-item.tsx:103
+#: src/features/settings/components/personalization/memory-item.tsx:109
 msgid "Pin memory"
 msgstr "メモリをピン留め"
 
@@ -25405,10 +25409,6 @@ msgstr "Enter キーまたはスペースキーでノードを選択します。
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr "Enter キーまたはスペースキーでエッジを選択します。その後、Delete キーで削除、Esc キーでキャンセルできます。"
 
-#: src/features/projects/components/add-project-dialog.tsx:616
-msgid "Press Enter to open the folder. A folder that does not exist is created."
-msgstr ""
-
 #: src/features/settings/components/account/account-settings.tsx:225
 msgid "Press Enter to send"
 msgstr "Enter キーで送信"
@@ -25446,6 +25446,7 @@ msgstr "プレビュー"
 #: src/features/canvas/canvas-panel.tsx:767
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:790
 #: src/features/prompts/components/variable-fill-dialog.tsx:174
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:286
 #: src/features/workflow/components/canvas/workflow-controls.tsx:633
 #: src/features/workflow/components/nodes/image-node.tsx:76
 msgid "Preview"
@@ -25909,6 +25910,10 @@ msgstr "プロンプトへの忠実さ"
 #: src/features/marketing/components/gateway-landing-page.tsx:101
 msgid "Prompt cache management"
 msgstr "プロンプトキャッシュ管理"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:113
+msgid "Prompt copied"
+msgstr ""
 
 #: src/features/prompts/components/prompt-item.tsx:62
 #: src/features/prompts/components/prompt-list-view.tsx:44
@@ -26521,6 +26526,10 @@ msgstr "「{attachmentName}」を読み込んでいます…"
 #: src/features/develop/components/guide-view.tsx:53
 msgid "Reading order"
 msgstr "読む順序"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:286
+msgid "Reading…"
+msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:237
 msgid "Ready"
@@ -28513,7 +28522,7 @@ msgstr "サウジアラビア"
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:641
 #: src/features/settings/components/chat/native-providers-settings.tsx:712
-#: src/features/settings/components/personalization/memory-item.tsx:145
+#: src/features/settings/components/personalization/memory-item.tsx:151
 #: src/features/slides/components/slide-editor-dialog.tsx:118
 #: src/features/workflow/components/canvas/workflow-controls.tsx:401
 msgid "Save"
@@ -29957,10 +29966,6 @@ msgstr "表示を減らす"
 msgid "Show more"
 msgstr "さらに表示"
 
-#: src/features/projects/components/add-project-dialog.tsx:665
-msgid "Show more folders"
-msgstr ""
-
 #: src/features/projects/components/project-repo-picker.tsx:175
 #: src/features/tasks/components/task-form-dialog.tsx:465
 msgid "Show more projects"
@@ -30746,7 +30751,7 @@ msgstr "出典 {index}"
 msgid "Source {position}: {0}, passage {1}"
 msgstr "ソース {position}：{0}、パッセージ {1}"
 
-#: src/features/settings/components/personalization/memory-item.tsx:97
+#: src/features/settings/components/personalization/memory-item.tsx:103
 msgid "Source chat"
 msgstr "元のチャット"
 
@@ -30998,20 +31003,6 @@ msgstr "スカッシュしてマージ"
 #: src/features/chat/core/utils/language-utilities.ts:376
 msgid "Sri Lanka"
 msgstr "スリランカ"
-
-#. placeholder {0}: row.name
-#: src/features/projects/components/add-project-dialog.tsx:185
-msgid "SSH · {0}"
-msgstr ""
-
-#. placeholder {0}: row.name
-#: src/features/projects/components/add-project-dialog.tsx:188
-msgid "SSH · {0} · not connected yet"
-msgstr ""
-
-#: src/features/projects/components/add-project-dialog.tsx:577
-msgid "SSH hosts come from ~/.ssh/config. Picking one connects it."
-msgstr ""
 
 #: src/features/devices/lib/device-diagnostics.ts:72
 msgid "SSH server via a paired computer"
@@ -32910,21 +32901,9 @@ msgstr "うまくいきませんでした。もう一度お試しください。
 msgid "That did not work. Try again."
 msgstr "うまくいきませんでした。もう一度お試しください。"
 
-#: src/features/projects/components/add-project-dialog.tsx:152
-msgid "That folder is already shared with this server."
-msgstr ""
-
 #: src/features/develop/components/guide-tab.tsx:92
 msgid "That folder is not offered for this repository on that computer."
 msgstr "そのフォルダは、そのコンピュータのこのリポジトリには提供されていません。"
-
-#: src/features/projects/components/add-project-dialog.tsx:156
-msgid "That folder is the server's home folder or a folder above it. Choose a folder inside it."
-msgstr ""
-
-#: src/features/projects/components/add-project-dialog.tsx:136
-msgid "That folder was not found."
-msgstr ""
 
 #: src/features/chat/core/context/chat-context.tsx:718
 msgid "That guest link has ended."
@@ -32968,10 +32947,6 @@ msgstr "そのメッセージはすでに送信されています。"
 #: src/features/chat/lock/thread-lock-dialog.tsx:60
 msgid "That passcode is not right."
 msgstr "パスコードが正しくありません。"
-
-#: src/features/projects/components/add-project-dialog.tsx:140
-msgid "That path is a file."
-msgstr ""
 
 #: src/features/chat/host/host-composer.tsx:879
 msgid "That request is no longer waiting."
@@ -33102,7 +33077,7 @@ msgstr ""
 msgid "The agent's tool calls"
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-settings.tsx:155
+#: src/features/settings/components/personalization/memory-settings.tsx:159
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "AI は会話から学習して応答をパーソナライズし、毎晩学んだことを振り返ります。記憶している内容はすべてここに表示され、編集、種類の変更、ピン留め、削除ができます。"
 
@@ -33263,10 +33238,6 @@ msgstr "説明が途中で切れています。"
 #: src/features/download/components/download-page.tsx:71
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "デスクトップアプリは macOS、Windows、Linux で動作します。インストーラーは GitHub のデスクトップリリースに添付され、そのリリースが公開されるとそこに表示されます。"
-
-#: src/features/projects/components/add-project-dialog.tsx:167
-msgid "The desktop could not complete that. Try again."
-msgstr ""
 
 #: src/features/chat/host/host-options.tsx:237
 msgid "the device was removed"
@@ -34097,8 +34068,6 @@ msgid "this computer"
 msgstr "このコンピュータ"
 
 #: src/features/devices/components/devices-settings.tsx:310
-#: src/features/projects/components/add-project-dialog.tsx:173
-#: src/features/projects/components/add-project-dialog.tsx:177
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "このコンピューター"
@@ -34127,10 +34096,6 @@ msgstr "このコンピューターは別のアカウントとペアリングさ
 #: src/features/devices/components/devices-settings.tsx:563
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "このコンピューターはペアリングされました。共有するフォルダーはデスクトップアプリで選択してください。"
-
-#: src/features/projects/components/add-project-dialog.tsx:348
-msgid "This computer must be paired first."
-msgstr ""
 
 #: src/features/devices/lib/device-diagnostics.ts:75
 msgid "this computer: {viaName}"
@@ -34228,10 +34193,6 @@ msgstr "このファイルは大きすぎる（{0} KB）ため、ブラウザー
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "このファイルは大きすぎ（約 {0} トークン）、モデルのコンテキストウィンドウを超えています。モデルがこのファイルを適切に処理できない可能性があります。"
 
-#: src/features/projects/components/add-project-dialog.tsx:144
-msgid "This folder cannot be read."
-msgstr ""
-
 #: src/features/develop/components/guide-tab.tsx:218
 msgid "This guide was written for an earlier commit. The {requestNoun} has changed since: write it again to see the change as it is now."
 msgstr "このガイドは以前のコミットに対して作成されました。その後{requestNoun}が変更されています。現在の変更を確認するには、もう一度作成してください。"
@@ -34243,18 +34204,6 @@ msgstr "このホストはまだ受信トレイを提供していません。"
 #: src/features/develop/components/pull-request-view.tsx:133
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr "このホストはまだ{requestNoun}のビューを提供していません。"
-
-#: src/features/projects/components/add-project-dialog.tsx:205
-msgid "This host has an invalid Port in ~/.ssh/config."
-msgstr ""
-
-#: src/features/projects/components/add-project-dialog.tsx:201
-msgid "This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate."
-msgstr ""
-
-#: src/features/projects/components/add-project-dialog.tsx:197
-msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
-msgstr ""
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:406
 msgid "This image has been flagged for review"
@@ -34281,6 +34230,10 @@ msgstr "これはすでにスレッドにあります。"
 #: src/features/auth/components/organization/organization-name-card.tsx:155
 msgid "This is how your organization appears to members"
 msgstr "メンバーに表示される組織の名前です"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:219
+msgid "This is longer than {maxPasteChars} characters. Paste it in parts and bring in each one."
+msgstr ""
 
 #: src/features/projects/components/project-repositories.tsx:180
 msgid "This is not a valid branch name."
@@ -34318,10 +34271,6 @@ msgstr "このリンクは不完全です。完全なリンクを依頼してく
 #: src/features/chat/guest-links/guest-page.tsx:92
 msgid "This link is not taking messages right now. Try again later."
 msgstr "このリンクは現在メッセージを受け付けていません。後でもう一度お試しください。"
-
-#: src/features/projects/components/add-project-dialog.tsx:432
-msgid "This machine is not ready yet."
-msgstr ""
 
 #: src/features/chat/thread/memory-usage-action.tsx:63
 msgid "This memory has since been deleted."
@@ -34481,10 +34430,6 @@ msgstr "この実行は利用できなくなりました。"
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr "この選択はサイズが大きすぎて一度にインポートできません。一度にインポートするファイルを減らしてください。"
 
-#: src/features/projects/components/add-project-dialog.tsx:160
-msgid "This server already has its maximum of shared folders. Share a parent folder or remove one in the desktop app."
-msgstr ""
-
 #: src/features/settings/components/chat/mcp-settings.tsx:368
 msgid "This server requires sign-in. Save it, then choose Sign in."
 msgstr "このサーバーにはサインインが必要です。保存してから「サインイン」を選択してください。"
@@ -34601,7 +34546,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "{0} 件の匿名ユーザーアカウントとそのすべてのデータが完全に削除されます。この操作は元に戻せません。"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:242
+#: src/features/settings/components/personalization/memory-settings.tsx:249
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "{0} 件のメモリとその日次ダイジェストがすべて完全に削除されます。AI は次の会話から改めて学習を始めます。"
 
@@ -35515,6 +35460,10 @@ msgstr "自動マージをオフにしますか？"
 #~ msgid "Turn on Daily Brief"
 #~ msgstr "Daily Brief をオンにする"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:164
+msgid "Turn on memory"
+msgstr ""
+
 #: src/features/chat/goal/composer-goal.tsx:62
 #~ msgid "Turn on run until done"
 #~ msgstr ""
@@ -35918,7 +35867,7 @@ msgstr "左の固定を解除"
 msgid "Unpin from right"
 msgstr "右の固定を解除"
 
-#: src/features/settings/components/personalization/memory-item.tsx:103
+#: src/features/settings/components/personalization/memory-item.tsx:109
 msgid "Unpin memory"
 msgstr "メモリのピン留めを解除"
 
@@ -36125,6 +36074,12 @@ msgstr "スライド {slideNumber} を更新しました"
 #: src/lib/model-descriptions.ts:239
 msgid "Updated vision model from Z.AI"
 msgstr "Z.AI のアップデート版ビジョンモデル"
+
+#. placeholder {0}: result.updated
+#. placeholder {1}: result.alreadyKnown
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:101
+msgid "Updated: {0} · Already known: {1}"
+msgstr ""
 
 #: src/features/chat/thread/widgets/currency-widget.tsx:120
 msgid "Updated: {timestamp}"
@@ -37848,10 +37803,6 @@ msgstr "アシスタントはどんなときにこのスキルを使うべきで
 #: src/features/tasks/components/task-form-dialog.tsx:586
 msgid "Where each run goes"
 msgstr "各実行の保存先"
-
-#: src/features/projects/components/add-project-dialog.tsx:510
-msgid "Where is the project?"
-msgstr ""
 
 #: src/features/develop/components/guide-tab.tsx:166
 msgid "Where the guide is written"
