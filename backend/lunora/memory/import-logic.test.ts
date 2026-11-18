@@ -60,6 +60,8 @@ describe(looksSensitive, () => {
 
     it("flags a shorter account number named as one", () => {
         expect(looksSensitive("The user's account number is 123456789012")).toBe(true);
+        expect(looksSensitive("acct #1234567 at the local bank")).toBe(true);
+        expect(looksSensitive("Routing 021000021")).toBe(true);
     });
 
     it("drops a pasted private key, header and body, after the line cleaning", () => {
@@ -75,6 +77,8 @@ describe(looksSensitive, () => {
     it("leaves an ordinary fact alone", () => {
         expect(looksSensitive("The user keeps a password manager and prefers TypeScript")).toBe(false);
         expect(looksSensitive("The user walks 120000 steps a month and has a card game night in 2024")).toBe(false);
+        expect(looksSensitive("The user opened a business account on 2024-03-15")).toBe(false);
+        expect(looksSensitive("The user's Instagram account has 120000 followers")).toBe(false);
     });
 });
 
