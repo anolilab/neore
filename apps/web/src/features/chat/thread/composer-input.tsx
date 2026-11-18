@@ -78,6 +78,7 @@ import ComposerLongTextPrompt from "./composer-long-text-prompt";
 import { breaksBefore, inOpenFence, isLongPaste, onOwnLines, planPaste, planText } from "./composer-paste/paste-plan";
 import { takesPaste } from "./composer-paste/paste-target";
 import ComposerPromptQueue from "./composer-prompt-queue";
+import ComposerPromptSearch from "./composer-prompt-search";
 import { composerSubmitIntent } from "./composer-submit-intent";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
 import { quoteRestoreDraft } from "./composer-tiptap/extensions/quote-chip";
@@ -534,6 +535,25 @@ const ComposerInput = ({
 
     // Composer state from store
     const { addAttachment, attachments, clear, removeAttachment, setText, text, updateAttachment } = useComposerState();
+    // Ctrl+R opens the search over the person's sent prompts (`composer-prompt-search.tsx`). Only a thread composer has one.
+    const [promptSearchOpen, setPromptSearchOpen] = useState(false);
+    const openPromptSearch = useCallback((): boolean => {
+        setPromptSearchOpen(true);
+
+        return true;
+    }, []);
+    const closePromptSearch = useCallback(() => setPromptSearchOpen(false), []);
+    const pickSentPrompt = useCallback(
+        (prompt: string) => {
+            // The prompt becomes the draft, and is never sent. Text already typed stays, with the prompt below it.
+            const current = useChatUIStore.getState().composerText;
+
+            setText(current.trim() === "" ? prompt : `${current}\n${prompt}`);
+            setPromptSearchOpen(false);
+            inputAreaRef.current?.focus();
+        },
+        [setText],
+    );
 
     // A `/compact` typed in one chat is not carried into the next: submitting it there would compact the chat that is open.
     useEffect(() => {
@@ -1658,6 +1678,7 @@ const ComposerInput = ({
                 {failureAnnouncement}
             </span>
             {isThreadComposer && <PromptHistorySource onEntries={promptHistory.setEntries} />}
+            {isThreadComposer && promptSearchOpen && <ComposerPromptSearch onClose={closePromptSearch} onPick={pickSentPrompt} />}
             {isThreadComposer && <ComposerPromptQueue />}
             {isThreadComposer && <AutoReadReplies />}
             {isThreadComposer && <CompletionSound />}
@@ -1747,6 +1768,7 @@ const ComposerInput = ({
                 onDraw={compact ? undefined : onOpenDraw}
                 onHistoryNavigate={isThreadComposer ? promptHistory.navigate : undefined}
                 onPaste={compact ? undefined : handlePaste}
+                onPromptSearch={isThreadComposer && !disabled ? openPromptSearch : undefined}
                 onSelectChat={compact ? undefined : handleSelectChat}
                 onSelectFileUpload={compact ? undefined : handleSelectFileUpload}
                 onSelectVaultFile={compact ? undefined : handleSelectVaultFile}

@@ -1,0 +1,211 @@
+/**
+ * `searchSentPrompts` feeds the composer's Ctrl+R popup. It lists only the caller's own prompts (user rows of their
+ * own threads), newest first, at most 50, and never a locked thread's prompt.
+ */
+import { lunoraTest } from "@lunora/testing";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+
+import { registeredApi, registerModule } from "../../test/registered-api";
+import schema from "../schema";
+import { searchSentPrompts } from "./functions";
+
+const registry = vi.hoisted(() => new Map<string, unknown>());
+
+vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
+vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
+
+beforeAll(async () => {
+    registerModule(registry, "agent_messages", await import("../agent/messages"));
+    registerModule(registry, "agent_threads", await import("../agent/threads"));
+}, 30_000);
+
+const { sessionFrom } = vi.hoisted(() => {
+    return {
+        sessionFrom: async (context: { auth: { userId?: string | null } }) =>
+            context.auth.userId ? { activeOrganization: { id: "org-1" }, id: context.auth.userId, userId: context.auth.userId } : null,
+    };
+});
+
+vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/crpc-auth-helpers")>()),
+        getSessionUser: sessionFrom,
+        getSessionUserForQuery: sessionFrom,
+        getSessionUserForQueryLite: sessionFrom,
+    };
+});
+
+vi.mock("../lib/audit-triggers", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/audit-triggers")>()),
+        auditTriggersFor: () => {
+            return {};
+        },
+    };
+});
+
+const OWNER = "user-owner";
+const OTHER = "user-other";
+
+const insertMessage = (context: any, fields: { createdAt: number; order: number; role: string; text: string; threadId: string; userId: string }) =>
+    context.db.insert("messages", {
+        createdAt: fields.createdAt,
+        message: { content: fields.text, role: fields.role },
+        order: fields.order,
+        status: "success",
+        stepOrder: 0,
+        text: fields.text,
+        threadId: fields.threadId,
+        tool: false,
+        userId: fields.userId,
+    });
+
+const insertThread = (context: any, fields: { lockedAt?: number; title: string; userId: string }) =>
+    context.db.insert("threads", { model: "gpt-4o", status: "active", ...fields });
+
+const search = async (harness: ReturnType<typeof lunoraTest>, searchQuery: string, userId = OWNER) => {
+    const result: any = await harness.withIdentity({ userId } as never).query(searchSentPrompts as never, { searchQuery } as never);
+
+    return result.prompts as { createdAt?: number; messageId: string; text: string; threadId: string; threadTitle: string }[];
+};
+
+describe("searchSentPrompts", () => {
+    it("lists the caller's sent prompts from two threads, newest first, and nothing else", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await harness.run(async (context: any) => {
+                const deploys = await insertThread(context, { title: "Release", userId: OWNER });
+                const notes = await insertThread(context, { title: "Notes", userId: OWNER });
+                const theirs = await insertThread(context, { title: "Theirs", userId: OTHER });
+
+                const older = await insertMessage(context, {
+                    createdAt: 100,
+                    order: 0,
+                    role: "user",
+                    text: "deploy the staging build",
+                    threadId: deploys,
+                    userId: OWNER,
+                });
+                const reply = await insertMessage(context, {
+                    createdAt: 110,
+                    order: 1,
+                    role: "assistant",
+                    text: "deploy finished",
+                    threadId: deploys,
+                    userId: OWNER,
+                });
+                const newer = await insertMessage(context, {
+                    createdAt: 300,
+                    order: 0,
+                    role: "user",
+                    text: "deploy to production",
+                    threadId: notes,
+                    userId: OWNER,
+                });
+                const other = await insertMessage(context, {
+                    createdAt: 400,
+                    order: 0,
+                    role: "user",
+                    text: "deploy from someone else",
+                    threadId: theirs,
+                    userId: OTHER,
+                });
+
+                return { deploys, newer, notes, older, other, reply, theirs };
+            });
+
+            const prompts = await search(harness, "deploy");
+
+            expect(prompts.map((prompt) => prompt.messageId)).toEqual([ids.newer, ids.older]);
+            expect(prompts.map((prompt) => prompt.threadId)).toEqual([ids.notes, ids.deploys]);
+            expect(prompts.map((prompt) => prompt.threadTitle)).toEqual(["Notes", "Release"]);
+            expect(prompts[0]?.text).toBe("deploy to production");
+            expect(prompts.map((prompt) => prompt.messageId)).not.toContain(ids.reply);
+            expect(prompts.map((prompt) => prompt.messageId)).not.toContain(ids.other);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("leaves out a locked thread's prompt", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const ids = await harness.run(async (context: any) => {
+                const open = await insertThread(context, { title: "Open", userId: OWNER });
+                const locked = await insertThread(context, { lockedAt: 2, title: "Locked chat", userId: OWNER });
+
+                const shown = await insertMessage(context, {
+                    createdAt: 100,
+                    order: 0,
+                    role: "user",
+                    text: "deploy the open chat",
+                    threadId: open,
+                    userId: OWNER,
+                });
+                const hidden = await insertMessage(context, {
+                    createdAt: 200,
+                    order: 0,
+                    role: "user",
+                    text: "deploy the secret chat",
+                    threadId: locked,
+                    userId: OWNER,
+                });
+
+                return { hidden, shown };
+            });
+
+            const prompts = await search(harness, "deploy");
+
+            expect(prompts.map((prompt) => prompt.messageId)).toEqual([ids.shown]);
+            expect(prompts.map((prompt) => prompt.messageId)).not.toContain(ids.hidden);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("returns at most 50 prompts", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                const thread = await insertThread(context, { title: "Busy", userId: OWNER });
+
+                for (let index = 0; index < 60; index += 1) {
+                    await insertMessage(context, {
+                        createdAt: index,
+                        order: index,
+                        role: "user",
+                        text: `deploy number ${index}`,
+                        threadId: thread,
+                        userId: OWNER,
+                    });
+                }
+            });
+
+            const prompts = await search(harness, "deploy");
+
+            expect(prompts).toHaveLength(50);
+            expect(prompts[0]?.text).toBe("deploy number 59");
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("answers nothing for a blank query", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                const thread = await insertThread(context, { title: "Plain", userId: OWNER });
+
+                await insertMessage(context, { createdAt: 1, order: 0, role: "user", text: "deploy", threadId: thread, userId: OWNER });
+            });
+
+            expect(await search(harness, " ".repeat(3))).toEqual([]);
+        } finally {
+            harness.close();
+        }
+    });
+});
