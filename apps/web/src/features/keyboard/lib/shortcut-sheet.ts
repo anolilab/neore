@@ -133,14 +133,14 @@ export interface ComposerSendRow {
 
 /**
  * The composer's send and new-line chords for the user's send setting, as keycaps. Cmd/Ctrl+Enter always sends, so it
- * is listed on its own unless it is already the primary chord (button mode).
+ * is listed on its own unless it is already the primary chord (button and modEnter modes).
  */
 export const composerSendRows = (behavior: SendBehavior, isMac: boolean): ComposerSendRow[] => {
     const enter = shortcutToKeys("enter", isMac);
     const shiftEnter = shortcutToKeys("shift+enter", isMac);
     const modifiedEnter = shortcutToKeys("ctrl+enter", isMac);
 
-    if (behavior === "button") {
+    if (behavior === "button" || behavior === "modEnter") {
         return [
             { id: "sendMessage", keys: modifiedEnter },
             { id: "composerNewline", keys: enter },

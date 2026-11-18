@@ -25531,6 +25531,10 @@ msgstr "キーを押してください..."
 msgid "Press Shift+Enter to send"
 msgstr "Shift+Enter キーで送信"
 
+#: src/features/settings/components/account/account-settings.tsx:227
+msgid "Press Ctrl/Cmd+Enter to send"
+msgstr ""
+
 #: src/features/chat/thread/widgets/stock-widget.tsx:166
 msgid "Prev Close"
 msgstr "前日終値"

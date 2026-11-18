@@ -13,12 +13,18 @@ describe(resolveEnterAction, () => {
         expect(resolveEnterAction("shiftEnter", "plain")).toBe("newline");
     });
 
+    it("modEnter: Enter breaks the line, Ctrl/Cmd+Enter sends", () => {
+        expect(resolveEnterAction("modEnter", "plain")).toBe("newline");
+        expect(resolveEnterAction("modEnter", "shift")).toBe("newline");
+        expect(resolveEnterAction("modEnter", "mod")).toBe("send");
+    });
+
     it("button: both Enter chords break the line", () => {
         expect(resolveEnterAction("button", "plain")).toBe("newline");
         expect(resolveEnterAction("button", "shift")).toBe("newline");
     });
 
-    it.each(["enter", "shiftEnter", "button"] as const)("%s: Cmd/Ctrl+Enter sends", (behavior) => {
+    it.each(["enter", "shiftEnter", "modEnter", "button"] as const)("%s: Cmd/Ctrl+Enter sends", (behavior) => {
         expect(resolveEnterAction(behavior, "mod")).toBe("send");
     });
 });
@@ -27,6 +33,7 @@ describe(sendShortcutLabel, () => {
     it("names the chord, or nothing in button mode", () => {
         expect(sendShortcutLabel("enter")).toBe("Enter");
         expect(sendShortcutLabel("shiftEnter")).toBe("Shift+Enter");
+        expect(sendShortcutLabel("modEnter")).toBe("Ctrl/Cmd+Enter");
         expect(sendShortcutLabel("button")).toBeUndefined();
     });
 });

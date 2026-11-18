@@ -125,7 +125,7 @@ export const userSettingsFieldsWithoutUserId = {
             message: "Too many blocked domains",
         }),
     ), // Hostnames the web search tool never returns (subdomains too). Normalised server-side in `settingsUpsert`.
-    sendBehavior: v.optional(v.union(v.literal("enter"), v.literal("shiftEnter"), v.literal("button"))),
+    sendBehavior: v.optional(v.union(v.literal("enter"), v.literal("shiftEnter"), v.literal("modEnter"), v.literal("button"))),
     taskEmailEnabled: v.optional(v.boolean()), // Opt-in email when a task or trigger run finishes with a result. OPT-IN: absent means off.
     temporaryChatRetentionHours: v.optional(v.number()), // Default: 24 hours
     threadSummariesEnabled: v.optional(v.boolean()), // Summarise a long thread's older turns while it sits idle. OPT-IN: absent means off.

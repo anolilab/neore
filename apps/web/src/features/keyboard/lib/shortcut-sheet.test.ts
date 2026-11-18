@@ -21,6 +21,13 @@ describe("composerSendRows", () => {
         ]);
     });
 
+    it("modEnter: Ctrl+Enter sends and is the only send chord, Enter adds a line", () => {
+        expect(composerSendRows("modEnter", false)).toEqual([
+            { id: "sendMessage", keys: ["Ctrl", "Enter"] },
+            { id: "composerNewline", keys: ["Enter"] },
+        ]);
+    });
+
     it("button: only the send chord is listed once, the new line stays Enter", () => {
         expect(composerSendRows("button", false)).toEqual([
             { id: "sendMessage", keys: ["Ctrl", "Enter"] },

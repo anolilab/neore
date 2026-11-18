@@ -12978,6 +12978,10 @@
                             "type": "string"
                           },
                           {
+                            "const": "modEnter",
+                            "type": "string"
+                          },
+                          {
                             "const": "button",
                             "type": "string"
                           }
