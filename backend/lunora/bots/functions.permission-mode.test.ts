@@ -188,4 +188,20 @@ describe("setting a bot's mode", () => {
 
         expect(await modeOf("bots", botId)).toBe("full");
     });
+
+    it("to the default stores no mode, on create and on update, so the bot keeps following the default", async () => {
+        const created = (await as(OWNER).mutation(
+            createBot as never,
+            { computerEnabled: false, instructions: "x", model: DEFAULT_CHAT_MODEL, name: "n", permissionMode: "auto" } as never,
+        )) as string;
+
+        expect(await modeOf("bots", created)).toBeUndefined();
+
+        const botId = await botWith("supervised");
+
+        await as(OWNER).mutation(updateBot as never, { botId, patch: { permissionMode: "auto" } } as never);
+
+        expect(await modeOf("bots", botId)).toBeUndefined();
+        expect(await modeOf("threads", await chatWith(botId))).toBeUndefined();
+    });
 });

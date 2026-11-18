@@ -4,7 +4,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalQuery } from "../_generated/server";
-import type { ThreadPermissionMode } from "../chat/lib/thread-permission-mode";
+import { DEFAULT_THREAD_PERMISSION_MODE, type ThreadPermissionMode } from "../chat/lib/thread-permission-mode";
 import { deleteBotConnectorAccess } from "../connectors/access";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
@@ -93,12 +93,16 @@ export const createBot = authMutation
             instructions: args.instructions,
             model: args.model,
             name: args.name,
-            ...(args.permissionMode && { permissionMode: args.permissionMode }),
+            ...(args.permissionMode && args.permissionMode !== DEFAULT_THREAD_PERMISSION_MODE && { permissionMode: args.permissionMode }),
             updatedAt: now,
             userId,
         });
 
-        context.log.event("bots.create_bot", { computerEnabled: args.computerEnabled, permissionMode: args.permissionMode ?? "auto" });
+        context.log.event("bots.create_bot", {
+            botId,
+            computerEnabled: args.computerEnabled,
+            permissionMode: args.permissionMode ?? DEFAULT_THREAD_PERMISSION_MODE,
+        });
 
         return botId as string;
     });
@@ -135,13 +139,23 @@ export const updateBot = authMutation
             throw new LunoraError("INVALID_ARGUMENT", "A bot needs a name and instructions.");
         }
 
-        await patchRow(context.db, "bots", bot, withoutUndefined({ ...patch, updatedAt: context.now }));
+        const { permissionMode, ...rest } = patch;
+
+        await patchRow(context.db, "bots", bot, {
+            ...withoutUndefined({ ...rest, updatedAt: context.now }),
+            // The default is stored as no mode, as on create, so the bot keeps following the default.
+            ...(permissionMode !== undefined && { permissionMode: permissionMode === DEFAULT_THREAD_PERMISSION_MODE ? undefined : permissionMode }),
+        });
 
         context.log.event("bots.update_bot", { computerEnabled: patch.computerEnabled });
 
-        if (patch.permissionMode !== undefined && patch.permissionMode !== (bot.permissionMode ?? "auto")) {
+        if (permissionMode !== undefined && permissionMode !== (bot.permissionMode ?? DEFAULT_THREAD_PERMISSION_MODE)) {
             // Who changed which bot's default tool permissions, and from what: kept in the request log for a later investigation.
-            context.log.event("bots.bot_permission_mode_changed", { botId: bot._id, from: bot.permissionMode ?? "auto", to: patch.permissionMode });
+            context.log.event("bots.bot_permission_mode_changed", {
+                botId: bot._id,
+                from: bot.permissionMode ?? DEFAULT_THREAD_PERMISSION_MODE,
+                to: permissionMode,
+            });
         }
 
         return null;
