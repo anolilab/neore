@@ -10459,6 +10459,42 @@
           "optional": true,
           "unique": false
         },
+        "importedFrom": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"chatgpt\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"claude\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"gemini\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"other\""
+            }
+          ]
+        },
         "lastConfirmedAt": {
           "kind": "number",
           "nullable": false,
@@ -10496,6 +10532,13 @@
               "optional": false,
               "unique": false,
               "literal": "\"compressed\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"imported\""
             },
             {
               "kind": "literal",

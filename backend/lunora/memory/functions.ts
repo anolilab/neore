@@ -3,18 +3,33 @@ import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { memoryLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
 import { withoutUndefined } from "../lib/patch";
-import { lastConfirmedOf, type MemoryType } from "./taxonomy";
+import { type ImportApp, importDedupKey, IMPORT_MEMORY_OFF_MESSAGE, IMPORTED_CONFIDENCE, IMPORTED_IMPORTANCE, vImportApp } from "./import-logic";
+import { lastConfirmedOf, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { requireOwnedThread } from "../agent/thread-read-access";
 import { getVectorIdInfo, type VectorTableId, type VectorTableName } from "../agent/vector/tables";
 import { parentKeyOf } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
+
+/**
+ * Whether the user turned memory on. OPT-IN: absent means off. Memory extraction reads every
+ * conversation and derives statements about the user, so it must not start because nobody
+ * has visited the setting yet. Enabling it is a deliberate act.
+ */
+export const readMemoryEnabled = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<boolean> => {
+    const settings = await ctx.db
+        .query("userSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+
+    return settings?.memoryEnabled === true;
+};
 
 /** Most memories one user-facing read looks at. */
 const MEMORY_READ_CAP = 2000;
@@ -27,6 +42,7 @@ const toMemoryView = (m: Doc<"memories">) => {
         confidence: m.confidence ?? undefined,
         createdAt: m._creationTime,
         importance: m.importance ?? undefined,
+        importedFrom: m.importedFrom ?? undefined,
         lastConfirmedAt: lastConfirmedOf(m),
         memory: m.memory,
         pinned: m.pinned === true,
@@ -75,6 +91,7 @@ export const listUserMemories = authQuery
                 confidence: v.optional(v.number()),
                 createdAt: v.number(),
                 importance: v.optional(v.number()),
+                importedFrom: v.optional(vImportApp),
                 lastConfirmedAt: v.number(),
                 memory: v.string(),
                 pinned: v.boolean(),
@@ -419,8 +436,9 @@ const vMemoryInsertFields = {
     botId: v.optional(v.string()),
     confidence: v.optional(v.number()),
     importance: v.optional(v.number()),
+    importedFrom: v.optional(vImportApp),
     memory: v.string(),
-    source: v.optional(v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"))),
+    source: v.optional(v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"), v.literal("imported"))),
     supersedes: v.optional(v.id("memories")),
     threadId: v.optional(v.id("threads")),
     type: v.union(v.literal("identity"), v.literal("preference"), v.literal("context"), v.literal("activity"), v.literal("experience")),
@@ -431,8 +449,9 @@ type MemoryInsert = {
     botId?: string;
     confidence?: number;
     importance?: number;
+    importedFrom?: ImportApp;
     memory: string;
-    source?: "auto" | "compressed" | "manual" | "reflection";
+    source?: "auto" | "compressed" | "imported" | "manual" | "reflection";
     supersedes?: Id<"memories">;
     threadId?: Id<"threads">;
     type: MemoryType;
@@ -446,6 +465,7 @@ const insertMemory = async (ctx: Pick<MutationCtx, "db">, mem: MemoryInsert, now
         botId: mem.botId as Id<"bots"> | undefined,
         confidence: mem.confidence,
         importance: mem.importance,
+        importedFrom: mem.importedFrom,
         lastConfirmedAt: now,
         memory: mem.memory,
         source: mem.source ?? "auto",
@@ -483,6 +503,149 @@ export const saveMemoryBatch = internalMutation
         }
 
         return memoryIds;
+    });
+
+/** The user's own rows the import's last check reads: far past the action's dedup window. */
+const IMPORT_EXACT_CHECK_ROWS = 5000;
+
+/**
+ * Every write of one import, applied together after the memory setting is re-checked, so
+ * memory switched off meanwhile leaves the user's rows untouched. In order:
+ * - a planned merge (`merge`) rewords its row while that is still the user's own, active,
+ *   unpinned and unchanged since it was read; otherwise the fact is saved as new;
+ * - `confirms` are marked confirmed while they still read as the text the fact matched;
+ * - the other facts are inserted, minus any whose text the user already has (that row is
+ *   confirmed instead). It runs in the mutation because one shard's mutations run one at a
+ *   time: a second save of the same paste sees what the first wrote, and a repeat past the
+ *   action's dedup window is still found.
+ */
+export const saveImportedMemoryBatch = internalMutation
+    .input({
+        app: vImportApp,
+        confirms: v.array(v.object({ base: v.string(), memoryId: v.id("memories") })),
+        facts: v.array(
+            v.object({
+                memory: v.string(),
+                merge: v.optional(v.object({ base: v.string(), confidence: v.number(), memory: v.string(), memoryId: v.id("memories") })),
+                supersede: v.optional(v.object({ base: v.string(), memoryId: v.id("memories") })),
+                type: vMemoryType,
+            }),
+        ),
+        userId: v.string(),
+    })
+    .output(v.array(v.object({ memoryId: v.id("memories"), status: v.union(v.literal("added"), v.literal("known"), v.literal("updated")) })))
+    .mutation(async ({ args, ctx }) => {
+        const { now } = ctx;
+
+        if (!(await readMemoryEnabled(ctx, args.userId))) {
+            throw new LunoraError("FORBIDDEN", IMPORT_MEMORY_OFF_MESSAGE);
+        }
+
+        const ownActive = (row: Doc<"memories"> | null): row is Doc<"memories"> => row?.userId === args.userId && !row.botId && !row.supersededBy;
+        const outcomes: ({ memoryId: Id<"memories">; status: "added" | "known" | "updated" } | undefined)[] = args.facts.map(() => undefined);
+
+        const reembed = new Set<Id<"memories">>();
+
+        for (const [index, { merge }] of args.facts.entries()) {
+            const target = merge ? await ctx.db.get("memories", merge.memoryId) : null;
+
+            // The row must still read as the text the merge was built from: an edit or another save meanwhile is not overwritten.
+            if (merge && ownActive(target) && target.pinned !== true && target.memory === merge.base) {
+                await ctx.db.patch("memories", target._id, { confidence: merge.confidence, lastConfirmedAt: now, memory: merge.memory, updatedAt: now });
+
+                // The merged text needs its own vector, or a repeat import matches the old one and revises again.
+                // Once per row, though two facts of the paste may merge into it.
+                if (!reembed.has(target._id)) {
+                    reembed.add(target._id);
+                    await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: target._id, userId: args.userId });
+                }
+
+                outcomes[index] = { memoryId: target._id, status: "updated" };
+            }
+        }
+
+        for (const { base, memoryId } of args.confirms) {
+            const row = await ctx.db.get("memories", memoryId);
+
+            // An edit meanwhile is not confirmed by a fact that matched the old text.
+            if (ownActive(row) && row.memory === base) {
+                await ctx.db.patch("memories", memoryId, { lastConfirmedAt: now });
+            }
+        }
+
+        // Read after the merges, so the exact check sees merged texts. The user's own active rows,
+        // newest first: a bot's rows and superseded history never use up the read.
+        const { page: own } = await ctx.db.memories.findMany({
+            limit: IMPORT_EXACT_CHECK_ROWS,
+            orderBy: [{ _creationTime: "desc" }],
+            where: { botId: { isNull: true }, supersededBy: { isNull: true }, userId: args.userId },
+        });
+        const textOf = new Map(own.map((row) => [row._id, importDedupKey(row.memory)]));
+        const byText = new Map([...textOf].map(([memoryId, key]) => [key, memoryId]));
+        // A superseded row is no longer a match for a later fact of this batch.
+        const retire = (memoryId: Id<"memories"> | undefined) => {
+            const key = memoryId ? textOf.get(memoryId) : undefined;
+
+            if (key !== undefined && byText.get(key) === memoryId) {
+                byText.delete(key);
+            }
+        };
+
+        for (const [index, mem] of args.facts.entries()) {
+            const done = outcomes[index];
+
+            if (done) {
+                continue;
+            }
+
+            const key = importDedupKey(mem.memory);
+            const known = byText.get(key);
+            // The row the action planned to supersede ends only while it is still the user's own active, unpinned
+            // row with the text the decision read: another save may have ended, removed or edited it, or the user
+            // pinned it, meanwhile. Otherwise the fact is saved beside it.
+            const planned = mem.supersede ? await ctx.db.get("memories", mem.supersede.memoryId) : null;
+            const supersedes =
+                ownActive(planned) && planned.pinned !== true && planned.memory === mem.supersede?.base && planned._id !== known ? planned._id : undefined;
+
+            if (known) {
+                await ctx.db.patch("memories", known, { lastConfirmedAt: now });
+
+                if (supersedes) {
+                    await ctx.db.patch("memories", supersedes, { supersededBy: known, updatedAt: now });
+                }
+
+                outcomes[index] = { memoryId: known, status: "known" };
+            } else {
+                const memoryId = await insertMemory(
+                    ctx,
+                    {
+                        confidence: IMPORTED_CONFIDENCE,
+                        importance: IMPORTED_IMPORTANCE,
+                        importedFrom: args.app,
+                        memory: mem.memory,
+                        source: "imported",
+                        supersedes,
+                        type: mem.type,
+                        userId: args.userId,
+                    },
+                    now,
+                );
+
+                byText.set(key, memoryId);
+                outcomes[index] = { memoryId, status: "added" };
+            }
+
+            retire(supersedes);
+        }
+
+        // One outcome per fact, in order: the action pairs them with its facts by index.
+        return outcomes.map((outcome) => {
+            if (!outcome) {
+                throw new Error("[memory/import] A fact was left without an outcome");
+            }
+
+            return outcome;
+        });
     });
 
 export const updateMemoryInternal = internalMutation
@@ -634,10 +797,12 @@ export const getMemoriesByEmbeddingIds = internalQuery
                 return {
                     _creationTime: memory._creationTime,
                     _id: memory._id as string,
+                    botId: memory.botId,
                     confidence: memory.confidence,
                     embeddingId,
                     importance: memory.importance,
                     memory: memory.memory,
+                    pinned: memory.pinned === true,
                     type: memory.type,
                 };
             }),
@@ -704,17 +869,7 @@ export const recordRetrievedMemories = internalMutation
 export const isMemoryEnabled = internalQuery
     .input({ userId: v.string() })
     .output(v.boolean())
-    .query(async ({ args: { userId }, ctx }) => {
-        const settings = await ctx.db
-            .query("userSettings")
-            .withIndex("by_userId", (q) => q.eq("userId", userId))
-            .unique();
-
-        // OPT-IN. Absent means off: memory extraction reads every conversation and
-        // derives statements about the user, so it must not start because nobody
-        // has visited the setting yet. Enabling it is a deliberate act.
-        return settings?.memoryEnabled ?? false;
-    });
+    .query(async ({ args: { userId }, ctx }) => readMemoryEnabled(ctx, userId));
 
 /**
  * Whether a thread is a temporary chat. Temporary chats are meant to leave no

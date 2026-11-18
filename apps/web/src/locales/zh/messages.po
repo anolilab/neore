@@ -234,6 +234,11 @@ msgstr "{0, plural, other {# 张图片}}"
 msgid "{0, plural, one {# issue found} other {# issues found}}"
 msgstr "{0, plural, other {发现 # 个问题}}"
 
+#. placeholder {0}: preview.dropped
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:257
+msgid "{0, plural, one {# line was left out as not about you or sensitive.} other {# lines were left out as not about you or sensitive.}}"
+msgstr ""
+
 #. placeholder {0}: stats.lines
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:757
 msgid "{0, plural, one {# line} other {# lines}}"
@@ -259,6 +264,11 @@ msgstr "{0, plural, other {# 条消息}}"
 #: src/features/settings/components/chat/native-providers-settings.tsx:414
 msgid "{0, plural, one {# model} other {# models}}"
 msgstr "{0, plural, other {# 个模型}}"
+
+#. placeholder {0}: preview.cut
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:264
+msgid "{0, plural, one {# more line was past the limit.} other {# more lines were past the limit.}}"
+msgstr ""
 
 #. placeholder {0}: data.omittedTargets
 #: src/features/evals/components/model-comparison.tsx:102
@@ -368,6 +378,16 @@ msgstr "{0, plural, other {# 个模型}}"
 #: src/components/model-picker/model-picker-button.tsx:160
 msgid "{0, plural, one {Comparing # model} other {Comparing # models}}"
 msgstr "{0, plural, other {正在对比 # 个模型}}"
+
+#. placeholder {0}: kept.length
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:304
+msgid "{0, plural, one {Save # memory} other {Save # memories}}"
+msgstr ""
+
+#. placeholder {0}: result.added
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:117
+msgid "{0, plural, one {Saved # new memory} other {Saved # new memories}}"
+msgstr ""
 
 #. placeholder {0}: results.length - MAX_VISIBLE
 #: src/features/chat/thread/widgets/image-search-gallery.tsx:89
@@ -545,7 +565,7 @@ msgid "{0} lines"
 msgstr "{0} 行"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:175
+#: src/features/settings/components/personalization/memory-settings.tsx:182
 msgid "{0} memories"
 msgstr "{0} 条记忆"
 
@@ -642,7 +662,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0}，位于 {1}，目录 {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:176
+#: src/features/settings/components/personalization/memory-settings.tsx:183
 msgid "{0} pinned"
 msgstr "{0} 条已置顶"
 
@@ -1592,6 +1612,10 @@ msgstr "1:1（正方形）"
 msgid "1:1 ratio"
 msgstr "1:1 比例"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:195
+msgid "1. Which assistant?"
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:250
 msgid "10 seconds"
 msgstr "10 秒"
@@ -1623,6 +1647,10 @@ msgstr "16:9 比例"
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:56
 msgid "1970s glass, dreamlike"
 msgstr "1970 年代镜头，梦幻感"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:219
+msgid "2. Send it this prompt"
+msgstr ""
 
 #: src/features/marketing/components/landing-page.tsx:979
 msgid "20 free messages a day to start. No credit card required. Upgrade when you're ready, cancel anytime."
@@ -1676,6 +1704,10 @@ msgstr "2 倍压缩，蓝色光晕"
 msgid "3:4"
 msgstr "3:4"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:227
+msgid "3. Paste its answer"
+msgstr ""
+
 #: src/features/admin/components/ban-user-dialog.tsx:31
 msgid "30 days"
 msgstr "30 天"
@@ -1711,6 +1743,10 @@ msgstr "3D 深度估计"
 #: src/features/workflow/components/nodes/video-node.tsx:28
 msgid "4:3"
 msgstr "4:3"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:252
+msgid "4. Choose what to keep"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:1449
 msgid "400B parameter MoE with 13B active per token"
@@ -2464,12 +2500,12 @@ msgstr "将选取的帧添加为图片节点"
 
 #: src/features/chat/thread-list/thread-list-header.tsx:126
 #: src/features/chat/thread-list/thread-list-header.tsx:136
-#: src/features/projects/components/add-project-dialog.tsx:687
+#: src/features/projects/components/add-project-dialog.tsx:691
 msgid "Add project"
 msgstr ""
 
 #. placeholder {0}: rowName(machine)
-#: src/features/projects/components/add-project-dialog.tsx:510
+#: src/features/projects/components/add-project-dialog.tsx:514
 msgid "Add project on {0}"
 msgstr ""
 
@@ -2646,7 +2682,7 @@ msgstr "新增："
 msgid "Adding documents… {0} of {1}"
 msgstr "正在添加文档… {0} / {1}"
 
-#: src/features/projects/components/add-project-dialog.tsx:521
+#: src/features/projects/components/add-project-dialog.tsx:525
 msgid "Adding the project…"
 msgstr ""
 
@@ -2659,7 +2695,7 @@ msgid "Adding your earlier replies…"
 msgstr "正在添加你之前的回复…"
 
 #: src/features/chat/aside/aside-panel.tsx:168
-#: src/features/projects/components/add-project-dialog.tsx:687
+#: src/features/projects/components/add-project-dialog.tsx:691
 msgid "Adding…"
 msgstr "正在添加…"
 
@@ -3195,7 +3231,7 @@ msgid "All"
 msgstr "全部"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:197
+#: src/features/settings/components/personalization/memory-settings.tsx:204
 msgid "All ({0})"
 msgstr "全部（{0}）"
 
@@ -3632,6 +3668,10 @@ msgstr "不活跃超过此天数的匿名用户将可被删除。"
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:343
 msgid "Another action already uses this key combination. Change or clear one of them to save."
 msgstr "另一个操作已使用此组合键。请更改或清除其中一个后再保存。"
+
+#: src/features/settings/components/personalization/memory-import-apps.ts:14
+msgid "Another assistant"
+msgstr ""
 
 #: src/features/evals/components/run-detail.tsx:51
 msgid "Answer"
@@ -4201,6 +4241,10 @@ msgstr "问我任何问题..."
 msgid "Ask something without interrupting the reply. The question and the answer stay here unless you add them to the thread."
 msgstr "在不打断回复的情况下提问。除非你将其添加到对话，否则问题和回答只保留在此处。"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:180
+msgid "Ask your other assistant to list what it remembers, paste its answer, and choose which facts to keep. The pasted text is only read as a list of facts."
+msgstr ""
+
 #: src/features/chat/thread/composer-image-settings.tsx:152
 #: src/features/chat/thread/composer-video-settings.tsx:108
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:128
@@ -4620,7 +4664,8 @@ msgstr "Azure 门户 → 你的 OpenAI 资源 → 密钥和终结点。加密存
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:394
 #: src/features/pages/components/page-version-panel.tsx:89
-#: src/features/projects/components/add-project-dialog.tsx:684
+#: src/features/projects/components/add-project-dialog.tsx:688
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:301
 msgid "Back"
 msgstr "返回"
 
@@ -5224,6 +5269,11 @@ msgstr "亮度"
 msgid "Bring Forward"
 msgstr "上移一层"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:175
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:179
+msgid "Bring in what another AI knows about you"
+msgstr ""
+
 #: src/features/marketing/components/tutorials-page.tsx:117
 msgid "Bring your own API keys for AI providers and tools. Manage encrypted keys in settings."
 msgstr "为 AI 提供商和工具使用你自己的 API 密钥，在设置中管理加密的密钥。"
@@ -5646,7 +5696,7 @@ msgstr "加拿大"
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
-#: src/features/projects/components/add-project-dialog.tsx:678
+#: src/features/projects/components/add-project-dialog.tsx:682
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:395
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
@@ -5662,8 +5712,8 @@ msgstr "加拿大"
 #: src/features/settings/components/chat/usage-settings.tsx:573
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
-#: src/features/settings/components/personalization/memory-item.tsx:141
-#: src/features/settings/components/personalization/memory-settings.tsx:246
+#: src/features/settings/components/personalization/memory-item.tsx:147
+#: src/features/settings/components/personalization/memory-settings.tsx:253
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6317,7 +6367,7 @@ msgstr "选择搜索模式"
 msgid "Choose the camera system for your shot"
 msgstr "为你的镜头选择相机系统"
 
-#: src/features/projects/components/add-project-dialog.tsx:513
+#: src/features/projects/components/add-project-dialog.tsx:517
 msgid "Choose the project's folder, or type a path."
 msgstr ""
 
@@ -6494,11 +6544,11 @@ msgstr "全部清除"
 msgid "Clear All"
 msgstr "全部清除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:236
+#: src/features/settings/components/personalization/memory-settings.tsx:243
 msgid "Clear All Memories"
 msgstr "清除所有记忆"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:240
+#: src/features/settings/components/personalization/memory-settings.tsx:247
 msgid "Clear all memories?"
 msgstr "清除所有记忆？"
 
@@ -6545,7 +6595,7 @@ msgstr "清除标签筛选"
 msgid "Clear the queue"
 msgstr "清空队列"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:132
+#: src/features/settings/components/personalization/memory-settings.tsx:133
 msgid "Cleared {count} memories"
 msgstr "已清除 {count} 条记忆"
 
@@ -6631,7 +6681,7 @@ msgstr "剪贴板"
 msgid "clock"
 msgstr "时钟"
 
-#: src/features/projects/components/add-project-dialog.tsx:675
+#: src/features/projects/components/add-project-dialog.tsx:679
 msgid "Clone or create new…"
 msgstr ""
 
@@ -7702,7 +7752,7 @@ msgstr "已连接到 {0}"
 msgid "Connected. You can close this window."
 msgstr "已连接。你可以关闭此窗口。"
 
-#: src/features/projects/components/add-project-dialog.tsx:518
+#: src/features/projects/components/add-project-dialog.tsx:522
 msgid "Connecting {pairingHost}…"
 msgstr ""
 
@@ -8205,6 +8255,10 @@ msgstr "复制消息"
 msgid "Copy object"
 msgstr "复制对象"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:223
+msgid "Copy prompt"
+msgstr ""
+
 #: src/features/prompts/components/prompt-item.tsx:240
 #: src/features/prompts/components/prompt-item.tsx:266
 msgid "Copy Prompt"
@@ -8463,6 +8517,10 @@ msgstr "无法自动复制。邀请链接：{inviteLink}"
 msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr "无法自动复制。公开链接：{publicLink}"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:132
+msgid "Could not copy the prompt"
+msgstr ""
+
 #: src/features/chat/thread/copy-prompt-link-action.tsx:69
 msgid "Could not copy the prompt link. Your browser did not allow access to the clipboard."
 msgstr "无法复制提示词链接。你的浏览器不允许访问剪贴板。"
@@ -8677,6 +8735,10 @@ msgstr "无法读取该聊天"
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:85
+msgid "Could not read the pasted list"
+msgstr ""
+
 #: src/features/onboarding/components/setup-checklist.tsx:216
 msgid "Could not read your devices, so the steps cannot be checked yet. The links still work."
 msgstr ""
@@ -8730,6 +8792,10 @@ msgstr "无法保存每日简报设置。"
 #: src/features/notifications/components/notification-settings.tsx:103
 msgid "Could not save the email setting."
 msgstr "无法保存邮件设置。"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:114
+msgid "Could not save the memories"
+msgstr ""
 
 #: src/components/model-picker/model-picker.tsx:1036
 msgid "Could not save the new order for {label}"
@@ -9994,7 +10060,7 @@ msgstr "删除账号"
 msgid "Delete alert \"{ruleName}\""
 msgstr "删除提醒“{ruleName}”"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:247
+#: src/features/settings/components/personalization/memory-settings.tsx:254
 msgid "Delete All"
 msgstr "全部删除"
 
@@ -10051,7 +10117,7 @@ msgstr "删除分组及其子节点"
 msgid "Delete Logo"
 msgstr "删除徽标"
 
-#: src/features/settings/components/personalization/memory-item.tsx:117
+#: src/features/settings/components/personalization/memory-item.tsx:123
 msgid "Delete memory"
 msgstr "删除记忆"
 
@@ -11480,7 +11546,7 @@ msgstr "编辑 MCP 服务器"
 msgid "Edit me"
 msgstr "编辑我"
 
-#: src/features/settings/components/personalization/memory-item.tsx:113
+#: src/features/settings/components/personalization/memory-item.tsx:119
 msgid "Edit memory"
 msgstr "编辑记忆"
 
@@ -11877,7 +11943,7 @@ msgstr "启用后续建议"
 msgid "Enable for Next Chat"
 msgstr "为下一个聊天启用"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:163
+#: src/features/settings/components/personalization/memory-settings.tsx:167
 msgid "Enable memory"
 msgstr "启用记忆"
 
@@ -13069,6 +13135,10 @@ msgstr "事实核查"
 msgid "Fact check: Does sugar cause hyperactivity in children?"
 msgstr "事实核查：糖会导致儿童多动吗？"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:270
+msgid "Facts to save"
+msgstr ""
+
 #: src/features/evals/components/model-comparison.tsx:90
 #: src/features/evals/components/run-detail.tsx:39
 msgid "Fail"
@@ -13154,7 +13224,7 @@ msgstr "更改标签颜色失败"
 msgid "Failed to clear filter rules"
 msgstr "清除筛选规则失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:128
+#: src/features/settings/components/personalization/memory-settings.tsx:129
 msgid "Failed to clear memories"
 msgstr "清除记忆失败"
 
@@ -13247,7 +13317,7 @@ msgstr "删除文件失败，请重试。"
 msgid "Failed to delete files"
 msgstr "删除文件失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:100
+#: src/features/settings/components/personalization/memory-settings.tsx:101
 msgid "Failed to delete memory"
 msgstr "删除记忆失败"
 
@@ -13761,8 +13831,8 @@ msgstr "更新键盘快捷键失败"
 msgid "Failed to update MCP server"
 msgstr "更新 MCP 服务器失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:111
-#: src/features/settings/components/personalization/memory-settings.tsx:119
+#: src/features/settings/components/personalization/memory-settings.tsx:112
+#: src/features/settings/components/personalization/memory-settings.tsx:120
 msgid "Failed to update memory"
 msgstr "更新记忆失败"
 
@@ -13790,7 +13860,7 @@ msgstr "无法更新拉取请求设置"
 msgid "Failed to update reply tools"
 msgstr "无法更新回复工具"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:145
+#: src/features/settings/components/personalization/memory-settings.tsx:144
 msgid "Failed to update setting"
 msgstr "更新设置失败"
 
@@ -14450,7 +14520,7 @@ msgstr "按类型筛选"
 msgid "Filter condition"
 msgstr "筛选条件"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:183
+#: src/features/settings/components/personalization/memory-settings.tsx:190
 msgid "Filter memories by type"
 msgstr "按类型筛选记忆"
 
@@ -14654,11 +14724,11 @@ msgstr "聚焦聊天：{title}"
 msgid "Focus Search"
 msgstr "聚焦搜索"
 
-#: src/features/projects/components/add-project-dialog.tsx:600
+#: src/features/projects/components/add-project-dialog.tsx:604
 msgid "Folder path"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:619
+#: src/features/projects/components/add-project-dialog.tsx:623
 msgid "Folders"
 msgstr ""
 
@@ -15663,7 +15733,7 @@ msgstr "前往文件库"
 msgid "Go to your pages"
 msgstr "前往你的页面"
 
-#: src/features/projects/components/add-project-dialog.tsx:623
+#: src/features/projects/components/add-project-dialog.tsx:627
 msgid "Go up to {parent}"
 msgstr ""
 
@@ -17091,6 +17161,10 @@ msgstr "已导入 {added} 个 Notion 页面。"
 msgid "Imported as /{0}."
 msgstr "已导入为 /{0}。"
 
+#: src/features/settings/components/personalization/memory-item.tsx:96
+msgid "Imported from {importedFromLabel}"
+msgstr ""
+
 #. placeholder {0}: result.slug
 #: src/features/skills/components/skill-import-dialog.tsx:147
 msgid "Imported skill \"{0}\""
@@ -18277,7 +18351,7 @@ msgid "Last activity {lastActivityAgo}"
 msgstr "最近活动 {lastActivityAgo}"
 
 #. placeholder {0}: relativeTime(memory.lastConfirmedAt)
-#: src/features/settings/components/personalization/memory-item.tsx:90
+#: src/features/settings/components/personalization/memory-item.tsx:95
 msgid "Last confirmed {0}"
 msgstr "上次确认于 {0}"
 
@@ -18841,6 +18915,10 @@ msgstr "列表"
 msgid "List all available models and pricing"
 msgstr "列出所有可用模型及价格"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:80
+msgid "List everything you remember about me from our past conversations and your saved memory. Write one fact per line, in the third person, starting with \"The user\" (for example: \"The user works as a nurse in Hamburg.\"). Where you know when you learned a fact, add the date in brackets at the end of its line. Leave out passwords, keys, account numbers and health details. Write no introduction, headings or comments."
+msgstr ""
+
 #: src/features/prompts/components/prompt-list.tsx:560
 msgid "List view"
 msgstr "列表视图"
@@ -19034,7 +19112,7 @@ msgstr "正在加载文件"
 msgid "Loading files…"
 msgstr "正在加载文件…"
 
-#: src/features/projects/components/add-project-dialog.tsx:519
+#: src/features/projects/components/add-project-dialog.tsx:523
 msgid "Loading folders…"
 msgstr ""
 
@@ -19428,7 +19506,7 @@ msgstr "LINE 频道 Messaging API 标签页中的长期 channel access token"
 msgid "Longest the answer may take, in milliseconds"
 msgstr "答案允许的最长耗时，单位为毫秒"
 
-#: src/features/projects/components/add-project-dialog.tsx:534
+#: src/features/projects/components/add-project-dialog.tsx:538
 msgid "Looking for machines…"
 msgstr ""
 
@@ -19515,7 +19593,7 @@ msgstr "Mach-O 二进制文件"
 msgid "Machine"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:538
+#: src/features/projects/components/add-project-dialog.tsx:542
 msgid "Machines"
 msgstr ""
 
@@ -20040,7 +20118,7 @@ msgid "memories"
 msgstr "记忆"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:209
+#: src/features/settings/components/personalization/memory-settings.tsx:216
 msgid "Memories"
 msgstr "记忆"
 
@@ -20058,7 +20136,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "此回复使用的记忆（{0}）"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:156
+#: src/features/settings/components/personalization/memory-settings.tsx:160
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "记忆"
@@ -20067,15 +20145,15 @@ msgstr "记忆"
 msgid "Memory — what the agent keeps across chats"
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-settings.tsx:104
+#: src/features/settings/components/personalization/memory-settings.tsx:105
 msgid "Memory deleted"
 msgstr "记忆已删除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:138
+#: src/features/settings/components/personalization/memory-settings.tsx:142
 msgid "Memory disabled"
 msgstr "记忆已关闭"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:138
+#: src/features/settings/components/personalization/memory-settings.tsx:142
 msgid "Memory enabled"
 msgstr "记忆已开启"
 
@@ -20087,7 +20165,11 @@ msgstr ""
 msgid "Memory is off until you turn it on. Temporary chats and locked chats are never mined for memories."
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-item.tsx:125
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:185
+msgid "Memory is off. Turn it on to bring in memories; nothing is saved while it is off."
+msgstr ""
+
+#: src/features/settings/components/personalization/memory-item.tsx:131
 msgid "Memory text"
 msgstr "记忆内容"
 
@@ -20095,7 +20177,7 @@ msgstr "记忆内容"
 msgid "Memory the agent keeps across chats"
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-item.tsx:79
+#: src/features/settings/components/personalization/memory-item.tsx:84
 msgid "Memory type"
 msgstr "记忆类型"
 
@@ -21999,6 +22081,10 @@ msgstr "尚无执行记录"
 msgid "No expiration"
 msgstr "不过期"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:268
+msgid "No facts found in the pasted text."
+msgstr ""
+
 #: src/features/develop/components/checks-tab.tsx:138
 msgid "No failures in the checks shown."
 msgstr "所显示的检查中没有失败项。"
@@ -22027,7 +22113,7 @@ msgstr "你的知识库中还没有文件。在上方上传文档即可开始。
 msgid "No focal length selected"
 msgstr "未选择焦距"
 
-#: src/features/projects/components/add-project-dialog.tsx:655
+#: src/features/projects/components/add-project-dialog.tsx:659
 msgid "No folders in here."
 msgstr ""
 
@@ -22102,11 +22188,11 @@ msgstr "未配置 MCP 服务器。添加服务器以扩展 AI 能力。"
 msgid "No members in this team yet"
 msgstr "此团队还没有成员"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:225
+#: src/features/settings/components/personalization/memory-settings.tsx:232
 msgid "No memories of this type."
 msgstr "没有此类型的记忆。"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:226
+#: src/features/settings/components/personalization/memory-settings.tsx:233
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "还没有记忆。AI 会自动从你的对话中开始学习。"
 
@@ -24861,7 +24947,7 @@ msgstr "从收件箱中选择一项进行阅读。"
 msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
 msgstr "选择要作为一个 Markdown 文件分享的技能、计划任务、webhook 和群聊。API 密钥、webhook 密钥、连接器令牌和其他凭据绝不会包含在内，你的账号或组织 ID 也不会。"
 
-#: src/features/projects/components/add-project-dialog.tsx:513
+#: src/features/projects/components/add-project-dialog.tsx:517
 msgid "Pick the computer or server the project's folder is on."
 msgstr ""
 
@@ -24912,7 +24998,7 @@ msgstr "置顶"
 msgid "Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own."
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-item.tsx:103
+#: src/features/settings/components/personalization/memory-item.tsx:109
 msgid "Pin memory"
 msgstr "置顶记忆"
 
@@ -25405,7 +25491,7 @@ msgstr "按回车键或空格键选择节点。然后可使用方向键移动节
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr "按回车键或空格键选择连线。然后可按 Delete 键删除，或按 Esc 键取消。"
 
-#: src/features/projects/components/add-project-dialog.tsx:616
+#: src/features/projects/components/add-project-dialog.tsx:620
 msgid "Press Enter to open the folder. A folder that does not exist is created."
 msgstr ""
 
@@ -25446,6 +25532,7 @@ msgstr "预览版"
 #: src/features/canvas/canvas-panel.tsx:767
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:790
 #: src/features/prompts/components/variable-fill-dialog.tsx:174
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:309
 #: src/features/workflow/components/canvas/workflow-controls.tsx:633
 #: src/features/workflow/components/nodes/image-node.tsx:76
 msgid "Preview"
@@ -25909,6 +25996,10 @@ msgstr "提示词遵循度"
 #: src/features/marketing/components/gateway-landing-page.tsx:101
 msgid "Prompt cache management"
 msgstr "提示词缓存管理"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:130
+msgid "Prompt copied"
+msgstr ""
 
 #: src/features/prompts/components/prompt-item.tsx:62
 #: src/features/prompts/components/prompt-list-view.tsx:44
@@ -26521,6 +26612,10 @@ msgstr "正在读取“{attachmentName}”…"
 #: src/features/develop/components/guide-view.tsx:53
 msgid "Reading order"
 msgstr "阅读顺序"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:309
+msgid "Reading…"
+msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:237
 msgid "Ready"
@@ -28513,7 +28608,7 @@ msgstr "沙特阿拉伯"
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:641
 #: src/features/settings/components/chat/native-providers-settings.tsx:712
-#: src/features/settings/components/personalization/memory-item.tsx:145
+#: src/features/settings/components/personalization/memory-item.tsx:151
 #: src/features/slides/components/slide-editor-dialog.tsx:118
 #: src/features/workflow/components/canvas/workflow-controls.tsx:401
 msgid "Save"
@@ -29957,7 +30052,7 @@ msgstr "收起"
 msgid "Show more"
 msgstr "展开"
 
-#: src/features/projects/components/add-project-dialog.tsx:665
+#: src/features/projects/components/add-project-dialog.tsx:669
 msgid "Show more folders"
 msgstr ""
 
@@ -30746,7 +30841,7 @@ msgstr "来源 {index}"
 msgid "Source {position}: {0}, passage {1}"
 msgstr "来源 {position}：{0}，段落 {1}"
 
-#: src/features/settings/components/personalization/memory-item.tsx:97
+#: src/features/settings/components/personalization/memory-item.tsx:103
 msgid "Source chat"
 msgstr "来源聊天"
 
@@ -31009,7 +31104,7 @@ msgstr ""
 msgid "SSH · {0} · not connected yet"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:577
+#: src/features/projects/components/add-project-dialog.tsx:581
 msgid "SSH hosts come from ~/.ssh/config. Picking one connects it."
 msgstr ""
 
@@ -33102,7 +33197,7 @@ msgstr ""
 msgid "The agent's tool calls"
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-settings.tsx:155
+#: src/features/settings/components/personalization/memory-settings.tsx:159
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "AI 会从你的对话中学习以个性化回复，并在每晚反思所学内容。它记住的一切都列在这里——你可以编辑、修改类型、置顶或删除其中任何一条。"
 
@@ -34282,6 +34377,10 @@ msgstr "这已经在对话中了。"
 msgid "This is how your organization appears to members"
 msgstr "这是你的组织向成员显示的名称"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:242
+msgid "This is longer than {maxPasteChars} characters. Paste it in parts and bring in each one."
+msgstr ""
+
 #: src/features/projects/components/project-repositories.tsx:180
 msgid "This is not a valid branch name."
 msgstr "这不是有效的分支名称。"
@@ -34319,7 +34418,7 @@ msgstr "此链接不完整。请索取完整链接。"
 msgid "This link is not taking messages right now. Try again later."
 msgstr "此链接目前不接收消息。请稍后再试。"
 
-#: src/features/projects/components/add-project-dialog.tsx:432
+#: src/features/projects/components/add-project-dialog.tsx:436
 msgid "This machine is not ready yet."
 msgstr ""
 
@@ -34601,7 +34700,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "这将永久删除 {0} 个匿名用户账号及其所有数据。此操作无法撤销。"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:242
+#: src/features/settings/components/personalization/memory-settings.tsx:249
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "这将永久删除全部 {0} 条记忆及其每日摘要。AI 将从你的下一次对话开始重新学习。"
 
@@ -35515,6 +35614,10 @@ msgstr "要关闭自动合并吗？"
 #~ msgid "Turn on Daily Brief"
 #~ msgstr "开启每日简报"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:187
+msgid "Turn on memory"
+msgstr ""
+
 #: src/features/chat/goal/composer-goal.tsx:62
 #~ msgid "Turn on run until done"
 #~ msgstr ""
@@ -35918,7 +36021,7 @@ msgstr "取消固定到左侧"
 msgid "Unpin from right"
 msgstr "取消固定到右侧"
 
-#: src/features/settings/components/personalization/memory-item.tsx:103
+#: src/features/settings/components/personalization/memory-item.tsx:109
 msgid "Unpin memory"
 msgstr "取消置顶记忆"
 
@@ -36125,6 +36228,12 @@ msgstr "已更新第 {slideNumber} 张幻灯片"
 #: src/lib/model-descriptions.ts:239
 msgid "Updated vision model from Z.AI"
 msgstr "Z.AI 更新的视觉模型"
+
+#. placeholder {0}: result.updated
+#. placeholder {1}: result.alreadyKnown
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:118
+msgid "Updated: {0} · Already known: {1}"
+msgstr ""
 
 #: src/features/chat/thread/widgets/currency-widget.tsx:120
 msgid "Updated: {timestamp}"
@@ -37849,7 +37958,7 @@ msgstr "助手应在什么时候使用此技能？"
 msgid "Where each run goes"
 msgstr "每次运行的去向"
 
-#: src/features/projects/components/add-project-dialog.tsx:510
+#: src/features/projects/components/add-project-dialog.tsx:514
 msgid "Where is the project?"
 msgstr ""
 
