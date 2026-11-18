@@ -1,5 +1,5 @@
-import { Autocomplete } from "@base-ui/react/autocomplete";
 import { useLingui } from "@lingui/react/macro";
+import { api } from "@neore/backend/api";
 import {
     Command,
     CommandCollection,
@@ -17,6 +17,7 @@ import {
     CommandShortcut,
 } from "@neore/ui/components/command";
 import { Kbd, KbdGroup } from "@neore/ui/components/kbd";
+import { Toggle } from "@neore/ui/components/toggle";
 import useIsHydrated from "@neore/ui/hooks/use-hydrated";
 import { formatShortcutForDisplay } from "@neore/ui/utils/keyboard-shortcuts";
 import { skipToken, useQuery } from "@tanstack/react-query";
@@ -30,12 +31,14 @@ import {
     CornerDownRightIcon,
     File,
     FileText,
+    Folder,
     GitBranch,
     Hourglass,
     MessageSquare,
     Pin,
     PinOff,
     Settings,
+    Sparkles,
     Trash2,
 } from "lucide-react";
 import type { FC } from "react";
@@ -56,11 +59,14 @@ import { compareByStateRank, parseStateQuery } from "@/features/chat/thread-list
 import { buildMatchSnippet } from "@/features/chat/thread-list/utilities";
 import convertShortcutToHotkeysHook from "@/features/keyboard/lib/shortcut-converter";
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
+import { useProjectList } from "@/features/projects/hooks/use-projects";
 import useDebouncedValue from "@/hooks/use-debounced-value";
-import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
+import { useAction, useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
 import { useCommandDialogActions, useCommandDialogState, useCommandDialogStore } from "./command-dialog-store";
+import type { PaletteScope } from "./command-palette-scope";
+import { isPaletteScoped, matchesWithinWords, NO_PALETTE_SCOPE, projectRowsVisible, threadRowVisible, unscopedRowsVisible } from "./command-palette-scope";
 
 ("use client");
 
@@ -68,6 +74,9 @@ import { useCommandDialogActions, useCommandDialogState, useCommandDialogStore }
 const MESSAGE_SEARCH_MIN_CHARS = 2;
 const MESSAGE_SEARCH_DEBOUNCE_MS = 250;
 const MAX_MESSAGE_HITS = 8;
+/** The meaning search embeds the query, so it waits for a few characters, as the backend does (`agent/thread-search-plan.ts`). */
+const MEANING_SEARCH_MIN_CHARS = 3;
+const MAX_MEANING_HITS = 10;
 /** The longest delay setTimeout accepts; a timer capped by it re-arms when it fires (the effect reads `now`). */
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
@@ -114,6 +123,7 @@ interface Item {
     detail?: string;
     icon?: React.ReactNode;
     isCurrent?: boolean;
+    isMeaningHit?: boolean;
     isMessageHit?: boolean;
     label: string;
     onClick?: () => void;
@@ -131,8 +141,15 @@ interface Group {
 interface ThreadItem {
     id: string;
     isPinned?: boolean;
+    projectId?: string;
     state: ThreadState;
     status: "active" | "archived";
+    title: string;
+}
+
+/** A project the palette is narrowed to: its thread rows only. */
+interface ProjectFilter {
+    id: string;
     title: string;
 }
 
@@ -153,7 +170,6 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
     const currentThreadModel = useCurrentModel();
     const { isAuthenticated, isLoading: isAuthLoading } = useLunoraAuth();
     const router = useRouter();
-    const { contains } = Autocomplete.useFilter();
 
     const isAuthReady = isAuthenticated && !isAuthLoading;
     const shouldQuery = isOpen && isAuthReady;
@@ -164,9 +180,14 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
 
     // The palette's input is uncontrolled; mirror it so message search can follow it.
     const [searchInput, setSearchInput] = useState("");
+    // The filters and the project the palette is narrowed to. Each closes with the palette.
+    const [scope, setScope] = useState<PaletteScope>(NO_PALETTE_SCOPE);
+    const [projectFilter, setProjectFilter] = useState<ProjectFilter | undefined>(undefined);
 
-    if (!isOpen && searchInput !== "") {
+    if (!isOpen && (searchInput !== "" || isPaletteScoped(scope) || projectFilter !== undefined)) {
         setSearchInput("");
+        setScope(NO_PALETTE_SCOPE);
+        setProjectFilter(undefined);
     }
 
     // Message search is a full-text query: it waits for the palette to be open, for
@@ -182,6 +203,25 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             isMessageSearchCurrent ? { paginationOpts: THREAD_LIST_PAGINATION_OPTS, searchQuery: debouncedSearch } : skipToken,
         ),
     );
+
+    // Search by meaning embeds the query on the server, so it waits as message search does. Its hits are threads, so it is not
+    // asked for while the palette is narrowed to a project or to project rows.
+    const searchMeaning = useAction(api.agent.thread_search.searchThreadsByMeaning);
+    const showsThreadRows = !isPaletteScoped(scope) || scope.threads || scope.archived;
+    const isMeaningSearchCurrent =
+        shouldQuery &&
+        !isStateTagged &&
+        showsThreadRows &&
+        projectFilter === undefined &&
+        trimmedSearch.length >= MEANING_SEARCH_MIN_CHARS &&
+        trimmedSearch === debouncedSearch;
+    const { data: meaningHits } = useQuery({
+        // The hits are a user's own thread titles: they are not kept once the palette closes.
+        gcTime: 0,
+        queryFn: isMeaningSearchCurrent ? () => searchMeaning({ query: debouncedSearch }) : skipToken,
+        queryKey: ["command-palette", "meaning", debouncedSearch],
+    });
+    const { projects } = useProjectList(shouldQuery);
 
     const setLoadingStates = () => {};
     const { handleCreateBranch, handlePinThread, handleUnpinThread, updateThread } = useThreadHandlers(setLoadingStates);
@@ -249,6 +289,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                 threads.push({
                     id: threadId,
                     isPinned: pinnedThreadIds.has(threadId),
+                    projectId: (thread as { projectId?: string }).projectId,
                     state: threadStateOf(
                         {
                             awaitingInput: row.awaitingInput,
@@ -418,6 +459,8 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
 
     const groupedItems = (() => {
         const groups: Group[] = [];
+        // A filter narrows the palette to its kinds: navigation, actions and message hits show only without one.
+        const unscopedRows = unscopedRowsVisible(scope) && projectFilter === undefined;
 
         const navigationItems: Item[] = [
             {
@@ -446,7 +489,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             },
         ];
 
-        if (navigationItems.length > 0) {
+        if (unscopedRows && navigationItems.length > 0) {
             groups.push({ items: navigationItems, value: t`Navigation` });
         }
 
@@ -504,11 +547,35 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             }
         }
 
-        groups.push({ items: threadActions, value: t`Thread Actions` });
+        if (unscopedRows) {
+            groups.push({ items: threadActions, value: t`Thread Actions` });
+        }
+
+        // The thread rows the filters and the project let through; a row is listed only when its title matches the typed text.
+        const shownThreads = visibleThreads.filter(
+            (candidate) => threadRowVisible(scope, candidate.status) && (projectFilter === undefined || candidate.projectId === projectFilter.id),
+        );
+
+        if (projectRowsVisible(scope) && projectFilter === undefined && projects.length > 0) {
+            groups.push({
+                items: projects.map((project) => {
+                    return {
+                        icon: <Folder aria-hidden="true" className="size-4" />,
+                        label: project.title,
+                        onClick: () => {
+                            setProjectFilter({ id: project._id, title: project.title });
+                            setScope(NO_PALETTE_SCOPE);
+                        },
+                        value: `project-${project._id}`,
+                    };
+                }),
+                value: t`Projects`,
+            });
+        }
 
         if (allThreads.length > 0) {
-            const activeThreads = visibleThreads.filter((candidate) => candidate.status === "active");
-            const archivedThreads = visibleThreads.filter((candidate) => candidate.status === "archived");
+            const activeThreads = shownThreads.filter((candidate) => candidate.status === "active");
+            const archivedThreads = shownThreads.filter((candidate) => candidate.status === "archived");
 
             if (activeThreads.length > 0) {
                 groups.push({
@@ -545,7 +612,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             }
         }
 
-        const messageHits = isMessageSearchCurrent ? collectMessageHits(messageSearchResults?.page as MessageSearchThread[] | undefined) : [];
+        const messageHits = isMessageSearchCurrent && unscopedRows ? collectMessageHits(messageSearchResults?.page as MessageSearchThread[] | undefined) : [];
 
         if (messageHits.length > 0) {
             groups.push({
@@ -560,6 +627,30 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                     };
                 }),
                 value: t`Messages`,
+            });
+        }
+
+        // Meaning hits come after the exact matches. A thread whose title already matches the typed text is listed above, not again.
+        // The hits are shown only for the query they were asked for: the debounced one may still be behind the input.
+        const exactIds = new Set(shownThreads.filter((candidate) => matchesWithinWords(candidate.title, trimmedSearch)).map((candidate) => candidate.id));
+        const meaningRows = (isMeaningSearchCurrent ? (meaningHits ?? []) : [])
+            .filter((hit) => !exactIds.has(hit.threadId) && threadRowVisible(scope, hit.archived ? "archived" : "active"))
+            .slice(0, MAX_MEANING_HITS);
+
+        if (meaningRows.length > 0) {
+            groups.push({
+                items: meaningRows.map((hit) => {
+                    return {
+                        icon: <Sparkles aria-hidden="true" className="size-4" />,
+                        isMeaningHit: true,
+                        label: hit.title ?? t`Untitled Thread`,
+                        onClick: () => handleSwitchThread(hit.threadId),
+                        status: hit.archived ? ("archived" as const) : ("active" as const),
+                        threadId: hit.threadId,
+                        value: `meaning-${hit.threadId}`,
+                    };
+                }),
+                value: t`Related threads`,
             });
         }
 
@@ -583,10 +674,11 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
 
         // With a state tag the input narrows by title only; the tag already picked the threads.
         if (state !== undefined) {
-            return text === "" || contains(candidate, text, (value) => value.label);
+            return matchesWithinWords(candidate.label, text);
         }
 
-        return candidate.isMessageHit === true || contains(candidate, query, (value) => value.label);
+        // Message and meaning hits were matched on the server, not by their label, so the typed text does not drop them.
+        return candidate.isMessageHit === true || candidate.isMeaningHit === true || matchesWithinWords(candidate.label, query);
     };
 
     const handleCommandPaletteToggle = (event: KeyboardEvent) => {
@@ -624,6 +716,22 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
             <CommandDialogPopup>
                 <Command filter={filterItem} items={groupedItems} onValueChange={setSearchInput}>
                     <CommandInput placeholder={t`Search threads, navigate, or perform actions...`} />
+                    <div aria-label={t`Filter results`} className="flex flex-wrap items-center gap-1.5 px-3 pt-2" role="group">
+                        <Toggle onPressedChange={(pressed) => setScope({ ...scope, threads: pressed })} pressed={scope.threads} size="sm" variant="outline">
+                            {t`Threads`}
+                        </Toggle>
+                        <Toggle onPressedChange={(pressed) => setScope({ ...scope, projects: pressed })} pressed={scope.projects} size="sm" variant="outline">
+                            {t`Projects`}
+                        </Toggle>
+                        <Toggle onPressedChange={(pressed) => setScope({ ...scope, archived: pressed })} pressed={scope.archived} size="sm" variant="outline">
+                            {t`Archived`}
+                        </Toggle>
+                        {projectFilter !== undefined && (
+                            <Toggle onPressedChange={() => setProjectFilter(undefined)} pressed size="sm" variant="outline">
+                                {t`Project: ${projectFilter.title}`}
+                            </Toggle>
+                        )}
+                    </div>
                     <CommandPanel>
                         {/* A state tag filters the threads loaded here, one page of them: say so when there are more, so an empty or short list is not taken as complete. */}
                         {stateFilter !== undefined && allThreadsData.hasMore && (

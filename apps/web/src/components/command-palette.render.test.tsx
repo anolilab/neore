@@ -21,6 +21,11 @@ const harness = vi.hoisted(() => {
         threads: [{ _id: "thread-1", status: "active", title: "Alpha plan" }] as Record<string, unknown>[],
         /** Whether the thread list has more pages than the palette loaded. */
         hasMore: false,
+        /** What the meaning search returns for any query; a test may replace it. */
+        meaning: [] as Record<string, unknown>[],
+        meaningArgs: [] as unknown[],
+        /** The project rows the palette lists; a test may replace them. */
+        projects: [] as { _id: string; title: string }[],
     };
 });
 
@@ -89,11 +94,24 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 
     return {
+        useAction: () => async (args: unknown) => {
+            harness.meaningArgs.push(args);
+
+            return harness.meaning;
+        },
         useCRPC: () => {
             return { chat: { functions: { getPinnedThreads: pinned, searchMessages } } };
         },
         useLunoraAuth: () => {
             return { isAuthenticated: true, isLoading: false };
+        },
+    };
+});
+
+vi.mock("@/features/projects/hooks/use-projects", () => {
+    return {
+        useProjectList: () => {
+            return { isAnswered: true, projects: harness.projects };
         },
     };
 });
@@ -384,5 +402,91 @@ describe("command palette state tags", () => {
         fireEvent.change(await openPalette(), { target: { value: "#working" } });
 
         expect(screen.queryByText(LOADED_ONLY)).toBeNull();
+    });
+});
+
+describe("command palette filters and meaning search", () => {
+    beforeEach(() => {
+        Element.prototype.getAnimations = () => [];
+        stubResizeObserver();
+        harness.meaningArgs.length = 0;
+    });
+
+    afterEach(() => {
+        act(() => {
+            useCommandDialogStore.getState().close();
+        });
+        harness.threads = [{ _id: "thread-1", status: "active", title: "Alpha plan" }];
+        harness.meaning = [];
+        harness.projects = [];
+    });
+
+    it("the archived filter limits the palette to archived threads", async () => {
+        harness.threads = [
+            { _id: "thread-a", status: "active", title: "Alpha plan" },
+            { _id: "thread-b", status: "archived", title: "Old invoice run" },
+        ];
+        renderPalette();
+        await openPalette();
+
+        expect(screen.getByText("Alpha plan")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: "Archived" }));
+
+        expect(screen.getByText("Old invoice run")).toBeTruthy();
+        expect(screen.queryByText("Alpha plan")).toBeNull();
+        expect(screen.queryByText("Go to Chat")).toBeNull();
+    });
+
+    it("finds 'PDF totals off by one' for 'the invoice bug' through the meaning search", async () => {
+        harness.threads = [];
+        harness.meaning = [{ archived: false, score: 0.82, threadId: "thread-pdf", title: "PDF totals off by one" }];
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "the invoice bug" } });
+
+        expect(await screen.findByText("PDF totals off by one", undefined, { timeout: 3000 })).toBeTruthy();
+        expect(screen.getByText("Related threads")).toBeTruthy();
+        expect(harness.meaningArgs).toContainEqual({ query: "the invoice bug" });
+    });
+
+    it("lists meaning hits after the exact title matches, and does not repeat a thread the title already matched", async () => {
+        harness.threads = [{ _id: "thread-x", status: "active", title: "Invoice export" }];
+        harness.meaning = [
+            { archived: false, score: 0.9, threadId: "thread-x", title: "Invoice export" },
+            { archived: false, score: 0.7, threadId: "thread-y", title: "PDF totals off by one" },
+        ];
+        renderPalette();
+        const input = await openPalette();
+
+        fireEvent.change(input, { target: { value: "invoice" } });
+
+        const meaningHit = await screen.findByText("PDF totals off by one", undefined, { timeout: 3000 });
+
+        expect(screen.getAllByText("Invoice export")).toHaveLength(1);
+        expect(isBefore(screen.getByText("Invoice export"), meaningHit)).toBe(true);
+    });
+
+    it("the projects filter lists project rows only, and choosing one narrows the threads to that project", async () => {
+        harness.threads = [
+            { _id: "thread-1a", projectId: "p-billing", status: "active", title: "Refund flow" },
+            { _id: "thread-2a", projectId: "p-other", status: "active", title: "Other chat" },
+        ];
+        harness.projects = [{ _id: "p-billing", title: "Billing" }];
+        renderPalette();
+        await openPalette();
+
+        fireEvent.click(screen.getByRole("button", { name: "Projects" }));
+
+        expect(screen.getByText("Billing")).toBeTruthy();
+        expect(screen.queryByText("Refund flow")).toBeNull();
+        expect(screen.queryByText("Go to Chat")).toBeNull();
+
+        fireEvent.click(screen.getByText("Billing"));
+
+        expect(screen.getByText("Refund flow")).toBeTruthy();
+        expect(screen.queryByText("Other chat")).toBeNull();
+        expect(screen.getByRole("button", { name: "Project: Billing" })).toBeTruthy();
     });
 });
