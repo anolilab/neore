@@ -17,13 +17,13 @@ import { hasClaimWithPrefix } from "../lib/claim-once";
 export const FILE_ATTACH_SCOPE = "file-attach";
 
 /** A normal attach takes well under this; a crashed one stops blocking locks after it. */
-export const FILE_ATTACH_TTL_MS = 2 * 60 * 1000;
+export const FILE_ATTACH_TTL_MS = 3 * 60 * 1000;
 
 /**
  * Time kept back from the claim's end. A save may start only inside `TTL - margin`, so it lands before the claim lapses even with
  * its own round trip and the clock skew between shards.
  */
-export const FILE_ATTACH_SAVE_MARGIN_MS = 20 * 1000;
+export const FILE_ATTACH_SAVE_MARGIN_MS = 60 * 1000;
 
 /**
  * Whether an attach that holds the claim taken at `claimedAt` may still save its message. Once it may not, a lock can commit
