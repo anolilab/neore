@@ -4517,98 +4517,9 @@ export const getCachedFollowupSuggestions = authQuery
     });
 
 /**
- * Action to generate follow-up suggestions for a thread.
- * Can be called from the frontend to get suggestions after a message.
+ * The generator is the only thing that pays for a follow-up suggestion: the run that finished a reply schedules it once, and the
+ * composer reads the cache (`getCachedFollowupSuggestions`) live. There is no client-triggered generation to race it.
  */
-export const getFollowupSuggestions = authAction
-    // An LLM call per invocation; it had no limit at all.
-    .use(rateLimit("chat/followups"))
-    .input({
-        threadId: v.id("threads"),
-        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
-    })
-    .output(v.object({ suggestions: v.array(v.string()) }))
-    .action(async ({ args: { threadId, unlockProof }, ctx: context }) => {
-        const { userId } = context.user;
-
-        const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "read", threadId, unlockProof, userId });
-
-        throwUnlessGranted(gateResult.outcome, "Access denied to this thread");
-
-        // The suggestions come from a cloud model, which a host-run thread's messages must never reach. The
-        // client asks after every reply, so this answers with none instead of an error.
-        if (gateResult.hostRun) {
-            return { suggestions: [] };
-        }
-
-        const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
-
-        const threadLanguage = threadData?.language;
-
-        const { language: userLanguage, location, timezone } = await context.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
-        const language = threadLanguage || userLanguage;
-
-        // The messages are the thread owner's, so the owner's filters pick the model, not the (possibly collaborating) caller's.
-        const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId, true);
-
-        // The model filters allow no background model: no suggestions, as for a host-run thread.
-        if (!background) {
-            return { suggestions: [] };
-        }
-
-        const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, background.billedUserId);
-
-        const messagesResult = await agent.listMessages(context, {
-            paginationOpts: { cursor: null, numItems: 10 },
-            threadId,
-            // The gate above admitted this proof: without it a locked chat has no turns to suggest from.
-            unlockProof,
-        });
-
-        // A context reset (`/clear`) ends the context follow-ups are made from: rows before it are not read.
-        const contextReset = await context.runQuery(internal.agent.context_reset_read.getContextReset, { threadId: threadId as Id<"threads"> });
-        const filteredMessageDocuments = rowsAfterContextReset(messagesResult.page || [], contextReset).filter((messageDocument) => {
-            const role = messageDocument.message?.role;
-
-            return role === "user" || role === "assistant";
-        });
-
-        // Messages are returned in descending order (newest first), so the first element is the latest
-        const lastMessageId = filteredMessageDocuments.length > 0 ? (filteredMessageDocuments[0]?._id ?? null) : null;
-
-        if (lastMessageId) {
-            const cached = await context.runQuery(internal.agent.followup_suggestions.getCachedFollowupSuggestions, {
-                threadId,
-            });
-
-            if (cached && cached.lastMessageId === lastMessageId) {
-                context.log.event("chat.get_followup_suggestions", { cacheHit: true, suggestionCount: cached.suggestions.length });
-
-                return {
-                    suggestions: cached.suggestions,
-                };
-            }
-        }
-
-        const modelMessages = docsToModelMessages(filteredMessageDocuments);
-
-        const output = await generateFollowupSuggestionsInternal(modelMessages, agent.options.languageModel as LanguageModel, language, timezone, location);
-
-        if (lastMessageId) {
-            await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, {
-                lastMessageId,
-                suggestions: output.suggestions,
-                threadId,
-            });
-        }
-
-        context.log.event("chat.get_followup_suggestions", { cacheHit: false, suggestionCount: output.suggestions.length });
-
-        return {
-            suggestions: output.suggestions,
-        };
-    });
-
 export const generateFollowupSuggestionsForThread = internalAction
     .input({
         threadId: v.string(),
@@ -4628,8 +4539,15 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
-            // Follow-ups are generated from the messages, so a locked chat gets none.
-            if (isThreadLocked(threadData)) {
+            // Follow-ups are generated from the messages, so a locked chat gets none. A host-run thread's messages must never
+            // reach a cloud model, and a guest or a user who turned the setting off costs no call.
+            if (isThreadLocked(threadData) || isHostRunThread(threadData)) {
+                return;
+            }
+
+            const gate = await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId });
+
+            if (!gate.enabled || gate.guest) {
                 return;
             }
 
@@ -4685,6 +4603,22 @@ export const generateFollowupSuggestionsForThread = internalAction
             if (cached && cached.lastMessageId === lastMessageId) {
                 chatLogger.debug(`[generateFollowupSuggestionsForThread] Already cached for this message`, { lastMessageId, threadId });
 
+                return;
+            }
+
+            // One paid call per reply: a second run of this reply, or one on a thread locked since the check above, stops here.
+            if (!(await context.runMutation(internal.agent.followup_suggestions.admitFollowupSuggestions, { lastMessageId, threadId, userId }))) {
+                return;
+            }
+
+            // A utility call: one unit of the daily Text quota, on whoever the background model bills (keyed per reply, so a retry is not charged again).
+            const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
+                kind: "Text",
+                requestId: `followup:${threadId}:${lastMessageId}`,
+                userId: background.billedUserId ?? userId,
+            });
+
+            if (!charged) {
                 return;
             }
 

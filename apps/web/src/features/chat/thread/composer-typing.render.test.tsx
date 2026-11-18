@@ -43,6 +43,7 @@ vi.mock("@/features/chat/core/context/chat-context", async () => {
 
     return {
         useChatActions: () => use(harness.ActionsContext!),
+        useChatIsRunning: () => false,
         useChatIsStreaming: () => {
             return { activeStreamId: null, gatewayUrl: null, isStreaming: false, sseStreamState: null, streamToken: null };
         },
