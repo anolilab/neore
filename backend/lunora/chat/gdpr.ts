@@ -9,13 +9,17 @@ import { dropGuestLinkRoutes } from "./lib/guest-link-store";
 import { BATCH, type BatchResult, deleteParentsWithChildren } from "../gdpr/batch";
 
 /**
- * The user's pins and tags (relationships, grants and passcodes are `agent/gdpr.ts`; goals go in batches
+ * The user's pins, follows and tags (relationships, grants and passcodes are `agent/gdpr.ts`; goals go in batches
  * with the run state, {@link erasePersistentStreamsForUser}).
  */
 export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
-    const [pins, threadTags] = await Promise.all([
+    const [pins, follows, threadTags] = await Promise.all([
         ctx.db
             .query("threadPins")
+            .withIndex("by_user_and_thread", (q) => q.eq("userId", userId))
+            .collect(),
+        ctx.db
+            .query("threadFollows")
             .withIndex("by_user_and_thread", (q) => q.eq("userId", userId))
             .collect(),
         ctx.db
@@ -24,7 +28,11 @@ export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: st
             .collect(),
     ]);
 
-    await Promise.all([...pins.map((p) => ctx.db.delete("threadPins", p._id)), ...threadTags.map((tag) => ctx.db.delete("threadTags", tag._id))]);
+    await Promise.all([
+        ...pins.map((p) => ctx.db.delete("threadPins", p._id)),
+        ...follows.map((f) => ctx.db.delete("threadFollows", f._id)),
+        ...threadTags.map((tag) => ctx.db.delete("threadTags", tag._id)),
+    ]);
 };
 
 /**

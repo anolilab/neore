@@ -9,6 +9,7 @@ export default defineModule({
         "presentationSlides",
         "presentations",
         "requestedSecrets",
+        "threadFollows",
         "threadGoals",
         "threadGuestLinks",
         "threadGuestMessages",

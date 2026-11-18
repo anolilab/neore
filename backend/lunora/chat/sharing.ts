@@ -16,6 +16,7 @@ import { toUIMessages } from "../agent/ui-messages";
 import type { MessageDoc } from "../agent/validators";
 import { vThreadDocFields } from "../agent/validators";
 import { callOnShard } from "../lib/cross-shard";
+import { deleteThreadFollowRow, ensureThreadFollowDefault, setThreadFollowState } from "./follows/functions";
 import { authAction, authMutation, authQuery, publicAction, rateLimit } from "../lib/crpc";
 import { rateLimitGuard, shareLinkBucket } from "../lib/rate-limiter";
 import { deleteShardRoute, setShardRoute, shardRouteOwner } from "../lib/shard-routes";
@@ -254,6 +255,9 @@ export const createThreadInvite = authMutation
             threadId,
         });
 
+        // Sharing makes the thread one others can post in, so the sharer follows it by default. An explicit choice is kept.
+        await ensureThreadFollowDefault(context, { now: context.now, state: "on", threadId, userId });
+
         context.log.event("chat.create_thread_invite", { expirationType, permission });
 
         return {
@@ -420,6 +424,9 @@ export const acceptThreadInvite = authMutation
             status: "accepted",
         });
 
+        // A person invited to a thread follows it from the moment they accept.
+        await setThreadFollowState(context, { now: context.now, state: "on", threadId: invite.threadId, userId });
+
         context.log.event("chat.accept_thread_invite", { alreadyHadAccess: Boolean(existingAccess), kept, permission: invite.permission });
 
         return {
@@ -466,6 +473,9 @@ export const removeThreadAccess = authMutation
                 accessId: access._id,
             });
         }
+
+        // A person who leaves the thread loses their follow row in the same mutation.
+        await deleteThreadFollowRow(context, { threadId, userId: targetUserId });
 
         context.log.event("chat.remove_thread_access", { removed: Boolean(access) });
     });

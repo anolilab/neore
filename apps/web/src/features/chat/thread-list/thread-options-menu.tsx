@@ -11,6 +11,8 @@ import { MoreHorizontal } from "lucide-react";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 import { showError, showSuccess } from "@/lib/toast";
 
+import { useThreadFollow } from "../follows/use-thread-follow";
+
 interface ThreadOptionsMenuProps {
     /** Where this copy of the menu shows: `className` for the wrapper, which is `display: contents` while it shows. */
     className?: string;
@@ -37,6 +39,8 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
         networkMode: "always",
         retry: 0,
     });
+    // The follow state is read only while the menu is open, so a list of rows opens no subscription per thread.
+    const follow = useThreadFollow(open && !isLocked ? threadId : null);
 
     // A locked row keeps only the split-view item: the server refuses its rename and its regenerate.
     if (isLocked && !onOpenInSplitView) {
@@ -90,6 +94,15 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                         >
                             {t`Regenerate title`}
                         </DropdownMenuItem>
+                    )}
+                    {!isLocked && follow.state !== undefined && follow.state !== "on" && (
+                        <DropdownMenuItem onClick={() => follow.setState("on")}>{t`Follow thread`}</DropdownMenuItem>
+                    )}
+                    {!isLocked && follow.state !== undefined && follow.state !== "off" && (
+                        <DropdownMenuItem onClick={() => follow.setState("off")}>{t`Unfollow thread`}</DropdownMenuItem>
+                    )}
+                    {!isLocked && follow.state !== undefined && follow.state !== "muted" && (
+                        <DropdownMenuItem onClick={() => follow.setState("muted")}>{t`Mute thread`}</DropdownMenuItem>
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>
