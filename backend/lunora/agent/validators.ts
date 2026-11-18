@@ -746,9 +746,12 @@ export const vThreadDocFields = {
     // Written only by `agent/thread-summaries.ts` and `agent/branches.ts` (the edit bumps the epoch).
     summaryEpoch: v.optional(v.number()),
     summaryPathTooLongAt: v.optional(v.number()),
+    // Palette-search vector ids (`agent/thread-search.ts`). Internal: `publicThread` omits them, so no response carries them.
+    summaryVectorId: v.optional(v.string()),
     // Written only by `chat/tags/functions.ts`, which checks the ids belong to
     // the caller — so it is deliberately not a create field.
     tagIds: v.optional(v.array(v.string())),
+    titleVectorId: v.optional(v.string()),
     // Written only by `sub-agents/functions.ts#setWorkerPolicy`, which checks the caller owns the thread.
     workerPolicy: v.optional(vWorkerPolicy),
 };

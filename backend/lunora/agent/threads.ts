@@ -39,7 +39,8 @@ import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source
 import { deleteThreadSummaries } from "./thread-summaries";
 
 export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
-    const result = omit(thread, ["parentThreadIds"]);
+    // The palette-search vector ids are internal (`agent/thread-search.ts`): no client reads them.
+    const result = omit(thread, ["parentThreadIds", "summaryVectorId", "titleVectorId"]);
 
     // `vThreadDoc` types `projectId` as a plain string, and `Id<"projects">` is a
     // branded `string`, so the widening needs no cast — the branch stays only to
