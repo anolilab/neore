@@ -4,6 +4,7 @@
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import MemoryImportDialog from "./memory-import-dialog";
@@ -208,6 +209,34 @@ describe("memory import dialog", () => {
         released = true;
 
         await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    it("shows no error for a preview that fails after the dialog closed", async () => {
+        expect.hasAssertions();
+
+        let closed = false;
+
+        vi.mocked(toast.error).mockClear();
+        calls.preview.mockImplementation(async () => {
+            await vi.waitUntil(() => closed);
+
+            throw new Error("model down");
+        });
+
+        openDialog(true);
+
+        fireEvent.change(await screen.findByLabelText("3. Paste its answer"), { target: { value: "The user is a nurse" } });
+        fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+        await waitFor(() => expect(calls.preview).toHaveBeenCalledOnce());
+        fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        closed = true;
+        await calls.preview.mock.results[0]?.value.catch(() => undefined);
+        await new Promise((resolve) => {
+            setTimeout(resolve, 0);
+        });
+
+        expect(toast.error).not.toHaveBeenCalled();
     });
 
     it("returns focus to the paste field on Back", async () => {

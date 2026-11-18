@@ -31,7 +31,14 @@ export const IMPORT_MAX_FACTS = 100;
 export const IMPORT_MAX_FACT_CHARS = 500;
 
 /** Shorter lines are dropped, as extraction drops short facts. */
-export const IMPORT_MIN_FACT_CHARS = 10;
+const IMPORT_MIN_FACT_CHARS = 10;
+
+/** Chinese, Japanese and Korean say a whole fact in fewer characters ("用户是一名护士。"). */
+const IMPORT_MIN_CJK_FACT_CHARS = 4;
+const CJK_RE = /[\u{3040}-\u{30FF}\u{3400}-\u{9FFF}\u{AC00}-\u{D7AF}]/u;
+
+/** Whether a line is long enough to be a fact. */
+export const isLongEnoughFact = (text: string): boolean => text.length >= (CJK_RE.test(text) ? IMPORT_MIN_CJK_FACT_CHARS : IMPORT_MIN_FACT_CHARS);
 
 export interface ImportedFact {
     memory: string;
@@ -102,7 +109,7 @@ export const splitImportedText = (text: string): { cut: number; dropped: number;
     for (const raw of text.slice(0, IMPORT_MAX_INPUT_CHARS).split(LINE_BREAK_RE)) {
         const line = cleanImportLine(raw);
 
-        if (line.length < IMPORT_MIN_FACT_CHARS || seen.has(importDedupKey(line))) {
+        if (!isLongEnoughFact(line) || seen.has(importDedupKey(line))) {
             continue;
         }
 
@@ -128,7 +135,7 @@ export const sanitizeImportedFacts = (facts: ReadonlyArray<ImportedFact>): Impor
     for (const fact of facts) {
         const memory = cleanImportLine(fact.memory);
 
-        if (memory.length >= IMPORT_MIN_FACT_CHARS && !looksSensitive(memory) && !seen.has(importDedupKey(memory)) && kept.length < IMPORT_MAX_FACTS) {
+        if (isLongEnoughFact(memory) && !looksSensitive(memory) && !seen.has(importDedupKey(memory)) && kept.length < IMPORT_MAX_FACTS) {
             seen.add(importDedupKey(memory));
             kept.push({ memory, type: fact.type });
         }

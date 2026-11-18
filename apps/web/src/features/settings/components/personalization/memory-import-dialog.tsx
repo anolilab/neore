@@ -81,9 +81,6 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
 
     const { isPending: isPreviewing, mutate: runPreview } = useMutation({
         ...useLunoraActionOptions(api.memory.import.previewMemoryImport),
-        onError: (error: Error) => {
-            toast.error(t`Could not read the pasted list`, { description: error.message });
-        },
     });
 
     // Bumped on every close: a preview that answers after the dialog closed is not shown.
@@ -95,6 +92,11 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
         runPreview(
             { text },
             {
+                onError: (error: Error) => {
+                    if (opening.current === started) {
+                        toast.error(t`Could not read the pasted list`, { description: error.message });
+                    }
+                },
                 onSuccess: (result: Preview) => {
                     if (opening.current !== started) {
                         return;

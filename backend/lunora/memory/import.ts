@@ -27,7 +27,7 @@ import {
     IMPORT_MAX_FACTS,
     IMPORT_MAX_INPUT_CHARS,
     IMPORT_MEMORY_OFF_MESSAGE,
-    IMPORT_MIN_FACT_CHARS,
+    isLongEnoughFact,
     type ImportApp,
     type ImportedFact,
     looksSensitive,
@@ -143,7 +143,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
 
                 memory = cleanImportLine(merged);
                 action =
-                    revision.action === "UPDATE" && (merged.length > IMPORT_MAX_FACT_CHARS || memory.length < IMPORT_MIN_FACT_CHARS || looksSensitive(memory))
+                    revision.action === "UPDATE" && (merged.length > IMPORT_MAX_FACT_CHARS || !isLongEnoughFact(memory) || looksSensitive(memory))
                         ? "ADD"
                         : revision.action;
             } catch (error) {

@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import { applyImportLabels, buildImportLabelPrompt, IMPORT_MAX_FACTS, looksSensitive, sanitizeImportedFacts, splitImportedText } from "./import-logic";
 
 describe(splitImportedText, () => {
+    it("keeps a short Chinese or Japanese fact that a Latin line that short would not make", () => {
+        expect(splitImportedText("用户是一名护士。\nユーザーは東京在住\nToo short").lines).toStrictEqual(["用户是一名护士。", "ユーザーは東京在住"]);
+    });
+
     it("keeps one cleaned fact per line, without wrapping, repeats or short lines", () => {
         expect.assertions(1);
 
@@ -87,6 +91,10 @@ describe(looksSensitive, () => {
 });
 
 describe(sanitizeImportedFacts, () => {
+    it("keeps a short Chinese fact on save", () => {
+        expect(sanitizeImportedFacts([{ memory: "用户是一名护士。", type: "identity" }])).toStrictEqual([{ memory: "用户是一名护士。", type: "identity" }]);
+    });
+
     it("holds facts a client sends to the preview's rules", () => {
         expect.assertions(1);
 
