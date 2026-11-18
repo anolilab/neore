@@ -73,11 +73,24 @@ describe("resolveShortcuts", () => {
         expect(keysOf("focusSearch")).toEqual(["Ctrl", "Shift", "F"]);
     });
 
+    it("lists the composer's Ctrl+R prompt search with the literal Control key", () => {
+        const keysOf = (isMac: boolean) => resolveShortcuts(defaultKeyboardShortcuts, isMac).find((item) => item.entry.id === "promptSearch")?.keys;
+
+        expect(keysOf(false)).toEqual(["Ctrl", "R"]);
+        expect(keysOf(true)).toEqual(["⌃", "R"]);
+    });
+
     it("leaves out actions that are unbound", () => {
         const resolved = resolveShortcuts(defaultKeyboardShortcuts, false);
 
         expect(resolved.some((item) => item.entry.id === "increaseEffort")).toBe(false);
         expect(resolved.some((item) => item.entry.id === "listOpen")).toBe(true);
+    });
+});
+
+describe("Ctrl+R", () => {
+    it("is not the default chord of any user-bindable action, so the composer's search keeps it", () => {
+        expect(Object.values(defaultKeyboardShortcuts)).not.toContain("ctrl+r");
     });
 });
 

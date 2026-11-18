@@ -112,6 +112,8 @@ interface ComposerInputAreaProps {
     onHistoryNavigate?: (direction: PromptHistoryDirection) => string | null;
     /** Called on paste */
     onPaste?: (event: React.ClipboardEvent) => void;
+    /** Ctrl+R prompt search, see `ComposerTiptapEditor` */
+    onPromptSearch?: () => boolean;
     /** Called when a chat is selected from the @ popup, to attach its text */
     onSelectChat?: (chat: ChatReference) => void;
     /** Called when "Upload new file" is selected from the @ popup */
@@ -170,6 +172,7 @@ const ComposerInputArea = ({
     onChange,
     onDraw,
     onHistoryNavigate,
+    onPromptSearch,
     isHistoryRecalled,
     onPaste,
     onSelectChat,
@@ -325,6 +328,7 @@ const ComposerInputArea = ({
                         onChange={onChange}
                         onHistoryNavigate={onHistoryNavigate}
                         onPaste={onPaste}
+                        onPromptSearch={onPromptSearch}
                         onSelectChat={onSelectChat}
                         onSelectFileUpload={onSelectFileUpload}
                         onSelectVaultFile={onSelectVaultFile}

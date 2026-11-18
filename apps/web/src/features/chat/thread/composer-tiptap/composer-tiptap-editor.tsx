@@ -47,6 +47,7 @@ import type { FileMentionMatch } from "./extensions/file-mention";
 import FileMention from "./extensions/file-mention";
 import GhostCompletion, { getGhostCompletion } from "./extensions/ghost-completion";
 import PromptHistoryKeys from "./extensions/prompt-history-keys";
+import PromptSearchKey from "./extensions/prompt-search-key";
 import QuoteChip, { refreshQuoteChipLabels } from "./extensions/quote-chip";
 import type { SlashCommandMatch } from "./extensions/slash-command";
 import SlashCommand from "./extensions/slash-command";
@@ -119,8 +120,15 @@ export interface ComposerTiptapEditorProps {
      * Escape). Returns the text to show, or `null` to let the key through.
      */
     onHistoryNavigate?: (direction: PromptHistoryDirection) => string | null;
+
     /** Called on paste (for file and long text handling) */
     onPaste?: (e: React.ClipboardEvent) => void;
+
+    /**
+     * Ctrl+R: opens the search over the person's sent prompts. Returns `true` when it opened, so the key is taken; omit it
+     * (or return `false`) and Ctrl+R stays the browser's reload.
+     */
+    onPromptSearch?: () => boolean;
     /** Called when a chat is selected from the @ popup, to attach its text */
     onSelectChat?: (chat: ChatReference) => void;
     /** Called when "Upload new file" is selected from the @ popup */
@@ -203,6 +211,7 @@ const ComposerTiptapEditor = ({
     onCancel,
     onChange,
     onHistoryNavigate,
+    onPromptSearch,
     isHistoryRecalled,
     onPaste,
     onSelectChat,
@@ -307,11 +316,11 @@ const ComposerTiptapEditor = ({
     // shortcuts read the options captured when the editor was built, so a handler assigned onto it later is lost; the
     // extensions read this ref at key time instead. No popup check here: an open popup (one with items) takes Enter, the
     // arrows and Escape on `window` in the capture phase, and a match without items must still let Enter send.
-    const keyHandlersRef = useRef({ isStreaming, onCancel, onHistoryNavigate, onSubmit });
+    const keyHandlersRef = useRef({ isStreaming, onCancel, onHistoryNavigate, onPromptSearch, onSubmit });
 
     useLayoutEffect(() => {
-        keyHandlersRef.current = { isStreaming, onCancel, onHistoryNavigate, onSubmit };
-    }, [isStreaming, onCancel, onHistoryNavigate, onSubmit]);
+        keyHandlersRef.current = { isStreaming, onCancel, onHistoryNavigate, onPromptSearch, onSubmit };
+    }, [isStreaming, onCancel, onHistoryNavigate, onPromptSearch, onSubmit]);
 
     // Create editor
     const editor = useEditor({
@@ -358,6 +367,10 @@ const ComposerTiptapEditor = ({
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             PromptHistoryKeys.configure({
                 onNavigate: (direction: PromptHistoryDirection) => keyHandlersRef.current.onHistoryNavigate?.(direction) ?? null,
+            }),
+            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
+            PromptSearchKey.configure({
+                onOpen: () => keyHandlersRef.current.onPromptSearch?.() ?? false,
             }),
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             SubmitOnEnter.configure({
