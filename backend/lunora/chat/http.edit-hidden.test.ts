@@ -136,6 +136,20 @@ describe("editMessageHttpAction hidden characters", () => {
         expect(state.saved[0]?.message.content).toStrictEqual([{ text: "fix this", type: "text" }]);
     });
 
+    it("refuses an edit whose file list is an object, as a bad request, before anything is read", async () => {
+        const response = await editMessageHttpAction(
+            context(),
+            new Request("https://example.test/chat/edit", {
+                body: JSON.stringify({ content: [{ text: "fix this", type: "text" }], fileIds: { length: 1 }, messageId: MESSAGE_ID }),
+                method: "POST",
+            }),
+        );
+
+        expect(response.status).toBe(400);
+        expect(state.saved).toStrictEqual([]);
+        expect(state.charges).toBe(0);
+    });
+
     it.each([
         ["missing", undefined],
         ["null", null],

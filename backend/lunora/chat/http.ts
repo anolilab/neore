@@ -1204,6 +1204,16 @@ const runChatStartOnShard = async (
         return Response.json({ error: startOutcome.error }, { status: 400 });
     }
 
+    // A resend whose saved record is gone (its claim lapsed between the read and this claim) is a new send to the claim, with
+    // nothing to compare: its files were never checked. It gives the claim back and asks for the send again, which checks them.
+    if (resend && startOutcome?.outcome === "claimed") {
+        await context
+            .runMutation(internal.chat.start_claim.releaseChatStart, { claim: startOutcome.claim })
+            .catch((error: unknown) => chatLogger.error("[chat] Could not release a resend's claim; it lapses on its own", error));
+
+        return Response.json({ error: "CHAT_START_RETRY", message: "This message must be sent again." }, { status: 409 });
+    }
+
     // A resend runs on the model its first try saved the prompt with: the thread's agent may have been switched since.
     const savedModel = startOutcome?.outcome === "duplicate" || startOutcome?.outcome === "resume" ? startOutcome.model : undefined;
 
@@ -1756,6 +1766,11 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
     // Validate messageId format
     if (!messageId || !isValidDocumentIdFormat(messageId)) {
         return Response.json({ error: "Invalid message ID format" }, { headers: { "Content-Type": "application/json" }, status: 400 });
+    }
+
+    // The body is untrusted JSON: a file list that is not a list is refused before anything iterates it.
+    if (fileIds !== undefined && !Array.isArray(fileIds)) {
+        return Response.json({ error: "Could not attach the file" }, { headers: { "Content-Type": "application/json" }, status: 400 });
     }
 
     // Validate fileIds format if provided
