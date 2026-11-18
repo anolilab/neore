@@ -1327,6 +1327,10 @@ export interface Doc_projects {
     pinnedAt?: number;
     projectType?: "chat" | "workflow";
     publicAccessToken?: string;
+    runnerAgentKey?: string;
+    runnerDeviceId?: string;
+    runnerFolderId?: string;
+    runnerKind?: "host";
     title: string;
     updatedAt?: number;
     userId?: string;
@@ -2267,6 +2271,7 @@ export interface Doc_userSettings {
     nickname?: string;
     onboardingCompleted?: boolean;
     profession?: string;
+    projectRunnerDefaults?: Record<string, { agentKey: string; deviceId: string; folderId: string }>;
     resumeInterruptedRuns?: boolean;
     resumeLastChat?: boolean;
     searchDomainBlocklist?: Array<string>;
@@ -4567,6 +4572,10 @@ export interface Insert_projects {
     pinnedAt?: number;
     projectType?: "chat" | "workflow";
     publicAccessToken?: string;
+    runnerAgentKey?: string;
+    runnerDeviceId?: string;
+    runnerFolderId?: string;
+    runnerKind?: "host";
     title: string;
     updatedAt?: number;
     userId?: string;
@@ -5507,6 +5516,7 @@ export interface Insert_userSettings {
     nickname?: string;
     onboardingCompleted?: boolean;
     profession?: string;
+    projectRunnerDefaults?: Record<string, { agentKey: string; deviceId: string; folderId: string }>;
     resumeInterruptedRuns?: boolean;
     resumeLastChat?: boolean;
     searchDomainBlocklist?: Array<string>;

@@ -34,4 +34,10 @@ if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(
 if (typeof source["threadId"] !== "string") return DEFER;
 return { "threadId": source["threadId"] };
 });
+installCompiledValidatorMap(lunora_acp_remote_4.getProjectRunnerDefault.args, (source) => {
+if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
+if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["projectId"] !== "string") return DEFER;
+return { "projectId": source["projectId"] };
+});
 export * from "../../acp/remote.js";

@@ -87,3 +87,6 @@
   only while the owner is still a member. Every way one is started or sent a turn (a start, `/hosts/send`, a switch to a computer,
   `/clear`, the pull-request guide, a worker) checks `acp/lib/organization-cap.ts` with the thread's own organization first, then
   its `capOrganizationId` (a temporary chat, or a chat saved from one), which a switch carries on, else the caller's verified one. A start files the thread under the caller's organization, so switching spaces cannot lift the cap.
+  **Project runner default** (`acp/lib/project-runner.ts`): a start given a `projectId` files the thread under that project (only one the caller may write to)
+  and records the computer, agent and folder id there: on the project row for a personal project, on the starter's own `userSettings.projectRunnerDefaults`
+  for an organization project, so no member reads another's. `getProjectRunnerDefault` returns it only while the device still offers the pair.

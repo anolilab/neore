@@ -892,6 +892,11 @@ export const vProjectDocFields = {
     _creationTime: v.number(),
     _id: v.string(),
     createdAt: v.number(),
+    // Written by `acp/lib/project-runner.ts`, never by a caller: the runner a new thread here starts on.
+    runnerAgentKey: v.optional(v.string()),
+    runnerDeviceId: v.optional(v.string()),
+    runnerFolderId: v.optional(v.string()),
+    runnerKind: v.optional(v.literal("host")),
     updatedAt: v.optional(v.number()),
 };
 

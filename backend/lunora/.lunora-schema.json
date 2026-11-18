@@ -10911,6 +10911,12 @@
           "optional": true,
           "unique": false
         },
+        "replyId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "retrievedMemories": {
           "kind": "array",
           "nullable": false,
@@ -19210,6 +19216,101 @@
               "optional": false,
               "unique": false,
               "fields": {
+                "entries": {
+                  "kind": "array",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "of": {
+                    "kind": "object",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "fields": {
+                      "content": {
+                        "kind": "string",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "refined": true
+                      },
+                      "priority": {
+                        "kind": "union",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "members": [
+                          {
+                            "kind": "literal",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "literal": "\"high\""
+                          },
+                          {
+                            "kind": "literal",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "literal": "\"low\""
+                          },
+                          {
+                            "kind": "literal",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "literal": "\"medium\""
+                          }
+                        ]
+                      },
+                      "status": {
+                        "kind": "union",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "members": [
+                          {
+                            "kind": "literal",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "literal": "\"completed\""
+                          },
+                          {
+                            "kind": "literal",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "literal": "\"in_progress\""
+                          },
+                          {
+                            "kind": "literal",
+                            "nullable": false,
+                            "optional": false,
+                            "unique": false,
+                            "literal": "\"pending\""
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "refined": true
+                },
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"plan\""
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
                 "error": {
                   "kind": "string",
                   "nullable": false,
@@ -19333,6 +19434,57 @@
                       ]
                     }
                   }
+                }
+              }
+            },
+            {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "exit": {
+                  "kind": "object",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "fields": {
+                    "code": {
+                      "kind": "number",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false,
+                      "refined": true
+                    },
+                    "signal": {
+                      "kind": "string",
+                      "nullable": false,
+                      "optional": true,
+                      "unique": false,
+                      "refined": true
+                    }
+                  }
+                },
+                "id": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
+                },
+                "kind": {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"tool_output\""
+                },
+                "output": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "refined": true
                 }
               }
             },
@@ -21396,6 +21548,31 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "runnerAgentKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "runnerDeviceId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "runnerFolderId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "runnerKind": {
+          "kind": "literal",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "literal": "\"host\""
         },
         "title": {
           "kind": "string",
@@ -30833,6 +31010,44 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "projectRunnerDefaults": {
+          "kind": "record",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "key": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          },
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "agentKey": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "deviceId": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "folderId": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            }
+          }
         },
         "resumeInterruptedRuns": {
           "kind": "boolean",
