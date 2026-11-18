@@ -827,6 +827,41 @@ describe("import limits", () => {
         }
     });
 
+    it("finds a near-match older than more superseded history than the window can scan", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+
+        const bees = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("memories", {
+                    memory: "The user keeps bees in a small garden behind the old workshop",
+                    type: "context",
+                    userId: USER,
+                }),
+        );
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 2100; index += 1) {
+                await ctx.db.insert("memories", {
+                    memory: `The user kept stamp ${String(index)} from a far country`,
+                    supersededBy: bees,
+                    type: "context",
+                    userId: USER,
+                });
+            }
+        });
+
+        generateText.mockResolvedValueOnce({ output: { action: "IGNORE" } });
+
+        expect(await save([{ memory: "The user keeps bees in a small garden behind the old workshop yearly", type: "context" }])).toStrictEqual({
+            added: 0,
+            alreadyKnown: 1,
+            updated: 0,
+        });
+        expect((await rowOf(bees))?.lastConfirmedAt).toBeTypeOf("number");
+    });
+
     it("looks up at most ten facts by vector in one save", async () => {
         expect.assertions(2);
 

@@ -812,6 +812,7 @@ export const memories = sqliteTable("memories", {
     by_userId_type: index("by_userId_type").on(t.userId, t.type),
     by_userId_supersededBy: index("by_userId_supersededBy").on(t.userId, t.supersededBy),
     by_userId_botId: index("by_userId_botId").on(t.userId, t.botId, t.type),
+    by_userId_botId_active: index("by_userId_botId_active").on(t.userId, t.botId, t.supersededBy, t.type),
 }));
 
 export const memoryDigests = sqliteTable("memoryDigests", {

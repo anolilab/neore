@@ -2672,7 +2672,7 @@ export interface IndexNamesByTable {
     mcpServerGrants: "by_user_and_server";
     member: "organizationId_userId" | "organizationId_role" | "userId";
     memberCredits: "organizationId_userId" | "memberId";
-    memories: "threadId" | "embeddingId" | "by_userId_type" | "by_userId_supersededBy" | "by_userId_botId";
+    memories: "threadId" | "embeddingId" | "by_userId_type" | "by_userId_supersededBy" | "by_userId_botId" | "by_userId_botId_active";
     memoryDigests: "by_userId_createdAt";
     memoryReflectionState: "by_userId";
     messages: "threadId_status_tool_order_stepOrder" | "by_threadId_order_stepOrder" | "by_threadId_parentMessageId" | "embeddingId_threadId";

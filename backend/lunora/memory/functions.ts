@@ -879,38 +879,6 @@ export const confirmMemories = internalMutation
         return unconfirmed;
     });
 
-/** Raw rows one scope's active read may scan. A scope with more superseded rows ahead of its active ones returns a shorter window. */
-const MEMORY_ACTIVE_SCAN_ROWS = 2000;
-/** Rows per page of that read: never more than the window asks for, and never a page bigger than this. */
-const MEMORY_ACTIVE_PAGE_ROWS = 500;
-
-/**
- * The newest `limit` active rows of one scope, in index order. Superseded rows are skipped as they come, and the read
- * pages on until `limit` active rows are found or its scan budget is spent. An index that excludes superseded rows
- * would remove the budget.
- */
-const activeRowsInScope = async (ctx: QueryCtx, userId: string, scope: string | null, limit: number): Promise<Doc<"memories">[]> => {
-    const active: Doc<"memories">[] = [];
-    let cursor: string | null = null;
-    let isDone = false;
-    let scanned = 0;
-
-    while (active.length < limit && scanned < MEMORY_ACTIVE_SCAN_ROWS && !isDone) {
-        const page = await ctx.db
-            .query("memories")
-            .withIndex("by_userId_botId", (q) => q.eq("userId", userId).eq("botId", scope as Id<"bots"> | null))
-            .order("desc")
-            .paginate({ cursor, numItems: Math.min(limit, MEMORY_ACTIVE_PAGE_ROWS) });
-
-        scanned += page.page.length;
-        active.push(...page.page.filter((memory) => !memory.supersededBy));
-        cursor = page.continueCursor;
-        isDone = page.isDone;
-    }
-
-    return active.slice(0, limit);
-};
-
 /**
  * Memories a run may read or dedupe against. Without `botId` only the user's own
  * memories (no bot). With `botId`, that bot's memories, plus the user's own ones
@@ -936,7 +904,22 @@ export const getActiveMemoriesForUser = internalQuery
             scopes.push(null);
         }
 
-        const perScope = await Promise.all(scopes.map(async (scope) => await activeRowsInScope(ctx, args.userId, scope, limit)));
+        // The active-row index: superseded rows are never read, so the window is always `limit` active rows when they exist.
+        const perScope = await Promise.all(
+            scopes.map(
+                async (scope) =>
+                    await ctx.db
+                        .query("memories")
+                        .withIndex("by_userId_botId_active", (q) =>
+                            q
+                                .eq("userId", args.userId)
+                                .eq("botId", scope as Id<"bots"> | null)
+                                .eq("supersededBy", null),
+                        )
+                        .order("desc")
+                        .take(limit),
+            ),
+        );
 
         // Each scope keeps up to `limit` of its own, so a busy bot cannot push the user's memories out. Merged in
         // the order each index yields: type descending, then newest first.
