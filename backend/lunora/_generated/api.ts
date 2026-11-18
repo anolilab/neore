@@ -181,10 +181,10 @@ export interface ApiTypes {
     };
     bots: {
         functions: {
-            createBot: FunctionReference<"mutation", { computerEnabled: boolean; description?: string; instructions: string; model: string; name: string }, string>;
+            createBot: FunctionReference<"mutation", { computerEnabled: boolean; description?: string; instructions: string; model: string; name: string; permissionMode?: "supervised" | "auto" | "full" }, string>;
             deleteBot: FunctionReference<"mutation", { botId: Id<"bots"> }, null>;
-            listBots: FunctionReference<"query", {}, Array<{ _creationTime: number; _id: string; computerEnabled: boolean; createdAt: number; description?: string; instructions: string; model: string; name: string; updatedAt: number; userId: string }>>;
-            updateBot: FunctionReference<"mutation", { botId: Id<"bots">; patch: { computerEnabled?: boolean; description?: string; instructions?: string; model?: string; name?: string } }, null>;
+            listBots: FunctionReference<"query", {}, Array<{ _creationTime: number; _id: string; computerEnabled: boolean; createdAt: number; description?: string; instructions: string; model: string; name: string; permissionMode?: "supervised" | "auto" | "full"; updatedAt: number; userId: string }>>;
+            updateBot: FunctionReference<"mutation", { botId: Id<"bots">; patch: { computerEnabled?: boolean; description?: string; instructions?: string; model?: string; name?: string; permissionMode?: "supervised" | "auto" | "full" } }, null>;
         };
     };
     changelog: {
@@ -550,9 +550,13 @@ export interface ApiTypes {
             deleteMemory: FunctionReference<"mutation", { memoryId: string }, null>;
             getMemoryStats: FunctionReference<"query", {}, { byType: Record<string, number>; pinned: number; total: number }>;
             getMessageMemoryUsage: FunctionReference<"query", { messageId: string; unlockProof?: string }, Array<{ memory?: string; memoryId: string; pinned?: boolean; score: number; status: "active" | "superseded" | "deleted"; threadId?: string; type?: "identity" | "preference" | "context" | "activity" | "experience" }>>;
-            listUserMemories: FunctionReference<"query", { includeSuperseded?: boolean }, Array<{ _creationTime: number; _id: string; confidence?: number; createdAt: number; importance?: number; lastConfirmedAt: number; memory: string; pinned: boolean; source?: string; supersededBy?: string; supersedes?: string; threadId?: string; type: "identity" | "preference" | "context" | "activity" | "experience"; updatedAt?: number; version?: number }>>;
+            listUserMemories: FunctionReference<"query", { includeSuperseded?: boolean }, Array<{ _creationTime: number; _id: string; confidence?: number; createdAt: number; importance?: number; importedFrom?: "chatgpt" | "claude" | "gemini" | "other"; lastConfirmedAt: number; memory: string; pinned: boolean; source?: string; supersededBy?: string; supersedes?: string; threadId?: string; type: "identity" | "preference" | "context" | "activity" | "experience"; updatedAt?: number; version?: number }>>;
             setMemoryPinned: FunctionReference<"mutation", { memoryId: string; pinned: boolean }, null>;
             updateMemory: FunctionReference<"mutation", { memory?: string; memoryId: string; type?: "identity" | "preference" | "context" | "activity" | "experience" }, null>;
+        };
+        import: {
+            previewMemoryImport: FunctionReference<"action", { text: string }, { cut: number; dropped: number; facts: Array<{ memory: string; type: "identity" | "preference" | "context" | "activity" | "experience" }> }>;
+            saveImportedMemories: FunctionReference<"action", { app: "chatgpt" | "claude" | "gemini" | "other"; facts: Array<{ memory: string; type: "identity" | "preference" | "context" | "activity" | "experience" }> }, { added: number; alreadyKnown: number; updated: number }>;
         };
         reflection: {
             dismissMemoryDigest: FunctionReference<"mutation", { digestId: string }, null>;
@@ -1481,6 +1485,10 @@ export const api: ApiTypes = {
             listUserMemories: { __lunoraRef: "memory_functions:listUserMemories" },
             setMemoryPinned: { __lunoraRef: "memory_functions:setMemoryPinned" },
             updateMemory: { __lunoraRef: "memory_functions:updateMemory" },
+        },
+        import: {
+            previewMemoryImport: { __lunoraRef: "memory_import:previewMemoryImport" },
+            saveImportedMemories: { __lunoraRef: "memory_import:saveImportedMemories" },
         },
         reflection: {
             dismissMemoryDigest: { __lunoraRef: "memory_reflection:dismissMemoryDigest" },

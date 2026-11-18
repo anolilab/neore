@@ -363,6 +363,9 @@ export const schema = defineSchema({
         instructions: v.string(),
         model: v.string(),
         name: v.string(),
+        // The mode a new chat with this bot starts in (`chat/lib/thread-permission-mode.ts`); absent = the default. A run
+        // nobody watches takes it only when it asks more (`unattendedMode` in `chat/lib/tool-permissions.ts`).
+        permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
         updatedAt: v.number(),
         userId: v.string(),
     })
@@ -1447,13 +1450,15 @@ export const schema = defineSchema({
         confidence: v.optional(v.number()),
         embeddingId: v.optional(v.string()),
         importance: v.optional(v.number()),
+        // The assistant an `imported` memory was brought in from (`memory/import.ts`).
+        importedFrom: v.optional(v.union(v.literal("chatgpt"), v.literal("claude"), v.literal("gemini"), v.literal("other"))),
         // Last time evidence confirmed the memory (a restatement, a reflection
         // merge, a user edit). Unset reads as `updatedAt` — see `memory/taxonomy.ts`.
         lastConfirmedAt: v.optional(v.number()),
         memory: v.string(),
         // Pinned by the user: nightly reflection never decays, retires or merges it away.
         pinned: v.optional(v.boolean()),
-        source: v.optional(v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"))),
+        source: v.optional(v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"), v.literal("imported"))),
         supersededBy: v.optional(v.id("memories")),
         supersedes: v.optional(v.id("memories")),
         threadId: v.optional(v.id("threads")),

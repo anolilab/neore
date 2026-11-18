@@ -119,6 +119,11 @@ export interface HeadlessRunOptions {
     memory: boolean;
     model: string;
     /**
+     * The thread whose bot's mode the run's tools take, when the run starts a thread of its own: a sub-agent child's lead. A run
+     * that continues a thread reads it from that thread. Never stamped on the new thread.
+     */
+    modeThreadId?: string;
+    /**
      * Called right before the model is asked, after the model, keys, tools and thread are ready: the
      * point from which a failure means the run reached the model (and may have been billed). A caller
      * that must give something back when a run never started tells the two apart with it.
@@ -266,28 +271,43 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
     // A run that continues a thread gets that thread's tools too (its linked pull requests); a new thread has none yet.
     const continuedThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
-    const toolResult =
-        options.tools === "headless" && allowTools
-            ? await buildAgentTools(ctx, {
-                  headless: true,
-                  ...(continuedThreadId !== undefined && { threadId: continuedThreadId }),
-                  ...(options.approvedTools && { headlessApproved: options.approvedTools }),
-                  ...(options.pauseForApproval && { headlessCanAsk: true }),
-                  model,
-                  organizationId: options.organizationId,
-                  searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
-                  skillTools: headlessSkillTools(skill?.config, options.additionalTools, options.withheldTools),
-                  userId,
-              })
-            : {
-                  mcpClients: [],
-                  mcpLabels: {},
-                  mcpServerNames: [],
-                  mcpToolFingerprints: NO_PERMISSION_KEYS,
-                  permissionKeys: NO_PERMISSION_KEYS,
-                  requiresApproval: [],
-                  tools: {},
-              };
+    const buildsTools = options.tools === "headless" && allowTools;
+    // The bot's mode: stamped on a new thread of the bot, and the run's tools take it where it asks more. Read for the bot the run
+    // names, else for the bot of the thread it continues or of `modeThreadId`. A failed read fails closed: this run's tools, and a new
+    // thread of the bot, are supervised, so a later chat there never starts wider than the bot asks; the owner can widen the thread.
+    const modeThreadId = continuedThreadId ?? options.modeThreadId;
+    const botMode =
+        options.botId !== undefined || (buildsTools && modeThreadId !== undefined)
+            ? await ctx
+                  .runQuery(internal.bots.functions.getBotPermissionModeForRun, { botId: options.botId, threadId: modeThreadId, userId })
+                  .catch((error: unknown) => {
+                      console.warn("[headless-run] bot permission mode unavailable, using supervised", error);
+
+                      return "supervised" as const;
+                  })
+            : null;
+    const toolResult = buildsTools
+        ? await buildAgentTools(ctx, {
+              headless: true,
+              ...(continuedThreadId !== undefined && { threadId: continuedThreadId }),
+              ...(options.approvedTools && { headlessApproved: options.approvedTools }),
+              ...(options.pauseForApproval && { headlessCanAsk: true }),
+              model,
+              organizationId: options.organizationId,
+              searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
+              skillTools: headlessSkillTools(skill?.config, options.additionalTools, options.withheldTools),
+              ...(botMode && { unattendedMode: botMode }),
+              userId,
+          })
+        : {
+              mcpClients: [],
+              mcpLabels: {},
+              mcpServerNames: [],
+              mcpToolFingerprints: NO_PERMISSION_KEYS,
+              permissionKeys: NO_PERMISSION_KEYS,
+              requiresApproval: [],
+              tools: {},
+          };
     const toolAllowlist =
         options.toolAllowlist && options.toolAllowlistKeepsMcp ? [...options.toolAllowlist, ...Object.keys(toolResult.mcpLabels)] : options.toolAllowlist;
 
@@ -369,6 +389,11 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // Before the run: a tool call reads `thread.botId` to find the bot's computer, and a later threaded run reads the
             // thread's organization, which went in with the insert above. A thread that already exists is never moved.
             if (options.botId) {
+                // The mode before the bot: a thread that names its bot always carries the bot's mode, like a chat started with it.
+                if (botMode) {
+                    await ctx.runMutation(internal.chat.thread_state.copyThreadPermissionMode, { mode: botMode, threadId });
+                }
+
                 await ctx.runMutation(internal.agent.threads.updateThread, {
                     patch: { botId: options.botId },
                     threadId: threadId as Id<"threads">,

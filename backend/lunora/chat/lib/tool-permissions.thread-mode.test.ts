@@ -93,6 +93,20 @@ describe("thread permission mode", () => {
         expect(resolveToolPermission(CODING_AGENT, undefined, { headless: true, threadMode: "full" })).toBe("off");
     });
 
+    it("a headless run takes a bot's mode only where it asks more", () => {
+        // Supervised: a tool that would run unasked asks, and nobody is there to answer, so it is removed, or kept to pause on.
+        expect(resolveToolPermission(SHELL, undefined, { headless: true, unattendedMode: "supervised" })).toBe("off");
+        expect(resolveToolPermission(SHELL, undefined, { headless: true, headlessCanAsk: true, unattendedMode: "supervised" })).toBe("ask");
+        expect(resolveToolPermission(mcp({ readOnlyHint: true }), undefined, { headless: true, unattendedMode: "supervised" })).toBe("off");
+        expect(resolveToolPermission(builtin("dateTime"), undefined, { headless: true, unattendedMode: "supervised" })).toBe("auto");
+        // Full never lifts the headless clamp: an `ask` tool is still removed, and a lookup stays as it was.
+        expect(resolveToolPermission(CODING_AGENT, undefined, { headless: true, unattendedMode: "full" })).toBe("off");
+        expect(resolveToolPermission(mcp(), undefined, { headless: true, unattendedMode: "full" })).toBe("off");
+        expect(resolveToolPermission(SHELL, undefined, { headless: true, unattendedMode: "full" })).toBe("auto");
+        // A chat (not headless) reads the thread's mode, never the unattended one.
+        expect(resolveToolPermission(SHELL, undefined, { unattendedMode: "supervised" })).toBe("auto");
+    });
+
     it("device tools keep their own default in every mode", () => {
         const device: ToolDescriptor = { key: "device:d1:shell_run", source: "device" };
 

@@ -156,6 +156,7 @@ export interface Doc_bots {
     instructions: string;
     model: string;
     name: string;
+    permissionMode?: "supervised" | "auto" | "full";
     updatedAt: number;
     userId: string;
 }
@@ -913,10 +914,11 @@ export interface Doc_memories {
     confidence?: number;
     embeddingId?: string;
     importance?: number;
+    importedFrom?: "chatgpt" | "claude" | "gemini" | "other";
     lastConfirmedAt?: number;
     memory: string;
     pinned?: boolean;
-    source?: "auto" | "manual" | "compressed" | "reflection";
+    source?: "auto" | "manual" | "compressed" | "reflection" | "imported";
     supersededBy?: Id<"memories">;
     supersedes?: Id<"memories">;
     threadId?: Id<"threads">;
@@ -3398,6 +3400,7 @@ export interface Insert_bots {
     instructions: string;
     model: string;
     name: string;
+    permissionMode?: "supervised" | "auto" | "full";
     updatedAt: number;
     userId: string;
 }
@@ -4155,10 +4158,11 @@ export interface Insert_memories {
     confidence?: number;
     embeddingId?: string;
     importance?: number;
+    importedFrom?: "chatgpt" | "claude" | "gemini" | "other";
     lastConfirmedAt?: number;
     memory: string;
     pinned?: boolean;
-    source?: "auto" | "manual" | "compressed" | "reflection";
+    source?: "auto" | "manual" | "compressed" | "reflection" | "imported";
     supersededBy?: Id<"memories">;
     supersedes?: Id<"memories">;
     threadId?: Id<"threads">;

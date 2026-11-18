@@ -18,3 +18,15 @@
   LLM only words merges/promotions/the digest — WHICH rows change is decided by
   the pure, tested planner. Injected memories are recorded on the reply's first
   row (`messages.retrievedMemories`) for the "memories used" popover.
+  **Import** (`memory/import*.ts`): another assistant's memory, pasted. Lines are
+  split by the pure parser and stored as pasted (the model labels `type`; only a
+  belief-revision UPDATE rewords a row), so a repeat import is the same text and
+  dedup confirms it. Near-match dedup reads a 1000-row window (type first, then newest), not
+  extraction's 50. The action only plans; one mutation (`saveImportedMemoryBatch`) applies every merge,
+  confirmation and insert after re-checking the memory setting, so turning memory off meanwhile writes
+  nothing. It also re-checks exact text (the newest 5000 own active rows), so a repeat past the window or
+  a second tab saving the same paste confirms, not adds. Vector dedup (`dedup.ts`, shared with extraction)
+  walks hits best first, reads one past the window by its embedding id, and passes over a row of another
+  scope (user vs bot) or one this save superseded. An import never revises a pinned row,
+  and a merged text that fails the paste's rules saves the fact as new. Rows are `source: "imported"` with
+  `importedFrom`; both actions refuse while memory is off.

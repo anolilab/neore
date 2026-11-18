@@ -123,6 +123,8 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             keepThreadStatus: worker !== undefined,
             memory: false,
             model,
+            // A bot's chain runs under the bot's mode where it asks more; a worker reads it through its own thread.
+            modeThreadId: claim.parentThreadId,
             onThread: async (childThreadId) => {
                 const linked = await ctx.runMutation(internal.sub_agents.functions.attachChildThread, { childThreadId, runId });
 

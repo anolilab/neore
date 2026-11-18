@@ -568,6 +568,13 @@ export const createThread = authMutation
                 userId,
             });
 
+            // A chat with a bot starts in the bot's mode; the owner can still change it per thread. Before the bot patch, so a
+            // thread that names its bot always carries the bot's mode. An admin acting as the owner cannot set a mode, so their
+            // chat never takes `full` from the bot: it stays on the default.
+            if (bot?.permissionMode && !(bot.permissionMode === "full" && context.user.impersonatedBy)) {
+                await context.runMutation(internal.chat.thread_state.copyThreadPermissionMode, { mode: bot.permissionMode, threadId });
+            }
+
             await context.runMutation(internal.agent.threads.updateThread, {
                 patch: {
                     botId: botId && bot ? botId : undefined,

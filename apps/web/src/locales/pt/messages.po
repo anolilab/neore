@@ -234,6 +234,11 @@ msgstr "{0, plural, one {# imagem} other {# imagens}}"
 msgid "{0, plural, one {# issue found} other {# issues found}}"
 msgstr "{0, plural, one {# problema encontrado} other {# problemas encontrados}}"
 
+#. placeholder {0}: preview.dropped
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:257
+msgid "{0, plural, one {# line was left out as not about you or sensitive.} other {# lines were left out as not about you or sensitive.}}"
+msgstr ""
+
 #. placeholder {0}: stats.lines
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:757
 msgid "{0, plural, one {# line} other {# lines}}"
@@ -259,6 +264,11 @@ msgstr "{0, plural, one {# mensagem} other {# mensagens}}"
 #: src/features/settings/components/chat/native-providers-settings.tsx:414
 msgid "{0, plural, one {# model} other {# models}}"
 msgstr "{0, plural, one {# modelo} other {# modelos}}"
+
+#. placeholder {0}: preview.cut
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:264
+msgid "{0, plural, one {# more line was past the limit.} other {# more lines were past the limit.}}"
+msgstr ""
 
 #. placeholder {0}: data.omittedTargets
 #: src/features/evals/components/model-comparison.tsx:102
@@ -368,6 +378,16 @@ msgstr "{0, plural, one {1 modelo} other {# modelos}}"
 #: src/components/model-picker/model-picker-button.tsx:160
 msgid "{0, plural, one {Comparing # model} other {Comparing # models}}"
 msgstr "{0, plural, one {Comparando # modelo} other {Comparando # modelos}}"
+
+#. placeholder {0}: kept.length
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:304
+msgid "{0, plural, one {Save # memory} other {Save # memories}}"
+msgstr ""
+
+#. placeholder {0}: result.added
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:117
+msgid "{0, plural, one {Saved # new memory} other {Saved # new memories}}"
+msgstr ""
 
 #. placeholder {0}: results.length - MAX_VISIBLE
 #: src/features/chat/thread/widgets/image-search-gallery.tsx:89
@@ -545,7 +565,7 @@ msgid "{0} lines"
 msgstr "{0} linhas"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:175
+#: src/features/settings/components/personalization/memory-settings.tsx:182
 msgid "{0} memories"
 msgstr "{0} memórias"
 
@@ -642,7 +662,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0} em {1}, em {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:176
+#: src/features/settings/components/personalization/memory-settings.tsx:183
 msgid "{0} pinned"
 msgstr "{0} fixadas"
 
@@ -1592,6 +1612,10 @@ msgstr "1:1 (Quadrado)"
 msgid "1:1 ratio"
 msgstr "Proporção 1:1"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:195
+msgid "1. Which assistant?"
+msgstr ""
+
 #: src/features/marketing/data/models-data.ts:250
 msgid "10 seconds"
 msgstr "10 segundos"
@@ -1623,6 +1647,10 @@ msgstr "Proporção 16:9"
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:56
 msgid "1970s glass, dreamlike"
 msgstr "Lentes dos anos 1970, onírico"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:219
+msgid "2. Send it this prompt"
+msgstr ""
 
 #: src/features/marketing/components/landing-page.tsx:979
 msgid "20 free messages a day to start. No credit card required. Upgrade when you're ready, cancel anytime."
@@ -1676,6 +1704,10 @@ msgstr "Compressão 2x, flares azuis"
 msgid "3:4"
 msgstr "3:4"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:227
+msgid "3. Paste its answer"
+msgstr ""
+
 #: src/features/admin/components/ban-user-dialog.tsx:31
 msgid "30 days"
 msgstr "30 dias"
@@ -1711,6 +1743,10 @@ msgstr "Estimativa de profundidade 3D"
 #: src/features/workflow/components/nodes/video-node.tsx:28
 msgid "4:3"
 msgstr "4:3"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:252
+msgid "4. Choose what to keep"
+msgstr ""
 
 #: src/features/marketing/data/models-data.ts:1449
 msgid "400B parameter MoE with 13B active per token"
@@ -1965,7 +2001,7 @@ msgstr ""
 msgid "A run's thread is filed in this project. Moving the task to another project starts a new thread."
 msgstr "A conversa de cada execução fica neste projeto. Mover a tarefa para outro projeto inicia uma nova conversa."
 
-#: src/features/settings/components/chat/bots-settings.tsx:141
+#: src/features/settings/components/chat/bots-settings.tsx:225
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "Um sandbox que o bot mantém entre conversas. Pausado quando ocioso, sem cobrança enquanto pausado."
 
@@ -2464,12 +2500,12 @@ msgstr "Adicionar o quadro escolhido como nó de imagem"
 
 #: src/features/chat/thread-list/thread-list-header.tsx:126
 #: src/features/chat/thread-list/thread-list-header.tsx:136
-#: src/features/projects/components/add-project-dialog.tsx:687
+#: src/features/projects/components/add-project-dialog.tsx:691
 msgid "Add project"
 msgstr ""
 
 #. placeholder {0}: rowName(machine)
-#: src/features/projects/components/add-project-dialog.tsx:510
+#: src/features/projects/components/add-project-dialog.tsx:514
 msgid "Add project on {0}"
 msgstr ""
 
@@ -2646,7 +2682,7 @@ msgstr "Adicionado:"
 msgid "Adding documents… {0} of {1}"
 msgstr "Adicionando documentos… {0} de {1}"
 
-#: src/features/projects/components/add-project-dialog.tsx:521
+#: src/features/projects/components/add-project-dialog.tsx:525
 msgid "Adding the project…"
 msgstr ""
 
@@ -2659,7 +2695,7 @@ msgid "Adding your earlier replies…"
 msgstr "Adicionando suas respostas anteriores…"
 
 #: src/features/chat/aside/aside-panel.tsx:168
-#: src/features/projects/components/add-project-dialog.tsx:687
+#: src/features/projects/components/add-project-dialog.tsx:691
 msgid "Adding…"
 msgstr "Adicionando…"
 
@@ -3195,7 +3231,7 @@ msgid "All"
 msgstr "Todos"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:197
+#: src/features/settings/components/personalization/memory-settings.tsx:204
 msgid "All ({0})"
 msgstr "Todas ({0})"
 
@@ -3632,6 +3668,10 @@ msgstr "Usuários anônimos inativos por esta quantidade de dias ficam elegívei
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:343
 msgid "Another action already uses this key combination. Change or clear one of them to save."
 msgstr "Outra ação já usa esta combinação de teclas. Altere ou limpe uma delas para salvar."
+
+#: src/features/settings/components/personalization/memory-import-apps.ts:14
+msgid "Another assistant"
+msgstr ""
 
 #: src/features/evals/components/run-detail.tsx:51
 msgid "Answer"
@@ -4201,6 +4241,10 @@ msgstr "Pergunte qualquer coisa..."
 msgid "Ask something without interrupting the reply. The question and the answer stay here unless you add them to the thread."
 msgstr "Pergunte algo sem interromper a resposta. A pergunta e a resposta ficam aqui, a menos que você as adicione à conversa."
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:180
+msgid "Ask your other assistant to list what it remembers, paste its answer, and choose which facts to keep. The pasted text is only read as a list of facts."
+msgstr ""
+
 #: src/features/chat/thread/composer-image-settings.tsx:152
 #: src/features/chat/thread/composer-video-settings.tsx:108
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:128
@@ -4398,6 +4442,7 @@ msgstr "automático"
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
+#: src/features/settings/components/chat/bots-settings.tsx:58
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Auto"
 msgstr "Automático"
@@ -4620,7 +4665,8 @@ msgstr "Portal do Azure → seu recurso do OpenAI → Chaves e ponto de extremid
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:394
 #: src/features/pages/components/page-version-panel.tsx:89
-#: src/features/projects/components/add-project-dialog.tsx:684
+#: src/features/projects/components/add-project-dialog.tsx:688
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:301
 msgid "Back"
 msgstr "Voltar"
 
@@ -5108,11 +5154,11 @@ msgstr "Bósnio"
 msgid "Bosnian (Bosnia)"
 msgstr "Bósnio (Bósnia)"
 
-#: src/features/settings/components/chat/bots-settings.tsx:76
+#: src/features/settings/components/chat/bots-settings.tsx:137
 msgid "Bot created"
 msgstr "Bot criado"
 
-#: src/features/settings/components/chat/bots-settings.tsx:100
+#: src/features/settings/components/chat/bots-settings.tsx:171
 msgid "Bot deleted"
 msgstr "Bot excluído"
 
@@ -5223,6 +5269,11 @@ msgstr "Brilho"
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:614
 msgid "Bring Forward"
 msgstr "Trazer para a frente"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:175
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:179
+msgid "Bring in what another AI knows about you"
+msgstr ""
 
 #: src/features/marketing/components/tutorials-page.tsx:117
 msgid "Bring your own API keys for AI providers and tools. Manage encrypted keys in settings."
@@ -5646,7 +5697,7 @@ msgstr "Canadá"
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
-#: src/features/projects/components/add-project-dialog.tsx:678
+#: src/features/projects/components/add-project-dialog.tsx:682
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:395
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
@@ -5662,8 +5713,8 @@ msgstr "Canadá"
 #: src/features/settings/components/chat/usage-settings.tsx:573
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
-#: src/features/settings/components/personalization/memory-item.tsx:141
-#: src/features/settings/components/personalization/memory-settings.tsx:246
+#: src/features/settings/components/personalization/memory-item.tsx:147
+#: src/features/settings/components/personalization/memory-settings.tsx:253
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6010,7 +6061,7 @@ msgstr "chat"
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
 #: src/features/settings/components/account/account-settings.tsx:340
-#: src/features/settings/components/chat/bots-settings.tsx:172
+#: src/features/settings/components/chat/bots-settings.tsx:262
 #: src/features/settings/lib/settings-keywords.ts:33
 #: src/features/settings/lib/settings-navigation.ts:98
 msgid "Chat"
@@ -6317,7 +6368,7 @@ msgstr "Escolha o modo de pesquisa"
 msgid "Choose the camera system for your shot"
 msgstr "Escolha o sistema de câmera para a sua cena"
 
-#: src/features/projects/components/add-project-dialog.tsx:513
+#: src/features/projects/components/add-project-dialog.tsx:517
 msgid "Choose the project's folder, or type a path."
 msgstr ""
 
@@ -6494,11 +6545,11 @@ msgstr "Limpar tudo"
 msgid "Clear All"
 msgstr "Limpar tudo"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:236
+#: src/features/settings/components/personalization/memory-settings.tsx:243
 msgid "Clear All Memories"
 msgstr "Limpar todas as memórias"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:240
+#: src/features/settings/components/personalization/memory-settings.tsx:247
 msgid "Clear all memories?"
 msgstr "Limpar todas as memórias?"
 
@@ -6545,7 +6596,7 @@ msgstr "Limpar filtro de tags"
 msgid "Clear the queue"
 msgstr "Limpar a fila"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:132
+#: src/features/settings/components/personalization/memory-settings.tsx:133
 msgid "Cleared {count} memories"
 msgstr "{count} memórias apagadas"
 
@@ -6631,7 +6682,7 @@ msgstr "área de transferência"
 msgid "clock"
 msgstr "relógio"
 
-#: src/features/projects/components/add-project-dialog.tsx:675
+#: src/features/projects/components/add-project-dialog.tsx:679
 msgid "Clone or create new…"
 msgstr ""
 
@@ -7401,7 +7452,7 @@ msgid "Compressing context..."
 msgstr "Comprimindo o contexto..."
 
 #: src/features/auth/components/device-code-parts.tsx:76
-#: src/features/settings/components/chat/bots-settings.tsx:140
+#: src/features/settings/components/chat/bots-settings.tsx:224
 msgid "Computer"
 msgstr "Computador"
 
@@ -7702,7 +7753,7 @@ msgstr "Conectado a {0}"
 msgid "Connected. You can close this window."
 msgstr "Conectado. Você pode fechar esta janela."
 
-#: src/features/projects/components/add-project-dialog.tsx:518
+#: src/features/projects/components/add-project-dialog.tsx:522
 msgid "Connecting {pairingHost}…"
 msgstr ""
 
@@ -8205,6 +8256,10 @@ msgstr "Copiar mensagem"
 msgid "Copy object"
 msgstr "Copiar objeto"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:223
+msgid "Copy prompt"
+msgstr ""
+
 #: src/features/prompts/components/prompt-item.tsx:240
 #: src/features/prompts/components/prompt-item.tsx:266
 msgid "Copy Prompt"
@@ -8409,6 +8464,10 @@ msgstr "Não foi possível alterar Auto. Tente novamente."
 msgid "Could not change push notifications. Try again."
 msgstr "Não foi possível alterar as notificações push. Tente novamente."
 
+#: src/features/settings/components/chat/bots-settings.tsx:159
+msgid "Could not change the bot's permission mode."
+msgstr "Não foi possível alterar o modo de permissão do bot."
+
 #: src/features/chat/model-settings/use-model-combobox.ts:283
 #: src/features/chat/model-settings/use-model-combobox.ts:307
 msgid "Could not change the model. Please try again."
@@ -8463,6 +8522,10 @@ msgstr "Não foi possível copiar automaticamente. Link de convite: {inviteLink}
 msgid "Could not copy automatically. Public link: {publicLink}"
 msgstr "Não foi possível copiar automaticamente. Link público: {publicLink}"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:132
+msgid "Could not copy the prompt"
+msgstr ""
+
 #: src/features/chat/thread/copy-prompt-link-action.tsx:69
 msgid "Could not copy the prompt link. Your browser did not allow access to the clipboard."
 msgstr "Não foi possível copiar o link do prompt. Seu navegador não permitiu o acesso à área de transferência."
@@ -8486,7 +8549,7 @@ msgstr "Não foi possível copiar; selecione o texto"
 msgid "Could not create a collection for this import. Try again."
 msgstr "Não foi possível criar uma coleção para esta importação. Tente novamente."
 
-#: src/features/settings/components/chat/bots-settings.tsx:78
+#: src/features/settings/components/chat/bots-settings.tsx:139
 msgid "Could not create the bot."
 msgstr "Não foi possível criar o bot."
 
@@ -8499,7 +8562,7 @@ msgstr "Não foi possível criar o chat em grupo"
 msgid "Could not create the page"
 msgstr "Não foi possível criar a página"
 
-#: src/features/settings/components/chat/bots-settings.tsx:102
+#: src/features/settings/components/chat/bots-settings.tsx:173
 msgid "Could not delete the bot."
 msgstr "Não foi possível excluir o bot."
 
@@ -8677,6 +8740,10 @@ msgstr "Não foi possível ler essa conversa"
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Não foi possível ler essa conversa. Se estiver bloqueada, desbloqueie-a primeiro."
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:85
+msgid "Could not read the pasted list"
+msgstr ""
+
 #: src/features/onboarding/components/setup-checklist.tsx:216
 msgid "Could not read your devices, so the steps cannot be checked yet. The links still work."
 msgstr ""
@@ -8731,6 +8798,10 @@ msgstr "Não foi possível salvar a configuração do Daily Brief."
 msgid "Could not save the email setting."
 msgstr "Não foi possível salvar a configuração de e-mail."
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:114
+msgid "Could not save the memories"
+msgstr ""
+
 #: src/components/model-picker/model-picker.tsx:1036
 msgid "Could not save the new order for {label}"
 msgstr "Não foi possível guardar a nova ordem de {label}"
@@ -8783,7 +8854,7 @@ msgstr "Não foi possível sair"
 msgid "Could not snooze the thread. Please try again."
 msgstr "Não foi possível adiar a conversa. Tente novamente."
 
-#: src/features/settings/components/chat/bots-settings.tsx:88
+#: src/features/settings/components/chat/bots-settings.tsx:149
 msgid "Could not start a chat with this bot."
 msgstr "Não foi possível iniciar um chat com este bot."
 
@@ -8978,7 +9049,7 @@ msgstr "Crie e gerencie chaves de API para acesso programático à sua conta."
 msgid "Create API Key"
 msgstr "Criar chave de API"
 
-#: src/features/settings/components/chat/bots-settings.tsx:150
+#: src/features/settings/components/chat/bots-settings.tsx:234
 msgid "Create bot"
 msgstr "Criar bot"
 
@@ -9925,8 +9996,8 @@ msgstr "Delegue tarefas ao Devin, o engenheiro de software de IA"
 #: src/features/prompts/components/prompt-list-view.tsx:227
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:709
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:848
-#: src/features/settings/components/chat/bots-settings.tsx:181
-#: src/features/settings/components/chat/bots-settings.tsx:190
+#: src/features/settings/components/chat/bots-settings.tsx:271
+#: src/features/settings/components/chat/bots-settings.tsx:280
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
 #: src/features/settings/components/chat/trigger-settings.tsx:1096
 #: src/features/skills/components/skill-list.tsx:307
@@ -9953,7 +10024,7 @@ msgstr "Excluir “{pendingDeleteTitle}”?"
 #. placeholder {0}: model.name
 #. placeholder {0}: server.name
 #: src/features/local-models/components/ollama-model-manager.tsx:265
-#: src/features/settings/components/chat/bots-settings.tsx:175
+#: src/features/settings/components/chat/bots-settings.tsx:265
 #: src/features/settings/components/chat/mcp/server-list.tsx:171
 #: src/features/skills/components/skill-item.tsx:189
 msgid "Delete {0}"
@@ -9967,7 +10038,7 @@ msgstr "Excluir {0} usuários"
 #. placeholder {0}: deleting.name
 #. placeholder {0}: pendingDelete?.name ?? ""
 #: src/features/local-models/components/ollama-model-manager.tsx:342
-#: src/features/settings/components/chat/bots-settings.tsx:200
+#: src/features/settings/components/chat/bots-settings.tsx:290
 msgid "Delete {0}?"
 msgstr "Excluir {0}?"
 
@@ -9994,7 +10065,7 @@ msgstr "Excluir conta"
 msgid "Delete alert \"{ruleName}\""
 msgstr "Excluir o alerta \"{ruleName}\""
 
-#: src/features/settings/components/personalization/memory-settings.tsx:247
+#: src/features/settings/components/personalization/memory-settings.tsx:254
 msgid "Delete All"
 msgstr "Excluir tudo"
 
@@ -10051,7 +10122,7 @@ msgstr "Excluir grupo e filhos"
 msgid "Delete Logo"
 msgstr "Excluir logo"
 
-#: src/features/settings/components/personalization/memory-item.tsx:117
+#: src/features/settings/components/personalization/memory-item.tsx:123
 msgid "Delete memory"
 msgstr "Excluir memória"
 
@@ -10438,7 +10509,7 @@ msgstr "Descreva seu fluxo de trabalho... ex.: “Gerar uma imagem a partir de t
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
 #: src/features/prompts/components/variable-definitions.tsx:122
-#: src/features/settings/components/chat/bots-settings.tsx:117
+#: src/features/settings/components/chat/bots-settings.tsx:188
 #: src/features/skills/components/bundle-import-dialog.tsx:115
 #: src/features/skills/components/bundle-import-dialog.tsx:148
 #: src/features/skills/components/skill-builder-diff.tsx:28
@@ -11480,7 +11551,7 @@ msgstr "Editar servidor MCP"
 msgid "Edit me"
 msgstr "Edite-me"
 
-#: src/features/settings/components/personalization/memory-item.tsx:113
+#: src/features/settings/components/personalization/memory-item.tsx:119
 msgid "Edit memory"
 msgstr "Editar memória"
 
@@ -11877,7 +11948,7 @@ msgstr "Ativar sugestões de continuação"
 msgid "Enable for Next Chat"
 msgstr "Ativar para o próximo chat"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:163
+#: src/features/settings/components/personalization/memory-settings.tsx:167
 msgid "Enable memory"
 msgstr "Ativar memória"
 
@@ -13069,6 +13140,10 @@ msgstr "Checagem de fatos"
 msgid "Fact check: Does sugar cause hyperactivity in children?"
 msgstr "Checagem de fatos: o açúcar causa hiperatividade em crianças?"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:270
+msgid "Facts to save"
+msgstr ""
+
 #: src/features/evals/components/model-comparison.tsx:90
 #: src/features/evals/components/run-detail.tsx:39
 msgid "Fail"
@@ -13154,7 +13229,7 @@ msgstr "Falha ao alterar a cor da tag"
 msgid "Failed to clear filter rules"
 msgstr "Falha ao limpar as regras de filtro"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:128
+#: src/features/settings/components/personalization/memory-settings.tsx:129
 msgid "Failed to clear memories"
 msgstr "Falha ao limpar as memórias"
 
@@ -13247,7 +13322,7 @@ msgstr "Falha ao excluir o arquivo. Tente novamente."
 msgid "Failed to delete files"
 msgstr "Falha ao excluir os arquivos"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:100
+#: src/features/settings/components/personalization/memory-settings.tsx:101
 msgid "Failed to delete memory"
 msgstr "Falha ao excluir a memória"
 
@@ -13761,8 +13836,8 @@ msgstr "Falha ao atualizar os atalhos de teclado"
 msgid "Failed to update MCP server"
 msgstr "Falha ao atualizar o servidor MCP"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:111
-#: src/features/settings/components/personalization/memory-settings.tsx:119
+#: src/features/settings/components/personalization/memory-settings.tsx:112
+#: src/features/settings/components/personalization/memory-settings.tsx:120
 msgid "Failed to update memory"
 msgstr "Falha ao atualizar a memória"
 
@@ -13790,7 +13865,7 @@ msgstr "Não foi possível atualizar as configurações de pull requests"
 msgid "Failed to update reply tools"
 msgstr "Não foi possível atualizar as ferramentas de resposta"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:145
+#: src/features/settings/components/personalization/memory-settings.tsx:144
 msgid "Failed to update setting"
 msgstr "Falha ao atualizar a configuração"
 
@@ -14450,7 +14525,7 @@ msgstr "Filtrar por tipo"
 msgid "Filter condition"
 msgstr "Condição do filtro"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:183
+#: src/features/settings/components/personalization/memory-settings.tsx:190
 msgid "Filter memories by type"
 msgstr "Filtrar memórias por tipo"
 
@@ -14654,11 +14729,11 @@ msgstr "Focar no chat: {title}"
 msgid "Focus Search"
 msgstr "Focar na busca"
 
-#: src/features/projects/components/add-project-dialog.tsx:600
+#: src/features/projects/components/add-project-dialog.tsx:604
 msgid "Folder path"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:619
+#: src/features/projects/components/add-project-dialog.tsx:623
 msgid "Folders"
 msgstr ""
 
@@ -15115,6 +15190,7 @@ msgstr "Vídeo em alta definição Full HD 1080p"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
 #: src/features/chat/thread/composer-permission-mode.tsx:42
+#: src/features/settings/components/chat/bots-settings.tsx:59
 msgid "Full access"
 msgstr "Acesso total"
 
@@ -15663,7 +15739,7 @@ msgstr "Ir para o cofre"
 msgid "Go to your pages"
 msgstr "Ir para suas páginas"
 
-#: src/features/projects/components/add-project-dialog.tsx:623
+#: src/features/projects/components/add-project-dialog.tsx:627
 msgid "Go up to {parent}"
 msgstr ""
 
@@ -16170,7 +16246,7 @@ msgstr "Modo de voz mãos-livres — fale, e as respostas são lidas em voz alta
 msgid "Hands-free voice updated"
 msgstr "Voz do modo mãos-livres atualizada"
 
-#: src/features/settings/components/chat/bots-settings.tsx:168
+#: src/features/settings/components/chat/bots-settings.tsx:252
 msgid "Has a computer"
 msgstr "Tem um computador"
 
@@ -17091,6 +17167,10 @@ msgstr "{added} página(s) do Notion importada(s)."
 msgid "Imported as /{0}."
 msgstr "Importado como /{0}."
 
+#: src/features/settings/components/personalization/memory-item.tsx:96
+msgid "Imported from {importedFromLabel}"
+msgstr ""
+
 #. placeholder {0}: result.slug
 #: src/features/skills/components/skill-import-dialog.tsx:147
 msgid "Imported skill \"{0}\""
@@ -17474,7 +17554,7 @@ msgstr "instruct"
 msgid "instructions"
 msgstr "instruções"
 
-#: src/features/settings/components/chat/bots-settings.tsx:126
+#: src/features/settings/components/chat/bots-settings.tsx:197
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:155
@@ -18277,7 +18357,7 @@ msgid "Last activity {lastActivityAgo}"
 msgstr "Última atividade {lastActivityAgo}"
 
 #. placeholder {0}: relativeTime(memory.lastConfirmedAt)
-#: src/features/settings/components/personalization/memory-item.tsx:90
+#: src/features/settings/components/personalization/memory-item.tsx:95
 msgid "Last confirmed {0}"
 msgstr "Confirmada pela última vez {0}"
 
@@ -18841,6 +18921,10 @@ msgstr "Lista"
 msgid "List all available models and pricing"
 msgstr "Listar todos os modelos disponíveis e preços"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:80
+msgid "List everything you remember about me from our past conversations and your saved memory. Write one fact per line, in the third person, starting with \"The user\" (for example: \"The user works as a nurse in Hamburg.\"). Where you know when you learned a fact, add the date in brackets at the end of its line. Leave out passwords, keys, account numbers and health details. Write no introduction, headings or comments."
+msgstr ""
+
 #: src/features/prompts/components/prompt-list.tsx:560
 msgid "List view"
 msgstr "Visualização em lista"
@@ -19034,7 +19118,7 @@ msgstr "Carregando arquivos"
 msgid "Loading files…"
 msgstr "Carregando arquivos…"
 
-#: src/features/projects/components/add-project-dialog.tsx:519
+#: src/features/projects/components/add-project-dialog.tsx:523
 msgid "Loading folders…"
 msgstr ""
 
@@ -19231,7 +19315,7 @@ msgstr "Carregando..."
 #: src/features/chat/thread/request-secret-prompt.tsx:478
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
-#: src/features/settings/components/chat/bots-settings.tsx:158
+#: src/features/settings/components/chat/bots-settings.tsx:242
 #: src/routes/auth/extension.tsx:68
 msgid "Loading…"
 msgstr "Carregando…"
@@ -19428,7 +19512,7 @@ msgstr "Channel access token de longa duração da aba Messaging API do seu cana
 msgid "Longest the answer may take, in milliseconds"
 msgstr "Tempo máximo que a resposta pode levar, em milissegundos"
 
-#: src/features/projects/components/add-project-dialog.tsx:534
+#: src/features/projects/components/add-project-dialog.tsx:538
 msgid "Looking for machines…"
 msgstr ""
 
@@ -19515,7 +19599,7 @@ msgstr "Binário Mach-O"
 msgid "Machine"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:538
+#: src/features/projects/components/add-project-dialog.tsx:542
 msgid "Machines"
 msgstr ""
 
@@ -20040,7 +20124,7 @@ msgid "memories"
 msgstr "memórias"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:209
+#: src/features/settings/components/personalization/memory-settings.tsx:216
 msgid "Memories"
 msgstr "Memórias"
 
@@ -20058,7 +20142,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "Memórias usadas nesta resposta ({0})"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:156
+#: src/features/settings/components/personalization/memory-settings.tsx:160
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "Memória"
@@ -20067,15 +20151,15 @@ msgstr "Memória"
 msgid "Memory — what the agent keeps across chats"
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-settings.tsx:104
+#: src/features/settings/components/personalization/memory-settings.tsx:105
 msgid "Memory deleted"
 msgstr "Memória excluída"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:138
+#: src/features/settings/components/personalization/memory-settings.tsx:142
 msgid "Memory disabled"
 msgstr "Memória desativada"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:138
+#: src/features/settings/components/personalization/memory-settings.tsx:142
 msgid "Memory enabled"
 msgstr "Memória ativada"
 
@@ -20087,7 +20171,11 @@ msgstr ""
 msgid "Memory is off until you turn it on. Temporary chats and locked chats are never mined for memories."
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-item.tsx:125
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:185
+msgid "Memory is off. Turn it on to bring in memories; nothing is saved while it is off."
+msgstr ""
+
+#: src/features/settings/components/personalization/memory-item.tsx:131
 msgid "Memory text"
 msgstr "Texto da memória"
 
@@ -20095,7 +20183,7 @@ msgstr "Texto da memória"
 msgid "Memory the agent keeps across chats"
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-item.tsx:79
+#: src/features/settings/components/personalization/memory-item.tsx:84
 msgid "Memory type"
 msgstr "Tipo de memória"
 
@@ -20530,7 +20618,7 @@ msgstr "Modo:"
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
-#: src/features/settings/components/chat/bots-settings.tsx:135
+#: src/features/settings/components/chat/bots-settings.tsx:206
 #: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:407
 #: src/features/workflow/components/nodes/ai-node.tsx:34
@@ -21125,7 +21213,7 @@ msgstr "nome"
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
-#: src/features/settings/components/chat/bots-settings.tsx:113
+#: src/features/settings/components/chat/bots-settings.tsx:184
 #: src/features/settings/components/chat/custom-providers-settings.tsx:494
 #: src/features/settings/components/chat/mcp/server-form.tsx:194
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
@@ -21502,7 +21590,7 @@ msgstr "Novo"
 msgid "New Azure Bots are single-tenant: set the Teams Tenant ID key, or replies cannot authenticate."
 msgstr "Novos Azure Bots são single-tenant: defina a chave Tenant ID do Teams, senão as respostas não conseguem se autenticar."
 
-#: src/features/settings/components/chat/bots-settings.tsx:111
+#: src/features/settings/components/chat/bots-settings.tsx:182
 msgid "New bot"
 msgstr "Novo bot"
 
@@ -21546,6 +21634,10 @@ msgstr "Novos chats começam permanentes"
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:65
 msgid "New chats start temporary"
 msgstr "Novos chats começam temporários"
+
+#: src/features/settings/components/chat/bots-settings.tsx:157
+msgid "New chats with this bot start in the chosen mode"
+msgstr "Novos chats com este bot começam no modo escolhido"
 
 #: src/features/knowledge/components/collection-dialog.tsx:52
 #: src/features/knowledge/components/collection-picker.tsx:93
@@ -21858,7 +21950,7 @@ msgstr "Nenhum log de auditoria encontrado"
 msgid "No bot"
 msgstr "Nenhum bot"
 
-#: src/features/settings/components/chat/bots-settings.tsx:161
+#: src/features/settings/components/chat/bots-settings.tsx:245
 msgid "No bots yet."
 msgstr "Nenhum bot ainda."
 
@@ -21999,6 +22091,10 @@ msgstr "Nenhuma execução ainda"
 msgid "No expiration"
 msgstr "Sem expiração"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:268
+msgid "No facts found in the pasted text."
+msgstr ""
+
 #: src/features/develop/components/checks-tab.tsx:138
 msgid "No failures in the checks shown."
 msgstr "Nenhuma falha nas verificações exibidas."
@@ -22027,7 +22123,7 @@ msgstr "Ainda não há arquivos na sua base de conhecimento. Envie documentos ac
 msgid "No focal length selected"
 msgstr "Nenhuma distância focal selecionada"
 
-#: src/features/projects/components/add-project-dialog.tsx:655
+#: src/features/projects/components/add-project-dialog.tsx:659
 msgid "No folders in here."
 msgstr ""
 
@@ -22102,11 +22198,11 @@ msgstr "Nenhum servidor MCP configurado. Adicione um servidor para ampliar os re
 msgid "No members in this team yet"
 msgstr "Ainda não há membros nesta equipe"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:225
+#: src/features/settings/components/personalization/memory-settings.tsx:232
 msgid "No memories of this type."
 msgstr "Nenhuma memória deste tipo."
 
-#: src/features/settings/components/personalization/memory-settings.tsx:226
+#: src/features/settings/components/personalization/memory-settings.tsx:233
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "Nenhuma memória ainda. A IA vai começar a aprender com suas conversas automaticamente."
 
@@ -24730,8 +24826,14 @@ msgid "Permission Level"
 msgstr "Nível de permissão"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:89
+#: src/features/settings/components/chat/bots-settings.tsx:210
 msgid "Permission mode"
 msgstr ""
+
+#. placeholder {0}: bot.name
+#: src/features/settings/components/chat/bots-settings.tsx:256
+msgid "Permission mode for {0}"
+msgstr "Modo de permissão de {0}"
 
 #. placeholder {0}: labels[mode]
 #: src/features/chat/thread/composer-permission-mode.tsx:63
@@ -24861,7 +24963,7 @@ msgstr "Escolha um item da caixa de entrada para lê-lo."
 msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
 msgstr "Escolha habilidades, agendamentos, webhooks e chats em grupo para compartilhar como um único arquivo Markdown. Chaves de API, segredos de webhook, tokens de conectores e outras credenciais nunca são incluídos, nem os IDs da sua conta ou organização."
 
-#: src/features/projects/components/add-project-dialog.tsx:513
+#: src/features/projects/components/add-project-dialog.tsx:517
 msgid "Pick the computer or server the project's folder is on."
 msgstr ""
 
@@ -24912,7 +25014,7 @@ msgstr "Fixar"
 msgid "Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own."
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-item.tsx:103
+#: src/features/settings/components/personalization/memory-item.tsx:109
 msgid "Pin memory"
 msgstr "Fixar memória"
 
@@ -25405,7 +25507,7 @@ msgstr "Pressione enter ou espaço para selecionar um nó. Depois você pode usa
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr "Pressione enter ou espaço para selecionar uma aresta. Depois você pode pressionar delete para removê-la ou escape para cancelar."
 
-#: src/features/projects/components/add-project-dialog.tsx:616
+#: src/features/projects/components/add-project-dialog.tsx:620
 msgid "Press Enter to open the folder. A folder that does not exist is created."
 msgstr ""
 
@@ -25446,6 +25548,7 @@ msgstr "preview"
 #: src/features/canvas/canvas-panel.tsx:767
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:790
 #: src/features/prompts/components/variable-fill-dialog.tsx:174
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:309
 #: src/features/workflow/components/canvas/workflow-controls.tsx:633
 #: src/features/workflow/components/nodes/image-node.tsx:76
 msgid "Preview"
@@ -25909,6 +26012,10 @@ msgstr "aderência ao prompt"
 #: src/features/marketing/components/gateway-landing-page.tsx:101
 msgid "Prompt cache management"
 msgstr "Gerenciamento do cache de prompts"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:130
+msgid "Prompt copied"
+msgstr ""
 
 #: src/features/prompts/components/prompt-item.tsx:62
 #: src/features/prompts/components/prompt-list-view.tsx:44
@@ -26521,6 +26628,10 @@ msgstr "Lendo \"{attachmentName}\"…"
 #: src/features/develop/components/guide-view.tsx:53
 msgid "Reading order"
 msgstr "Ordem de leitura"
+
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:309
+msgid "Reading…"
+msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:237
 msgid "Ready"
@@ -28513,7 +28624,7 @@ msgstr "Arábia Saudita"
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:641
 #: src/features/settings/components/chat/native-providers-settings.tsx:712
-#: src/features/settings/components/personalization/memory-item.tsx:145
+#: src/features/settings/components/personalization/memory-item.tsx:151
 #: src/features/slides/components/slide-editor-dialog.tsx:118
 #: src/features/workflow/components/canvas/workflow-controls.tsx:401
 msgid "Save"
@@ -29957,7 +30068,7 @@ msgstr "Mostrar menos"
 msgid "Show more"
 msgstr "Mostrar mais"
 
-#: src/features/projects/components/add-project-dialog.tsx:665
+#: src/features/projects/components/add-project-dialog.tsx:669
 msgid "Show more folders"
 msgstr ""
 
@@ -30746,7 +30857,7 @@ msgstr "Fonte {index}"
 msgid "Source {position}: {0}, passage {1}"
 msgstr "Fonte {position}: {0}, trecho {1}"
 
-#: src/features/settings/components/personalization/memory-item.tsx:97
+#: src/features/settings/components/personalization/memory-item.tsx:103
 msgid "Source chat"
 msgstr "Chat de origem"
 
@@ -31009,7 +31120,7 @@ msgstr ""
 msgid "SSH · {0} · not connected yet"
 msgstr ""
 
-#: src/features/projects/components/add-project-dialog.tsx:577
+#: src/features/projects/components/add-project-dialog.tsx:581
 msgid "SSH hosts come from ~/.ssh/config. Picking one connects it."
 msgstr ""
 
@@ -32081,6 +32192,7 @@ msgid "Superior understanding of complex visual concepts"
 msgstr "Compreensão superior de conceitos visuais complexos"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:43
+#: src/features/settings/components/chat/bots-settings.tsx:60
 msgid "Supervised"
 msgstr ""
 
@@ -33102,7 +33214,7 @@ msgstr ""
 msgid "The agent's tool calls"
 msgstr ""
 
-#: src/features/settings/components/personalization/memory-settings.tsx:155
+#: src/features/settings/components/personalization/memory-settings.tsx:159
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "A IA aprende com suas conversas para personalizar as respostas e revisa o que aprendeu todas as noites. Tudo o que ela lembra está listado aqui — edite, reclassifique, fixe ou exclua o que quiser."
 
@@ -33139,7 +33251,7 @@ msgstr "O assistente está pedindo um segredo"
 msgid "The assistant needs a secret"
 msgstr "O assistente precisa de um segredo"
 
-#: src/features/settings/components/chat/bots-settings.tsx:191
+#: src/features/settings/components/chat/bots-settings.tsx:281
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr "O bot e o computador dele são removidos. Os chats dele permanecem, como chats comuns."
 
@@ -33551,6 +33663,10 @@ msgstr "O MCP Registry está indisponível no momento. Mostrando servidores popu
 #: src/features/chat/guest-links/guest-page.tsx:98
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "Não foi possível enviar a mensagem. Verifique sua conexão e tente novamente."
+
+#: src/features/settings/components/chat/bots-settings.tsx:212
+msgid "The mode each new chat with this bot starts in. You can still change it per chat. Scheduled runs use it only when it asks more."
+msgstr "O modo em que cada novo chat com este bot começa. Você ainda pode alterá-lo em cada chat. As execuções agendadas o usam apenas quando ele pede mais confirmações."
 
 #: src/features/marketing/use-cases/use-case-data.ts:56
 msgid "The model asks to use a tool you set to Ask. The run stops before the tool executes."
@@ -34282,6 +34398,10 @@ msgstr "Isto já está na conversa."
 msgid "This is how your organization appears to members"
 msgstr "É assim que sua organização aparece para os membros"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:242
+msgid "This is longer than {maxPasteChars} characters. Paste it in parts and bring in each one."
+msgstr ""
+
 #: src/features/projects/components/project-repositories.tsx:180
 msgid "This is not a valid branch name."
 msgstr "Este não é um nome de branch válido."
@@ -34319,7 +34439,7 @@ msgstr "Este link está incompleto. Peça o link completo."
 msgid "This link is not taking messages right now. Try again later."
 msgstr "Este link não está aceitando mensagens no momento. Tente novamente mais tarde."
 
-#: src/features/projects/components/add-project-dialog.tsx:432
+#: src/features/projects/components/add-project-dialog.tsx:436
 msgid "This machine is not ready yet."
 msgstr ""
 
@@ -34601,7 +34721,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "Isso vai excluir permanentemente {0} contas de usuários anônimos e todos os dados delas. Essa ação não pode ser desfeita."
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:242
+#: src/features/settings/components/personalization/memory-settings.tsx:249
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "Isso vai excluir permanentemente todas as {0} memórias e os resumos diários delas. A IA vai recomeçar a aprender a partir da sua próxima conversa."
 
@@ -35515,6 +35635,10 @@ msgstr "Desativar a mesclagem automática?"
 #~ msgid "Turn on Daily Brief"
 #~ msgstr "Ativar o Daily Brief"
 
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:187
+msgid "Turn on memory"
+msgstr ""
+
 #: src/features/chat/goal/composer-goal.tsx:62
 #~ msgid "Turn on run until done"
 #~ msgstr ""
@@ -35918,7 +36042,7 @@ msgstr "Desafixar da esquerda"
 msgid "Unpin from right"
 msgstr "Desafixar da direita"
 
-#: src/features/settings/components/personalization/memory-item.tsx:103
+#: src/features/settings/components/personalization/memory-item.tsx:109
 msgid "Unpin memory"
 msgstr "Desafixar memória"
 
@@ -36125,6 +36249,12 @@ msgstr "Slide {slideNumber} atualizado"
 #: src/lib/model-descriptions.ts:239
 msgid "Updated vision model from Z.AI"
 msgstr "Modelo de visão atualizado da Z.AI"
+
+#. placeholder {0}: result.updated
+#. placeholder {1}: result.alreadyKnown
+#: src/features/settings/components/personalization/memory-import-dialog.tsx:118
+msgid "Updated: {0} · Already known: {1}"
+msgstr ""
 
 #: src/features/chat/thread/widgets/currency-widget.tsx:120
 msgid "Updated: {timestamp}"
@@ -37849,7 +37979,7 @@ msgstr "Quando o assistente deve usar esta habilidade?"
 msgid "Where each run goes"
 msgstr "Para onde vai cada execução"
 
-#: src/features/projects/components/add-project-dialog.tsx:510
+#: src/features/projects/components/add-project-dialog.tsx:514
 msgid "Where is the project?"
 msgstr ""
 
@@ -38504,7 +38634,7 @@ msgstr "Seu recurso do Azure OpenAI: ponto de extremidade, versão da API e nome
 msgid "Your background, preferences, or location to help the AI understand you better"
 msgstr "Sua formação, preferências ou localização, para ajudar a IA a entender você melhor"
 
-#: src/features/settings/components/chat/bots-settings.tsx:155
+#: src/features/settings/components/chat/bots-settings.tsx:239
 msgid "Your bots"
 msgstr "Seus bots"
 
