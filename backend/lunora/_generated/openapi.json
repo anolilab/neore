@@ -8542,6 +8542,97 @@
         "x-lunora-function-kind": "mutation"
       }
     },
+    "/_lunora/rpc#agent_thread_search:searchThreadsByMeaning": {
+      "post": {
+        "description": "Invoke the `action` `agent_thread_search:searchThreadsByMeaning` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "agent_thread_search:searchThreadsByMeaning",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "query": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "query"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "agent_thread_search:searchThreadsByMeaning",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "properties": {
+                      "archived": {
+                        "type": "boolean"
+                      },
+                      "score": {
+                        "type": "number"
+                      },
+                      "threadId": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "archived",
+                      "score",
+                      "threadId",
+                      "title"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: agent_thread_search:searchThreadsByMeaning",
+        "tags": [
+          "agent"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
     "/_lunora/rpc#agent_threads:getChildThreads": {
       "post": {
         "description": "Invoke the `query` `agent_threads:getChildThreads` over the Lunora RPC envelope (POST /_lunora/rpc).",
@@ -17125,11 +17216,17 @@
                               "summaryPathTooLongAt": {
                                 "type": "number"
                               },
+                              "summaryVectorId": {
+                                "type": "string"
+                              },
                               "tagIds": {
                                 "items": {
                                   "type": "string"
                                 },
                                 "type": "array"
+                              },
+                              "titleVectorId": {
+                                "type": "string"
                               },
                               "workerPolicy": {
                                 "properties": {
@@ -19890,11 +19987,17 @@
                       "summaryPathTooLongAt": {
                         "type": "number"
                       },
+                      "summaryVectorId": {
+                        "type": "string"
+                      },
                       "tagIds": {
                         "items": {
                           "type": "string"
                         },
                         "type": "array"
+                      },
+                      "titleVectorId": {
+                        "type": "string"
                       },
                       "workerPolicy": {
                         "properties": {

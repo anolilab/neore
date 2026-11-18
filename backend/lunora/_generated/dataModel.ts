@@ -1991,10 +1991,12 @@ export interface Doc_threads {
     summary?: string;
     summaryEpoch?: number;
     summaryPathTooLongAt?: number;
+    summaryVectorId?: string;
     tagIds?: Array<string>;
     tags?: Array<string>;
     teamId?: string;
     title?: string;
+    titleVectorId?: string;
     updatedAt?: number;
     userId?: string;
     workerPolicy?: { allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; hostDispatch: "ask"; maxDispatchesPerHour?: number };
@@ -5231,10 +5233,12 @@ export interface Insert_threads {
     summary?: string;
     summaryEpoch?: number;
     summaryPathTooLongAt?: number;
+    summaryVectorId?: string;
     tagIds?: Array<string>;
     tags?: Array<string>;
     teamId?: string;
     title?: string;
+    titleVectorId?: string;
     updatedAt?: number;
     userId?: string;
     workerPolicy?: { allowedSources: Array<"lead" | "user" | "trigger" | "messenger" | "outside_agent">; hostDispatch: "ask"; maxDispatchesPerHour?: number };
