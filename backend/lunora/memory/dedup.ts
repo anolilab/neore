@@ -85,6 +85,8 @@ export interface SimilarMemoryResult {
     confidence: number | undefined;
     id: Id<"memories">;
     memory: string;
+    /** A pinned memory is never revised: a near-match of one is kept beside it instead. */
+    pinned: boolean;
     score: number;
 }
 
@@ -138,17 +140,38 @@ export const findSimilarMemoryByVector = async (
             row = found;
         }
 
-        return { confidence: row.confidence ?? undefined, id: row._id as Id<"memories">, memory: row.memory, row, score: hit._score };
+        return {
+            confidence: row.confidence ?? undefined,
+            id: row._id as Id<"memories">,
+            memory: row.memory,
+            pinned: row.pinned === true,
+            row,
+            score: hit._score,
+        };
     }
 
     return null;
 };
 
-/** Jaccard similarity of the two texts' word sets. */
-const textSimilarity = (a: string, b: string): number => {
-    const wordsA = new Set(a.split(WHITESPACE_RE).filter(Boolean));
-    const wordsB = new Set(b.split(WHITESPACE_RE).filter(Boolean));
+/** The word set of a text, lowercased. Memoised per text by a caller that compares many facts to one list. */
+export type WordSetCache = Map<string, ReadonlySet<string>>;
 
+const wordSetOf = (text: string, cache?: WordSetCache): ReadonlySet<string> => {
+    const cached = cache?.get(text);
+
+    if (cached) {
+        return cached;
+    }
+
+    const words = new Set(text.toLowerCase().split(WHITESPACE_RE).filter(Boolean));
+
+    cache?.set(text, words);
+
+    return words;
+};
+
+/** Jaccard similarity of two word sets. */
+const jaccardOf = (wordsA: ReadonlySet<string>, wordsB: ReadonlySet<string>): number => {
     if (wordsA.size === 0 && wordsB.size === 0) {
         return 1;
     }
@@ -170,14 +193,15 @@ const textSimilarity = (a: string, b: string): number => {
 
 /**
  * Find the most similar existing memory using Jaccard similarity on word sets.
- * Fast fallback when no embedding is available.
+ * Fast fallback when no embedding is available. Pass one `cache` across the facts of a save.
  */
-export const findSimilarMemoryByJaccard = (newFact: string, existingMemories: ReadonlyArray<DedupMemory>): SimilarMemoryResult | null => {
+export const findSimilarMemoryByJaccard = (newFact: string, existingMemories: ReadonlyArray<DedupMemory>, cache?: WordSetCache): SimilarMemoryResult | null => {
     let bestMatch: SimilarMemoryResult | null = null;
     let bestScore = 0;
+    const newWords = wordSetOf(newFact, cache);
 
     for (const existing of existingMemories) {
-        const score = textSimilarity(newFact.toLowerCase(), existing.memory.toLowerCase());
+        const score = jaccardOf(newWords, wordSetOf(existing.memory, cache));
 
         if (score > bestScore && score >= NEAR_MATCH_SCORE) {
             bestScore = score;
@@ -185,6 +209,7 @@ export const findSimilarMemoryByJaccard = (newFact: string, existingMemories: Re
                 confidence: existing.confidence ?? undefined,
                 id: existing._id as Id<"memories">,
                 memory: existing.memory,
+                pinned: existing.pinned === true,
                 score,
             };
         }
@@ -193,18 +218,49 @@ export const findSimilarMemoryByJaccard = (newFact: string, existingMemories: Re
     return bestMatch;
 };
 
+/** A vector a row should be linked to, with the text it was computed from. */
+export interface MemoryVectorLink {
+    embeddingId: string;
+    memoryId: Id<"memories">;
+    text: string;
+}
+
 /**
- * Stores the vectors computed for dedup on the rows a run saved. Never throws: the vectors are
- * a retrieval aid, and a row without one is still found by keyword search.
+ * Links stored vectors to their rows, but only while each row still reads as the text its vector
+ * was computed from. A vector whose row was edited meanwhile is deleted, not linked: the edit
+ * schedules its own re-embed. Never throws: a row without a vector is still found by keyword search.
+ */
+export const linkMemoryVectors = async (ctx: ActionCtx, userId: string, links: ReadonlyArray<MemoryVectorLink>, logPrefix: string): Promise<void> => {
+    try {
+        if (links.length === 0) {
+            return;
+        }
+
+        const unlinked = await ctx.runMutation(internal.memory.functions.linkMemoryEmbeddings, { links: [...links], userId });
+
+        if (unlinked.length > 0) {
+            await ctx.runMutation(internal.agent.vector.deleteBatch, {
+                // `memories.embeddingId` is a plain string column: memory vectors are 1024-dim (bge-m3), so the id is re-branded here.
+                ids: unlinked as Id<"embeddings_1024">[],
+            });
+        }
+    } catch (error) {
+        console.error(`${logPrefix} Embedding link failed:`, error);
+    }
+};
+
+/**
+ * Stores the vectors computed for dedup on the rows a run saved, and links them. Never throws.
+ * `text` is what each row was saved with, so a row edited since is not linked to its old vector.
  */
 export const saveMemoryVectors = async (
     ctx: ActionCtx,
     userId: string,
-    saved: ReadonlyArray<{ memoryId: Id<"memories"> | null; vector: number[] | null }>,
+    saved: ReadonlyArray<{ memoryId: Id<"memories"> | null; text: string; vector: number[] | null }>,
     logPrefix: string,
 ): Promise<void> => {
     try {
-        const withVector = saved.flatMap(({ memoryId, vector }) => (memoryId && vector && vector.length > 0 ? [{ memoryId, vector }] : []));
+        const withVector = saved.flatMap(({ memoryId, text, vector }) => (memoryId && vector && vector.length > 0 ? [{ memoryId, text, vector }] : []));
 
         if (withVector.length === 0) {
             return;
@@ -223,13 +279,17 @@ export const saveMemoryVectors = async (
             }),
         });
 
-        for (const [index, { memoryId }] of withVector.entries()) {
+        const links: MemoryVectorLink[] = [];
+
+        for (const [index, { memoryId, text }] of withVector.entries()) {
             const embeddingId = embeddingIds[index];
 
             if (embeddingId) {
-                await ctx.runMutation(internal.memory.functions.updateMemoryInternal, { embeddingId: embeddingId as string, memoryId });
+                links.push({ embeddingId: embeddingId as string, memoryId, text });
             }
         }
+
+        await linkMemoryVectors(ctx, userId, links, logPrefix);
     } catch (error) {
         console.error(`${logPrefix} Embedding save failed:`, error);
     }

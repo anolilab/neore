@@ -137,4 +137,69 @@ describe("extraction vector dedup", () => {
         expect(rows.find((row: { _id: string }) => row._id === ownRow)?.lastConfirmedAt).toBeTypeOf("number");
         expect(rows.find((row: { _id: string }) => row._id === botRow)?.lastConfirmedAt).toBeUndefined();
     });
+
+    it("never revises a pinned row, and saves the fact beside it", async () => {
+        expect.assertions(2);
+
+        const pinned = await harness.run(async (ctx: any) => {
+            const vector = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: VECTOR });
+
+            searchVectors.mockResolvedValue([{ _id: vector, _score: 0.9 }]);
+
+            return await ctx.db.insert("memories", {
+                embeddingId: vector,
+                memory: "The user owns a blue vase",
+                pinned: true,
+                type: "activity",
+                userId: USER,
+            });
+        });
+
+        generateText
+            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, importance: 80, memory: FACT, type: "activity" }] } })
+            .mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: `${FACT} and keeps it on a shelf` } });
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "A lovely vase.",
+                    threadId,
+                    userId: USER,
+                    userMessage: "I bought a blue vase in Lisbon, please remember that about me",
+                }),
+        );
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("memories").collect());
+
+        expect(rows.find((row: { _id: string }) => row._id === pinned)?.memory).toBe("The user owns a blue vase");
+        expect(rows).toHaveLength(2);
+    });
+
+    it("schedules a new vector for a row an extraction merged into", async () => {
+        expect.assertions(1);
+
+        const rowId = await harness.run(async (ctx: any) => {
+            const vector = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: VECTOR });
+
+            searchVectors.mockResolvedValue([{ _id: vector, _score: 0.9 }]);
+
+            return await ctx.db.insert("memories", { embeddingId: vector, memory: "The user owns a blue vase", type: "activity", userId: USER });
+        });
+
+        generateText
+            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, importance: 80, memory: FACT, type: "activity" }] } })
+            .mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: `${FACT} and keeps it on a shelf` } });
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "A lovely vase.",
+                    threadId,
+                    userId: USER,
+                    userMessage: "I bought a blue vase in Lisbon, please remember that about me",
+                }),
+        );
+
+        expect(harness.scheduler.list().map((job) => job.args)).toContainEqual({ memoryId: rowId, userId: USER });
+    });
 });

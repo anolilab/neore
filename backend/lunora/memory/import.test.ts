@@ -7,6 +7,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { importFacts, labelImportedText } from "./import";
 
@@ -74,6 +75,13 @@ const setMemoryEnabled = async (memoryEnabled: boolean) =>
     });
 
 const memories = async () => await harness.run(async (ctx: any) => await ctx.db.query("memories").collect());
+
+/** The stored row with this id, read back after a save. */
+const rowOf = async (id: unknown): Promise<{ confidence?: number; embeddingId?: string; lastConfirmedAt?: number; memory: string } | undefined> => {
+    const rows: { _id: string }[] = await memories();
+
+    return rows.find((row) => row._id === id) as { confidence?: number; embeddingId?: string; lastConfirmedAt?: number; memory: string } | undefined;
+};
 
 const save = async (facts: ReadonlyArray<{ memory: string; type: "context" | "identity" }>) =>
     await harness.action(async (ctx: any) => await importFacts(ctx, { app: "gemini", facts, userId: USER }));
@@ -187,13 +195,13 @@ describe("importing another assistant's memory", () => {
         expect(await memories()).toHaveLength(1001);
     });
 
-    it("supersedes the row a fact contradicts even when its exact text is found past the window", async () => {
+    it("confirms an exact repeat found past the near-match window instead of superseding a near row", async () => {
         expect.assertions(2);
 
         await setMemoryEnabled(true);
 
-        const { contradicted, known } = await harness.run(async (ctx: any) => {
-            const kept = await ctx.db.insert("memories", { memory: "The user lives in Lisbon near the old harbour", type: "activity", userId: USER });
+        const { contradicted } = await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user lives in Lisbon near the old harbour", type: "activity", userId: USER });
 
             for (let index = 0; index < 999; index += 1) {
                 await ctx.db.insert("memories", { memory: `Preference number ${String(index)} of the user`, type: "preference", userId: USER });
@@ -205,12 +213,10 @@ describe("importing another assistant's memory", () => {
                     type: "preference",
                     userId: USER,
                 }),
-                known: kept,
             };
         });
 
-        generateText.mockResolvedValueOnce({ output: { action: "SUPERSEDE" } });
-
+        // The exact row is the best match once it is in the window, so no revision is asked and the near row stays active.
         expect(await save([{ memory: "The user lives in Lisbon near the old harbour", type: "context" }])).toStrictEqual({
             added: 0,
             alreadyKnown: 1,
@@ -218,7 +224,7 @@ describe("importing another assistant's memory", () => {
         });
         const row: { supersededBy?: string } = await harness.run(async (ctx: any) => await ctx.db.get("memories", contradicted));
 
-        expect(row.supersededBy).toBe(known);
+        expect(row.supersededBy).toBeUndefined();
     });
 
     it("saves a fact whose text matches a row the same save superseded", async () => {
@@ -386,7 +392,8 @@ describe("importing another assistant's memory", () => {
 
         expect(rows.find((row: { _id: string }) => row._id === known)?.lastConfirmedAt).toBeUndefined();
         expect(rows.find((row: { _id: string }) => row._id === contradicted)?.supersededBy).toBeUndefined();
-        expect(rows).toHaveLength(3);
+        // The confirmation was skipped, so the fact is saved as new rather than dropped.
+        expect(rows).toHaveLength(4);
     });
 
     it("does not supersede a row edited while the save ran", async () => {
@@ -711,5 +718,186 @@ describe("importing another assistant's memory", () => {
         expect(await save(FACTS)).toStrictEqual({ added: 60, alreadyKnown: 0, updated: 0 });
         expect(await save(FACTS)).toStrictEqual({ added: 0, alreadyKnown: 60, updated: 0 });
         expect(await memories()).toHaveLength(60);
+    });
+});
+
+describe("import limits", () => {
+    it("counts a confirmation the save could not apply as added, and saves its fact", async () => {
+        expect.assertions(3);
+
+        await setMemoryEnabled(true);
+
+        const [nurse, berlin] = await harness.run(async (ctx: any) => [
+            await ctx.db.insert("memories", { memory: "The user is a nurse in Hamburg", type: "identity", userId: USER }),
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER }),
+        ]);
+
+        // The first fact is planned as a confirmation of the nurse row; the second fact's revision edits that row before the save.
+        generateText.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("memories", nurse, { memory: "The user is a nurse in Bremen" });
+            });
+
+            return { output: { action: "SUPERSEDE" } };
+        });
+
+        const result = await save([
+            { memory: "The user is a nurse in Hamburg", type: "identity" },
+            { memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" },
+        ]);
+
+        const rows = await memories();
+
+        expect(result).toStrictEqual({ added: 2, alreadyKnown: 0, updated: 0 });
+        expect(rows.find((row: { _id: string }) => row._id === berlin)?.supersededBy).toBeTypeOf("string");
+        expect(rows.filter((row: { memory: string }) => row.memory === "The user is a nurse in Hamburg")).toHaveLength(1);
+    });
+
+    it("confirms the row a merge would duplicate instead of rewording its own row into a copy", async () => {
+        expect.assertions(4);
+
+        await setMemoryEnabled(true);
+
+        const [nurse, cycling] = await harness.run(async (ctx: any) => [
+            await ctx.db.insert("memories", {
+                memory: "The user is a nurse in the city hospital on the night shift every week",
+                type: "identity",
+                userId: USER,
+            }),
+            await ctx.db.insert("memories", { memory: "The user enjoys cycling along the river every morning", type: "context", userId: USER }),
+        ]);
+
+        generateText.mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: "The user enjoys cycling along the river every morning" } });
+
+        const result = await save([{ memory: "The user is a nurse in the city hospital on the night shift every weekend", type: "identity" }]);
+        const rows = await memories();
+
+        expect(result).toStrictEqual({ added: 0, alreadyKnown: 1, updated: 0 });
+        expect(rows).toHaveLength(2);
+        expect(rows.find((row: { _id: string }) => row._id === nurse)?.memory).toBe("The user is a nurse in the city hospital on the night shift every week");
+        expect(rows.find((row: { _id: string }) => row._id === cycling)?.lastConfirmedAt).toBeTypeOf("number");
+    });
+
+    it("finds a near-match past the 1000-row window when no fact has an embedding", async () => {
+        expect.assertions(3);
+
+        await setMemoryEnabled(true);
+
+        const bees = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("memories", {
+                    memory: "The user keeps bees in a small garden behind the old workshop",
+                    type: "context",
+                    userId: USER,
+                }),
+        );
+
+        // The window reads newest first: the filler rows must be strictly newer than the bees row, not the same millisecond.
+        await new Promise((resolve) => {
+            setTimeout(resolve, 5);
+        });
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 1000; index += 1) {
+                await ctx.db.insert("memories", {
+                    memory: `The user collects stamp number ${String(index)} from a far country`,
+                    type: "context",
+                    userId: USER,
+                });
+            }
+        });
+
+        generateText.mockResolvedValueOnce({ output: { action: "IGNORE" } });
+
+        expect(await save([{ memory: "The user keeps bees in a small garden behind the old workshop yearly", type: "context" }])).toStrictEqual({
+            added: 0,
+            alreadyKnown: 1,
+            updated: 0,
+        });
+        expect(await memories()).toHaveLength(1001);
+
+        const row = await rowOf(bees);
+
+        expect(row?.lastConfirmedAt).toBeTypeOf("number");
+    });
+
+    it("looks up at most ten facts by vector in one save", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+        useFakeVectors();
+
+        const facts = FACTS.slice(0, 30);
+
+        expect(await save(facts)).toStrictEqual({ added: 30, alreadyKnown: 0, updated: 0 });
+        // Each lookup is a vector query plus a row read, so the count bounds a save's subrequests.
+        expect(searchVectors.mock.calls.length).toBeLessThanOrEqual(10);
+    });
+
+    it("does not revise a pinned row, and saves the fact beside it", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+
+        const pinned = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("memories", {
+                    memory: "The user lives in Berlin near the river with a garden and bikes",
+                    pinned: true,
+                    type: "context",
+                    userId: USER,
+                }),
+        );
+
+        generateText.mockResolvedValueOnce({
+            output: { action: "UPDATE", mergedMemory: "The user lives in Berlin near the river with a garden and bikes daily" },
+        });
+
+        expect(await save([{ memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" }])).toStrictEqual({
+            added: 1,
+            alreadyKnown: 0,
+            updated: 0,
+        });
+
+        const row = await rowOf(pinned);
+
+        expect(row?.memory).toBe("The user lives in Berlin near the river with a garden and bikes");
+    });
+});
+
+describe("linking a vector to its memory", () => {
+    it("links a vector only while the memory still reads as the text it embeds", async () => {
+        expect.assertions(3);
+
+        const [memoryId, embeddingId] = await harness.run(async (ctx: any) => [
+            await ctx.db.insert("memories", { memory: "The user now reads the new text", type: "context", userId: USER }),
+            await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: vectorOf("item 1") }),
+        ]);
+
+        const unlinked = await harness.action(
+            async (ctx: any) =>
+                await ctx.runMutation(internal.memory.functions.linkMemoryEmbeddings, {
+                    links: [{ embeddingId: String(embeddingId), memoryId, text: "The user read the old text" }],
+                    userId: USER,
+                }),
+        );
+
+        expect(unlinked).toStrictEqual([String(embeddingId)]);
+
+        const unlinkedRow = await rowOf(memoryId);
+
+        expect(unlinkedRow?.embeddingId).toBeUndefined();
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runMutation(internal.memory.functions.linkMemoryEmbeddings, {
+                    links: [{ embeddingId: String(embeddingId), memoryId, text: "The user now reads the new text" }],
+                    userId: USER,
+                }),
+        );
+
+        const linkedRow = await rowOf(memoryId);
+
+        expect(linkedRow?.embeddingId).toBe(String(embeddingId));
     });
 });

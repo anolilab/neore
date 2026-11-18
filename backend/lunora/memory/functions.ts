@@ -9,7 +9,15 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { memoryLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
 import { withoutUndefined } from "../lib/patch";
-import { type ImportApp, importDedupKey, IMPORT_MEMORY_OFF_MESSAGE, IMPORTED_CONFIDENCE, IMPORTED_IMPORTANCE, vImportApp } from "./import-logic";
+import {
+    type ImportApp,
+    importDedupKey,
+    IMPORT_MEMORY_OFF_MESSAGE,
+    IMPORT_WIDE_WINDOW_ROWS,
+    IMPORTED_CONFIDENCE,
+    IMPORTED_IMPORTANCE,
+    vImportApp,
+} from "./import-logic";
 import { lastConfirmedOf, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { requireOwnedThread } from "../agent/thread-read-access";
@@ -505,15 +513,15 @@ export const saveMemoryBatch = internalMutation
         return memoryIds;
     });
 
-/** The user's own rows the import's last check reads: far past the action's dedup window. */
-const IMPORT_EXACT_CHECK_ROWS = 5000;
-
 /**
  * Every write of one import, applied together after the memory setting is re-checked, so
  * memory switched off meanwhile leaves the user's rows untouched. In order:
  * - a planned merge (`merge`) rewords its row while that is still the user's own, active,
- *   unpinned and unchanged since it was read; otherwise the fact is saved as new;
- * - `confirms` are marked confirmed while they still read as the text the fact matched;
+ *   unpinned and unchanged since it was read; otherwise the fact is saved as new. A merge
+ *   whose text another row of the user already holds confirms that row instead, so no two
+ *   rows end up with one text;
+ * - `confirms` are marked confirmed while they still read as the text the fact matched; each
+ *   reports `skipped` otherwise, and the action then saves that fact as new;
  * - the other facts are inserted, minus any whose text the user already has (that row is
  *   confirmed instead). It runs in the mutation because one shard's mutations run one at a
  *   time: a second save of the same paste sees what the first wrote, and a repeat past the
@@ -533,7 +541,12 @@ export const saveImportedMemoryBatch = internalMutation
         ),
         userId: v.string(),
     })
-    .output(v.array(v.object({ memoryId: v.id("memories"), status: v.union(v.literal("added"), v.literal("known"), v.literal("updated")) })))
+    .output(
+        v.object({
+            confirms: v.array(v.union(v.literal("known"), v.literal("skipped"))),
+            facts: v.array(v.object({ memoryId: v.id("memories"), status: v.union(v.literal("added"), v.literal("known"), v.literal("updated")) })),
+        }),
+    )
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
 
@@ -544,44 +557,25 @@ export const saveImportedMemoryBatch = internalMutation
         const ownActive = (row: Doc<"memories"> | null): row is Doc<"memories"> => row?.userId === args.userId && !row.botId && !row.supersededBy;
         const outcomes: ({ memoryId: Id<"memories">; status: "added" | "known" | "updated" } | undefined)[] = args.facts.map(() => undefined);
 
-        const reembed = new Set<Id<"memories">>();
-
-        for (const [index, { merge }] of args.facts.entries()) {
-            const target = merge ? await ctx.db.get("memories", merge.memoryId) : null;
-
-            // The row must still read as the text the merge was built from: an edit or another save meanwhile is not overwritten.
-            if (merge && ownActive(target) && target.pinned !== true && target.memory === merge.base) {
-                await ctx.db.patch("memories", target._id, { confidence: merge.confidence, lastConfirmedAt: now, memory: merge.memory, updatedAt: now });
-
-                // The merged text needs its own vector, or a repeat import matches the old one and revises again.
-                // Once per row, though two facts of the paste may merge into it.
-                if (!reembed.has(target._id)) {
-                    reembed.add(target._id);
-                    await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: target._id, userId: args.userId });
-                }
-
-                outcomes[index] = { memoryId: target._id, status: "updated" };
-            }
-        }
-
-        for (const { base, memoryId } of args.confirms) {
-            const row = await ctx.db.get("memories", memoryId);
-
-            // An edit meanwhile is not confirmed by a fact that matched the old text.
-            if (ownActive(row) && row.memory === base) {
-                await ctx.db.patch("memories", memoryId, { lastConfirmedAt: now });
-            }
-        }
-
-        // Read after the merges, so the exact check sees merged texts. The user's own active rows,
-        // newest first: a bot's rows and superseded history never use up the read.
+        // The user's own active rows, newest first: a bot's rows and superseded history never use up the read. Kept in step
+        // with every reword and retirement below, so each check sees the texts as this save leaves them.
         const { page: own } = await ctx.db.memories.findMany({
-            limit: IMPORT_EXACT_CHECK_ROWS,
+            limit: IMPORT_WIDE_WINDOW_ROWS,
             orderBy: [{ _creationTime: "desc" }],
             where: { botId: { isNull: true }, supersededBy: { isNull: true }, userId: args.userId },
         });
         const textOf = new Map(own.map((row) => [row._id, importDedupKey(row.memory)]));
         const byText = new Map([...textOf].map(([memoryId, key]) => [key, memoryId]));
+        const reword = (memoryId: Id<"memories">, key: string) => {
+            const previous = textOf.get(memoryId);
+
+            if (previous !== undefined && byText.get(previous) === memoryId) {
+                byText.delete(previous);
+            }
+
+            textOf.set(memoryId, key);
+            byText.set(key, memoryId);
+        };
         // A superseded row is no longer a match for a later fact of this batch.
         const retire = (memoryId: Id<"memories"> | undefined) => {
             const key = memoryId ? textOf.get(memoryId) : undefined;
@@ -591,10 +585,57 @@ export const saveImportedMemoryBatch = internalMutation
             }
         };
 
-        for (const [index, mem] of args.facts.entries()) {
-            const done = outcomes[index];
+        const reembed = new Set<Id<"memories">>();
 
-            if (done) {
+        for (const [index, { merge }] of args.facts.entries()) {
+            const target = merge ? await ctx.db.get("memories", merge.memoryId) : null;
+
+            // The row must still read as the text the merge was built from: an edit or another save meanwhile is not overwritten.
+            if (!merge || !ownActive(target) || target.pinned === true || target.memory !== merge.base) {
+                continue;
+            }
+
+            const key = importDedupKey(merge.memory);
+            const twin = byText.get(key);
+
+            // The merged text is already another row's: that row is confirmed, and the target keeps its own text.
+            if (twin !== undefined && twin !== target._id) {
+                await ctx.db.patch("memories", twin, { lastConfirmedAt: now });
+
+                outcomes[index] = { memoryId: twin, status: "known" };
+
+                continue;
+            }
+
+            await ctx.db.patch("memories", target._id, { confidence: merge.confidence, lastConfirmedAt: now, memory: merge.memory, updatedAt: now });
+            reword(target._id, key);
+
+            // The merged text needs its own vector, or a repeat import matches the old one and revises again.
+            // Once per row, though two facts of the paste may merge into it.
+            if (!reembed.has(target._id)) {
+                reembed.add(target._id);
+                await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: target._id, userId: args.userId });
+            }
+
+            outcomes[index] = { memoryId: target._id, status: "updated" };
+        }
+
+        const confirms: ("known" | "skipped")[] = [];
+
+        for (const { base, memoryId } of args.confirms) {
+            const row = await ctx.db.get("memories", memoryId);
+
+            // An edit meanwhile is not confirmed by a fact that matched the old text.
+            if (ownActive(row) && row.memory === base) {
+                await ctx.db.patch("memories", memoryId, { lastConfirmedAt: now });
+                confirms.push("known");
+            } else {
+                confirms.push("skipped");
+            }
+        }
+
+        for (const [index, mem] of args.facts.entries()) {
+            if (outcomes[index]) {
                 continue;
             }
 
@@ -639,13 +680,79 @@ export const saveImportedMemoryBatch = internalMutation
         }
 
         // One outcome per fact, in order: the action pairs them with its facts by index.
-        return outcomes.map((outcome) => {
-            if (!outcome) {
-                throw new Error("[memory/import] A fact was left without an outcome");
-            }
+        return {
+            confirms,
+            facts: outcomes.map((outcome) => {
+                if (!outcome) {
+                    throw new Error("[memory/import] A fact was left without an outcome");
+                }
 
-            return outcome;
+                return outcome;
+            }),
+        };
+    });
+
+/**
+ * Links stored vectors to their memories, each only while the row still reads as the text its
+ * vector was computed from. Returns the embedding ids that were NOT linked, for the caller to delete.
+ */
+export const linkMemoryEmbeddings = internalMutation
+    .input({
+        links: v.array(v.object({ embeddingId: v.string(), memoryId: v.id("memories"), text: v.string() })),
+        userId: v.string(),
+    })
+    .output(v.array(v.string()))
+    .mutation(async ({ args, ctx }) => {
+        const unlinked: string[] = [];
+
+        for (const link of args.links) {
+            const row = await ctx.db.get("memories", link.memoryId);
+
+            if (row?.userId === args.userId && row.memory === link.text) {
+                await ctx.db.patch("memories", link.memoryId, { embeddingId: link.embeddingId });
+            } else {
+                unlinked.push(link.embeddingId);
+            }
+        }
+
+        return unlinked;
+    });
+
+/**
+ * Extraction's belief-revision UPDATE: rewords one row only while it is still the user's own (or the bot's own, for
+ * its scope), active, unpinned and reads as the text the decision was made on. Returns whether it applied; when it did
+ * not, the caller saves the fact as new.
+ */
+export const reviseExtractedMemory = internalMutation
+    .input({
+        base: v.string(),
+        botId: v.optional(v.string()),
+        confidence: v.number(),
+        lastConfirmedAt: v.number(),
+        memory: v.string(),
+        memoryId: v.id("memories"),
+        userId: v.string(),
+    })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        const row = await ctx.db.get("memories", args.memoryId);
+
+        if (!row || row.userId !== args.userId || (row.botId ?? undefined) !== (args.botId ?? undefined) || row.supersededBy || row.pinned === true) {
+            return false;
+        }
+
+        if (row.memory !== args.base) {
+            return false;
+        }
+
+        await ctx.db.patch("memories", args.memoryId, {
+            confidence: args.confidence,
+            lastConfirmedAt: args.lastConfirmedAt,
+            memory: args.memory,
+            updatedAt: ctx.now,
         });
+
+        return true;
     });
 
 export const updateMemoryInternal = internalMutation

@@ -46,6 +46,7 @@ import {
     findSimilarMemoryByJaccard,
     findSimilarMemoryByVector,
     getMemoryEmbeddingModel,
+    linkMemoryVectors,
     MEMORY_EMBEDDING_MODEL_NAME,
     saveMemoryVectors,
     type SimilarMemoryResult,
@@ -389,7 +390,11 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
         const factEmbeddingsToSave: (number[] | null)[] = [];
 
         const memoriesToUpdate: {
+            base: string;
+            botId: string | undefined;
             confidence: number;
+            embedding: number[] | null;
+            fact: z.infer<typeof extractedFactSchema>;
             memory: string;
             memoryId: Id<"memories">;
         }[] = [];
@@ -450,6 +455,23 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                 continue;
             }
 
+            // A pinned memory is never revised: a near-match of one is kept beside it.
+            if (similarMemory.pinned) {
+                memoriesToSave.push({
+                    botId: args.botId,
+                    confidence: fact.confidence,
+                    importance: fact.importance,
+                    memory: fact.memory,
+                    source: "auto",
+                    supersedes: undefined,
+                    threadId: args.threadId,
+                    type: fact.type,
+                    userId: args.userId,
+                });
+                factEmbeddingsToSave.push(factEmbedding);
+                continue;
+            }
+
             // 0.85 <= score < 0.95 — potential conflict, run belief revision
             try {
                 const revision = await runBeliefRevision(model, similarMemory.memory, fact.memory);
@@ -492,7 +514,11 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                     case "UPDATE": {
                         if (revision.mergedMemory) {
                             memoriesToUpdate.push({
+                                base: similarMemory.memory,
+                                botId: args.botId,
                                 confidence: Math.max(fact.confidence, similarMemory.confidence ?? 50),
+                                embedding: factEmbedding,
+                                fact,
                                 memory: revision.mergedMemory,
                                 memoryId: similarMemory.id,
                             });
@@ -531,20 +557,65 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                 ctx,
                 args.userId,
                 savedIds.map((memoryId, index) => {
-                    return { memoryId, vector: factEmbeddingsToSave[index] ?? null };
+                    return { memoryId, text: memoriesToSave[index]?.memory ?? "", vector: factEmbeddingsToSave[index] ?? null };
                 }),
                 "[memory/extract]",
             );
         }
 
-        // 7. Apply updates to existing memories
+        // 7. Apply revisions to existing memories. Each applies only while its row still reads as the decided text; otherwise the
+        // fact is saved as new, below.
+        const reworded = new Set<Id<"memories">>();
+        const unapplied: (typeof memoriesToUpdate)[number][] = [];
+
         for (const update of memoriesToUpdate) {
-            await ctx.runMutation(internal.memory.functions.updateMemoryInternal, {
+            const applied = await ctx.runMutation(internal.memory.functions.reviseExtractedMemory, {
+                base: update.base,
+                botId: update.botId,
                 confidence: update.confidence,
                 lastConfirmedAt: now,
                 memory: update.memory,
                 memoryId: update.memoryId,
+                userId: args.userId,
             });
+
+            if (applied) {
+                reworded.add(update.memoryId);
+            } else {
+                unapplied.push(update);
+            }
+        }
+
+        // A reworded row's vector is of its old text: a new one is computed for the new text.
+        for (const memoryId of reworded) {
+            await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId, userId: args.userId });
+        }
+
+        if (unapplied.length > 0) {
+            const fallbackIds = await ctx.runMutation(internal.memory.functions.saveMemoryBatch, {
+                memories: unapplied.map((update) => {
+                    return {
+                        botId: update.botId,
+                        confidence: update.fact.confidence,
+                        importance: update.fact.importance,
+                        memory: update.fact.memory,
+                        source: "auto" as const,
+                        supersedes: undefined,
+                        threadId: args.threadId,
+                        type: update.fact.type,
+                        userId: args.userId,
+                    };
+                }),
+            });
+
+            await saveMemoryVectors(
+                ctx,
+                args.userId,
+                fallbackIds.map((memoryId, index) => {
+                    return { memoryId, text: unapplied[index]!.fact.memory, vector: unapplied[index]!.embedding };
+                }),
+                "[memory/extract]",
+            );
         }
 
         if (memoriesToConfirm.length > 0) {
@@ -649,11 +720,14 @@ export const regenerateMemoryEmbedding = internalAction
                 ],
             });
 
+            // Linked only while the row still reads as the text just embedded: an edit meanwhile schedules its own re-embed.
             if (embeddingId) {
-                await ctx.runMutation(internal.memory.functions.updateMemoryInternal, {
-                    embeddingId: embeddingId as string,
-                    memoryId: args.memoryId,
-                });
+                await linkMemoryVectors(
+                    ctx,
+                    args.userId,
+                    [{ embeddingId: embeddingId as string, memoryId: args.memoryId, text: memory.memory }],
+                    "[memory/extract]",
+                );
             }
         } catch (error) {
             console.error("[memory/extract] Embedding regeneration failed:", error);

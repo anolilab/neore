@@ -27,6 +27,19 @@ export const IMPORT_MAX_INPUT_CHARS = 20_000;
 /** Most facts one import reads or saves; lines past it are reported as cut. */
 export const IMPORT_MAX_FACTS = 100;
 
+/**
+ * The user's own rows an import reads past its near-match window: the exact-text check in the save, and the
+ * word-overlap match when a fact has no embedding (or past the vector budget below).
+ */
+export const IMPORT_WIDE_WINDOW_ROWS = 5000;
+
+/**
+ * Vector lookups one save makes. Each is a vector query and a row read, so this bounds a save's subrequests. Facts
+ * past it are matched by words over the wide window. Not a measured figure: a save with the full revision cap can
+ * still exceed the Free plan's 50 subrequests, which is the deploy plan's decision.
+ */
+export const IMPORT_MAX_VECTOR_LOOKUPS = 10;
+
 /** Longest single fact kept. */
 export const IMPORT_MAX_FACT_CHARS = 500;
 
