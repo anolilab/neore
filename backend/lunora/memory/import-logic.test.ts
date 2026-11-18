@@ -3,6 +3,14 @@ import { describe, expect, it } from "vitest";
 import { applyImportLabels, buildImportLabelPrompt, IMPORT_MAX_FACTS, looksSensitive, sanitizeImportedFacts, splitImportedText } from "./import-logic";
 
 describe(splitImportedText, () => {
+    it("splits on the Unicode line and paragraph separators", () => {
+        expect(splitImportedText("The user is a nurse in Hamburg\u{2028}The user likes green tea\u{2029}The user owns a bike").lines).toStrictEqual([
+            "The user is a nurse in Hamburg",
+            "The user likes green tea",
+            "The user owns a bike",
+        ]);
+    });
+
     it("splits on a bare carriage return as on a line feed", () => {
         expect(splitImportedText("The user is a nurse in Hamburg\rThe user likes green tea\r\nThe user owns a bike").lines).toStrictEqual([
             "The user is a nurse in Hamburg",
