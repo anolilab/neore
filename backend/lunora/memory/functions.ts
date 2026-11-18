@@ -499,15 +499,29 @@ export const saveMemory = internalMutation
 
 export const saveMemoryBatch = internalMutation
     .input({
-        memories: v.array(v.object({ ...vMemoryInsertFields })),
+        memories: v.array(v.object({ ...vMemoryInsertFields, supersedesBase: v.optional(v.string()) })),
     })
     .output(v.array(v.id("memories")))
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
         const memoryIds: Id<"memories">[] = [];
 
-        for (const mem of args.memories) {
-            memoryIds.push(await insertMemory(ctx, mem, now));
+        for (const { supersedesBase, ...mem } of args.memories) {
+            // A supersession applies only while its target still reads as the text the decision was made on, in the same
+            // scope, unpinned and active. Otherwise the new memory is saved beside it.
+            const target = mem.supersedes ? await ctx.db.get("memories", mem.supersedes) : null;
+            const supersedes =
+                target &&
+                supersedesBase !== undefined &&
+                target.userId === mem.userId &&
+                (target.botId ?? undefined) === (mem.botId ?? undefined) &&
+                !target.supersededBy &&
+                target.pinned !== true &&
+                target.memory === supersedesBase
+                    ? mem.supersedes
+                    : undefined;
+
+            memoryIds.push(await insertMemory(ctx, { ...mem, supersedes }, now));
         }
 
         return memoryIds;
@@ -618,7 +632,8 @@ export const saveImportedMemoryBatch = internalMutation
         const confirmOutcomes: (ImportOutcome | undefined)[] = args.confirms.map(() => undefined);
         // Rows this save confirmed or reworded: a later supersede must not retire them.
         const kept = new Set<Id<"memories">>();
-        const reworded = new Set<Id<"memories">>();
+        // The texts each reworded row's merges consumed: a confirmation of one of them still holds once merged.
+        const reworded = new Map<Id<"memories">, Set<string>>();
         const reembed = new Set<Id<"memories">>();
 
         for (const [index, { merge }] of args.facts.entries()) {
@@ -645,7 +660,7 @@ export const saveImportedMemoryBatch = internalMutation
             await ctx.db.patch("memories", target._id, { confidence: merge.confidence, lastConfirmedAt: now, memory: merge.memory, updatedAt: now });
             reword(target._id, key);
             kept.add(target._id);
-            reworded.add(target._id);
+            reworded.set(target._id, new Set([...(reworded.get(target._id) ?? []), merge.base]));
 
             // The merged text needs its own vector, or a repeat import matches the old one and revises again.
             // Once per row, though two facts of the paste may merge into it.
@@ -663,7 +678,7 @@ export const saveImportedMemoryBatch = internalMutation
             const row = await ctx.db.get("memories", memoryId);
 
             // A row this save reworded still holds what the confirmation matched, in its merged text.
-            if (ownActive(row) && (reworded.has(memoryId) || row.memory === base)) {
+            if (ownActive(row) && (reworded.get(memoryId)?.has(base) || row.memory === base)) {
                 await ctx.db.patch("memories", memoryId, { lastConfirmedAt: now });
                 kept.add(memoryId);
 
@@ -688,8 +703,9 @@ export const saveImportedMemoryBatch = internalMutation
             // row with the text the decision read: another save may have ended, removed or edited it, or the user
             // pinned it, meanwhile. Otherwise the fact is saved beside it.
             const planned = fact.supersede ? await ctx.db.get("memories", fact.supersede.memoryId) : null;
+            // A fact whose exact text is already a row is known: a supersession planned against another row does not apply.
             const supersedes =
-                ownActive(planned) && planned.pinned !== true && planned.memory === fact.supersede?.base && planned._id !== known && !kept.has(planned._id)
+                ownActive(planned) && planned.pinned !== true && planned.memory === fact.supersede?.base && known === undefined && !kept.has(planned._id)
                     ? planned._id
                     : undefined;
 
@@ -748,34 +764,31 @@ export const saveImportedMemoryBatch = internalMutation
 
 /**
  * Links stored vectors to their memories, each only while the row still reads as the text its
- * vector was computed from. `rejected` are the new vectors that did not link; `replaced` are the
- * vectors a linked row let go of. The caller deletes both.
+ * vector was computed from. A rejected vector and the one a linked row lets go of are deleted in
+ * this same write, through the retrying delete, so a failed delete is retried rather than lost.
  */
 export const linkMemoryEmbeddings = internalMutation
     .input({
         links: v.array(v.object({ embeddingId: v.string(), memoryId: v.id("memories"), text: v.string() })),
         userId: v.string(),
     })
-    .output(v.object({ rejected: v.array(v.string()), replaced: v.array(v.string()) }))
+    .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const rejected: string[] = [];
-        const replaced: string[] = [];
-
         for (const link of args.links) {
             const row = await ctx.db.get("memories", link.memoryId);
 
             if (row?.userId === args.userId && row.memory === link.text) {
                 if (row.embeddingId && row.embeddingId !== link.embeddingId) {
-                    replaced.push(row.embeddingId);
+                    await deleteMemoryVector(ctx, { embeddingId: row.embeddingId, memoryId: link.memoryId, userId: args.userId });
                 }
 
                 await ctx.db.patch("memories", link.memoryId, { embeddingId: link.embeddingId });
             } else {
-                rejected.push(link.embeddingId);
+                await deleteMemoryVector(ctx, { embeddingId: link.embeddingId, memoryId: link.memoryId, userId: args.userId });
             }
         }
 
-        return { rejected, replaced };
+        return null;
     });
 
 /**
@@ -846,45 +859,50 @@ export const updateMemoryInternal = internalMutation
  * already known. Only the owner's rows are touched.
  */
 export const confirmMemories = internalMutation
-    .input({ memoryIds: v.array(v.id("memories")), userId: v.string() })
-    .output(v.null())
+    .input({ confirms: v.array(v.object({ base: v.string(), memoryId: v.id("memories") })), userId: v.string() })
+    .output(v.array(v.number()))
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
+        // Indexes of the confirmations that did not apply: their row no longer reads as the text the fact matched.
+        const unconfirmed: number[] = [];
 
-        for (const memoryId of args.memoryIds) {
+        for (const [index, { base, memoryId }] of args.confirms.entries()) {
             const memory = await ctx.db.get("memories", memoryId);
 
-            if (memory?.userId === args.userId && !memory.supersededBy) {
+            if (memory?.userId === args.userId && !memory.supersededBy && memory.memory === base) {
                 await ctx.db.patch("memories", memoryId, { lastConfirmedAt: now });
+            } else {
+                unconfirmed.push(index);
             }
         }
 
-        return null;
+        return unconfirmed;
     });
 
+/** Raw rows one scope's active read may scan. A scope with more superseded rows ahead of its active ones returns a shorter window. */
+const MEMORY_ACTIVE_SCAN_ROWS = 2000;
+/** Rows per page of that read: never more than the window asks for, and never a page bigger than this. */
+const MEMORY_ACTIVE_PAGE_ROWS = 500;
+
 /**
- * Memories a run may read or dedupe against. Without `botId` only the user's own
- * memories (no bot). With `botId`, that bot's memories, plus the user's own ones
- * when `includeUserWide` (a bot chat reads what the user already knows). Writes
- * pass `botId` WITHOUT `includeUserWide`: a bot's extraction never matches or
- * edits a user memory.
- */
-/**
- * The newest `limit` active rows of one scope, in index order. Superseded rows are skipped as they come and the read
- * pages on until `limit` active rows are found, so history never uses up the window.
+ * The newest `limit` active rows of one scope, in index order. Superseded rows are skipped as they come, and the read
+ * pages on until `limit` active rows are found or its scan budget is spent. An index that excludes superseded rows
+ * would remove the budget.
  */
 const activeRowsInScope = async (ctx: QueryCtx, userId: string, scope: string | null, limit: number): Promise<Doc<"memories">[]> => {
     const active: Doc<"memories">[] = [];
     let cursor: string | null = null;
     let isDone = false;
+    let scanned = 0;
 
-    while (active.length < limit && !isDone) {
+    while (active.length < limit && scanned < MEMORY_ACTIVE_SCAN_ROWS && !isDone) {
         const page = await ctx.db
             .query("memories")
             .withIndex("by_userId_botId", (q) => q.eq("userId", userId).eq("botId", scope as Id<"bots"> | null))
             .order("desc")
-            .paginate({ cursor, numItems: limit });
+            .paginate({ cursor, numItems: Math.min(limit, MEMORY_ACTIVE_PAGE_ROWS) });
 
+        scanned += page.page.length;
         active.push(...page.page.filter((memory) => !memory.supersededBy));
         cursor = page.continueCursor;
         isDone = page.isDone;
@@ -893,6 +911,13 @@ const activeRowsInScope = async (ctx: QueryCtx, userId: string, scope: string | 
     return active.slice(0, limit);
 };
 
+/**
+ * Memories a run may read or dedupe against. Without `botId` only the user's own
+ * memories (no bot). With `botId`, that bot's memories, plus the user's own ones
+ * when `includeUserWide` (a bot chat reads what the user already knows). Writes
+ * pass `botId` WITHOUT `includeUserWide`: a bot's extraction never matches or
+ * edits a user memory.
+ */
 export const getActiveMemoriesForUser = internalQuery
     .input({
         botId: v.optional(v.string()),

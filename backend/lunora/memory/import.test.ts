@@ -880,7 +880,7 @@ describe("linking a vector to its memory", () => {
             await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: vectorOf("item 1") }),
         ]);
 
-        const unlinked = await harness.action(
+        await harness.action(
             async (ctx: any) =>
                 await ctx.runMutation(internal.memory.functions.linkMemoryEmbeddings, {
                     links: [{ embeddingId: String(embeddingId), memoryId, text: "The user read the old text" }],
@@ -888,11 +888,10 @@ describe("linking a vector to its memory", () => {
                 }),
         );
 
-        expect(unlinked).toStrictEqual({ rejected: [String(embeddingId)], replaced: [] });
+        const rejectedRow = await rowOf(memoryId);
 
-        const unlinkedRow = await rowOf(memoryId);
-
-        expect(unlinkedRow?.embeddingId).toBeUndefined();
+        expect(rejectedRow?.embeddingId).toBeUndefined();
+        expect(await harness.run(async (ctx: any) => await ctx.db.get("embeddings_128", embeddingId))).toBeNull();
 
         await harness.action(
             async (ctx: any) =>
@@ -976,36 +975,9 @@ describe("import writes in one batch", () => {
     });
 });
 
-describe("linking a vector replaces the row's old one", () => {
-    it("reports the vector a linked row lets go of, so it can be deleted", async () => {
-        expect.assertions(1);
-
-        const [memoryId, oldEmbedding, newEmbedding] = await harness.run(async (ctx: any) => {
-            const oldId = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: vectorOf("item 1") });
-            const memory = await ctx.db.insert("memories", {
-                embeddingId: String(oldId),
-                memory: "The user now reads the new text",
-                type: "context",
-                userId: USER,
-            });
-            const newId = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: vectorOf("item 2") });
-
-            return [memory, String(oldId), String(newId)];
-        });
-
-        expect(
-            await harness.action(
-                async (ctx: any) =>
-                    await ctx.runMutation(internal.memory.functions.linkMemoryEmbeddings, {
-                        links: [{ embeddingId: newEmbedding, memoryId, text: "The user now reads the new text" }],
-                        userId: USER,
-                    }),
-            ),
-        ).toStrictEqual({ rejected: [], replaced: [oldEmbedding] });
-    });
-
-    it("reports the vector an overlapping second link replaces, so neither vector is left unreferenced", async () => {
-        expect.assertions(1);
+describe("linking a second vector replaces the first", () => {
+    it("deletes the vector a row lets go of when a second link replaces it", async () => {
+        expect.assertions(3);
 
         const [memoryId, firstEmbedding, secondEmbedding] = await harness.run(async (ctx: any) => {
             const memory = await ctx.db.insert("memories", { memory: "The user now reads the new text", type: "context", userId: USER });
@@ -1015,22 +987,20 @@ describe("linking a vector replaces the row's old one", () => {
             return [memory, String(first), String(second)];
         });
 
-        await harness.action(
-            async (ctx: any) =>
-                await ctx.runMutation(internal.memory.functions.linkMemoryEmbeddings, {
-                    links: [{ embeddingId: firstEmbedding, memoryId, text: "The user now reads the new text" }],
-                    userId: USER,
-                }),
-        );
-
-        expect(
+        for (const embeddingId of [firstEmbedding, secondEmbedding]) {
             await harness.action(
                 async (ctx: any) =>
                     await ctx.runMutation(internal.memory.functions.linkMemoryEmbeddings, {
-                        links: [{ embeddingId: secondEmbedding, memoryId, text: "The user now reads the new text" }],
+                        links: [{ embeddingId, memoryId, text: "The user now reads the new text" }],
                         userId: USER,
                     }),
-            ),
-        ).toStrictEqual({ rejected: [], replaced: [firstEmbedding] });
+            );
+        }
+
+        const row = await rowOf(memoryId);
+
+        expect(row?.embeddingId).toBe(secondEmbedding);
+        expect(await harness.run(async (ctx: any) => await ctx.db.get("embeddings_128", firstEmbedding))).toBeNull();
+        expect(await harness.run(async (ctx: any) => await ctx.db.get("embeddings_128", secondEmbedding))).not.toBeNull();
     });
 });

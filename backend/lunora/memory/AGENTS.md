@@ -34,9 +34,11 @@
   fact of the same save. A merge whose text another own row holds confirms that row. Vector lookups are capped per
   save (`IMPORT_MAX_VECTOR_LOOKUPS`); the 1000-row window is widened to 5000 rows once, the first time a fact must
   be matched by words.
-- **Extraction** never revises a pinned row (a near-match is saved beside it). Its UPDATE applies only while the
-  row still reads as the decided text (`reviseExtractedMemory`), which also schedules the re-embed in the same
-  write; a failed or unapplied revision saves its fact as new. A row revised earlier in one run is matched by words
-  against its revised text.
+- **Extraction** never revises a pinned row (a near-match is saved beside it). Its write runs in order: revisions
+  (`reviseExtractedMemory`, which re-embeds in the same write and applies only while the row reads as the decided
+  text), then confirmations (`confirmMemories`, same check), then ONE save of every new memory, with the fallbacks
+  of unapplied revisions and confirmations. A supersession applies only while its target still reads as the text
+  the decision read (`saveMemoryBatch`, `supersedesBase`). A row revised earlier in one run is matched by words
+  against its revised text, and carries the confidence its revision set.
 - **Vectors link only while the row reads as the embedded text** (`linkMemoryEmbeddings`, via `linkMemoryVectors`
-  in `dedup.ts`): a vector whose row was edited meanwhile is deleted, and so is the vector a linked row replaces.
+  in `dedup.ts`): the mutation deletes a vector it does not keep (rejected, or replaced) through the retrying delete.

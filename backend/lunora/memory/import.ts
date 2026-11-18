@@ -149,11 +149,6 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
     for (const [index, fact] of facts.entries()) {
         const embedding = embeddings[index] ?? null;
         const vectorAllowed = embedding !== null && lookups < IMPORT_MAX_VECTOR_LOOKUPS;
-
-        if (!vectorAllowed) {
-            await widen();
-        }
-
         let byVector: Awaited<ReturnType<typeof findSimilarMemoryByVector>> = null;
 
         if (embedding && vectorAllowed) {
@@ -170,7 +165,15 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
             existing.push(byVector.row);
         }
 
-        const similar = byVector && !reworded.has(byVector.id) ? byVector : findSimilarMemoryByJaccard(fact.memory, existing, words);
+        const usableVector = byVector && !reworded.has(byVector.id) ? byVector : null;
+
+        // No usable vector match (no embedding, budget spent, a failed search, or a hit on a reworded row): the fact is matched
+        // by words over the wide window, so a near-match past the first window is found.
+        if (!usableVector) {
+            await widen();
+        }
+
+        const similar = usableVector ?? findSimilarMemoryByJaccard(fact.memory, existing, words);
         // Later facts compare against the row as this save leaves it: merged text, or gone once superseded.
         const match = similar ? existing.find((row) => row._id === similar.id) : undefined;
         let action: "ADD" | "IGNORE" | "SUPERSEDE" | "UPDATE" = "ADD";

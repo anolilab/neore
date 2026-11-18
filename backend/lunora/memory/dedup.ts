@@ -227,9 +227,8 @@ export interface MemoryVectorLink {
 
 /**
  * Links stored vectors to their rows, but only while each row still reads as the text its vector
- * was computed from. A vector whose row was edited meanwhile is deleted, not linked: the edit
- * schedules its own re-embed. The vector a linked row replaces is deleted too. Never throws: a row without a
- * vector is still found by keyword search.
+ * was computed from. The mutation deletes the vectors a link does not keep, with retries. Never throws:
+ * a row without a vector is still found by keyword search.
  */
 export const linkMemoryVectors = async (ctx: ActionCtx, userId: string, links: ReadonlyArray<MemoryVectorLink>, logPrefix: string): Promise<void> => {
     try {
@@ -237,16 +236,7 @@ export const linkMemoryVectors = async (ctx: ActionCtx, userId: string, links: R
             return;
         }
 
-        const { rejected, replaced } = await ctx.runMutation(internal.memory.functions.linkMemoryEmbeddings, { links: [...links], userId });
-        // A vector that no row references any more. Deleting an id that is already gone is a no-op.
-        const stale = [...rejected, ...replaced];
-
-        if (stale.length > 0) {
-            await ctx.runMutation(internal.agent.vector.deleteBatch, {
-                // `memories.embeddingId` is a plain string column: memory vectors are 1024-dim (bge-m3), so the id is re-branded here.
-                ids: stale as Id<"embeddings_1024">[],
-            });
-        }
+        await ctx.runMutation(internal.memory.functions.linkMemoryEmbeddings, { links: [...links], userId });
     } catch (error) {
         console.error(`${logPrefix} Embedding link failed:`, error);
     }

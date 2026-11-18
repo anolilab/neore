@@ -8,15 +8,19 @@ import * as lunora_memory_functions_166 from "../../memory/functions.js";
 installCompiledValidatorMap(lunora_memory_functions_166.confirmMemories.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
-if (!Array.isArray(source["memoryIds"])) return DEFER;
-const __arr1 = new Array(source["memoryIds"].length);
-for (let __i1 = 0; __i1 < source["memoryIds"].length; __i1++) {
-const __e1 = source["memoryIds"][__i1];
-if (typeof __e1 !== "string") return DEFER;
-__arr1[__i1] = __e1;
+if (!Array.isArray(source["confirms"])) return DEFER;
+const __arr1 = new Array(source["confirms"].length);
+for (let __i1 = 0; __i1 < source["confirms"].length; __i1++) {
+const __e1 = source["confirms"][__i1];
+if (typeof __e1 !== "object" || __e1 === null || Array.isArray(__e1)) return DEFER;
+if (Object.getPrototypeOf(__e1) !== Object.prototype && Object.getPrototypeOf(__e1) !== null) return DEFER;
+if (typeof __e1["base"] !== "string") return DEFER;
+if (typeof __e1["memoryId"] !== "string") return DEFER;
+const __obj2 = { "base": __e1["base"], "memoryId": __e1["memoryId"] };
+__arr1[__i1] = __obj2;
 }
 if (typeof source["userId"] !== "string") return DEFER;
-return { "memoryIds": __arr1, "userId": source["userId"] };
+return { "confirms": __arr1, "userId": source["userId"] };
 });
 installCompiledValidatorMap(lunora_memory_functions_166.getActiveMemoriesForUser.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
