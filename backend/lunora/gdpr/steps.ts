@@ -6,7 +6,7 @@ import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
-import { collectAllRepositories } from "../projects/export-pages";
+import { collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
 import { feedbackReadBudget, projectDetailsReadBudget, repositoriesReadBudget, triggerReadBudget } from "./read-budget";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -609,8 +609,14 @@ export const generateExportFile = internalAction
             async (cursor) => await context.runQuery(internal.feedback.gdpr.collectFeedbackForExport, { cursor, userId: args.userId }),
             feedbackReadBudget(earlierReadBytes + repositories.readBytes),
         );
+        // Every project the user owns, the ones without a repository too: an owner's computer and folder are their data.
+        // It shares the read budget left after the repositories and the feedback; no floor, so past it a project loses its details (marked) and is never left out.
+        const ownedProjects = await collectAllOwnedProjects(
+            async (cursor) => await context.runQuery(internal.projects.gdpr.collectOwnedProjectsForExport, { cursor, userId: args.userId }),
+            projectDetailsReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes),
+        );
         // The projects read for their details count too: a row is read whole, however little of it is exported.
-        const triggerReadBytes = triggerReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes);
+        const triggerReadBytes = triggerReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes);
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
@@ -632,6 +638,7 @@ export const generateExportFile = internalAction
             pages: args.pages ?? { comments: [], favorites: [], grants: [], pages: [] },
             profile: args.profile,
             projectRepositories,
+            projects: ownedProjects.projects,
             prompts: args.prompts,
             pullRequestGuides: args.pullRequestGuides ?? { guides: [] },
             pullRequestThreads: args.pullRequestThreads ?? { links: [] },

@@ -25,30 +25,17 @@ msgstr " · modèle : {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, one {# ligne} other {# lignes}}, {1, plural, one {# colonne} other {# colonnes}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:639
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:752
 msgid "-- INSERT --"
 msgstr "-- INSERTION --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:639
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:752
 msgid "-- NORMAL --"
 msgstr "-- NORMAL --"
 
 #: src/features/notifications/components/notification-list.tsx:115
 msgid ", unread"
 msgstr ", non lue"
-
-#: src/features/chat/thread/composer-tiptap/emoji-shortcode-popup.tsx:48
-msgid "Emoji suggestions"
-msgstr ""
-
-#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:134
-msgid "No emoji found"
-msgstr ""
-
-#. placeholder {0}: suggestions.length
-#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:134
-msgid "{0, plural, one {# emoji} other {# emoji}} found"
-msgstr ""
 
 #: src/features/sub-agents/components/sub-agent-approvals.tsx:63
 msgid "… ({omitted, plural, one {# more character not shown} other {# more characters not shown}}; approving runs the whole call)"
@@ -74,23 +61,23 @@ msgstr "« {0} » démarrera une fois ses dépendances terminées"
 msgid "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
 msgstr "« {badLogin} » n’est pas un identifiant valide. Un identifiant commence par une lettre ou un chiffre, compte au plus {0} caractères et n’utilise que des lettres, des chiffres et des traits d’union ou tirets bas isolés."
 
-#: src/features/chat/thread/composer-input.tsx:628
+#: src/features/chat/thread/composer-input.tsx:629
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "Impossible de joindre « {fileName} » : ce type de fichier n’est pas pris en charge."
 
-#: src/features/chat/thread/composer-input.tsx:621
+#: src/features/chat/thread/composer-input.tsx:622
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "Impossible de joindre « {fileName} » : son contenu ne correspond pas à son type de fichier."
 
-#: src/features/chat/thread/composer-input.tsx:623
+#: src/features/chat/thread/composer-input.tsx:624
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "Impossible d’envoyer « {fileName} ». Vérifiez votre connexion et réessayez."
 
-#: src/features/chat/thread/composer-input.tsx:626
+#: src/features/chat/thread/composer-input.tsx:627
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "« {fileName} » est trop volumineux. Les documents ne peuvent pas dépasser {maxMegabytes} Mo."
 
-#: src/features/chat/thread/composer-input.tsx:627
+#: src/features/chat/thread/composer-input.tsx:628
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "« {fileName} » est trop volumineux. Les fichiers de ce type ne peuvent pas dépasser {maxMegabytes} Mo."
 
@@ -216,6 +203,11 @@ msgstr "{0, plural, one {# vérification échoue} other {# vérifications échou
 #: src/features/develop/components/checks-tab.tsx:91
 msgid "{0, plural, one {# check is still running} other {# checks are still running}}"
 msgstr "{0, plural, one {# vérification est encore en cours} other {# vérifications sont encore en cours}}"
+
+#. placeholder {0}: suggestions.length
+#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:162
+msgid "{0, plural, one {# emoji} other {# emoji}} found"
+msgstr ""
 
 #. placeholder {0}: files.length
 #: src/features/chat/thread/host-changes.tsx:53
@@ -2470,6 +2462,17 @@ msgstr "Ajouter une clé d’accès"
 msgid "Add picked frame as image node"
 msgstr "Ajouter l’image choisie comme nœud d’image"
 
+#: src/features/chat/thread-list/thread-list-header.tsx:126
+#: src/features/chat/thread-list/thread-list-header.tsx:136
+#: src/features/projects/components/add-project-dialog.tsx:687
+msgid "Add project"
+msgstr ""
+
+#. placeholder {0}: rowName(machine)
+#: src/features/projects/components/add-project-dialog.tsx:510
+msgid "Add project on {0}"
+msgstr ""
+
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:487
 msgid "Add prompt"
 msgstr "Ajouter un prompt"
@@ -2643,6 +2646,10 @@ msgstr "Ajouté :"
 msgid "Adding documents… {0} of {1}"
 msgstr "Ajout des documents… {0} sur {1}"
 
+#: src/features/projects/components/add-project-dialog.tsx:521
+msgid "Adding the project…"
+msgstr ""
+
 #: src/features/devices/components/devices-settings.tsx:452
 msgid "Adding the server was cancelled on this computer."
 msgstr "L’ajout du serveur a été annulé sur cet ordinateur."
@@ -2652,6 +2659,7 @@ msgid "Adding your earlier replies…"
 msgstr "Ajout de vos réponses précédentes…"
 
 #: src/features/chat/aside/aside-panel.tsx:168
+#: src/features/projects/components/add-project-dialog.tsx:687
 msgid "Adding…"
 msgstr "Ajout…"
 
@@ -4612,6 +4620,7 @@ msgstr "Portail Azure → votre ressource OpenAI → Clés et point de terminais
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:394
 #: src/features/pages/components/page-version-panel.tsx:89
+#: src/features/projects/components/add-project-dialog.tsx:684
 msgid "Back"
 msgstr "Retour"
 
@@ -5637,6 +5646,7 @@ msgstr "Canada"
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
+#: src/features/projects/components/add-project-dialog.tsx:678
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:395
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
@@ -5714,6 +5724,10 @@ msgstr "Annuler la sélection"
 #: src/features/workflow/components/canvas/workflow-controls.tsx:50
 msgid "Cancelled"
 msgstr "Annulé"
+
+#: src/features/projects/components/add-project-dialog.tsx:148
+msgid "Cancelled on this computer."
+msgstr ""
 
 #: src/features/settings/components/privacy/data-export.tsx:108
 msgid "Cancelling..."
@@ -6303,6 +6317,10 @@ msgstr "Choisir le mode de recherche"
 msgid "Choose the camera system for your shot"
 msgstr "Choisissez le système de caméra pour votre plan"
 
+#: src/features/projects/components/add-project-dialog.tsx:513
+msgid "Choose the project's folder, or type a path."
+msgstr ""
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:355
 msgid "Choose which tools the assistant may use on its own, which need your approval, and which are off."
 msgstr "Choisissez les outils que l’assistant peut utiliser seul, ceux qui nécessitent votre approbation et ceux qui sont désactivés."
@@ -6573,7 +6591,7 @@ msgstr "Cliquez sur l’icône d’épingle d’un message pour l’enregistrer 
 msgid "Click the star on any model in All models to add it here."
 msgstr "Cliquez sur l’étoile d’un modèle dans Tous les modèles pour l’ajouter ici."
 
-#: src/features/chat/thread/composer-input.tsx:316
+#: src/features/chat/thread/composer-input.tsx:317
 msgid "Click to edit"
 msgstr "Cliquer pour modifier"
 
@@ -6612,6 +6630,10 @@ msgstr "presse-papiers"
 #: src/features/settings/lib/settings-keywords.ts:32
 msgid "clock"
 msgstr "horloge"
+
+#: src/features/projects/components/add-project-dialog.tsx:675
+msgid "Clone or create new…"
+msgstr ""
 
 #: ../../packages/ui/src/components/ai-elements/artifact.tsx:31
 #: ../../packages/ui/src/components/countdown-toast-card.tsx:192
@@ -7019,7 +7041,7 @@ msgstr "La commande doit comporter au maximum {SKILL_SLUG_MAX} caractères"
 msgid "Command Palette"
 msgstr "Palette de commandes"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:537
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:544
 msgid "Commands"
 msgstr "Commandes"
 
@@ -7383,7 +7405,7 @@ msgstr "Compression du contexte..."
 msgid "Computer"
 msgstr "Ordinateur"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:64
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:66
 msgid "Condense older messages for the model"
 msgstr "Condenser les anciens messages pour le modèle"
 
@@ -7605,6 +7627,10 @@ msgstr "Connectez l’hébergeur pour garder ceci à jour."
 msgid "Connect third-party services to extend AI capabilities with your data and tools."
 msgstr "Connectez des services tiers pour étendre les capacités de l’IA avec vos données et vos outils."
 
+#: src/features/projects/components/add-project-dialog.tsx:164
+msgid "Connect this server first."
+msgstr ""
+
 #: src/features/settings/components/chat/mcp-settings.tsx:409
 msgid "Connect to Model Context Protocol servers to extend AI capabilities with external tools."
 msgstr "Connectez-vous à des serveurs Model Context Protocol pour étendre les capacités de l’IA avec des outils externes."
@@ -7637,6 +7663,7 @@ msgstr "Connectez vos plateformes de messagerie pour discuter avec l’IA direct
 msgid "Connect your own Telegram, WhatsApp, Slack or Discord bot to Neore and message your agent from the app you already use."
 msgstr ""
 
+#: src/features/projects/components/add-project-dialog.tsx:181
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:24
 #: src/features/settings/connectors/connector-card.tsx:74
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:172
@@ -7674,6 +7701,10 @@ msgstr "Connecté à {0}"
 #: src/routes/auth/extension.tsx:91
 msgid "Connected. You can close this window."
 msgstr "Connecté. Vous pouvez fermer cette fenêtre."
+
+#: src/features/projects/components/add-project-dialog.tsx:518
+msgid "Connecting {pairingHost}…"
+msgstr ""
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:392
 msgid "Connecting to your MCP servers..."
@@ -8027,8 +8058,8 @@ msgstr "Conversations et commentaires en attente sur des fichiers que cette list
 msgid "Conversations on lines this diff no longer shows"
 msgstr "Conversations sur des lignes que ce diff n’affiche plus"
 
-#: src/features/chat/thread/composer-input.tsx:812
-#: src/features/chat/thread/composer-input.tsx:1553
+#: src/features/chat/thread/composer-input.tsx:813
+#: src/features/chat/thread/composer-input.tsx:1554
 msgid "Conversion failed"
 msgstr "Échec de la conversion"
 
@@ -8354,7 +8385,7 @@ msgstr "Impossible de joindre {0}. Les autres fichiers ont été joints ; réess
 msgid "Could not attach {0}. Try those again."
 msgstr "Impossible de joindre {0}. Réessayez."
 
-#: src/features/chat/thread/composer-input.tsx:1575
+#: src/features/chat/thread/composer-input.tsx:1576
 msgid "Could not attach the chat"
 msgstr "Impossible de joindre la discussion"
 
@@ -8638,11 +8669,11 @@ msgstr "Impossible de joindre le serveur pour lancer la génération. Vérifiez 
 msgid "Could not reach the server. Try again."
 msgstr "Impossible de joindre le serveur. Réessayez."
 
-#: src/features/chat/thread/composer-input.tsx:1578
+#: src/features/chat/thread/composer-input.tsx:1579
 msgid "Could not read that chat"
 msgstr "Impossible de lire cette discussion"
 
-#: src/features/chat/thread/composer-input.tsx:1579
+#: src/features/chat/thread/composer-input.tsx:1580
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Impossible de lire cette discussion. Si elle est verrouillée, déverrouillez-la d'abord."
 
@@ -9024,8 +9055,6 @@ msgid "Create PR"
 msgstr "Créer une PR"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:147
-#: src/features/chat/thread-list/thread-list-header.tsx:126
-#: src/features/chat/thread-list/thread-list-header.tsx:136
 msgid "Create project"
 msgstr "Créer un projet"
 
@@ -9096,6 +9125,15 @@ msgstr "Créez votre premier workflow pour automatiser visuellement des tâches 
 #: src/features/skills/components/skill-item.tsx:80
 msgid "Created"
 msgstr "Créé"
+
+#. placeholder {0}: created.value.path
+#: src/features/projects/components/add-project-dialog.tsx:246
+msgid "Created {0}"
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:245
+#~ msgid "Created {path}"
+#~ msgstr ""
 
 #: src/features/skills/components/bundle-import-dialog.tsx:151
 msgid "Created switched off."
@@ -11086,7 +11124,7 @@ msgstr "Déposez un fichier ou cliquez pour l’importer"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1763
+#: src/features/chat/thread/composer-input.tsx:1765
 msgid "Drop files here"
 msgstr "Déposez les fichiers ici"
 
@@ -11395,8 +11433,8 @@ msgstr "Modifier la collection"
 msgid "Edit comment"
 msgstr "Modifier le commentaire"
 
-#: src/features/chat/thread/composer-input.tsx:323
-#: src/features/chat/thread/composer-input.tsx:335
+#: src/features/chat/thread/composer-input.tsx:324
+#: src/features/chat/thread/composer-input.tsx:336
 msgid "Edit content"
 msgstr "Modifier le contenu"
 
@@ -11780,6 +11818,10 @@ msgstr "E-mail :"
 #: src/features/canvas/canvas-panel.tsx:149
 msgid "Emboss"
 msgstr "Relief"
+
+#: src/features/chat/thread/composer-tiptap/emoji-shortcode-popup.tsx:59
+msgid "Emoji suggestions"
+msgstr ""
 
 #. placeholder {0}: provider.name
 #. placeholder {0}: skill.name
@@ -13088,7 +13130,7 @@ msgid "Failed to attach collection"
 msgstr "Impossible de joindre la collection"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1404
+#: src/features/chat/thread/composer-input.tsx:1405
 msgid "Failed to attach file"
 msgstr "Impossible de joindre le fichier"
 
@@ -13498,7 +13540,7 @@ msgstr "Impossible de demander l’export"
 msgid "Failed to reset to defaults"
 msgstr "Impossible de rétablir les valeurs par défaut"
 
-#: src/features/chat/thread/composer-input.tsx:1436
+#: src/features/chat/thread/composer-input.tsx:1437
 msgid "Failed to restore attachment"
 msgstr "Impossible de restaurer la pièce jointe"
 
@@ -14612,6 +14654,14 @@ msgstr "Mettre le focus sur le chat : {title}"
 msgid "Focus Search"
 msgstr "Mettre le focus sur la recherche"
 
+#: src/features/projects/components/add-project-dialog.tsx:600
+msgid "Folder path"
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:619
+msgid "Folders"
+msgstr ""
+
 #: src/features/appearance/components/appearance-controls.tsx:118
 msgid "Follow my system (default)"
 msgstr "Suivre le système (par défaut)"
@@ -15572,7 +15622,7 @@ msgstr "Aller à la page précédente"
 msgid "Go to Prompts"
 msgstr "Aller aux prompts"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:344
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:351
 msgid "Go to reply"
 msgstr "Aller à la réponse"
 
@@ -15612,6 +15662,10 @@ msgstr "Aller au coffre-fort"
 #: src/features/pages/components/page-invite-accept.tsx:46
 msgid "Go to your pages"
 msgstr "Accéder à vos pages"
+
+#: src/features/projects/components/add-project-dialog.tsx:623
+msgid "Go up to {parent}"
+msgstr ""
 
 #: src/features/chat/goal/composer-goal.tsx:75
 #: src/features/chat/goal/goal-notes.tsx:70
@@ -17344,7 +17398,7 @@ msgstr "Tokens d’entrée"
 msgid "Input:"
 msgstr "Entrée :"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:62
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:64
 msgid "Insert a saved prompt"
 msgstr "Insérer un prompt enregistré"
 
@@ -17356,7 +17410,7 @@ msgstr "Insérer une colonne après"
 msgid "Insert column before"
 msgstr "Insérer une colonne avant"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:601
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:608
 msgid "Insert Prompt"
 msgstr "Insérer un prompt"
 
@@ -17651,11 +17705,11 @@ msgstr "Invité à rejoindre"
 msgid "Invites"
 msgstr "Invitations"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:63
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:65
 msgid "Invoke a skill"
 msgstr "Appeler une compétence"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:634
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:641
 msgid "Invoke Skill"
 msgstr "Appeler une compétence"
 
@@ -18980,6 +19034,10 @@ msgstr "Chargement des fichiers"
 msgid "Loading files…"
 msgstr "Chargement des fichiers…"
 
+#: src/features/projects/components/add-project-dialog.tsx:519
+msgid "Loading folders…"
+msgstr ""
+
 #: src/features/canvas/canvas-panel.tsx:358
 msgid "Loading image editor..."
 msgstr "Chargement de l’éditeur d’image..."
@@ -19334,7 +19392,7 @@ msgstr "Texte long détecté"
 msgid "Long text generation in images"
 msgstr "Génération de textes longs dans les images"
 
-#: src/features/chat/thread/composer-input.tsx:888
+#: src/features/chat/thread/composer-input.tsx:889
 msgid "Long text was attached as a file."
 msgstr "Le long texte a été joint en tant que fichier."
 
@@ -19369,6 +19427,10 @@ msgstr "Channel access token longue durée depuis l’onglet Messaging API de vo
 #: src/features/evals/components/case-fields.tsx:28
 msgid "Longest the answer may take, in milliseconds"
 msgstr "Durée maximale de la réponse, en millisecondes"
+
+#: src/features/projects/components/add-project-dialog.tsx:534
+msgid "Looking for machines…"
+msgstr ""
 
 #: src/features/local-models/components/ollama-model-manager.tsx:166
 msgid "Looking for Ollama at {baseUrl}…"
@@ -19451,6 +19513,10 @@ msgstr "Binaire Mach-O"
 
 #: src/features/auth/components/device-code-parts.tsx:122
 msgid "Machine"
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:538
+msgid "Machines"
 msgstr ""
 
 #: src/features/local-models/components/local-setup-guide.tsx:76
@@ -20096,8 +20162,8 @@ msgstr "Fusionné sur {hostLabel}."
 msgid "Merging…"
 msgstr "Fusion…"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:294
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:471
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:301
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:619
 msgid "Message"
 msgstr "Message"
 
@@ -21915,6 +21981,10 @@ msgstr "Aucun appareil associé."
 msgid "No diff data available for this version"
 msgstr "Aucune différence disponible pour cette version"
 
+#: src/features/chat/thread/composer-tiptap/use-emoji-shortcode.ts:162
+msgid "No emoji found"
+msgstr ""
+
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:395
 msgid "No enabled MCP servers."
 msgstr "Aucun serveur MCP activé."
@@ -21956,6 +22026,10 @@ msgstr "Aucun fichier dans votre base de connaissances pour l’instant. Télév
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:53
 msgid "No focal length selected"
 msgstr "Aucune focale sélectionnée"
+
+#: src/features/projects/components/add-project-dialog.tsx:655
+msgid "No folders in here."
+msgstr ""
 
 #: src/features/tasks/components/task-form-dialog.tsx:383
 #: src/features/tasks/components/task-form-dialog.tsx:395
@@ -22223,7 +22297,7 @@ msgstr "Aucune réponse pour l’instant"
 msgid "No results"
 msgstr "Aucun résultat"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:662
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:669
 msgid "No results found"
 msgstr "Aucun résultat trouvé"
 
@@ -24244,6 +24318,10 @@ msgstr ""
 msgid "Pair one in Settings"
 msgstr "Associez-en un dans les paramètres"
 
+#: src/features/projects/components/add-project-dialog.tsx:208
+msgid "Pair this computer with your account first (Settings → Devices)."
+msgstr ""
+
 #: src/features/auth/components/device-approval.tsx:203
 msgid "Pair this machine?"
 msgstr ""
@@ -24782,6 +24860,10 @@ msgstr "Choisissez-en un dans la boîte de réception pour le lire."
 #: src/features/skills/components/bundle-export-dialog.tsx:150
 msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
 msgstr "Choisissez des compétences, planifications, webhooks et chats de groupe à partager dans un seul fichier Markdown. Les clés API, secrets de webhook, jetons de connecteur et autres identifiants ne sont jamais inclus, pas plus que les identifiants de votre compte ou de votre organisation."
+
+#: src/features/projects/components/add-project-dialog.tsx:513
+msgid "Pick the computer or server the project's folder is on."
+msgstr ""
 
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:212
 msgid "Pick up to {maxReferences} images. The order you select them is the order the model will see them."
@@ -25322,6 +25404,10 @@ msgstr "Appuyez sur Entrée ou Espace pour sélectionner un nœud. Vous pouvez e
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:27
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr "Appuyez sur Entrée ou Espace pour sélectionner une arête. Vous pouvez ensuite appuyer sur Suppr pour la supprimer ou sur Échap pour annuler."
+
+#: src/features/projects/components/add-project-dialog.tsx:616
+msgid "Press Enter to open the folder. A folder that does not exist is created."
+msgstr ""
 
 #: src/features/settings/components/account/account-settings.tsx:225
 msgid "Press Enter to send"
@@ -26428,7 +26514,7 @@ msgstr "Aperçu en lecture seule - Dupliquez pour modifier"
 msgid "Read-only shared conversation"
 msgstr "Conversation partagée en lecture seule"
 
-#: src/features/chat/thread/composer-input.tsx:280
+#: src/features/chat/thread/composer-input.tsx:281
 msgid "Reading \"{attachmentName}\"…"
 msgstr "Lecture de « {attachmentName} »…"
 
@@ -27055,10 +27141,10 @@ msgstr "Se souvenir de moi"
 #: src/features/chat/host/host-composer.tsx:1033
 #: src/features/chat/sharing/thread-share-button.tsx:300
 #: src/features/chat/sharing/thread-share-button.tsx:372
-#: src/features/chat/thread/composer-input.tsx:342
-#: src/features/chat/thread/composer-input.tsx:354
-#: src/features/chat/thread/composer-input.tsx:408
-#: src/features/chat/thread/composer-input.tsx:417
+#: src/features/chat/thread/composer-input.tsx:343
+#: src/features/chat/thread/composer-input.tsx:355
+#: src/features/chat/thread/composer-input.tsx:409
+#: src/features/chat/thread/composer-input.tsx:418
 #: src/features/devices/components/devices-settings.tsx:334
 #: src/features/devices/components/devices-settings.tsx:340
 #: src/features/projects/components/project-form-dialog.tsx:265
@@ -27440,7 +27526,7 @@ msgstr "Réponses, tokens et dépenses par compétence ou agent pour la période
 msgid "Reply"
 msgstr "Répondre"
 
-#: src/features/chat/thread/reply-complete-announcement.tsx:81
+#: src/features/chat/thread/reply-complete-announcement.tsx:93
 msgid "Reply complete"
 msgstr "Réponse terminée"
 
@@ -27836,11 +27922,11 @@ msgstr "Réessayer maintenant"
 msgid "Retry the device check"
 msgstr ""
 
-#: src/features/chat/thread/composer-input.tsx:431
+#: src/features/chat/thread/composer-input.tsx:432
 msgid "Retry upload"
 msgstr "Réessayer le téléversement"
 
-#: src/features/chat/thread/composer-input.tsx:426
+#: src/features/chat/thread/composer-input.tsx:427
 msgid "Retry upload of {attachmentName}"
 msgstr "Réessayer le téléversement de {attachmentName}"
 
@@ -28655,7 +28741,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Note chaque réponse de 0 à 100 % par rapport à la réponse attendue ou à la grille d’évaluation. Ajoute un petit appel de modèle par cas."
 
-#: src/features/chat/thread/composer-input.tsx:1363
+#: src/features/chat/thread/composer-input.tsx:1364
 msgid "Screen capture failed. Please try again."
 msgstr "La capture d’écran a échoué. Veuillez réessayer."
 
@@ -29871,6 +29957,10 @@ msgstr "Afficher moins"
 msgid "Show more"
 msgstr "Afficher plus"
 
+#: src/features/projects/components/add-project-dialog.tsx:665
+msgid "Show more folders"
+msgstr ""
+
 #: src/features/projects/components/project-repo-picker.tsx:175
 #: src/features/tasks/components/task-form-dialog.tsx:465
 msgid "Show more projects"
@@ -30909,6 +30999,20 @@ msgstr "Fusionner par squash"
 msgid "Sri Lanka"
 msgstr "Sri Lanka"
 
+#. placeholder {0}: row.name
+#: src/features/projects/components/add-project-dialog.tsx:185
+msgid "SSH · {0}"
+msgstr ""
+
+#. placeholder {0}: row.name
+#: src/features/projects/components/add-project-dialog.tsx:188
+msgid "SSH · {0} · not connected yet"
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:577
+msgid "SSH hosts come from ~/.ssh/config. Picking one connects it."
+msgstr ""
+
 #: src/features/devices/lib/device-diagnostics.ts:72
 msgid "SSH server via a paired computer"
 msgstr "Serveur SSH via un ordinateur associé"
@@ -31040,7 +31144,7 @@ msgstr "Démarrer une nouvelle conversation ({0})"
 msgid "Start a new chat to get started"
 msgstr "Lancez un nouveau chat pour commencer"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:65
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:67
 msgid "Start a new context: earlier messages are no longer sent to the model"
 msgstr "Démarrer un nouveau contexte : les messages précédents ne sont plus envoyés au modèle"
 
@@ -31886,7 +31990,7 @@ msgstr "Suggéré"
 msgid "Suggested answers"
 msgstr "Réponses suggérées"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:513
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:638
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Suggestion disponible, appuyez sur Flèche droite pour l’accepter"
 
@@ -32040,7 +32144,7 @@ msgstr "Bokeh tourbillonnant, vintage"
 msgid "Switch Account"
 msgstr "Changer de compte"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:61
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:63
 msgid "Switch AI model"
 msgstr "Changer de modèle d’IA"
 
@@ -32056,7 +32160,7 @@ msgstr "Passez d’OpenAI à Google, Anthropic et d’autres avec un seul param�
 msgid "switch model"
 msgstr "changer de modèle"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:558
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:565
 msgid "Switch Model"
 msgstr "Changer de modèle"
 
@@ -32667,7 +32771,7 @@ msgstr "Sens du texte défini sur LTR"
 msgid "Text direction set to RTL"
 msgstr "Sens du texte défini sur RTL"
 
-#: src/features/chat/thread/composer-input.tsx:316
+#: src/features/chat/thread/composer-input.tsx:317
 msgid "Text document"
 msgstr "Document texte"
 
@@ -32806,9 +32910,21 @@ msgstr "Cela n’a pas fonctionné. Veuillez réessayer."
 msgid "That did not work. Try again."
 msgstr "Cela n’a pas fonctionné. Réessayez."
 
+#: src/features/projects/components/add-project-dialog.tsx:152
+msgid "That folder is already shared with this server."
+msgstr ""
+
 #: src/features/develop/components/guide-tab.tsx:92
 msgid "That folder is not offered for this repository on that computer."
 msgstr "Ce dossier n’est pas proposé pour ce dépôt sur cet ordinateur."
+
+#: src/features/projects/components/add-project-dialog.tsx:156
+msgid "That folder is the server's home folder or a folder above it. Choose a folder inside it."
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:136
+msgid "That folder was not found."
+msgstr ""
 
 #: src/features/chat/core/context/chat-context.tsx:718
 msgid "That guest link has ended."
@@ -32852,6 +32968,10 @@ msgstr "Ce message a déjà été envoyé."
 #: src/features/chat/lock/thread-lock-dialog.tsx:60
 msgid "That passcode is not right."
 msgstr "Ce code d’accès n’est pas correct."
+
+#: src/features/projects/components/add-project-dialog.tsx:140
+msgid "That path is a file."
+msgstr ""
 
 #: src/features/chat/host/host-composer.tsx:879
 msgid "That request is no longer waiting."
@@ -33059,7 +33179,7 @@ msgstr ""
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "L’agent de chat traite la tâche avec ses outils, en suivant éventuellement une compétence."
 
-#: src/features/chat/thread/composer-input.tsx:988
+#: src/features/chat/thread/composer-input.tsx:989
 msgid "The chat changed before the paste was ready, so it was not inserted."
 msgstr "La discussion a changé avant que le collage soit prêt, il n’a donc pas été inséré."
 
@@ -33095,8 +33215,8 @@ msgstr ""
 msgid "The comparison could not be loaded."
 msgstr "Impossible de charger la comparaison."
 
-#: src/features/chat/thread/composer-input.tsx:996
-#: src/features/chat/thread/composer-input.tsx:1018
+#: src/features/chat/thread/composer-input.tsx:997
+#: src/features/chat/thread/composer-input.tsx:1019
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "La zone de saisie a été verrouillée avant que le collage soit prêt, il n’a donc pas été inséré."
 
@@ -33143,6 +33263,10 @@ msgstr "La description est tronquée."
 #: src/features/download/components/download-page.tsx:71
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "L'application de bureau fonctionne sous macOS, Windows et Linux. Les programmes d'installation sont joints à une version de bureau sur GitHub et y apparaissent une fois cette version publiée."
+
+#: src/features/projects/components/add-project-dialog.tsx:167
+msgid "The desktop could not complete that. Try again."
+msgstr ""
 
 #: src/features/chat/host/host-options.tsx:237
 msgid "the device was removed"
@@ -33503,7 +33627,7 @@ msgstr "La page affiche désormais l’autre version. Copiez ce que vous souhait
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "La page, toutes ses sous-pages, ses commentaires et son historique des versions sont supprimés. Cette action est irréversible."
 
-#: src/features/chat/thread/composer-input.tsx:1044
+#: src/features/chat/thread/composer-input.tsx:1045
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "Le texte collé n’a pas pu être joint et n’a pas été inséré."
 
@@ -33665,7 +33789,7 @@ msgstr "Les deux codes d’accès ne correspondent pas."
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "La passerelle LLM unifiée pour les applications d’IA modernes."
 
-#: src/features/chat/thread/composer-input.tsx:622
+#: src/features/chat/thread/composer-input.tsx:623
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "L’envoi de « {fileName} » a expiré. Veuillez le joindre à nouveau."
 
@@ -33973,6 +34097,8 @@ msgid "this computer"
 msgstr "cet ordinateur"
 
 #: src/features/devices/components/devices-settings.tsx:310
+#: src/features/projects/components/add-project-dialog.tsx:173
+#: src/features/projects/components/add-project-dialog.tsx:177
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "Cet ordinateur"
@@ -34001,6 +34127,10 @@ msgstr "Cet ordinateur est associé à un autre compte."
 #: src/features/devices/components/devices-settings.tsx:563
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "Cet ordinateur est associé. Choisissez les dossiers à partager dans l'application de bureau."
+
+#: src/features/projects/components/add-project-dialog.tsx:348
+msgid "This computer must be paired first."
+msgstr ""
 
 #: src/features/devices/lib/device-diagnostics.ts:75
 msgid "this computer: {viaName}"
@@ -34098,6 +34228,10 @@ msgstr "Ce fichier est trop volumineux ({0} Ko) pour être prévisualisé ou mod
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "Ce fichier est trop volumineux (~{0} tokens) et dépasse la fenêtre de contexte du modèle. Le modèle risque de ne pas pouvoir le traiter efficacement."
 
+#: src/features/projects/components/add-project-dialog.tsx:144
+msgid "This folder cannot be read."
+msgstr ""
+
 #: src/features/develop/components/guide-tab.tsx:218
 msgid "This guide was written for an earlier commit. The {requestNoun} has changed since: write it again to see the change as it is now."
 msgstr "Ce guide a été rédigé pour un commit antérieur. Le(la) {requestNoun} a changé depuis : rédigez-le à nouveau pour voir la modification telle qu’elle est maintenant."
@@ -34109,6 +34243,18 @@ msgstr "Cet hébergeur ne propose pas encore de boîte de réception."
 #: src/features/develop/components/pull-request-view.tsx:133
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr "Cet hébergeur ne propose pas encore de vue de {requestNoun}."
+
+#: src/features/projects/components/add-project-dialog.tsx:205
+msgid "This host has an invalid Port in ~/.ssh/config."
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:201
+msgid "This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate."
+msgstr ""
+
+#: src/features/projects/components/add-project-dialog.tsx:197
+msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
+msgstr ""
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:406
 msgid "This image has been flagged for review"
@@ -34172,6 +34318,10 @@ msgstr "Ce lien est incomplet. Demandez le lien complet."
 #: src/features/chat/guest-links/guest-page.tsx:92
 msgid "This link is not taking messages right now. Try again later."
 msgstr "Ce lien n’accepte pas de messages pour le moment. Réessayez plus tard."
+
+#: src/features/projects/components/add-project-dialog.tsx:432
+msgid "This machine is not ready yet."
+msgstr ""
 
 #: src/features/chat/thread/memory-usage-action.tsx:63
 msgid "This memory has since been deleted."
@@ -34330,6 +34480,10 @@ msgstr "Cette exécution n’est plus disponible."
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:237
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr "Cette sélection est trop volumineuse pour être importée en une fois. Importez moins de fichiers à la fois."
+
+#: src/features/projects/components/add-project-dialog.tsx:160
+msgid "This server already has its maximum of shared folders. Share a parent folder or remove one in the desktop app."
+msgstr ""
 
 #: src/features/settings/components/chat/mcp-settings.tsx:368
 msgid "This server requires sign-in. Save it, then choose Sign in."
@@ -35454,8 +35608,8 @@ msgid "Type your answer…"
 msgstr "Saisissez votre réponse…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1753
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:197
+#: src/features/chat/thread/composer-input.tsx:1755
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:201
 msgid "Type your message..."
 msgstr "Saisissez votre message..."
 
@@ -35624,7 +35778,7 @@ msgstr "Souligné"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:890
+#: src/features/chat/thread/composer-input.tsx:891
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Annuler"
@@ -35867,7 +36021,7 @@ msgstr "Documentation à jour pour n’importe quelle bibliothèque ou framework
 msgid "Update Duration"
 msgstr "Modifier la durée"
 
-#: src/features/chat/thread/composer-input.tsx:1610
+#: src/features/chat/thread/composer-input.tsx:1611
 msgid "Update failed"
 msgstr "Échec de la mise à jour"
 
@@ -36055,14 +36209,14 @@ msgstr "Importez des CSV, lancez des analyses Python et exportez des graphiques 
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Importez des documents dans votre base de connaissances et regroupez-les en collections. L’IA y recherche le contexte pertinent et cite les passages utilisés."
 
-#: src/features/chat/thread/composer-input.tsx:423
-#: src/features/chat/thread/composer-input.tsx:667
-#: src/features/chat/thread/composer-input.tsx:1531
+#: src/features/chat/thread/composer-input.tsx:424
+#: src/features/chat/thread/composer-input.tsx:668
+#: src/features/chat/thread/composer-input.tsx:1532
 msgid "Upload failed"
 msgstr "Échec de l’importation"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1524
+#: src/features/chat/thread/composer-input.tsx:1525
 msgid "Upload failed: {0}"
 msgstr "Échec du téléversement : {0}"
 
@@ -36112,7 +36266,7 @@ msgstr "Importée"
 msgid "Uploaded {fileName}"
 msgstr "{fileName} importé"
 
-#: src/features/chat/thread/composer-input.tsx:360
+#: src/features/chat/thread/composer-input.tsx:361
 msgid "Uploading {attachmentName}"
 msgstr "Envoi de {attachmentName}"
 
@@ -36467,7 +36621,7 @@ msgid "Uses AI SDK Text-to-Speech"
 msgstr "Utilise la synthèse vocale de l’AI SDK"
 
 #. placeholder {0}: newest.toolName
-#: src/features/chat/thread/turn-step-announcement.tsx:48
+#: src/features/chat/thread/turn-step-announcement.tsx:55
 msgid "Using {0}"
 msgstr "Utilisation de {0}"
 
@@ -37695,6 +37849,10 @@ msgstr "Quand l’assistant doit-il utiliser cette compétence ?"
 msgid "Where each run goes"
 msgstr "Où va chaque exécution"
 
+#: src/features/projects/components/add-project-dialog.tsx:510
+msgid "Where is the project?"
+msgstr ""
+
 #: src/features/develop/components/guide-tab.tsx:166
 msgid "Where the guide is written"
 msgstr "Où le guide est rédigé"
@@ -38099,8 +38257,8 @@ msgstr "Vous ne surveillez aucun dépôt."
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "Vous êtes hors ligne. Neore se reconnectera dès que le réseau sera de retour."
 
-#: src/features/chat/thread/composer-input.tsx:1102
-#: src/features/chat/thread/composer-input.tsx:1178
+#: src/features/chat/thread/composer-input.tsx:1103
+#: src/features/chat/thread/composer-input.tsx:1179
 #: src/features/chat/thread/composer-prompt-queue.tsx:112
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "Vous êtes hors ligne. Votre message reste ici ; envoyez-le dès que vous êtes de nouveau en ligne."
@@ -38432,12 +38590,12 @@ msgid "Your First Chat"
 msgstr "Votre premier chat"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:732
+#: src/features/chat/thread/composer-input.tsx:733
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Votre saisie est volumineuse (~{0} tokens) et occupera une part importante de la fenêtre de contexte du modèle."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:725
+#: src/features/chat/thread/composer-input.tsx:726
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Votre saisie est trop volumineuse (~{0} tokens) et dépasse la fenêtre de contexte du modèle. Veuillez raccourcir le message ou retirer des pièces jointes pour l’envoyer."
 

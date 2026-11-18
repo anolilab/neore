@@ -6,7 +6,7 @@
  * values cross the addon as JSON strings and are parsed here, so a transport hands back typed values.
  */
 import { loadDeviceCore } from "./addon";
-import type { CoreEvent, DeviceCore as DeviceCoreHandle, DeviceStatus, Download, FileRead, FilesPage, HostProbe, HostSpec, HostUpgrade, Prompt, SettingsView, Signed } from "./types";
+import type { BrowsePage, CoreEvent, CreatedFolder, DeviceCore as DeviceCoreHandle, DeviceStatus, Download, FileRead, FilesPage, HostProbe, HostSpec, HostUpgrade, Prompt, SettingsView, Signed } from "./types";
 
 export interface HostTransport {
     auditTail: () => string[];
@@ -14,6 +14,8 @@ export interface HostTransport {
     denyPrompts: () => void;
     /** Verifies, asks about, runs and signs one relayed call. */
     execute: (envelope: string, signature: string) => Promise<Signed>;
+    /** One page of the folder names inside an absolute path on a connected server; not confined to its shared folders. */
+    hostBrowse: (deviceId: string, path: string, after?: string) => Promise<BrowsePage>;
     /** Connects a paired server again. */
     /** `retry` is the local window's Retry: it starts the reconnect attempts over. A page's connect counts as one more attempt. */
     hostConnect: (deviceId: string, retry: boolean) => Promise<HostProbe>;
@@ -26,6 +28,8 @@ export interface HostTransport {
     hostFilesList: (deviceId: string, path: string, after?: string) => Promise<FilesPage>;
     /** Drops the pinned host key, so the next connection asks to trust whatever the server presents. */
     hostForgetKey: (deviceId: string) => void;
+    /** Creates an absolute folder (and its parents) on a connected server. */
+    hostMakeDir: (deviceId: string, path: string) => Promise<CreatedFolder>;
     /** Stores a probed server as a device of its own, after a local confirmation. */
     hostPair: (spec: HostSpec, deviceId: string, secret: string) => Promise<boolean>;
     /** Connects a server that is not paired yet, asking to trust its key and for a key passphrase. */
@@ -66,12 +70,14 @@ export const createLocalTransport = (dataDirectory: string, onEvent: (event: Cor
         core,
         denyPrompts: () => core.denyPrompts(),
         execute: async (envelope, signature) => JSON.parse(await core.execute(envelope, signature)) as Signed,
+        hostBrowse: async (deviceId, path, after) => JSON.parse(await core.hostBrowse(deviceId, path, after)) as BrowsePage,
         hostConnect: async (deviceId, retry) => JSON.parse(await core.hostConnect(deviceId, retry)) as HostProbe,
         hostDisconnect: (deviceId) => core.hostDisconnect(deviceId),
         hostDownload: async (deviceId, path, destination) => JSON.parse(await core.hostDownload(deviceId, path, destination)) as Download,
         hostFileRead: async (deviceId, path) => JSON.parse(await core.hostFileRead(deviceId, path)) as FileRead,
         hostFilesList: async (deviceId, path, after) => JSON.parse(await core.hostFilesList(deviceId, path, after)) as FilesPage,
         hostForgetKey: (deviceId) => core.hostForgetKey(deviceId),
+        hostMakeDir: async (deviceId, path) => JSON.parse(await core.hostMakeDir(deviceId, path)) as CreatedFolder,
         hostPair: (spec, deviceId, secret) => core.hostPair(JSON.stringify(spec), deviceId, secret),
         hostProbe: async (spec) => JSON.parse(await core.hostProbe(JSON.stringify(spec))) as HostProbe,
         hostRemove: (deviceId) => core.hostRemove(deviceId),

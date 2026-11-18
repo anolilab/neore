@@ -1,0 +1,9 @@
+
+ RUN  v5.1.0 /private/tmp/claude-501/-Users-danielbannert--t3-worktrees-neore-add-project-machine-picker/2bc5412d-68f1-4a18-af42-31dbd5ae5923/scratchpad/wt-merge/apps/desktop
+
+
+ Test Files  10 passed (10)
+      Tests  196 passed (196)
+   Start at  13:27:43
+   Duration  1.38s (transform 52%, tests 38%, import 9%, worker 1%)
+

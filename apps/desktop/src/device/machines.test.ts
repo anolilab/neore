@@ -1,0 +1,556 @@
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { MachineDependencies } from "./machines";
+import { createAddProjectMachines } from "./machines";
+import type { SshHost } from "./ssh-config";
+import type { HostView } from "./types";
+import { readMachineId, readMachinePath, readSshAlias } from "./validate";
+
+let root: string;
+
+beforeEach(() => {
+    root = mkdtempSync(path.join(tmpdir(), "neore-machines-"));
+});
+
+afterEach(() => {
+    rmSync(root, { force: true, recursive: true });
+});
+
+const ssh = (alias: string, extra: Partial<SshHost> = {}): SshHost => {
+    return { alias, disabledReason: null, hostName: `${alias}.example.com`, identityFile: null, port: null, user: "deploy", ...extra };
+};
+
+const server = (extra: Partial<HostView> = {}): HostView => ({
+        address: "build.example.com",
+        connected: true,
+        deviceId: "srv-1",
+        name: "build",
+        port: 22,
+        roots: ["/srv/app"],
+        user: "deploy",
+        ...extra,
+    } as HostView);
+
+const setup = (options: { answer?: boolean; deviceId?: string | null; hosts?: HostView[]; ssh?: SshHost[] } = {}) => {
+    const state = { hosts: options.hosts ?? [server()] };
+    const dependencies = {
+        confirm: vi.fn(async () => options.answer ?? true),
+        home: () => root,
+        hostBrowse: vi.fn(async (_id: string, folder: string) => {
+            return { entries: [{ name: "app" }], host: "build", next: null, parent: "/", path: folder, refusedRoot: false };
+        }),
+        hostConnect: vi.fn(async () => { return {}; }),
+        hostMakeDir: vi.fn(async (_id: string, folder: string) => {
+            return { created: true, path: folder };
+        }),
+        setRoots: vi.fn(),
+        settings: () => ({ hosts: state.hosts }) as never,
+        sshHosts: () => options.ssh ?? [ssh("build")],
+        status: () => ({ deviceId: options.deviceId === undefined ? "desk-1" : options.deviceId, hosts: [] }) as never,
+        username: () => "me",
+    } satisfies MachineDependencies;
+
+    return { deps: dependencies, machines: createAddProjectMachines(dependencies), state };
+};
+
+describe("list", () => {
+    it("starts with this computer, then the ssh hosts with their status", () => {
+        const { machines } = setup({ ssh: [ssh("build"), ssh("new", { port: 2200 }), ssh("jump", { disabledReason: "uses ProxyJump" })] });
+        const rows = machines.list();
+
+        expect(rows.map((row) => [row.name, row.status, row.label])).toEqual([
+            ["This computer", "this-computer", "This computer"],
+            ["build", "connected", "Connected"],
+            ["new", "unpaired", "SSH · new · not connected yet"],
+            ["jump", "disabled", "SSH · jump"],
+        ]);
+        expect(rows[0]?.id).toBe("desk-1");
+        expect(rows[1]?.id).toBe("srv-1");
+        expect(rows[2]?.disabledReason).toBeNull();
+        expect(rows[2]?.spec).toEqual({ address: "new.example.com", identityFile: null, name: "new", port: 2200, user: "deploy" });
+        expect(rows[3]?.disabledReason).toBe("uses ProxyJump");
+    });
+
+    it("disables this computer, with a reason, when it is not paired", () => {
+        const [first] = setup({ deviceId: null }).machines.list();
+
+        expect(first).toMatchObject({ id: null, status: "disabled" });
+        expect(first?.disabledReason).toContain("Pair");
+    });
+
+    it("pairs an ssh host whose HostName differs from the saved address only in case", () => {
+        const rows = setup({ ssh: [ssh("build", { hostName: "BUILD.Example.com" })] }).machines.list();
+
+        expect(rows[1]).toMatchObject({ id: "srv-1", status: "connected" });
+    });
+
+    it("says not connected for a paired server that is down", () => {
+        const rows = setup({ hosts: [server({ connected: false })] }).machines.list();
+
+        expect(rows[1]).toMatchObject({ label: "SSH · build · not connected yet", status: "not-connected" });
+    });
+});
+
+describe("connect", () => {
+    it("connects a paired server that is down", async () => {
+        const { deps, machines, state } = setup({ hosts: [server({ connected: false })] });
+
+        deps.hostConnect.mockImplementation(async () => {
+            state.hosts = [server()];
+
+            return {};
+        });
+
+        await expect(machines.connect("build")).resolves.toMatchObject({ status: "connected" });
+        expect(deps.confirm).toHaveBeenCalledTimes(1);
+        expect(deps.hostConnect).toHaveBeenCalledWith("srv-1");
+    });
+
+    it("asks before connecting a paired server that is down, and connects nothing when declined", async () => {
+        const { deps, machines } = setup({ answer: false, hosts: [server({ connected: false })] });
+
+        await expect(machines.connect("build")).rejects.toThrow("the person declined");
+        expect(deps.confirm).toHaveBeenCalledTimes(1);
+        expect(deps.hostConnect).not.toHaveBeenCalled();
+    });
+
+    it("refuses to connect a server that is not paired yet, and connects nothing", async () => {
+        const { deps, machines } = setup({ hosts: [], ssh: [ssh("box")] });
+
+        await expect(machines.connect("box")).rejects.toThrow("pair this server first");
+        expect(deps.hostConnect).not.toHaveBeenCalled();
+    });
+
+    it("disables a server whose user, address or alias the pairing or connection does not accept, instead of offering it", () => {
+        const { machines } = setup({
+            hosts: [],
+            ssh: [ssh("box", { user: "u".repeat(33) }), ssh("build!legacy", { hostName: null }), ssh("my box")],
+        });
+        const [, long, bang, spaced] = machines.list();
+
+        expect(long).toMatchObject({ disabledReason: expect.stringContaining("cannot connect"), status: "disabled" });
+        expect(bang).toMatchObject({ disabledReason: expect.stringContaining("cannot connect"), status: "disabled" });
+        expect(spaced).toMatchObject({ disabledReason: expect.stringContaining("cannot connect"), status: "disabled" });
+    });
+
+    it("gives an unpaired server the address, port, user and key file its config names", () => {
+        const [, box] = setup({ hosts: [], ssh: [ssh("box", { identityFile: "/k/id", port: 2222 })] }).machines.list();
+
+        expect(box?.spec).toEqual({ address: "box.example.com", identityFile: "/k/id", name: "box", port: 2222, user: "deploy" });
+    });
+
+    it("disables a server whose user starts with a dash, even when its address is valid", () => {
+        const [, box] = setup({ hosts: [], ssh: [ssh("box", { user: "-deploy" })] }).machines.list();
+
+        expect(box).toMatchObject({ disabledReason: expect.stringContaining("cannot connect"), status: "disabled" });
+    });
+
+    it("cuts a long emoji alias to the name limit in UTF-16 units, without splitting a character", () => {
+        const [, box] = setup({ hosts: [], ssh: [ssh("😀".repeat(60), { hostName: "box.example.com" })] }).machines.list();
+
+        expect(box?.spec?.name).toBe("😀".repeat(40));
+        expect(box?.spec?.name?.length).toBeLessThanOrEqual(80);
+    });
+
+    it("names a pairing with an alias longer than the 80-character limit, cut to the limit", () => {
+        const alias = "a".repeat(120);
+        const [, box] = setup({ hosts: [], ssh: [ssh(alias)] }).machines.list();
+
+        expect(box?.spec?.name).toBe("a".repeat(80));
+    });
+
+    it("uses the local user and port 22 in the pairing when the config names neither", () => {
+        const [, box] = setup({ hosts: [], ssh: [ssh("box", { hostName: null, user: null })] }).machines.list();
+
+        expect(box?.spec).toEqual({ address: "box", identityFile: null, name: "box", port: 22, user: "me" });
+    });
+
+    it("refuses an alias the reader did not return and a disabled host, connecting nothing", async () => {
+        const { deps, machines } = setup({ ssh: [ssh("jump", { disabledReason: "uses ProxyJump" })] });
+
+        await expect(machines.connect("other")).rejects.toThrow("not in ~/.ssh/config");
+        await expect(machines.connect("jump")).rejects.toThrow("uses ProxyJump");
+        expect(deps.hostConnect).not.toHaveBeenCalled();
+        expect(deps.hostConnect).not.toHaveBeenCalled();
+    });
+});
+
+describe("browse", () => {
+    it("names the resolved folder in the prompt when the request has a .. part, and lists that folder", async () => {
+        const { deps, machines } = setup();
+
+        mkdirSync(path.join(root, "a"));
+        const page = await machines.browse("desk-1", path.join(root, "a", ".."));
+
+        const resolved = JSON.stringify(realpathSync(root));
+
+        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: `Folder: ${resolved}` }));
+        expect(page.entries).toEqual([{ name: "a" }]);
+    });
+
+    it("asks before looking at a folder, a missing one included, so a page learns nothing unseen", async () => {
+        const { deps, machines } = setup();
+
+        await expect(machines.browse("desk-1", path.join(root, "missing"))).rejects.toThrow("not found");
+        expect(deps.confirm).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks before every listing of a folder on this computer, a continuation page included, and lists nothing when declined", async () => {
+        const { deps, machines } = setup();
+
+        // The real path: a root under a symlink (macOS /var) would be a second prompt, which another test covers.
+        const real = realpathSync(root);
+
+        mkdirSync(path.join(real, "a"));
+        await machines.browse("desk-1", real);
+        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringContaining(real) }));
+        expect(deps.confirm).toHaveBeenCalledTimes(1);
+
+        await machines.browse("desk-1", real, "a");
+        expect(deps.confirm).toHaveBeenCalledTimes(2);
+
+        const declined = setup({ answer: false });
+
+        await expect(declined.machines.browse("desk-1", real, "a")).rejects.toThrow("declined");
+        expect(declined.deps.confirm).toHaveBeenCalledTimes(1);
+    });
+
+    it("lists directories of this computer only, skipping files and symlinks, sorted", async () => {
+        mkdirSync(path.join(root, "b"));
+        mkdirSync(path.join(root, "a"));
+        writeFileSync(path.join(root, "file.txt"), "x");
+        symlinkSync(path.join(root, "a"), path.join(root, "link"));
+
+        const page = await setup().machines.browse("desk-1", root);
+
+        expect(page.entries).toEqual([{ name: "a" }, { name: "b" }]);
+        expect(page.next).toBeNull();
+        expect(page.parent).toBe(path.dirname(page.path));
+    });
+
+    it("starts at the home folder for an empty path and pages by name", async () => {
+        for (let index = 0; index < 2003; index += 1) {
+            mkdirSync(path.join(root, `d${String(index).padStart(4, "0")}`));
+        }
+
+        const { machines } = setup();
+        const first = await machines.browse("desk-1", "");
+
+        expect(first.entries).toHaveLength(2000);
+        expect(first.next).toBe("d1999");
+
+        const second = await machines.browse("desk-1", "", first.next ?? undefined);
+
+        expect(second.entries.map((entry) => entry.name)).toEqual(["d2000", "d2001", "d2002"]);
+        expect(second.next).toBeNull();
+    });
+
+    it("refuses a missing folder and a file", async () => {
+        writeFileSync(path.join(root, "f"), "x");
+        const { machines } = setup();
+
+        await expect(machines.browse("desk-1", path.join(root, "nope"))).rejects.toThrow("not found");
+        await expect(machines.browse("desk-1", path.join(root, "f"))).rejects.toThrow("cannot be read");
+    });
+
+    it("asks a connected server through the host, and refuses one that is not connected", async () => {
+        const { deps, machines, state } = setup();
+
+        await machines.browse("srv-1", "/srv/app", "m");
+        expect(deps.hostBrowse).toHaveBeenCalledWith("srv-1", "/srv/app", "m");
+
+        await machines.browse("srv-1", "");
+        expect(deps.hostBrowse).toHaveBeenLastCalledWith("srv-1", "/srv/app", undefined);
+
+        state.hosts = [server({ connected: false })];
+        await expect(machines.browse("srv-1", "/srv")).rejects.toThrow("connect the server first");
+    });
+
+    it("refuses a machine this process does not know", async () => {
+        const { deps, machines } = setup();
+
+        await expect(machines.browse("srv-other", "/")).rejects.toThrow("unknown machine");
+        expect(deps.hostBrowse).not.toHaveBeenCalled();
+    });
+});
+
+describe("browse eligibility", () => {
+    it("refuses a paired server that no eligible ssh config entry stands for", async () => {
+        const { deps, machines } = setup({ ssh: [ssh("other", { hostName: "other.example.com" })] });
+
+        await expect(machines.browse("srv-1", "/srv/app")).rejects.toThrow("unknown machine");
+        expect(deps.hostBrowse).not.toHaveBeenCalled();
+    });
+
+    it("refuses a paired server whose ssh config entry is disabled", async () => {
+        const { machines } = setup({ ssh: [ssh("build", { disabledReason: "uses ProxyJump", hostName: "build.example.com" })] });
+
+        await expect(machines.browse("srv-1", "/srv/app")).rejects.toThrow("unknown machine");
+    });
+});
+
+describe("createFolder", () => {
+    it("names, and creates, the resolved folder when a symlink in the requested path points elsewhere", async () => {
+        const real = path.join(root, "real");
+
+        mkdirSync(real);
+        symlinkSync(real, path.join(root, "link"));
+        const { deps, machines } = setup({ deviceId: "desk-1" });
+        const resolved = JSON.stringify(path.join(realpathSync(real), "newdir"));
+        const detail = expect.stringContaining(resolved);
+
+        await machines.createFolder("desk-1", path.join(root, "link", "newdir"));
+
+        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail }));
+        expect(existsSync(path.join(real, "newdir"))).toBe(true);
+    });
+
+    it("asks before looking at a folder on this computer, asks to create only a missing one, and refuses a file", async () => {
+        const { deps, machines } = setup();
+        const target = path.join(root, "x", "y");
+
+        // The look, then the creation of the missing folder.
+        await expect(machines.createFolder("desk-1", target)).resolves.toMatchObject({ created: true });
+        expect(deps.confirm).toHaveBeenCalledTimes(2);
+        // Existing: only the look.
+        await expect(machines.createFolder("desk-1", target)).resolves.toMatchObject({ created: false });
+        expect(deps.confirm).toHaveBeenCalledTimes(3);
+        writeFileSync(path.join(root, "f"), "x");
+        await expect(machines.createFolder("desk-1", path.join(root, "f"))).rejects.toThrow("is a file");
+        expect(deps.confirm).toHaveBeenCalledTimes(4);
+    });
+
+    it("makes nothing on this computer when the confirmation is declined", async () => {
+        const { deps, machines } = setup({ answer: false });
+        const target = path.join(root, "declined");
+
+        await expect(machines.createFolder("desk-1", target)).rejects.toThrow("declined");
+        expect(existsSync(target)).toBe(false);
+        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringContaining(target) }));
+    });
+
+    it("names and makes the server folder at the path the host resolves, so a symlinked parent cannot move it", async () => {
+        const { deps, machines } = setup();
+
+        deps.hostBrowse.mockResolvedValueOnce({ entries: [], host: "build", next: null, parent: "/srv", path: "/srv/real/new", refusedRoot: false });
+        await machines.createFolder("srv-1", "/srv/link/new");
+
+        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringContaining("/srv/real/new") }));
+        expect(deps.hostMakeDir).toHaveBeenCalledWith("srv-1", "/srv/real/new");
+    });
+
+    it("confirms by naming the server and the path, then makes the folder on the server", async () => {
+        const { deps, machines } = setup();
+
+        await machines.createFolder("srv-1", "/srv/new");
+
+        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringContaining("/srv/new"), message: expect.stringContaining("build") }));
+        expect(deps.hostMakeDir).toHaveBeenCalledWith("srv-1", "/srv/new");
+    });
+
+    it("does nothing on a server when the confirmation is declined", async () => {
+        const { deps, machines } = setup({ answer: false });
+
+        await expect(machines.createFolder("srv-1", "/srv/new")).rejects.toThrow("declined");
+        expect(deps.hostMakeDir).not.toHaveBeenCalled();
+    });
+
+    it("refuses a second confirmation while one is open", async () => {
+        const { deps, machines } = setup();
+        let release: (answer: boolean) => void = () => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- Promise.withResolvers needs Node 22.11
+        const held = new Promise<boolean>((resolve) => {
+            release = resolve;
+        });
+
+        deps.confirm.mockImplementationOnce(() => held);
+
+        const first = machines.createFolder("srv-1", "/srv/a");
+
+        await expect(machines.createFolder("srv-1", "/srv/b")).rejects.toThrow("another confirmation");
+        release(false);
+        await expect(first).rejects.toThrow("declined");
+        expect(deps.hostMakeDir).not.toHaveBeenCalled();
+    });
+});
+
+describe("shareFolder", () => {
+    it("adds the folder to the server's shared folders after a confirmation naming both", async () => {
+        const { deps, machines } = setup();
+
+        await expect(machines.shareFolder("srv-1", "/data/proj")).resolves.toEqual({ path: "/data/proj", shared: true });
+
+        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringContaining("/data/proj"), message: expect.stringContaining("build") }));
+        expect(deps.setRoots).toHaveBeenCalledWith("srv-1", ["/srv/app", "/data/proj"]);
+    });
+
+    it("changes nothing when the confirmation is declined", async () => {
+        const { deps, machines } = setup({ answer: false });
+
+        await expect(machines.shareFolder("srv-1", "/data/proj")).rejects.toThrow("declined");
+        expect(deps.setRoots).not.toHaveBeenCalled();
+    });
+
+    it("refuses a folder that is already shared or inside a shared folder, without asking", async () => {
+        const { deps, machines } = setup();
+
+        await expect(machines.shareFolder("srv-1", "/srv/app")).rejects.toThrow("already shared");
+        await expect(machines.shareFolder("srv-1", "/srv/app/sub")).rejects.toThrow("already shared");
+        await expect(machines.shareFolder("srv-1", "/srv/application")).resolves.toEqual({ path: "/srv/application", shared: true });
+        expect(deps.confirm).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows and stores the folder the host resolved", async () => {
+        const { deps, machines } = setup();
+
+        deps.hostBrowse.mockResolvedValueOnce({ entries: [], host: "build", next: null, parent: "/", path: "/real/proj", refusedRoot: false });
+
+        await expect(machines.shareFolder("srv-1", "/link/proj")).resolves.toEqual({ path: "/real/proj", shared: true });
+        expect(deps.confirm).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.stringContaining("/real/proj") }));
+        expect(deps.setRoots).toHaveBeenCalledWith("srv-1", ["/srv/app", "/real/proj"]);
+    });
+
+    it("refuses a resolved folder whose name would disguise the share prompt, without asking", async () => {
+        const { deps, machines } = setup();
+
+        deps.hostBrowse.mockResolvedValueOnce({ entries: [], host: "build", next: null, parent: "/", path: "/real/\u{202E}proj", refusedRoot: false });
+
+        await expect(machines.shareFolder("srv-1", "/link/proj")).rejects.toThrow("device: path is invalid");
+        expect(deps.confirm).not.toHaveBeenCalled();
+        expect(deps.setRoots).not.toHaveBeenCalled();
+    });
+
+    it("refuses the server's home folder or one above it, without asking", async () => {
+        const { deps, machines } = setup();
+
+        deps.hostBrowse.mockResolvedValueOnce({ entries: [], host: "build", next: null, parent: "/", path: "/home/deploy", refusedRoot: true });
+
+        await expect(machines.shareFolder("srv-1", "/home/deploy")).rejects.toThrow("home folder or one above it");
+        expect(deps.confirm).not.toHaveBeenCalled();
+        expect(deps.setRoots).not.toHaveBeenCalled();
+    });
+
+    it("refuses a 21st shared folder before asking", async () => {
+        const roots = Array.from({ length: 20 }, (_, index) => `/srv/r${index}`);
+        const { deps, machines } = setup({ hosts: [server({ roots })] });
+
+        await expect(machines.shareFolder("srv-1", "/data/proj")).rejects.toThrow("already has 20 shared folders");
+        expect(deps.confirm).not.toHaveBeenCalled();
+        expect(deps.setRoots).not.toHaveBeenCalled();
+    });
+
+    it("is a no-op for this computer", async () => {
+        const { deps, machines } = setup();
+
+        await expect(machines.shareFolder("desk-1", root)).resolves.toEqual({ path: root, shared: false });
+        expect(deps.confirm).not.toHaveBeenCalled();
+        expect(deps.setRoots).not.toHaveBeenCalled();
+    });
+});
+
+describe("pairing identity", () => {
+    it("pairs an alias with no User to the saved host of the local user, not another user's", () => {
+        const hosts = [server({ deviceId: "srv-deploy", user: "deploy" }), server({ deviceId: "srv-me", user: "me" })];
+        const [, box] = setup({ hosts, ssh: [ssh("build", { user: null })] }).machines.list();
+
+        expect(box?.id).toBe("srv-me");
+    });
+
+    it("does not pair two saved hosts that differ only by user to the wrong alias", () => {
+        const hosts = [server({ deviceId: "srv-a", user: "alice" }), server({ deviceId: "srv-b", user: "bob" })];
+        const [, box] = setup({ hosts, ssh: [ssh("build", { user: "bob" })] }).machines.list();
+
+        expect(box?.id).toBe("srv-b");
+        expect(setup({ hosts, ssh: [ssh("build", { user: "carol" })] }).machines.list()[1]?.status).toBe("unpaired");
+    });
+
+    it("does not reuse a saved host whose key file differs from the one the alias names", () => {
+        const hosts = [server({ identityFile: "/k/old" })];
+
+        expect(setup({ hosts, ssh: [ssh("build", { identityFile: "/k/new" })] }).machines.list()[1]?.status).toBe("unpaired");
+        expect(setup({ hosts, ssh: [ssh("build", { identityFile: "/k/old" })] }).machines.list()[1]?.status).toBe("connected");
+        expect(setup({ hosts, ssh: [ssh("build")] }).machines.list()[1]?.status).toBe("unpaired");
+    });
+
+    it("pairs an alias that names no key file with the saved host that has none, not one with a key", () => {
+        const hosts = [server({ deviceId: "srv-key", identityFile: "/k/old" }), server({ deviceId: "srv-plain", identityFile: null })];
+        const [, box] = setup({ hosts, ssh: [ssh("build")] }).machines.list();
+
+        expect(box?.id).toBe("srv-plain");
+    });
+
+    it("writes nothing when the paired server changes while the folder confirmation is open", async () => {
+        const entry = ssh("build");
+        const { deps, machines, state } = setup({ ssh: [entry] });
+
+        deps.confirm.mockImplementationOnce(async () => {
+            entry.hostName = "other.example.com";
+            state.hosts = [server({ address: "other.example.com" })];
+
+            return true;
+        });
+
+        await expect(machines.createFolder("srv-1", "/srv/new")).rejects.toThrow("server changed");
+        expect(deps.hostMakeDir).not.toHaveBeenCalled();
+    });
+
+    it("shares nothing when the paired server changes while the share confirmation is open", async () => {
+        const { deps, machines, state } = setup({ ssh: [ssh("build")] });
+
+        deps.confirm.mockImplementationOnce(async () => {
+            state.hosts = [server({ user: "me" })];
+
+            return true;
+        });
+
+        await expect(machines.shareFolder("srv-1", "/data/proj")).rejects.toThrow();
+        expect(deps.confirm).toHaveBeenCalled();
+        expect(deps.setRoots).not.toHaveBeenCalled();
+    });
+});
+
+describe("validators", () => {
+    it("accept an absolute path and refuse the rest", () => {
+        expect(readMachinePath("/srv/app", false)).toBe("/srv/app");
+        expect(readMachinePath("", true, true)).toBe("");
+        expect(() => readMachinePath("", true)).toThrow("device: path is invalid");
+        expect(() => readMachinePath("srv/app", false)).toThrow("must be absolute");
+        expect(() => readMachinePath("../x", true)).toThrow("must be absolute");
+        expect(() => readMachinePath("/a\0b", false)).toThrow("device: path is invalid");
+        expect(() => readMachinePath(`/${"a".repeat(1000)}`, false)).toThrow("device: path is invalid");
+        expect(() => readMachinePath(`/${"é".repeat(600)}`, false)).toThrow("device: path is invalid");
+        expect(() => readMachinePath("/a\u{202E}b", false)).toThrow("device: path is invalid");
+        expect(() => readMachinePath("/a\u{2066}b", true)).toThrow("device: path is invalid");
+        expect(() => readMachinePath("/a\u{200B}b", false)).toThrow("device: path is invalid");
+        expect(() => readMachinePath(7, false)).toThrow("device: path is invalid");
+        expect(() => readMachinePath(String.raw`\\host\share\dir`, true)).toThrow("must be absolute");
+        expect(() => readMachinePath(String.raw`\\?\C:\dir`, true)).toThrow("must be absolute");
+        expect(() => readMachinePath(String.raw`\/host\share`, true)).toThrow("must be absolute");
+
+        // Only Windows has UNC and device paths; on POSIX a leading `//` or `/\` is an ordinary absolute path.
+        if (path.sep === "\\") {
+            expect(() => readMachinePath("//host/share", true)).toThrow("must be absolute");
+            expect(() => readMachinePath(String.raw`/\host\share`, true)).toThrow("must be absolute");
+        } else {
+            expect(readMachinePath("//host/share", true)).toBe("//host/share");
+            expect(readMachinePath(String.raw`/\project`, true)).toBe(String.raw`/\project`);
+        }
+
+        expect(readMachinePath("/home/me/app", true)).toBe("/home/me/app");
+    });
+
+    it("refuse a machine id or alias of the wrong shape", () => {
+        expect(readMachineId("srv-1")).toBe("srv-1");
+        expect(() => readMachineId("")).toThrow("machineId is invalid");
+        expect(() => readMachineId({})).toThrow("machineId is invalid");
+        expect(readSshAlias("build-box")).toBe("build-box");
+        expect(() => readSshAlias("a b")).toThrow("sshAlias is invalid");
+        expect(() => readSshAlias("web-*")).toThrow("sshAlias is invalid");
+        expect(() => readSshAlias(3)).toThrow("sshAlias is invalid");
+    });
+});

@@ -93,3 +93,52 @@ export const collectAllRepositories = async (
         readBytes,
     };
 };
+
+/** One page of `collectOwnedProjectsForExport`: its projects, where the next page starts, and what reading them cost. */
+interface OwnedProjectsPage {
+    cursor?: string | null;
+    projects?: object[];
+    readBytes?: number;
+}
+
+/**
+ * Every project the user owns, one page per query, reported only after the last page. A project is never left out and
+ * the export never fails for its size: the query reads only the columns it exports, and a page that takes the reads
+ * past `maxBytes` has its projects' sharing flag dropped and marked `{ detailsOmitted: true }`, the same way the
+ * repositories' project details are. The id, title, machine and folder stay on every row.
+ */
+export const collectAllOwnedProjects = async (
+    readPage: (cursor: string | null) => Promise<unknown>,
+    maxBytes: number,
+): Promise<{ projects: unknown[]; readBytes: number }> => {
+    const projects: unknown[] = [];
+    let cursor: string | null = null;
+    let readBytes = 0;
+
+    for (;;) {
+        const result = (await readPage(cursor)) as OwnedProjectsPage;
+
+        readBytes += result.readBytes ?? 0;
+
+        const pageProjects = result.projects ?? [];
+
+        for (const project of pageProjects) {
+            if (readBytes > maxBytes) {
+                const kept: Record<string, unknown> = { ...project, detailsOmitted: true };
+
+                delete kept.sharingEnabled;
+                projects.push(kept);
+            } else {
+                projects.push(project);
+            }
+        }
+
+        if (!result.cursor) {
+            break;
+        }
+
+        cursor = result.cursor;
+    }
+
+    return { projects, readBytes };
+};

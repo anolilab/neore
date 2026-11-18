@@ -61,7 +61,7 @@ vi.mock("./stores/thread-list-ui-store", () => {
         useThreadListUIStore: (selector: (state: Record<string, unknown>) => unknown) =>
             selector({
                 enterSelectionMode: () => {},
-                openCreateProjectDialog: () => {},
+                openAddProjectDialog: () => {},
                 searchQuery: "",
                 searchType: searchState.searchType,
                 selectedCategory: undefined,
@@ -78,7 +78,7 @@ vi.mock("./stores/thread-list-ui-store", () => {
 const { default: ThreadListHeader } = await import("./thread-list-header");
 
 describe("ThreadListHeader", () => {
-    it.each(["Search threads", "Create project", "Keyboard shortcuts", "Bulk actions"])("names the %s button", (name) => {
+    it.each(["Search threads", "Add project", "Keyboard shortcuts", "Bulk actions"])("names the %s button", (name) => {
         render(<ThreadListHeader />);
 
         expect(screen.getByRole("button", { name })).toBeTruthy();
