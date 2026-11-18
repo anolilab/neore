@@ -62,6 +62,15 @@ describe(looksSensitive, () => {
         expect(looksSensitive("The user's account number is 123456789012")).toBe(true);
     });
 
+    it("drops a pasted private key, header and body, after the line cleaning", () => {
+        const { dropped, lines } = splitImportedText(
+            ["-----BEGIN RSA PRIVATE KEY-----", "MIIEpAIBAAKCAQEA3Tz2mr7SZiAMfQyuvBjM9OiZ1BjP5CE/Wm/Rr500P", "The user is a nurse in Hamburg"].join("\n"),
+        );
+
+        expect(lines).toStrictEqual(["The user is a nurse in Hamburg"]);
+        expect(dropped).toBe(2);
+    });
+
     it("leaves an ordinary fact alone", () => {
         expect(looksSensitive("The user keeps a password manager and prefers TypeScript")).toBe(false);
         expect(looksSensitive("The user walks 120000 steps a month and has a card game night in 2024")).toBe(false);

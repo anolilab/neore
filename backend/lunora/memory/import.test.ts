@@ -358,6 +358,37 @@ describe("importing another assistant's memory", () => {
         expect(rows.find((row: { _id: string }) => row._id === merged)?.memory).toBe("The user lives in Berlin near the river with a garden and bikes");
     });
 
+    it("neither confirms a row edited while the save ran nor supersedes one pinned meanwhile", async () => {
+        expect.assertions(3);
+
+        await setMemoryEnabled(true);
+
+        const [known, contradicted] = await harness.run(async (ctx: any) => [
+            await ctx.db.insert("memories", { memory: "The user is a nurse in Hamburg", type: "identity", userId: USER }),
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER }),
+        ]);
+
+        generateText.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("memories", known, { memory: "The user is a nurse in Bremen" });
+                await ctx.db.patch("memories", contradicted, { pinned: true });
+            });
+
+            return { output: { action: "SUPERSEDE" } };
+        });
+
+        await save([
+            { memory: "The user is a nurse in Hamburg", type: "identity" },
+            { memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" },
+        ]);
+
+        const rows = await memories();
+
+        expect(rows.find((row: { _id: string }) => row._id === known)?.lastConfirmedAt).toBeUndefined();
+        expect(rows.find((row: { _id: string }) => row._id === contradicted)?.supersededBy).toBeUndefined();
+        expect(rows).toHaveLength(3);
+    });
+
     it("saves the fact as new when its merge row was edited while the save ran", async () => {
         expect.assertions(3);
 

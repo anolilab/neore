@@ -99,7 +99,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
         merge?: { base: string; confidence: number; memory: string; memoryId: Id<"memories"> };
         supersedes?: Id<"memories">;
     }[] = [];
-    const toConfirm: Id<"memories">[] = [];
+    const toConfirm: { base: string; memoryId: Id<"memories"> }[] = [];
     // Rows a fact of this save superseded: still active until the save, but no longer a match.
     const retired = new Set<string>();
 
@@ -154,7 +154,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
         }
 
         if (similar && action === "IGNORE") {
-            toConfirm.push(similar.id);
+            toConfirm.push({ base: similar.memory, memoryId: similar.id });
             result.alreadyKnown += 1;
         } else if (similar && action === "UPDATE") {
             planned.push({

@@ -56,7 +56,10 @@ const SENSITIVE_RES: ReadonlyArray<RegExp> = [
     /\bAKIA[0-9A-Z]{16}\b/,
     /\bgh[opsur]_\w{20,}/,
     /\bxox[abpr]-[\w-]{10,}/,
-    /-----BEGIN [A-Z ]*PRIVATE KEY/,
+    // Without the dashes: the line cleaning reads a leading "-----" as a bullet.
+    /\bBEGIN [A-Z ]*PRIVATE KEY/,
+    // A line that is one long base64 run, as in a key or certificate body.
+    /^[A-Z0-9+/]{40,}={0,2}$/i,
     /\beyJ[\w-]{10,}\.[\w-]{10,}\./,
     /\b(?:\d[ -]?){13,19}\b/,
     /\b\d{3}-\d{2}-\d{4}\b/,

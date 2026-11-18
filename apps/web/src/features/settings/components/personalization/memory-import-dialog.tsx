@@ -84,12 +84,29 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
         onError: (error: Error) => {
             toast.error(t`Could not read the pasted list`, { description: error.message });
         },
-        onSuccess: (result: Preview) => {
-            setUnchecked(new Set());
-            focusNext.current = factsHeadingId;
-            setPreview(result);
-        },
     });
+
+    // Bumped on every close: a preview that answers after the dialog closed is not shown.
+    const opening = useRef(0);
+
+    const startPreview = () => {
+        const started = opening.current;
+
+        runPreview(
+            { text },
+            {
+                onSuccess: (result: Preview) => {
+                    if (opening.current !== started) {
+                        return;
+                    }
+
+                    setUnchecked(new Set());
+                    focusNext.current = factsHeadingId;
+                    setPreview(result);
+                },
+            },
+        );
+    };
 
     const { isPending: isSaving, mutate: runSave } = useMutation({
         ...useLunoraActionOptions(api.memory.import.saveImportedMemories),
@@ -141,6 +158,7 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
 
                 // Closing drops the preview: reopening starts from the paste, never from facts checked earlier.
                 if (!next) {
+                    opening.current += 1;
                     setPreview(undefined);
                     setUnchecked(new Set());
                 }
@@ -282,7 +300,7 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
                                 </Button>
                             </>
                         ) : (
-                            <Button disabled={isPreviewing || tooLong || text.trim().length === 0} onClick={() => runPreview({ text })}>
+                            <Button disabled={isEnabling || isPreviewing || tooLong || text.trim().length === 0} onClick={startPreview}>
                                 {isPreviewing ? t`Reading…` : t`Preview`}
                             </Button>
                         )}

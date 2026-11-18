@@ -513,7 +513,7 @@ const IMPORT_EXACT_CHECK_ROWS = 5000;
  * memory switched off meanwhile leaves the user's rows untouched. In order:
  * - a planned merge (`merge`) rewords its row while that is still the user's own, active,
  *   unpinned and unchanged since it was read; otherwise the fact is saved as new;
- * - `confirms` are marked confirmed;
+ * - `confirms` are marked confirmed while they still read as the text the fact matched;
  * - the other facts are inserted, minus any whose text the user already has (that row is
  *   confirmed instead). It runs in the mutation because one shard's mutations run one at a
  *   time: a second save of the same paste sees what the first wrote, and a repeat past the
@@ -522,7 +522,7 @@ const IMPORT_EXACT_CHECK_ROWS = 5000;
 export const saveImportedMemoryBatch = internalMutation
     .input({
         app: vImportApp,
-        confirms: v.array(v.id("memories")),
+        confirms: v.array(v.object({ base: v.string(), memoryId: v.id("memories") })),
         facts: v.array(
             v.object({
                 memory: v.string(),
@@ -564,8 +564,11 @@ export const saveImportedMemoryBatch = internalMutation
             }
         }
 
-        for (const memoryId of args.confirms) {
-            if (ownActive(await ctx.db.get("memories", memoryId))) {
+        for (const { base, memoryId } of args.confirms) {
+            const row = await ctx.db.get("memories", memoryId);
+
+            // An edit meanwhile is not confirmed by a fact that matched the old text.
+            if (ownActive(row) && row.memory === base) {
                 await ctx.db.patch("memories", memoryId, { lastConfirmedAt: now });
             }
         }
@@ -597,10 +600,10 @@ export const saveImportedMemoryBatch = internalMutation
 
             const key = importDedupKey(mem.memory);
             const known = byText.get(key);
-            // The row the action planned to supersede ends only while it is still the user's own active row:
-            // another save may have ended or removed it meanwhile.
+            // The row the action planned to supersede ends only while it is still the user's own active, unpinned
+            // row: another save may have ended or removed it, or the user pinned it, meanwhile.
             const planned = mem.supersedes ? await ctx.db.get("memories", mem.supersedes) : null;
-            const supersedes = ownActive(planned) && planned._id !== known ? planned._id : undefined;
+            const supersedes = ownActive(planned) && planned.pinned !== true && planned._id !== known ? planned._id : undefined;
 
             if (known) {
                 await ctx.db.patch("memories", known, { lastConfirmedAt: now });

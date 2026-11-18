@@ -155,6 +155,33 @@ describe("memory import dialog", () => {
         expect(screen.queryByRole("checkbox")).toBeNull();
     });
 
+    it("does not show a preview that answers after the dialog closed", async () => {
+        expect.hasAssertions();
+
+        let closed = false;
+
+        // Answers only once the dialog is closed.
+        calls.preview.mockImplementation(async () => {
+            await vi.waitUntil(() => closed);
+
+            return { cut: 0, dropped: 0, facts: [{ memory: "The user is a nurse", type: "identity" }] };
+        });
+
+        openDialog(true);
+
+        fireEvent.change(await screen.findByLabelText("3. Paste its answer"), { target: { value: "The user is a nurse" } });
+        fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+        await waitFor(() => expect(calls.preview).toHaveBeenCalledOnce());
+        fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        closed = true;
+        await calls.preview.mock.results[0]?.value;
+        fireEvent.click(screen.getByRole("button", { name: "Bring in what another AI knows about you" }));
+
+        expect(await screen.findByLabelText("3. Paste its answer")).toBeTruthy();
+        expect(screen.queryByRole("checkbox")).toBeNull();
+    });
+
     it("returns focus to the paste field on Back", async () => {
         expect.assertions(1);
 

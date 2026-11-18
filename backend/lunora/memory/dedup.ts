@@ -115,7 +115,8 @@ export const findSimilarMemoryByVector = async (
 
     const results = await searchVectors(ctx, embedding, {
         dimension: embedding.length as VectorDimension,
-        limit: 5,
+        // Room past the best few: the user's and their bots' vectors share the search, and a wrong-scope hit is skipped.
+        limit: 10,
         model: MEMORY_EMBEDDING_MODEL_NAME,
         searchAllMessagesForUserId: userId,
         table: "memories",
