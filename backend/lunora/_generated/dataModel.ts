@@ -156,6 +156,7 @@ export interface Doc_bots {
     instructions: string;
     model: string;
     name: string;
+    permissionMode?: "supervised" | "auto" | "full";
     updatedAt: number;
     userId: string;
 }
@@ -3399,6 +3400,7 @@ export interface Insert_bots {
     instructions: string;
     model: string;
     name: string;
+    permissionMode?: "supervised" | "auto" | "full";
     updatedAt: number;
     userId: string;
 }

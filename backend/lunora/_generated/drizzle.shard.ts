@@ -80,6 +80,7 @@ export const bots = sqliteTable("bots", {
     instructions: text("instructions").notNull(),
     model: text("model").notNull(),
     name: text("name").notNull(),
+    permissionMode: text("permissionMode", { mode: "json" }).$type<"supervised" | "auto" | "full">(),
     updatedAt: real("updatedAt").notNull(),
     userId: text("userId").notNull(),
 }, (t) => ({

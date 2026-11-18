@@ -1210,6 +1210,15 @@ export const resumeApprovedRun = async (
         throw new AgentRunError("left-organization", LEFT_ORGANIZATION_MESSAGE);
     }
 
+    // A sub-agent child is rebuilt under its chain's bot's mode, as it ran (`runHeadlessAgent`); a failed read fails closed.
+    const childBotMode = subAgentChild
+        ? await ctx.runQuery(internal.bots.functions.getBotPermissionModeForRun, { threadId, userId }).catch((error: unknown) => {
+              console.warn("[agent-run] bot permission mode unavailable, using supervised", error);
+
+              return "supervised" as const;
+          })
+        : null;
+
     const [toolResult, userProviderKeys, preferences] = await Promise.all([
         buildAgentTools(ctx, {
             ...(options.admittedRun && { admittedRun: true }),
@@ -1220,6 +1229,7 @@ export const resumeApprovedRun = async (
                 headless: true,
                 headlessCanAsk: true,
                 ...(config.headlessApproved && { headlessApproved: config.headlessApproved }),
+                ...(childBotMode && { unattendedMode: childBotMode }),
             }),
             mcpProgress: toolProgressSink(ctx, streamId),
             model: config.model,

@@ -181,10 +181,10 @@ export interface ApiTypes {
     };
     bots: {
         functions: {
-            createBot: FunctionReference<"mutation", { computerEnabled: boolean; description?: string; instructions: string; model: string; name: string }, string>;
+            createBot: FunctionReference<"mutation", { computerEnabled: boolean; description?: string; instructions: string; model: string; name: string; permissionMode?: "supervised" | "auto" | "full" }, string>;
             deleteBot: FunctionReference<"mutation", { botId: Id<"bots"> }, null>;
-            listBots: FunctionReference<"query", {}, Array<{ _creationTime: number; _id: string; computerEnabled: boolean; createdAt: number; description?: string; instructions: string; model: string; name: string; updatedAt: number; userId: string }>>;
-            updateBot: FunctionReference<"mutation", { botId: Id<"bots">; patch: { computerEnabled?: boolean; description?: string; instructions?: string; model?: string; name?: string } }, null>;
+            listBots: FunctionReference<"query", {}, Array<{ _creationTime: number; _id: string; computerEnabled: boolean; createdAt: number; description?: string; instructions: string; model: string; name: string; permissionMode?: "supervised" | "auto" | "full"; updatedAt: number; userId: string }>>;
+            updateBot: FunctionReference<"mutation", { botId: Id<"bots">; patch: { computerEnabled?: boolean; description?: string; instructions?: string; model?: string; name?: string; permissionMode?: "supervised" | "auto" | "full" } }, null>;
         };
     };
     changelog: {

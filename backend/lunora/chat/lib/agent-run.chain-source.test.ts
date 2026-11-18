@@ -119,6 +119,29 @@ const resume = async (chainSource: string | undefined) =>
         },
     ).catch(() => undefined);
 
+describe("a resumed sub-agent child's tools", () => {
+    it("are rebuilt under its chain's bot's mode", async () => {
+        await resumeApprovedRun(
+            {
+                // The bot-mode read names only the thread and its owner; every other read here is the approval's.
+                runQuery: vi.fn(async (_reference: unknown, args: Record<string, unknown>) =>
+                    JSON.stringify(Object.keys(args)) === `["threadId","userId"]` ? "supervised" : { toolName: TOOL },
+                ),
+            } as never,
+            {
+                approvalId: "approval-1",
+                approved: true,
+                config: { mcpServerNames: [], model: "gpt-4o", searchMode: "chat", stepsLeft: 5, subAgentRunId: "run-1", toolNames: [TOOL] } as never,
+                streamId: "stream-1",
+                threadId: "thread-1",
+                userId,
+            },
+        ).catch(() => undefined);
+
+        expect(vi.mocked(buildAgentTools).mock.lastCall?.[1]).toMatchObject({ headless: true, unattendedMode: "supervised" });
+    });
+});
+
 describe("a resumed sub-agent child's own delegation", () => {
     it("is refused while another child of its task waits", async () => {
         await resume("task:t1");
