@@ -21,6 +21,7 @@ import type { GroupType, LoadingStates } from "./types";
 
 // Lazy: a dialog opened on demand, with its icon picker and project panels.
 const ProjectFormDialog = lazy(() => import("@/features/projects/components/project-form-dialog"));
+const AddProjectDialog = lazy(() => import("@/features/projects/components/add-project-dialog"));
 
 const CHAT_THREAD_PATH_RE = new RegExp(`^/chat/(${LUNORA_ID_SOURCE})$`);
 
@@ -70,6 +71,7 @@ const ThreadList: FC = () => {
         selectedCategory,
         selectedThreadIds,
         showKeyboardHelp,
+        showAddProjectDialog,
         showProjectFormDialog,
     } = useThreadListUIStore(
         useShallow((state) => {
@@ -82,6 +84,7 @@ const ThreadList: FC = () => {
                 selectedCategory: state.selectedCategory,
                 selectedThreadIds: state.selectedThreadIds,
                 showKeyboardHelp: state.showKeyboardHelp,
+                showAddProjectDialog: state.showAddProjectDialog,
                 showProjectFormDialog: state.showProjectFormDialog,
             };
         }),
@@ -93,6 +96,9 @@ const ThreadList: FC = () => {
     const setLastSelectedIndex = useThreadListUIStore((state) => state.setLastSelectedIndex);
     const exitSelectionMode = useThreadListUIStore((state) => state.exitSelectionMode);
     const closeProjectFormDialog = useThreadListUIStore((state) => state.closeProjectFormDialog);
+    const closeAddProjectDialog = useThreadListUIStore((state) => state.closeAddProjectDialog);
+    const openCreateProjectDialog = useThreadListUIStore((state) => state.openCreateProjectDialog);
+    const hasOpenedAddProject = useHasOpened(showAddProjectDialog);
     // Mounted on first open only: a lazy dialog rendered closed still loads its chunk on first paint.
     const hasOpenedProjectForm = useHasOpened(showProjectFormDialog);
     const showManageTagsDialog = useThreadListUIStore((state) => state.showManageTagsDialog);
@@ -283,6 +289,11 @@ const ThreadList: FC = () => {
                     toggleExpanded={toggleExpanded}
                     toggleGroupCollapsed={toggleGroupCollapsed}
                 />
+                {hasOpenedAddProject && (
+                    <Suspense fallback={null}>
+                        <AddProjectDialog onClose={closeAddProjectDialog} onCreateNew={openCreateProjectDialog} open={showAddProjectDialog} />
+                    </Suspense>
+                )}
                 {hasOpenedProjectForm && (
                     <Suspense fallback={null}>
                         <ProjectFormDialog editingProject={editingProject} onClose={closeProjectFormDialog} open={showProjectFormDialog} />

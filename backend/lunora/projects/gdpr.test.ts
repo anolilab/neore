@@ -6,11 +6,13 @@ import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { collectAllRepositories } from "./export-pages";
-import { collectProjectDetailsForExport, collectProjectRepositoriesForExport } from "./gdpr";
+import { collectAllOwnedProjects, collectAllRepositories } from "./export-pages";
+import { collectOwnedProjectsForExport, collectProjectDetailsForExport, collectProjectRepositoriesForExport } from "./gdpr";
 
 const A = "user-a";
 const SHARE_TOKENS = /share-token|old-token/u;
+const PROJECT_FOLDER = /^\/home\/a\/p\d$/u;
+const PROJECT_TITLE = /^p\d$/u;
 const B = "user-b";
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -149,5 +151,84 @@ describe("project repositories in the GDPR export", () => {
                 1000,
             ),
         ).rejects.toMatchObject({ code: "PAYLOAD_TOO_LARGE" });
+    });
+});
+
+describe("owned projects in the GDPR export", () => {
+    const ownedFor = async (userId: string, maxBytes = Infinity) => {
+        let pages = 0;
+        const result = await collectAllOwnedProjects(async (cursor) => {
+            pages += 1;
+
+            return await harness.run((async (ctx: any) => await ctx.runQuery(collectOwnedProjectsForExport, { cursor, userId })) as never);
+        }, maxBytes);
+
+        return { ...result, pages };
+    };
+
+    it("exports every project the user owns, with or without a repository, its machine and folder, and never another user's", async () => {
+        await harness.run((async (ctx: any) => {
+            await ctx.db.insert("projects", { createdAt: 1, path: "/home/a/app", title: "with folder", userId: A });
+            await ctx.db.insert("projects", { createdAt: 2, title: "no folder", userId: A });
+            await ctx.db.insert("projects", { createdAt: 3, title: "not mine", userId: B });
+        }) as never);
+
+        const { projects } = await ownedFor(A);
+
+        // Rows created in the same millisecond share a _creationTime, so the order between them is not asserted.
+        expect(projects).toHaveLength(2);
+        expect(projects).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ path: "/home/a/app", sharingEnabled: false, title: "with folder" }),
+                expect.objectContaining({ sharingEnabled: false, title: "no folder" }),
+            ]),
+        );
+    });
+
+    it("pages two projects to a query and reports the rows' read cost, the rows counted whole", async () => {
+        await harness.run((async (ctx: any) => {
+            for (let index = 0; index < 5; index += 1) {
+                await ctx.db.insert("projects", { createdAt: index, title: `p${index}`, userId: A });
+            }
+        }) as never);
+
+        const { pages, projects, readBytes } = await ownedFor(A);
+
+        expect(projects).toHaveLength(5);
+        expect(pages).toBe(3);
+        expect(readBytes).toBeGreaterThan(0);
+    });
+
+    it("exports every project past the read limit, marked detailsOmitted, with its id, title, machine and folder", async () => {
+        await harness.run((async (ctx: any) => {
+            for (let index = 0; index < 5; index += 1) {
+                await ctx.db.insert("projects", { createdAt: index, isPublic: true, path: `/home/a/p${index}`, title: `p${index}`, userId: A });
+            }
+        }) as never);
+
+        const { projects } = await ownedFor(A, 16);
+
+        expect(projects).toHaveLength(5);
+
+        for (const project of projects) {
+            expect(project).toMatchObject({
+                detailsOmitted: true,
+                path: expect.stringMatching(PROJECT_FOLDER),
+                projectId: expect.any(String),
+                title: expect.stringMatching(PROJECT_TITLE),
+            });
+            expect(project).not.toHaveProperty("sharingEnabled");
+        }
+    });
+
+    it("does not read a project's heavy columns, so a large row costs no more than a small one", async () => {
+        await harness.run((async (ctx: any) => {
+            await ctx.db.insert("projects", { context: "x".repeat(100_000), createdAt: 1, title: "big", userId: A });
+        }) as never);
+
+        const { projects, readBytes } = await ownedFor(A, 4096);
+
+        expect(readBytes).toBeLessThan(4096);
+        expect(projects).toEqual([expect.not.objectContaining({ detailsOmitted: true })]);
     });
 });

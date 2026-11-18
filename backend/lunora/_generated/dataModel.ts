@@ -1322,8 +1322,10 @@ export interface Doc_projects {
     galleryViewCount?: number;
     icon?: string;
     isPublic?: boolean;
+    machineId?: Id<"devices">;
     order?: number;
     organizationId?: string;
+    path?: string;
     pinnedAt?: number;
     projectType?: "chat" | "workflow";
     publicAccessToken?: string;
@@ -4562,8 +4564,10 @@ export interface Insert_projects {
     galleryViewCount?: number;
     icon?: string;
     isPublic?: boolean;
+    machineId?: Id<"devices">;
     order?: number;
     organizationId?: string;
+    path?: string;
     pinnedAt?: number;
     projectType?: "chat" | "workflow";
     publicAccessToken?: string;
