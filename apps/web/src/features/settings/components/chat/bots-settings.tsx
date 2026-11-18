@@ -18,7 +18,7 @@ import type { FC, FormEvent } from "react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 
-import { useIsImpersonating } from "@/features/admin/hooks/use-admin";
+import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import PromptModelSelector from "@/features/prompts/components/prompt-model-selector";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -107,9 +107,8 @@ const BotsSettings = () => {
     const deleteMutation = useMutation(crpc.bots.functions.deleteBot.mutationOptions());
     const updateMutation = useMutation(crpc.bots.functions.updateBot.mutationOptions());
     const chatMutation = useMutation(crpc.chat.functions.createThread.mutationOptions());
-    // The server refuses a mode change from an admin acting as the owner.
-    const { data: impersonation } = useIsImpersonating();
-    const impersonating = impersonation?.isImpersonating === true;
+    // The server refuses a mode change from an admin acting as the owner; held off too while the session is not read yet.
+    const impersonating = useImpersonating();
 
     const [draft, setDraft] = useState<BotDraft>(emptyDraft);
     const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
@@ -130,7 +129,7 @@ const BotsSettings = () => {
                 instructions: draft.instructions.trim(),
                 model: draft.model,
                 name: draft.name.trim(),
-                // The default is stored as nothing, so a bot made without a choice keeps following it.
+                // Auto is stored as nothing: a bot with no mode runs exactly as one set to auto.
                 ...(draft.permissionMode !== DEFAULT_THREAD_PERMISSION_MODE && { permissionMode: draft.permissionMode }),
             });
             setDraft(emptyDraft());
