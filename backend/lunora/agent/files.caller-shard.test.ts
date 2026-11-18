@@ -10,12 +10,41 @@
  * decision the caller's shard must make, and that it does not weaken the owner's own chats.
  */
 import { lunoraTest } from "@lunora/testing";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Id } from "../_generated/dataModel";
 import { mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
 import schema from "../schema";
-import { changeMessageFiles, gatedFileIdsOnCallerShard } from "./files";
+import { fileAttachInFlight } from "./file-attach-claim";
+import { enableThreadLock } from "./thread-lock";
+import { beginFileAttach, changeMessageFiles, endFileAttach, gatedFileIdsOnCallerShard } from "./files";
+
+const PASSCODE = "correct horse";
+
+/** The session is read from the harness identity, as in `file-link-backfill.test.ts`. */
+const { sessionFrom } = vi.hoisted(() => {
+    return {
+        sessionFrom: async (context: { auth: { userId?: string | null } }) =>
+            context.auth.userId ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, userId: context.auth.userId } : null,
+    };
+});
+
+vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/crpc-auth-helpers")>()),
+        getSessionUser: sessionFrom,
+        getSessionUserForQuery: sessionFrom,
+        getSessionUserForQueryLite: sessionFrom,
+    };
+});
+
+vi.mock("../auth", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../auth")>()),
+        getAuthUserIdentity: async (context: { auth: { userId?: string | null } }) =>
+            context.auth.userId ? { subject: context.auth.userId, userId: context.auth.userId } : null,
+    };
+});
 
 const SECRET = "test-storage-signing-secret";
 const OWNER = "owner-shard-owner";
@@ -166,5 +195,66 @@ describe("the owner's own chats keep the same check", () => {
         const unlockProof = await proofFor(ownerLockedId, OWNER);
 
         await expect(gatedOnCallerShard(OWNER, [ownerFileId], { threadId: ownerLockedId, unlockProof })).resolves.toEqual([]);
+    });
+});
+
+/** Runs an attach's gate-and-claim on the caller's shard, as a send does before its save. */
+const beginAttach = async (userId: string, fileIds: string[], requestId: string, threadId?: string) =>
+    await run(
+        async (ctx) =>
+            await ctx.runMutation(beginFileAttach as never, {
+                fileIds,
+                requestId,
+                userId,
+                ...(threadId !== undefined && { threadId }),
+            }),
+    );
+
+const endAttach = async (userId: string, requestId: string, claimedAt: number) =>
+    await run(async (ctx) => await ctx.runMutation(endFileAttach as never, { claimedAt, requestId, userId }));
+
+const lockAttempt = async (userId: string, threadId: string) =>
+    await harness
+        .withIdentity({ userId } as never)
+        .mutation(enableThreadLock as never, { passcode: PASSCODE, threadId } as never)
+        .catch((error: unknown) => error);
+
+describe("an attach holds a claim that the caller's own lock waits for", () => {
+    it("takes no claim when a file is gated, so nothing waits on a refused attach", async () => {
+        const result = await beginAttach(COLLAB, [secretFileId], "req-gated", ownerSharedId);
+
+        expect(result).toMatchObject({ gated: [secretFileId] });
+        expect(result).not.toHaveProperty("claimedAt");
+        await expect(run(async (ctx) => await fileAttachInFlight(ctx, COLLAB))).resolves.toBe(false);
+    });
+
+    it("refuses the caller's lock of an unlocked chat while an attach of an open file is in flight", async () => {
+        const result = (await beginAttach(COLLAB, [collabOpenFileId], "req-open", ownerSharedId)) as { claimedAt?: number };
+
+        expect(result.claimedAt).toEqual(expect.any(Number));
+        await expect(run(async (ctx) => await fileAttachInFlight(ctx, COLLAB))).resolves.toBe(true);
+        await expect(lockAttempt(COLLAB, collabOpenId)).resolves.toMatchObject({
+            code: "CONFLICT",
+            message: expect.stringContaining("Try again in a moment"),
+        });
+    });
+
+    it("lets the lock through once the attach has released its claim", async () => {
+        const { claimedAt } = (await beginAttach(COLLAB, [collabOpenFileId], "req-release", ownerSharedId)) as { claimedAt: number };
+
+        await endAttach(COLLAB, "req-release", claimedAt);
+
+        await expect(run(async (ctx) => await fileAttachInFlight(ctx, COLLAB))).resolves.toBe(false);
+        await lockAttempt(COLLAB, collabOpenId);
+
+        await expect(run(async (ctx) => await ctx.db.get("threads", collabOpenId))).resolves.toMatchObject({ lockedAt: expect.any(Number) });
+    });
+
+    it("does not hold back the owner's own lock, since the claim belongs to the collaborator", async () => {
+        await beginAttach(COLLAB, [collabOpenFileId], "req-other-user", ownerSharedId);
+
+        await lockAttempt(OWNER, ownerSharedId);
+
+        await expect(run(async (ctx) => await ctx.db.get("threads", ownerSharedId))).resolves.toMatchObject({ lockedAt: expect.any(Number) });
     });
 });

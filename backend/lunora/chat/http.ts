@@ -407,14 +407,24 @@ const workerThreadResponse = (): Response =>
 /** The answer to a request that writes into a locked thread without a valid proof. */
 const threadLockedResponse = (): Response => Response.json({ code: THREAD_LOCKED_CODE, error: "This chat is locked." }, { status: 403 });
 
+/** What an attach's gate decided: a refusal to answer with, or nothing, and in either case a `release` to call once the attach is done. */
+interface FileAttach {
+    refusal?: Response;
+    release: () => Promise<void>;
+}
+
+const noFileAttach: FileAttach = { release: async () => undefined };
+
 /**
- * Refuses an attach of a file that the CALLER's own locked chats hold (`gatedFileIdsOnCallerShard`), and runs that check
- * on the caller's shard. The thread's shard cannot see the caller's passcode rows or file links, so a collaborator's file
- * from their own locked chat would pass there. A gated file answers as a missing one, as `getFile` does for a file it may
- * not serve. A failed check refuses the attach (fail closed). An id that is not well-formed is left to the attach's own
- * check, which refuses it.
+ * Checks an attach's files on the CALLER's shard and holds the attach's claim there until `release` (`agent/file-attach-claim.ts`).
+ *
+ * The thread's shard cannot see the caller's passcode rows or file links, so a collaborator's file from their own locked chat
+ * would pass there; this check runs where those rows are. The check and the claim are one transaction, so a lock of the
+ * caller's chat cannot commit between them and the owner-shard read that attaches the file. A gated file answers as a missing
+ * one, as `getFile` does for a file it may not serve. A failed check refuses the attach (fail closed). An id that is not
+ * well-formed is left to the attach's own check, which refuses it. `release` never throws: a lost release lapses after its TTL.
  */
-const refuseGatedFiles = async (
+const beginFileAttach = async (
     context: HttpActionCtx,
     {
         fileIds,
@@ -422,26 +432,46 @@ const refuseGatedFiles = async (
         unlockProof,
         userId,
     }: { fileIds: string[] | undefined; threadId: string | undefined; unlockProof: string | undefined; userId: string },
-): Promise<Response | undefined> => {
+): Promise<FileAttach> => {
     const ids = (fileIds ?? []).filter((fileId) => isValidDocumentIdFormat(fileId)) as Id<"chatFiles">[];
 
     if (ids.length === 0) {
-        return undefined;
+        return noFileAttach;
     }
 
+    const requestId = crypto.randomUUID();
+    const caller = context.forShard(userId);
+
     try {
-        const gated = await context.forShard(userId).runQuery(internal.agent.files.gateFilesOnCallerShard, {
+        const attach = await caller.runMutation(internal.agent.files.beginFileAttach, {
             fileIds: ids,
+            requestId,
             ...(threadId && { threadId: threadId as Id<"threads"> }),
             ...(unlockProof !== undefined && { unlockProof }),
             userId,
         });
 
-        return gated.length > 0 ? Response.json({ error: "File not found" }, { status: 404 }) : undefined;
+        if (attach.gated.length > 0) {
+            return { refusal: Response.json({ error: "File not found" }, { status: 404 }), release: noFileAttach.release };
+        }
+
+        const { claimedAt } = attach;
+
+        if (claimedAt === undefined) {
+            return { refusal: Response.json({ error: "Could not attach the file" }, { status: 400 }), release: noFileAttach.release };
+        }
+
+        return {
+            release: async () => {
+                await caller.runMutation(internal.agent.files.endFileAttach, { claimedAt, requestId, userId }).catch((error: unknown) => {
+                    chatLogger.error("[chat] Could not release a file attach's claim; it lapses on its own", error);
+                });
+            },
+        };
     } catch (error) {
         chatLogger.error("Error checking attached files on the caller's shard:", error);
 
-        return Response.json({ error: "Could not attach the file" }, { status: 400 });
+        return { refusal: Response.json({ error: "Could not attach the file" }, { status: 400 }), release: noFileAttach.release };
     }
 };
 
@@ -561,24 +591,29 @@ export const runChatStart = async (
     // its owner's, where the thread, its messages and this run's stream live.
     // Everything below runs there.
     // A file from the caller's own locked chat is refused here, on the caller's shard, before the thread's shard is entered.
-    const refusedFiles = await refuseGatedFiles(context, {
+    // The attach's claim is held until the send has answered, so a lock of the caller's chat waits for the attach's save.
+    const fileAttach = await beginFileAttach(context, {
         fileIds: body.fileIds,
         threadId: body.threadId === "default" ? undefined : body.threadId,
         unlockProof: body.unlockProof,
         userId,
     });
 
-    if (refusedFiles) {
-        return refusedFiles;
+    if (fileAttach.refusal) {
+        return fileAttach.refusal;
     }
 
-    const shardKey = await threadShardFor(context, userId, body.threadId);
+    try {
+        const shardKey = await threadShardFor(context, userId, body.threadId);
 
-    return await inShard(
-        context,
-        shardKey,
-        async (shardCtx) => await runChatStartOnShard(shardCtx, body, signingSecret, { origin, pageContext, user, userId }),
-    );
+        return await inShard(
+            context,
+            shardKey,
+            async (shardCtx) => await runChatStartOnShard(shardCtx, body, signingSecret, { origin, pageContext, user, userId }),
+        );
+    } finally {
+        await fileAttach.release();
+    }
 };
 
 /**
@@ -1519,7 +1554,21 @@ const runChatStartOnShard = async (
     );
 };
 
+/**
+ * `/chat/edit`. The attach's claim is taken after the thread's gate, inside `editMessageAttached`, and released here once the
+ * edit has answered, so the claim covers the file reads and the save.
+ */
 export const editMessageHttpAction = async (context: HttpActionCtx, request: Request) => {
+    const holder: { release?: () => Promise<void> } = {};
+
+    try {
+        return await editMessageAttached(context, request, holder);
+    } finally {
+        await holder.release?.();
+    }
+};
+
+const editMessageAttached = async (context: HttpActionCtx, request: Request, holder: { release?: () => Promise<void> }) => {
     const { content, fileIds, messageId, unlockProof } = (await request.json()) as {
         content: ({ text: string; type: "text" } | { image: string; type: "image" } | { data: string; filename?: string; mimeType?: string; type: "file" })[];
         fileIds?: string[];
@@ -1621,11 +1670,14 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
         }
 
         // The edit's files are checked on the caller's own shard too: this route runs on the thread owner's (`onThreadShard`).
-        const refusedFiles = await refuseGatedFiles(context, { fileIds, threadId, unlockProof, userId });
+        // The claim is held from here until the outer handler answers.
+        const fileAttach = await beginFileAttach(context, { fileIds, threadId, unlockProof, userId });
 
-        if (refusedFiles) {
-            return refusedFiles;
+        if (fileAttach.refusal) {
+            return fileAttach.refusal;
         }
+
+        holder.release = fileAttach.release;
 
         // An edit of a guest's note the owner sent on is still the guest's words: it keeps the mark and the note's id.
         const guestNoteId = guestNoteIdOfMessage(message.message as Parameters<typeof guestNoteIdOfMessage>[0]);
