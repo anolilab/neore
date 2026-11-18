@@ -46,12 +46,24 @@ import {
     findSimilarMemoryByJaccard,
     findSimilarMemoryByVector,
     getMemoryEmbeddingModel,
+    isNearExact,
     linkMemoryVectors,
     MEMORY_EMBEDDING_MODEL_NAME,
     saveMemoryVectors,
     type SimilarMemoryResult,
 } from "./dedup";
 import { logRedaction, redactMemoryFacts, redactMemoryText, type RedactionCounts } from "./redact";
+import {
+    describeFactDates,
+    differentEventDays,
+    type FactDates,
+    factDatesOf,
+    normalizeFactDates,
+    restatedDates,
+    restatementOutcome,
+    sameFactDates,
+} from "./dates";
+import { localDayOf, resolveTimeZone } from "./reflection-logic";
 import { lastConfirmedOf, MEMORY_TYPE_GUIDE, MEMORY_TYPES, type MemoryType } from "./taxonomy";
 
 // ============================================================================
@@ -61,7 +73,12 @@ import { lastConfirmedOf, MEMORY_TYPE_GUIDE, MEMORY_TYPES, type MemoryType } fro
 const EXTRACTION_SYSTEM_PROMPT = `You are a fact extraction system. Extract key facts about the user from this conversation that would be useful in future conversations.
 
 Guidelines:
-- Write facts in third-person, present tense (e.g., "User prefers TypeScript")
+- Write facts in third person (e.g., "User prefers TypeScript")
+- Never keep a relative date. Resolve "tomorrow", "next Friday", "until the 20th" against the current date given with the conversation and write the absolute date into the fact ("User flies to Paris on 2026-11-20", not "next Friday"). A user message that starts with [sent on YYYY-MM-DD] was sent on that day: resolve its relative dates against that day
+- Dates (YYYY-MM-DD, the user's local calendar):
+  - validUntil: the last day a fact holds, only when it stops holding on a known day ("in Lisbon until the 20th"). Omit it for lasting facts.
+  - eventStart / eventEnd: the day or days something happens (a flight, a trip, an appointment). eventEnd only for more than one day.
+  - A birthday, anniversary or other yearly date repeats: write it in the fact and set none of these fields.
 - One fact = one concise statement (max 1 sentence)
 - Only extract facts that are explicitly stated or strongly implied
 - Assign confidence based on how clearly the fact was stated (50-100)
@@ -79,15 +96,26 @@ Choose ONE action:
 - IGNORE: New fact is a duplicate or already covered by existing
 - ADD: Facts are distinct, no conflict — keep both`;
 
+/** The day the extractor resolves relative dates against, e.g. "Tuesday, 2026-11-17 (Europe/Lisbon)". */
+export const describeToday = (now: number, timeZone: string | null | undefined): string => {
+    const zone = resolveTimeZone(timeZone);
+    const weekday = new Intl.DateTimeFormat("en-US", { timeZone: zone, weekday: "long" }).format(now);
+
+    return `${weekday}, ${localDayOf(now, zone)} (${zone})`;
+};
+
 // ============================================================================
 // Schema for LLM outputs
 // ============================================================================
 
 const extractedFactSchema = z.object({
     confidence: z.int().min(50).max(100),
+    eventEnd: z.string().optional().describe("Last day of a multi-day event, YYYY-MM-DD"),
+    eventStart: z.string().optional().describe("Day the event happens or starts, YYYY-MM-DD"),
     importance: z.int().min(30).max(100),
     memory: z.string(),
     type: z.enum(MEMORY_TYPES),
+    validUntil: z.string().optional().describe("Last day the fact holds, YYYY-MM-DD; omit for lasting or yearly facts"),
 });
 
 const beliefRevisionSchema = z.object({
@@ -234,6 +262,10 @@ export const extractMemories = internalAction
         // The bot whose chat produced the turn. Its memories are written and deduped in
         // that scope only (`getActiveMemoriesForUser`), never against the user's own.
         botId: v.optional(v.string()),
+        /** When the user wrote the message: relative dates in it resolve against this day. Unset = now. */
+        messageAt: v.optional(v.number()),
+        /** When the last message steered into the reply was delivered: relative dates in the steers resolve against its day. */
+        steeredAt: v.optional(v.number()),
         /** Where the messages sent into the reply start in `userMessage`; they are kept whole when it is cut. */
         steeredFrom: v.optional(v.number()),
         threadId: v.optional(v.id("threads")),
@@ -263,17 +295,26 @@ export const extractMemories = internalAction
             return;
         }
 
-        // 2. Load existing memories for dedup context
+        // 2. Load existing memories for dedup context. An unpinned fact past its end date is left out: a
+        //    restatement of it ("in Lisbon again") must be saved anew, not matched to a row reflection retires.
+        const messageAt = args.messageAt ?? Date.now();
+        // The turn's last word: a fact past its end date by then is not matched.
+        const lastSaidAt = args.steeredFrom !== undefined && args.steeredAt !== undefined ? Math.max(messageAt, args.steeredAt) : messageAt;
         const existingMemories = await ctx.runQuery(internal.memory.functions.getActiveMemoriesForUser, {
+            activeOn: lastSaidAt,
             botId: args.botId,
             limit: 50,
             userId: args.userId,
         });
 
         const existingMemoriesText =
-            existingMemories.length > 0
-                ? existingMemories.map((m: { memory: string; type: string }) => `- [${m.type}] ${m.memory}`).join("\n")
-                : "(No existing memories)";
+            existingMemories.length > 0 ? existingMemories.map((m) => `- [${m.type}] ${m.memory}${describeFactDates(m)}`).join("\n") : "(No existing memories)";
+        // The dates and pin of every row a fact may match: the window, plus rows vector dedup reads past it.
+        const matchable = new Map<string, FactDates & { pinned?: boolean }>(
+            existingMemories.map((m) => [m._id as string, { ...factDatesOf(m), pinned: m.pinned }]),
+        );
+        const timeZone = await ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId: args.userId });
+        const today = describeToday(messageAt, timeZone);
 
         // 3. LLM extraction — truncate inputs to control cost
         const truncatedUserMessage = truncateUserMessage(args.userMessage, args.steeredFrom);
@@ -332,7 +373,9 @@ export const extractMemories = internalAction
                         facts: z.array(extractedFactSchema),
                     }),
                 }),
-                prompt: `<existing_memories>
+                prompt: `Current date (the user's timezone): ${today}
+
+<existing_memories>
 ${existingMemoriesText}
 </existing_memories>
 
@@ -383,6 +426,8 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
         const memoriesToSave: {
             botId?: string;
             confidence: number;
+            eventEnd: string | undefined;
+            eventStart: string | undefined;
             importance: number;
             memory: string;
             source: "auto";
@@ -391,6 +436,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             threadId: Id<"threads"> | undefined;
             type: MemoryType;
             userId: string;
+            validUntil: string | undefined;
         }[] = [];
         const factEmbeddingsToSave: (number[] | null)[] = [];
 
@@ -398,31 +444,91 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             base: string;
             botId: string | undefined;
             confidence: number;
+            dates?: FactDates;
             embedding: number[] | null;
             fact: z.infer<typeof extractedFactSchema>;
+            factDates: FactDates;
             memory: string;
             memoryId: Id<"memories">;
         }[] = [];
 
         // Existing memories the conversation restated — reconfirmed, not duplicated. Each keeps the text it matched and its fact,
         // so a confirmation that no longer applies is saved as new.
-        const memoriesToConfirm: { base: string; embedding: number[] | null; fact: z.infer<typeof extractedFactSchema>; memoryId: Id<"memories"> }[] = [];
+        const memoriesToConfirm: {
+            base: string;
+            dates: FactDates;
+            embedding: number[] | null;
+            fact: z.infer<typeof extractedFactSchema>;
+            memoryId: Id<"memories">;
+        }[] = [];
         // Rows this run has planned a revision for: their stored vector is of the old text, so a later fact compares by words,
         // and against their revised text.
         const revisedIds = new Set<Id<"memories">>();
         // Rows this run has already confirmed or superseded: a later fact does not match them, so no later revision can
-        // change a row an earlier decision is waiting to write against its text.
+        // change a row an earlier decision is waiting to write against its text, and none is retired twice.
         const decidedIds = new Set<string>();
         // Secrets taken out of revision wordings: counted apart from the facts', which were logged when extracted.
         const revisionRedaction: RedactionCounts = { dropped: 0, redacted: 0 };
+        // Every fact this run settled, whatever became of it.
+        const handled: { dates: FactDates; memory: string }[] = [];
+
+        const saveNew = (
+            fact: z.infer<typeof extractedFactSchema>,
+            dates: FactDates,
+            embedding: number[] | null,
+            supersedes?: { base: string; memoryId: Id<"memories"> },
+        ) => {
+            memoriesToSave.push({
+                botId: args.botId,
+                confidence: fact.confidence,
+                eventEnd: dates.eventEnd,
+                eventStart: dates.eventStart,
+                importance: fact.importance,
+                memory: fact.memory,
+                source: "auto",
+                supersedes: supersedes?.memoryId,
+                supersedesBase: supersedes?.base,
+                threadId: args.threadId,
+                type: fact.type,
+                userId: args.userId,
+                validUntil: dates.validUntil,
+            });
+            factEmbeddingsToSave.push(embedding);
+
+            if (supersedes) {
+                decidedIds.add(supersedes.memoryId);
+            }
+        };
+
+        // A restatement with the same dates reconfirms the memory. With other dates the newer statement decides
+        // (`restatementOutcome`): it replaces the row, text and dates together, or is saved beside a pinned one.
+        const confirm = (fact: z.infer<typeof extractedFactSchema>, dates: FactDates, embedding: number[] | null, matched: SimilarMemoryResult) => {
+            const outcome = restatementOutcome(matchable.get(matched.id) ?? {}, dates);
+
+            if (outcome === "confirm") {
+                memoriesToConfirm.push({ base: matched.memory, dates, embedding, fact, memoryId: matched.id });
+                decidedIds.add(matched.id);
+            } else {
+                saveNew(fact, dates, embedding, outcome === "replace" ? { base: matched.memory, memoryId: matched.id } : undefined);
+            }
+        };
 
         for (const [i, extractedFact] of extractedFacts.entries()) {
             const fact = extractedFact!;
+            const dates = normalizeFactDates(fact);
 
             // Skip very short or empty facts
             if (fact.memory.trim().length < 10) {
                 continue;
             }
+
+            // The extractor can return one statement twice: the second is the first, already settled (saved, merged
+            // or confirmed), not a new fact.
+            if (handled.some((earlier) => sameFactDates(earlier.dates, dates) && isNearExact(fact.memory, earlier.memory))) {
+                continue;
+            }
+
+            handled.push({ dates, memory: fact.memory });
 
             const factEmbedding = factEmbeddings[i] ?? null;
 
@@ -432,13 +538,20 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
 
             if (factEmbedding) {
                 try {
-                    similarMemory = await findSimilarMemoryByVector(ctx, {
+                    const match = await findSimilarMemoryByVector(ctx, {
+                        activeOn: lastSaidAt,
                         botId: args.botId,
                         embedding: factEmbedding,
                         existing: candidates,
                         retired: decidedIds,
                         userId: args.userId,
                     });
+
+                    if (match && !matchable.has(match.id)) {
+                        matchable.set(match.id, { ...factDatesOf(match.row), pinned: match.row.pinned });
+                    }
+
+                    similarMemory = match;
                 } catch (error) {
                     console.warn("[memory/extract] Vector dedup search failed, falling back to Jaccard:", error);
                 }
@@ -453,43 +566,26 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             }
 
             if (!similarMemory) {
-                // No similar memory found — save as new
-                memoriesToSave.push({
-                    botId: args.botId,
-                    confidence: fact.confidence,
-                    importance: fact.importance,
-                    memory: fact.memory,
-                    source: "auto",
-                    supersedes: undefined,
-                    threadId: args.threadId,
-                    type: fact.type,
-                    userId: args.userId,
-                });
-                factEmbeddingsToSave.push(factEmbedding);
+                saveNew(fact, dates, factEmbedding);
                 continue;
             }
 
             if (similarMemory.score >= 0.95) {
                 // Near-exact duplicate — nothing new, but the fact was stated again.
-                memoriesToConfirm.push({ base: similarMemory.memory, embedding: factEmbedding, fact, memoryId: similarMemory.id });
-                decidedIds.add(similarMemory.id);
+                confirm(fact, dates, factEmbedding, similarMemory);
                 continue;
             }
 
-            // A pinned memory is never revised: a near-match of one is kept beside it.
-            if (similarMemory.pinned) {
-                memoriesToSave.push({
-                    botId: args.botId,
-                    confidence: fact.confidence,
-                    importance: fact.importance,
-                    memory: fact.memory,
-                    source: "auto",
-                    supersedes: undefined,
-                    threadId: args.threadId,
-                    type: fact.type,
-                    userId: args.userId,
-                });
-                factEmbeddingsToSave.push(factEmbedding);
+            // An event on another day is another occurrence, not a changed plan: it is never revised against the
+            // match (as in reflection), so a second trip never retires the first.
+            if (differentEventDays(matchable.get(similarMemory.id) ?? {}, dates)) {
+                saveNew(fact, dates, factEmbedding);
+                continue;
+            }
+
+            // A pinned memory is never revised, text or dates: a near-match of one is kept beside it.
+            if (similarMemory.pinned || matchable.get(similarMemory.id)?.pinned === true) {
+                saveNew(fact, dates, factEmbedding);
                 continue;
             }
 
@@ -499,40 +595,16 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
 
                 switch (revision.action) {
                     case "ADD": {
-                        memoriesToSave.push({
-                            botId: args.botId,
-                            confidence: fact.confidence,
-                            importance: fact.importance,
-                            memory: fact.memory,
-                            source: "auto",
-                            supersedes: undefined,
-                            threadId: args.threadId,
-                            type: fact.type,
-                            userId: args.userId,
-                        });
-                        factEmbeddingsToSave.push(factEmbedding);
+                        saveNew(fact, dates, factEmbedding);
                         break;
                     }
                     case "IGNORE": {
-                        memoriesToConfirm.push({ base: similarMemory.memory, embedding: factEmbedding, fact, memoryId: similarMemory.id });
-                        decidedIds.add(similarMemory.id);
+                        confirm(fact, dates, factEmbedding, similarMemory);
                         break;
                     }
                     case "SUPERSEDE": {
-                        memoriesToSave.push({
-                            botId: args.botId,
-                            confidence: fact.confidence,
-                            importance: fact.importance,
-                            memory: fact.memory,
-                            source: "auto",
-                            supersedes: similarMemory.id,
-                            supersedesBase: similarMemory.memory,
-                            threadId: args.threadId,
-                            type: fact.type,
-                            userId: args.userId,
-                        });
-                        factEmbeddingsToSave.push(factEmbedding);
-                        decidedIds.add(similarMemory.id);
+                        // The new statement replaces the old one whole, dates included.
+                        saveNew(fact, dates, factEmbedding, { base: similarMemory.memory, memoryId: similarMemory.id });
                         break;
                     }
                     case "UPDATE": {
@@ -557,12 +629,22 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                                 threadId: args.threadId,
                                 type: fact.type,
                                 userId: args.userId,
+                                eventEnd: dates.eventEnd,
+                                eventStart: dates.eventStart,
+                                validUntil: dates.validUntil,
                             });
                             factEmbeddingsToSave.push(factEmbedding);
                         } else if (mergedMemory) {
                             // The row now reads as the merged text for the rest of this run, so a later fact is revised against it.
                             const confidence = Math.max(fact.confidence, similarMemory.confidence ?? 50);
                             const working = existingMemories.find((row) => row._id === similarMemory.id);
+                            const current = matchable.get(similarMemory.id) ?? {};
+                            // The newer statement's dates replace the row's (`restatedDates`), here and for later facts of the run.
+                            const nextDates = restatedDates(current, dates);
+
+                            if (nextDates) {
+                                matchable.set(similarMemory.id, { ...nextDates, pinned: current.pinned });
+                            }
 
                             if (working) {
                                 working.memory = mergedMemory;
@@ -582,6 +664,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                                         memory: mergedMemory,
                                         pinned: row.pinned === true,
                                         type: row.type,
+                                        ...factDatesOf(nextDates ?? row),
                                     });
                                 }
                             }
@@ -593,8 +676,10 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                                 confidence,
                                 embedding: factEmbedding,
                                 fact,
+                                factDates: dates,
                                 memory: mergedMemory,
                                 memoryId: similarMemory.id,
+                                ...(nextDates && { dates: nextDates }),
                             });
                         }
 
@@ -606,18 +691,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                 }
             } catch (error) {
                 console.error("[memory/extract] Belief revision failed, saving as new:", error);
-                memoriesToSave.push({
-                    botId: args.botId,
-                    confidence: fact.confidence,
-                    importance: fact.importance,
-                    memory: fact.memory,
-                    source: "auto",
-                    supersedes: undefined,
-                    threadId: args.threadId,
-                    type: fact.type,
-                    userId: args.userId,
-                });
-                factEmbeddingsToSave.push(factEmbedding);
+                saveNew(fact, dates, factEmbedding);
             }
         }
 
@@ -634,6 +708,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                     base: update.base,
                     botId: update.botId,
                     confidence: update.confidence,
+                    dates: update.dates,
                     lastConfirmedAt: now,
                     memory: update.memory,
                     memoryId: update.memoryId,
@@ -644,18 +719,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             }
 
             if (!applied) {
-                memoriesToSave.push({
-                    botId: args.botId,
-                    confidence: update.fact.confidence,
-                    importance: update.fact.importance,
-                    memory: update.fact.memory,
-                    source: "auto",
-                    supersedes: undefined,
-                    threadId: args.threadId,
-                    type: update.fact.type,
-                    userId: args.userId,
-                });
-                factEmbeddingsToSave.push(update.embedding);
+                saveNew(update.fact, update.factDates, update.embedding);
             }
         }
 
@@ -669,20 +733,9 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             });
 
             for (const index of unconfirmed) {
-                const { embedding, fact } = memoriesToConfirm[index]!;
+                const { dates, embedding, fact } = memoriesToConfirm[index]!;
 
-                memoriesToSave.push({
-                    botId: args.botId,
-                    confidence: fact.confidence,
-                    importance: fact.importance,
-                    memory: fact.memory,
-                    source: "auto",
-                    supersedes: undefined,
-                    threadId: args.threadId,
-                    type: fact.type,
-                    userId: args.userId,
-                });
-                factEmbeddingsToSave.push(embedding);
+                saveNew(fact, dates, embedding);
             }
         }
 

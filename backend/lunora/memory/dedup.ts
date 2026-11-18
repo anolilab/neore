@@ -10,11 +10,13 @@ import type { ActionCtx } from "../_generated/server";
 import { searchVectors } from "../agent/vector/index";
 import { validateVectorDimension, type VectorDimension } from "../agent/vector/tables";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
+import type { FactDates } from "./dates";
 
 const WHITESPACE_RE = /\s+/;
 
 /** Cosine (vector) or Jaccard (words) score from which a memory is a near-match. */
 const NEAR_MATCH_SCORE = 0.85;
+const NEAR_EXACT_SCORE = 0.95;
 
 /**
  * Model name string stored in the vector table for memory embeddings.
@@ -71,8 +73,8 @@ export const embedMemoryFacts = async (
     return texts.map(() => null);
 };
 
-/** A stored memory as dedup compares against it. */
-export interface DedupMemory {
+/** A stored memory as dedup compares against it, with its dates (`dates.ts`). */
+export interface DedupMemory extends FactDates {
     _id: string;
     botId?: string | null;
     confidence?: number | null;
@@ -100,6 +102,8 @@ export interface SimilarMemoryResult {
 export const findSimilarMemoryByVector = async (
     ctx: ActionCtx,
     options: {
+        /** Leaves out an unpinned row read past the window that is past its end date on that day. */
+        activeOn?: number;
         botId: string | undefined;
         embedding: number[];
         existing: ReadonlyArray<DedupMemory>;
@@ -107,7 +111,7 @@ export const findSimilarMemoryByVector = async (
         userId: string;
     },
 ): Promise<(SimilarMemoryResult & { row: DedupMemory }) | null> => {
-    const { botId, embedding, existing, retired, userId } = options;
+    const { activeOn, botId, embedding, existing, retired, userId } = options;
 
     if (embedding.length === 0) {
         return null;
@@ -125,7 +129,7 @@ export const findSimilarMemoryByVector = async (
     });
     const hits = results.filter((hit) => hit._score >= NEAR_MATCH_SCORE);
     const missing = hits.map((hit) => hit._id as string).filter((id) => existing.every((memory) => memory.embeddingId !== id));
-    const read = missing.length > 0 ? await ctx.runQuery(internal.memory.functions.getMemoriesByEmbeddingIds, { embeddingIds: missing, userId }) : [];
+    const read = missing.length > 0 ? await ctx.runQuery(internal.memory.functions.getMemoriesByEmbeddingIds, { activeOn, embeddingIds: missing, userId }) : [];
 
     for (const hit of hits) {
         let row: DedupMemory | undefined = existing.find((memory) => memory.embeddingId === hit._id);
@@ -190,6 +194,9 @@ const jaccardOf = (wordsA: ReadonlySet<string>, wordsB: ReadonlySet<string>): nu
 
     return union === 0 ? 0 : intersection / union;
 };
+
+/** Two wordings of the same statement: the score a near-exact duplicate reaches. */
+export const isNearExact = (a: string, b: string): boolean => jaccardOf(wordSetOf(a), wordSetOf(b)) >= NEAR_EXACT_SCORE;
 
 /**
  * Find the most similar existing memory using Jaccard similarity on word sets.

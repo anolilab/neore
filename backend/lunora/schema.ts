@@ -1449,6 +1449,9 @@ export const schema = defineSchema({
         botId: v.optional(v.id("bots")),
         confidence: v.optional(v.number()),
         embeddingId: v.optional(v.string()),
+        // The day or days the event happens, local `YYYY-MM-DD` (`memory/dates.ts`).
+        eventEnd: v.optional(v.string()),
+        eventStart: v.optional(v.string()),
         importance: v.optional(v.number()),
         // The assistant an `imported` memory was brought in from (`memory/import.ts`).
         importedFrom: v.optional(v.union(v.literal("chatgpt"), v.literal("claude"), v.literal("gemini"), v.literal("other"))),
@@ -1466,6 +1469,8 @@ export const schema = defineSchema({
         type: v.union(v.literal("identity"), v.literal("preference"), v.literal("context"), v.literal("activity"), v.literal("experience")),
         updatedAt: v.optional(v.number()),
         userId: v.optional(v.string()),
+        // Last local day the fact holds; after it the memory is not injected and reflection retires it.
+        validUntil: v.optional(v.string()),
         version: v.optional(v.number()),
     })
         .shardBy("userId")
@@ -2007,6 +2012,8 @@ export const schema = defineSchema({
                     messageId: v.optional(v.string()),
                     /** Set on delivery: the run's pending row, moved under that message, so a stop finds it even when that message is gone. */
                     pendingMessageId: v.optional(v.string()),
+                    /** When the user sent it: memory reads "tomorrow" in it against that day, not the delivery's. */
+                    sentAt: v.optional(v.number()),
                     status: v.union(v.literal("queued"), v.literal("delivered"), v.literal("withdrawn")),
                     text: v.optional(v.string()),
                 }),

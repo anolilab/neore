@@ -17,6 +17,8 @@ export interface SteerEntry {
     messageId?: string;
     /** The run's pending row the delivery moved under `messageId`. */
     pendingMessageId?: string;
+    /** When the user sent it, while queued. */
+    sentAt?: number;
     status: "delivered" | "queued" | "withdrawn";
     text?: string;
 }
@@ -28,24 +30,26 @@ export const MAX_QUEUED_STEERS = 3;
 export const MAX_STEERS_PER_RUN = 20;
 
 /** `undefined` when the run already holds its maximum. */
-export const queueSteer = (entries: ReadonlyArray<SteerEntry>, entry: { id: string; text: string }): SteerEntry[] | undefined => {
+export const queueSteer = (entries: ReadonlyArray<SteerEntry>, entry: { id: string; sentAt: number; text: string }): SteerEntry[] | undefined => {
     const queued = entries.filter((item) => item.status === "queued").length;
 
     if (queued >= MAX_QUEUED_STEERS || entries.length >= MAX_STEERS_PER_RUN) {
         return undefined;
     }
 
-    return [...entries, { id: entry.id, status: "queued", text: entry.text }];
+    return [...entries, { id: entry.id, sentAt: entry.sentAt, status: "queued", text: entry.text }];
 };
 
 /**
  * Every queued entry, as the ONE message the run receives (texts in the order
  * they were sent, a blank line apart), and `deliver(messageId, pendingMessageId)`: the queue with
- * them delivered as that row. `undefined` when nothing is queued.
+ * them delivered as that row, and `parts`: each text with when it was sent. `undefined` when nothing is queued.
  */
 export const takeQueuedSteers = (
     entries: ReadonlyArray<SteerEntry>,
-): { deliver: (messageId: string, pendingMessageId: string) => SteerEntry[]; ids: string[]; text: string } | undefined => {
+):
+    | { deliver: (messageId: string, pendingMessageId: string) => SteerEntry[]; ids: string[]; parts: { sentAt?: number; text: string }[]; text: string }
+    | undefined => {
     const queued = entries.filter((item) => item.status === "queued" && item.text);
 
     if (queued.length === 0) {
@@ -56,6 +60,9 @@ export const takeQueuedSteers = (
         deliver: (messageId, pendingMessageId) =>
             entries.map((item) => (item.status === "queued" ? { id: item.id, messageId, pendingMessageId, status: "delivered" } : item)),
         ids: queued.map((item) => item.id),
+        parts: queued.map((item) => {
+            return { ...(item.sentAt !== undefined && { sentAt: item.sentAt }), text: item.text ?? "" };
+        }),
         text: queued.map((item) => item.text).join("\n\n"),
     };
 };
@@ -105,12 +112,12 @@ export const withdrawQueuedSteer = (
 };
 
 /**
- * The entries of a run that has ended, without the text of any that is still queued: nothing will take
+ * The entries of a run that has ended, without the text (or send time) of any that is still queued: nothing will take
  * it, and a message the user typed has no business staying on the row. The client still has the text and
  * sends it after `withdrawSteer` answers. `undefined` when there is nothing to drop.
  */
 export const withoutQueuedText = (entries: ReadonlyArray<SteerEntry> | undefined): SteerEntry[] | undefined =>
-    entries?.some((item) => item.text !== undefined) ? entries.map(({ text: _text, ...rest }) => rest) : undefined;
+    entries?.some((item) => item.text !== undefined) ? entries.map(({ sentAt: _sentAt, text: _text, ...rest }) => rest) : undefined;
 
 /** The ids the run has taken, for the client to retire their chips. */
 export const deliveredSteerIds = (entries: ReadonlyArray<SteerEntry> | undefined): string[] =>

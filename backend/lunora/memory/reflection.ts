@@ -47,7 +47,9 @@ import {
     createReflectionBudget,
     decayToOps,
     digestDayOf,
+    expiryToOps,
     estimateTokens,
+    localDayOf,
     mergeToOps,
     nextReflectionRunAt,
     planActivityUpdate,
@@ -62,8 +64,10 @@ import {
     countAppliedMerges,
     countResolvedContradictions,
     selectReflectionInputs,
+    splitExpired,
 } from "./reflection-logic";
 import { logRedaction, redactDigestSummary, redactMemoryText, redactReflectionOps } from "./redact";
+import { factDatesOf, isExpired } from "./dates";
 import { lastConfirmedOf } from "./taxonomy";
 import { MAX_LENGTH } from "../lib/validators";
 
@@ -223,6 +227,8 @@ export const loadReflectionInputs = internalQuery
                 v.object({
                     confidence: v.number(),
                     createdAt: v.number(),
+                    eventEnd: v.optional(v.string()),
+                    eventStart: v.optional(v.string()),
                     id: v.string(),
                     importance: v.number(),
                     lastConfirmedAt: v.number(),
@@ -231,6 +237,7 @@ export const loadReflectionInputs = internalQuery
                     threadId: v.optional(v.string()),
                     type: vReflectionMemoryType,
                     updatedAt: v.number(),
+                    validUntil: v.optional(v.string()),
                 }),
             ),
             threadTitles: v.array(v.string()),
@@ -257,6 +264,7 @@ export const loadReflectionInputs = internalQuery
                     type: m.type,
                     updatedAt: m.updatedAt ?? m._creationTime,
                     ...(m.threadId && { threadId: m.threadId as string }),
+                    ...factDatesOf(m),
                 };
             });
 
@@ -279,7 +287,7 @@ export const loadReflectionInputs = internalQuery
     });
 
 const vReflectionOp = v.union(
-    v.object({ byMemoryId: v.string(), kind: v.literal("supersede"), memoryId: v.string() }),
+    v.object({ byMemoryId: v.string(), expiredOn: v.optional(v.string()), kind: v.literal("supersede"), memoryId: v.string() }),
     v.object({
         confidence: v.optional(v.number()),
         kind: v.literal("patch"),
@@ -403,7 +411,8 @@ export const applyReflectionOps = internalMutation
                     const row = await active(op.memoryId);
                     const by = op.byMemoryId === op.memoryId ? row : await active(op.byMemoryId);
 
-                    if (!row || !by || row.pinned === true) {
+                    // An expiry planned before a restatement moved the end date no longer holds.
+                    if (!row || !by || row.pinned === true || (op.expiredOn !== undefined && !isExpired(row, op.expiredOn))) {
                         break;
                     }
 
@@ -493,15 +502,18 @@ interface ScopeOutcome {
  */
 const reflectScope = async (
     ctx: ActionCtx,
-    scope: { botId: string | undefined; budget: ReflectionBudget; model: UtilityModel | undefined; now: number; userId: string },
+    scope: { botId: string | undefined; budget: ReflectionBudget; model: UtilityModel | undefined; now: number; timeZone: string | undefined; userId: string },
 ): Promise<ScopeOutcome> => {
-    const { botId, budget, model, now, userId } = scope;
+    const { botId, budget, model, now, timeZone, userId } = scope;
     const inputs = await ctx.runQuery(internal.memory.reflection.loadReflectionInputs, { botId, now, userId });
-    const memories: ReflectionMemory[] = selectReflectionInputs(inputs.memories, now, REFLECTION_LIMITS);
+    // Expiry is read in the user's own calendar: a fact held "until the 20th" is retired on the 21st there.
+    const today = localDayOf(now, timeZone);
+    const { expire, live } = splitExpired(inputs.memories, today);
+    const memories: ReflectionMemory[] = selectReflectionInputs(live, now, REFLECTION_LIMITS);
     const byId = new Map(memories.map((m) => [m.id, m]));
     const plan = planReflection(memories, now);
     const learnedToday = memories.filter((m) => m.createdAt >= now - DAY_MS);
-    const ops: ReflectionOp[] = decayToOps(plan);
+    const ops: ReflectionOp[] = [...expiryToOps(expire, today), ...decayToOps(plan)];
 
     // 1. One synthesis call: merge wording, promotion decisions, the digest.
     let synthesis: z.infer<typeof synthesisSchema> | undefined;
@@ -566,7 +578,7 @@ const reflectScope = async (
 
         try {
             const decision = await runBeliefRevision(model, pair.olderText, pair.newerText, REFLECTION_LIMITS.maxOutputTokensPerCall);
-            const pairOps = revisionToOps(pair, decision, now);
+            const pairOps = revisionToOps(pair, decision, now, byId);
 
             if (pairOps.length > 0) {
                 revisedPairs.push(pair);
@@ -622,7 +634,7 @@ const reflectScope = async (
             merged: countAppliedMerges(plan.merges, writeOps),
             newMemories: learnedToday.length,
             promoted: result.promotedIds.filter((id) => id !== null).length,
-            retired: plan.retire.length,
+            retired: plan.retire.length + expire.length,
         },
         summary: redactDigestSummary(synthesis?.summary ?? "", REFLECTION_LIMITS.maxSummaryChars),
     };
@@ -656,12 +668,12 @@ export const runMemoryReflection = internalAction
 
         // The user's own memories first, then each bot's, each planned on its own.
         const botIds = await ctx.runQuery(internal.bots.functions.listBotIdsForUser, { userId });
-        const userScope = await reflectScope(ctx, { botId: undefined, budget, model, now, userId });
+        const userScope = await reflectScope(ctx, { botId: undefined, budget, model, now, timeZone: claim.timeZone, userId });
         const botScopes: ScopeOutcome[] = [];
 
         for (const botId of botIds) {
             try {
-                botScopes.push(await reflectScope(ctx, { botId, budget, model, now, userId }));
+                botScopes.push(await reflectScope(ctx, { botId, budget, model, now, timeZone: claim.timeZone, userId }));
             } catch (error) {
                 // One bot's failure must not skip the other bots or the user's digest.
                 console.warn("[memory/reflection] A bot's reflection failed, continuing:", error);

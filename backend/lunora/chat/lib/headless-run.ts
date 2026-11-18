@@ -425,6 +425,11 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         };
         const result = await thread.generateText(generateArgs as never, callOptions).catch(wakeOnFailure);
         const text = result.text ?? "";
+        // When the prompt was saved, which the generation does after preparing its context: "tomorrow" in it is read against that day.
+        const promptAt =
+            (result as { savedMessages?: ReadonlyArray<{ _creationTime: number; message?: { role?: string } }> }).savedMessages?.find(
+                (row) => row.message?.role === "user",
+            )?._creationTime ?? startedAt;
         // Usage heatmap + per-skill breakdown, keyed on the reply's first row so a
         // redelivered record counts once. Every round of a goal is a reply of its own. Scheduled before any write below:
         // the generation is paid for even when a later write (the pause's, the thread's) fails.
@@ -532,6 +537,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 void ctx.scheduler.runAfter(0, internal.memory.extract.extractMemories, {
                     assistantResponse: answer.slice(0, 4000),
                     ...(options.botId && { botId: options.botId }),
+                    messageAt: promptAt,
                     threadId: threadId as Id<"threads">,
                     userId,
                     userMessage: prompt,

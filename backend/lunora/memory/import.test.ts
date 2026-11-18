@@ -198,6 +198,50 @@ describe("importing another assistant's memory", () => {
         expect(await memories()).toHaveLength(1001);
     });
 
+    it("saves a fact beside an unpinned row past its end date instead of confirming or merging into it", async () => {
+        expect.assertions(4);
+
+        await setMemoryEnabled(true);
+
+        const [ended, near, pinned] = await harness.run(async (ctx: any) => [
+            await ctx.db.insert("memories", { memory: "The user is staying in Lisbon", type: "context", userId: USER, validUntil: "2020-01-31" }),
+            await ctx.db.insert("memories", {
+                memory: "The user lives in Berlin near the river with a garden and bikes",
+                type: "context",
+                userId: USER,
+                validUntil: "2020-01-31",
+            }),
+            await ctx.db.insert("memories", {
+                memory: "The user is a nurse in Hamburg",
+                pinned: true,
+                type: "identity",
+                userId: USER,
+                validUntil: "2020-01-31",
+            }),
+        ]);
+
+        generateText.mockResolvedValue({ output: { action: "UPDATE", mergedMemory: "The user lives in Berlin near the river with a garden and bikes daily" } });
+
+        expect(
+            await save([
+                { memory: "The user is staying in Lisbon", type: "context" },
+                { memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" },
+                { memory: "The user is a nurse in Hamburg", type: "identity" },
+            ]),
+        ).toStrictEqual({ added: 2, alreadyKnown: 1, updated: 0 });
+        expect(generateText).not.toHaveBeenCalled();
+
+        const rows = await memories();
+        const byId = (id: string) => rows.find((row: { _id: string }) => row._id === id);
+
+        expect([byId(ended), byId(near)].map((row) => [row.memory, row.lastConfirmedAt, row.validUntil])).toStrictEqual([
+            ["The user is staying in Lisbon", undefined, "2020-01-31"],
+            ["The user lives in Berlin near the river with a garden and bikes", undefined, "2020-01-31"],
+        ]);
+        // Pinning keeps a fact past its end date, so a repeat of it is known; its dates stay as they are.
+        expect(byId(pinned)).toMatchObject({ lastConfirmedAt: expect.any(Number), validUntil: "2020-01-31" });
+    });
+
     it("confirms an exact repeat found past the near-match window instead of superseding a near row", async () => {
         expect.assertions(2);
 
