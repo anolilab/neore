@@ -39814,3 +39814,7 @@ msgstr "Zurique"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ pontos"
+
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:654
+msgid "Suggested next prompt, press Tab to insert"
+msgstr ""

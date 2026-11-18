@@ -4,7 +4,49 @@
  */
 import { v } from "lunorash/server";
 
+import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "../_generated/server";
+import { getUser } from "../auth/lib/better-auth-queries";
+import { claimOnce } from "../lib/claim-once";
+import { isThreadLocked } from "../lib/thread-lock";
+
+/** One paid suggestion call per reply: keyed `<threadId>:<lastMessageId>`, so a second run of the same reply finds it taken. */
+export const FOLLOWUP_CLAIM_SCOPE = "followup-suggestions";
+const FOLLOWUP_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Whether a reply gets a suggestion for this user: the setting is on (absent = on) and the user is not a guest.
+ * Read before any model is picked, so a user who switched the setting off costs no call.
+ */
+export const getFollowupSuggestionGate = internalQuery
+    .input({ userId: v.string() })
+    .output(v.object({ enabled: v.boolean(), guest: v.boolean() }))
+    .query(async ({ args: { userId }, ctx: context }) => {
+        const settings = await context.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
+        const user = await getUser(context, userId);
+
+        return { enabled: settings?.enableFollowupSuggestions !== false, guest: user?.isAnonymous === true };
+    });
+
+/**
+ * The last check before the paid call: the thread is still open, and this reply's suggestion is not already claimed.
+ * `false` for a locked or deleted thread, or a reply another run has already paid for.
+ */
+export const admitFollowupSuggestions = internalMutation
+    .input({ lastMessageId: v.string(), threadId: v.string(), userId: v.string() })
+    .output(v.boolean())
+    .mutation(async ({ args: { lastMessageId, threadId, userId }, ctx: context }) => {
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+
+        if (!thread || thread.deletedAt || isThreadLocked(thread)) {
+            return false;
+        }
+
+        return await claimOnce(context, FOLLOWUP_CLAIM_SCOPE, `${threadId}:${lastMessageId}`, FOLLOWUP_CLAIM_TTL_MS, userId);
+    });
 
 export const getCachedFollowupSuggestions = internalQuery
     .input({

@@ -174,7 +174,7 @@ export const chatFixtures = (options: ChatFixtureOptions = {}): LunoraFixture[] 
         lunora(api.chat.functions.getThreadUIMessages, () => pageOf(messages.map(ownedBy)) as ReturnOf<typeof api.chat.functions.getThreadUIMessages>),
         lunora(api.chat.sharing.resolveThreadShard, null),
         lunora(api.chat.slides.functions.getGeneratingPresentation, null),
-        lunora(api.chat.functions.getFollowupSuggestions, { suggestions: options.suggestions ?? [] }),
+        lunora(api.chat.functions.getCachedFollowupSuggestions, { suggestions: options.suggestions ?? [] }),
         lunora(api.chat.composite.getThreadPaneState, {
             childThreads: [],
             goal: null,

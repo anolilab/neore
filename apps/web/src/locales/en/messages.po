@@ -39813,3 +39813,7 @@ msgstr "Zurich"
 #: src/features/evals/components/run-comparison.tsx:150
 msgid "Δ points"
 msgstr "Δ points"
+
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:654
+msgid "Suggested next prompt, press Tab to insert"
+msgstr "Suggested next prompt, press Tab to insert"

@@ -47,6 +47,7 @@ const REACHED = "getAgent reached";
 beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "auth_functions", await import("../auth/functions"));
+    registerModule(registry, "agent_followup_suggestions", await import("../agent/followup-suggestions"));
 });
 
 let harness: ReturnType<typeof lunoraTest>;

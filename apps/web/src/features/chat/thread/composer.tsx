@@ -31,7 +31,6 @@ import type { FC, RefObject } from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
-import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import ComposerAskAside from "@/features/chat/aside/composer-ask-aside";
 import BrowserLiveView from "@/features/chat/browser-live-view/browser-live-view";
 import CompactionChip from "@/features/chat/compaction/compaction-chip";
@@ -64,7 +63,6 @@ import { useCRPC } from "@/lib/lunora/crpc";
 
 import { ComposerBase } from "./composer-base";
 import ComposerContextCount from "./composer-context-count";
-import ComposerFollowupSuggestions from "./composer-followup-suggestions";
 import type { ComposerInputRef } from "./composer-input";
 import ComposerInput from "./composer-input";
 import ComposerLanguageSelector from "./composer-language-selector";
@@ -352,7 +350,6 @@ const Composer: FC<ComposerProps> = ({
 
     // favoriteModelIds is handled by the tiptap editor internally
     useFavoriteModels();
-    const { data: userSettings } = useUserSettings();
     const { isAnonymous } = useIsAnonymous();
     const currentModel = useCurrentModel();
     const flaggedModels = useFeatureFlaggedModels();
@@ -455,36 +452,32 @@ const Composer: FC<ComposerProps> = ({
         return mode;
     }, [isNewThread, threadId, storeNewThreadMode, storeUserChangedMode, storeThreadMode, thread?.mode]);
 
-    const isEnableFollowupSuggestions = userSettings?.enableFollowupSuggestions !== false;
     const prefersReducedMotion = useReducedMotion();
 
     // Get model mode and default models (memoized together since they share the same data source)
-    const { defaultModelsByMode, isAudioModel, isImageModel, isVideoModel, maxReferenceImages, modelAspectRatios, modelMode, supportsNegativePrompt } =
-        useMemo(() => {
-            const modelDefinition = flaggedModels.find((candidate) => candidate.id === (currentModel as unknown as string));
-            const mode = modelDefinition?.mode || "text";
+    const { defaultModelsByMode, isImageModel, maxReferenceImages, modelAspectRatios, modelMode, supportsNegativePrompt } = useMemo(() => {
+        const modelDefinition = flaggedModels.find((candidate) => candidate.id === (currentModel as unknown as string));
+        const mode = modelDefinition?.mode || "text";
 
-            const textModel = flaggedModels.find((candidate) => candidate.enabled && (candidate.mode === "text" || !candidate.mode));
-            const imageModel = flaggedModels.find((candidate) => candidate.enabled && candidate.mode === "image");
-            const videoModel = flaggedModels.find((candidate) => candidate.enabled && candidate.mode === "video");
-            const audioModel = flaggedModels.find((candidate) => candidate.enabled && candidate.mode === "speech-to-text");
+        const textModel = flaggedModels.find((candidate) => candidate.enabled && (candidate.mode === "text" || !candidate.mode));
+        const imageModel = flaggedModels.find((candidate) => candidate.enabled && candidate.mode === "image");
+        const videoModel = flaggedModels.find((candidate) => candidate.enabled && candidate.mode === "video");
+        const audioModel = flaggedModels.find((candidate) => candidate.enabled && candidate.mode === "speech-to-text");
 
-            return {
-                defaultModelsByMode: {
-                    audio: audioModel?.id,
-                    image: imageModel?.id,
-                    text: textModel?.id,
-                    video: videoModel?.id,
-                },
-                isAudioModel: mode === "speech-to-text",
-                isImageModel: mode === "image",
-                isVideoModel: mode === "video",
-                maxReferenceImages: modelDefinition?.maxReferenceImages ?? 0,
-                modelAspectRatios: modelDefinition?.aspectRatios as ReadonlyArray<string> | undefined,
-                modelMode: mode === "speech-to-text" ? "audio" : mode,
-                supportsNegativePrompt: modelDefinition?.supportsNegativePrompt ?? false,
-            };
-        }, [currentModel, flaggedModels]);
+        return {
+            defaultModelsByMode: {
+                audio: audioModel?.id,
+                image: imageModel?.id,
+                text: textModel?.id,
+                video: videoModel?.id,
+            },
+            isImageModel: mode === "image",
+            maxReferenceImages: modelDefinition?.maxReferenceImages ?? 0,
+            modelAspectRatios: modelDefinition?.aspectRatios as ReadonlyArray<string> | undefined,
+            modelMode: mode === "speech-to-text" ? "audio" : mode,
+            supportsNegativePrompt: modelDefinition?.supportsNegativePrompt ?? false,
+        };
+    }, [currentModel, flaggedModels]);
 
     // When the model changes, reset aspectRatio if the current value isn't supported
     useEffect(() => {

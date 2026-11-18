@@ -10,7 +10,7 @@
  *   question and the answer live in the client's panel only. The answer comes
  *   back whole, not streamed.
  * - It runs on the thread's own model. A thread on a paired computer's coding
- *   agent must never reach a cloud model (`getFollowupSuggestions`), so there
+ *   agent must never reach a cloud model (`generateFollowupSuggestionsForThread`), so there
  *   the utility model sees the QUESTION ALONE. A registry model the caller's
  *   plan cannot run, or a non-text thread, falls back to the utility model
  *   (those threads are already on hosted models). A thread on a CUSTOM

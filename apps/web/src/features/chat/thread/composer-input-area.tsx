@@ -90,6 +90,8 @@ interface ComposerInputAreaProps {
     isUploading?: boolean;
     /** Max rows for editor */
     maxRows?: number;
+    /** The suggested next prompt after a reply, as ghost text; `null` or omit for none. See `ComposerTiptapEditor`. */
+    nextPromptSuggestion?: string | null;
     /** Called when attachment button is clicked */
     onAddAttachment?: () => void;
     /** Moves an over-the-cap draft into a text attachment; the length notice offers it. Leave out where it would not fit. */
@@ -110,6 +112,7 @@ interface ComposerInputAreaProps {
     onSelectChat?: (chat: ChatReference) => void;
     /** Called when "Upload new file" is selected from the @ popup */
     onSelectFileUpload?: () => void;
+
     /** Called when a vault file is selected from the @ popup */
     onSelectVaultFile?: (file: VaultFileRef) => void;
 
@@ -170,6 +173,7 @@ const ComposerInputArea = ({
     onSelectVaultFile,
     onSteer,
     onSubmit,
+    nextPromptSuggestion,
     placeholder,
     ref,
     requestCompletion,
@@ -308,6 +312,7 @@ const ComposerInputArea = ({
                         isHistoryRecalled={isHistoryRecalled}
                         isStreaming={isStreaming}
                         maxRows={maxRows}
+                        nextPromptSuggestion={nextPromptSuggestion}
                         onCancel={onCancel}
                         onChange={onChange}
                         onHistoryNavigate={onHistoryNavigate}

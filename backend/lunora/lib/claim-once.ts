@@ -24,6 +24,7 @@
  * | `host-send`        | `<userId>:<requestId>`   | 24 h                          | `acp/send.ts` (`POST /hosts/send`) |
  * | `chat-start`       | `<userId>:<clientMessageId>` | 24 h (`CHAT_START_CLAIM_TTL_MS`); taken over when nothing was saved within `CHAT_START_LEASE_MS` | `chat/start-claim.ts` (`/chat/start` with `clientMessageId`): its `result` is the request's fingerprint from the claim on (another send under the id is refused), then the saved thread and message ids, recorded in the save's transaction |
  * | `thread-category`  | `<threadId>:<promptId>` (`<threadId>:thread` without one) | 24 h (`CATEGORY_CLAIM_TTL_MS`); an unanswered claim is taken over after `CATEGORY_LEASE_MS` and released when the call fails; its `result` keeps the answer, written by any later delivery without a call | `chat/functions.ts` (`createCategoryChat`: one paid category call per prompt, however often a resend schedules the job) |
+ * | `followup-suggestions` | `<threadId>:<lastMessageId>` | 24 h | `agent/followup-suggestions.ts` (`admitFollowupSuggestions`: one paid suggestion call per reply, however often its job runs) |
  * | `host-start`       | `<userId>:<clientId>`    | 24 h                          | `acp/remote.ts` (`startHostSession`) |
  * | `bundle-import` | `<userId>:<importId>` | 24 h (released when the import fails) | `skills/bundle.ts` (`importBundle`) |
  * | `public-api-idempotency` | `<sha256 of api key id + Idempotency-Key>` | 24 h        | `public-api/router.ts` (POSTs with an `Idempotency-Key`) |
