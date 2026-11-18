@@ -585,7 +585,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
         }
 
         // 6. Revisions first: a supersession planned against a revised row then sees the text the row committed.
-        // A revision that cannot apply, or fails, saves its fact as new below.
+        // A revision that cannot apply, or fails, saves its fact as new.
         for (const update of memoriesToUpdate) {
             let applied = false;
 
@@ -646,7 +646,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             }
         }
 
-        // 8. One save for every new memory, fallbacks included. A supersession applies only to the text its decision read.
+        // 8. One save for every new memory, fallbacks included.
         if (memoriesToSave.length > 0) {
             const savedIds = await ctx.runMutation(internal.memory.functions.saveMemoryBatch, {
                 memories: memoriesToSave,
