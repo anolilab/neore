@@ -3,6 +3,7 @@ import { isHostRunThread, refuseHostThread } from "../acp/lib/host-thread";
 import { rowsAfterContextReset } from "../agent/context-reset";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { withoutSwitchIds } from "../agent/agent-switch-logic";
+import { withoutSearchVectors } from "../agent/thread-search-plan";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -3735,7 +3736,8 @@ export const getFullThreadForExport = authQuery
             allMessages = messages.page;
         }
 
-        return { messages: allMessages, thread };
+        // Derived data is not exported: the palette-search vector ids (`agent/thread-search.ts`) are rebuilt from the text.
+        return { messages: allMessages, thread: withoutSearchVectors(thread) };
     });
 
 export const branchThread = authAction

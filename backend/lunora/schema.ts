@@ -15,6 +15,7 @@ import { defineSchema, defineTable, v } from "lunorash/server";
 
 import { vAcpAgentState, vAcpOptionResult, vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
 import { vAgentRef } from "./agent/agent-switch-validators";
+import { threadSearchTriggers } from "./agent/thread-search-triggers";
 import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
 import { runStreamingAgentFields } from "./chat/lib/streaming-run-args";
@@ -3296,12 +3297,16 @@ export const schema = defineSchema({
         summaryEpoch: v.optional(v.number()),
         // When a summary run found the path too long to read from the top; later runs skip the walk.
         summaryPathTooLongAt: v.optional(v.number()),
+        // Palette search by meaning (`agent/thread-search.ts`): the vector ids of the title and summary, embedded only for a
+        // thread with enough turns and not locked. Derived data: never exported, and removed with the thread.
+        summaryVectorId: v.optional(v.string()),
         // User-defined `threadTags` ids. NOT `tags` — that column holds
         // system-assigned source labels ("chat", "telegram", ...).
         tagIds: v.optional(v.array(v.string())),
         tags: v.optional(v.array(v.string())),
         teamId: v.optional(v.string()),
         title: v.optional(v.string()),
+        titleVectorId: v.optional(v.string()),
         updatedAt: v.optional(v.number()),
         userId: v.optional(v.string()),
         // Which sources may dispatch to this lead's workers; unset = the lead and the user.
@@ -3328,6 +3333,7 @@ export const schema = defineSchema({
         .index("by_user_and_organization_and_updatedAt", ["userId", "organizationId", "updatedAt"])
         .searchIndex("title", { field: "title", filterFields: ["userId"] })
         .searchIndex("summary", { field: "summary", filterFields: ["userId"] })
+        .triggers((t) => threadSearchTriggers(t))
         .relations((r) => {
             return {
                 access: r.many("threadAccess", { field: "threadId" }),
