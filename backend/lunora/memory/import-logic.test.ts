@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { REDACTED } from "../lib/secret-redaction";
 import { applyImportLabels, buildImportLabelPrompt, IMPORT_MAX_FACTS, looksSensitive, sanitizeImportedFacts, splitImportedText } from "./import-logic";
+
+/** Assembled at runtime so the file holds no literal that reads as a real credential; no line rule names its shape. */
+const TOKEN = ["Zq8LmV2xR7tYw4", "KpN3bC9dF6hJ1sA5gE0uIo"].join("");
 
 describe(splitImportedText, () => {
     it("splits on the Unicode line and paragraph separators", () => {
@@ -123,6 +127,86 @@ describe(sanitizeImportedFacts, () => {
                 { memory: "short", type: "context" },
             ]),
         ).toStrictEqual([{ memory: "The user lives in Berlin", type: "identity" }]);
+    });
+});
+
+describe("a secret in the paste", () => {
+    it("is redacted, or its line dropped, alike in the preview and the save", () => {
+        expect.assertions(2);
+
+        const kept = [{ memory: `The user deploys the blog with ${REDACTED} from CI`, type: "context" as const }];
+
+        expect(splitImportedText(`${TOKEN}\nThe user deploys the blog with ${TOKEN} from CI`)).toStrictEqual({
+            cut: 0,
+            dropped: 1,
+            lines: kept.map((fact) => fact.memory),
+        });
+        expect(
+            sanitizeImportedFacts([
+                { memory: TOKEN, type: "context" },
+                { memory: `The user deploys the blog with ${TOKEN} from CI`, type: "context" },
+            ]),
+        ).toStrictEqual(kept);
+    });
+
+    it("is redacted before the line is cut to length, so no head of it is kept", () => {
+        expect.assertions(1);
+
+        const fact = `The user ${"likes green tea ".repeat(30)}`;
+
+        expect(splitImportedText(`${fact}${TOKEN}`).lines).toStrictEqual([`${fact}${REDACTED}`]);
+    });
+
+    it("is redacted when removing emphasis joins a token, so no model sees it in the preview or the save", () => {
+        expect.assertions(2);
+
+        // Too short to read as random on its own, and split by `**` until the line is cleaned.
+        const split = ["github_", "**", "pat_", TOKEN.slice(0, 20)].join("");
+        const kept = `The user deploys with ${REDACTED} from CI`;
+
+        expect(splitImportedText(`The user deploys with ${split} from CI`).lines).toStrictEqual([kept]);
+        expect(sanitizeImportedFacts([{ memory: `The user deploys with ${split} from CI`, type: "context" }])).toStrictEqual([
+            { memory: kept, type: "context" },
+        ]);
+    });
+
+    it("drops a line whose fact lies past the cut, alike in the preview and the save", () => {
+        expect.assertions(2);
+
+        // Redacted, the secrets alone fill the 500 characters a line is cut to, so the fact after them is cut off.
+        const line = `${`${TOKEN} `.repeat(50)}and the user likes green tea every morning`;
+
+        expect(splitImportedText(line)).toStrictEqual({ cut: 0, dropped: 1, lines: [] });
+        expect(sanitizeImportedFacts([{ memory: line, type: "context" }])).toStrictEqual([]);
+    });
+
+    it("drops filler that the cut leaves once it removes the marker and the fact after it", () => {
+        expect.assertions(2);
+
+        const line = `${"the ".repeat(124)}${TOKEN} and the user likes green tea`;
+
+        expect(splitImportedText(line)).toStrictEqual({ cut: 0, dropped: 1, lines: [] });
+        expect(sanitizeImportedFacts([{ memory: line, type: "context" }])).toStrictEqual([]);
+    });
+
+    it("is redacted whole when its quoted value spans lines, and the lines around it are kept", () => {
+        expect.assertions(1);
+
+        const value = ["alpha", "\n", "mycontinuation", "looksfine"].join("");
+
+        expect(splitImportedText(`The user lives in Lisbon\nDB_PASSWORD="${value}"\nThe user likes "green" tea`).lines).toStrictEqual([
+            "The user lives in Lisbon",
+            'The user likes "green" tea',
+        ]);
+    });
+
+    it("is redacted when emphasis joins a token across the cut to length", () => {
+        expect.assertions(1);
+
+        const split = ["github_", "**", "pat_", TOKEN.slice(0, 20)].join("");
+        const fact = `The user ${"likes green tea ".repeat(31)}`.slice(0, 485);
+
+        expect(splitImportedText(`${fact}${split}`).lines).toStrictEqual([`${fact}${REDACTED}`]);
     });
 });
 

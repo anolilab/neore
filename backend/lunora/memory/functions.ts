@@ -8,7 +8,8 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { memoryLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
-import { withoutUndefined } from "../lib/patch";
+import { patchRow, withoutUndefined } from "../lib/patch";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import {
     type ImportApp,
     importDedupKey,
@@ -18,6 +19,7 @@ import {
     IMPORTED_IMPORTANCE,
     vImportApp,
 } from "./import-logic";
+import { logRedaction, redactMemoryText } from "./redact";
 import { lastConfirmedOf, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { requireOwnedThread } from "../agent/thread-read-access";
@@ -224,6 +226,29 @@ const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, 
     }
 };
 
+/**
+ * Schedules a fresh vector for a memory whose wording changed, on the owner's shard: the row and its vector live
+ * there, and a job without a shard key would run where neither does.
+ */
+export const scheduleMemoryReembed = async (scheduler: unknown, memoryId: Id<"memories">, userId: string): Promise<void> => {
+    await runAfterOnShard(scheduler, 0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId, userId }, userId);
+};
+
+/**
+ * For a write that changed a row's wording: the row's vector encodes the old wording, so it goes now, before the
+ * re-embed's model call, and the row is found by keyword until the new vector is attached. Then the re-embed is scheduled.
+ */
+export const reembedRewordedMemory = async (ctx: MutationCtx, memoryId: Id<"memories">, userId: string): Promise<void> => {
+    const row = await ctx.db.get("memories", memoryId);
+
+    if (row?.embeddingId) {
+        await patchRow(ctx.db, "memories", row, { embeddingId: undefined });
+        await deleteMemoryVector(ctx, { embeddingId: row.embeddingId, memoryId, userId });
+    }
+
+    await scheduleMemoryReembed(ctx.scheduler, memoryId, userId);
+};
+
 /** Retry of a memory vector delete that failed (`deleteMemoryVector`). */
 export const retryMemoryVectorDelete = internalMutation
     .input({
@@ -279,9 +304,21 @@ export const updateMemory = authMutation
     .mutation(async ({ args: { memory, memoryId, type }, ctx: context }) => {
         const { userId } = context.user;
         const existing = await requireOwnMemory(context, memoryId, userId);
-        const text = memory?.trim();
+        const trimmed = memory?.trim();
 
-        if (memory !== undefined && (!text || text.length > 1000)) {
+        // The length check runs first, so the detector only ever sees a short text.
+        if (memory !== undefined && (!trimmed || trimmed.length > 1000)) {
+            throw new LunoraError("BAD_REQUEST", "A memory must be between 1 and 1000 characters");
+        }
+
+        const text = trimmed === undefined ? undefined : redactMemoryText(trimmed);
+
+        if (text === null) {
+            throw new LunoraError("BAD_REQUEST", "A memory can't hold only a password, key or token");
+        }
+
+        // Each «redacted» marker can be longer than the value it replaced.
+        if (text !== undefined && text.length > 1000) {
             throw new LunoraError("BAD_REQUEST", "A memory must be between 1 and 1000 characters");
         }
 
@@ -302,12 +339,10 @@ export const updateMemory = authMutation
 
         // The previous embedding vector is stale once the text changed.
         if (textChanged) {
-            await context.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, {
-                memoryId: existing._id,
-                userId,
-            });
+            await reembedRewordedMemory(context, existing._id, userId);
         }
 
+        logRedaction(context.log, "edit", { dropped: 0, redacted: text !== undefined && text !== trimmed ? 1 : 0 });
         context.log.event("memory.update_memory", { textChanged, typeChanged: type !== undefined });
 
         return null;
@@ -466,8 +501,17 @@ type MemoryInsert = {
     userId: string;
 };
 
-/** Inserts one memory and points what it supersedes at it. */
-const insertMemory = async (ctx: Pick<MutationCtx, "db">, mem: MemoryInsert, now: number): Promise<Id<"memories">> => {
+/**
+ * Inserts one memory and points what it supersedes at it. The backstop for every insert: a fact that is nothing but a
+ * secret is not saved (`null`), and what it would have superseded stays active.
+ */
+const insertMemory = async (ctx: Pick<MutationCtx, "db">, mem: MemoryInsert, now: number): Promise<Id<"memories"> | null> => {
+    const memory = redactMemoryText(mem.memory);
+
+    if (memory === null) {
+        return null;
+    }
+
     // `insert` drops `undefined` keys itself — only patches need `withoutUndefined`.
     const memoryId = await ctx.db.insert("memories", {
         botId: mem.botId as Id<"bots"> | undefined,
@@ -475,7 +519,7 @@ const insertMemory = async (ctx: Pick<MutationCtx, "db">, mem: MemoryInsert, now
         importance: mem.importance,
         importedFrom: mem.importedFrom,
         lastConfirmedAt: now,
-        memory: mem.memory,
+        memory,
         source: mem.source ?? "auto",
         supersedes: mem.supersedes,
         threadId: mem.threadId,
@@ -494,17 +538,18 @@ const insertMemory = async (ctx: Pick<MutationCtx, "db">, mem: MemoryInsert, now
 
 export const saveMemory = internalMutation
     .input({ ...vMemoryInsertFields })
-    .output(v.id("memories"))
+    .output(v.union(v.id("memories"), v.null()))
     .mutation(async ({ args, ctx }) => insertMemory(ctx, args, ctx.now));
 
 export const saveMemoryBatch = internalMutation
     .input({
         memories: v.array(v.object({ ...vMemoryInsertFields, supersedesBase: v.optional(v.string()) })),
     })
-    .output(v.array(v.id("memories")))
+    // One entry per memory, in order: `null` where the fact was nothing but a secret and was not saved.
+    .output(v.array(v.union(v.id("memories"), v.null())))
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
-        const memoryIds: Id<"memories">[] = [];
+        const memoryIds: (Id<"memories"> | null)[] = [];
 
         for (const { supersedesBase, ...mem } of args.memories) {
             // A supersession applies only while its target still reads as the text the decision was made on, in the same
@@ -528,7 +573,7 @@ export const saveMemoryBatch = internalMutation
     });
 
 /** A save's outcome for one fact or confirmation: the row it landed on, and how. */
-type ImportOutcome = { memoryId: Id<"memories">; status: "added" | "known" | "updated" };
+type ImportOutcome = { memoryId: Id<"memories">; status: "added" | "known" | "updated" } | { memoryId: null; status: "dropped" };
 
 /** A fact a save writes: a pasted fact, or a confirmation that could not apply, saved as new. */
 type PendingFact = { memory: string; supersede?: { base: string; memoryId: Id<"memories"> }; type: MemoryType };
@@ -565,9 +610,20 @@ export const saveImportedMemoryBatch = internalMutation
         userId: v.string(),
     })
     .output(
+        // `dropped`: the save's backstop left out a fact that was only a secret, so no row holds it.
         v.object({
-            confirms: v.array(v.object({ memoryId: v.id("memories"), status: v.union(v.literal("added"), v.literal("known"), v.literal("updated")) })),
-            facts: v.array(v.object({ memoryId: v.id("memories"), status: v.union(v.literal("added"), v.literal("known"), v.literal("updated")) })),
+            confirms: v.array(
+                v.object({
+                    memoryId: v.union(v.id("memories"), v.null()),
+                    status: v.union(v.literal("added"), v.literal("dropped"), v.literal("known"), v.literal("updated")),
+                }),
+            ),
+            facts: v.array(
+                v.object({
+                    memoryId: v.union(v.id("memories"), v.null()),
+                    status: v.union(v.literal("added"), v.literal("dropped"), v.literal("known"), v.literal("updated")),
+                }),
+            ),
         }),
     )
     .mutation(async ({ args, ctx }) => {
@@ -638,13 +694,15 @@ export const saveImportedMemoryBatch = internalMutation
 
         for (const [index, { merge }] of args.facts.entries()) {
             const target = merge ? await ctx.db.get("memories", merge.memoryId) : null;
+            // The backstop, as in `insertMemory`. A merge that is only a secret is no merge: the fact is saved as new below.
+            const merged = merge ? redactMemoryText(merge.memory) : null;
 
             // The row must still read as the text the merge was built from: an edit or another save meanwhile is not overwritten.
-            if (!merge || !ownActive(target) || target.pinned === true || target.memory !== merge.base) {
+            if (!merge || merged === null || !ownActive(target) || target.pinned === true || target.memory !== merge.base) {
                 continue;
             }
 
-            const key = importDedupKey(merge.memory);
+            const key = importDedupKey(merged);
             const twin = (idsByText.get(key) ?? []).findLast((id) => id !== target._id);
 
             // The merged text is already another row's: that row is confirmed, and the target keeps its own text.
@@ -657,7 +715,7 @@ export const saveImportedMemoryBatch = internalMutation
                 continue;
             }
 
-            await ctx.db.patch("memories", target._id, { confidence: merge.confidence, lastConfirmedAt: now, memory: merge.memory, updatedAt: now });
+            await ctx.db.patch("memories", target._id, { confidence: merge.confidence, lastConfirmedAt: now, memory: merged, updatedAt: now });
             reword(target._id, key);
             kept.add(target._id);
             reworded.set(target._id, new Set([...(reworded.get(target._id) ?? []), merge.base]));
@@ -666,7 +724,7 @@ export const saveImportedMemoryBatch = internalMutation
             // Once per row, though two facts of the paste may merge into it.
             if (!reembed.has(target._id)) {
                 reembed.add(target._id);
-                await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: target._id, userId: args.userId });
+                await reembedRewordedMemory(ctx, target._id, args.userId);
             }
 
             outcomes[index] = { memoryId: target._id, status: "updated" };
@@ -696,8 +754,24 @@ export const saveImportedMemoryBatch = internalMutation
             }),
         ];
 
+        const settle = (slot: "confirms" | "facts", index: number, outcome: ImportOutcome) => {
+            if (slot === "facts") {
+                outcomes[index] = outcome;
+            } else {
+                confirmOutcomes[index] = outcome;
+            }
+        };
+
         for (const { fact, index, slot } of pending) {
-            const key = importDedupKey(fact.memory);
+            // The backstop, as in `insertMemory`: the action already left out a line that was only a secret.
+            const text = redactMemoryText(fact.memory);
+
+            if (text === null) {
+                settle(slot, index, { memoryId: null, status: "dropped" });
+                continue;
+            }
+
+            const key = importDedupKey(text);
             const known = knownId(key);
             // The row the action planned to supersede ends only while it is still the user's own active, unpinned
             // row with the text the decision read: another save may have ended, removed or edited it, or the user
@@ -709,7 +783,7 @@ export const saveImportedMemoryBatch = internalMutation
                     ? planned._id
                     : undefined;
 
-            let outcome: { memoryId: Id<"memories">; status: "added" | "known" | "updated" };
+            let outcome: ImportOutcome;
 
             if (known) {
                 await ctx.db.patch("memories", known, { lastConfirmedAt: now });
@@ -727,7 +801,7 @@ export const saveImportedMemoryBatch = internalMutation
                         confidence: IMPORTED_CONFIDENCE,
                         importance: IMPORTED_IMPORTANCE,
                         importedFrom: args.app,
-                        memory: fact.memory,
+                        memory: text,
                         source: "imported",
                         supersedes,
                         type: fact.type,
@@ -736,16 +810,15 @@ export const saveImportedMemoryBatch = internalMutation
                     now,
                 );
 
-                indexRow(memoryId, key);
-                outcome = { memoryId, status: "added" };
+                if (memoryId === null) {
+                    outcome = { memoryId: null, status: "dropped" };
+                } else {
+                    indexRow(memoryId, key);
+                    outcome = { memoryId, status: "added" };
+                }
             }
 
-            if (slot === "facts") {
-                outcomes[index] = outcome;
-            } else {
-                confirmOutcomes[index] = outcome;
-            }
-
+            settle(slot, index, outcome);
             retire(supersedes);
         }
 
@@ -793,8 +866,8 @@ export const linkMemoryEmbeddings = internalMutation
 
 /**
  * Extraction's belief-revision UPDATE: rewords one row only while it is still the user's own (or the bot's own, for
- * its scope), active, unpinned and reads as the text the decision was made on. The re-embed is scheduled in the same
- * write, so a revision never commits without its re-embed. Returns whether it applied; when it did not, the caller
+ * its scope), active, unpinned and reads as the text the decision was made on. The old vector is dropped and the re-embed
+ * scheduled in the same write (`reembedRewordedMemory`), so a revision never commits without its re-embed. Returns whether it applied; when it did not, the caller
  * saves the fact as new.
  */
 export const reviseExtractedMemory = internalMutation
@@ -815,17 +888,24 @@ export const reviseExtractedMemory = internalMutation
             return false;
         }
 
-        if (row.memory !== args.base) {
+        // The backstop, as in `insertMemory`: a revision that is nothing but a secret does not apply, so the caller saves
+        // the fact as new, as for any revision that cannot apply.
+        const memory = redactMemoryText(args.memory);
+
+        if (row.memory !== args.base || memory === null) {
             return false;
         }
 
         await ctx.db.patch("memories", args.memoryId, {
             confidence: args.confidence,
             lastConfirmedAt: args.lastConfirmedAt,
-            memory: args.memory,
+            memory,
             updatedAt: ctx.now,
         });
-        await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: args.memoryId, userId: args.userId });
+
+        if (memory !== row.memory) {
+            await reembedRewordedMemory(ctx, args.memoryId, args.userId);
+        }
 
         return true;
     });
@@ -840,6 +920,16 @@ export const updateMemoryInternal = internalMutation
         memoryId: v.id("memories"),
     })
     .mutation(async ({ args, ctx }) => {
+        const existing = await ctx.db.get("memories", args.memoryId);
+
+        if (!existing) {
+            return;
+        }
+
+        // A rewording that is nothing but a secret keeps the row's text.
+        const text = args.memory === undefined ? undefined : (redactMemoryText(args.memory) ?? undefined);
+        const textChanged = text !== undefined && text !== existing.memory;
+
         await ctx.db.patch(
             "memories",
             args.memoryId,
@@ -848,10 +938,15 @@ export const updateMemoryInternal = internalMutation
                 embeddingId: args.embeddingId,
                 importance: args.importance,
                 lastConfirmedAt: args.lastConfirmedAt,
-                memory: args.memory,
+                memory: textChanged ? text : undefined,
                 updatedAt: ctx.now,
             }),
         );
+
+        // The old vector encodes the old wording: replace it, so search never finds a row by text it no longer holds.
+        if (textChanged && existing.userId) {
+            await reembedRewordedMemory(ctx, args.memoryId, existing.userId);
+        }
     });
 
 /**

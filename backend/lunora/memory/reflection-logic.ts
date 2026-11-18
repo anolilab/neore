@@ -494,6 +494,26 @@ export const mergeToOps = (merge: MergeCandidate, memories: ReadonlyMap<string, 
 };
 
 /**
+ * How many merges the written ops still carry out: one whose wording was dropped as only a secret supersedes nothing
+ * (`redactReflectionOps`), so the digest does not count it.
+ */
+export const countAppliedMerges = (merges: ReadonlyArray<MergeCandidate>, ops: ReadonlyArray<ReflectionOp>): number => {
+    const absorbed = new Set(ops.flatMap((op) => (op.kind === "supersede" ? [`${op.byMemoryId}\u{0}${op.memoryId}`] : [])));
+
+    return merges.filter((merge) => merge.absorbedIds.some((id) => absorbed.has(`${merge.survivorId}\u{0}${id}`))).length;
+};
+
+/**
+ * How many contradictions the written ops still resolve. Every revision supersedes one row of its pair by the other;
+ * an UPDATE whose merged wording was dropped as only a secret keeps both rows (`redactReflectionOps`), so it is not counted.
+ */
+export const countResolvedContradictions = (pairs: ReadonlyArray<ContradictionCandidate>, ops: ReadonlyArray<ReflectionOp>): number => {
+    const superseded = new Set(ops.flatMap((op) => (op.kind === "supersede" ? [`${op.byMemoryId}\u{0}${op.memoryId}`] : [])));
+
+    return pairs.filter((pair) => superseded.has(`${pair.olderId}\u{0}${pair.newerId}`) || superseded.has(`${pair.newerId}\u{0}${pair.olderId}`)).length;
+};
+
+/**
  * A promotion the model accepted: one new `preference`/`identity` memory, a
  * little more confident than the strongest observation behind it (it was seen
  * repeatedly), capped at {@link MAX_PROMOTED_CONFIDENCE}. The observations are

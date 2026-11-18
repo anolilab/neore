@@ -54,6 +54,8 @@ vi.mock("../chat/lib/gateway-embedding-model", () => {
 
 const USER = "user-a";
 const FACT = "The user owns a blue vase from Lisbon";
+// Built at run time, so no token-shaped literal sits in the source.
+const TOKEN = ["gh", "p_", "Zq8LmV2xR7tYw4KpN3bC9dF6hJ1sA5gE0uIo"].join("");
 const VECTOR = Array.from({ length: 128 }, (_, axis) => (axis === 0 ? 1 : 0));
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -327,5 +329,47 @@ describe("extraction vector dedup", () => {
             "The user owns a blue vase from Lisbon today",
             "The user sold the blue vase in Lisbon",
         ]);
+    });
+
+    it("stores a revision's wording redacted, and keeps it when a later revision of the row is only a secret", async () => {
+        expect.assertions(3);
+
+        const rowId = await harness.run(async (ctx: any) => {
+            const vector = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: VECTOR });
+
+            searchVectors.mockResolvedValue([{ _id: vector, _score: 0.9 }]);
+
+            return await ctx.db.insert("memories", { embeddingId: vector, memory: "The user owns a blue vase", type: "activity", userId: USER });
+        });
+
+        generateText
+            .mockResolvedValueOnce({
+                output: {
+                    facts: [
+                        { confidence: 90, importance: 80, memory: "The user owns a blue vase from Lisbon", type: "activity" },
+                        { confidence: 90, importance: 80, memory: "The user owns a blue vase from Lisbon today", type: "activity" },
+                    ],
+                },
+            })
+            .mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: `The user owns a blue vase from Lisbon, CI token ${TOKEN}` } })
+            .mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: `token=${TOKEN}` } });
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "A lovely vase.",
+                    threadId,
+                    userId: USER,
+                    userMessage: "I bought a blue vase in Lisbon, please remember that about me",
+                }),
+        );
+
+        const rows: { _id: string; memory: string }[] = await harness.run(async (ctx: any) => await ctx.db.query("memories").collect());
+        const revised = rows.find((row) => row._id === rowId)?.memory;
+
+        expect(rows.some((row) => row.memory.includes(TOKEN))).toBe(false);
+        expect(revised?.startsWith("The user owns a blue vase from Lisbon")).toBe(true);
+        // The secret-only revision is no revision: its fact is saved as new, as for one that cannot apply.
+        expect(rows.map((row) => row.memory)).toContain("The user owns a blue vase from Lisbon today");
     });
 });

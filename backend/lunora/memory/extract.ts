@@ -51,6 +51,7 @@ import {
     saveMemoryVectors,
     type SimilarMemoryResult,
 } from "./dedup";
+import { logRedaction, redactMemoryFacts, redactMemoryText, type RedactionCounts } from "./redact";
 import { lastConfirmedOf, MEMORY_TYPE_GUIDE, MEMORY_TYPES, type MemoryType } from "./taxonomy";
 
 // ============================================================================
@@ -346,7 +347,10 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             });
 
             if (result.output?.facts) {
-                extractedFacts = result.output.facts;
+                const redaction = redactMemoryFacts(result.output.facts);
+
+                logRedaction(ctx.log, "extract", redaction);
+                extractedFacts = redaction.facts;
             }
         } catch (error) {
             console.error("[memory/extract] LLM extraction failed:", error);
@@ -409,6 +413,8 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
         // Rows this run has already confirmed or superseded: a later fact does not match them, so no later revision can
         // change a row an earlier decision is waiting to write against its text.
         const decidedIds = new Set<string>();
+        // Secrets taken out of revision wordings: counted apart from the facts', which were logged when extracted.
+        const revisionRedaction: RedactionCounts = { dropped: 0, redacted: 0 };
 
         for (const [i, extractedFact] of extractedFacts.entries()) {
             const fact = extractedFact!;
@@ -530,13 +536,36 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                         break;
                     }
                     case "UPDATE": {
+                        // The merged wording is redacted before it is planned, so a later fact of this run is revised
+                        // against the text the row will hold. A wording that is only a secret is no revision: the fact
+                        // is saved as new, as for a revision that cannot apply.
+                        const mergedMemory = revision.mergedMemory ? redactMemoryText(revision.mergedMemory) : undefined;
+
                         if (revision.mergedMemory) {
+                            revisionRedaction.dropped += mergedMemory === null ? 1 : 0;
+                            revisionRedaction.redacted += mergedMemory && mergedMemory !== revision.mergedMemory ? 1 : 0;
+                        }
+
+                        if (mergedMemory === null) {
+                            memoriesToSave.push({
+                                botId: args.botId,
+                                confidence: fact.confidence,
+                                importance: fact.importance,
+                                memory: fact.memory,
+                                source: "auto",
+                                supersedes: undefined,
+                                threadId: args.threadId,
+                                type: fact.type,
+                                userId: args.userId,
+                            });
+                            factEmbeddingsToSave.push(factEmbedding);
+                        } else if (mergedMemory) {
                             // The row now reads as the merged text for the rest of this run, so a later fact is revised against it.
                             const confidence = Math.max(fact.confidence, similarMemory.confidence ?? 50);
                             const working = existingMemories.find((row) => row._id === similarMemory.id);
 
                             if (working) {
-                                working.memory = revision.mergedMemory;
+                                working.memory = mergedMemory;
                                 working.confidence = confidence;
                             } else {
                                 // A row found by vector past the window joins the working set, so later facts match its revised words.
@@ -550,7 +579,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                                         embeddingId: row.embeddingId ?? undefined,
                                         importance: row.importance ?? undefined,
                                         lastConfirmedAt: lastConfirmedOf(row),
-                                        memory: revision.mergedMemory,
+                                        memory: mergedMemory,
                                         pinned: row.pinned === true,
                                         type: row.type,
                                     });
@@ -564,7 +593,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                                 confidence,
                                 embedding: factEmbedding,
                                 fact,
-                                memory: revision.mergedMemory,
+                                memory: mergedMemory,
                                 memoryId: similarMemory.id,
                             });
                         }
@@ -591,6 +620,9 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                 factEmbeddingsToSave.push(factEmbedding);
             }
         }
+
+        // The merged wordings are their own count, logged once for the run's revisions.
+        logRedaction(ctx.log, "extract", revisionRedaction);
 
         // 6. Revisions first: a supersession planned against a revised row then sees the text the row committed.
         // A revision that cannot apply, or fails, saves its fact as new.
@@ -688,9 +720,16 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
     });
 
 // ============================================================================
-// Embedding Regeneration (invoked after manual memory edits)
+// Embedding Regeneration (after any change to a memory's wording)
 // ============================================================================
 
+/**
+ * Embeds the row's current wording and links the vector through `linkMemoryVectors`, which keeps it only while the row
+ * still reads as that wording. So when two wording changes overlap, the job that read the older text can never
+ * leave its vector on the row. The write that changed the wording already dropped the old vector
+ * (`reembedRewordedMemory`), so a job that fails leaves the row without one, found by keyword, and deletes nothing:
+ * a vector another job linked for the same wording stays.
+ */
 export const regenerateMemoryEmbedding = internalAction
     .input({
         memoryId: v.id("memories"),
@@ -707,12 +746,11 @@ export const regenerateMemoryEmbedding = internalAction
             return;
         }
 
-        // Generate and save a fresh embedding for the updated text
         try {
             const rules = await loadModelFilterRules(ctx, args.userId);
             const { embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
 
-            // The gateway would refuse the call: the memory is kept without a vector, found by keyword.
+            // The gateway would refuse the call: the memory is found by keyword.
             if (!embeddingModelAllowed(rules)) {
                 return;
             }

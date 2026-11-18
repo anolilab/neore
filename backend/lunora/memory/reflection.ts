@@ -40,6 +40,7 @@ import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
 import { runBeliefRevision } from "./extract";
+import { reembedRewordedMemory } from "./functions";
 import {
     buildReflectionPrompt,
     checkReflectionEligibility,
@@ -54,11 +55,15 @@ import {
     promotionToOp,
     REFLECTION_LIMITS,
     REFLECTION_SYSTEM_PROMPT,
+    type ContradictionCandidate,
     type ReflectionMemory,
     type ReflectionOp,
     revisionToOps,
+    countAppliedMerges,
+    countResolvedContradictions,
     selectReflectionInputs,
 } from "./reflection-logic";
+import { logRedaction, redactDigestSummary, redactMemoryText, redactReflectionOps } from "./redact";
 import { lastConfirmedOf } from "./taxonomy";
 import { MAX_LENGTH } from "../lib/validators";
 
@@ -296,15 +301,27 @@ const vReflectionOp = v.union(
 /**
  * Applies a run's writes. Every op re-reads its rows and re-checks ownership,
  * that the row is still active, and — defence in depth for the plan's own rule
- * — that a pinned row is never superseded.
+ * — that a pinned row is never superseded. Each row whose wording it wrote is
+ * re-embedded. It returns what it committed: the rows it superseded and the
+ * wording it wrote, for the digest.
  */
 export const applyReflectionOps = internalMutation
     .input({ botId: v.optional(v.string()), ops: v.array(vReflectionOp), userId: v.string() })
-    .output(v.object({ applied: v.number(), promotedIds: v.array(v.string()), textChangedIds: v.array(v.string()) }))
+    // One `promotedIds` entry per promote op, in order: `null` where the promotion was not made.
+    .output(
+        v.object({
+            applied: v.number(),
+            promotedIds: v.array(v.union(v.string(), v.null())),
+            supersededIds: v.array(v.string()),
+            written: v.array(v.object({ memory: v.string(), memoryId: v.string() })),
+        }),
+    )
     .mutation(async ({ args: { botId, ops, userId }, ctx }) => {
         const { now } = ctx;
-        const promotedIds: string[] = [];
-        const textChangedIds: string[] = [];
+        const promotedIds: (string | null)[] = [];
+        const supersededIds: string[] = [];
+        // The last wording written to each row.
+        const written = new Map<Id<"memories">, string>();
         let applied = 0;
 
         // A row outside this scope is refused, so one scope's ops can never write another's rows.
@@ -323,6 +340,9 @@ export const applyReflectionOps = internalMutation
                         break;
                     }
 
+                    // The backstop: a wording that is nothing but a secret keeps the row's text; the rest of the patch applies.
+                    const memory = op.memory === undefined ? undefined : (redactMemoryText(op.memory) ?? undefined);
+
                     await ctx.db.patch(
                         "memories",
                         row._id,
@@ -332,13 +352,13 @@ export const applyReflectionOps = internalMutation
                             // effective confirmation time, which would otherwise
                             // follow `updatedAt` forward.
                             lastConfirmedAt: op.lastConfirmedAt ?? lastConfirmedOf(row),
-                            memory: op.memory,
+                            memory,
                             updatedAt: now,
                         }),
                     );
 
-                    if (op.memory !== undefined && op.memory !== row.memory) {
-                        textChangedIds.push(row._id);
+                    if (memory !== undefined && memory !== row.memory) {
+                        written.set(row._id, memory);
                     }
 
                     applied += 1;
@@ -347,8 +367,11 @@ export const applyReflectionOps = internalMutation
                 case "promote": {
                     const rows = await Promise.all(op.sourceIds.map(async (id) => active(id)));
                     const sources = rows.filter((row): row is Doc<"memories"> => row !== null && row.pinned !== true);
+                    // A promotion that is nothing but a secret is not made, and its sources stay.
+                    const memory = redactMemoryText(op.memory);
 
-                    if (sources.length === 0) {
+                    if (sources.length === 0 || memory === null) {
+                        promotedIds.push(null);
                         break;
                     }
 
@@ -357,7 +380,7 @@ export const applyReflectionOps = internalMutation
                         confidence: op.confidence,
                         importance: op.importance,
                         lastConfirmedAt: now,
-                        memory: op.memory,
+                        memory,
                         source: "reflection",
                         threadId: op.threadId as Id<"threads"> | undefined,
                         type: op.type,
@@ -368,10 +391,11 @@ export const applyReflectionOps = internalMutation
 
                     for (const source of sources) {
                         await ctx.db.patch("memories", source._id, { supersededBy: promotedId, updatedAt: now });
+                        supersededIds.push(source._id);
                     }
 
                     promotedIds.push(promotedId);
-                    textChangedIds.push(promotedId);
+                    written.set(promotedId, memory);
                     applied += 1;
                     break;
                 }
@@ -384,6 +408,7 @@ export const applyReflectionOps = internalMutation
                     }
 
                     await ctx.db.patch("memories", row._id, { supersededBy: by._id, updatedAt: now });
+                    supersededIds.push(row._id);
                     applied += 1;
                     break;
                 }
@@ -393,7 +418,21 @@ export const applyReflectionOps = internalMutation
             }
         }
 
-        return { applied, promotedIds, textChangedIds };
+        // A later op may have superseded a row whose wording was written: it needs no vector of its own then.
+        for (const memoryId of written.keys()) {
+            if (!supersededIds.includes(memoryId)) {
+                await reembedRewordedMemory(ctx, memoryId, userId);
+            }
+        }
+
+        return {
+            applied,
+            promotedIds,
+            supersededIds,
+            written: [...written].map(([memoryId, memory]) => {
+                return { memory, memoryId };
+            }),
+        };
     });
 
 export const saveMemoryDigest = internalMutation
@@ -493,7 +532,8 @@ const reflectScope = async (
         }
     }
 
-    const mergedText = new Map((synthesis?.merges ?? []).map((m) => [m.id, m.text.slice(0, REFLECTION_LIMITS.maxMemoryChars)]));
+    // Cut to length only after redaction (in `redactReflectionOps`), so a cut never hides the end of a secret.
+    const mergedText = new Map((synthesis?.merges ?? []).map((m) => [m.id, m.text]));
 
     for (const [index, merge] of plan.merges.entries()) {
         ops.push(...mergeToOps(merge, byId, now, mergedText.get(index)));
@@ -508,15 +548,16 @@ const reflectScope = async (
             continue;
         }
 
-        const op = promotionToOp(candidate, byId, { memory: decision.text.slice(0, REFLECTION_LIMITS.maxMemoryChars), type: decision.type });
+        const op = promotionToOp(candidate, byId, { memory: decision.text, type: decision.type });
 
         if (op) {
             ops.push(op);
         }
     }
 
-    // 2. Contradictions, through the extractor's own belief revision.
-    let contradictionsResolved = 0;
+    // 2. Contradictions, through the extractor's own belief revision. Their merged text is stored whole, never cut.
+    const revisedPairs: ContradictionCandidate[] = [];
+    const revisionOps = new Set<ReflectionOp>();
 
     for (const pair of plan.contradictions) {
         if (!model || !budget.tryReserve(estimateTokens(pair.olderText + pair.newerText) + 200)) {
@@ -525,48 +566,49 @@ const reflectScope = async (
 
         try {
             const decision = await runBeliefRevision(model, pair.olderText, pair.newerText, REFLECTION_LIMITS.maxOutputTokensPerCall);
-            const revisionOps = revisionToOps(pair, decision, now);
+            const pairOps = revisionToOps(pair, decision, now);
 
-            if (revisionOps.length > 0) {
-                contradictionsResolved += 1;
-                ops.push(...revisionOps);
+            if (pairOps.length > 0) {
+                revisedPairs.push(pair);
+                ops.push(...pairOps);
+
+                for (const op of pairOps) {
+                    revisionOps.add(op);
+                }
             }
         } catch (error) {
             console.warn("[memory/reflection] Belief revision failed:", error);
         }
     }
 
-    // 3. Write, then re-embed whatever changed wording.
+    // 3. Write with secrets redacted, then re-embed whatever changed wording.
+    const redaction = redactReflectionOps(ops, REFLECTION_LIMITS.maxMemoryChars, revisionOps);
+    const writeOps = redaction.ops;
+
+    logRedaction(ctx.log, "reflection", redaction);
     const result =
-        ops.length > 0
-            ? await ctx.runMutation(internal.memory.reflection.applyReflectionOps, { botId, ops, userId })
-            : { applied: 0, promotedIds: [] as string[], textChangedIds: [] as string[] };
+        writeOps.length > 0
+            ? await ctx.runMutation(internal.memory.reflection.applyReflectionOps, { botId, ops: writeOps, userId })
+            : { applied: 0, promotedIds: [] as (string | null)[], supersededIds: [] as string[], written: [] as { memory: string; memoryId: string }[] };
 
-    for (const memoryId of result.textChangedIds) {
-        await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: memoryId as Id<"memories">, userId });
-    }
-
-    // 4. What the digest says about this scope.
-    const superseded = new Set(
-        ops.flatMap((op) => {
-            if (op.kind === "supersede") {
-                return [op.memoryId];
-            }
-
-            return op.kind === "promote" ? op.sourceIds : [];
-        }),
-    );
-    const promoteOps = ops.filter((op): op is Extract<ReflectionOp, { kind: "promote" }> => op.kind === "promote");
+    // 4. What the digest says about this scope, from what the write committed: a source pinned meanwhile stays active
+    // and is still listed, and a row it reworded is listed with its new wording.
+    const superseded = new Set(result.supersededIds);
+    const committed = new Map(result.written.map(({ memory, memoryId }) => [memoryId, memory]));
+    const promoteOps = writeOps.filter((op): op is Extract<ReflectionOp, { kind: "promote" }> => op.kind === "promote");
     const learned = [
         ...promoteOps.flatMap((op, index) => {
             const memoryId = result.promotedIds[index];
 
-            return memoryId ? [{ memory: op.memory, memoryId, type: op.type as string }] : [];
+            return memoryId ? [{ memory: committed.get(memoryId) ?? op.memory, memoryId, type: op.type as string }] : [];
         }),
+        // A row written before redaction existed may still hold a secret: redacted here, left out when that is all it is.
         ...learnedToday
             .filter((m) => !superseded.has(m.id))
-            .map((m) => {
-                return { memory: m.text, memoryId: m.id, type: m.type as string };
+            .flatMap((m) => {
+                const memory = committed.get(m.id) ?? redactMemoryText(m.text);
+
+                return memory === null ? [] : [{ memory, memoryId: m.id, type: m.type as string }];
             }),
     ].slice(0, REFLECTION_LIMITS.maxDigestItems);
 
@@ -574,14 +616,15 @@ const reflectScope = async (
         applied: result.applied,
         learned,
         stats: {
-            contradictionsResolved,
+            // Counted from what is written: a revision whose wording was only a secret resolves nothing.
+            contradictionsResolved: countResolvedContradictions(revisedPairs, writeOps),
             decayed: plan.decay.length,
-            merged: plan.merges.length,
+            merged: countAppliedMerges(plan.merges, writeOps),
             newMemories: learnedToday.length,
-            promoted: result.promotedIds.length,
+            promoted: result.promotedIds.filter((id) => id !== null).length,
             retired: plan.retire.length,
         },
-        summary: (synthesis?.summary ?? "").trim().slice(0, REFLECTION_LIMITS.maxSummaryChars),
+        summary: redactDigestSummary(synthesis?.summary ?? "", REFLECTION_LIMITS.maxSummaryChars),
     };
 };
 
