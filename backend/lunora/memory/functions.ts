@@ -572,24 +572,45 @@ export const saveImportedMemoryBatch = internalMutation
             orderBy: [{ _creationTime: "desc" }],
             where: { botId: { isNull: true }, supersededBy: { isNull: true }, userId: args.userId },
         });
-        const textOf = new Map(own.map((row) => [row._id, importDedupKey(row.memory)]));
-        const byText = new Map([...textOf].map(([memoryId, key]) => [key, memoryId]));
-        const reword = (memoryId: Id<"memories">, key: string) => {
-            const previous = textOf.get(memoryId);
+        // Every active row by its text: two rows may hold one text, and retiring or rewording one leaves the other.
+        // The last id of a text is the one a match confirms, the most recently indexed.
+        const textOf = new Map<Id<"memories">, string>();
+        const idsByText = new Map<string, Id<"memories">[]>();
+        const indexRow = (memoryId: Id<"memories">, key: string) => {
+            idsByText.set(key, [...(idsByText.get(key) ?? []).filter((id) => id !== memoryId), memoryId]);
+            textOf.set(memoryId, key);
+        };
+        const unindexRow = (memoryId: Id<"memories">) => {
+            const key = textOf.get(memoryId);
 
-            if (previous !== undefined && byText.get(previous) === memoryId) {
-                byText.delete(previous);
+            if (key === undefined) {
+                return;
             }
 
-            textOf.set(memoryId, key);
-            byText.set(key, memoryId);
+            textOf.delete(memoryId);
+
+            const rest = (idsByText.get(key) ?? []).filter((id) => id !== memoryId);
+
+            if (rest.length > 0) {
+                idsByText.set(key, rest);
+            } else {
+                idsByText.delete(key);
+            }
+        };
+        const knownId = (key: string): Id<"memories"> | undefined => idsByText.get(key)?.at(-1);
+
+        for (const row of own) {
+            indexRow(row._id, importDedupKey(row.memory));
+        }
+
+        const reword = (memoryId: Id<"memories">, key: string) => {
+            unindexRow(memoryId);
+            indexRow(memoryId, key);
         };
         // A superseded row is no longer a match for a later fact of this batch.
         const retire = (memoryId: Id<"memories"> | undefined) => {
-            const key = memoryId ? textOf.get(memoryId) : undefined;
-
-            if (key !== undefined && byText.get(key) === memoryId) {
-                byText.delete(key);
+            if (memoryId !== undefined) {
+                unindexRow(memoryId);
             }
         };
 
@@ -609,7 +630,7 @@ export const saveImportedMemoryBatch = internalMutation
             }
 
             const key = importDedupKey(merge.memory);
-            const twin = byText.get(key);
+            const twin = (idsByText.get(key) ?? []).findLast((id) => id !== target._id);
 
             // The merged text is already another row's: that row is confirmed, and the target keeps its own text.
             if (twin !== undefined && twin !== target._id) {
@@ -662,7 +683,7 @@ export const saveImportedMemoryBatch = internalMutation
 
         for (const { fact, index, slot } of pending) {
             const key = importDedupKey(fact.memory);
-            const known = byText.get(key);
+            const known = knownId(key);
             // The row the action planned to supersede ends only while it is still the user's own active, unpinned
             // row with the text the decision read: another save may have ended, removed or edited it, or the user
             // pinned it, meanwhile. Otherwise the fact is saved beside it.
@@ -699,7 +720,7 @@ export const saveImportedMemoryBatch = internalMutation
                     now,
                 );
 
-                byText.set(key, memoryId);
+                indexRow(memoryId, key);
                 outcome = { memoryId, status: "added" };
             }
 
@@ -848,6 +869,30 @@ export const confirmMemories = internalMutation
  * pass `botId` WITHOUT `includeUserWide`: a bot's extraction never matches or
  * edits a user memory.
  */
+/**
+ * The newest `limit` active rows of one scope, in index order. Superseded rows are skipped as they come and the read
+ * pages on until `limit` active rows are found, so history never uses up the window.
+ */
+const activeRowsInScope = async (ctx: QueryCtx, userId: string, scope: string | null, limit: number): Promise<Doc<"memories">[]> => {
+    const active: Doc<"memories">[] = [];
+    let cursor: string | null = null;
+    let isDone = false;
+
+    while (active.length < limit && !isDone) {
+        const page = await ctx.db
+            .query("memories")
+            .withIndex("by_userId_botId", (q) => q.eq("userId", userId).eq("botId", scope as Id<"bots"> | null))
+            .order("desc")
+            .paginate({ cursor, numItems: limit });
+
+        active.push(...page.page.filter((memory) => !memory.supersededBy));
+        cursor = page.continueCursor;
+        isDone = page.isDone;
+    }
+
+    return active.slice(0, limit);
+};
+
 export const getActiveMemoriesForUser = internalQuery
     .input({
         botId: v.optional(v.string()),
@@ -866,17 +911,7 @@ export const getActiveMemoriesForUser = internalQuery
             scopes.push(null);
         }
 
-        // Over-fetch to account for superseded entries being filtered out.
-        const perScope = await Promise.all(
-            scopes.map(
-                async (scope) =>
-                    await ctx.db
-                        .query("memories")
-                        .withIndex("by_userId_botId", (q) => q.eq("userId", args.userId).eq("botId", scope as Id<"bots"> | null))
-                        .order("desc")
-                        .take(limit * 3),
-            ),
-        );
+        const perScope = await Promise.all(scopes.map(async (scope) => await activeRowsInScope(ctx, args.userId, scope, limit)));
 
         // Each scope keeps up to `limit` of its own, so a busy bot cannot push the user's memories out. Merged in
         // the order each index yields: type descending, then newest first.

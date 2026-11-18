@@ -783,42 +783,48 @@ describe("import limits", () => {
 
         await setMemoryEnabled(true);
 
-        const bees = await harness.run(
-            async (ctx: any) =>
-                await ctx.db.insert("memories", {
-                    memory: "The user keeps bees in a small garden behind the old workshop",
-                    type: "context",
-                    userId: USER,
-                }),
-        );
+        // The window reads newest first, so the bees row is pinned to an earlier clock than the filler rows.
+        vi.useFakeTimers({ toFake: ["Date"] });
 
-        // The window reads newest first: the filler rows must be strictly newer than the bees row, not the same millisecond.
-        await new Promise((resolve) => {
-            setTimeout(resolve, 5);
-        });
+        try {
+            vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
 
-        await harness.run(async (ctx: any) => {
-            for (let index = 0; index < 1000; index += 1) {
-                await ctx.db.insert("memories", {
-                    memory: `The user collects stamp number ${String(index)} from a far country`,
-                    type: "context",
-                    userId: USER,
-                });
-            }
-        });
+            const bees = await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("memories", {
+                        memory: "The user keeps bees in a small garden behind the old workshop",
+                        type: "context",
+                        userId: USER,
+                    }),
+            );
 
-        generateText.mockResolvedValueOnce({ output: { action: "IGNORE" } });
+            vi.setSystemTime(new Date("2026-01-01T00:00:01Z"));
 
-        expect(await save([{ memory: "The user keeps bees in a small garden behind the old workshop yearly", type: "context" }])).toStrictEqual({
-            added: 0,
-            alreadyKnown: 1,
-            updated: 0,
-        });
-        expect(await memories()).toHaveLength(1001);
+            await harness.run(async (ctx: any) => {
+                for (let index = 0; index < 1000; index += 1) {
+                    await ctx.db.insert("memories", {
+                        memory: `The user collects stamp number ${String(index)} from a far country`,
+                        type: "context",
+                        userId: USER,
+                    });
+                }
+            });
 
-        const row = await rowOf(bees);
+            generateText.mockResolvedValueOnce({ output: { action: "IGNORE" } });
 
-        expect(row?.lastConfirmedAt).toBeTypeOf("number");
+            expect(await save([{ memory: "The user keeps bees in a small garden behind the old workshop yearly", type: "context" }])).toStrictEqual({
+                added: 0,
+                alreadyKnown: 1,
+                updated: 0,
+            });
+            expect(await memories()).toHaveLength(1001);
+
+            const row = await rowOf(bees);
+
+            expect(row?.lastConfirmedAt).toBeTypeOf("number");
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("looks up at most ten facts by vector in one save", async () => {
@@ -996,5 +1002,35 @@ describe("linking a vector replaces the row's old one", () => {
                     }),
             ),
         ).toStrictEqual({ rejected: [], replaced: [oldEmbedding] });
+    });
+
+    it("reports the vector an overlapping second link replaces, so neither vector is left unreferenced", async () => {
+        expect.assertions(1);
+
+        const [memoryId, firstEmbedding, secondEmbedding] = await harness.run(async (ctx: any) => {
+            const memory = await ctx.db.insert("memories", { memory: "The user now reads the new text", type: "context", userId: USER });
+            const first = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: vectorOf("item 1") });
+            const second = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: vectorOf("item 2") });
+
+            return [memory, String(first), String(second)];
+        });
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runMutation(internal.memory.functions.linkMemoryEmbeddings, {
+                    links: [{ embeddingId: firstEmbedding, memoryId, text: "The user now reads the new text" }],
+                    userId: USER,
+                }),
+        );
+
+        expect(
+            await harness.action(
+                async (ctx: any) =>
+                    await ctx.runMutation(internal.memory.functions.linkMemoryEmbeddings, {
+                        links: [{ embeddingId: secondEmbedding, memoryId, text: "The user now reads the new text" }],
+                        userId: USER,
+                    }),
+            ),
+        ).toStrictEqual({ rejected: [], replaced: [firstEmbedding] });
     });
 });
