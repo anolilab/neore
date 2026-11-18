@@ -648,6 +648,30 @@ describe("importing another assistant's memory", () => {
         expect(generateText).toHaveBeenCalledOnce();
     });
 
+    it("compares a later fact by words, not by the old vector, once an earlier fact reworded the row", async () => {
+        expect.assertions(1);
+
+        await setMemoryEnabled(true);
+        useFakeVectors();
+        // The first fact is a near-match (0.9) and is merged; the second scores 1 against the row's old vector.
+        embedMany.mockImplementation(async (_ctx: unknown, { values }: { values: string[] }) => {
+            return { embeddings: values.map((value) => (value.includes("by the door") ? nearVectorOf(3) : vectorOf(value))) };
+        });
+        await harness.run(async (ctx: any) => {
+            const embeddingId = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: vectorOf("item 3") });
+
+            await ctx.db.insert("memories", { embeddingId, memory: "The user keeps collection item 3 in the hall", type: "context", userId: USER });
+        });
+        generateText.mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: "The user keeps collection item 3 in the hall by the door" } });
+
+        expect(
+            await save([
+                { memory: "The user keeps collection item 3 in the hall by the door", type: "context" },
+                { memory: "Collection item 3 is kept in the hallway", type: "context" },
+            ]),
+        ).toStrictEqual({ added: 1, alreadyKnown: 0, updated: 1 });
+    });
+
     it("passes over a bot's vector hit to the user's own row past the window", async () => {
         expect.assertions(2);
 

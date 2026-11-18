@@ -71,7 +71,7 @@ const SENSITIVE_RES: ReadonlyArray<RegExp> = [
     /\b(?:\d[ -]?){13,19}\b/,
     /\b\d{3}-\d{2}-\d{4}\b/,
     /\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){3,7}\b/,
-    /\b(?:password|passwort|passcode|api[ _-]?key|secret|token|pin)\b\s*(?:is|:|=)\s*\S+/i,
+    /\b(?:password|passwort|passcode|api[ _-]?key|secret|token|pin)\b\s*(?:is\b|:|=)\s*\S+/i,
     // A shorter account, routing or card number, when the line says that is what it is ("account number",
     // "acct #", "IBAN"): a date or a count beside the word ("an account opened on 2024-03-15") is not one.
     /\b(?:account|acct|konto|card)\s*(?:number|nummer|num|no|nr|#|:)[\s.#:]*(?:is\s+)?\d(?:[ -]?\d){5,}/i,

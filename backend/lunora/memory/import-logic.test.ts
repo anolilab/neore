@@ -87,6 +87,7 @@ describe(looksSensitive, () => {
         expect(looksSensitive("The user walks 120000 steps a month and has a card game night in 2024")).toBe(false);
         expect(looksSensitive("The user opened a business account on 2024-03-15")).toBe(false);
         expect(looksSensitive("The user's Instagram account has 120000 followers")).toBe(false);
+        expect(looksSensitive("The user is building an OAuth token issuer")).toBe(false);
     });
 });
 

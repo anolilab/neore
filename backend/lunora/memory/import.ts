@@ -102,6 +102,8 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
     const toConfirm: { base: string; memoryId: Id<"memories"> }[] = [];
     // Rows a fact of this save superseded: still active until the save, but no longer a match.
     const retired = new Set<string>();
+    // Rows a fact of this save reworded: their stored vector is of the old text, so a later fact is compared by words.
+    const reworded = new Set<string>();
 
     let revisions = 0;
 
@@ -120,7 +122,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
             existing.push(byVector.row);
         }
 
-        const similar = byVector ?? findSimilarMemoryByJaccard(fact.memory, existing);
+        const similar = byVector && !reworded.has(byVector.id) ? byVector : findSimilarMemoryByJaccard(fact.memory, existing);
         // Later facts compare against the row as this save leaves it: merged text, or gone once superseded.
         const match = similar ? existing.find((row) => row._id === similar.id) : undefined;
         let action: "ADD" | "IGNORE" | "SUPERSEDE" | "UPDATE" = "ADD";
@@ -162,6 +164,8 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
                 fact,
                 merge: { base: similar.memory, confidence: Math.max(IMPORTED_CONFIDENCE, similar.confidence ?? 50), memory, memoryId: similar.id },
             });
+
+            reworded.add(similar.id);
 
             if (match) {
                 match.memory = memory;

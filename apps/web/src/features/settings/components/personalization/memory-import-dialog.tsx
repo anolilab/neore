@@ -79,7 +79,11 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
 
     const prompt = t`List everything you remember about me from our past conversations and your saved memory. Write one fact per line, in the third person, starting with "The user" (for example: "The user works as a nurse in Hamburg."). Where you know when you learned a fact, add the date in brackets at the end of its line. Leave out passwords, keys, account numbers and health details. Write no introduction, headings or comments.`;
 
-    const { isPending: isPreviewing, mutate: runPreview } = useMutation({
+    const {
+        isPending: isPreviewing,
+        mutate: runPreview,
+        reset: resetPreview,
+    } = useMutation({
         ...useLunoraActionOptions(api.memory.import.previewMemoryImport),
     });
 
@@ -163,9 +167,11 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
 
                 setOpen(next);
 
-                // Closing drops the preview: reopening starts from the paste, never from facts checked earlier.
+                // Closing drops the preview: reopening starts from the paste, never from facts checked earlier,
+                // and is not held read-only by a preview the closed dialog was still waiting on.
                 if (!next) {
                     opening.current += 1;
+                    resetPreview();
                     setPreview(undefined);
                     setUnchecked(new Set());
                 }

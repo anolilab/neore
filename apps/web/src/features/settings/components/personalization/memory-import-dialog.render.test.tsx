@@ -239,6 +239,35 @@ describe("memory import dialog", () => {
         expect(toast.error).not.toHaveBeenCalled();
     });
 
+    it("reopens editable while a preview from the closed dialog is still pending", async () => {
+        expect.hasAssertions();
+
+        let released = false;
+
+        // Still pending when the dialog reopens.
+        calls.preview.mockImplementation(async () => {
+            await vi.waitUntil(() => released);
+
+            return { cut: 0, dropped: 0, facts: [] };
+        });
+
+        openDialog(true);
+
+        fireEvent.change(await screen.findByLabelText("3. Paste its answer"), { target: { value: "The user is a nurse" } });
+        fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+        await waitFor(() => expect(screen.getByLabelText("3. Paste its answer").hasAttribute("readonly")).toBe(true));
+        fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        fireEvent.click(screen.getByRole("button", { name: "Bring in what another AI knows about you" }));
+
+        const field = await screen.findByLabelText("3. Paste its answer");
+
+        expect(field.hasAttribute("readonly")).toBe(false);
+        expect(screen.getByRole("button", { name: "Preview" }).hasAttribute("disabled")).toBe(false);
+
+        released = true;
+    });
+
     it("returns focus to the paste field on Back", async () => {
         expect.assertions(1);
 
