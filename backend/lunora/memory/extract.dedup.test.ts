@@ -323,7 +323,7 @@ describe("extraction vector dedup", () => {
 
         expect(rows).toHaveLength(3);
         expect(rows.find((row: { _id: string }) => row._id === rowId)?.supersededBy).toBeTypeOf("string");
-        expect(active.map((row: { memory: string }) => row.memory).toSorted()).toStrictEqual([
+        expect(active.map((row: { memory: string }) => row.memory).toSorted((a: string, b: string) => a.localeCompare(b))).toStrictEqual([
             "The user owns a blue vase from Lisbon today",
             "The user sold the blue vase in Lisbon",
         ]);
