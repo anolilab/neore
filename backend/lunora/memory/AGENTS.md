@@ -29,12 +29,14 @@
   walks hits best first, reads one past the window by its embedding id, and passes over a row of another
   scope (user vs bot) or one this save superseded. An import never revises a pinned row,
   and a merged text that fails the paste's rules saves the fact as new. Rows are `source: "imported"` with
-  `importedFrom`; both actions refuse while memory is off. A confirmation whose row changed mid-save is
-  saved as new (the batch reports `skipped`, the action retries); a merge whose text another own row holds
-  confirms that row. Vector lookups are capped per save (`IMPORT_MAX_VECTOR_LOOKUPS`, subrequest budget); past
-  it, and whenever a fact has no vector, dedup reads the 5000-row wide window by words.
-- **Extraction** never revises a pinned row (a near-match is saved beside it), and its UPDATE applies only while
-  the row still reads as the decided text (`reviseExtractedMemory`); otherwise the fact is saved as new. An
-  applied UPDATE schedules `regenerateMemoryEmbedding`.
+  `importedFrom`; both actions refuse while memory is off. The whole save is ONE write: a confirmation that
+  cannot apply is inserted by that write, and a row the save confirmed or reworded is never superseded by a later
+  fact of the same save. A merge whose text another own row holds confirms that row. Vector lookups are capped per
+  save (`IMPORT_MAX_VECTOR_LOOKUPS`); the 1000-row window is widened to 5000 rows once, the first time a fact must
+  be matched by words.
+- **Extraction** never revises a pinned row (a near-match is saved beside it). Its UPDATE applies only while the
+  row still reads as the decided text (`reviseExtractedMemory`), which also schedules the re-embed in the same
+  write; a failed or unapplied revision saves its fact as new. A row revised earlier in one run is matched by words
+  against its revised text.
 - **Vectors link only while the row reads as the embedded text** (`linkMemoryEmbeddings`, via `linkMemoryVectors`
-  in `dedup.ts`): a vector whose row was edited meanwhile is deleted, and the edit's own re-embed is what counts.
+  in `dedup.ts`): a vector whose row was edited meanwhile is deleted, and so is the vector a linked row replaces.

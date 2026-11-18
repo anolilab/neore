@@ -68,8 +68,8 @@ interface ImportResult {
 }
 
 /**
- * The facts a save planned to keep as they were, with the vectors computed for them. A fact is planned as a
- * merge, a supersede, a confirmation of a near-match or a plain insert; `confirm` is set for a confirmation.
+ * A fact the save planned, with the vector computed for it. `confirm` marks a fact planned as a confirmation of a
+ * near-match; `merge` and `supersede` are the write the decision asked for.
  */
 interface PlannedFact {
     confirm?: { base: string; memoryId: Id<"memories"> };
@@ -82,7 +82,7 @@ interface PlannedFact {
 /**
  * Saves the facts through the same dedup and belief revision as extraction: a fact
  * already remembered is confirmed, not repeated, so importing the same list twice adds nothing.
- * Every count is taken from what the write applied, never from what the planning expected.
+ * Every count is taken from what the one write applied, never from what the planning expected.
  */
 export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts: ReadonlyArray<ImportedFact>; userId: string }): Promise<ImportResult> => {
     await requireMemoryEnabled(ctx, args.userId);
@@ -102,33 +102,62 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
         facts.map((fact) => fact.memory),
         "[memory/import]",
     );
-    // Facts without a vector (no embedding, or past the vector budget) are matched by words, so they read the wide window.
-    const embedded = embeddings.filter((embedding) => embedding !== null).length;
-    const wide = embedded < facts.length || facts.length > IMPORT_MAX_VECTOR_LOOKUPS;
-    const existing: DedupMemory[] = await ctx.runQuery(internal.memory.functions.getActiveMemoriesForUser, {
-        limit: wide ? IMPORT_WIDE_WINDOW_ROWS : IMPORT_DEDUP_WINDOW,
-        userId: args.userId,
-    });
     const words: WordSetCache = new Map();
     let model: Awaited<ReturnType<typeof getUtilityModelForUser>> | undefined;
     // Set once the user has no allowed utility model: the rest of the save does not ask again.
     let modelUnavailable = false;
 
-    // Every write is planned here and applied by one mutation, which re-checks the setting first.
-    const planned: PlannedFact[] = [];
+    // The working set is the near-match window. It is widened once, the first time a fact has to be matched by words
+    // (no vector, or past the vector budget), so an import that every fact can match by vector never reads the wide window.
+    let existing: DedupMemory[] = await ctx.runQuery(internal.memory.functions.getActiveMemoriesForUser, {
+        limit: IMPORT_DEDUP_WINDOW,
+        userId: args.userId,
+    });
+    let widened = false;
+
+    // Rows of this save as they now read: merged text for a reword, gone once superseded. Kept across a widen.
+    const rewordedText = new Map<string, string>();
     // Rows a fact of this save superseded: still active until the save, but no longer a match.
     const retired = new Set<string>();
     // Rows a fact of this save reworded: their stored vector is of the old text, so a later fact is compared by words.
     const reworded = new Set<string>();
 
+    const widen = async () => {
+        if (widened) {
+            return;
+        }
+
+        widened = true;
+
+        const fetched: DedupMemory[] = await ctx.runQuery(internal.memory.functions.getActiveMemoriesForUser, {
+            limit: IMPORT_WIDE_WINDOW_ROWS,
+            userId: args.userId,
+        });
+        const fetchedIds = new Set(fetched.map((row) => row._id));
+        // Rows already read past the window by a vector hit stay in the working set.
+        const carried = existing.filter((row) => !fetchedIds.has(row._id));
+
+        existing = [...fetched, ...carried]
+            .filter((row) => !retired.has(row._id))
+            .map((row) => (rewordedText.has(row._id) ? { ...row, memory: rewordedText.get(row._id) ?? row.memory } : row));
+    };
+
+    const planned: PlannedFact[] = [];
     let revisions = 0;
     let lookups = 0;
 
     for (const [index, fact] of facts.entries()) {
         const embedding = embeddings[index] ?? null;
+        // A fact is matched by vector while the budget lasts; otherwise, and when it has no vector, by words over the wide window.
+        const vectorAllowed = embedding !== null && lookups < IMPORT_MAX_VECTOR_LOOKUPS;
+
+        if (!vectorAllowed) {
+            await widen();
+        }
+
         let byVector: Awaited<ReturnType<typeof findSimilarMemoryByVector>> = null;
 
-        if (embedding && lookups < IMPORT_MAX_VECTOR_LOOKUPS) {
+        if (embedding && vectorAllowed) {
             lookups += 1;
             byVector = await findSimilarMemoryByVector(ctx, { botId: undefined, embedding, existing, retired, userId: args.userId }).catch((error: unknown) => {
                 console.warn("[memory/import] Vector dedup failed, deduping by text:", error);
@@ -185,6 +214,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
             });
 
             reworded.add(similar.id);
+            rewordedText.set(similar.id, memory);
 
             if (match) {
                 match.memory = memory;
@@ -202,53 +232,37 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
         }
     }
 
-    const { retry } = await applyPlanned(ctx, args, planned, result);
-
-    if (retry.length > 0) {
-        // A confirmation whose row was edited while the save ran: its fact is not dropped, it is saved as new.
-        await applyPlanned(ctx, args, retry, result);
-    }
-
-    return result;
-};
-
-/**
- * Applies one plan in one mutation, counts its outcomes and stores the vectors of the rows it added. A confirmation the
- * mutation could not apply comes back as `retry`: the caller saves those facts as new.
- */
-const applyPlanned = async (
-    ctx: ActionCtx,
-    args: { app: ImportApp; userId: string },
-    planned: PlannedFact[],
-    result: ImportResult,
-): Promise<{ retry: PlannedFact[] }> => {
-    const confirmsOf = planned.filter((plan) => plan.confirm);
+    const confirms = planned.flatMap((plan) => (plan.confirm ? [{ confirm: plan.confirm, plan }] : []));
     const writes = planned.filter((plan) => !plan.confirm);
 
-    if (writes.length === 0 && confirmsOf.length === 0) {
-        return { retry: [] };
+    if (writes.length === 0 && confirms.length === 0) {
+        return result;
     }
 
+    // One write for the whole save: a confirmation that cannot apply is inserted by it, so no half-applied save is left behind.
     const outcome = await ctx.runMutation(internal.memory.functions.saveImportedMemoryBatch, {
         app: args.app,
-        confirms: confirmsOf.map((plan) => plan.confirm!),
+        confirms: confirms.map(({ confirm, plan }) => {
+            return { base: confirm.base, memory: plan.fact.memory, memoryId: confirm.memoryId, type: plan.fact.type };
+        }),
         facts: writes.map(({ fact, merge, supersede }) => {
             return { memory: fact.memory, merge, supersede, type: fact.type };
         }),
         userId: args.userId,
     });
 
-    const retry: PlannedFact[] = [];
+    const applied = [
+        ...outcome.confirms.map((status, index) => {
+            return { outcome: status, plan: confirms[index]!.plan };
+        }),
+        ...outcome.facts.map((status, index) => {
+            return { outcome: status, plan: writes[index]! };
+        }),
+    ];
 
-    for (const [index, status] of outcome.confirms.entries()) {
-        if (status === "known") {
-            result.alreadyKnown += 1;
-        } else {
-            retry.push({ embedding: confirmsOf[index]!.embedding, fact: confirmsOf[index]!.fact });
-        }
-    }
-
-    for (const { status } of outcome.facts) {
+    for (const {
+        outcome: { status },
+    } of applied) {
         if (status === "added") {
             result.added += 1;
         } else if (status === "updated") {
@@ -262,13 +276,13 @@ const applyPlanned = async (
     await saveMemoryVectors(
         ctx,
         args.userId,
-        outcome.facts.map(({ memoryId, status }, index) => {
-            return { memoryId: status === "added" ? memoryId : null, text: writes[index]?.fact.memory ?? "", vector: writes[index]?.embedding ?? null };
+        applied.map(({ outcome: { memoryId, status }, plan }) => {
+            return { memoryId: status === "added" ? memoryId : null, text: plan.fact.memory, vector: plan.embedding };
         }),
         "[memory/import]",
     );
 
-    return { retry };
+    return result;
 };
 
 /**

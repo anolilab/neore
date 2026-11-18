@@ -882,7 +882,7 @@ describe("linking a vector to its memory", () => {
                 }),
         );
 
-        expect(unlinked).toStrictEqual([String(embeddingId)]);
+        expect(unlinked).toStrictEqual({ rejected: [String(embeddingId)], replaced: [] });
 
         const unlinkedRow = await rowOf(memoryId);
 
@@ -899,5 +899,102 @@ describe("linking a vector to its memory", () => {
         const linkedRow = await rowOf(memoryId);
 
         expect(linkedRow?.embeddingId).toBe(String(embeddingId));
+    });
+});
+
+describe("import writes in one batch", () => {
+    it("keeps a row a merge confirmed as a twin when a later fact in the same save would supersede it", async () => {
+        expect.assertions(4);
+
+        await setMemoryEnabled(true);
+
+        const [nurse, cycling] = await harness.run(async (ctx: any) => [
+            await ctx.db.insert("memories", {
+                memory: "The user is a nurse in the city hospital on the night shift every week",
+                type: "identity",
+                userId: USER,
+            }),
+            await ctx.db.insert("memories", { memory: "The user enjoys cycling along the river every morning", type: "context", userId: USER }),
+        ]);
+
+        generateText
+            .mockResolvedValueOnce({ output: { action: "SUPERSEDE" } })
+            .mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: "The user enjoys cycling along the river every morning" } });
+
+        const result = await save([
+            { memory: "The user enjoys cycling along the river every morning daily", type: "context" },
+            { memory: "The user is a nurse in the city hospital on the night shift every weekend", type: "identity" },
+        ]);
+        const rows = await memories();
+
+        expect(result).toStrictEqual({ added: 1, alreadyKnown: 1, updated: 0 });
+        const cyclingRow = await rowOf(cycling);
+
+        expect(cyclingRow?.memory).toBe("The user enjoys cycling along the river every morning");
+        expect(rows.find((row: { _id: string }) => row._id === cycling)?.supersededBy).toBeUndefined();
+        const nurseRow = await rowOf(nurse);
+
+        expect(nurseRow?.memory).toBe("The user is a nurse in the city hospital on the night shift every week");
+    });
+
+    it("confirms a row an earlier merge of the same paste reworded, instead of saving a copy of its old text", async () => {
+        expect.assertions(4);
+
+        await setMemoryEnabled(true);
+
+        const berlin = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("memories", {
+                    memory: "The user lives in Berlin near the river with a garden and bikes",
+                    type: "context",
+                    userId: USER,
+                }),
+        );
+
+        generateText.mockResolvedValueOnce({
+            output: { action: "UPDATE", mergedMemory: "The user lives in Berlin near the river with a garden and bikes daily" },
+        });
+
+        const result = await save([
+            { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context" },
+            { memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" },
+        ]);
+        const rows = await memories();
+
+        expect(result).toStrictEqual({ added: 0, alreadyKnown: 1, updated: 1 });
+        expect(rows).toHaveLength(1);
+        const berlinRow = await rowOf(berlin);
+
+        expect(berlinRow?.memory).toBe("The user lives in Berlin near the river with a garden and bikes daily");
+        expect(berlinRow?.lastConfirmedAt).toBeTypeOf("number");
+    });
+});
+
+describe("linking a vector replaces the row's old one", () => {
+    it("reports the vector a linked row lets go of, so it can be deleted", async () => {
+        expect.assertions(1);
+
+        const [memoryId, oldEmbedding, newEmbedding] = await harness.run(async (ctx: any) => {
+            const oldId = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: vectorOf("item 1") });
+            const memory = await ctx.db.insert("memories", {
+                embeddingId: String(oldId),
+                memory: "The user now reads the new text",
+                type: "context",
+                userId: USER,
+            });
+            const newId = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: vectorOf("item 2") });
+
+            return [memory, String(oldId), String(newId)];
+        });
+
+        expect(
+            await harness.action(
+                async (ctx: any) =>
+                    await ctx.runMutation(internal.memory.functions.linkMemoryEmbeddings, {
+                        links: [{ embeddingId: newEmbedding, memoryId, text: "The user now reads the new text" }],
+                        userId: USER,
+                    }),
+            ),
+        ).toStrictEqual({ rejected: [], replaced: [oldEmbedding] });
     });
 });

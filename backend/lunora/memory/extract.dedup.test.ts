@@ -202,4 +202,43 @@ describe("extraction vector dedup", () => {
 
         expect(harness.scheduler.list().map((job) => job.args)).toContainEqual({ memoryId: rowId, userId: USER });
     });
+
+    it("revises a row once per run, comparing a second fact to the text the first revision wrote", async () => {
+        expect.assertions(2);
+
+        const rowId = await harness.run(async (ctx: any) => {
+            const vector = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: VECTOR });
+
+            searchVectors.mockResolvedValue([{ _id: vector, _score: 0.9 }]);
+
+            return await ctx.db.insert("memories", { embeddingId: vector, memory: "The user owns a blue vase", type: "activity", userId: USER });
+        });
+
+        generateText
+            .mockResolvedValueOnce({
+                output: {
+                    facts: [
+                        { confidence: 90, importance: 80, memory: "The user owns a blue vase from Lisbon", type: "activity" },
+                        { confidence: 90, importance: 80, memory: "The user owns a blue vase from Lisbon today", type: "activity" },
+                    ],
+                },
+            })
+            .mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: "The user owns a blue vase from Lisbon" } })
+            .mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: "The user owns a blue vase from Lisbon today" } });
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "A lovely vase.",
+                    threadId,
+                    userId: USER,
+                    userMessage: "I bought a blue vase in Lisbon, please remember that about me",
+                }),
+        );
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("memories").collect());
+
+        expect(rows).toHaveLength(1);
+        expect(rows.find((row: { _id: string }) => row._id === rowId)?.memory).toBe("The user owns a blue vase from Lisbon today");
+    });
 });

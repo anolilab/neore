@@ -401,6 +401,9 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
 
         // Existing memories the conversation restated — reconfirmed, not duplicated.
         const memoriesToConfirm: Id<"memories">[] = [];
+        // Rows this run has planned a revision for: their stored vector is of the old text, so a later fact compares by words,
+        // and against their revised text.
+        const revisedIds = new Set<Id<"memories">>();
 
         for (const [i, extractedFact] of extractedFacts.entries()) {
             const fact = extractedFact!;
@@ -426,6 +429,10 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                 } catch (error) {
                     console.warn("[memory/extract] Vector dedup search failed, falling back to Jaccard:", error);
                 }
+            }
+
+            if (similarMemory && revisedIds.has(similarMemory.id)) {
+                similarMemory = null;
             }
 
             if (!similarMemory) {
@@ -513,6 +520,14 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                     }
                     case "UPDATE": {
                         if (revision.mergedMemory) {
+                            // The row now reads as the merged text for the rest of this run, so a later fact is revised against it.
+                            const working = existingMemories.find((row) => row._id === similarMemory.id);
+
+                            if (working) {
+                                working.memory = revision.mergedMemory;
+                            }
+
+                            revisedIds.add(similarMemory.id);
                             memoriesToUpdate.push({
                                 base: similarMemory.memory,
                                 botId: args.botId,
@@ -563,32 +578,30 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             );
         }
 
-        // 7. Apply revisions to existing memories. Each applies only while its row still reads as the decided text; otherwise the
-        // fact is saved as new, below.
-        const reworded = new Set<Id<"memories">>();
+        // 7. Apply revisions to existing memories. Each applies only while its row still reads as the decided text; a revision
+        // that cannot apply, or fails, saves its fact as new below.
         const unapplied: (typeof memoriesToUpdate)[number][] = [];
 
         for (const update of memoriesToUpdate) {
-            const applied = await ctx.runMutation(internal.memory.functions.reviseExtractedMemory, {
-                base: update.base,
-                botId: update.botId,
-                confidence: update.confidence,
-                lastConfirmedAt: now,
-                memory: update.memory,
-                memoryId: update.memoryId,
-                userId: args.userId,
-            });
+            let applied = false;
 
-            if (applied) {
-                reworded.add(update.memoryId);
-            } else {
+            try {
+                applied = await ctx.runMutation(internal.memory.functions.reviseExtractedMemory, {
+                    base: update.base,
+                    botId: update.botId,
+                    confidence: update.confidence,
+                    lastConfirmedAt: now,
+                    memory: update.memory,
+                    memoryId: update.memoryId,
+                    userId: args.userId,
+                });
+            } catch (error) {
+                console.error("[memory/extract] Revision failed, saving as new:", error);
+            }
+
+            if (!applied) {
                 unapplied.push(update);
             }
-        }
-
-        // A reworded row's vector is of its old text: a new one is computed for the new text.
-        for (const memoryId of reworded) {
-            await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId, userId: args.userId });
         }
 
         if (unapplied.length > 0) {
