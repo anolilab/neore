@@ -51,11 +51,6 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
                   skip-playwright: "true"
-            - name: "Generate the Lunora backend code"
-              env:
-                  NODE_OPTIONS: "--max-old-space-size=4096"
-              run: "pnpm --filter @neore/backend run codegen"
-
             # services/document-parser is a Rust Worker: its tests need rustc +
             # wasm32 + worker-build, built once up front as `test.yml` does.
             - name: "Setup Rust Worker toolchain"
@@ -68,6 +63,10 @@ jobs:
             - name: "Build packages"
               shell: "bash"
               run: "pnpm run build:packages"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # Not the `affected` variant: this measures the whole tree.
             - name: "Run all tests with coverage"

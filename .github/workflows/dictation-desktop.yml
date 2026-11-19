@@ -126,11 +126,6 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
-            - name: "Generate the Lunora backend code"
-              env:
-                  NODE_OPTIONS: "--max-old-space-size=4096"
-              run: "pnpm --filter @neore/backend run codegen"
-
             # An x64 Node on an ARM runner (it runs under emulation) would build and measure the wrong helper and say nothing.
             - name: "Check that Node runs natively"
               shell: "bash"
@@ -257,6 +252,10 @@ jobs:
             - name: "Build the shared capability rules"
               if: "always()"
               run: "pnpm --filter @neore/ai run build"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # Not tied to the helper: these use a stand-in, and must run (and pass) wherever the helper could not be built.
             - name: "Unit and integration tests"

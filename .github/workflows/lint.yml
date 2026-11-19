@@ -242,17 +242,16 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
                   skip-playwright: "true"
-            - name: "Generate the Lunora backend code"
-              env:
-                  NODE_OPTIONS: "--max-old-space-size=4096"
-              run: "pnpm --filter @neore/backend run codegen"
-
             # Typed rules read the packages' emitted declarations. `build:packages` builds the
             # `type:package` projects (`ai`, `service-sdk`), which need neither the Rust toolchain
             # nor libdbus: those stay with the type check, which builds the native module.
             - name: "Build packages"
               shell: "bash"
               run: "pnpm run build:packages"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "ESLint"
               shell: "bash"

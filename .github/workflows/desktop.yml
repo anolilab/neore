@@ -173,10 +173,6 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
-            - name: "Generate the Lunora backend code"
-              env:
-                  NODE_OPTIONS: "--max-old-space-size=4096"
-              run: "pnpm --filter @neore/backend run codegen"
 
             # The device-execution addon (`packages/device-core-node`, Rust via napi) is
             # loaded by the shell at runtime. Without it the installer ships with the

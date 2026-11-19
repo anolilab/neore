@@ -108,14 +108,13 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
                   skip-playwright: "true"
+            - name: "Build the workspace packages"
+              shell: "bash"
+              run: "pnpm run build:packages"
             - name: "Generate the Lunora backend code"
               env:
                   NODE_OPTIONS: "--max-old-space-size=4096"
               run: "pnpm --filter @neore/backend run codegen"
-
-            - name: "Build the workspace packages"
-              shell: "bash"
-              run: "pnpm run build:packages"
 
             - name: "Build Storybook"
               shell: "bash"

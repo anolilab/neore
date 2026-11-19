@@ -39,13 +39,12 @@ jobs:
                   enable-nx-cache: "false"
                   node-version: "24.22.1"
                   npm-version: "11"
+            - name: "Build workspace packages"
+              run: "pnpm run build:packages"
             - name: "Generate the Lunora backend code"
               env:
                   NODE_OPTIONS: "--max-old-space-size=4096"
               run: "pnpm --filter @neore/backend run codegen"
-
-            - name: "Build workspace packages"
-              run: "pnpm run build:packages"
 
             - name: "Measure the thread snapshot (backend)"
               env:
