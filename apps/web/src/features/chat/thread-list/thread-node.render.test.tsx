@@ -17,6 +17,15 @@ const linkedPullRequests = vi.hoisted(() => {
     return { count: 0 };
 });
 
+// The options menu reads the follow state; these tests are about the row, not the follow items.
+vi.mock("../follows/use-thread-follow", () => {
+    return {
+        useThreadFollow: () => {
+            return { isPending: false, setState: () => {}, state: undefined };
+        },
+    };
+});
+
 vi.mock("@lingui/core/macro", () => {
     return { msg: (strings: TemplateStringsArray) => strings[0] };
 });
