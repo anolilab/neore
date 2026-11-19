@@ -25587,6 +25587,10 @@ msgstr "Press keys..."
 msgid "Press Shift+Enter to send"
 msgstr "Press Shift+Enter to send"
 
+#: src/features/settings/components/account/account-settings.tsx:227
+msgid "Press Ctrl/Cmd+Enter to send"
+msgstr "Press Ctrl/Cmd+Enter to send"
+
 #: src/features/chat/thread/widgets/stock-widget.tsx:166
 msgid "Prev Close"
 msgstr "Prev Close"
