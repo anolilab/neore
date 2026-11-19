@@ -471,8 +471,8 @@ export const removeThreadAccess = authMutation
         });
 
         // A person who leaves the thread loses their follow row. The admin's view cannot read another person's row (owner-only
-        // RLS), so the trusted internal mutation deletes it. Before the grant: the two writes commit separately, and a failed
-        // cleanup must leave the grant in place so the removal can be retried, never a removed member with a follow row.
+        // RLS), so the trusted internal mutation deletes it. Before the grant: the writes commit separately, and a failed
+        // cleanup must leave the grant in place so the removal can be retried.
         await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
 
         if (access) {
@@ -480,6 +480,10 @@ export const removeThreadAccess = authMutation
                 accessId: access._id,
             });
         }
+
+        // Again once the grant is gone: a change the member made between the two writes wrote a row back, and with no grant
+        // `setThreadFollow`'s primary check now refuses any further one.
+        await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
 
         context.log.event("chat.remove_thread_access", { removed: Boolean(access) });
     });

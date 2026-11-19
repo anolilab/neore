@@ -368,4 +368,10 @@ describe("sharing writes the follow rows first", () => {
 
         expect(body.indexOf("deleteFollowRowOfRemovedMember")).toBeLessThan(body.indexOf("internal.agent.sharing.deleteThreadAccess"));
     });
+
+    it("deletes the follow row again once the grant is gone, so a change made in between does not survive", () => {
+        const body = between("export const removeThreadAccess", "export const toggleThreadVisibility");
+
+        expect(body.lastIndexOf("deleteFollowRowOfRemovedMember")).toBeGreaterThan(body.indexOf("internal.agent.sharing.deleteThreadAccess"));
+    });
 });
