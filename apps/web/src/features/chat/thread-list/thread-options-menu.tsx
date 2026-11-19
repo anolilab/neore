@@ -95,14 +95,21 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                             {t`Regenerate title`}
                         </DropdownMenuItem>
                     )}
+                    {/* Disabled while a change is in flight: a second choice made then could reach the server first. */}
                     {!isLocked && follow.state !== undefined && follow.state !== "on" && (
-                        <DropdownMenuItem onClick={() => follow.setState("on")}>{t`Follow thread`}</DropdownMenuItem>
+                        <DropdownMenuItem disabled={follow.isPending} onClick={() => follow.setState("on")}>
+                            {t`Follow thread`}
+                        </DropdownMenuItem>
                     )}
                     {!isLocked && follow.state !== undefined && follow.state !== "off" && (
-                        <DropdownMenuItem onClick={() => follow.setState("off")}>{t`Unfollow thread`}</DropdownMenuItem>
+                        <DropdownMenuItem disabled={follow.isPending} onClick={() => follow.setState("off")}>
+                            {t`Unfollow thread`}
+                        </DropdownMenuItem>
                     )}
                     {!isLocked && follow.state !== undefined && follow.state !== "muted" && (
-                        <DropdownMenuItem onClick={() => follow.setState("muted")}>{t`Mute thread`}</DropdownMenuItem>
+                        <DropdownMenuItem disabled={follow.isPending} onClick={() => follow.setState("muted")}>
+                            {t`Mute thread`}
+                        </DropdownMenuItem>
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>

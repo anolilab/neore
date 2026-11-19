@@ -41,6 +41,7 @@ vi.mock("@/lib/toast", () => {
 
 const follow = vi.hoisted(() => {
     return {
+        isPending: false,
         setState: vi.fn(),
         state: "off" as "on" | "off" | "muted" | undefined,
     };
@@ -49,7 +50,7 @@ const follow = vi.hoisted(() => {
 vi.mock("../follows/use-thread-follow", () => {
     return {
         useThreadFollow: () => {
-            return { isPending: false, setState: follow.setState, state: follow.state };
+            return { isPending: follow.isPending, setState: follow.setState, state: follow.state };
         },
     };
 });
@@ -124,6 +125,7 @@ describe("ThreadOptionsMenu", () => {
 
     describe("follow items", () => {
         beforeEach(() => {
+            follow.isPending = false;
             follow.setState.mockReset();
         });
 
@@ -160,6 +162,15 @@ describe("ThreadOptionsMenu", () => {
 
             expect(screen.queryByRole("menuitem", { name: "Follow thread" })).toBeNull();
             expect(screen.queryByRole("menuitem", { name: "Mute thread" })).toBeNull();
+        });
+
+        it("disables the follow items while a change is in flight", () => {
+            follow.state = "off";
+            follow.isPending = true;
+            renderMenu();
+
+            expect(screen.getByRole("menuitem", { name: "Follow thread" }).getAttribute("aria-disabled")).toBe("true");
+            expect(screen.getByRole("menuitem", { name: "Mute thread" }).getAttribute("aria-disabled")).toBe("true");
         });
 
         it("sets the chosen state when an item is clicked", () => {

@@ -21,6 +21,8 @@ export const useThreadFollow = (threadId: string | null) => {
     );
     const { isPending, mutate } = useMutation({
         ...crpc.chat.follows.functions.setThreadFollow.mutationOptions(),
+        // One change at a time per thread, across every menu that shows it, so they reach the server in the order chosen.
+        scope: threadId ? { id: `thread-follow:${threadId}` } : undefined,
         onError: (error: Error) => {
             console.error("Failed to change the thread follow state:", error);
             showError(error);

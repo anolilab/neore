@@ -8,7 +8,14 @@ import { useThreadFollow } from "./use-thread-follow";
 type State = "on" | "off" | "muted";
 
 const server = vi.hoisted(() => {
-    return { fetches: 0, queryOptionsCalls: [] as unknown[][], state: "off" as State };
+    return {
+        fetches: 0,
+        // Each write waits on its own gate when set, so a test can hold one in flight.
+        gates: [] as Promise<void>[],
+        queryOptionsCalls: [] as unknown[][],
+        started: [] as State[],
+        state: "off" as State,
+    };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {
@@ -39,6 +46,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                                 mutationOptions: () => {
                                     return {
                                         mutationFn: async ({ state }: { state: State }) => {
+                                            server.started.push(state);
+                                            await server.gates[server.started.length - 1];
                                             server.state = state;
 
                                             return null;
@@ -63,7 +72,9 @@ const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider 
 describe("useThreadFollow", () => {
     beforeEach(() => {
         server.fetches = 0;
+        server.gates = [];
         server.queryOptionsCalls = [];
+        server.started = [];
         server.state = "off";
     });
 
@@ -86,5 +97,34 @@ describe("useThreadFollow", () => {
 
         await waitFor(() => expect(result.current.state).toBe("muted"));
         expect(server.fetches).toBe(2);
+    });
+
+    it("sends a second change only after the first one finished, so they reach the server in order", async () => {
+        let releaseFirst: () => void = () => {};
+
+        server.gates = [
+            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the web lib target has no Promise.withResolvers
+            new Promise<void>((resolve) => {
+                releaseFirst = resolve;
+            }),
+        ];
+
+        const { result } = renderHook(() => useThreadFollow("t1"), { wrapper });
+
+        await waitFor(() => expect(result.current.state).toBe("off"));
+
+        act(() => {
+            result.current.setState("on");
+            result.current.setState("muted");
+        });
+
+        await waitFor(() => expect(server.started).toStrictEqual(["on"]));
+
+        act(() => {
+            releaseFirst();
+        });
+
+        await waitFor(() => expect(server.started).toStrictEqual(["on", "muted"]));
+        await waitFor(() => expect(server.state).toBe("muted"));
     });
 });
