@@ -142,6 +142,14 @@ describe("redactReflectionOps", () => {
         });
     });
 
+    it("keeps the date check of a patch whose wording was only a secret", () => {
+        const checkDates = { memory: { eventStart: "2026-11-20" } };
+
+        expect(redactReflectionOps([{ checkDates, kind: "patch", lastConfirmedAt: 1, memory: "password: hunter2", memoryId: "survivor" }], 500).ops).toEqual([
+            { checkDates, kind: "patch", lastConfirmedAt: 1, memoryId: "survivor" },
+        ]);
+    });
+
     it("drops a wording the cut leaves as nothing but a secret, and keeps the rows it would absorb", () => {
         const text = `password: hunter2, ${"1234 ".repeat(60)}, user likes green tea`;
 

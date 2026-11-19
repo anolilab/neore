@@ -159,9 +159,18 @@ export const redactReflectionOps = (
 
         lostWording.add(op.memoryId);
 
-        const { confidence, lastConfirmedAt, memoryId } = op;
+        const { checkDates, confidence, lastConfirmedAt, memoryId } = op;
 
-        return [{ kind: "patch", memoryId, ...(confidence !== undefined && { confidence }), ...(lastConfirmedAt !== undefined && { lastConfirmedAt }) }];
+        // The planned dates stay checked: a refresh planned on dates the row no longer holds is not written.
+        return [
+            {
+                kind: "patch",
+                memoryId,
+                ...(checkDates !== undefined && { checkDates }),
+                ...(confidence !== undefined && { confidence }),
+                ...(lastConfirmedAt !== undefined && { lastConfirmedAt }),
+            },
+        ];
     });
 
     return {

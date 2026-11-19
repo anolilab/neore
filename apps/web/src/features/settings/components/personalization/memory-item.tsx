@@ -102,8 +102,12 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
         const stored = datesOf(memory);
         const dates = Object.fromEntries(keys.map((key) => [key, datesAtEditStart[key] === draftDates[key] ? stored[key] : draftDates[key]])) as MemoryDates;
 
-        // Two edits to different ends can meet in an impossible range: keep the editor open rather than send it.
+        // Two edits to different ends can meet in an impossible range: the editor shows that range, with its error, rather
+        // than send it. The stored dates become the edit's start, so the next save compares against them.
         if (dates.eventEnd !== "" && (dates.eventStart === "" || dates.eventEnd < dates.eventStart)) {
+            setDraftDates(dates);
+            setDatesAtEditStart(stored);
+
             return;
         }
 

@@ -107,10 +107,12 @@ export const findSimilarMemoryByVector = async (
         embedding: number[];
         existing: ReadonlyArray<DedupMemory>;
         retired?: ReadonlySet<string>;
+        /** The day of `activeOn` is read in this timezone; without it, in the user's stored one. */
+        timeZone?: string;
         userId: string;
     },
 ): Promise<(SimilarMemoryResult & { row: DedupMemory }) | null> => {
-    const { activeOn, botId, embedding, existing, retired, userId } = options;
+    const { activeOn, botId, embedding, existing, retired, timeZone, userId } = options;
 
     if (embedding.length === 0) {
         return null;
@@ -128,7 +130,10 @@ export const findSimilarMemoryByVector = async (
     });
     const hits = results.filter((hit) => hit._score >= NEAR_MATCH_SCORE);
     const missing = hits.map((hit) => hit._id as string).filter((id) => existing.every((memory) => memory.embeddingId !== id));
-    const read = missing.length > 0 ? await ctx.runQuery(internal.memory.functions.getMemoriesByEmbeddingIds, { activeOn, embeddingIds: missing, userId }) : [];
+    const read =
+        missing.length > 0
+            ? await ctx.runQuery(internal.memory.functions.getMemoriesByEmbeddingIds, { activeOn, embeddingIds: missing, timeZone, userId })
+            : [];
 
     for (const hit of hits) {
         let row: DedupMemory | undefined = existing.find((memory) => memory.embeddingId === hit._id);

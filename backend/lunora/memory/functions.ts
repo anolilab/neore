@@ -1020,7 +1020,8 @@ export const updateMemoryInternal = internalMutation
                 memory: textChanged ? text : undefined,
                 updatedAt: ctx.now,
             }),
-            ...(args.dates && dateColumns(args.dates)),
+            // Cleaned as an extractor's dates are: no malformed day, no end without a start or before it.
+            ...(args.dates && dateColumns(normalizeFactDates(args.dates))),
         });
 
         // The old vector encodes the old wording: replace it, so search never finds a row by text it no longer holds.
@@ -1071,11 +1072,13 @@ export const getActiveMemoriesForUser = internalQuery
         botId: v.optional(v.string()),
         includeUserWide: v.optional(v.boolean()),
         limit: v.optional(v.number()),
+        /** The day of `activeOn` is read in this timezone; without it, in the user's stored one. */
+        timeZone: v.optional(v.string()),
         userId: v.string(),
     })
     .query(async ({ args, ctx }) => {
         const limit = args.limit ?? 50;
-        const today = args.activeOn === undefined ? undefined : localDayOf(args.activeOn, await userTimeZone(ctx, args.userId));
+        const today = args.activeOn === undefined ? undefined : localDayOf(args.activeOn, args.timeZone ?? (await userTimeZone(ctx, args.userId)));
 
         // Each scope is read through its own index, so one scope's rows never use up
         // another's window. A null `botId` is the user's own memories.
@@ -1175,10 +1178,11 @@ export const getMemoriesByEmbeddingIds = internalQuery
         /** As in `getActiveMemoriesForUser`: an unpinned fact past its end date on that day is left out. */
         activeOn: v.optional(v.number()),
         embeddingIds: v.array(v.string()),
+        timeZone: v.optional(v.string()),
         userId: v.string(),
     })
     .query(async ({ args, ctx }) => {
-        const today = args.activeOn === undefined ? undefined : localDayOf(args.activeOn, await userTimeZone(ctx, args.userId));
+        const today = args.activeOn === undefined ? undefined : localDayOf(args.activeOn, args.timeZone ?? (await userTimeZone(ctx, args.userId)));
         const settled = await Promise.all(
             args.embeddingIds.map(async (embeddingId) => {
                 const memory = await ctx.db

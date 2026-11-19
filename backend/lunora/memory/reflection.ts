@@ -67,7 +67,7 @@ import {
     splitExpired,
 } from "./reflection-logic";
 import { logRedaction, redactDigestSummary, redactMemoryText, redactReflectionOps } from "./redact";
-import { factDatesOf, isExpired, normalizeFactDates, sameFactDates } from "./dates";
+import { factDatesOf, hasFactDates, isExpired, normalizeFactDates, sameFactDates } from "./dates";
 import { lastConfirmedOf } from "./taxonomy";
 import { MAX_LENGTH } from "../lib/validators";
 
@@ -241,6 +241,8 @@ const vReflectionRow = v.object({
  */
 const EXPIRY_PAGE_ROWS = 250;
 const EXPIRY_READ_PAGES = 40;
+/** Expiry retirements per write, so a scope with many expired rows never needs one oversized transaction. */
+const EXPIRY_WRITE_BATCH = 250;
 
 const toReflectionRow = (m: Doc<"memories">) => {
     return {
@@ -428,8 +430,10 @@ export const applyReflectionOps = internalMutation
                     const sources = rows.filter((row): row is Doc<"memories"> => row !== null && row.pinned !== true);
                     // A promotion that is nothing but a secret is not made, and its sources stay.
                     const memory = redactMemoryText(op.memory);
+                    // Planned from undated activities: a source dated since is an occurrence, not a habit, so nothing is promoted.
+                    const datedSince = sources.some((row) => hasFactDates(factDatesOf(row)));
 
-                    if (sources.length === 0 || memory === null) {
+                    if (sources.length === 0 || memory === null || datedSince) {
                         promotedIds.push(null);
                         break;
                     }
@@ -593,7 +597,9 @@ const reflectScope = async (
     const byId = new Map(memories.map((m) => [m.id, m]));
     const plan = planReflection(memories, now);
     const learnedToday = memories.filter((m) => m.createdAt >= now - DAY_MS);
-    const ops: ReflectionOp[] = [...expiryToOps(expire, today), ...decayToOps(plan)];
+    // Retirements for expiry are written apart, in bounded batches: a scope can hold thousands of expired rows.
+    const expiryOps = expiryToOps(expire, today);
+    const ops: ReflectionOp[] = decayToOps(plan);
 
     // 1. One synthesis call: merge wording, promotion decisions, the digest.
     let synthesis: z.infer<typeof synthesisSchema> | undefined;
@@ -678,6 +684,20 @@ const reflectScope = async (
     const writeOps = redaction.ops;
 
     logRedaction(ctx.log, "reflection", redaction);
+    let expiryApplied = 0;
+    const expirySuperseded: string[] = [];
+
+    for (let start = 0; start < expiryOps.length; start += EXPIRY_WRITE_BATCH) {
+        const batch = await ctx.runMutation(internal.memory.reflection.applyReflectionOps, {
+            botId,
+            ops: expiryOps.slice(start, start + EXPIRY_WRITE_BATCH),
+            userId,
+        });
+
+        expiryApplied += batch.applied;
+        expirySuperseded.push(...batch.supersededIds);
+    }
+
     const result =
         writeOps.length > 0
             ? await ctx.runMutation(internal.memory.reflection.applyReflectionOps, { botId, ops: writeOps, userId })
@@ -685,7 +705,7 @@ const reflectScope = async (
 
     // 4. What the digest says about this scope, from what the write committed: a source pinned meanwhile stays active
     // and is still listed, and a row it reworded is listed with its new wording.
-    const superseded = new Set(result.supersededIds);
+    const superseded = new Set([...expirySuperseded, ...result.supersededIds]);
     const committed = new Map(result.written.map(({ memory, memoryId }) => [memoryId, memory]));
     const promoteOps = writeOps.filter((op): op is Extract<ReflectionOp, { kind: "promote" }> => op.kind === "promote");
     const learned = [
@@ -705,7 +725,7 @@ const reflectScope = async (
     ].slice(0, REFLECTION_LIMITS.maxDigestItems);
 
     return {
-        applied: result.applied,
+        applied: expiryApplied + result.applied,
         learned,
         stats: {
             // Counted from what is written: a revision whose wording was only a secret resolves nothing.
@@ -715,7 +735,7 @@ const reflectScope = async (
             newMemories: learnedToday.length,
             promoted: result.promotedIds.filter((id) => id !== null).length,
             // A retirement is a supersession of a row by itself (decay or expiry); count only those the write committed.
-            retired: writeOps.filter((op) => op.kind === "supersede" && op.byMemoryId === op.memoryId && superseded.has(op.memoryId)).length,
+            retired: [...expiryOps, ...writeOps].filter((op) => op.kind === "supersede" && op.byMemoryId === op.memoryId && superseded.has(op.memoryId)).length,
         },
         summary: redactDigestSummary(synthesis?.summary ?? "", REFLECTION_LIMITS.maxSummaryChars),
     };

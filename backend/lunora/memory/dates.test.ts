@@ -6,7 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { namesOnlyDays, normalizeFactDates, restatementOutcome, userFactDates } from "./dates";
+import { normalizeFactDates, restatementOutcome, userFactDates } from "./dates";
 import { describeToday } from "./extract";
 import { getActiveMemoriesForUser, updateMemoryInternal } from "./functions";
 
@@ -139,16 +139,6 @@ describe("retrieval drops expired facts", () => {
         expect(row).toMatchObject({ eventStart: "2026-11-28" });
         expect(row.eventEnd).toBeUndefined();
         expect(row.validUntil).toBeUndefined();
-    });
-});
-
-describe(namesOnlyDays, () => {
-    it("keeps a merged wording that names only the new days, and refuses one that names an old day", () => {
-        const dates = { validUntil: "2026-11-25" };
-
-        expect(namesOnlyDays("User is in Lisbon with their sister until 2026-11-25", dates)).toBe(true);
-        expect(namesOnlyDays("User is in Lisbon with their sister", dates)).toBe(true);
-        expect(namesOnlyDays("User is in Lisbon until 2026-11-20, now until 2026-11-25", dates)).toBe(false);
     });
 });
 

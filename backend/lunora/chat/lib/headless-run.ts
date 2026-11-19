@@ -539,6 +539,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                     ...(options.botId && { botId: options.botId }),
                     messageAt: promptAt,
                     threadId: threadId as Id<"threads">,
+                    ...(prefs.timezone && { timeZone: prefs.timezone }),
                     userId,
                     userMessage: prompt,
                 });

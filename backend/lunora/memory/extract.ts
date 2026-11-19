@@ -57,7 +57,6 @@ import {
     differentEventDays,
     type FactDates,
     factDatesOf,
-    namesOnlyDays,
     normalizeFactDates,
     restatedDates,
     restatementOutcome,
@@ -311,10 +310,13 @@ export const extractMemories = internalAction
         const messageAt = args.messageAt ?? Date.now();
         // The turn's last word: a fact past its end date by then is not matched.
         const lastSaidAt = args.steeredFrom !== undefined && args.steeredAt !== undefined ? Math.max(messageAt, args.steeredAt) : messageAt;
+        // The timezone the message was sent in: its dates and the expiry of the rows it is matched to are read in it.
+        const timeZone = args.timeZone ?? (await ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId: args.userId })) ?? undefined;
         const existingMemories = await ctx.runQuery(internal.memory.functions.getActiveMemoriesForUser, {
             activeOn: lastSaidAt,
             botId: args.botId,
             limit: 50,
+            timeZone,
             userId: args.userId,
         });
 
@@ -326,7 +328,6 @@ export const extractMemories = internalAction
         );
         // The dates each row was read with, before this run changes them: a revision checks them when it applies.
         const storedDates = new Map<string, FactDates>(existingMemories.map((m) => [m._id as string, factDatesOf(m)]));
-        const timeZone = args.timeZone ?? (await ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId: args.userId }));
         const today = describeToday(messageAt, timeZone);
 
         // 3. LLM extraction — truncate inputs to control cost
@@ -558,6 +559,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                         embedding: factEmbedding,
                         existing: candidates,
                         retired: decidedIds,
+                        timeZone,
                         userId: args.userId,
                     });
 
@@ -659,11 +661,8 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                             // The row's dates as this run read them, before this revision moves them: the revision is checked against these.
                             const observedDates = storedDates.get(similarMemory.id);
 
-                            // A revision that changes the dates keeps the merged wording, with the details it carries over, when every
-                            // day it names is one of the new dates. Otherwise it takes the newer statement's words, so the text never
-                            // names a day the columns lack.
-                            const revisedText =
-                                nextDates && !namesOnlyDays(mergedMemory, nextDates) ? (redactMemoryText(fact.memory) ?? mergedMemory) : mergedMemory;
+                            // A revision that changes the dates takes the newer statement's words, so the text never names a day the columns lack.
+                            const revisedText = nextDates ? (redactMemoryText(fact.memory) ?? mergedMemory) : mergedMemory;
 
                             if (nextDates) {
                                 matchable.set(similarMemory.id, { ...nextDates, pinned: current.pinned });
