@@ -583,6 +583,9 @@ export const saveMemory = internalMutation
 
 export const saveMemoryBatch = internalMutation
     .input({
+        // Compression: the rows the saved facts replace. Checked and retired in this same write, so a row given dates
+        // meanwhile (its text would be lost undated) stops the whole save, and nothing is written.
+        compressedFrom: v.optional(v.array(v.id("memories"))),
         memories: v.array(v.object({ ...vMemoryInsertFields, supersedesBase: v.optional(v.string()) })),
     })
     // One entry per memory, in order: `null` where the fact was nothing but a secret and was not saved.
@@ -590,6 +593,16 @@ export const saveMemoryBatch = internalMutation
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
         const memoryIds: (Id<"memories"> | null)[] = [];
+
+        if (args.compressedFrom !== undefined) {
+            const owner = args.memories[0]?.userId;
+            const originals = await Promise.all(args.compressedFrom.map((id) => ctx.db.get("memories", id)));
+            const stillCompressible = originals.every((row) => row && row.userId === owner && !row.supersededBy && !hasFactDates(factDatesOf(row)));
+
+            if (!stillCompressible) {
+                return args.memories.map(() => null);
+            }
+        }
 
         for (const { supersedesBase, ...mem } of args.memories) {
             // A supersession applies only while its target still reads as the text the decision was made on, in the same
@@ -607,6 +620,13 @@ export const saveMemoryBatch = internalMutation
                     : undefined;
 
             memoryIds.push(await insertMemory(ctx, { ...mem, supersedes }, now));
+        }
+
+        // The originals are retired by the same write, pointing at themselves as `markMemorySupersededByCompression` does.
+        const compressedFrom = args.compressedFrom ?? [];
+
+        for (const id of compressedFrom) {
+            await ctx.db.patch("memories", id, { supersededBy: id, updatedAt: now });
         }
 
         return memoryIds;

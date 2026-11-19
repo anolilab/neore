@@ -148,7 +148,14 @@ export type ReflectionOp =
           kind: "supersede";
           memoryId: string;
       }
-    | { confidence?: number; kind: "patch"; lastConfirmedAt?: number; memory?: string; memoryId: string }
+    | {
+          checkDates?: { memory: { eventEnd?: string; eventStart?: string; validUntil?: string } };
+          confidence?: number;
+          kind: "patch";
+          lastConfirmedAt?: number;
+          memory?: string;
+          memoryId: string;
+      }
     | { confidence: number; importance: number; kind: "promote"; memory: string; sourceIds: string[]; threadId?: string; type: MemoryType };
 
 // ============================================================================
@@ -509,38 +516,36 @@ export const revisionToOps = (
 ): ReflectionOp[] => {
     const older = memories.get(pair.olderId);
     const newer = memories.get(pair.newerId);
-    // The supersessions below are decided on the dates read now: applying one checks that both rows still hold them.
-    const supersede = (memoryId: string, byMemoryId: string): ReflectionOp => {
-        const row = memories.get(memoryId);
-        const by = memories.get(byMemoryId);
-
-        return {
-            byMemoryId,
-            kind: "supersede",
-            memoryId,
-            ...(row && by && { checkDates: { by: factDatesOf(by), memory: factDatesOf(row) } }),
-        };
-    };
 
     switch (decision.action) {
         case "IGNORE": {
             // The newer one said nothing new: the older one stands, reconfirmed. Unless their dates differ — the newer
             // statement decides the dates (`restatedDates`), so the newer row stands with its own text and dates.
             if (older && newer && !sameFactDates(older, newer)) {
-                return [{ kind: "patch", lastConfirmedAt: now, memoryId: pair.newerId }, supersede(pair.olderId, pair.newerId)];
+                return [{ kind: "patch", lastConfirmedAt: now, memoryId: pair.newerId }, supersedeChecked(pair.olderId, pair.newerId, memories)];
             }
 
-            return [supersede(pair.newerId, pair.olderId), { kind: "patch", lastConfirmedAt: now, memoryId: pair.olderId }];
+            return [supersedeChecked(pair.newerId, pair.olderId, memories), { kind: "patch", lastConfirmedAt: now, memoryId: pair.olderId }];
         }
         case "SUPERSEDE": {
-            return [supersede(pair.olderId, pair.newerId)];
+            return [supersedeChecked(pair.olderId, pair.newerId, memories)];
         }
         case "UPDATE": {
             // The newer row keeps its own dates: they are the newer statement's. A merged wording of two rows with other
             // dates could name the older one's day beside them, so it is taken only when the dates agree.
             const merged = !older || !newer || sameFactDates(older, newer) ? decision.mergedMemory?.trim() : undefined;
 
-            return [{ kind: "patch", lastConfirmedAt: now, memoryId: pair.newerId, ...(merged && { memory: merged }) }, supersede(pair.olderId, pair.newerId)];
+            // The wording is planned on the newer row's dates too: a wording written for dates the row no longer holds is not written.
+            return [
+                {
+                    checkDates: newer ? { memory: factDatesOf(newer) } : undefined,
+                    kind: "patch",
+                    lastConfirmedAt: now,
+                    memoryId: pair.newerId,
+                    ...(merged && { memory: merged }),
+                },
+                supersedeChecked(pair.olderId, pair.newerId, memories),
+            ];
         }
         default: {
             return [];
@@ -553,15 +558,35 @@ export const revisionToOps = (
  * the highest confidence in the cluster, and is reconfirmed; the rest point at it.
  * Its dates stay: every row of a cluster has the same ones (`clusterBySimilarity`).
  */
+/** A supersession planned on the dates both rows held then: applying it checks they still hold them. */
+const supersedeChecked = (memoryId: string, byMemoryId: string, memories: ReadonlyMap<string, ReflectionMemory>): ReflectionOp => {
+    const row = memories.get(memoryId);
+    const by = memories.get(byMemoryId);
+
+    return {
+        byMemoryId,
+        kind: "supersede",
+        memoryId,
+        ...(row && by && { checkDates: { by: factDatesOf(by), memory: factDatesOf(row) } }),
+    };
+};
+
 export const mergeToOps = (merge: MergeCandidate, memories: ReadonlyMap<string, ReflectionMemory>, now: number, mergedText?: string): ReflectionOp[] => {
     const confidence = Math.max(...[merge.survivorId, ...merge.absorbedIds].map((id) => memories.get(id)?.confidence ?? 0));
     const text = mergedText?.trim();
+    const survivor = memories.get(merge.survivorId);
 
+    // Each source is checked against the dates the merge was planned on: a source a person moved meanwhile is not merged away.
     return [
-        { confidence, kind: "patch", lastConfirmedAt: now, memoryId: merge.survivorId, ...(text && { memory: text }) },
-        ...merge.absorbedIds.map((memoryId): ReflectionOp => {
-            return { byMemoryId: merge.survivorId, kind: "supersede", memoryId };
-        }),
+        {
+            confidence,
+            kind: "patch",
+            lastConfirmedAt: now,
+            memoryId: merge.survivorId,
+            ...(text && { memory: text }),
+            ...(survivor && { checkDates: { memory: factDatesOf(survivor) } }),
+        },
+        ...merge.absorbedIds.map((memoryId) => supersedeChecked(memoryId, merge.survivorId, memories)),
     ];
 };
 

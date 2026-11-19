@@ -219,54 +219,86 @@ export const claimReflectionRun = internalMutation
 // Inputs and writes
 // ============================================================================
 
+const vReflectionRow = v.object({
+    confidence: v.number(),
+    createdAt: v.number(),
+    eventEnd: v.optional(v.string()),
+    eventStart: v.optional(v.string()),
+    id: v.string(),
+    importance: v.number(),
+    lastConfirmedAt: v.number(),
+    pinned: v.boolean(),
+    text: v.string(),
+    threadId: v.optional(v.string()),
+    type: vReflectionMemoryType,
+    updatedAt: v.number(),
+    validUntil: v.optional(v.string()),
+});
+
+/** Expiry reads at most this many active rows of a scope: pages of `EXPIRY_PAGE_ROWS`, `EXPIRY_READ_PAGES` of them. */
+const EXPIRY_PAGE_ROWS = 250;
+const EXPIRY_READ_PAGES = 40;
+
+const toReflectionRow = (m: Doc<"memories">) => {
+    return {
+        confidence: m.confidence ?? 70,
+        createdAt: m._creationTime,
+        id: m._id as string,
+        importance: m.importance ?? 50,
+        lastConfirmedAt: lastConfirmedOf(m),
+        pinned: m.pinned === true,
+        text: m.memory,
+        type: m.type,
+        updatedAt: m.updatedAt ?? m._creationTime,
+        ...(m.threadId && { threadId: m.threadId as string }),
+        ...factDatesOf(m),
+    };
+};
+
 export const loadReflectionInputs = internalQuery
-    .input({ botId: v.optional(v.string()), now: v.number(), userId: v.string() })
+    .input({ botId: v.optional(v.string()), now: v.number(), timeZone: v.optional(v.string()), userId: v.string() })
     .output(
         v.object({
-            memories: v.array(
-                v.object({
-                    confidence: v.number(),
-                    createdAt: v.number(),
-                    eventEnd: v.optional(v.string()),
-                    eventStart: v.optional(v.string()),
-                    id: v.string(),
-                    importance: v.number(),
-                    lastConfirmedAt: v.number(),
-                    pinned: v.boolean(),
-                    text: v.string(),
-                    threadId: v.optional(v.string()),
-                    type: vReflectionMemoryType,
-                    updatedAt: v.number(),
-                    validUntil: v.optional(v.string()),
-                }),
-            ),
+            expired: v.array(vReflectionRow),
+            memories: v.array(vReflectionRow),
             threadTitles: v.array(v.string()),
         }),
     )
-    .query(async ({ args: { botId, now, userId }, ctx }) => {
+    .query(async ({ args: { botId, now, timeZone, userId }, ctx }) => {
         // One scope per call: the user's own memories (no bot), or one bot's. Merging, decay and
         // promotion never cross a scope, so one bot's memory never merges into another's or the user's.
+        const scopeBot = (botId ?? null) as Id<"bots"> | null;
         const rows = await ctx.db
             .query("memories")
-            .withIndex("by_userId_botId", (q) => q.eq("userId", userId).eq("botId", (botId ?? null) as Id<"bots"> | null))
+            .withIndex("by_userId_botId", (q) => q.eq("userId", userId).eq("botId", scopeBot))
             .take(REFLECTION_READ_CAP);
-        const memories = rows
-            .filter((m) => !m.supersededBy)
-            .map((m) => {
-                return {
-                    confidence: m.confidence ?? 70,
-                    createdAt: m._creationTime,
-                    id: m._id as string,
-                    importance: m.importance ?? 50,
-                    lastConfirmedAt: lastConfirmedOf(m),
-                    pinned: m.pinned === true,
-                    text: m.memory,
-                    type: m.type,
-                    updatedAt: m.updatedAt ?? m._creationTime,
-                    ...(m.threadId && { threadId: m.threadId as string }),
-                    ...factDatesOf(m),
-                };
-            });
+        const memories = rows.filter((m) => !m.supersededBy).map((m) => toReflectionRow(m));
+
+        // Expiry covers every active row of the scope, not only the capped read above: an expired fact is retired
+        // however many newer rows there are. Paged through the active index, within a bound.
+        const today = localDayOf(now, timeZone);
+        const expired: ReturnType<typeof toReflectionRow>[] = [];
+        let cursor: string | null = null;
+
+        for (let page = 0; page < EXPIRY_READ_PAGES; page += 1) {
+            const result = await ctx.db
+                .query("memories")
+                .withIndex("by_userId_botId_active", (q) => q.eq("userId", userId).eq("botId", scopeBot).eq("supersededBy", null))
+                .order("desc")
+                .paginate({ cursor, numItems: EXPIRY_PAGE_ROWS });
+
+            for (const m of result.page) {
+                if (m.pinned !== true && isExpired(m, today)) {
+                    expired.push(toReflectionRow(m));
+                }
+            }
+
+            if (result.isDone) {
+                break;
+            }
+
+            cursor = result.continueCursor;
+        }
 
         // "The day's threads": the ones that produced a memory in the last day.
         const since = now - DAY_MS;
@@ -283,7 +315,7 @@ export const loadReflectionInputs = internalQuery
                       .map((t) => t.title!)
                 : [];
 
-        return { memories, threadTitles };
+        return { expired, memories, threadTitles };
     });
 
 const vReflectionOp = v.union(
@@ -300,6 +332,9 @@ const vReflectionOp = v.union(
         memoryId: v.string(),
     }),
     v.object({
+        checkDates: v.optional(
+            v.object({ memory: v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) }) }),
+        ),
         confidence: v.optional(v.number()),
         kind: v.literal("patch"),
         lastConfirmedAt: v.optional(v.number()),
@@ -356,6 +391,11 @@ export const applyReflectionOps = internalMutation
                     const row = await active(op.memoryId);
 
                     if (!row) {
+                        break;
+                    }
+
+                    // A wording planned for other dates than the row holds now is not written: a person's date edit wins.
+                    if (op.checkDates && !sameFactDates(factDatesOf(row), normalizeFactDates(op.checkDates.memory))) {
                         break;
                     }
 
@@ -525,10 +565,12 @@ const reflectScope = async (
     scope: { botId: string | undefined; budget: ReflectionBudget; model: UtilityModel | undefined; now: number; timeZone: string | undefined; userId: string },
 ): Promise<ScopeOutcome> => {
     const { botId, budget, model, now, timeZone, userId } = scope;
-    const inputs = await ctx.runQuery(internal.memory.reflection.loadReflectionInputs, { botId, now, userId });
+    const inputs = await ctx.runQuery(internal.memory.reflection.loadReflectionInputs, { botId, now, timeZone, userId });
     // Expiry is read in the user's own calendar: a fact held "until the 20th" is retired on the 21st there.
     const today = localDayOf(now, timeZone);
-    const { expire, live } = splitExpired(inputs.memories, today);
+    // The capped read plans the rest; expiry also sees every active row, so an old expired fact is retired.
+    const everyRow = [...new Map([...inputs.memories, ...inputs.expired].map((m) => [m.id, m])).values()];
+    const { expire, live } = splitExpired(everyRow, today);
     const memories: ReflectionMemory[] = selectReflectionInputs(live, now, REFLECTION_LIMITS);
     const byId = new Map(memories.map((m) => [m.id, m]));
     const plan = planReflection(memories, now);
@@ -654,7 +696,8 @@ const reflectScope = async (
             merged: countAppliedMerges(plan.merges, writeOps),
             newMemories: learnedToday.length,
             promoted: result.promotedIds.filter((id) => id !== null).length,
-            retired: plan.retire.length + expire.length,
+            // A retirement is a supersession of a row by itself (decay or expiry); count only those the write committed.
+            retired: writeOps.filter((op) => op.kind === "supersede" && op.byMemoryId === op.memoryId && superseded.has(op.memoryId)).length,
         },
         summary: redactDigestSummary(synthesis?.summary ?? "", REFLECTION_LIMITS.maxSummaryChars),
     };

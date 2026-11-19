@@ -112,8 +112,8 @@ describe("merge", () => {
         const ops = mergeToOps({ absorbedIds: [weak.id], survivorId: strong.id, texts: [], type: "preference" }, byId([weak, strong]), NOW, " Merged. ");
 
         expect(ops).toEqual([
-            { confidence: 90, kind: "patch", lastConfirmedAt: NOW, memory: "Merged.", memoryId: strong.id },
-            { byMemoryId: strong.id, kind: "supersede", memoryId: weak.id },
+            { checkDates: { memory: {} }, confidence: 90, kind: "patch", lastConfirmedAt: NOW, memory: "Merged.", memoryId: strong.id },
+            { byMemoryId: strong.id, checkDates: { by: {}, memory: {} }, kind: "supersede", memoryId: weak.id },
         ]);
     });
 
@@ -350,6 +350,7 @@ describe("the newer statement decides the dates", () => {
 
         // The merged wording could name the older row's day beside the newer row's empty date fields.
         expect(revisionToOps(pair, { action: "UPDATE", mergedMemory: "User is in Lisbon for work until 2026-11-20" }, NOW, byId([older, newer]))[0]).toEqual({
+            checkDates: { memory: {} },
             kind: "patch",
             lastConfirmedAt: NOW,
             memoryId: newer.id,

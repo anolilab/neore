@@ -275,6 +275,8 @@ export const compressThreadMemories = internalAction
 
         // Save compressed memories
         await ctx.runMutation(internal.memory.functions.saveMemoryBatch, {
+            // The originals are checked and retired in the same write as the facts that replace them.
+            compressedFrom: oldIds,
             // `supersedes: undefined` is explicit — a nested `v.optional()`
             // renders as a required key.
             memories: synthesizedFacts.map((f) => {
@@ -291,12 +293,4 @@ export const compressThreadMemories = internalAction
                 };
             }),
         });
-
-        // Mark originals as superseded (use a sentinel string to indicate compression)
-        for (const oldId of oldIds) {
-            await ctx.runMutation(internal.memory.functions.markMemorySupersededByCompression, {
-                memoryId: oldId,
-                userId: args.userId,
-            });
-        }
     });
