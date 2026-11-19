@@ -43,6 +43,10 @@ jobs:
             - name: "Build workspace packages"
               shell: "bash"
               run: "pnpm run build:packages"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # The client build only reads these to validate its env schema; the
             # values are not deployed. Same placeholders as the E2E job.
@@ -57,11 +61,6 @@ jobs:
               run: |
                   pnpm --filter @neore/web exec node scripts/generate-og.mjs
                   pnpm --filter @neore/web exec vite build
-            - name: "Generate the Lunora backend code"
-              env:
-                  NODE_OPTIONS: "--max-old-space-size=4096"
-              run: "pnpm --filter @neore/backend run codegen"
-
             # Reads `.vite/manifest.json`, so it must run before the service-worker step: that step deletes `.vite/`.
             - name: "Check the web client bundle budget"
               shell: "bash"

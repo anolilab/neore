@@ -237,6 +237,10 @@ jobs:
             - name: "Build workspace packages"
               shell: "bash"
               run: "pnpm run build:packages"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Resolve the Playwright version"
               id: "playwright"
