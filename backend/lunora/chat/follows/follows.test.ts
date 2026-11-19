@@ -61,7 +61,11 @@ let threadId: Id<"threads">;
 const as = (userId: string) => harness.withIdentity({ userId });
 
 const followRowsFor = async (userId: string) =>
-    await harness.run(async (context: any) => (await context.db.threadFollows.findMany({ where: { threadId, userId } })).page);
+    await harness.run(async (context: any) => {
+        const { page } = await context.db.threadFollows.findMany({ where: { threadId, userId } });
+
+        return page;
+    });
 
 beforeEach(async () => {
     harness = lunoraTest(schema as never);
@@ -193,9 +197,9 @@ describe("thread follow rows across people and threads", () => {
     });
 
     it("erasing a person removes their rows on every thread they follow", async () => {
-        const otherThreadId = await harness.run(async (context: any) => {
-            return await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Other", userId: OWNER });
-        });
+        const otherThreadId = await harness.run(
+            async (context: any) => await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Other", userId: OWNER }),
+        );
 
         await harness.run(async (context: any) => {
             await setThreadFollowState(context, { now: 1, state: "on", threadId, userId: GRANTEE });

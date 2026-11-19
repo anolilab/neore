@@ -25,8 +25,8 @@ export const useThreadFollow = (threadId: string | null) => {
             console.error("Failed to change the thread follow state:", error);
             showError(error);
         },
-        onSuccess: async (_data, { threadId }) => {
-            await queryClient.invalidateQueries({ queryKey: crpc.chat.follows.functions.getThreadFollow.queryKey({ threadId }) });
+        onSuccess: async (_data, { threadId: changedThreadId }) => {
+            await queryClient.invalidateQueries({ queryKey: crpc.chat.follows.functions.getThreadFollow.queryKey({ threadId: changedThreadId }) });
         },
     });
 
