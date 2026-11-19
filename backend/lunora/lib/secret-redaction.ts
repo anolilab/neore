@@ -393,6 +393,8 @@ const MIN_HEX_SECRET = 48;
 const MIN_PATH_SEGMENT = 20;
 const MIN_ENTROPY_BITS = 3.5;
 const MIN_DIGITS = 2;
+/** Three or more lowercase letters, a capital, then two or more lowercase: a camelCase word, as an identifier has (`shouldRender`). */
+const CAMEL_WORD = /(?<=[a-z]{3})[A-Z][a-z]{2}/u;
 const MAX_MEAN_CLASS_RUN = 3;
 
 const shannonEntropy = (value: string): number => {
@@ -455,12 +457,12 @@ export const looksLikeRandomSecret = (value: string): boolean => {
         return false;
     }
 
-    return (
-        (value.match(DIGIT)?.length ?? 0) >= MIN_DIGITS &&
-        LETTER.test(value) &&
-        meanClassRun(value) <= MAX_MEAN_CLASS_RUN &&
-        shannonEntropy(value) >= MIN_ENTROPY_BITS
-    );
+    const digits = value.match(DIGIT)?.length ?? 0;
+    // One digit is enough for a long mixed-case run: an opaque 32-character token often has only one.
+    const enoughDigits =
+        digits >= MIN_DIGITS || (digits >= 1 && value.length >= MIN_RUN_CANDIDATE && LOWER.test(value) && UPPER.test(value) && !CAMEL_WORD.test(value));
+
+    return enoughDigits && LETTER.test(value) && meanClassRun(value) <= MAX_MEAN_CLASS_RUN && shannonEntropy(value) >= MIN_ENTROPY_BITS;
 };
 
 /**

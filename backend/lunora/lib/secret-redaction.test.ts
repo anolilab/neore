@@ -315,4 +315,8 @@ describe("redactSecrets", () => {
 
         expect(redactSecrets(once)).toBe(once);
     });
+
+    it("redacts an opaque 32-character token that has a single digit", () => {
+        expect(redactSecrets("key vKqPzRtLmNvBwYhJdFgSaEcTuIoPlQr1")).toBe("key «redacted»");
+    });
 });
