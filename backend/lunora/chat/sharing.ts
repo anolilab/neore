@@ -16,7 +16,7 @@ import { toUIMessages } from "../agent/ui-messages";
 import type { MessageDoc } from "../agent/validators";
 import { vThreadDocFields } from "../agent/validators";
 import { callOnShard } from "../lib/cross-shard";
-import { deleteThreadFollowRow, ensureThreadFollowDefault, setThreadFollowState } from "./follows/functions";
+import { ensureThreadFollowDefault } from "./follows/functions";
 import { authAction, authMutation, authQuery, publicAction, rateLimit } from "../lib/crpc";
 import { rateLimitGuard, shareLinkBucket } from "../lib/rate-limiter";
 import { deleteShardRoute, setShardRoute, shardRouteOwner } from "../lib/shard-routes";
@@ -424,8 +424,8 @@ export const acceptThreadInvite = authMutation
             status: "accepted",
         });
 
-        // A person invited to a thread follows it from the moment they accept.
-        await setThreadFollowState(context, { now: context.now, state: "on", threadId: invite.threadId, userId });
+        // A person invited to a thread follows it from the moment they accept. An explicit choice made before is kept.
+        await ensureThreadFollowDefault(context, { now: context.now, state: "on", threadId: invite.threadId, userId });
 
         context.log.event("chat.accept_thread_invite", { alreadyHadAccess: Boolean(existingAccess), kept, permission: invite.permission });
 
@@ -474,8 +474,9 @@ export const removeThreadAccess = authMutation
             });
         }
 
-        // A person who leaves the thread loses their follow row in the same mutation.
-        await deleteThreadFollowRow(context, { threadId, userId: targetUserId });
+        // A person who leaves the thread loses their follow row in the same mutation. The admin's view cannot read another
+        // person's row (owner-only RLS), so the trusted internal mutation deletes it.
+        await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
 
         context.log.event("chat.remove_thread_access", { removed: Boolean(access) });
     });

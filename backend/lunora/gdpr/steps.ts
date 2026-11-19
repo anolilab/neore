@@ -189,6 +189,24 @@ export const collectThreadTags = internalQuery
         });
     });
 
+/** Every follow row of a paged export read: the pages one after another until the last (`cursor` null). */
+const collectAllThreadFollows = async <T>(readPage: (cursor: string | null) => Promise<{ cursor: string | null; follows: T[] }>): Promise<T[]> => {
+    const rows: T[] = [];
+    let cursor: string | null = null;
+
+    for (;;) {
+        const result = await readPage(cursor);
+
+        rows.push(...result.follows);
+
+        if (result.cursor === null) {
+            return rows;
+        }
+
+        cursor = result.cursor;
+    }
+};
+
 /** Every row of a paged export read: the pages one after another until the last. */
 const readAllPages = async <T>(readPage: (cursor: string | null) => Promise<{ continueCursor: string | null; isDone: boolean; page: T[] }>): Promise<T[]> => {
     const rows: T[] = [];
@@ -646,6 +664,10 @@ export const generateExportFile = internalAction
             settings: args.settings,
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
+            // Each user's follow states on threads they follow, read a page per query (`chat/follows/functions.ts`).
+            threadFollows: await collectAllThreadFollows(
+                async (cursor) => await context.runQuery(internal.chat.follows.functions.collectThreadFollowsForExport, { cursor, userId: args.userId }),
+            ),
             threadTags: args.threadTags ?? [],
             // Triggers with their settings and their newest runs, read here within a byte budget (`triggers/gdpr.ts`).
             triggers: await collectAllTriggers(

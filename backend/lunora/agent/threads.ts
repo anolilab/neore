@@ -6,6 +6,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalMutation, internalQuery, type MutationCtx as MutationContext, type QueryCtx as QueryContext } from "../_generated/server";
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
+import { deleteFollowRowsOfThread } from "../chat/follows/functions";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
 import { revokeGuestLinksForThread, withdrawGuestLinksForThread } from "../chat/lib/guest-link-store";
 import { deleteThreadSecrets } from "../chat/lib/secret-requests";
@@ -545,6 +546,11 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         // Steered messages still waiting on a run of this thread have nobody left to take them.
         // Here, after every batched removal (file links, guest links): this page re-runs once per batch.
         await dropQueuedSteersForThread(context, args.threadId);
+
+        // The follow rows of the thread (`chat/follows/functions.ts`), one batch per call; the thread goes once none are left.
+        if (!(await deleteFollowRowsOfThread(context, args.threadId))) {
+            return { cursor: messages.continueCursor, isDone: false };
+        }
 
         const thread = await context.db.get("threads", args.threadId);
 

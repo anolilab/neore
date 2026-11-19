@@ -6,6 +6,7 @@
  */
 import type { MutationCtx } from "../_generated/server";
 import { dropGuestLinkRoutes } from "./lib/guest-link-store";
+import { deleteFollowRowsOfUser } from "./follows/functions";
 import { BATCH, type BatchResult, deleteParentsWithChildren } from "../gdpr/batch";
 
 /**
@@ -13,13 +14,9 @@ import { BATCH, type BatchResult, deleteParentsWithChildren } from "../gdpr/batc
  * with the run state, {@link erasePersistentStreamsForUser}).
  */
 export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
-    const [pins, follows, threadTags] = await Promise.all([
+    const [pins, threadTags] = await Promise.all([
         ctx.db
             .query("threadPins")
-            .withIndex("by_user_and_thread", (q) => q.eq("userId", userId))
-            .collect(),
-        ctx.db
-            .query("threadFollows")
             .withIndex("by_user_and_thread", (q) => q.eq("userId", userId))
             .collect(),
         ctx.db
@@ -28,11 +25,10 @@ export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: st
             .collect(),
     ]);
 
-    await Promise.all([
-        ...pins.map((p) => ctx.db.delete("threadPins", p._id)),
-        ...follows.map((f) => ctx.db.delete("threadFollows", f._id)),
-        ...threadTags.map((tag) => ctx.db.delete("threadTags", tag._id)),
-    ]);
+    await Promise.all([...pins.map((p) => ctx.db.delete("threadPins", p._id)), ...threadTags.map((tag) => ctx.db.delete("threadTags", tag._id))]);
+
+    // The follow rows are global, so they are found by the user, wherever the threads they follow live.
+    await deleteFollowRowsOfUser(ctx, userId);
 };
 
 /**

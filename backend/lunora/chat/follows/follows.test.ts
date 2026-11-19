@@ -8,7 +8,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Id } from "../../_generated/dataModel";
 import schema from "../../schema";
-import { ensureThreadFollowDefault, getThreadFollow, setThreadFollow, setThreadFollowState } from "./functions";
+import {
+    deleteFollowRowsOfThread,
+    deleteFollowRowsOfUser,
+    deleteThreadFollowRow,
+    ensureThreadFollowDefault,
+    getThreadFollow,
+    setThreadFollow,
+    setThreadFollowState,
+} from "./functions";
 
 const OWNER = "user-owner";
 const GRANTEE = "user-grantee";
@@ -53,13 +61,7 @@ let threadId: Id<"threads">;
 const as = (userId: string) => harness.withIdentity({ userId });
 
 const followRowsFor = async (userId: string) =>
-    await harness.run(
-        async (context: any) =>
-            await context.db
-                .query("threadFollows")
-                .withIndex("by_user_and_thread", (q: any) => q.eq("userId", userId).eq("threadId", threadId))
-                .collect(),
-    );
+    await harness.run(async (context: any) => (await context.db.threadFollows.findMany({ where: { threadId, userId } })).page);
 
 beforeEach(async () => {
     harness = lunoraTest(schema as never);
@@ -133,5 +135,67 @@ describe("thread follow state", () => {
         });
 
         expect(await as(OWNER).query(getThreadFollow as never, { threadId } as never)).toEqual({ state: "on" });
+    });
+});
+
+describe("thread follow rows outlive the shard they are written from", () => {
+    it("an accepted default is still there when the menu reads it, and an explicit mute survives a later accept", async () => {
+        await harness.run(async (context: any) => {
+            await ensureThreadFollowDefault(context, { now: 1, state: "on", threadId, userId: GRANTEE });
+        });
+        expect(await as(GRANTEE).query(getThreadFollow as never, { threadId } as never)).toEqual({ state: "on" });
+
+        await as(GRANTEE).mutation(setThreadFollow as never, { state: "muted", threadId } as never);
+        await harness.run(async (context: any) => {
+            await ensureThreadFollowDefault(context, { now: 2, state: "on", threadId, userId: GRANTEE });
+        });
+
+        expect(await as(GRANTEE).query(getThreadFollow as never, { threadId } as never)).toEqual({ state: "muted" });
+        expect(await followRowsFor(GRANTEE)).toHaveLength(1);
+    });
+
+    it("removing a member's access deletes that member's row", async () => {
+        await harness.run(async (context: any) => {
+            await setThreadFollowState(context, { now: 1, state: "on", threadId, userId: GRANTEE });
+        });
+
+        await harness.run(async (context: any) => {
+            await deleteThreadFollowRow(context, { threadId, userId: GRANTEE });
+        });
+
+        expect(await followRowsFor(GRANTEE)).toHaveLength(0);
+    });
+
+    it("deleting a thread removes every follower's row, in batches", async () => {
+        await harness.run(async (context: any) => {
+            await setThreadFollowState(context, { now: 1, state: "on", threadId, userId: OWNER });
+            await setThreadFollowState(context, { now: 1, state: "muted", threadId, userId: GRANTEE });
+            await setThreadFollowState(context, { now: 1, state: "on", threadId, userId: STRANGER });
+        });
+
+        const done = await harness.run(async (context: any) => await deleteFollowRowsOfThread(context, threadId));
+
+        expect(done).toBe(true);
+        expect(await followRowsFor(GRANTEE)).toHaveLength(0);
+        expect(await followRowsFor(OWNER)).toHaveLength(0);
+    });
+
+    it("erasing a person removes their rows on every thread they follow", async () => {
+        const otherThreadId = await harness.run(async (context: any) => {
+            return await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Other", userId: OWNER });
+        });
+
+        await harness.run(async (context: any) => {
+            await setThreadFollowState(context, { now: 1, state: "on", threadId, userId: GRANTEE });
+            await setThreadFollowState(context, { now: 1, state: "muted", threadId: otherThreadId, userId: GRANTEE });
+            await setThreadFollowState(context, { now: 1, state: "on", threadId, userId: OWNER });
+        });
+
+        await harness.run(async (context: any) => {
+            await deleteFollowRowsOfUser(context, GRANTEE);
+        });
+
+        expect(await followRowsFor(GRANTEE)).toHaveLength(0);
+        expect(await followRowsFor(OWNER)).toHaveLength(1);
     });
 });

@@ -73,6 +73,7 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     skillRatings: ["userId"],
     skills: ["userId"],
     threadAccess: ["userId", "ownerId", "grantedBy"],
+    threadFollows: ["userId"],
     threadInvites: ["ownerId", "invitedBy", "acceptedBy"],
     userVariableDefaults: ["userId"],
 };

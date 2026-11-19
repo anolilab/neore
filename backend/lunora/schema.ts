@@ -3043,6 +3043,7 @@ export const schema = defineSchema({
         .index("by_userId", ["userId"]),
     // Whether a person follows a thread for new-reply notifications (`chat/follows/functions.ts`). A row exists only
     // once a state is set (by the person, or by share/accept); no row means "off".
+    // `.global()` like `threadAccess`: the follower, the thread's owner and the erasure of either read the same rows.
     threadFollows: defineTable({
         createdAt: v.number(),
         state: v.union(v.literal("on"), v.literal("off"), v.literal("muted")),
@@ -3050,7 +3051,7 @@ export const schema = defineSchema({
         updatedAt: v.number(),
         userId: v.string(),
     })
-        .shardBy("userId")
+        .global()
         .index("by_thread", ["threadId"])
         .index("by_user_and_thread", ["userId", "threadId"])
         .relations((r) => {
