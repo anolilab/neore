@@ -102,7 +102,6 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "24.22.1"
                   npm-version: "11"
-
             # services/document-parser is a Rust Worker: its `build:worker`
             # (which `test` depends on, and `lunora dev` runs on start) needs
             # rustc + wasm32 + worker-build.
@@ -149,6 +148,10 @@ jobs:
               run: |
                   pnpm run build:packages
                   pnpm exec vis affected build --if-present --query "project!=@neore/web && project!=@neore/backend && project!=@neore/browser-extension && project!=@neore/mobile" --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # Run directly rather than through `vis affected`, which would pull in the backend Worker build.
             # The app builds catch a broken bundle, which type checks and unit tests do not.
@@ -229,12 +232,15 @@ jobs:
                   npm-version: "11"
                   # The browsers come from the cache below (or its miss install), not from setup.
                   skip-playwright: "true"
-
             # Stories import `@neore/ai`, whose `dist` is gitignored; without it Vite cannot resolve
             # `@neore/ai/models` and every story that touches a model fails to load.
             - name: "Build workspace packages"
               shell: "bash"
               run: "pnpm run build:packages"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Resolve the Playwright version"
               id: "playwright"
@@ -367,7 +373,6 @@ jobs:
                   npm-version: "11"
                   # The browsers come from the cache below (or its miss install), not from setup.
                   skip-playwright: "true"
-
             # Playwright's first `webServer` is the backend, and `buildAuth(env)`
             # refuses to start without a signing secret:
             #
@@ -479,6 +484,10 @@ jobs:
             - name: "Build the document-parser Worker"
               shell: "bash"
               run: "pnpm --filter document-parser run build:worker"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # `apps/web/.source` holds the `fumadocs-mdx:collections/*` virtual
             # modules and is gitignored, so a fresh checkout has none. `vite build`
@@ -759,7 +768,6 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
-
             - name: "Install Rust (stable)"
               uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # v1
               with:
@@ -780,6 +788,10 @@ jobs:
             # else builds that package on this job.
             - name: "Build the shared capability rules"
               run: "pnpm --filter @neore/ai run build"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Bundle the main process and preloads"
               run: "pnpm --filter @neore/desktop run build"
@@ -816,7 +828,6 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
-
             - name: "Install Rust (stable)"
               uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # v1
               with:
@@ -834,6 +845,10 @@ jobs:
             # else builds that package on this job.
             - name: "Build the shared capability rules"
               run: "pnpm --filter @neore/ai run build"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Bundle the main process and preloads"
               run: "pnpm --filter @neore/desktop run build"
@@ -873,7 +888,6 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
-
             - name: "Install Rust (stable)"
               uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # v1
               with:
@@ -891,6 +905,10 @@ jobs:
             # else builds that package on this job.
             - name: "Build the shared capability rules"
               run: "pnpm --filter @neore/ai run build"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Bundle the main process and preloads"
               run: "pnpm --filter @neore/desktop run build"

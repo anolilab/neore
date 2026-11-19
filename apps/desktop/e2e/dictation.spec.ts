@@ -384,7 +384,21 @@ test("only the dictation window is given the microphone", async () => {
         expect(await microphone(composer)).toBe("denied");
 
         await call(app, "begin");
-        await expect.poll(() => call<string>(app, "state"), { timeout: 15_000 }).toBe("recording");
+        // As `dictate` does: a dictation that ends before it records says why (its outcome), instead of only "idle".
+        await expect
+            .poll(
+                async () => {
+                    const state = await call<string>(app, "state");
+
+                    if (state === "idle") {
+                        throw new Error(`the dictation ended before it recorded: ${await call<string | undefined>(app, "outcome")}`);
+                    }
+
+                    return state;
+                },
+                { timeout: 15_000 },
+            )
+            .toBe("recording");
         expect(await microphone(await findPage(app, (url) => DICTATION_PAGE.test(url)))).toBe("granted");
         // And the window goes away with the dictation: the grant does not outlive it.
         await call(app, "cancel");

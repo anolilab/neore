@@ -99,6 +99,10 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
                   skip-playwright: "true"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Check formatting"
               shell: "bash"
@@ -145,6 +149,10 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
                   skip-playwright: "true"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # A rule ESLint turned off for some files but the committed config still
             # enforces would fail here on code ESLint accepts.
@@ -185,6 +193,10 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
                   skip-playwright: "true"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # `lint:types` builds the document-parser Worker (worker-build), so the
             # same toolchain the test workflow installs is needed here too.
@@ -230,13 +242,16 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
                   skip-playwright: "true"
-
             # Typed rules read the packages' emitted declarations. `build:packages` builds the
             # `type:package` projects (`ai`, `service-sdk`), which need neither the Rust toolchain
             # nor libdbus: those stay with the type check, which builds the native module.
             - name: "Build packages"
               shell: "bash"
               run: "pnpm run build:packages"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "ESLint"
               shell: "bash"

@@ -805,6 +805,7 @@ const startSettingsOf = (body: ChatStartBody, pageContext: ReturnType<typeof par
         negativePrompt: body.negativePrompt,
         numImages: body.numImages,
         pageContext,
+        projectId: body.projectId,
         quality: body.quality,
         reasoningEffort: body.reasoningEffort,
         referenceImages: body.referenceImages,
@@ -814,7 +815,6 @@ const startSettingsOf = (body: ChatStartBody, pageContext: ReturnType<typeof par
         seed: body.seed,
         shouldAutoContinue: body.shouldAutoContinue,
         statelessMode: body.statelessMode,
-        projectId: body.projectId,
         style: body.style,
         temporary: body.temporary,
     };

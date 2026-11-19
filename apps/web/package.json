@@ -15,10 +15,12 @@
     ],
     "type": "module",
     "scripts": {
+        "prebuild": "pnpm -w run codegen:backend",
         "build": "node scripts/generate-og.mjs && vite build && node scripts/generate-sw.mjs && tsc --noEmit",
         "build-storybook": "storybook build --output-dir storybook-static",
         "cf:typegen": "wrangler types",
         "clean": "rimraf node_modules dist .eslintcache .tanstack",
+        "predev": "pnpm -w run codegen:backend",
         "dev": "vite dev --port 5173",
         "email:dev": "email dev --dir src/components/emails --port 5555",
         "generate:pwa-assets": "pwa-assets-generator",
