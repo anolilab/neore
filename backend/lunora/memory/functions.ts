@@ -597,7 +597,9 @@ export const saveMemoryBatch = internalMutation
         if (args.compressedFrom !== undefined) {
             const owner = args.memories[0]?.userId;
             const originals = await Promise.all(args.compressedFrom.map((id) => ctx.db.get("memories", id)));
-            const stillCompressible = originals.every((row) => row && row.userId === owner && !row.supersededBy && !hasFactDates(factDatesOf(row)));
+            const stillCompressible = originals.every(
+                (row) => row && row.userId === owner && !row.supersededBy && row.pinned !== true && !hasFactDates(factDatesOf(row)),
+            );
 
             if (!stillCompressible) {
                 return args.memories.map(() => null);

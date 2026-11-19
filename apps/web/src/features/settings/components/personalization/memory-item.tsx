@@ -101,6 +101,11 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
         const stored = datesOf(memory);
         const dates = Object.fromEntries(keys.map((key) => [key, datesAtEditStart[key] === draftDates[key] ? stored[key] : draftDates[key]])) as MemoryDates;
 
+        // Two edits to different ends can meet in an impossible range: keep the editor open rather than send it.
+        if (dates.eventEnd !== "" && (dates.eventStart === "" || dates.eventEnd < dates.eventStart)) {
+            return;
+        }
+
         const textChanged = text !== "" && text !== memory.memory;
 
         if (textChanged || datesChanged) {

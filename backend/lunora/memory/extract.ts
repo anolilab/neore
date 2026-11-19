@@ -651,6 +651,8 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                             const current = matchable.get(similarMemory.id) ?? {};
                             // The newer statement's dates replace the row's (`restatedDates`), here and for later facts of the run.
                             const nextDates = restatedDates(current, dates);
+                            // The row's dates as this run read them, before this revision moves them: the revision is checked against these.
+                            const observedDates = storedDates.get(similarMemory.id);
 
                             // A revision that changes the dates takes the newer statement's words, so the text never names a day the columns lack.
                             const revisedText = nextDates ? (redactMemoryText(fact.memory) ?? mergedMemory) : mergedMemory;
@@ -669,7 +671,10 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                                 const row = await ctx.runQuery(internal.memory.functions.getMemoryById, { memoryId: similarMemory.id });
 
                                 if (row) {
-                                    storedDates.set(row._id as string, factDatesOf(row));
+                                    if (!storedDates.has(row._id as string)) {
+                                        storedDates.set(row._id as string, factDatesOf(row));
+                                    }
+
                                     existingMemories.push({
                                         _id: row._id,
                                         confidence,
@@ -695,7 +700,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                                 factDates: dates,
                                 memory: revisedText,
                                 memoryId: similarMemory.id,
-                                observed: storedDates.get(similarMemory.id),
+                                observed: observedDates,
                                 ...(nextDates && { dates: nextDates }),
                             });
                         }
