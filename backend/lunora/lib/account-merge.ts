@@ -346,7 +346,6 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
     const follows = await moveThreadFollows(call, references, from, to);
 
     moved += follows.moved;
-    drained &&= follows.drained;
 
     // Stopped by the round cap with follow rows left: fail the job, so its redelivery moves the rest and deletes the guest.
     if (!follows.drained) {
