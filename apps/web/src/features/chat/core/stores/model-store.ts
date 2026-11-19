@@ -63,7 +63,7 @@ export interface PendingSettings {
     isTempChat?: boolean;
     language?: string;
     model?: string;
-    /** The project the new thread is filed in once the first send has created it (a move, not part of the create request). */
+    /** The project the new thread is filed in: sent with the create request, so the thread's first run already sees it. */
     projectId?: string;
     reasoningEffort?: number;
     retentionHours?: number;

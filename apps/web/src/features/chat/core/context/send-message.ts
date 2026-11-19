@@ -154,11 +154,12 @@ export const holdSendForSignIn = (text: string, { guestMessageId }: SendMessageO
  * Files a new thread in the project the composer chip picked. A failed move leaves the thread outside the project; the
  * send itself has already started and is not held for it.
  */
-const fileNewThreadInProject = (lunora: ReturnType<typeof useLunora>, threadId: string, projectId: string): void => {
+const fileNewThreadInProject = (lunora: ReturnType<typeof useLunora>, threadId: string, projectId: string, onFailure?: (error: unknown) => void): void => {
     void lunora
         .mutation(api.projects.functions.moveThreadToProject, { projectId: projectId as Id<"projects">, threadId: threadId as Id<"threads"> })
         .catch((error: unknown) => {
             providerLogger.error("[ChatProvider] Could not file the new thread in its project", error);
+            onFailure?.(error);
         });
 };
 
@@ -319,6 +320,27 @@ const runSendMessageBody = async (
 
         const pendingSettings = isCreatingNewThread ? takePendingSettingsFor(owner, getPendingSettingsFromStore) : null;
 
+        // Taken out of the store above: a local send that is not saved puts them back with the draft, as the gateway send does.
+        const restorePendingSettings = () => {
+            if (!pendingSettings || !sameSession()) {
+                return;
+            }
+
+            if (owner && !isOwnerLive(owner)) {
+                parkSettingsFor(owner, pendingSettings);
+
+                return;
+            }
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
+            useModelStore.getState().setPendingSettings((previous) => {
+                return { ...pendingSettings, ...previous };
+            });
+        };
+
         clearSentDraft(owner, text, focusAtStart);
         useChatUIStore.getState().setIsSubmitting(false);
         trackEvent("message_sent", { attachment_count: 0, has_attachments: false, model, thread_mode: "text" });
@@ -326,7 +348,10 @@ const runSendMessageBody = async (
         await sendLocalTurn({
             history: afterLastContextReset(messagesRef.current.filter((m) => m.id !== optimisticId)),
             language: isCreatingNewThread ? pendingSettings?.language || defaultLanguage : undefined,
-            onNotSaved: restoreComposer,
+            onNotSaved: (message) => {
+                restoreComposer(message);
+                restorePendingSettings();
+            },
             onSaved: ({ isNewThread: createdThread, message, threadId: savedThreadId }) => {
                 if (message) {
                     handleError(localModelError(message));
@@ -336,7 +361,9 @@ const runSendMessageBody = async (
                     trackEvent("thread_created", { mode: "text", model });
 
                     if (pendingSettings?.projectId && !newChatTemporaryFields(pendingSettings, newChatsTemporary)) {
-                        fileNewThreadInProject(lunora, savedThreadId, pendingSettings.projectId);
+                        fileNewThreadInProject(lunora, savedThreadId, pendingSettings.projectId, (error) => {
+                            handleError(error instanceof Error ? error : new Error(String(error)));
+                        });
                     }
 
                     setTransitioningMessage({ text, threadId: savedThreadId });
@@ -480,6 +507,12 @@ const runSendMessageBody = async (
             }
 
             Object.assign(requestBody, newChatTemporaryFields(pendingSettings, newChatsTemporary));
+
+            // The chip's project is filed with the thread by the backend, so the first run already sees it. Text mode only: the
+            // chip is not shown in image or video mode. Not for a temporary chat, which the backend keeps out of every project.
+            if (pendingSettings?.projectId && currentMode === "text" && requestBody.temporary !== true) {
+                requestBody.projectId = pendingSettings.projectId;
+            }
         } else if (changedSettings) {
             // Existing thread: also send changed settings
             Object.assign(requestBody, changedSettings);
@@ -601,12 +634,6 @@ const runSendMessageBody = async (
 
             // Navigate to new thread if we just created one
             if (isCreatingNewThread && data.threadId) {
-                // The chip's project: the create request takes none, so the thread is filed once its id is back. Not for a
-                // temporary chat, which the backend keeps out of every project.
-                if (pendingSettings?.projectId && requestBody.temporary !== true) {
-                    fileNewThreadInProject(lunora, data.threadId, pendingSettings.projectId);
-                }
-
                 // Prime caches for both individual thread query AND composite query
                 // This prevents expensive re-fetches during route loading
                 const optimisticThread = {

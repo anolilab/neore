@@ -662,6 +662,8 @@ export const createThreadWithInitialMessage = internalMutation
          * chat started in an organization is never left without it and later capped by a broader space.
          */
         organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
+        /** The composer chip's project, filed with the thread from its first run. A project the caller cannot read is refused. */
+        projectId: v.optional(v.string().max(MAX_LENGTH.id)),
         reasoningEffort: v.optional(v.number()),
         /** Hours until expiry when `temporary`; the client sends a preset from the temporary-chat control. */
         retentionHours: v.optional(v.number().check((value) => value >= 1 && value <= 168, { message: "Invalid retention" })),
@@ -685,6 +687,7 @@ export const createThreadWithInitialMessage = internalMutation
                 mode,
                 model,
                 organizationId,
+                projectId,
                 reasoningEffort,
                 retentionHours,
                 startClaim,
@@ -699,6 +702,19 @@ export const createThreadWithInitialMessage = internalMutation
                 await assertStartClaimHeld(context, startClaim);
             }
 
+            // The pick is filed only when the caller may file threads in it: the owner rule of `moveThreadToProject`, read on the
+            // primary so a revoked project is not admitted from a lagging replica. Another pick is left out rather than refused,
+            // so a stale chip never blocks the send.
+            let filedProjectId: Id<"projects"> | undefined;
+
+            if (projectId && !temporary) {
+                const project = await readableProject(context, projectId as Id<"projects">, userId, { primary: true });
+
+                if (project && (!project.userId || project.userId === userId)) {
+                    filedProjectId = projectId as Id<"projects">;
+                }
+            }
+
             // Every write below is in THIS transaction, with no nested mutation (each would commit on its own): a send with
             // a `clientMessageId` must leave either the thread, its prompt and the claim's record, or none of them.
             const threadId = await insertThread(context.db, {
@@ -708,6 +724,7 @@ export const createThreadWithInitialMessage = internalMutation
                 model,
                 // A temporary chat stays untagged, as `createThread` leaves it.
                 ...(organizationId && !temporary && { organizationId }),
+                ...(filedProjectId && { projectId: filedProjectId }),
                 status: "running", // Running from the start: no separate status write
                 tags: ["chat"],
                 title: title ?? DEFAULT_THREAD_TITLE,

@@ -69,10 +69,15 @@ const hitsWord = (draftWord: string, titleWords: ReadonlyArray<string>): boolean
 
 /** Every word of a project title appears in the draft: "Billing" in "billing export", "Client Portal" in "portal client bug". */
 const titleInDraft = (titleWords: ReadonlyArray<string>, draftWords: ReadonlyArray<string>): boolean =>
-    titleWords.length > 0 &&
-    titleWords.every((titleWord) =>
-        draftWords.some((draftWord) => draftWord === titleWord || (titleWord.length >= MIN_DRAFT_WORD_LENGTH && draftWord.startsWith(titleWord))),
-    );
+    titleWords.some((titleWord) => titleWord.length >= MIN_DRAFT_WORD_LENGTH) &&
+    titleWords.every((titleWord) => {
+        // A short title word ("AI" in "AI Research") is matched only as the draft's own word, as the draft drops short words.
+        if (titleWord.length < MIN_DRAFT_WORD_LENGTH) {
+            return draftWords.includes(titleWord);
+        }
+
+        return draftWords.some((draftWord) => draftWord === titleWord || draftWord.startsWith(titleWord));
+    });
 
 /**
  * The project the draft points at, or null. `threads` are the person's loaded thread rows; archived ones and threads

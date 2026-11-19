@@ -25,6 +25,7 @@ const state = vi.hoisted(() => {
     return {
         isNewThread: true,
         projects: [] as { _id: string; projectType?: string; title: string }[],
+        newChatsTemporary: false,
         threads: [] as { projectId?: string; status?: string; title?: string }[],
     };
 });
@@ -45,10 +46,20 @@ vi.mock("@/features/chat/core/hooks/use-threads", () => {
     return { useThreads: () => state.threads };
 });
 
+vi.mock("@/features/auth/hooks/use-user-settings", () => {
+    return {
+        useUserSettings: () => {
+            return { data: { newChatsTemporary: state.newChatsTemporary } };
+        },
+    };
+});
+
 const billing = { _id: "p-billing", title: "Billing" };
+const fileInBilling = /File in Billing/;
 
 beforeEach(() => {
     state.isNewThread = true;
+    state.newChatsTemporary = false;
     state.projects = [billing];
     state.threads = [{ projectId: "p-billing", status: "active", title: "Invoice export as CSV" }];
     useChatUIStore.getState().setComposerText("");
@@ -92,7 +103,7 @@ describe("composer project hint", () => {
 
         expect(useModelStore.getState().pendingSettings?.projectId).toBe("p-billing");
 
-        const picked = screen.getByRole("button", { name: "Will file in Billing" });
+        const picked = screen.getByRole("button", { name: "File in Billing" });
 
         expect(picked.getAttribute("aria-pressed")).toBe("true");
 
@@ -100,5 +111,44 @@ describe("composer project hint", () => {
 
         expect(useModelStore.getState().pendingSettings?.projectId).toBeUndefined();
         expect(screen.getByRole("button", { name: "File in Billing" }).getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it("offers no project for a temporary chat, and offers it again once the chat is lasting", () => {
+        useChatUIStore.getState().setComposerText("invoice export");
+        useModelStore.getState().setPendingSettings({ isTempChat: true, projectId: "p-billing" } as never);
+
+        const { container, rerender } = render(<ComposerProjectHint />);
+
+        expect(container.textContent).toBe("");
+
+        useModelStore.getState().setPendingSettings({ isTempChat: false, projectId: "p-billing" } as never);
+        rerender(<ComposerProjectHint />);
+
+        expect(screen.getByRole("button", { name: fileInBilling })).toBeTruthy();
+    });
+
+    it("keeps a stored pick visible, pressed, even when its project is not in the list, and clears it on click", () => {
+        state.projects = [];
+        useChatUIStore.getState().setComposerText("weather tomorrow");
+        useModelStore.getState().setPendingSettings({ projectId: "p-gone" } as never);
+
+        render(<ComposerProjectHint />);
+
+        const chip = screen.getByRole("button", { name: "File in another project" });
+
+        expect(chip.getAttribute("aria-pressed")).toBe("true");
+
+        fireEvent.click(chip);
+
+        expect(useModelStore.getState().pendingSettings?.projectId).toBeUndefined();
+    });
+
+    it("offers no project for a temporary chat that comes from the user's default", () => {
+        state.newChatsTemporary = true;
+        useChatUIStore.getState().setComposerText("invoice export");
+
+        const { container } = render(<ComposerProjectHint />);
+
+        expect(container.textContent).toBe("");
     });
 });

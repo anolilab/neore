@@ -2,7 +2,6 @@
  * A new thread's first send files it in the project the composer chip picked, once the gateway has returned the thread id.
  * A temporary chat is never filed: the backend keeps it out of every project.
  */
-import { api } from "@neore/backend/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PendingSettings } from "../stores/model-store";
@@ -24,6 +23,8 @@ const gatewayReply = () =>
             status: 200,
         },
     );
+
+const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(async () => gatewayReply());
 
 const envWith = (pending: PendingSettings | null) => {
     const lunora = {
@@ -80,10 +81,8 @@ const envWith = (pending: PendingSettings | null) => {
 };
 
 beforeEach(() => {
-    vi.stubGlobal(
-        "fetch",
-        vi.fn(async () => gatewayReply()),
-    );
+    fetchMock.mockClear();
+    vi.stubGlobal("fetch", fetchMock);
 });
 
 afterEach(() => {
@@ -104,14 +103,15 @@ describe("runSendMessage project hint", () => {
         expect(lunora.mutation.mock.calls[0]?.[1]).toEqual({ projectId: "p-billing", threadId: "t-local" });
     });
 
-    it("files the new thread in the picked project once the gateway returns its id", async () => {
+    it("sends the picked project with the create request, so the first run already sees it", async () => {
         const { env, lunora } = envWith({ projectId: "p-billing" });
 
         await runSendMessage(env, "invoice export");
 
-        expect(lunora.mutation).toHaveBeenCalledTimes(1);
-        expect(lunora.mutation.mock.calls[0]?.[0]).toBe(api.projects.functions.moveThreadToProject);
-        expect(lunora.mutation.mock.calls[0]?.[1]).toEqual({ projectId: "p-billing", threadId: "t-new" });
+        const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+
+        expect(body.projectId).toBe("p-billing");
+        expect(lunora.mutation).not.toHaveBeenCalled();
     });
 
     it("moves nothing when no project was picked", async () => {
@@ -122,11 +122,14 @@ describe("runSendMessage project hint", () => {
         expect(lunora.mutation).not.toHaveBeenCalled();
     });
 
-    it("moves nothing for a temporary chat, which the backend keeps out of projects", async () => {
+    it("sends no project for a temporary chat, which the backend keeps out of projects", async () => {
         const { env, lunora } = envWith({ isTempChat: true, projectId: "p-billing" });
 
         await runSendMessage(env, "invoice export");
 
+        const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+
+        expect(body).not.toHaveProperty("projectId");
         expect(lunora.mutation).not.toHaveBeenCalled();
     });
 });

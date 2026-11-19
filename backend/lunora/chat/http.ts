@@ -382,6 +382,8 @@ export interface ChatStartBody {
     /** Browser-extension page capture; untrusted, validated by `parsePageContext`. */
     pageContext?: unknown;
     parentId?: string;
+    /** New thread only: the composer chip's project, filed with the thread. Not sent for a temporary chat. */
+    projectId?: string;
     prompt?: string;
     quality?: string;
     reasoningEffort?: number;
@@ -812,6 +814,7 @@ const startSettingsOf = (body: ChatStartBody, pageContext: ReturnType<typeof par
         seed: body.seed,
         shouldAutoContinue: body.shouldAutoContinue,
         statelessMode: body.statelessMode,
+        projectId: body.projectId,
         style: body.style,
         temporary: body.temporary,
     };
@@ -1654,6 +1657,7 @@ const runChatStartOnShard = async (
                 reasoningEffort: body.reasoningEffort,
                 statelessMode: body.statelessMode,
                 // Temporary only when the client asked for it; the composer applies the user's default itself.
+                ...(body.projectId && body.temporary !== true && { projectId: body.projectId }),
                 ...(body.temporary === true && { retentionHours: body.retentionHours, temporary: true }),
                 ...(startClaim !== undefined && { startClaim }),
                 // A media thread is titled from its prompt, with no model call.
