@@ -6,11 +6,10 @@
  */
 import type { MutationCtx } from "../_generated/server";
 import { dropGuestLinkRoutes } from "./lib/guest-link-store";
-import { deleteFollowRowsOfUser } from "./follows/functions";
 import { BATCH, type BatchResult, deleteParentsWithChildren } from "../gdpr/batch";
 
 /**
- * The user's pins, follows and tags (relationships, grants and passcodes are `agent/gdpr.ts`; goals go in batches
+ * The user's pins and tags (relationships, grants and passcodes are `agent/gdpr.ts`; goals go in batches
  * with the run state, {@link erasePersistentStreamsForUser}).
  */
 export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
@@ -26,9 +25,6 @@ export const eraseThreadPinsAndTagsForUser = async (ctx: MutationCtx, userId: st
     ]);
 
     await Promise.all([...pins.map((p) => ctx.db.delete("threadPins", p._id)), ...threadTags.map((tag) => ctx.db.delete("threadTags", tag._id))]);
-
-    // The follow rows are global, so they are found by the user, wherever the threads they follow live.
-    await deleteFollowRowsOfUser(ctx, userId);
 };
 
 /**

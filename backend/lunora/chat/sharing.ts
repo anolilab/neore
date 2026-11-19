@@ -416,6 +416,10 @@ export const acceptThreadInvite = authMutation
             });
         }
 
+        // A person invited to a thread follows it from the moment they accept; an explicit choice made before is kept.
+        // Written before the invite is marked accepted, so a failed write leaves the invite pending and the accept retryable.
+        await ensureThreadFollowDefault(context, { now: context.now, state: "on", threadId: invite.threadId, userId });
+
         // Mark invite as accepted
         await context.runMutation(internal.agent.sharing.updateThreadInvite, {
             acceptedAt: context.now,
@@ -423,9 +427,6 @@ export const acceptThreadInvite = authMutation
             inviteId: invite._id,
             status: "accepted",
         });
-
-        // A person invited to a thread follows it from the moment they accept. An explicit choice made before is kept.
-        await ensureThreadFollowDefault(context, { now: context.now, state: "on", threadId: invite.threadId, userId });
 
         context.log.event("chat.accept_thread_invite", { alreadyHadAccess: Boolean(existingAccess), kept, permission: invite.permission });
 

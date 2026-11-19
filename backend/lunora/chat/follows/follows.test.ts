@@ -10,7 +10,7 @@ import type { Id } from "../../_generated/dataModel";
 import schema from "../../schema";
 import {
     deleteFollowRowsOfThread,
-    deleteFollowRowsOfUser,
+    deleteFollowRowsOfUserBatch,
     deleteThreadFollowRow,
     ensureThreadFollowDefault,
     getThreadFollow,
@@ -138,7 +138,7 @@ describe("thread follow state", () => {
     });
 });
 
-describe("thread follow rows outlive the shard they are written from", () => {
+describe("thread follow rows across people and threads", () => {
     it("an accepted default is still there when the menu reads it, and an explicit mute survives a later accept", async () => {
         await harness.run(async (context: any) => {
             await ensureThreadFollowDefault(context, { now: 1, state: "on", threadId, userId: GRANTEE });
@@ -154,7 +154,7 @@ describe("thread follow rows outlive the shard they are written from", () => {
         expect(await followRowsFor(GRANTEE)).toHaveLength(1);
     });
 
-    it("removing a member's access deletes that member's row", async () => {
+    it("deleting a person's follow row removes it", async () => {
         await harness.run(async (context: any) => {
             await setThreadFollowState(context, { now: 1, state: "on", threadId, userId: GRANTEE });
         });
@@ -191,9 +191,11 @@ describe("thread follow rows outlive the shard they are written from", () => {
             await setThreadFollowState(context, { now: 1, state: "on", threadId, userId: OWNER });
         });
 
-        await harness.run(async (context: any) => {
-            await deleteFollowRowsOfUser(context, GRANTEE);
-        });
+        let done = false;
+
+        while (!done) {
+            done = await harness.run(async (context: any) => await deleteFollowRowsOfUserBatch(context, GRANTEE));
+        }
 
         expect(await followRowsFor(GRANTEE)).toHaveLength(0);
         expect(await followRowsFor(OWNER)).toHaveLength(1);

@@ -22,7 +22,12 @@ export type ThreadFollowState = "on" | "off" | "muted";
 /** Rows read or deleted per call of a bounded follow-row cleanup. */
 const FOLLOW_BATCH = 100;
 
-/** Writes a person's follow state, creating the row when there is none. */
+/**
+ * Writes a person's follow state, creating the row when there is none.
+ *
+ * TODO: two first writes that race can each insert a row for one person and thread. Make the pair unique once a
+ * `.global()` table can declare a unique index.
+ */
 export const setThreadFollowState = async (
     ctx: Pick<MutationCtx, "db">,
     { now, state, threadId, userId }: { now: number; state: ThreadFollowState; threadId: Id<"threads">; userId: string },
@@ -68,17 +73,13 @@ export const deleteFollowRowsOfThread = async (ctx: Pick<MutationCtx, "db">, thr
     return page.isDone;
 };
 
-/** Deletes every follow row a person holds, in batches (account erasure). */
-export const deleteFollowRowsOfUser = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<void> => {
-    for (;;) {
-        const page = await ctx.db.threadFollows.findMany({ limit: FOLLOW_BATCH, where: { userId } });
+/** Deletes one batch of a person's follow rows; `true` when none are left. Account erasure drains it round by round. */
+export const deleteFollowRowsOfUserBatch = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<boolean> => {
+    const page = await ctx.db.threadFollows.findMany({ limit: FOLLOW_BATCH, where: { userId } });
 
-        await Promise.all(page.page.map((row) => ctx.db.delete("threadFollows", row._id)));
+    await Promise.all(page.page.map((row) => ctx.db.delete("threadFollows", row._id)));
 
-        if (page.isDone || page.page.length === 0) {
-            return;
-        }
-    }
+    return page.isDone;
 };
 
 /** Removes a member's follow row when the owner or an admin removes their access: a trusted write, past the admin's RLS view. */
