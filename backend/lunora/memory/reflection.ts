@@ -243,6 +243,8 @@ const EXPIRY_PAGE_ROWS = 250;
 const EXPIRY_READ_PAGES = 40;
 /** Expiry retirements per write, so a scope with many expired rows never needs one oversized transaction. */
 const EXPIRY_WRITE_BATCH = 250;
+/** How long a failed expiry batch waits before it is written again. */
+const EXPIRY_RETRY_DELAY_MS = 5 * 60_000;
 
 const toReflectionRow = (m: Doc<"memories">) => {
     return {
@@ -691,20 +693,19 @@ const reflectScope = async (
     let expiryApplied = 0;
     const expirySuperseded: string[] = [];
 
-    // A batch that fails is logged and skipped: the run still writes the rest and its digest, and the next night's run,
-    // which finds expired rows from every active row again, retires what it left.
+    // A batch that fails does not stop the run, which still writes the rest and its digest. The batch is written again
+    // on its own, without waiting for another run (which needs the user to be active): each retirement rechecks its row.
     for (let start = 0; start < expiryOps.length; start += EXPIRY_WRITE_BATCH) {
+        const batchOps = expiryOps.slice(start, start + EXPIRY_WRITE_BATCH);
+
         try {
-            const batch = await ctx.runMutation(internal.memory.reflection.applyReflectionOps, {
-                botId,
-                ops: expiryOps.slice(start, start + EXPIRY_WRITE_BATCH),
-                userId,
-            });
+            const batch = await ctx.runMutation(internal.memory.reflection.applyReflectionOps, { botId, ops: batchOps, userId });
 
             expiryApplied += batch.applied;
             expirySuperseded.push(...batch.supersededIds);
         } catch (error) {
-            console.warn("[memory/reflection] An expiry batch failed; the next run retires its rows:", error);
+            console.warn("[memory/reflection] An expiry batch failed; retrying it on its own:", error);
+            await ctx.scheduler.runAfter(EXPIRY_RETRY_DELAY_MS, internal.memory.reflection.applyReflectionOps, { botId, ops: batchOps, userId });
         }
     }
 
