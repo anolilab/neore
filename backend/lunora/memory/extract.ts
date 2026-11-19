@@ -272,7 +272,7 @@ export const extractMemories = internalAction
         botId: v.optional(v.string()),
         /** When the user wrote the message: relative dates in it resolve against this day. Unset = now. */
         messageAt: v.optional(v.number()),
-        /** When the last message steered into the reply was delivered: relative dates in the steers resolve against its day. */
+        /** When the user sent the last message steered into the reply (its `sentAt`, set when it was queued): relative dates in the steers resolve against its day. */
         steeredAt: v.optional(v.number()),
         /** Where the messages sent into the reply start in `userMessage`; they are kept whole when it is cut. */
         steeredFrom: v.optional(v.number()),
