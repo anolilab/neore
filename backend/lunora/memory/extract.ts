@@ -447,6 +447,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             source: "auto";
             supersedes: Id<"memories"> | undefined;
             supersedesBase?: string;
+            supersedesDates?: FactDates;
             threadId: Id<"threads"> | undefined;
             type: MemoryType;
             userId: string;
@@ -491,7 +492,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             fact: z.infer<typeof extractedFactSchema>,
             dates: FactDates,
             embedding: number[] | null,
-            supersedes?: { base: string; memoryId: Id<"memories"> },
+            supersedes?: { base: string; dates?: FactDates; memoryId: Id<"memories"> },
         ) => {
             memoriesToSave.push({
                 botId: args.botId,
@@ -503,6 +504,8 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                 source: "auto",
                 supersedes: supersedes?.memoryId,
                 supersedesBase: supersedes?.base,
+                // The dates the replacement was decided on: a person's edit to them since keeps the row.
+                ...(supersedes?.dates && { supersedesDates: supersedes.dates }),
                 threadId: args.threadId,
                 type: fact.type,
                 userId: args.userId,
@@ -524,7 +527,12 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                 memoriesToConfirm.push({ base: matched.memory, dates, embedding, fact, memoryId: matched.id });
                 decidedIds.add(matched.id);
             } else {
-                saveNew(fact, dates, embedding, outcome === "replace" ? { base: matched.memory, memoryId: matched.id } : undefined);
+                saveNew(
+                    fact,
+                    dates,
+                    embedding,
+                    outcome === "replace" ? { base: matched.memory, dates: storedDates.get(matched.id), memoryId: matched.id } : undefined,
+                );
             }
         };
 

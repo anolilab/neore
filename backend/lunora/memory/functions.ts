@@ -586,7 +586,15 @@ export const saveMemoryBatch = internalMutation
         // Compression: the rows the saved facts replace. Checked and retired in this same write, so a row given dates
         // meanwhile (its text would be lost undated) stops the whole save, and nothing is written.
         compressedFrom: v.optional(v.array(v.id("memories"))),
-        memories: v.array(v.object({ ...vMemoryInsertFields, supersedesBase: v.optional(v.string()) })),
+        memories: v.array(
+            v.object({
+                ...vMemoryInsertFields,
+                supersedesBase: v.optional(v.string()),
+                supersedesDates: v.optional(
+                    v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) }),
+                ),
+            }),
+        ),
     })
     // One entry per memory, in order: `null` where the fact was nothing but a secret and was not saved.
     .output(v.array(v.union(v.id("memories"), v.null())))
@@ -606,9 +614,9 @@ export const saveMemoryBatch = internalMutation
             }
         }
 
-        for (const { supersedesBase, ...mem } of args.memories) {
-            // A supersession applies only while its target still reads as the text the decision was made on, in the same
-            // scope, unpinned and active. Otherwise the new memory is saved beside it.
+        for (const { supersedesBase, supersedesDates, ...mem } of args.memories) {
+            // A supersession applies only while its target still reads as the text, and holds the dates, the decision was
+            // made on, in the same scope, unpinned and active. Otherwise the new memory is saved beside it.
             const target = mem.supersedes ? await ctx.db.get("memories", mem.supersedes) : null;
             const supersedes =
                 target &&
@@ -617,7 +625,8 @@ export const saveMemoryBatch = internalMutation
                 (target.botId ?? undefined) === (mem.botId ?? undefined) &&
                 !target.supersededBy &&
                 target.pinned !== true &&
-                target.memory === supersedesBase
+                target.memory === supersedesBase &&
+                (supersedesDates === undefined || sameFactDates(factDatesOf(target), normalizeFactDates(supersedesDates)))
                     ? mem.supersedes
                     : undefined;
 

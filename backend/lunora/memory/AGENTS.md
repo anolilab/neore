@@ -86,8 +86,9 @@
   Reflection: only rows with the same dates cluster, so a merge never changes
   dates (a pinned row's included) and never leaves text naming another day;
   two events on different days are never paired for revision either. UPDATE and
-  SUPERSEDE keep the newer row (UPDATE takes the merged wording only when both
-  rows' dates agree); IGNORE with other dates keeps the newer row.
+  SUPERSEDE keep the newer row with its own dates (UPDATE takes the merged
+  wording, which belief revision writes for the newer row's dates when the two
+  rows' dates differ); IGNORE with other dates keeps the newer row.
   Dated rows are never promoted or compressed (both rewrite text without dates).
   An import carries no dates and leaves a row's dates alone: a pasted line is
   not a newer statement. Like extraction it never matches, confirms or merges

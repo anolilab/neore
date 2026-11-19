@@ -38,6 +38,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { getUtilityModel } from "../lib/utility-model";
 import { runBeliefRevision } from "./extract";
 import { reembedRewordedMemory } from "./functions";
@@ -705,7 +706,14 @@ const reflectScope = async (
             expirySuperseded.push(...batch.supersededIds);
         } catch (error) {
             console.warn("[memory/reflection] An expiry batch failed; retrying it on its own:", error);
-            await ctx.scheduler.runAfter(EXPIRY_RETRY_DELAY_MS, internal.memory.reflection.applyReflectionOps, { botId, ops: batchOps, userId });
+            // On the owner's shard, where the rows live.
+            await runAfterOnShard(
+                ctx.scheduler,
+                EXPIRY_RETRY_DELAY_MS,
+                internal.memory.reflection.applyReflectionOps,
+                { botId, ops: batchOps, userId },
+                userId,
+            );
         }
     }
 

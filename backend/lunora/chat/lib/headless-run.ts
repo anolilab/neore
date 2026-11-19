@@ -64,6 +64,7 @@ import getAgent from "./get-agent";
 import { closeMCPClients } from "./mcp-tools";
 import type { SearchMode } from "./tool-builder";
 import { servesUser } from "../../lib/shard-context";
+import { resolveTimeZone } from "../../memory/reflection-logic";
 import { applyToolAllowlist, stopWhenRequested } from "../../sub-agents/logic";
 import type { ReplySkill, SavedRowLike } from "../../usage/activity-logic";
 import { replyUsageArgs } from "../../usage/activity-logic";
@@ -539,7 +540,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                     ...(options.botId && { botId: options.botId }),
                     messageAt: promptAt,
                     threadId: threadId as Id<"threads">,
-                    ...(prefs.timezone && { timeZone: prefs.timezone }),
+                    // The timezone the run read, UTC when none is set: a change before the job runs does not move its dates.
+                    timeZone: resolveTimeZone(prefs.timezone),
                     userId,
                     userMessage: prompt,
                 });

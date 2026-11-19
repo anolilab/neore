@@ -72,7 +72,7 @@ import { shouldNoteBriefActivity } from "../../notifications/daily-brief-logic";
 import { buildKnowledgeCitations, type KnowledgeSource } from "../../knowledge/citations";
 import type { ReplySkill } from "../../usage/activity-logic";
 import { type DispatchOrigin, stopWhenRequested } from "../../sub-agents/logic";
-import { localDayOf } from "../../memory/reflection-logic";
+import { localDayOf, resolveTimeZone } from "../../memory/reflection-logic";
 import { writeLoopStopNotice } from "../loop-stop";
 import { type LoopFinding, type RepeatedCallGuard, repeatedCallGuard } from "./repeated-call-guard";
 
@@ -816,8 +816,8 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
             // When it was said, not when the reply ended or the job runs: a reply or a pause can cross midnight.
             messageAt: args.promptAt ?? args.timingStart ?? Date.now(),
             threadId: threadId as Id<"threads">,
-            // The timezone the message was sent in: a change before the job runs does not move its dates.
-            ...(args.timeZone && { timeZone: args.timeZone }),
+            // The timezone the message was sent in, UTC when none is set: a change before the job runs does not move its dates.
+            timeZone: resolveTimeZone(args.timeZone),
             userId,
             // A steer can carry the very fact worth keeping ("actually, I'm vegetarian"); `steeredFrom` keeps it whole when a long prompt is cut.
             userMessage: [prompt, ...labelSentDays(steeredTexts, args.steeredAt, args.promptAt ?? args.timingStart, args.timeZone)].join("\n\n"),
