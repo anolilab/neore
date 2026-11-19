@@ -57,6 +57,7 @@ import {
     differentEventDays,
     type FactDates,
     factDatesOf,
+    namesOnlyDays,
     normalizeFactDates,
     restatedDates,
     restatementOutcome,
@@ -658,8 +659,11 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                             // The row's dates as this run read them, before this revision moves them: the revision is checked against these.
                             const observedDates = storedDates.get(similarMemory.id);
 
-                            // A revision that changes the dates takes the newer statement's words, so the text never names a day the columns lack.
-                            const revisedText = nextDates ? (redactMemoryText(fact.memory) ?? mergedMemory) : mergedMemory;
+                            // A revision that changes the dates keeps the merged wording, with the details it carries over, when every
+                            // day it names is one of the new dates. Otherwise it takes the newer statement's words, so the text never
+                            // names a day the columns lack.
+                            const revisedText =
+                                nextDates && !namesOnlyDays(mergedMemory, nextDates) ? (redactMemoryText(fact.memory) ?? mergedMemory) : mergedMemory;
 
                             if (nextDates) {
                                 matchable.set(similarMemory.id, { ...nextDates, pinned: current.pinned });

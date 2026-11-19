@@ -101,6 +101,15 @@ export const restatedDates = (current: FactDates, newer: FactDates): FactDates |
     return sameFactDates(factDatesOf(current), next) ? undefined : next;
 };
 
+const DAY_IN_TEXT_RE = /\b\d{4}-\d{2}-\d{2}\b/gu;
+
+/** Whether every `YYYY-MM-DD` day a text names is one of the dates. */
+export const namesOnlyDays = (text: string, dates: FactDates): boolean => {
+    const days = new Set([dates.eventEnd, dates.eventStart, dates.validUntil]);
+
+    return (text.match(DAY_IN_TEXT_RE) ?? []).every((day) => days.has(day));
+};
+
 /** Two events on different days are two occurrences (two trips, two appointments), however alike their text. */
 export const differentEventDays = (a: FactDates, b: FactDates): boolean =>
     a.eventStart !== undefined && b.eventStart !== undefined && a.eventStart !== b.eventStart;

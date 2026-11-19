@@ -361,6 +361,8 @@ const MIN_MEMORY_SEARCH_WORDS = 3;
 // Japanese sentence (no spaces) as one word, so such a prompt never reached memory search.
 const WORD_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "word" });
 const MEMORY_RETRIEVAL_CACHE_TTL_MS = 60_000;
+// How long a search may run between setting the cache lifetime and writing the result.
+const RETRIEVAL_SEARCH_MARGIN_MS = 30_000;
 
 /** Word-like segments of a prompt, by the locale's rules (see {@link WORD_SEGMENTER}). */
 export const countSearchWords = (text: string): number => {
@@ -375,21 +377,22 @@ export const countSearchWords = (text: string): number => {
     return count;
 };
 
-/** The memory block for the system prompt, and which memories went into it. */
 /** The cache lives for at most a minute, and never past the user's next local midnight: a fact that expires then must not be served. */
 const retrievalCacheTtl = (timeZone: string | null | undefined): number => {
     const now = Date.now();
     const day = localDayOf(now, timeZone);
     let instant = now;
 
-    while (instant - now < MEMORY_RETRIEVAL_CACHE_TTL_MS && localDayOf(instant, timeZone) === day) {
+    // Looks a margin past the full lifetime, so a midnight hours away leaves the whole minute.
+    while (instant - now < MEMORY_RETRIEVAL_CACHE_TTL_MS + RETRIEVAL_SEARCH_MARGIN_MS && localDayOf(instant, timeZone) === day) {
         instant += 1000;
     }
 
     // The lifetime is set before the search runs and the result is written after it, so a search of up to 30 s can end past midnight.
-    return Math.max(0, Math.min(MEMORY_RETRIEVAL_CACHE_TTL_MS, instant - now - 30_000));
+    return Math.max(0, Math.min(MEMORY_RETRIEVAL_CACHE_TTL_MS, instant - now - RETRIEVAL_SEARCH_MARGIN_MS));
 };
 
+/** The memory block for the system prompt, and which memories went into it. */
 const retrieveMemories = async (
     ctx: ActionCtx,
     userId: string,
