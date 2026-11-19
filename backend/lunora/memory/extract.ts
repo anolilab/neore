@@ -151,6 +151,8 @@ type GateOutcome = (GateDecision | { reason: "opt_out"; verdict: "skip" }) & {
 
 interface GateArgs {
     assistantResponse: string;
+    /** When the message was sent: the day its relative dates are read against. */
+    messageAt?: number;
     /** Where the messages sent into the reply start in `userMessage`. */
     steeredFrom?: number;
     threadId?: Id<"threads">;
@@ -224,7 +226,7 @@ const runExtractionGate = async (ctx: ActionContext, args: GateArgs): Promise<Ga
             args.userId,
             args.userMessage,
             heuristic.assistantQuestion,
-            localDayOf(Date.now(), await ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId: args.userId })),
+            localDayOf(args.messageAt ?? Date.now(), await ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId: args.userId })),
         ),
     );
     const processed = await ctx.runQuery(internal.lib.action_cache.get, { key: processedKey, now: Date.now() });
@@ -452,11 +454,11 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             confidence: number;
             dates?: FactDates;
             embedding: number[] | null;
-            observed?: FactDates;
             fact: z.infer<typeof extractedFactSchema>;
             factDates: FactDates;
             memory: string;
             memoryId: Id<"memories">;
+            observed?: FactDates;
         }[] = [];
 
         // Existing memories the conversation restated — reconfirmed, not duplicated. Each keeps the text it matched and its fact,
@@ -630,6 +632,8 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                             memoriesToSave.push({
                                 botId: args.botId,
                                 confidence: fact.confidence,
+                                eventEnd: dates.eventEnd,
+                                eventStart: dates.eventStart,
                                 importance: fact.importance,
                                 memory: fact.memory,
                                 source: "auto",
@@ -637,8 +641,6 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                                 threadId: args.threadId,
                                 type: fact.type,
                                 userId: args.userId,
-                                eventEnd: dates.eventEnd,
-                                eventStart: dates.eventStart,
                                 validUntil: dates.validUntil,
                             });
                             factEmbeddingsToSave.push(factEmbedding);
@@ -655,6 +657,8 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
 
                             if (nextDates) {
                                 matchable.set(similarMemory.id, { ...nextDates, pinned: current.pinned });
+                                // Revisions apply in order, so a later one of this row is judged against these dates.
+                                storedDates.set(similarMemory.id, nextDates);
                             }
 
                             if (working) {
@@ -684,7 +688,6 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                             revisedIds.add(similarMemory.id);
                             memoriesToUpdate.push({
                                 base: similarMemory.memory,
-                                observed: storedDates.get(similarMemory.id),
                                 botId: args.botId,
                                 confidence,
                                 embedding: factEmbedding,
@@ -692,6 +695,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                                 factDates: dates,
                                 memory: revisedText,
                                 memoryId: similarMemory.id,
+                                observed: storedDates.get(similarMemory.id),
                                 ...(nextDates && { dates: nextDates }),
                             });
                         }
@@ -723,9 +727,9 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                     confidence: update.confidence,
                     dates: update.dates,
                     lastConfirmedAt: now,
-                    observed: update.observed,
                     memory: update.memory,
                     memoryId: update.memoryId,
+                    observed: update.observed,
                     userId: args.userId,
                 });
             } catch (error) {

@@ -90,7 +90,8 @@ export const sameFactDates = (a: FactDates, b: FactDates): boolean =>
  * cleared, a date it carries is set. `undefined` when nothing changes.
  *
  * Written through a `dates` field that replaces all three columns
- * (`reviseExtractedMemory`, `updateMemoryInternal`, reflection's patch op), so a cleared date is removed.
+ * (`reviseExtractedMemory`, `updateMemoryInternal`), so a cleared date is removed. Reflection's merges and
+ * supersessions write no dates.
  */
 export const restatedDates = (current: FactDates, newer: FactDates): FactDates | undefined => {
     const next = factDatesOf(newer);

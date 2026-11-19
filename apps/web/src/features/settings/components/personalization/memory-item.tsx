@@ -95,12 +95,16 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
 
     const save = () => {
         const text = draft.trim();
-        const datesChanged = (Object.keys(datesAtEditStart) as (keyof MemoryDates)[]).some((key) => datesAtEditStart[key] !== draftDates[key]);
+        const keys = Object.keys(datesAtEditStart) as (keyof MemoryDates)[];
+        const datesChanged = keys.some((key) => datesAtEditStart[key] !== draftDates[key]);
+        // A date the person did not change keeps the stored value, so another tab's edit to it survives this save.
+        const stored = datesOf(memory);
+        const dates = Object.fromEntries(keys.map((key) => [key, datesAtEditStart[key] === draftDates[key] ? stored[key] : draftDates[key]])) as MemoryDates;
 
         const textChanged = text !== "" && text !== memory.memory;
 
         if (textChanged || datesChanged) {
-            onSave(memory._id, { ...(textChanged && { memory: text }), ...(datesChanged && { dates: draftDates }) });
+            onSave(memory._id, { ...(textChanged && { memory: text }), ...(datesChanged && { dates }) });
         }
 
         setIsEditing(false);

@@ -341,7 +341,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             userProviderKeys,
         });
 
-        const memoryContext = extractMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId) : undefined;
+        const memoryContext = extractMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId, prefs.timezone) : undefined;
         const extraParts = [options.system, memoryContext].filter((part): part is string => !!part);
         // Without extra parts the agent falls back to its own instructions.
         const system = extraParts.length > 0 ? [agent.options.instructions, ...extraParts].filter(Boolean).join("\n\n") : undefined;

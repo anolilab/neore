@@ -924,11 +924,11 @@ export const reviseExtractedMemory = internalMutation
         confidence: v.number(),
         // The newer statement's dates, replacing all three columns (`restatedDates`); absent keeps the row's.
         dates: v.optional(v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) })),
-        // The row's dates as the revision was planned: a person's date edit made since then is not overwritten.
-        observed: v.optional(v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) })),
         lastConfirmedAt: v.number(),
         memory: v.string(),
         memoryId: v.id("memories"),
+        // The row's dates as the revision was planned: a person's date edit made since then is not overwritten.
+        observed: v.optional(v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) })),
         userId: v.string(),
     })
     .output(v.boolean())

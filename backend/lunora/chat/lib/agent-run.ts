@@ -386,7 +386,8 @@ const retrievalCacheTtl = (timeZone: string | null | undefined): number => {
         instant += 1000;
     }
 
-    return Math.max(0, Math.min(MEMORY_RETRIEVAL_CACHE_TTL_MS, instant - now - 1000));
+    // The lifetime is set before the search runs and the result is written after it, so a search of up to 30 s can end past midnight.
+    return Math.max(0, Math.min(MEMORY_RETRIEVAL_CACHE_TTL_MS, instant - now - 30_000));
 };
 
 const retrieveMemories = async (
@@ -411,11 +412,16 @@ const retrieveMemories = async (
         // from a 60 s cache. A memory deleted in that minute can still reach one
         // reply, which is the cost of skipping the embedding call.
         const memories = servesUser(userId)
-            ? await new ActionCache<{ botId?: string; searchText: string; userId: string }, RetrievedMemory[]>(undefined, {
+            ? await new ActionCache<{ botId?: string; localDay?: string; searchText: string; userId: string }, RetrievedMemory[]>(undefined, {
                   action: internal.memory.retrieve.retrieveRelevantMemories,
                   name: "memory/retrieve",
                   ttl: retrievalCacheTtl(timeZone),
-              }).fetch(ctx, { botId, searchText: searchText.trim().toLowerCase(), userId })
+              }).fetch(ctx, {
+                  botId,
+                  localDay: timeZone === undefined ? undefined : localDayOf(Date.now(), timeZone),
+                  searchText: searchText.trim().toLowerCase(),
+                  userId,
+              })
             : await callOnShard(internal.memory.retrieve.retrieveRelevantMemories, { botId, searchText, userId }, { shardKey: userId });
 
         return {
@@ -431,8 +437,14 @@ const retrieveMemories = async (
     }
 };
 
-export const retrieveMemoryContext = async (ctx: ActionCtx, userId: string, searchText: string, botId?: string): Promise<string | undefined> => {
-    const { context } = await retrieveMemories(ctx, userId, searchText, botId, undefined);
+export const retrieveMemoryContext = async (
+    ctx: ActionCtx,
+    userId: string,
+    searchText: string,
+    botId?: string,
+    timeZone?: string | null,
+): Promise<string | undefined> => {
+    const { context } = await retrieveMemories(ctx, userId, searchText, botId, timeZone);
 
     return context;
 };

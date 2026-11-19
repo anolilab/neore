@@ -108,6 +108,8 @@ export const retrieveRelevantMemories = internalAction
     .input({
         /** The bot the chat runs as: its memories join the user's own. Unset = the user's own only. */
         botId: v.optional(v.string()),
+        // The user's local day when the caller asked: part of the chat-side cache key, not read by the search.
+        localDay: v.optional(v.string()),
         searchText: v.string(),
         userId: v.string(),
     })
