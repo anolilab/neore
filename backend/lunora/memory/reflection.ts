@@ -235,7 +235,10 @@ const vReflectionRow = v.object({
     validUntil: v.optional(v.string()),
 });
 
-/** Expiry reads at most this many active rows of a scope: pages of `EXPIRY_PAGE_ROWS`, `EXPIRY_READ_PAGES` of them. */
+/**
+ * Expiry reads a scope's active rows in pages of `EXPIRY_PAGE_ROWS`, each its own query (one transaction stays far below
+ * the read limit), at most `EXPIRY_READ_PAGES` of them.
+ */
 const EXPIRY_PAGE_ROWS = 250;
 const EXPIRY_READ_PAGES = 40;
 
@@ -256,15 +259,14 @@ const toReflectionRow = (m: Doc<"memories">) => {
 };
 
 export const loadReflectionInputs = internalQuery
-    .input({ botId: v.optional(v.string()), now: v.number(), timeZone: v.optional(v.string()), userId: v.string() })
+    .input({ botId: v.optional(v.string()), now: v.number(), userId: v.string() })
     .output(
         v.object({
-            expired: v.array(vReflectionRow),
             memories: v.array(vReflectionRow),
             threadTitles: v.array(v.string()),
         }),
     )
-    .query(async ({ args: { botId, now, timeZone, userId }, ctx }) => {
+    .query(async ({ args: { botId, now, userId }, ctx }) => {
         // One scope per call: the user's own memories (no bot), or one bot's. Merging, decay and
         // promotion never cross a scope, so one bot's memory never merges into another's or the user's.
         const scopeBot = (botId ?? null) as Id<"bots"> | null;
@@ -273,32 +275,6 @@ export const loadReflectionInputs = internalQuery
             .withIndex("by_userId_botId", (q) => q.eq("userId", userId).eq("botId", scopeBot))
             .take(REFLECTION_READ_CAP);
         const memories = rows.filter((m) => !m.supersededBy).map((m) => toReflectionRow(m));
-
-        // Expiry covers every active row of the scope, not only the capped read above: an expired fact is retired
-        // however many newer rows there are. Paged through the active index, within a bound.
-        const today = localDayOf(now, timeZone);
-        const expired: ReturnType<typeof toReflectionRow>[] = [];
-        let cursor: string | null = null;
-
-        for (let page = 0; page < EXPIRY_READ_PAGES; page += 1) {
-            const result = await ctx.db
-                .query("memories")
-                .withIndex("by_userId_botId_active", (q) => q.eq("userId", userId).eq("botId", scopeBot).eq("supersededBy", null))
-                .order("desc")
-                .paginate({ cursor, numItems: EXPIRY_PAGE_ROWS });
-
-            for (const m of result.page) {
-                if (m.pinned !== true && isExpired(m, today)) {
-                    expired.push(toReflectionRow(m));
-                }
-            }
-
-            if (result.isDone) {
-                break;
-            }
-
-            cursor = result.continueCursor;
-        }
 
         // "The day's threads": the ones that produced a memory in the last day.
         const since = now - DAY_MS;
@@ -315,7 +291,31 @@ export const loadReflectionInputs = internalQuery
                       .map((t) => t.title!)
                 : [];
 
-        return { expired, memories, threadTitles };
+        return { memories, threadTitles };
+    });
+
+/** One page of a scope's active rows, keeping those past their end date (unpinned): expiry reads the whole scope, page by page. */
+export const loadExpiredMemoriesPage = internalQuery
+    .input({ botId: v.optional(v.string()), cursor: v.union(v.string(), v.null()), now: v.number(), timeZone: v.optional(v.string()), userId: v.string() })
+    .output(v.object({ continueCursor: v.union(v.string(), v.null()), expired: v.array(vReflectionRow), isDone: v.boolean() }))
+    .query(async ({ args: { botId, cursor, now, timeZone, userId }, ctx }) => {
+        const today = localDayOf(now, timeZone);
+        const result = await ctx.db
+            .query("memories")
+            .withIndex("by_userId_botId_active", (q) =>
+                q
+                    .eq("userId", userId)
+                    .eq("botId", (botId ?? null) as Id<"bots"> | null)
+                    .eq("supersededBy", null),
+            )
+            .order("desc")
+            .paginate({ cursor, numItems: EXPIRY_PAGE_ROWS });
+
+        return {
+            continueCursor: result.continueCursor,
+            expired: result.page.filter((m) => m.pinned !== true && isExpired(m, today)).map((m) => toReflectionRow(m)),
+            isDone: result.isDone,
+        };
     });
 
 const vReflectionOp = v.union(
@@ -565,11 +565,29 @@ const reflectScope = async (
     scope: { botId: string | undefined; budget: ReflectionBudget; model: UtilityModel | undefined; now: number; timeZone: string | undefined; userId: string },
 ): Promise<ScopeOutcome> => {
     const { botId, budget, model, now, timeZone, userId } = scope;
-    const inputs = await ctx.runQuery(internal.memory.reflection.loadReflectionInputs, { botId, now, timeZone, userId });
+    const inputs = await ctx.runQuery(internal.memory.reflection.loadReflectionInputs, { botId, now, userId });
     // Expiry is read in the user's own calendar: a fact held "until the 20th" is retired on the 21st there.
     const today = localDayOf(now, timeZone);
-    // The capped read plans the rest; expiry also sees every active row, so an old expired fact is retired.
-    const everyRow = [...new Map([...inputs.memories, ...inputs.expired].map((m) => [m.id, m])).values()];
+    // The capped read plans the rest; expiry also sees every active row, page by page, so an old expired fact is retired.
+    const expiredRows: ReflectionMemory[] = [];
+    let cursor: string | null = null;
+
+    for (let page = 0; page < EXPIRY_READ_PAGES; page += 1) {
+        const result: { continueCursor: string | null; expired: ReflectionMemory[]; isDone: boolean } = await ctx.runQuery(
+            internal.memory.reflection.loadExpiredMemoriesPage,
+            { botId, cursor, now, timeZone, userId },
+        );
+
+        expiredRows.push(...result.expired);
+
+        if (result.isDone) {
+            break;
+        }
+
+        cursor = result.continueCursor;
+    }
+
+    const everyRow = [...new Map([...inputs.memories, ...expiredRows].map((m) => [m.id, m])).values()];
     const { expire, live } = splitExpired(everyRow, today);
     const memories: ReflectionMemory[] = selectReflectionInputs(live, now, REFLECTION_LIMITS);
     const byId = new Map(memories.map((m) => [m.id, m]));

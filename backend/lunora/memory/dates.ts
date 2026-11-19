@@ -40,9 +40,11 @@ export const normalizeFactDates = (raw: { eventEnd?: string | null; eventStart?:
     const validUntil = asDay(raw.validUntil);
     let eventStart = asDay(raw.eventStart);
     let eventEnd = asDay(raw.eventEnd);
+    // A start that was given but is no day drops the event's dates: the end alone would move the event to its last day.
+    const startGiven = typeof raw.eventStart === "string" && raw.eventStart.trim() !== "";
 
     if (eventStart === undefined) {
-        eventStart = eventEnd;
+        eventStart = startGiven ? undefined : eventEnd;
         eventEnd = undefined;
     }
 

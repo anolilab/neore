@@ -16,7 +16,6 @@ const WHITESPACE_RE = /\s+/;
 
 /** Cosine (vector) or Jaccard (words) score from which a memory is a near-match. */
 const NEAR_MATCH_SCORE = 0.85;
-const NEAR_EXACT_SCORE = 0.95;
 
 /**
  * Model name string stored in the vector table for memory embeddings.
@@ -194,9 +193,6 @@ const jaccardOf = (wordsA: ReadonlySet<string>, wordsB: ReadonlySet<string>): nu
 
     return union === 0 ? 0 : intersection / union;
 };
-
-/** Two wordings of the same statement: the score a near-exact duplicate reaches. */
-export const isNearExact = (a: string, b: string): boolean => jaccardOf(wordSetOf(a), wordSetOf(b)) >= NEAR_EXACT_SCORE;
 
 /**
  * Find the most similar existing memory using Jaccard similarity on word sets.

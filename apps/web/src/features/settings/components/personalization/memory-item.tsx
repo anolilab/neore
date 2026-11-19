@@ -75,6 +75,7 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
     const [datesAtEditStart, setDatesAtEditStart] = useState<MemoryDates>(() => datesOf(memory));
     const textareaId = useId();
     const dateIds = { eventEnd: useId(), eventStart: useId(), validUntil: useId() };
+    const dateErrorId = useId();
     // An event cannot end before it starts, nor without a start (the server checks the same).
     const datesInvalid = draftDates.eventEnd !== "" && (draftDates.eventStart === "" || draftDates.eventEnd < draftDates.eventStart);
     const dateFields: { key: keyof MemoryDates; label: string }[] = [
@@ -195,6 +196,7 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
                             <div className="flex items-center gap-1" key={key}>
                                 <label htmlFor={dateIds[key]}>{label}</label>
                                 <input
+                                    aria-describedby={key === "eventEnd" && datesInvalid ? dateErrorId : undefined}
                                     aria-invalid={key === "eventEnd" && datesInvalid}
                                     className="bg-background rounded border px-1.5 py-0.5"
                                     id={dateIds[key]}
@@ -210,7 +212,7 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
                             </div>
                         ))}
                     </div>
-                    {datesInvalid && <p className="text-destructive text-xs" role="alert">{t`An event cannot end before it starts.`}</p>}
+                    {datesInvalid && <p className="text-destructive text-xs" id={dateErrorId} role="alert">{t`An event cannot end before it starts.`}</p>}
                     <div className="flex justify-end gap-1">
                         <Button onClick={() => setIsEditing(false)} size="xs" variant="ghost">
                             <XIcon aria-hidden="true" className="size-3" />

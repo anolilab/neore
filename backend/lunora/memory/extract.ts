@@ -156,6 +156,8 @@ interface GateArgs {
     /** Where the messages sent into the reply start in `userMessage`. */
     steeredFrom?: number;
     threadId?: Id<"threads">;
+    /** The timezone the message was sent in. */
+    timeZone?: string;
     userId: string;
     userMessage: string;
 }
@@ -226,7 +228,7 @@ const runExtractionGate = async (ctx: ActionContext, args: GateArgs): Promise<Ga
             args.userId,
             args.userMessage,
             heuristic.assistantQuestion,
-            localDayOf(args.messageAt ?? Date.now(), await ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId: args.userId })),
+            localDayOf(args.messageAt ?? Date.now(), args.timeZone ?? (await ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId: args.userId }))),
         ),
     );
     const processed = await ctx.runQuery(internal.lib.action_cache.get, { key: processedKey, now: Date.now() });
@@ -275,6 +277,8 @@ export const extractMemories = internalAction
         /** Where the messages sent into the reply start in `userMessage`; they are kept whole when it is cut. */
         steeredFrom: v.optional(v.number()),
         threadId: v.optional(v.id("threads")),
+        /** The user's timezone when the message was sent: its relative dates resolve in it. Unset = the stored one. */
+        timeZone: v.optional(v.string()),
         toolResults: v.optional(
             v.array(
                 v.object({
@@ -321,7 +325,7 @@ export const extractMemories = internalAction
         );
         // The dates each row was read with, before this run changes them: a revision checks them when it applies.
         const storedDates = new Map<string, FactDates>(existingMemories.map((m) => [m._id as string, factDatesOf(m)]));
-        const timeZone = await ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId: args.userId });
+        const timeZone = args.timeZone ?? (await ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId: args.userId }));
         const today = describeToday(messageAt, timeZone);
 
         // 3. LLM extraction — truncate inputs to control cost

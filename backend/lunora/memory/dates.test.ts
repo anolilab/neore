@@ -141,3 +141,10 @@ describe("retrieval drops expired facts", () => {
         expect(row.validUntil).toBeUndefined();
     });
 });
+
+describe("a malformed event start", () => {
+    it("drops the event's dates rather than moving the event to its end day", () => {
+        expect(normalizeFactDates({ eventEnd: "2026-11-20", eventStart: "next week" })).toEqual({});
+        expect(normalizeFactDates({ eventEnd: "2026-11-20", eventStart: "" })).toEqual({ eventStart: "2026-11-20" });
+    });
+});

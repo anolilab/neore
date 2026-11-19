@@ -624,7 +624,7 @@ export const saveMemoryBatch = internalMutation
             memoryIds.push(await insertMemory(ctx, { ...mem, supersedes }, now));
         }
 
-        // The originals are retired by the same write, pointing at themselves as `markMemorySupersededByCompression` does.
+        // The originals are retired by the same write. Each points at itself: `supersededBy` is its own id when compression retired it.
         const compressedFrom = args.compressedFrom ?? [];
 
         for (const id of compressedFrom) {
@@ -1212,34 +1212,6 @@ export const getMemoriesByEmbeddingIds = internalQuery
 
         return settled.filter((r): r is NonNullable<typeof r> => r !== null);
     });
-
-export const markMemorySupersededByCompression = internalMutation.input({ memoryId: v.id("memories"), userId: v.string() }).mutation(async ({ args, ctx }) => {
-    const memory = await ctx.db.get("memories", args.memoryId);
-
-    // Ownership guard: skip silently if memory doesn't exist or belongs to another user
-    if (!memory || memory.userId !== args.userId) {
-        return;
-    }
-
-    // Idempotency guard: if already superseded (e.g. by a concurrent compression run),
-    // do nothing. This is the defence-in-depth layer for H1.
-    if (memory.supersededBy) {
-        return;
-    }
-
-    // A row given dates after its candidates were read is kept: compression rewrites text without dates.
-    if (hasFactDates(factDatesOf(memory))) {
-        return;
-    }
-
-    await ctx.db.patch("memories", args.memoryId, {
-        // Sentinel: memory points to itself to signal "retired by compression".
-        // All active-memory queries filter by !supersededBy, so this record
-        // is hidden from normal queries without needing a separate boolean field.
-        supersededBy: args.memoryId,
-        updatedAt: ctx.now,
-    });
-});
 
 export const getMemoryById = internalQuery.input({ memoryId: v.id("memories") }).query(async ({ args, ctx }) => ctx.db.get("memories", args.memoryId));
 

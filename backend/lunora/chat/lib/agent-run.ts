@@ -813,6 +813,8 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
             // When it was said, not when the reply ended or the job runs: a reply or a pause can cross midnight.
             messageAt: args.promptAt ?? args.timingStart ?? Date.now(),
             threadId: threadId as Id<"threads">,
+            // The timezone the message was sent in: a change before the job runs does not move its dates.
+            ...(args.timeZone && { timeZone: args.timeZone }),
             userId,
             // A steer can carry the very fact worth keeping ("actually, I'm vegetarian"); `steeredFrom` keeps it whole when a long prompt is cut.
             userMessage: [prompt, ...labelSentDays(steeredTexts, args.steeredAt, args.promptAt ?? args.timingStart, args.timeZone)].join("\n\n"),
@@ -1542,11 +1544,13 @@ export const resumeApprovedRun = async (
                 ...(config.memory?.botId && { botId: config.memory.botId }),
                 extractMemory: extractMemory && config.memory !== undefined && prefs.memoryEnabled,
                 firstTokenTime,
-                // Its prompt is the steers: the first one's day, not the continuation's start, is the one "tomorrow" is read
-                // against, and a later one sent on another day says so.
-                prompt: labelSentDays(steered, steeredTimes, steeredTimes[0], prefs.timezone).join("\n\n"),
+                // Its prompt is the first steer, read against its own day; the later ones follow as steers, labelled with
+                // their day when it differs, and the last one's time is the day expiry is checked on (`steeredAt`).
+                prompt: steered[0] ?? "",
                 ...(steeredTimes[0] !== undefined && { promptAt: steeredTimes[0] }),
                 savedMessages,
+                steeredAt: steeredTimes.slice(1),
+                steeredTexts: steered.slice(1),
                 summarizeThread: prefs.threadSummariesEnabled,
                 threadId,
                 ...(prefs.timezone && { timeZone: prefs.timezone }),

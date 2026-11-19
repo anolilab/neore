@@ -553,11 +553,6 @@ export const revisionToOps = (
     }
 };
 
-/**
- * A merge: the survivor takes the model's merged wording when it offered one,
- * the highest confidence in the cluster, and is reconfirmed; the rest point at it.
- * Its dates stay: every row of a cluster has the same ones (`clusterBySimilarity`).
- */
 /** A supersession planned on the dates both rows held then: applying it checks they still hold them. */
 const supersedeChecked = (memoryId: string, byMemoryId: string, memories: ReadonlyMap<string, ReflectionMemory>): ReflectionOp => {
     const row = memories.get(memoryId);
@@ -571,6 +566,11 @@ const supersedeChecked = (memoryId: string, byMemoryId: string, memories: Readon
     };
 };
 
+/**
+ * A merge: the survivor takes the model's merged wording when it offered one,
+ * the highest confidence in the cluster, and is reconfirmed; the rest point at it.
+ * Its dates stay: every row of a cluster has the same ones (`clusterBySimilarity`).
+ */
 export const mergeToOps = (merge: MergeCandidate, memories: ReadonlyMap<string, ReflectionMemory>, now: number, mergedText?: string): ReflectionOp[] => {
     const confidence = Math.max(...[merge.survivorId, ...merge.absorbedIds].map((id) => memories.get(id)?.confidence ?? 0));
     const text = mergedText?.trim();
