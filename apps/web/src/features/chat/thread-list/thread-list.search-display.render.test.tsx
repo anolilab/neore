@@ -46,7 +46,7 @@ const lingui = vi.hoisted(() => {
 vi.mock("../follows/use-thread-follow", () => {
     return {
         useThreadFollow: () => {
-            return { isPending: false, setState: () => {}, state: undefined };
+            return { error: null, isPending: false, setState: () => {}, state: undefined };
         },
     };
 });

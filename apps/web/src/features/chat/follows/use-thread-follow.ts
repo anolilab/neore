@@ -16,7 +16,7 @@ export const useThreadFollow = (threadId: string | null) => {
     const queryClient = useQueryClient();
     // TODO(anolilab/lunora#1628): not live, because a patch to a `.global()` row does not re-run live queries yet; a live
     // query would answer the refetch below from its stale subscription.
-    const { data } = useQuery(
+    const { data, error: loadError } = useQuery(
         crpc.chat.follows.functions.getThreadFollow.queryOptions(threadId ? { threadId: threadId as Id<"threads"> } : skipToken, { live: false }),
     );
     const { isPending, mutate } = useMutation({
@@ -33,6 +33,7 @@ export const useThreadFollow = (threadId: string | null) => {
     });
 
     return {
+        error: loadError,
         isPending,
         setState: (state: ThreadFollowState) => {
             if (threadId) {

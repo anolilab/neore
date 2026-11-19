@@ -41,6 +41,7 @@ vi.mock("@/lib/toast", () => {
 
 const follow = vi.hoisted(() => {
     return {
+        error: null as Error | null,
         isPending: false,
         setState: vi.fn(),
         state: "off" as "on" | "off" | "muted" | undefined,
@@ -50,7 +51,7 @@ const follow = vi.hoisted(() => {
 vi.mock("../follows/use-thread-follow", () => {
     return {
         useThreadFollow: () => {
-            return { isPending: follow.isPending, setState: follow.setState, state: follow.state };
+            return { error: follow.error, isPending: follow.isPending, setState: follow.setState, state: follow.state };
         },
     };
 });
@@ -125,6 +126,7 @@ describe("ThreadOptionsMenu", () => {
 
     describe("follow items", () => {
         beforeEach(() => {
+            follow.error = null;
             follow.isPending = false;
             follow.setState.mockReset();
         });
@@ -162,6 +164,15 @@ describe("ThreadOptionsMenu", () => {
 
             expect(screen.queryByRole("menuitem", { name: "Follow thread" })).toBeNull();
             expect(screen.queryByRole("menuitem", { name: "Mute thread" })).toBeNull();
+        });
+
+        it("says the follow state could not be loaded, instead of hiding the items", () => {
+            follow.state = undefined;
+            follow.error = new Error("network");
+            renderMenu();
+
+            expect(screen.getByRole("menuitem", { name: "Couldn't load follow state" }).getAttribute("aria-disabled")).toBe("true");
+            expect(screen.queryByRole("menuitem", { name: "Follow thread" })).toBeNull();
         });
 
         it("disables the follow items while a change is in flight", () => {

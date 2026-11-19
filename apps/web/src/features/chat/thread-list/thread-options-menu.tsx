@@ -95,6 +95,7 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                             {t`Regenerate title`}
                         </DropdownMenuItem>
                     )}
+                    {!isLocked && follow.error !== null && <DropdownMenuItem disabled>{t`Couldn't load follow state`}</DropdownMenuItem>}
                     {/* Disabled while a change is in flight: a second choice made then could reach the server first. */}
                     {!isLocked && follow.state !== undefined && follow.state !== "on" && (
                         <DropdownMenuItem disabled={follow.isPending} onClick={() => follow.setState("on")}>

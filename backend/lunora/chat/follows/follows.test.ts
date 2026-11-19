@@ -351,3 +351,21 @@ describe("the account export", () => {
         expect(source).toContain("threadFollows: threadFollows.section");
     });
 });
+
+describe("sharing writes the follow rows first", () => {
+    // Read from source: each pair is two writes that commit separately, so the order decides what a failure leaves behind.
+    const source = readFileSync(join(import.meta.dirname, "../sharing.ts"), "utf8");
+    const between = (from: string, to: string): string => source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from) + from.length));
+
+    it("writes the sharer's default before the invite, so a failed follow write leaves no pending invite to block a retry", () => {
+        const body = between("export const createThreadInvite", "export const ");
+
+        expect(body.indexOf("ensureThreadFollowDefault(")).toBeLessThan(body.indexOf("internal.agent.sharing.createThreadInvite"));
+    });
+
+    it("deletes a removed member's follow row before their grant, so a failed cleanup keeps the grant for a retry", () => {
+        const body = between("export const removeThreadAccess", "export const toggleThreadVisibility");
+
+        expect(body.indexOf("deleteFollowRowOfRemovedMember")).toBeLessThan(body.indexOf("internal.agent.sharing.deleteThreadAccess"));
+    });
+});

@@ -240,6 +240,10 @@ export const createThreadInvite = authMutation
             throw new LunoraError("BAD_REQUEST", "An invite already exists for this email");
         }
 
+        // Sharing makes the thread one others can post in, so the sharer follows it by default; an explicit choice is kept.
+        // Before the invite: if this write fails, no pending invite blocks a retry, and a retry re-runs it as a no-op.
+        await ensureThreadFollowDefault(context, { now: context.now, state: "on", threadId, userId });
+
         const inviteToken = generateToken();
         const expiresAt = calculateExpirationTime(expirationType, customHours);
 
@@ -254,9 +258,6 @@ export const createThreadInvite = authMutation
             permission,
             threadId,
         });
-
-        // Sharing makes the thread one others can post in, so the sharer follows it by default. An explicit choice is kept.
-        await ensureThreadFollowDefault(context, { now: context.now, state: "on", threadId, userId });
 
         context.log.event("chat.create_thread_invite", { expirationType, permission });
 
@@ -469,15 +470,16 @@ export const removeThreadAccess = authMutation
             userId: targetUserId,
         });
 
+        // A person who leaves the thread loses their follow row. The admin's view cannot read another person's row (owner-only
+        // RLS), so the trusted internal mutation deletes it. Before the grant: the two writes commit separately, and a failed
+        // cleanup must leave the grant in place so the removal can be retried, never a removed member with a follow row.
+        await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
+
         if (access) {
             await context.runMutation(internal.agent.sharing.deleteThreadAccess, {
                 accessId: access._id,
             });
         }
-
-        // A person who leaves the thread loses their follow row in the same mutation. The admin's view cannot read another
-        // person's row (owner-only RLS), so the trusted internal mutation deletes it.
-        await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
 
         context.log.event("chat.remove_thread_access", { removed: Boolean(access) });
     });
