@@ -663,7 +663,11 @@ const reflectScope = async (
         }
 
         try {
-            const decision = await runBeliefRevision(model, pair.olderText, pair.newerText, REFLECTION_LIMITS.maxOutputTokensPerCall);
+            const older = byId.get(pair.olderId);
+            const newer = byId.get(pair.newerId);
+            // The newer row keeps its own dates: an UPDATE's merged wording is written for them when the two rows' differ.
+            const newDates = older && newer && !sameFactDates(factDatesOf(older), factDatesOf(newer)) ? factDatesOf(newer) : undefined;
+            const decision = await runBeliefRevision(model, pair.olderText, pair.newerText, REFLECTION_LIMITS.maxOutputTokensPerCall, newDates);
             const pairOps = revisionToOps(pair, decision, now, byId);
 
             if (pairOps.length > 0) {
@@ -687,15 +691,21 @@ const reflectScope = async (
     let expiryApplied = 0;
     const expirySuperseded: string[] = [];
 
+    // A batch that fails is logged and skipped: the run still writes the rest and its digest, and the next night's run,
+    // which finds expired rows from every active row again, retires what it left.
     for (let start = 0; start < expiryOps.length; start += EXPIRY_WRITE_BATCH) {
-        const batch = await ctx.runMutation(internal.memory.reflection.applyReflectionOps, {
-            botId,
-            ops: expiryOps.slice(start, start + EXPIRY_WRITE_BATCH),
-            userId,
-        });
+        try {
+            const batch = await ctx.runMutation(internal.memory.reflection.applyReflectionOps, {
+                botId,
+                ops: expiryOps.slice(start, start + EXPIRY_WRITE_BATCH),
+                userId,
+            });
 
-        expiryApplied += batch.applied;
-        expirySuperseded.push(...batch.supersededIds);
+            expiryApplied += batch.applied;
+            expirySuperseded.push(...batch.supersededIds);
+        } catch (error) {
+            console.warn("[memory/reflection] An expiry batch failed; the next run retires its rows:", error);
+        }
     }
 
     const result =

@@ -531,9 +531,9 @@ export const revisionToOps = (
             return [supersedeChecked(pair.olderId, pair.newerId, memories)];
         }
         case "UPDATE": {
-            // The newer row keeps its own dates: they are the newer statement's. A merged wording of two rows with other
-            // dates could name the older one's day beside them, so it is taken only when the dates agree.
-            const merged = !older || !newer || sameFactDates(older, newer) ? decision.mergedMemory?.trim() : undefined;
+            // The newer row keeps its own dates: they are the newer statement's. When the rows' dates differ, the merged
+            // wording was written for the newer row's dates (`runBeliefRevision`'s `newDates`).
+            const merged = decision.mergedMemory?.trim();
 
             // The wording is planned on the newer row's dates too: a wording written for dates the row no longer holds is not written.
             return [

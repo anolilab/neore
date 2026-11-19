@@ -343,16 +343,17 @@ describe("the newer statement decides the dates", () => {
         expect(findMergeCandidates([undated, first, second], REFLECTION_LIMITS)).toEqual([]);
     });
 
-    it("keeps the newer row's own text and dates on UPDATE when the dates differ, and lets the newer row stand on IGNORE", () => {
-        const older = memory({ text: "User is in Lisbon until 2026-11-20", validUntil: "2026-11-20" });
+    it("writes the merged wording onto the newer row, which keeps its own dates, and lets the newer row stand on IGNORE", () => {
+        const older = memory({ text: "User is in Lisbon with their sister until 2026-11-20", validUntil: "2026-11-20" });
         const newer = memory({ text: "User is in Lisbon for work" });
         const pair = { newerId: newer.id, newerText: newer.text, olderId: older.id, olderText: older.text };
 
-        // The merged wording could name the older row's day beside the newer row's empty date fields.
-        expect(revisionToOps(pair, { action: "UPDATE", mergedMemory: "User is in Lisbon for work until 2026-11-20" }, NOW, byId([older, newer]))[0]).toEqual({
+        // The merged wording was written for the newer row's dates, so it keeps the older row's other details.
+        expect(revisionToOps(pair, { action: "UPDATE", mergedMemory: "User is in Lisbon for work with their sister" }, NOW, byId([older, newer]))[0]).toEqual({
             checkDates: { memory: {} },
             kind: "patch",
             lastConfirmedAt: NOW,
+            memory: "User is in Lisbon for work with their sister",
             memoryId: newer.id,
         });
         expect(
