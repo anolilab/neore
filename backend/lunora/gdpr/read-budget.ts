@@ -38,3 +38,9 @@ export const triggerReadBudget = (used: number): number => Math.max(0, Math.min(
 
 /** What the feedback may read after the earlier sections read `used` bytes; 0 leaves it all out, marked as cut. */
 export const feedbackReadBudget = (used: number): number => Math.max(0, Math.min(FEEDBACK_READ_BYTES, ACTION_READ_BYTES - used - READ_MARGIN_BYTES));
+
+/** The most reading the user's follow rows may cost (`chat/follows/export-pages.ts`). */
+export const THREAD_FOLLOWS_READ_BYTES = 2 * 1024 * 1024;
+
+/** What the follow rows may read after the earlier sections read `used` bytes; 0 leaves them all out, marked as cut. */
+export const threadFollowsReadBudget = (used: number): number => Math.max(0, Math.min(THREAD_FOLLOWS_READ_BYTES, ACTION_READ_BYTES - used - READ_MARGIN_BYTES));

@@ -20,6 +20,9 @@ import { MAX_LENGTH } from "../../lib/validators";
 /** A follow state set by the person: follow, unfollow, or mute. */
 export type ThreadFollowState = "on" | "off" | "muted";
 
+/** The size a row read costs the request's read budget. */
+const bytesOf = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+
 /** Rows read or deleted per call of a bounded follow-row cleanup. */
 const FOLLOW_BATCH = 100;
 
@@ -31,7 +34,7 @@ export const setThreadFollowState = async (
     ctx: Pick<MutationCtx, "db">,
     { now, state, threadId, userId }: { now: number; state: ThreadFollowState; threadId: Id<"threads">; userId: string },
 ): Promise<void> => {
-    const existing = await ctx.db.threadFollows.findFirst({ where: { threadId, userId } });
+    const existing = await ctx.db.threadFollows.findFirst({ consistency: "primary", where: { threadId, userId } });
 
     if (existing) {
         await ctx.db.patch("threadFollows", existing._id, { state, updatedAt: now });
@@ -62,7 +65,7 @@ export const ensureThreadFollowDefault = async (
     ctx: Pick<MutationCtx, "db">,
     { now, state, threadId, userId }: { now: number; state: ThreadFollowState; threadId: Id<"threads">; userId: string },
 ): Promise<void> => {
-    const existing = await ctx.db.threadFollows.findFirst({ where: { threadId, userId } });
+    const existing = await ctx.db.threadFollows.findFirst({ consistency: "primary", where: { threadId, userId } });
 
     if (existing) {
         return;
@@ -80,7 +83,7 @@ export const ensureThreadFollowDefault = async (
 
 /** Deletes a person's follow row for a thread, if any: used when they leave the thread or the thread goes. */
 export const deleteThreadFollowRow = async (ctx: Pick<MutationCtx, "db">, { threadId, userId }: { threadId: Id<"threads">; userId: string }): Promise<void> => {
-    const existing = await ctx.db.threadFollows.findFirst({ where: { threadId, userId } });
+    const existing = await ctx.db.threadFollows.findFirst({ consistency: "primary", where: { threadId, userId } });
 
     if (existing) {
         await ctx.db.delete("threadFollows", existing._id);
@@ -89,7 +92,7 @@ export const deleteThreadFollowRow = async (ctx: Pick<MutationCtx, "db">, { thre
 
 /** Deletes one batch of a thread's follow rows; `true` when none are left, so the caller can delete the thread. */
 export const deleteFollowRowsOfThread = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">): Promise<boolean> => {
-    const page = await ctx.db.threadFollows.findMany({ limit: FOLLOW_BATCH, where: { threadId } });
+    const page = await ctx.db.threadFollows.findMany({ consistency: "primary", limit: FOLLOW_BATCH, where: { threadId } });
 
     await Promise.all(page.page.map((row) => ctx.db.delete("threadFollows", row._id)));
 
@@ -98,7 +101,7 @@ export const deleteFollowRowsOfThread = async (ctx: Pick<MutationCtx, "db">, thr
 
 /** Deletes one batch of a person's follow rows; `true` when none are left. Account erasure drains it round by round. */
 export const deleteFollowRowsOfUserBatch = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<boolean> => {
-    const page = await ctx.db.threadFollows.findMany({ limit: FOLLOW_BATCH, where: { userId } });
+    const page = await ctx.db.threadFollows.findMany({ consistency: "primary", limit: FOLLOW_BATCH, where: { userId } });
 
     await Promise.all(page.page.map((row) => ctx.db.delete("threadFollows", row._id)));
 
@@ -118,12 +121,12 @@ export const deleteFollowRowOfRemovedMember = internalMutation
 /** A person's follow rows, one batch per call, for the account export. */
 export const collectThreadFollowsForExport = internalQuery
     .input({
-        cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
+        cursor: v.optional(v.string().max(MAX_LENGTH.cursor)),
         userId: v.string().max(MAX_LENGTH.id),
     })
     .output(
         v.object({
-            cursor: v.union(v.string(), v.null()),
+            continueCursor: v.optional(v.string()),
             follows: v.array(
                 v.object({
                     createdAt: v.number(),
@@ -132,16 +135,19 @@ export const collectThreadFollowsForExport = internalQuery
                     updatedAt: v.number(),
                 }),
             ),
+            // The whole rows read, not what is exported: the action's read budget counts what was read.
+            readBytes: v.number(),
         }),
     )
     .query(async ({ args: { cursor, userId }, ctx: context }) => {
-        const page = await context.db.threadFollows.findMany({ cursor: cursor ?? null, limit: FOLLOW_BATCH, where: { userId } });
+        const page = await context.db.threadFollows.findMany({ consistency: "primary", cursor, limit: FOLLOW_BATCH, where: { userId } });
 
         return {
-            cursor: page.isDone ? null : page.continueCursor,
+            continueCursor: page.isDone ? undefined : (page.continueCursor ?? undefined),
             follows: page.page.map((row) => {
                 return { createdAt: row.createdAt, state: row.state, threadId: row.threadId as string, updatedAt: row.updatedAt };
             }),
+            readBytes: page.page.reduce((total, row) => total + bytesOf(row), 0),
         };
     });
 
@@ -161,7 +167,8 @@ export const getThreadFollow = authQuery
         // Only someone who can read the thread may see or change its follow state.
         await requireThreadPermission(context, threadId, userId, "read", unlockProof);
 
-        const row = await context.db.threadFollows.findFirst({ where: { threadId, userId } });
+        // From the primary: the menu refetches right after a change, and a replica can still hold the old choice.
+        const row = await context.db.threadFollows.findFirst({ consistency: "primary", where: { threadId, userId } });
 
         return { state: row?.state ?? "off" };
     });
@@ -176,7 +183,8 @@ export const setThreadFollow = authMutation
     .mutation(async ({ args: { state, threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
 
-        await requireThreadPermission(context, threadId, userId, "read", unlockProof);
+        // The grant is read from the primary: a member removed a moment ago must not write a row back.
+        await requireThreadPermission(context, threadId, userId, "read", unlockProof, { primary: true });
         await setThreadFollowState(context, { now: context.now, state, threadId, userId });
 
         context.log.event("chat.set_thread_follow", { state });

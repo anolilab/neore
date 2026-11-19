@@ -213,6 +213,9 @@ describe("account deletion workflow: order", () => {
         // Projects are found through workflow rows, and the document history is the last data purge.
         before("delete-user-workflow-data", "delete-user-projects");
         before("delete-auth-records", "delete-user-identity");
+        // A follow write admitted before sign-in ended is caught by a last drain once nobody can be admitted.
+        before("delete-user-follow-rows", "delete-user-thread-cascade");
+        before("delete-auth-records", "delete-user-follow-rows-final");
         before("delete-user-identity", "purge-user-document-history");
         before("purge-user-document-history", "erase-post-hog-person");
     });

@@ -340,13 +340,14 @@ describe("thread follow writes that race", () => {
 
 describe("the account export", () => {
     // Read from source: the export action needs storage and a workflow to run.
-    it("counts the follow rows it read before the trigger history's budget", () => {
+    it("reads the follow rows within their own budget, before the trigger history's", () => {
         const source = readFileSync(join(import.meta.dirname, "../../gdpr/steps.ts"), "utf8");
 
         expect(source.indexOf("const threadFollows = await collectAllThreadFollows(")).toBeLessThan(
             source.indexOf("const triggerReadBytes = triggerReadBudget("),
         );
-        expect(source).toContain("+ readBytes(threadFollows)");
-        expect(source).toContain("            threadFollows,\n");
+        expect(source).toContain("threadFollowsReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes)");
+        expect(source).toContain("+ threadFollows.readBytes");
+        expect(source).toContain("threadFollows: threadFollows.section");
     });
 });

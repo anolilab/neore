@@ -7,7 +7,8 @@ import { collectAcpSessionPages } from "../acp/gdpr";
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
-import { feedbackReadBudget, projectDetailsReadBudget, repositoriesReadBudget, triggerReadBudget } from "./read-budget";
+import { feedbackReadBudget, projectDetailsReadBudget, repositoriesReadBudget, threadFollowsReadBudget, triggerReadBudget } from "./read-budget";
+import { collectAllThreadFollows } from "../chat/follows/export-pages";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
@@ -188,24 +189,6 @@ export const collectThreadTags = internalQuery
             return { _id: tag._id as string, color: tag.color, createdAt: tag.createdAt, name: tag.name, order: tag.order, updatedAt: tag.updatedAt };
         });
     });
-
-/** Every follow row of a paged export read: the pages one after another until the last (`cursor` null). */
-const collectAllThreadFollows = async <T>(readPage: (cursor: string | null) => Promise<{ cursor: string | null; follows: T[] }>): Promise<T[]> => {
-    const rows: T[] = [];
-    let cursor: string | null = null;
-
-    for (;;) {
-        const result = await readPage(cursor);
-
-        rows.push(...result.follows);
-
-        if (result.cursor === null) {
-            return rows;
-        }
-
-        cursor = result.cursor;
-    }
-};
 
 /** Every row of a paged export read: the pages one after another until the last. */
 const readAllPages = async <T>(readPage: (cursor: string | null) => Promise<{ continueCursor: string | null; isDone: boolean; page: T[] }>): Promise<T[]> => {
@@ -633,14 +616,14 @@ export const generateExportFile = internalAction
             async (cursor) => await context.runQuery(internal.projects.gdpr.collectOwnedProjectsForExport, { cursor, userId: args.userId }),
             projectDetailsReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes),
         );
-        // Each user's follow states on threads they follow, read a page per query (`chat/follows/functions.ts`).
+        // The user's follow states, a page per query within what the sections above left; past it marked as cut.
         const threadFollows = await collectAllThreadFollows(
             async (cursor) => await context.runQuery(internal.chat.follows.functions.collectThreadFollowsForExport, { cursor, userId: args.userId }),
+            threadFollowsReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes),
         );
-        // The projects read for their details count too: a row is read whole, however little of it is exported. So do the
-        // follow rows, which have no cap of their own.
+        // The projects read for their details count too: a row is read whole, however little of it is exported.
         const triggerReadBytes = triggerReadBudget(
-            earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes + readBytes(threadFollows),
+            earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes + threadFollows.readBytes,
         );
         const exportData = {
             acpSessions,
@@ -671,7 +654,7 @@ export const generateExportFile = internalAction
             settings: args.settings,
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
-            threadFollows,
+            threadFollows: threadFollows.section,
             threadTags: args.threadTags ?? [],
             // Triggers with their settings and their newest runs, read here within a byte budget (`triggers/gdpr.ts`).
             triggers: await collectAllTriggers(
