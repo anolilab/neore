@@ -102,6 +102,8 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "24.22.1"
                   npm-version: "11"
+            - name: "Generate the Lunora backend code"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # services/document-parser is a Rust Worker: its `build:worker`
             # (which `test` depends on, and `lunora dev` runs on start) needs
@@ -229,6 +231,8 @@ jobs:
                   npm-version: "11"
                   # The browsers come from the cache below (or its miss install), not from setup.
                   skip-playwright: "true"
+            - name: "Generate the Lunora backend code"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # Stories import `@neore/ai`, whose `dist` is gitignored; without it Vite cannot resolve
             # `@neore/ai/models` and every story that touches a model fails to load.
@@ -367,6 +371,8 @@ jobs:
                   npm-version: "11"
                   # The browsers come from the cache below (or its miss install), not from setup.
                   skip-playwright: "true"
+            - name: "Generate the Lunora backend code"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # Playwright's first `webServer` is the backend, and `buildAuth(env)`
             # refuses to start without a signing secret:
@@ -759,6 +765,8 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
+            - name: "Generate the Lunora backend code"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Install Rust (stable)"
               uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # v1
@@ -816,6 +824,8 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
+            - name: "Generate the Lunora backend code"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Install Rust (stable)"
               uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # v1
@@ -873,6 +883,8 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
+            - name: "Generate the Lunora backend code"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Install Rust (stable)"
               uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # v1

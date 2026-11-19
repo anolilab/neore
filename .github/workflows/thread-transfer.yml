@@ -39,6 +39,8 @@ jobs:
                   enable-nx-cache: "false"
                   node-version: "24.22.1"
                   npm-version: "11"
+            - name: "Generate the Lunora backend code"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Build workspace packages"
               run: "pnpm run build:packages"
