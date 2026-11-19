@@ -361,7 +361,7 @@ describe("the newer statement decides the dates", () => {
         });
         expect(revisionToOps(pair, { action: "IGNORE" }, NOW, byId([older, newer]))).toEqual([
             { kind: "patch", lastConfirmedAt: NOW, memoryId: newer.id },
-            { byMemoryId: newer.id, kind: "supersede", memoryId: older.id },
+            { byMemoryId: newer.id, checkDates: { by: {}, memory: { validUntil: "2026-11-20" } }, kind: "supersede", memoryId: older.id },
         ]);
     });
 });

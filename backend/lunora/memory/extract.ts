@@ -46,7 +46,6 @@ import {
     findSimilarMemoryByJaccard,
     findSimilarMemoryByVector,
     getMemoryEmbeddingModel,
-    isNearExact,
     linkMemoryVectors,
     MEMORY_EMBEDDING_MODEL_NAME,
     saveMemoryVectors,
@@ -221,7 +220,12 @@ const runExtractionGate = async (ctx: ActionContext, args: GateArgs): Promise<Ga
     // short reply answers, so "yes" to two different questions is two keys.)
     const processedKey = await cacheKeyFor(
         PROCESSED_EXCHANGE_CACHE_NAME,
-        processedExchangeFingerprint(args.userId, args.userMessage, heuristic.assistantQuestion),
+        processedExchangeFingerprint(
+            args.userId,
+            args.userMessage,
+            heuristic.assistantQuestion,
+            localDayOf(Date.now(), await ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId: args.userId })),
+        ),
     );
     const processed = await ctx.runQuery(internal.lib.action_cache.get, { key: processedKey, now: Date.now() });
 
@@ -313,6 +317,8 @@ export const extractMemories = internalAction
         const matchable = new Map<string, FactDates & { pinned?: boolean }>(
             existingMemories.map((m) => [m._id as string, { ...factDatesOf(m), pinned: m.pinned }]),
         );
+        // The dates each row was read with, before this run changes them: a revision checks them when it applies.
+        const storedDates = new Map<string, FactDates>(existingMemories.map((m) => [m._id as string, factDatesOf(m)]));
         const timeZone = await ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId: args.userId });
         const today = describeToday(messageAt, timeZone);
 
@@ -446,6 +452,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             confidence: number;
             dates?: FactDates;
             embedding: number[] | null;
+            observed?: FactDates;
             fact: z.infer<typeof extractedFactSchema>;
             factDates: FactDates;
             memory: string;
@@ -524,7 +531,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
 
             // The extractor can return one statement twice: the second is the first, already settled (saved, merged
             // or confirmed), not a new fact.
-            if (handled.some((earlier) => sameFactDates(earlier.dates, dates) && isNearExact(fact.memory, earlier.memory))) {
+            if (handled.some((earlier) => sameFactDates(earlier.dates, dates) && earlier.memory.trim().toLowerCase() === fact.memory.trim().toLowerCase())) {
                 continue;
             }
 
@@ -549,6 +556,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
 
                     if (match && !matchable.has(match.id)) {
                         matchable.set(match.id, { ...factDatesOf(match.row), pinned: match.row.pinned });
+                        storedDates.set(match.id, factDatesOf(match.row));
                     }
 
                     similarMemory = match;
@@ -642,18 +650,22 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                             // The newer statement's dates replace the row's (`restatedDates`), here and for later facts of the run.
                             const nextDates = restatedDates(current, dates);
 
+                            // A revision that changes the dates takes the newer statement's words, so the text never names a day the columns lack.
+                            const revisedText = nextDates ? (redactMemoryText(fact.memory) ?? mergedMemory) : mergedMemory;
+
                             if (nextDates) {
                                 matchable.set(similarMemory.id, { ...nextDates, pinned: current.pinned });
                             }
 
                             if (working) {
-                                working.memory = mergedMemory;
+                                working.memory = revisedText;
                                 working.confidence = confidence;
                             } else {
                                 // A row found by vector past the window joins the working set, so later facts match its revised words.
                                 const row = await ctx.runQuery(internal.memory.functions.getMemoryById, { memoryId: similarMemory.id });
 
                                 if (row) {
+                                    storedDates.set(row._id as string, factDatesOf(row));
                                     existingMemories.push({
                                         _id: row._id,
                                         confidence,
@@ -661,7 +673,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                                         embeddingId: row.embeddingId ?? undefined,
                                         importance: row.importance ?? undefined,
                                         lastConfirmedAt: lastConfirmedOf(row),
-                                        memory: mergedMemory,
+                                        memory: revisedText,
                                         pinned: row.pinned === true,
                                         type: row.type,
                                         ...factDatesOf(nextDates ?? row),
@@ -672,12 +684,13 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                             revisedIds.add(similarMemory.id);
                             memoriesToUpdate.push({
                                 base: similarMemory.memory,
+                                observed: storedDates.get(similarMemory.id),
                                 botId: args.botId,
                                 confidence,
                                 embedding: factEmbedding,
                                 fact,
                                 factDates: dates,
-                                memory: mergedMemory,
+                                memory: revisedText,
                                 memoryId: similarMemory.id,
                                 ...(nextDates && { dates: nextDates }),
                             });
@@ -710,6 +723,7 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                     confidence: update.confidence,
                     dates: update.dates,
                     lastConfirmedAt: now,
+                    observed: update.observed,
                     memory: update.memory,
                     memoryId: update.memoryId,
                     userId: args.userId,

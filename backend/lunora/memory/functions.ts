@@ -10,7 +10,7 @@ import { memoryLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
 import { patchById, patchRow, withoutUndefined } from "../lib/patch";
 import { runAfterOnShard } from "../lib/shard-scheduler";
-import { dateColumns, factDatesOf, isExpired, restatedDates, userFactDates } from "./dates";
+import { dateColumns, factDatesOf, hasFactDates, isExpired, normalizeFactDates, restatedDates, sameFactDates, userFactDates } from "./dates";
 import {
     type ImportApp,
     importDedupKey,
@@ -924,6 +924,8 @@ export const reviseExtractedMemory = internalMutation
         confidence: v.number(),
         // The newer statement's dates, replacing all three columns (`restatedDates`); absent keeps the row's.
         dates: v.optional(v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) })),
+        // The row's dates as the revision was planned: a person's date edit made since then is not overwritten.
+        observed: v.optional(v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) })),
         lastConfirmedAt: v.number(),
         memory: v.string(),
         memoryId: v.id("memories"),
@@ -942,6 +944,10 @@ export const reviseExtractedMemory = internalMutation
         const memory = redactMemoryText(args.memory);
 
         if (row.memory !== args.base || memory === null) {
+            return false;
+        }
+
+        if (args.observed && !sameFactDates(factDatesOf(row), normalizeFactDates(args.observed))) {
             return false;
         }
 
@@ -1196,6 +1202,11 @@ export const markMemorySupersededByCompression = internalMutation.input({ memory
     // Idempotency guard: if already superseded (e.g. by a concurrent compression run),
     // do nothing. This is the defence-in-depth layer for H1.
     if (memory.supersededBy) {
+        return;
+    }
+
+    // A row given dates after its candidates were read is kept: compression rewrites text without dates.
+    if (hasFactDates(factDatesOf(memory))) {
         return;
     }
 

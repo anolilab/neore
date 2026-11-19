@@ -67,7 +67,7 @@ import {
     splitExpired,
 } from "./reflection-logic";
 import { logRedaction, redactDigestSummary, redactMemoryText, redactReflectionOps } from "./redact";
-import { factDatesOf, isExpired } from "./dates";
+import { factDatesOf, isExpired, normalizeFactDates, sameFactDates } from "./dates";
 import { lastConfirmedOf } from "./taxonomy";
 import { MAX_LENGTH } from "../lib/validators";
 
@@ -287,7 +287,18 @@ export const loadReflectionInputs = internalQuery
     });
 
 const vReflectionOp = v.union(
-    v.object({ byMemoryId: v.string(), expiredOn: v.optional(v.string()), kind: v.literal("supersede"), memoryId: v.string() }),
+    v.object({
+        byMemoryId: v.string(),
+        checkDates: v.optional(
+            v.object({
+                by: v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) }),
+                memory: v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) }),
+            }),
+        ),
+        expiredOn: v.optional(v.string()),
+        kind: v.literal("supersede"),
+        memoryId: v.string(),
+    }),
     v.object({
         confidence: v.optional(v.number()),
         kind: v.literal("patch"),
@@ -413,6 +424,15 @@ export const applyReflectionOps = internalMutation
 
                     // An expiry planned before a restatement moved the end date no longer holds.
                     if (!row || !by || row.pinned === true || (op.expiredOn !== undefined && !isExpired(row, op.expiredOn))) {
+                        break;
+                    }
+
+                    // A supersession decided on dates the rows no longer hold (a person edited one meanwhile) is not applied.
+                    if (
+                        op.checkDates &&
+                        (!sameFactDates(factDatesOf(row), normalizeFactDates(op.checkDates.memory)) ||
+                            !sameFactDates(factDatesOf(by), normalizeFactDates(op.checkDates.by)))
+                    ) {
                         break;
                     }
 

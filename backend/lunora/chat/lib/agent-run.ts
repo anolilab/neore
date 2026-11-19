@@ -376,11 +376,25 @@ export const countSearchWords = (text: string): number => {
 };
 
 /** The memory block for the system prompt, and which memories went into it. */
+/** The cache lives for at most a minute, and never past the user's next local midnight: a fact that expires then must not be served. */
+const retrievalCacheTtl = (timeZone: string | null | undefined): number => {
+    const now = Date.now();
+    const day = localDayOf(now, timeZone);
+    let instant = now;
+
+    while (instant - now < MEMORY_RETRIEVAL_CACHE_TTL_MS && localDayOf(instant, timeZone) === day) {
+        instant += 1000;
+    }
+
+    return Math.max(0, Math.min(MEMORY_RETRIEVAL_CACHE_TTL_MS, instant - now - 1000));
+};
+
 const retrieveMemories = async (
     ctx: ActionCtx,
     userId: string,
     searchText: string,
     botId?: string,
+    timeZone?: string | null,
 ): Promise<{ context: string | undefined; refs: RetrievedMemoryRef[] }> => {
     // A prompt of two words or fewer ("thanks", "ok", "yes") has nothing to match
     // a memory against, so it skips the embedding and the vector search.
@@ -400,7 +414,7 @@ const retrieveMemories = async (
             ? await new ActionCache<{ botId?: string; searchText: string; userId: string }, RetrievedMemory[]>(undefined, {
                   action: internal.memory.retrieve.retrieveRelevantMemories,
                   name: "memory/retrieve",
-                  ttl: MEMORY_RETRIEVAL_CACHE_TTL_MS,
+                  ttl: retrievalCacheTtl(timeZone),
               }).fetch(ctx, { botId, searchText: searchText.trim().toLowerCase(), userId })
             : await callOnShard(internal.memory.retrieve.retrieveRelevantMemories, { botId, searchText, userId }, { shardKey: userId });
 
@@ -418,7 +432,7 @@ const retrieveMemories = async (
 };
 
 export const retrieveMemoryContext = async (ctx: ActionCtx, userId: string, searchText: string, botId?: string): Promise<string | undefined> => {
-    const { context } = await retrieveMemories(ctx, userId, searchText, botId);
+    const { context } = await retrieveMemories(ctx, userId, searchText, botId, undefined);
 
     return context;
 };
@@ -492,7 +506,7 @@ export const loadRunContext = async (
 
             const memoryBot = await botPromise;
 
-            return await retrieveMemories(ctx, userId, retrievalText, memoryBot?.botId);
+            return await retrieveMemories(ctx, userId, retrievalText, memoryBot?.botId, loaded.timezone);
         }),
         retrievalText ? retrieveKnowledgeContext(ctx, { ...(args.admittedRun && { admittedRun: true }), query: retrievalText, threadId, userId }) : undefined,
         threadSettingsPromise.then(async (settings) =>
@@ -596,14 +610,6 @@ const summariseToolResults = (savedMessages: ReadonlyArray<MessageDoc>): { summa
 };
 
 /**
- * Bookkeeping after a streamed run: the reply's timing (awaited before this
- * returns, so the action does not end with it in flight), the memories its
- * prompt carried, and — when `extractMemory` is set — memory extraction from
- * the exchange plus the activity stamp nightly reflection schedules from
- * (`memory/reflection.ts`). Billing is not here; the LLM Gateway usage webhook
- * owns it.
- */
-/**
  * The steers as memory extraction reads them: one sent on another local day than `sinceAt` (the prompt's) starts with
  * `[sent on YYYY-MM-DD]`, so "tomorrow" in it is read against its own day (`EXTRACTION_SYSTEM_PROMPT`).
  */
@@ -622,6 +628,14 @@ export const labelSentDays = (
         return day === undefined || since === undefined || day === since ? text : `[sent on ${day}] ${text}`;
     });
 };
+/**
+ * Bookkeeping after a streamed run: the reply's timing (awaited before this
+ * returns, so the action does not end with it in flight), the memories its
+ * prompt carried, and — when `extractMemory` is set — memory extraction from
+ * the exchange plus the activity stamp nightly reflection schedules from
+ * (`memory/reflection.ts`). Billing is not here; the LLM Gateway usage webhook
+ * owns it.
+ */
 
 export const afterRun = async (
     ctx: Pick<ActionCtx, "runMutation" | "scheduler">,

@@ -71,6 +71,8 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
     const [isEditing, setIsEditing] = useState(false);
     const [draft, setDraft] = useState(memory.memory);
     const [draftDates, setDraftDates] = useState<MemoryDates>(() => datesOf(memory));
+    // The dates as the edit began: a save sends them only when the person changed a date, not when another tab did.
+    const [datesAtEditStart, setDatesAtEditStart] = useState<MemoryDates>(() => datesOf(memory));
     const textareaId = useId();
     const dateIds = { eventEnd: useId(), eventStart: useId(), validUntil: useId() };
     // An event cannot end before it starts, nor without a start (the server checks the same).
@@ -87,13 +89,13 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
     const startEditing = () => {
         setDraft(memory.memory);
         setDraftDates(datesOf(memory));
+        setDatesAtEditStart(datesOf(memory));
         setIsEditing(true);
     };
 
     const save = () => {
         const text = draft.trim();
-        const current = datesOf(memory);
-        const datesChanged = (Object.keys(current) as (keyof MemoryDates)[]).some((key) => current[key] !== draftDates[key]);
+        const datesChanged = (Object.keys(datesAtEditStart) as (keyof MemoryDates)[]).some((key) => datesAtEditStart[key] !== draftDates[key]);
 
         const textChanged = text !== "" && text !== memory.memory;
 

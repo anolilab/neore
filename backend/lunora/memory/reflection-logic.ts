@@ -138,7 +138,16 @@ export interface ReflectionPlan {
  * only while the row is still past its end date on that day, so an end date moved after planning keeps it.
  */
 export type ReflectionOp =
-    | { byMemoryId: string; expiredOn?: string; kind: "supersede"; memoryId: string }
+    | {
+          byMemoryId: string;
+          checkDates?: {
+              by: { eventEnd?: string; eventStart?: string; validUntil?: string };
+              memory: { eventEnd?: string; eventStart?: string; validUntil?: string };
+          };
+          expiredOn?: string;
+          kind: "supersede";
+          memoryId: string;
+      }
     | { confidence?: number; kind: "patch"; lastConfirmedAt?: number; memory?: string; memoryId: string }
     | { confidence: number; importance: number; kind: "promote"; memory: string; sourceIds: string[]; threadId?: string; type: MemoryType };
 
@@ -500,35 +509,38 @@ export const revisionToOps = (
 ): ReflectionOp[] => {
     const older = memories.get(pair.olderId);
     const newer = memories.get(pair.newerId);
+    // The supersessions below are decided on the dates read now: applying one checks that both rows still hold them.
+    const supersede = (memoryId: string, byMemoryId: string): ReflectionOp => {
+        const row = memories.get(memoryId);
+        const by = memories.get(byMemoryId);
+
+        return {
+            byMemoryId,
+            kind: "supersede",
+            memoryId,
+            ...(row && by && { checkDates: { by: factDatesOf(by), memory: factDatesOf(row) } }),
+        };
+    };
 
     switch (decision.action) {
         case "IGNORE": {
             // The newer one said nothing new: the older one stands, reconfirmed. Unless their dates differ — the newer
             // statement decides the dates (`restatedDates`), so the newer row stands with its own text and dates.
             if (older && newer && !sameFactDates(older, newer)) {
-                return [
-                    { kind: "patch", lastConfirmedAt: now, memoryId: pair.newerId },
-                    { byMemoryId: pair.newerId, kind: "supersede", memoryId: pair.olderId },
-                ];
+                return [{ kind: "patch", lastConfirmedAt: now, memoryId: pair.newerId }, supersede(pair.olderId, pair.newerId)];
             }
 
-            return [
-                { byMemoryId: pair.olderId, kind: "supersede", memoryId: pair.newerId },
-                { kind: "patch", lastConfirmedAt: now, memoryId: pair.olderId },
-            ];
+            return [supersede(pair.newerId, pair.olderId), { kind: "patch", lastConfirmedAt: now, memoryId: pair.olderId }];
         }
         case "SUPERSEDE": {
-            return [{ byMemoryId: pair.newerId, kind: "supersede", memoryId: pair.olderId }];
+            return [supersede(pair.olderId, pair.newerId)];
         }
         case "UPDATE": {
             // The newer row keeps its own dates: they are the newer statement's. A merged wording of two rows with other
             // dates could name the older one's day beside them, so it is taken only when the dates agree.
             const merged = !older || !newer || sameFactDates(older, newer) ? decision.mergedMemory?.trim() : undefined;
 
-            return [
-                { kind: "patch", lastConfirmedAt: now, memoryId: pair.newerId, ...(merged && { memory: merged }) },
-                { byMemoryId: pair.newerId, kind: "supersede", memoryId: pair.olderId },
-            ];
+            return [{ kind: "patch", lastConfirmedAt: now, memoryId: pair.newerId, ...(merged && { memory: merged }) }, supersede(pair.olderId, pair.newerId)];
         }
         default: {
             return [];
