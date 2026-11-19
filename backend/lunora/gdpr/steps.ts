@@ -633,8 +633,15 @@ export const generateExportFile = internalAction
             async (cursor) => await context.runQuery(internal.projects.gdpr.collectOwnedProjectsForExport, { cursor, userId: args.userId }),
             projectDetailsReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes),
         );
-        // The projects read for their details count too: a row is read whole, however little of it is exported.
-        const triggerReadBytes = triggerReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes);
+        // Each user's follow states on threads they follow, read a page per query (`chat/follows/functions.ts`).
+        const threadFollows = await collectAllThreadFollows(
+            async (cursor) => await context.runQuery(internal.chat.follows.functions.collectThreadFollowsForExport, { cursor, userId: args.userId }),
+        );
+        // The projects read for their details count too: a row is read whole, however little of it is exported. So do the
+        // follow rows, which have no cap of their own.
+        const triggerReadBytes = triggerReadBudget(
+            earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes + readBytes(threadFollows),
+        );
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
@@ -664,10 +671,7 @@ export const generateExportFile = internalAction
             settings: args.settings,
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
-            // Each user's follow states on threads they follow, read a page per query (`chat/follows/functions.ts`).
-            threadFollows: await collectAllThreadFollows(
-                async (cursor) => await context.runQuery(internal.chat.follows.functions.collectThreadFollowsForExport, { cursor, userId: args.userId }),
-            ),
+            threadFollows,
             threadTags: args.threadTags ?? [],
             // Triggers with their settings and their newest runs, read here within a byte budget (`triggers/gdpr.ts`).
             triggers: await collectAllTriggers(

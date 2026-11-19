@@ -3,6 +3,9 @@
  * or mute on their own row, and only someone who can read the thread may touch
  * it. Share and accept defaults are the sharer's and invitee's rows.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -332,5 +335,18 @@ describe("thread follow writes that race", () => {
         });
 
         expect(await followRowsFor(OWNER)).toMatchObject([{ state: "muted" }]);
+    });
+});
+
+describe("the account export", () => {
+    // Read from source: the export action needs storage and a workflow to run.
+    it("counts the follow rows it read before the trigger history's budget", () => {
+        const source = readFileSync(join(import.meta.dirname, "../../gdpr/steps.ts"), "utf8");
+
+        expect(source.indexOf("const threadFollows = await collectAllThreadFollows(")).toBeLessThan(
+            source.indexOf("const triggerReadBytes = triggerReadBudget("),
+        );
+        expect(source).toContain("+ readBytes(threadFollows)");
+        expect(source).toContain("            threadFollows,\n");
     });
 });

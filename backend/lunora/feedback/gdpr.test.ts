@@ -139,6 +139,7 @@ describe("feedback in the export file", () => {
 
         expect(source).toContain("feedback: feedback.section");
         expect(source).toContain("feedbackReadBudget(earlierReadBytes + repositories.readBytes)");
-        expect(source).toContain("triggerReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes)");
+        expect(source).toContain("const triggerReadBytes = triggerReadBudget(");
+        expect(source).toContain("earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes + readBytes(threadFollows)");
     });
 });
