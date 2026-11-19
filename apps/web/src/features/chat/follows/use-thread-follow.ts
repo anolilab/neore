@@ -14,14 +14,17 @@ export type ThreadFollowState = "on" | "off" | "muted";
 export const useThreadFollow = (threadId: string | null) => {
     const crpc = useCRPC();
     const queryClient = useQueryClient();
-    const { data } = useQuery(crpc.chat.follows.functions.getThreadFollow.queryOptions(threadId ? { threadId: threadId as Id<"threads"> } : skipToken));
+    // TODO(anolilab/lunora#1628): not live, because a patch to a `.global()` row does not re-run live queries yet; a live
+    // query would answer the refetch below from its stale subscription.
+    const { data } = useQuery(
+        crpc.chat.follows.functions.getThreadFollow.queryOptions(threadId ? { threadId: threadId as Id<"threads"> } : skipToken, { live: false }),
+    );
     const { isPending, mutate } = useMutation({
         ...crpc.chat.follows.functions.setThreadFollow.mutationOptions(),
         onError: (error: Error) => {
             console.error("Failed to change the thread follow state:", error);
             showError(error);
         },
-        // TODO(anolilab/lunora#1628): a write that patches a `.global()` row does not re-run live queries, so refetch the state here.
         onSuccess: async (_data, { threadId }) => {
             await queryClient.invalidateQueries({ queryKey: crpc.chat.follows.functions.getThreadFollow.queryKey({ threadId }) });
         },
