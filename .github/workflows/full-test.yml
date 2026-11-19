@@ -52,6 +52,8 @@ jobs:
                   npm-version: "11"
                   skip-playwright: "true"
             - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
               run: "pnpm --filter @neore/backend run codegen"
 
             # services/document-parser is a Rust Worker: its tests need rustc +
@@ -115,6 +117,8 @@ jobs:
                   npm-version: "11"
                   skip-playwright: "true"
             - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
               run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Resolve the Playwright version"

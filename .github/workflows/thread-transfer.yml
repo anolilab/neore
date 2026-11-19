@@ -40,6 +40,8 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
             - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
               run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Build workspace packages"

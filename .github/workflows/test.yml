@@ -103,6 +103,8 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
             - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
               run: "pnpm --filter @neore/backend run codegen"
 
             # services/document-parser is a Rust Worker: its `build:worker`
@@ -232,6 +234,8 @@ jobs:
                   # The browsers come from the cache below (or its miss install), not from setup.
                   skip-playwright: "true"
             - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
               run: "pnpm --filter @neore/backend run codegen"
 
             # Stories import `@neore/ai`, whose `dist` is gitignored; without it Vite cannot resolve
@@ -372,6 +376,8 @@ jobs:
                   # The browsers come from the cache below (or its miss install), not from setup.
                   skip-playwright: "true"
             - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
               run: "pnpm --filter @neore/backend run codegen"
 
             # Playwright's first `webServer` is the backend, and `buildAuth(env)`
@@ -766,6 +772,8 @@ jobs:
                   node-version: "22"
                   skip-playwright: "true"
             - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
               run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Install Rust (stable)"
@@ -825,6 +833,8 @@ jobs:
                   node-version: "22"
                   skip-playwright: "true"
             - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
               run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Install Rust (stable)"
@@ -884,6 +894,8 @@ jobs:
                   node-version: "22"
                   skip-playwright: "true"
             - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
               run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Install Rust (stable)"

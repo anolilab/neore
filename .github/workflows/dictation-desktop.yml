@@ -127,6 +127,8 @@ jobs:
                   node-version: "22"
                   skip-playwright: "true"
             - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
               run: "pnpm --filter @neore/backend run codegen"
 
             # An x64 Node on an ARM runner (it runs under emulation) would build and measure the wrong helper and say nothing.

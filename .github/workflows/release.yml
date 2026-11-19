@@ -53,6 +53,8 @@ jobs:
                   node-version: "24.22.1"
                   cache-prefix: "release"
             - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
               run: "pnpm --filter @neore/backend run codegen"
 
             # Setup writes files into the checkout (the composite appends to `.npmrc`,

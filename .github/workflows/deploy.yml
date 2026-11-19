@@ -177,8 +177,6 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
                   skip-playwright: "true"
-            - name: "Generate the Lunora backend code"
-              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Build the workspace packages"
               shell: "bash"
@@ -225,8 +223,6 @@ jobs:
               with:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "24.22.1"
-            - name: "Generate the Lunora backend code"
-              run: "pnpm --filter @neore/backend run codegen"
 
             # The three origins the app is built against and the backend verifies its
             # tokens against, from ONE place so they cannot disagree. Production uses
