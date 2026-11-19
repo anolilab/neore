@@ -564,7 +564,9 @@ describe("importing another assistant's memory", () => {
         const rows = await memories();
 
         expect(outcomes).toStrictEqual({ confirms: [], facts: [{ memoryId: expect.any(String), status: "added" }] });
-        expect(rows.map((row: { memory: string }) => row.memory).toSorted()).toStrictEqual([base, fact].toSorted());
+        expect(rows.map((row: { memory: string }) => row.memory).toSorted((a: string, b: string) => a.localeCompare(b))).toStrictEqual(
+            [base, fact].toSorted((a, b) => a.localeCompare(b)),
+        );
     });
 
     it("confirms the row that already holds a merge's text once redacted, and keeps the target's text", async () => {
@@ -599,7 +601,9 @@ describe("importing another assistant's memory", () => {
         );
 
         expect(outcomes).toStrictEqual({ confirms: [], facts: [{ memoryId: twin, status: "known" }] });
-        expect((await memories()).find((row: { _id: string }) => row._id === target)?.memory).toBe(base);
+        const stored = await memories();
+
+        expect(stored.find((row: { _id: string }) => row._id === target)?.memory).toBe(base);
     });
 
     it("reports a confirmation that cannot apply and is only a secret as dropped, and saves nothing for it", async () => {
@@ -620,7 +624,9 @@ describe("importing another assistant's memory", () => {
         );
 
         expect(outcomes).toStrictEqual({ confirms: [{ memoryId: null, status: "dropped" }], facts: [] });
-        expect((await memories()).map((memory: { memory: string }) => memory.memory)).toStrictEqual(["The user likes tea"]);
+        const stored = await memories();
+
+        expect(stored.map((memory: { memory: string }) => memory.memory)).toStrictEqual(["The user likes tea"]);
     });
 
     it("schedules a new vector for a merged row", async () => {
