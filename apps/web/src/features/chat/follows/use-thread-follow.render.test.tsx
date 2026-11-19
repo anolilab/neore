@@ -79,7 +79,7 @@ describe("useThreadFollow", () => {
     });
 
     it("reads the follow state without a live subscription", async () => {
-        const { result } = renderHook(() => useThreadFollow("t1"), { wrapper });
+        const { result } = renderHook(() => useThreadFollow("t1", { enabled: true }), { wrapper });
 
         await waitFor(() => expect(result.current.state).toBe("off"));
 
@@ -87,7 +87,7 @@ describe("useThreadFollow", () => {
     });
 
     it("reads the state again after a change, so an open menu shows the new choice", async () => {
-        const { result } = renderHook(() => useThreadFollow("t1"), { wrapper });
+        const { result } = renderHook(() => useThreadFollow("t1", { enabled: true }), { wrapper });
 
         await waitFor(() => expect(result.current.state).toBe("off"));
 
@@ -109,7 +109,7 @@ describe("useThreadFollow", () => {
             }),
         ];
 
-        const { result } = renderHook(() => useThreadFollow("t1"), { wrapper });
+        const { result } = renderHook(() => useThreadFollow("t1", { enabled: true }), { wrapper });
 
         await waitFor(() => expect(result.current.state).toBe("off"));
 
@@ -126,5 +126,43 @@ describe("useThreadFollow", () => {
 
         await waitFor(() => expect(server.started).toStrictEqual(["on", "muted"]));
         await waitFor(() => expect(server.state).toBe("muted"));
+    });
+
+    it("keeps the scope of a change in flight when its menu closes, so another menu's queued change still runs", async () => {
+        let releaseFirst: () => void = () => {};
+
+        server.gates = [
+            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the web lib target has no Promise.withResolvers
+            new Promise<void>((resolve) => {
+                releaseFirst = resolve;
+            }),
+        ];
+
+        // Two menus for the same thread: A sends a change and closes, B queues one behind it.
+        const { rerender, result } = renderHook(
+            ({ aOpen }: { aOpen: boolean }) => {
+                return { a: useThreadFollow("t1", { enabled: aOpen }), b: useThreadFollow("t1", { enabled: true }) };
+            },
+            { initialProps: { aOpen: true }, wrapper },
+        );
+
+        await waitFor(() => expect(result.current.b.state).toBe("off"));
+
+        act(() => {
+            result.current.a.setState("on");
+        });
+
+        await waitFor(() => expect(server.started).toStrictEqual(["on"]));
+
+        act(() => {
+            result.current.b.setState("muted");
+        });
+        rerender({ aOpen: false });
+
+        act(() => {
+            releaseFirst();
+        });
+
+        await waitFor(() => expect(server.started).toStrictEqual(["on", "muted"]));
     });
 });

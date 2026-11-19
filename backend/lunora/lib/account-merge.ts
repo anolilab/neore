@@ -348,6 +348,11 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
     moved += follows.moved;
     drained &&= follows.drained;
 
+    // Stopped by the round cap with follow rows left: fail the job, so its redelivery moves the rest and deletes the guest.
+    if (!follows.drained) {
+        throw new Error(`guest ${from} still has thread follows past the merge's round cap; the merge into ${to} runs again`);
+    }
+
     // Only once nothing of the guest's is left to move: a later run still needs to find it otherwise.
     if (drained) {
         const result: { deleted: boolean; followsRemain?: boolean } = await call(references.deleteGuest, { userId: from }, from);

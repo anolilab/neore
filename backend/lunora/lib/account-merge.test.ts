@@ -221,10 +221,10 @@ describe("mergeGuestInto", () => {
         expect(deletedGuests).toStrictEqual([{ left: 0, shardKey: "guest", userId: "guest" }]);
     });
 
-    it("keeps the guest when its thread follows are not all moved by the round cap, so a later run finds it", async () => {
+    it("keeps the guest and fails for the queue to redeliver when the round cap leaves thread follows behind", async () => {
         const { call, deletedGuests, followPageCalls } = fakeShards({ guest: {} }, 2, { follows: Infinity });
 
-        await mergeGuestInto(call, REFERENCES, "guest", "user");
+        await expect(mergeGuestInto(call, REFERENCES, "guest", "user")).rejects.toThrow("round cap");
 
         expect(followPageCalls()).toBeGreaterThan(1);
         expect(deletedGuests).toStrictEqual([]);

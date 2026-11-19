@@ -40,7 +40,7 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
         retry: 0,
     });
     // The follow state is read only while the menu is open, so a list of rows opens no subscription per thread.
-    const follow = useThreadFollow(open && !isLocked ? threadId : null);
+    const follow = useThreadFollow(threadId, { enabled: open && !isLocked });
 
     // A locked row keeps only the split-view item: the server refuses its rename and its regenerate.
     if (isLocked && !onOpenInSplitView) {
