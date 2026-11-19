@@ -3,6 +3,7 @@ import type { MutationCtx } from "../../_generated/server";
 import { internalMutation, internalQuery } from "../../_generated/server";
 import { requireThreadPermission } from "../../agent/thread-read-access";
 import { authMutation, authQuery, rateLimit } from "../../lib/crpc";
+import { isUniqueViolation } from "../../lib/error-helpers";
 import { v } from "lunorash/server";
 import { MAX_LENGTH } from "../../lib/validators";
 
@@ -23,10 +24,8 @@ export type ThreadFollowState = "on" | "off" | "muted";
 const FOLLOW_BATCH = 100;
 
 /**
- * Writes a person's follow state, creating the row when there is none.
- *
- * TODO: two first writes that race can each insert a row for one person and thread. Make the pair unique once a
- * `.global()` table can declare a unique index.
+ * Writes a person's follow state, creating the row when there is none. Two first writes that race cannot both insert:
+ * `by_user_and_thread` is unique, so the one that loses patches the row the other wrote.
  */
 export const setThreadFollowState = async (
     ctx: Pick<MutationCtx, "db">,
@@ -40,7 +39,22 @@ export const setThreadFollowState = async (
         return;
     }
 
-    await ctx.db.insert("threadFollows", { createdAt: now, state, threadId, updatedAt: now, userId });
+    try {
+        await ctx.db.insert("threadFollows", { createdAt: now, state, threadId, updatedAt: now, userId });
+    } catch (error) {
+        if (!isUniqueViolation(error)) {
+            throw error;
+        }
+
+        // Another write for this person and thread inserted between the read and the insert: this choice is the later one.
+        const raced = await ctx.db.threadFollows.findFirst({ consistency: "primary", where: { threadId, userId } });
+
+        if (!raced) {
+            throw error;
+        }
+
+        await ctx.db.patch("threadFollows", raced._id, { state, updatedAt: now });
+    }
 };
 
 /** Writes a default state only when the person has no row yet, so an explicit choice is never overwritten. */
@@ -50,8 +64,17 @@ export const ensureThreadFollowDefault = async (
 ): Promise<void> => {
     const existing = await ctx.db.threadFollows.findFirst({ where: { threadId, userId } });
 
-    if (!existing) {
+    if (existing) {
+        return;
+    }
+
+    try {
         await ctx.db.insert("threadFollows", { createdAt: now, state, threadId, updatedAt: now, userId });
+    } catch (error) {
+        // Another write inserted the person's row between the read and the insert: that row stands.
+        if (!isUniqueViolation(error)) {
+            throw error;
+        }
     }
 };
 

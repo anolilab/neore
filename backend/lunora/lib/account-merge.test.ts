@@ -265,6 +265,51 @@ describe("reassignGlobalRows", () => {
     });
 });
 
+describe("reassignGlobalRows for thread follows", () => {
+    it("moves a guest's follow row, and keeps the new account's own row where both follow a thread", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "threadFollows", "shardActivity"]) as never);
+
+        try {
+            const seeded = await harness.run(async (context: any) => {
+                const thread = async (title: string) =>
+                    (await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title, userId: "owner" })) as string;
+                const follow = async (userId: string, threadId: string, state: string) =>
+                    (await context.db.insert("threadFollows", { createdAt: 1, state, threadId, updatedAt: 1, userId })) as string;
+                const both = await thread("Both follow");
+                const guestOnly = await thread("Guest follows");
+
+                return {
+                    both,
+                    guestBoth: await follow("guest", both, "muted"),
+                    guestOnly,
+                    guestOnlyRow: await follow("guest", guestOnly, "on"),
+                    userBoth: await follow("user", both, "on"),
+                };
+            });
+
+            const { reassigned } = await harness.run(async (context: any) => await context.runMutation(reassignGlobalRows, { from: "guest", to: "user" }));
+            const rows = await harness.run(async (context: any) => {
+                const { page } = await context.db.threadFollows.findMany({ where: {} });
+
+                return page.map((row: Record<string, unknown>) => {
+                    return { _id: row._id, state: row.state, threadId: row.threadId, userId: row.userId };
+                });
+            });
+
+            expect(reassigned).toBe(1);
+            expect(rows.toSorted((a: { _id: string }, b: { _id: string }) => a._id.localeCompare(b._id))).toStrictEqual(
+                [
+                    { _id: seeded.userBoth, state: "on", threadId: seeded.both, userId: "user" },
+                    { _id: seeded.guestOnlyRow, state: "on", threadId: seeded.guestOnly, userId: "user" },
+                ].toSorted((a, b) => a._id.localeCompare(b._id)),
+            );
+            expect(rows.some((row: { _id: string }) => row._id === seeded.guestBoth)).toBe(false);
+        } finally {
+            harness.close();
+        }
+    });
+});
+
 describe("deleteMergedGuest", () => {
     const harnessWithUsers = () =>
         lunoraTest(schemaWithShardedTables(["user", "session", "account", "member", "twoFactor", "passkey", "shardRoutes", "shardActivity"]) as never);

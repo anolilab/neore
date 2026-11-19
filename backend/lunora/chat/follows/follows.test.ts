@@ -129,6 +129,18 @@ describe("thread follow state", () => {
         expect(await as(OWNER).query(getThreadFollow as never, { threadId } as never)).toEqual({ state: "muted" });
     });
 
+    it("writing the same person and thread twice leaves one row with the last state", async () => {
+        await harness.run(async (context: any) => {
+            await setThreadFollowState(context, { now: 1, state: "on", threadId, userId: OWNER });
+            await setThreadFollowState(context, { now: 2, state: "muted", threadId, userId: OWNER });
+        });
+
+        const rows = await followRowsFor(OWNER);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ state: "muted", updatedAt: 2 });
+    });
+
     it("the default write creates the row when there is none", async () => {
         await harness.run(async (context: any) => {
             await ensureThreadFollowDefault(context, { now: 1, state: "on", threadId, userId: OWNER });
@@ -199,5 +211,122 @@ describe("thread follow rows across people and threads", () => {
 
         expect(await followRowsFor(GRANTEE)).toHaveLength(0);
         expect(await followRowsFor(OWNER)).toHaveLength(1);
+    });
+});
+
+/**
+ * A `ctx` whose first `threadFollows.findFirst` misses, as a read does when another write for the same person and
+ * thread inserts right after it; every insert goes through `insert` (the real one unless given).
+ */
+const racingContext = (context: any, insert?: (...arguments_: unknown[]) => Promise<unknown>) => {
+    let missed = false;
+    const insertErrors: unknown[] = [];
+    const bound = (target: object, property: string | symbol) => {
+        const value = Reflect.get(target, property) as unknown;
+
+        return typeof value === "function" ? (value as (...arguments_: unknown[]) => unknown).bind(target) : value;
+    };
+    const threadFollows = new Proxy(context.db.threadFollows, {
+        get: (target, property) => {
+            if (property === "findFirst" && !missed) {
+                missed = true;
+
+                return async () => null;
+            }
+
+            return bound(target, property);
+        },
+    });
+    const realInsert = bound(context.db, "insert") as (...arguments_: unknown[]) => Promise<unknown>;
+    const db = new Proxy(context.db, {
+        get: (target, property) => {
+            if (property === "threadFollows") {
+                return threadFollows;
+            }
+
+            if (property === "insert") {
+                return async (...arguments_: unknown[]) => {
+                    try {
+                        return await (insert ?? realInsert)(...arguments_);
+                    } catch (error) {
+                        insertErrors.push(error);
+
+                        throw error;
+                    }
+                };
+            }
+
+            return bound(target, property);
+        },
+    });
+
+    return { context: { db }, insertErrors };
+};
+
+describe("thread follow writes that race", () => {
+    beforeEach(async () => {
+        await harness.run(async (context: any) => {
+            await setThreadFollowState(context, { now: 1, state: "muted", threadId, userId: OWNER });
+        });
+    });
+
+    it("a second row for one person and thread is refused by the unique index", async () => {
+        await expect(
+            harness.run(async (context: any) => await context.db.insert("threadFollows", { createdAt: 2, state: "on", threadId, updatedAt: 2, userId: OWNER })),
+        ).rejects.toMatchObject({ kind: "unique" });
+    });
+
+    it("a set that loses the insert patches the row the other write made", async () => {
+        const insertErrors = await harness.run(async (context: any) => {
+            const racing = racingContext(context);
+
+            await setThreadFollowState(racing.context as never, { now: 2, state: "on", threadId, userId: OWNER });
+
+            return racing.insertErrors;
+        });
+
+        expect(insertErrors).toHaveLength(1);
+        expect(insertErrors[0]).toMatchObject({ kind: "unique" });
+
+        const rows = await followRowsFor(OWNER);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ state: "on", updatedAt: 2 });
+    });
+
+    it("a default that loses the insert leaves the row the other write made", async () => {
+        const insertErrors = await harness.run(async (context: any) => {
+            const racing = racingContext(context);
+
+            await ensureThreadFollowDefault(racing.context as never, { now: 2, state: "on", threadId, userId: OWNER });
+
+            return racing.insertErrors;
+        });
+
+        expect(insertErrors).toHaveLength(1);
+        expect(insertErrors[0]).toMatchObject({ kind: "unique" });
+
+        const rows = await followRowsFor(OWNER);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ state: "muted", updatedAt: 1 });
+    });
+
+    it("rethrows any other insert failure from both writes", async () => {
+        const failure = Object.assign(new Error("optimistic concurrency conflict"), { kind: "occ" });
+        const failing = async () => {
+            throw failure;
+        };
+
+        await harness.run(async (context: any) => {
+            await expect(setThreadFollowState(racingContext(context, failing).context as never, { now: 2, state: "on", threadId, userId: OWNER })).rejects.toBe(
+                failure,
+            );
+            await expect(
+                ensureThreadFollowDefault(racingContext(context, failing).context as never, { now: 2, state: "on", threadId, userId: OWNER }),
+            ).rejects.toBe(failure);
+        });
+
+        expect(await followRowsFor(OWNER)).toMatchObject([{ state: "muted" }]);
     });
 });

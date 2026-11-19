@@ -33,6 +33,7 @@ import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
 import schema from "../schema";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
+import { mergeThreadFollowsOf } from "../chat/follows/follow-writes";
 
 /** Rows moved per round trip. */
 export const MERGE_PAGE_SIZE = 100;
@@ -73,12 +74,11 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     skillRatings: ["userId"],
     skills: ["userId"],
     threadAccess: ["userId", "ownerId", "grantedBy"],
-    threadFollows: ["userId"],
     threadInvites: ["ownerId", "invitedBy", "acceptedBy"],
     userVariableDefaults: ["userId"],
 };
 
-/** `.global()` tables with a `userId` the merge deliberately leaves alone, and why. */
+/** `.global()` tables with a `userId` the generic re-pointing loop deliberately leaves alone, and why. */
 export const GLOBAL_USER_TABLES_NOT_REASSIGNED: Readonly<Record<string, string>> = {
     account: "better-auth links the anonymous user itself",
     deviceCode: "a guest cannot approve a code, and a pending one lapses in 30 minutes",
@@ -89,6 +89,8 @@ export const GLOBAL_USER_TABLES_NOT_REASSIGNED: Readonly<Record<string, string>>
         "tied to the guest's session, which ends with the guest: the notifications module drops them, and the phone registers again under the new sign-in",
     session: "better-auth's own; the guest's sessions end with the guest",
     teamMember: "a guest joins no team",
+    threadFollows:
+        "moved by the follows module's own step (`mergeThreadFollowsOf`): a row per person and thread is unique, so where the new account already follows a thread, its row wins and the guest's is dropped",
     twoFactor: "better-auth's own; a guest has no second factor",
     user: "the guest's user row itself",
 };
@@ -244,8 +246,9 @@ export const reassignGlobalRows = internalMutation
             }
         }
 
-        // Through the notifications module's own write surface, never the generic loop above.
+        // Through each module's own write surface, never the generic loop above.
         await dropPushDevicesOf(ctx.db, args.from);
+        reassigned += await mergeThreadFollowsOf(ctx.db, args.from, args.to);
 
         const { page: census } = await ctx.db.shardActivity.findMany({ where: { shardKey: args.from } });
 

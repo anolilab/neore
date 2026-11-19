@@ -26685,7 +26685,7 @@
             "userId",
             "threadId"
           ],
-          "unique": false
+          "unique": true
         }
       },
       "memory": false,
