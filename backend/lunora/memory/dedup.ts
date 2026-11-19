@@ -239,6 +239,13 @@ export const linkMemoryVectors = async (ctx: ActionCtx, userId: string, links: R
         await ctx.runMutation(internal.memory.functions.linkMemoryEmbeddings, { links: [...links], userId });
     } catch (error) {
         console.error(`${logPrefix} Embedding link failed:`, error);
+
+        // The vectors were inserted but never linked: delete them, or nothing ever points at them.
+        try {
+            await ctx.runMutation(internal.agent.vector.deleteBatch, { ids: links.map(({ embeddingId }) => embeddingId as Id<"embeddings_1024">) });
+        } catch (deleteError) {
+            console.error(`${logPrefix} Unlinked vector delete failed:`, deleteError);
+        }
     }
 };
 

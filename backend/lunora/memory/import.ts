@@ -37,6 +37,7 @@ import {
     splitImportedText,
     vImportApp,
 } from "./import-logic";
+import { logRedaction, redactMemoryText } from "./redact";
 import { REFLECTION_LIMITS } from "./reflection-logic";
 import { MEMORY_TYPES, vMemoryType } from "./taxonomy";
 
@@ -76,6 +77,8 @@ interface PlannedFact {
     embedding: number[] | null;
     fact: ImportedFact;
     merge?: { base: string; confidence: number; memory: string; memoryId: Id<"memories"> };
+    // Whether the merged text lost a secret to redaction, for the save's redaction event.
+    mergeRedacted?: boolean;
     supersede?: { base: string; memoryId: Id<"memories"> };
 }
 
@@ -178,6 +181,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
         const match = similar ? existing.find((row) => row._id === similar.id) : undefined;
         let action: "ADD" | "IGNORE" | "SUPERSEDE" | "UPDATE" = "ADD";
         let memory = "";
+        let mergeRedacted = false;
 
         if (similar && similar.score >= 0.95) {
             action = "IGNORE";
@@ -194,9 +198,15 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
                 // A merge too long to store whole is not cut, which would drop what it merged.
                 const merged = revision.mergedMemory?.trim() ?? "";
 
-                memory = cleanImportLine(merged);
+                // A merge that is nothing but a secret is no merge.
+                const cleaned = cleanImportLine(merged);
+                const redacted = redactMemoryText(cleaned);
+
+                memory = redacted ?? "";
+                mergeRedacted = redacted !== cleaned;
                 action =
-                    revision.action === "UPDATE" && (merged.length > IMPORT_MAX_FACT_CHARS || !isLongEnoughFact(memory) || looksSensitive(memory))
+                    revision.action === "UPDATE" &&
+                    (merged.length > IMPORT_MAX_FACT_CHARS || memory.length > IMPORT_MAX_FACT_CHARS || !isLongEnoughFact(memory) || looksSensitive(memory))
                         ? "ADD"
                         : revision.action;
             } catch (error) {
@@ -213,6 +223,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
                 embedding,
                 fact,
                 merge: { base: similar.memory, confidence: Math.max(IMPORTED_CONFIDENCE, similar.confidence ?? 50), memory, memoryId: similar.id },
+                mergeRedacted,
             });
 
             reworded.add(similar.id);
@@ -265,14 +276,32 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
     for (const {
         outcome: { status },
     } of applied) {
-        if (status === "added") {
-            result.added += 1;
-        } else if (status === "updated") {
-            result.updated += 1;
-        } else {
-            result.alreadyKnown += 1;
+        switch (status) {
+            case "added": {
+                result.added += 1;
+                break;
+            }
+            case "known": {
+                result.alreadyKnown += 1;
+                break;
+            }
+            case "updated": {
+                result.updated += 1;
+                break;
+            }
+            default: {
+                // "dropped": the save's backstop left out a fact that was only a secret.
+                break;
+            }
         }
     }
+
+    // Counts only, and only for what the save wrote: a merge that was only a secret was refused and its fact saved as
+    // new, so it counts as neither; a fact the save's backstop left out counts as dropped.
+    logRedaction(ctx.log, "import", {
+        dropped: applied.filter(({ outcome: { status } }) => status === "dropped").length,
+        redacted: applied.filter(({ outcome: { status }, plan }) => status === "updated" && plan.mergeRedacted === true).length,
+    });
 
     // A merged row gets its new vector from the re-embed the save scheduled; a new row takes the fact's.
     await saveMemoryVectors(

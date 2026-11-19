@@ -6,6 +6,8 @@
  */
 import { v } from "lunorash/server";
 
+import { redactMultilineSecrets } from "../lib/secret-redaction";
+import { capMemoryText, recheckCutMemoryText, redactMemoryText } from "./redact";
 import { MEMORY_TYPE_GUIDE, type MemoryType } from "./taxonomy";
 
 export const IMPORT_APPS = ["chatgpt", "claude", "gemini", "other"] as const;
@@ -104,15 +106,31 @@ const stripDataTags = (text: string): string => {
     return stripped === text ? text : stripDataTags(stripped);
 };
 
-/** One line as stored: wrapping removed, whitespace collapsed, capped. Empty when nothing is left. Tags go last, after every step that could form one. */
-export const cleanImportLine = (raw: string): string =>
-    stripDataTags(
-        raw.trim().replace(LINE_PREFIX_RE, "").replaceAll(EMPHASIS_RE, "").replaceAll(WHITESPACE_RE, " ").trim().slice(0, IMPORT_MAX_FACT_CHARS),
-    ).trim();
+/** One line with wrapping removed and whitespace collapsed, not yet capped. Tags go last, after every step that could form one. */
+const unwrapImportLine = (raw: string): string =>
+    stripDataTags(raw.trim().replace(LINE_PREFIX_RE, "").replaceAll(EMPHASIS_RE, "").replaceAll(WHITESPACE_RE, " ").trim()).trim();
+
+/** One line as stored: wrapping removed, whitespace collapsed, capped. Empty when nothing is left. */
+export const cleanImportLine = (raw: string): string => stripDataTags(unwrapImportLine(raw).slice(0, IMPORT_MAX_FACT_CHARS)).trim();
+
+/**
+ * A raw line cleaned with its secrets redacted, or `null` when it was only a secret. Redacted as pasted and again once
+ * unwrapped, since removing emphasis can join a token split by it (`github_**pat_…`), and only then cut to length, so
+ * a cut never leaves the head of a token too short to be recognised.
+ */
+const redactImportLine = (raw: string): string | null => {
+    const redacted = redactMemoryText(raw);
+    const cleaned = redacted === null ? null : redactMemoryText(unwrapImportLine(redacted));
+
+    // Checked again after the cut: when the fact sits past the limit, the cut can leave only a label and its marker, or
+    // only the filler before a marker it removed, and a preview must not offer a line its save would drop.
+    return cleaned === null ? null : recheckCutMemoryText(cleaned, stripDataTags(capMemoryText(cleaned, IMPORT_MAX_FACT_CHARS)).trim());
+};
 
 /**
  * The paste as candidate facts: one per line, cleaned, without repeats, short lines or
- * sensitive ones. `cut` counts the lines past `IMPORT_MAX_FACTS`; `dropped` the sensitive ones.
+ * sensitive ones, secrets redacted. `cut` counts the lines past `IMPORT_MAX_FACTS`; `dropped` the sensitive ones and
+ * those that were nothing but a secret.
  */
 export const splitImportedText = (text: string): { cut: number; dropped: number; lines: string[] } => {
     const seen = new Set<string>();
@@ -120,16 +138,21 @@ export const splitImportedText = (text: string): { cut: number; dropped: number;
     let cut = 0;
     let dropped = 0;
 
-    for (const raw of text.slice(0, IMPORT_MAX_INPUT_CHARS).split(LINE_BREAK_RE)) {
-        const line = cleanImportLine(raw);
+    // A quoted secret that spans lines is redacted before the split, or its later lines would read as facts.
+    const rawLines = redactMultilineSecrets(text.slice(0, IMPORT_MAX_INPUT_CHARS)).split(LINE_BREAK_RE);
 
-        if (!isLongEnoughFact(line) || seen.has(importDedupKey(line))) {
+    for (const raw of rawLines) {
+        const cleaned = cleanImportLine(raw);
+        const line = isLongEnoughFact(cleaned) ? redactImportLine(raw) : cleaned;
+        const key = importDedupKey(line ?? cleaned);
+
+        if (!isLongEnoughFact(cleaned) || seen.has(key)) {
             continue;
         }
 
-        seen.add(importDedupKey(line));
+        seen.add(key);
 
-        if (looksSensitive(line)) {
+        if (line === null || looksSensitive(line)) {
             dropped += 1;
         } else if (lines.length >= IMPORT_MAX_FACTS) {
             cut += 1;
@@ -147,9 +170,9 @@ export const sanitizeImportedFacts = (facts: ReadonlyArray<ImportedFact>): Impor
     const kept: ImportedFact[] = [];
 
     for (const fact of facts) {
-        const memory = cleanImportLine(fact.memory);
+        const memory = redactImportLine(fact.memory);
 
-        if (isLongEnoughFact(memory) && !looksSensitive(memory) && !seen.has(importDedupKey(memory)) && kept.length < IMPORT_MAX_FACTS) {
+        if (memory !== null && isLongEnoughFact(memory) && !looksSensitive(memory) && !seen.has(importDedupKey(memory)) && kept.length < IMPORT_MAX_FACTS) {
             seen.add(importDedupKey(memory));
             kept.push({ memory, type: fact.type });
         }

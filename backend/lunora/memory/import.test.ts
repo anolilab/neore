@@ -9,6 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { internal } from "../_generated/internal";
 import schema from "../schema";
+import { REDACTED } from "../lib/secret-redaction";
 import { importFacts, labelImportedText } from "./import";
 
 const { embedMany, generateText, registry, searchVectors } = vi.hoisted(() => {
@@ -60,6 +61,8 @@ vi.mock("../chat/lib/gateway-embedding-model", () => {
 });
 
 const USER = "user-a";
+/** Assembled at runtime so the file holds no literal that reads as a real credential; no line rule names its shape. */
+const TOKEN = ["Zq8LmV2xR7tYw4", "KpN3bC9dF6hJ1sA5gE0uIo"].join("");
 const MEMORY_OFF_RE = /Turn on memory/;
 const ITEM_RE = /item (\d+)/;
 // Distinct enough wording per row that text dedup never merges two of them.
@@ -451,6 +454,179 @@ describe("importing another assistant's memory", () => {
 
         expect(rows.find((row: { _id: string }) => row._id === rowId)?.memory).toBe("The user lives in Berlin near the river with a garden");
         expect(harness.scheduler.list()).toHaveLength(0);
+    });
+
+    it("saves nothing for a line that is only a secret", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+
+        expect(await save([{ memory: TOKEN, type: "context" }])).toStrictEqual({ added: 0, alreadyKnown: 0, updated: 0 });
+        expect(await memories()).toHaveLength(0);
+    });
+
+    it("stores no secret in a row a fact merged into", async () => {
+        expect.assertions(1);
+
+        await setMemoryEnabled(true);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER });
+        });
+        generateText.mockResolvedValueOnce({
+            output: { action: "UPDATE", mergedMemory: `The user lives in Berlin near the river with a garden and bikes, gate code ${TOKEN}` },
+        });
+
+        await save([{ memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" }]);
+
+        const rows = await memories();
+
+        expect(rows.map((row: { memory: string }) => row.memory)).toStrictEqual([
+            `The user lives in Berlin near the river with a garden and bikes, gate code ${REDACTED}`,
+        ]);
+    });
+
+    it("saves the fact as new when its merged text is only a secret", async () => {
+        expect.assertions(3);
+
+        await setMemoryEnabled(true);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER });
+        });
+        generateText.mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: TOKEN } });
+
+        const events: [string, unknown][] = [];
+
+        expect(
+            await harness.action(async (ctx: any) => {
+                vi.spyOn(ctx.log, "event").mockImplementation((...call: unknown[]) => {
+                    events.push([call[0] as string, call[1]]);
+                });
+
+                return await importFacts(ctx, {
+                    app: "gemini",
+                    facts: [{ memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" }],
+                    userId: USER,
+                });
+            }),
+        ).toStrictEqual({ added: 1, alreadyKnown: 0, updated: 0 });
+        // The revision ran and its secret-only merge was refused; the default path would add the fact without it.
+        expect(generateText).toHaveBeenCalledOnce();
+        // Nothing the save wrote lost a secret: the refused merge is not counted.
+        expect(events).toStrictEqual([]);
+    });
+
+    it("logs a merge that lost a secret, counts only", async () => {
+        expect.assertions(1);
+
+        await setMemoryEnabled(true);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER });
+        });
+        generateText.mockResolvedValueOnce({
+            output: { action: "UPDATE", mergedMemory: `The user lives in Berlin near the river with a garden and bikes, gate code ${TOKEN}` },
+        });
+
+        const events: [string, unknown][] = [];
+
+        await harness.action(async (ctx: any) => {
+            vi.spyOn(ctx.log, "event").mockImplementation((...call: unknown[]) => {
+                events.push([call[0] as string, call[1]]);
+            });
+
+            return await importFacts(ctx, {
+                app: "gemini",
+                facts: [{ memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" }],
+                userId: USER,
+            });
+        });
+
+        expect(events).toStrictEqual([["memory.secret_redaction", { dropped: 0, path: "import", redacted: 1 }]]);
+    });
+
+    it("saves the fact as new when the save finds its merged text is only a secret", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+
+        const { saveImportedMemoryBatch } = await import("./functions");
+        const base = "The user lives in Berlin near the river with a garden and bikes";
+        const target = await harness.run(async (ctx: any) => await ctx.db.insert("memories", { memory: base, type: "context", userId: USER }));
+        const fact = "The user lives in Berlin near the river with a garden and bikes daily";
+        const outcomes = await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(saveImportedMemoryBatch, {
+                    app: "gemini",
+                    confirms: [],
+                    facts: [{ memory: fact, merge: { base, confidence: 60, memory: `API_KEY=${TOKEN}`, memoryId: target }, type: "context" }],
+                    userId: USER,
+                }),
+        );
+        const rows = await memories();
+
+        expect(outcomes).toStrictEqual({ confirms: [], facts: [{ memoryId: expect.any(String), status: "added" }] });
+        expect(rows.map((row: { memory: string }) => row.memory).toSorted((a: string, b: string) => a.localeCompare(b))).toStrictEqual(
+            [base, fact].toSorted((a, b) => a.localeCompare(b)),
+        );
+    });
+
+    it("confirms the row that already holds a merge's text once redacted, and keeps the target's text", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+
+        const { saveImportedMemoryBatch } = await import("./functions");
+        const { redactMemoryText } = await import("./redact");
+        const merged = `The user's CI publishes the site with ${TOKEN} every night`;
+        const base = "The user's CI publishes the site every night";
+        const { target, twin } = await harness.run(async (ctx: any) => {
+            return {
+                target: await ctx.db.insert("memories", { memory: base, type: "context", userId: USER }),
+                twin: await ctx.db.insert("memories", { memory: redactMemoryText(merged), type: "context", userId: USER }),
+            };
+        });
+        const outcomes = await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(saveImportedMemoryBatch, {
+                    app: "gemini",
+                    confirms: [],
+                    facts: [
+                        {
+                            memory: "The user's CI publishes the site nightly",
+                            merge: { base, confidence: 60, memory: merged, memoryId: target },
+                            type: "context",
+                        },
+                    ],
+                    userId: USER,
+                }),
+        );
+
+        expect(outcomes).toStrictEqual({ confirms: [], facts: [{ memoryId: twin, status: "known" }] });
+        const stored = await memories();
+
+        expect(stored.find((row: { _id: string }) => row._id === target)?.memory).toBe(base);
+    });
+
+    it("reports a confirmation that cannot apply and is only a secret as dropped, and saves nothing for it", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+
+        const { saveImportedMemoryBatch } = await import("./functions");
+        const row = await harness.run(async (ctx: any) => await ctx.db.insert("memories", { memory: "The user likes tea", type: "preference", userId: USER }));
+        const outcomes = await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(saveImportedMemoryBatch, {
+                    app: "gemini",
+                    confirms: [{ base: "The user likes green tea", memory: `API_KEY=${TOKEN}`, memoryId: row, type: "preference" }],
+                    facts: [],
+                    userId: USER,
+                }),
+        );
+
+        expect(outcomes).toStrictEqual({ confirms: [{ memoryId: null, status: "dropped" }], facts: [] });
+        const stored = await memories();
+
+        expect(stored.map((memory: { memory: string }) => memory.memory)).toStrictEqual(["The user likes tea"]);
     });
 
     it("schedules a new vector for a merged row", async () => {

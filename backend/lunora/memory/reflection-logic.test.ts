@@ -4,6 +4,8 @@ import {
     buildReflectionPrompt,
     checkReflectionEligibility,
     clusterBySimilarity,
+    countAppliedMerges,
+    countResolvedContradictions,
     createReflectionBudget,
     DECAY_INTERVAL_MS,
     DECAY_STEP,
@@ -119,6 +121,34 @@ describe("merge", () => {
         const [patch] = mergeToOps({ absorbedIds: [], survivorId: a.id, texts: [], type: "preference" }, byId([a]), NOW, " ".repeat(3));
 
         expect(patch).not.toHaveProperty("memory");
+    });
+
+    it("counts only the merges whose rows the written ops still supersede", () => {
+        const applied = { absorbedIds: ["a1"], survivorId: "a", texts: [], type: "preference" as const };
+        const skipped = { absorbedIds: ["b1"], survivorId: "b", texts: [], type: "preference" as const };
+        // A revision superseding with the skipped merge's survivor is no merge of its own.
+        const ops = [
+            { byMemoryId: "a", kind: "supersede" as const, memoryId: "a1" },
+            { byMemoryId: "b", kind: "supersede" as const, memoryId: "other" },
+        ];
+
+        expect(countAppliedMerges([applied, skipped], ops)).toBe(1);
+    });
+});
+
+describe(countResolvedContradictions, () => {
+    it("counts only the pairs whose supersession the written ops still carry", () => {
+        const updated = { newerId: "n1", newerText: "", olderId: "o1", olderText: "" };
+        const ignored = { newerId: "n2", newerText: "", olderId: "o2", olderText: "" };
+        // An UPDATE whose merged wording was only a secret: redaction kept the patch's metadata and dropped its supersession.
+        const dropped = { newerId: "n3", newerText: "", olderId: "o3", olderText: "" };
+        const ops = [
+            { byMemoryId: "n1", kind: "supersede" as const, memoryId: "o1" },
+            { byMemoryId: "o2", kind: "supersede" as const, memoryId: "n2" },
+            { kind: "patch" as const, lastConfirmedAt: 1, memoryId: "n3" },
+        ];
+
+        expect(countResolvedContradictions([updated, ignored, dropped], ops)).toBe(2);
     });
 });
 

@@ -18,6 +18,7 @@ import { patchThread } from "../agent/table-writes";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
+import { logRedaction, redactMemoryFacts } from "./redact";
 import { MEMORY_TYPE_GUIDE, MEMORY_TYPES } from "./taxonomy";
 
 const COMPRESSION_SYSTEM_PROMPT = `You are a memory consolidation system. Given a list of related memories, synthesize them into a smaller set of high-quality, comprehensive facts.
@@ -205,8 +206,10 @@ export const compressThreadMemories = internalAction
             userId: args.userId,
         })) as ThreadMemory[];
 
-        // Skip manually-added and pinned memories; only compress auto-extracted ones
-        const autoMemories = threadMemories.filter((m: ThreadMemory) => m.source === "auto" && !m.pinned);
+        // Skip manually-added and pinned memories; only compress auto-extracted ones. A row saved before redaction
+        // existed goes to the model redacted, and one that is nothing but a secret stays out: it is neither sent nor
+        // superseded, so the model never restates it and one such row cannot block every later run.
+        const autoMemories = redactMemoryFacts(threadMemories.filter((m: ThreadMemory) => m.source === "auto" && !m.pinned)).facts;
 
         if (autoMemories.length < COMPRESSION_THRESHOLD) {
             return;
@@ -238,7 +241,11 @@ export const compressThreadMemories = internalAction
             usage = result.usage;
 
             if (result.output?.facts) {
-                synthesizedFacts = result.output.facts;
+                const redaction = redactMemoryFacts(result.output.facts);
+
+                logRedaction(ctx.log, "compress", redaction);
+                // A fact dropped as nothing but a secret would leave the rows it replaces retired with nothing in their place.
+                synthesizedFacts = redaction.dropped > 0 ? [] : redaction.facts;
             }
         } catch (error) {
             console.error("[memory/compress] LLM compression failed:", error);

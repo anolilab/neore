@@ -41,4 +41,25 @@
   the decision read (`saveMemoryBatch`, `supersedesBase`). A row revised earlier in one run is matched by words
   against its revised text, and carries the confidence its revision set.
 - **Vectors link only while the row reads as the embedded text** (`linkMemoryEmbeddings`, via `linkMemoryVectors`
-  in `dedup.ts`): the mutation deletes a vector it does not keep (rejected, or replaced) through the retrying delete.
+  in `dedup.ts`): the mutation deletes a vector it does not keep (rejected, or replaced) through the retrying delete;
+  a link mutation that fails deletes the vectors it carried. Every wording change (manual edit, import merge,
+  `reviseExtractedMemory`, `updateMemoryInternal`, reflection) calls `reembedRewordedMemory` in the writing mutation:
+  the old vector is dropped there, then the re-embed is scheduled on the owner's shard and links through the same
+  check. A failed re-embed deletes nothing; the row is found by keyword.
+- **No secrets in `memories`.** Every write redacts with `lib/secret-redaction.ts` first: extraction and compression
+  facts (`redactMemoryFacts`, before embedding), extraction revisions (planned redacted, and `reviseExtractedMemory`
+  again), reflection ops (`redactReflectionOps`), import lines (redacted before the cut to length, again after
+  cleaning and after the cut, so preview and save agree; a quoted value the detector reads across lines, one without
+  spaces, is redacted before the split) and merged texts, the manual edit (a text that is only a secret is refused),
+  and `insertMemory` / `saveImportedMemoryBatch` / `updateMemoryInternal` / `applyReflectionOps` as the backstop.
+  Confirmations write no text. A fact that is nothing but a secret is dropped (`redactMemoryText` returns `null`),
+  never saved as `«redacted»`: `insertMemory` returns `null` and supersedes nothing (the import reports `dropped`);
+  a revision or import merge whose wording is only a secret does not apply, and its fact is saved as new, as for any
+  that cannot apply; a dropped reflection merge or UPDATE wording keeps the rows it would absorb (and is not counted
+  as merged or resolved). The import's exact-text and twin checks key on the redacted text. Compression that loses a
+  fact this way does not run; a stored row that is only a secret is left out of compression, neither sent nor
+  superseded. Reflection text (and the digest summary) is redacted before its cut to length, and a cut that removes
+  every marker must still state a fact (`recheckCutMemoryText`); a belief revision's UPDATE text is not cut.
+  Extraction (its facts, and its revision wordings), compression, reflection, the import save and the manual edit
+  log one `memory.secret_redaction` event each (path, counts; no text); the backstops do not. A new write path
+  calls the same helpers and `logRedaction`.
