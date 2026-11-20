@@ -328,3 +328,67 @@ describe("wrapSelection", () => {
         expect(text(editor)).toBe("_hello_ world");
     });
 });
+
+describe("wrapSelectionOnTextInput Markdown edge cases", () => {
+    afterEach(() => {
+        for (const editor of editors) {
+            editor.destroy();
+        }
+
+        editors.length = 0;
+    });
+
+    it("leaves a code wrap alone beside a backtick, which would join its fence", () => {
+        const editor = editorWith("<p>foo`</p>");
+
+        select(editor, 1, 4);
+
+        expect(wrapSelectionOnTextInput(editor.view, 1, 4, "`")).toBe(false);
+        expect(text(editor)).toBe("foo`");
+    });
+
+    it("uses a single asterisk for italic beside an astral letter, which counts as a word character", () => {
+        const editor = editorWith("<p>𝔸foo</p>");
+
+        select(editor, 3, 6);
+        wrapSelectionOnTextInput(editor.view, 3, 6, "_");
+
+        expect(text(editor)).toBe("𝔸*foo*");
+    });
+
+    it("doubles a trailing backslash so it does not escape the closing delimiter", () => {
+        const editor = editorWith(String.raw`<p>foo\ bar</p>`);
+
+        select(editor, 1, 5);
+        wrapSelectionOnTextInput(editor.view, 1, 5, "*");
+
+        expect(text(editor)).toBe(String.raw`**foo\\** bar`);
+    });
+
+    it("keeps a backslash that already escapes a star, instead of escaping it again", () => {
+        const editor = editorWith(String.raw`<p>a\*b c</p>`);
+
+        select(editor, 1, 5);
+        wrapSelectionOnTextInput(editor.view, 1, 5, "*");
+
+        expect(text(editor)).toBe(String.raw`**a\*b** c`);
+    });
+
+    it("leaves a wrap alone when a backslash before the opener would escape it", () => {
+        const editor = editorWith(String.raw`<p>a\foo</p>`);
+
+        select(editor, 3, 6);
+
+        expect(wrapSelectionOnTextInput(editor.view, 3, 6, "*")).toBe(false);
+        expect(text(editor)).toBe(String.raw`a\foo`);
+    });
+
+    it("leaves a selected period after a letter alone, as its asterisks would not open or close", () => {
+        const editor = editorWith("<p>a.b</p>");
+
+        select(editor, 2, 3);
+
+        expect(wrapSelectionOnTextInput(editor.view, 2, 3, "*")).toBe(false);
+        expect(text(editor)).toBe("a.b");
+    });
+});
