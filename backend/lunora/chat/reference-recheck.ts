@@ -62,6 +62,20 @@ export const referencesStillHeld = async (
         }
     }
 
+    // Renewed last, right before the provider call: a hold that lapsed while a later chat was checked is re-taken only if its chat is
+    // still held, so a lock that committed in that gap refuses the job here instead of reaching the provider.
+    for (const { claimedAt, shardKey, threadId } of claims) {
+        const { held } = await callOnShard(
+            internal.chat.reference_gate.renewReferenceChatOnShard,
+            { claimedAt, requestedAt, requestId, threadId, userId },
+            { shardKey },
+        );
+
+        if (!held) {
+            return false;
+        }
+    }
+
     return true;
 };
 

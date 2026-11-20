@@ -14,7 +14,7 @@ import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { FILE_ATTACH_THREAD_SCOPE } from "../agent/file-attach-claim";
-import { claimFence } from "../lib/claim-once";
+import { claimFence, holdClaim, holdTtlFrom } from "../lib/claim-once";
 import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { lockedAfterCreation, threadGateOutcome } from "./lib/thread-gate";
@@ -167,4 +167,35 @@ export const holdReferenceChatOnShard = internalMutation
 
         // A request id is unique per attempt, so a held key is not expected. Refusing the chat fails the job closed.
         return claimedAt === null ? { held: false } : { claimedAt, held: true };
+    });
+
+/**
+ * Renews a media job's hold on one chat right before the provider call (`referencesStillHeld`, `chat/reference-recheck.ts`). The chat is
+ * checked again in the same transaction: a lock that committed while the hold lapsed makes the renewal refuse, and a renewed hold lasts
+ * {@link REFERENCE_HOLD_TTL_MS} from now, so the provider call is covered from its start.
+ */
+export const renewReferenceChatOnShard = internalMutation
+    .input({
+        claimedAt: v.number(),
+        requestedAt: v.number(),
+        requestId: v.string().max(MAX_LENGTH.id),
+        threadId: v.string().max(MAX_LENGTH.id),
+        userId: v.string(),
+    })
+    .output(v.object({ held: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        if (!(await chatHeld(ctx, args))) {
+            return { held: false };
+        }
+
+        const held = await holdClaim(
+            ctx,
+            FILE_ATTACH_THREAD_SCOPE,
+            `${args.threadId}:${args.requestId}`,
+            args.claimedAt,
+            holdTtlFrom(args.claimedAt, REFERENCE_HOLD_TTL_MS),
+            args.userId,
+        );
+
+        return { held };
     });

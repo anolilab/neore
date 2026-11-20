@@ -11,7 +11,7 @@ import { endThreadAttach } from "../agent/file-attach-thread";
 import { fileAttachInThread } from "../agent/file-attach-claim";
 import { mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
 import schema from "../schema";
-import { gateReferenceRowsOnCallerShard, holdReferenceChatOnShard, threadReadableOnShard } from "./reference-gate";
+import { gateReferenceRowsOnCallerShard, holdReferenceChatOnShard, renewReferenceChatOnShard, threadReadableOnShard } from "./reference-gate";
 
 const SECRET = "test-storage-signing-secret";
 const OWNER = "reference-owner";
@@ -313,6 +313,52 @@ describe("a queued media job holds the chats it reads against a lock until the p
             vi.setSystemTime(new Date("2026-11-20T12:16:00Z"));
             await expect(attachInFlight(ownerOpenId)).resolves.toBe(false);
             expect(claimedAt).toBeDefined();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    const renewFor = async (threadId: string, userId: string, requestId: string, claimedAt: number, requestedAt: number): Promise<boolean> => {
+        const { held } = (await run(
+            async (ctx) => await ctx.runMutation(renewReferenceChatOnShard as never, { claimedAt, requestedAt, requestId, threadId, userId }),
+        )) as { held: boolean };
+
+        return held;
+    };
+
+    it("renews a hold that lapsed while the job waited, on a chat that stayed unlocked", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+
+        try {
+            vi.setSystemTime(new Date("2026-11-20T12:00:00Z"));
+            const { claimedAt } = await holdFor(ownerOpenId, OWNER, "job-renew", 1);
+
+            vi.setSystemTime(new Date("2026-11-20T12:20:00Z"));
+            await expect(attachInFlight(ownerOpenId)).resolves.toBe(false);
+
+            await expect(renewFor(ownerOpenId, OWNER, "job-renew", claimedAt as number, 1)).resolves.toBe(true);
+            await expect(attachInFlight(ownerOpenId)).resolves.toBe(true);
+
+            // The renewal runs the full hold again from now.
+            vi.setSystemTime(new Date("2026-11-20T12:36:00Z"));
+            await expect(attachInFlight(ownerOpenId)).resolves.toBe(false);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("refuses to renew a lapsed hold once its chat was locked in the gap", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+
+        try {
+            vi.setSystemTime(new Date("2026-11-20T12:00:00Z"));
+            const { claimedAt } = await holdFor(ownerOpenId, OWNER, "job-locked-gap", 1);
+
+            vi.setSystemTime(new Date("2026-11-20T12:20:00Z"));
+            await run(async (ctx) => await ctx.db.patch("threads", ownerOpenId as never, { lockedAt: 2 }));
+
+            await expect(renewFor(ownerOpenId, OWNER, "job-locked-gap", claimedAt as number, 1)).resolves.toBe(false);
+            await expect(attachInFlight(ownerOpenId)).resolves.toBe(false);
         } finally {
             vi.useRealTimers();
         }
