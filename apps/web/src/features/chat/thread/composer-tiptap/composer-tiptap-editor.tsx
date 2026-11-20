@@ -64,6 +64,7 @@ import { useEmojiShortcode } from "./use-emoji-shortcode";
 import useMentionPrefetch from "./use-mention-prefetch";
 import VariableAutocompletePopup from "./variable-autocomplete-popup";
 import type { VimMode as VimModeName } from "./vim-keys";
+import { WrapSelection } from "./wrap-selection";
 
 // ============================================================================
 // Types
@@ -374,6 +375,8 @@ const ComposerTiptapEditor = ({
                 isHistoryRecalled: () => historyRecalledRef.current?.() ?? false,
                 onModeChange: setVimMode,
             }),
+            // After VimMode: vim's normal mode takes typed text, and that must win over a wrap (`wrap-selection.ts`).
+            WrapSelection,
         ],
         immediatelyRender: false,
         onUpdate: ({ editor: ed }) => {
