@@ -72,6 +72,7 @@ const PASSWORD_REQUIRED = /password is required/;
 const CANNOT_CHANGE = /cannot change/;
 const ALREADY_SAVED = /already saved/;
 const NOT_FOUND = /not found/;
+const AT_MOST_BOTS = /at most 20 bots/;
 const OWN_ACCOUNT_ONLY = /own account only/;
 const SAVE_WHILE_IMPERSONATING = /cannot be saved while impersonating/;
 const DELETE_WHILE_IMPERSONATING = /cannot be deleted while impersonating/;
@@ -102,11 +103,56 @@ const save = async (args: Record<string, unknown>, userId = OWNER) =>
 
 const rows = async () => (await harness.run(async (ctx: any) => await ctx.db.query("savedSiteLogins").collect())) as Record<string, unknown>[];
 
-const usable = async (threadId: string, userId = OWNER, startedBy = userId) =>
-    await harness.run(async (ctx: any) => await ctx.runQuery(listUsableSiteLogins, { startedBy, threadId, userId }));
+type Turn = { headless: boolean; impersonated: boolean; origin: string; promptMessageId?: string; startedBy: string };
 
-const forFill = async (threadId: string, site = SITE, userId = OWNER, startedBy = userId) =>
-    await harness.run(async (ctx: any) => await ctx.runQuery(siteLoginForFill, { site, startedBy, threadId, userId }));
+// The owner's own prompt in each thread, written before the run asks for a login.
+const prompts = new Map<string, string>();
+
+const insertPrompt = async (threadId: string, fields: Record<string, unknown> = {}) =>
+    (await harness.run(
+        async (ctx: any) =>
+            await ctx.db.insert("messages", {
+                message: { content: [{ text: "Sign in and check my order", type: "text" }], role: "user" },
+                order: 0,
+                status: "success",
+                stepOrder: 0,
+                threadId,
+                tool: false,
+                userId: OWNER,
+                ...fields,
+            }),
+    )) as string;
+
+const promptFor = async (threadId: string) => {
+    const known = prompts.get(threadId);
+
+    if (known !== undefined) {
+        return known;
+    }
+
+    const id = await insertPrompt(threadId);
+
+    prompts.set(threadId, id);
+
+    return id;
+};
+
+// The owner's own turn at the app; a test overrides what it refuses.
+const turnFor = async (threadId: string, userId: string, overrides: Partial<Turn>) => {
+    return { headless: false, impersonated: false, origin: "lead", promptMessageId: await promptFor(threadId), startedBy: userId, ...overrides };
+};
+
+const usable = async (threadId: string, userId = OWNER, overrides: Partial<Turn> = {}) => {
+    const turn = await turnFor(threadId, userId, overrides);
+
+    return await harness.run(async (ctx: any) => await ctx.runQuery(listUsableSiteLogins, { threadId, turn, userId }));
+};
+
+const forFill = async (threadId: string, site = SITE, userId = OWNER, overrides: Partial<Turn> = {}) => {
+    const turn = await turnFor(threadId, userId, overrides);
+
+    return await harness.run(async (ctx: any) => await ctx.runQuery(siteLoginForFill, { site, threadId, turn, userId }));
+};
 
 const insertThread = async (fields: Record<string, unknown>) =>
     (await harness.run(async (ctx: any) => await ctx.db.insert("threads", { title: "Other", userId: OWNER, ...fields }))) as string;
@@ -114,6 +160,7 @@ const insertThread = async (fields: Record<string, unknown>) =>
 beforeEach(async () => {
     shard.servesOwnUser = true;
     impersonation.by = undefined;
+    prompts.clear();
     harness = lunoraTest(schema as never);
     botId = await insertBot(OWNER, "Ada");
     otherBotId = await insertBot(OWNER, "Bo");
@@ -194,6 +241,27 @@ describe("saving a site login", () => {
         const [row] = await rows();
 
         expect(row?.["teammateIds"]).toStrictEqual([botId]);
+    });
+
+    it("counts only the teammates it keeps toward the limit: deleted ones beside 20 kept save, 21 kept are refused", async () => {
+        const bots = [botId, otherBotId];
+
+        for (let index = bots.length; index < 21; index += 1) {
+            bots.push(await insertBot(OWNER, `Bot ${index}`));
+        }
+
+        const deleted = bots[20];
+
+        await harness.run(async (ctx: any) => await ctx.db.delete("bots", deleted));
+
+        // 20 of these 21 still exist; the deleted one is dropped and the rest are kept.
+        const id = await save({ password: PASSWORD, teammateIds: bots });
+        const [row] = await rows();
+
+        expect(row?.["teammateIds"]).toHaveLength(20);
+
+        bots.push(await insertBot(OWNER, "Bot 21"));
+        await expect(save({ loginId: id, teammateIds: bots.filter((bot) => bot !== deleted) })).rejects.toThrow(AT_MOST_BOTS);
     });
 
     it("lets no one else change, delete or list the owner's login", async () => {
@@ -326,11 +394,67 @@ describe("which chats may use a login", () => {
     it("a turn someone else started gets none, even in the owner's thread", async () => {
         await save({ password: PASSWORD });
 
-        expect(await usable(plainThread, OWNER, STRANGER)).toStrictEqual([]);
-        expect(await forFill(plainThread, SITE, OWNER, STRANGER)).toBeNull();
+        expect(await usable(plainThread, OWNER, { startedBy: STRANGER })).toStrictEqual([]);
+        expect(await forFill(plainThread, SITE, OWNER, { startedBy: STRANGER })).toBeNull();
     });
 
-    it("a thread other people can write in or read gets none: shared, public, a group chat, a messenger conversation, deleted", async () => {
+    it("only the owner's own turn at the app gets one: no outside agent, trigger, messenger reply, sub-agent or unknown origin", async () => {
+        await save({ password: PASSWORD, teammateIds: [botId] });
+
+        // An outside agent's run records the key's owner as `startedBy`; so do a trigger's, a task's and a messenger reply's.
+        const refused: Partial<Turn>[] = [
+            { origin: "outside_agent" },
+            { headless: true, origin: "trigger" },
+            { headless: true, origin: "messenger" },
+            { origin: "trigger" },
+            // A sub-agent child dispatched by the owner's chat: its origin is the lead, but nobody is at the app.
+            { headless: true },
+            { origin: "repair" },
+            { origin: "" },
+        ];
+
+        for (const threadId of [plainThread, botThread]) {
+            expect(await usable(threadId)).not.toStrictEqual([]);
+
+            for (const overrides of refused) {
+                expect(await usable(threadId, OWNER, overrides)).toStrictEqual([]);
+                expect(await forFill(threadId, SITE, OWNER, overrides)).toBeNull();
+            }
+        }
+    });
+
+    it("a turn an admin sent while acting as the owner gets none, though it records the owner as its starter", async () => {
+        await save({ password: PASSWORD });
+
+        expect(await usable(plainThread, OWNER, { impersonated: true })).toStrictEqual([]);
+        expect(await forFill(plainThread, SITE, OWNER, { impersonated: true })).toBeNull();
+    });
+
+    it("a prompt the owner did not type gets none: an outside agent's (a regenerate runs with no origin), a guest's, a goal round's, someone else's", async () => {
+        await save({ password: PASSWORD });
+
+        const outsideAgent = await insertPrompt(plainThread, {
+            message: { content: [{ providerOptions: { neore: { outsideAgent: true } }, text: "Sign in", type: "text" }], role: "user" },
+        });
+        const guest = await insertPrompt(plainThread, {
+            message: { content: [{ providerOptions: { neore: { guestText: "note-1" } }, text: "Sign in", type: "text" }], role: "user" },
+        });
+        const stranger = await insertPrompt(plainThread, { userId: STRANGER });
+        const assistant = await insertPrompt(plainThread, { message: { content: [{ text: "Signing in", type: "text" }], role: "assistant" } });
+        const otherThread = await insertPrompt(botThread);
+        // A goal's next round: written under the owner's id by the agent, not typed.
+        const goalRound = await insertPrompt(plainThread, { agentName: "neore:goal" });
+        const noAuthor = await insertPrompt(plainThread, { userId: undefined });
+
+        for (const promptMessageId of [outsideAgent, guest, stranger, assistant, otherThread, goalRound, noAuthor]) {
+            expect(await usable(plainThread, OWNER, { promptMessageId })).toStrictEqual([]);
+            expect(await forFill(plainThread, SITE, OWNER, { promptMessageId })).toBeNull();
+        }
+
+        expect(await usable(plainThread)).toStrictEqual([{ site: SITE }]);
+    });
+
+    it("a thread other people can write in or read, or a run opened unattended, gets none: shared, public, group, messenger, deleted, trigger, task, eval", async () => {
         await save({ password: PASSWORD, teammateIds: [botId] });
 
         const shared = await insertThread({});
@@ -353,6 +477,10 @@ describe("which chats may use a login", () => {
             await insertThread({ groupChat: { mode: "round-robin", participants: [] } }),
             await insertThread({ botId, externalThreadId: "chat-42" }),
             await insertThread({ deleted: true }),
+            // Opened by a trigger, a task or an eval: its first prompt is a payload saved under the owner's id.
+            await insertThread({ tags: ["trigger"] }),
+            await insertThread({ tags: ["task"] }),
+            await insertThread({ tags: ["eval"] }),
         ];
 
         for (const threadId of others) {

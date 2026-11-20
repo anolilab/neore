@@ -37,17 +37,17 @@ const emptyDraft = (): LoginDraft => {
 };
 
 /**
- * What the save sends: a trimmed draft, with an empty password meaning "keep the saved one". `botName` is `undefined`
- * until a bot list known to be this user's has loaded; only then is a deleted teammate dropped here, so a list that failed
- * to load, or another account's cached one, never clears them. The server drops a deleted one in any case.
+ * What the save sends: a trimmed draft, with an empty password meaning "keep the saved one". The teammate ids go
+ * unfiltered: a bot missing from the cached list may be deleted, or new and not loaded here yet, and only the server
+ * can tell. It keeps the caller's own existing bots and drops the rest.
  */
-const saveArgs = (draft: LoginDraft, botName: Map<string, string> | undefined) => {
+const saveArgs = (draft: LoginDraft) => {
     return {
         label: draft.label.trim() || undefined,
         loginId: draft.id,
         password: draft.password === "" ? undefined : draft.password,
         site: draft.site.trim(),
-        teammateIds: botName === undefined ? draft.teammateIds : draft.teammateIds.filter((id) => botName.has(id)),
+        teammateIds: draft.teammateIds,
         username: draft.username.trim(),
     };
 };
@@ -100,6 +100,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
     const { data: loginList, isError: loginListFailed, isFetching: loginsFetching, refetch: refetchLogins } = useQuery(loginsQuery);
     const {
         data: botListData,
+        dataUpdatedAt: botsUpdatedAt,
         isError: botListFailed,
         isFetching: botsFetching,
         refetch: refetchBots,
@@ -128,17 +129,23 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
         }
     }, [crpc, holdsAnotherAccountsBots, queryClient]);
 
-    // An empty bot list names no user: one cached when the form mounts (once per account) may be the last account's.
+    // The form mounts once per account (`key={userId}`), so a bot list written before it mounted may be the last account's.
+    const [mountedAt] = useState(() => Date.now());
+
+    // An empty bot list names no user: one cached when the form mounts may be the last account's, and so may one a fetch
+    // still in flight from before the switch brings back. Both are fetched again for this user.
     useEffect(() => {
         const queryKey = crpc.bots.functions.listBots.queryKey({});
+        const state = queryClient.getQueryState<unknown[]>(queryKey);
 
-        if (queryClient.getQueryData<unknown[]>(queryKey)?.length === 0) {
+        if (state?.data?.length === 0 || state?.fetchStatus === "fetching") {
             void queryClient.invalidateQueries({ queryKey });
         }
     }, [crpc, queryClient]);
 
-    // An empty list could be the last account's cached one, so only a non-empty one may drop a deleted teammate here.
-    const knownBots = botsLoaded && bots.length > 0;
+    // A non-empty list names its user. An empty one counts only once fetched after this form mounted: then this user has
+    // no bots, and a login still naming some (all deleted) is for their own chats only.
+    const knownBots = botsLoaded && (bots.length > 0 || botsUpdatedAt > mountedAt);
     // Offline, the default network mode pauses a write and sends it on reconnect, by then perhaps under another account
     // with the typed password still in it. These fail at once instead. The mutation cache would also keep the password for
     // five minutes after the save settles: `gcTime: 0` and the removal on settle drop it, as Lunora's own hook does for a
@@ -197,7 +204,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
         }
 
         const submitted = draft;
-        const args = saveArgs(submitted, knownBots ? botName : undefined);
+        const args = saveArgs(submitted);
         const saved = isEditing ? t`Login updated` : t`Login saved`;
         const fallback = t`Could not save the login.`;
 

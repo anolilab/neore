@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const SITE = "https://example.com";
 const USERNAME_TEXT = /ada@example\.com/u;
 const CHOSEN_BOTS_TEXT = /the bots you chose/u;
+const OWN_CHATS_TEXT = /Your own chats only/u;
 
 const harness = vi.hoisted(() => {
     return {
@@ -352,6 +353,23 @@ describe("SiteLogins", () => {
         expect(screen.queryByRole("status")).toBeNull();
     });
 
+    it("keeps a teammate the cached bot list has not seen yet on an edit of the label alone", async () => {
+        const user = userEvent.setup();
+
+        harness.bots = botsOf("user-a", 1);
+        // A bot made in another session: the login already names it, the cached list does not have it yet.
+        harness.logins = [savedLogin(["bot-0", "bot-new"])];
+        harness.saveSiteLogin.mockResolvedValue("login-1");
+        mount();
+
+        await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+        await user.type(screen.getByLabelText("Label (optional)"), "Work");
+        await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+        await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
+        expect(harness.saveSiteLogin.mock.calls[0]?.[0]).toMatchObject({ teammateIds: ["bot-0", "bot-new"] });
+    });
+
     it("never shows the last account's cached logins or bots after a switch", async () => {
         harness.bots = botsOf("user-a", 1);
         harness.logins = [savedLogin(["bot-0"])];
@@ -405,6 +423,33 @@ describe("SiteLogins", () => {
 
         await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
         expect(harness.saveSiteLogin.mock.calls[0]?.[0]).toMatchObject({ teammateIds: ["bot-0"] });
+    });
+
+    it("calls a login whose bots were all deleted owner-only once the empty bot list was fetched for this user", async () => {
+        harness.logins = [savedLogin(["bot-deleted"])];
+        mount();
+
+        expect(await screen.findByText(OWN_CHATS_TEXT)).toBeDefined();
+        expect(screen.queryByText(CHOSEN_BOTS_TEXT)).toBeNull();
+    });
+
+    it("does not call a login owner-only from the last account's empty bot list right after a switch, and does once this user's loads", async () => {
+        const view = mount();
+
+        await waitFor(() => expect(view.queryClient.getQueryData(["bots"])).toStrictEqual([]));
+
+        harness.userId = "user-b";
+        harness.botsState = "pending";
+        harness.logins = [savedLogin(["bot-0"])];
+        view.rerender();
+
+        expect(await screen.findByText(CHOSEN_BOTS_TEXT)).toBeDefined();
+        expect(screen.queryByText(OWN_CHATS_TEXT)).toBeNull();
+
+        harness.botsState = "loaded";
+        await view.queryClient.refetchQueries({ queryKey: ["bots"] });
+
+        expect(await screen.findByText(OWN_CHATS_TEXT)).toBeDefined();
     });
 
     it("shows a failed login list as an error with a retry, never as an empty list to add to", async () => {

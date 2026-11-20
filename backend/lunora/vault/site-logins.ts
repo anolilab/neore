@@ -12,6 +12,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
+import { messageCarriesGuestText, messageCarriesOutsideAgentText } from "../chat/lib/attached-text";
 import { loadEligibleThread } from "../devices/internal";
 import { encryptKey } from "../lib/encryption";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
@@ -148,7 +149,9 @@ export const saveSiteLogin = authMutation
         // Sensitive: the runtime keeps it out of request logs and validation errors.
         password: v.optional(v.sensitive(v.string().check((value) => value.length > 0 && value.length <= PASSWORD_MAX, { message: "Invalid password" }))),
         site: v.string().max(SITE_ORIGIN_MAX * 4),
-        teammateIds: v.array(v.id("bots")).max(MAX_SITE_LOGIN_TEAMMATES),
+        // Twice the limit: the form sends a login's saved ids unfiltered (it cannot tell a deleted bot from one its cached
+        // list has not seen yet) plus the ones ticked, which it caps at the limit. What is kept is checked below.
+        teammateIds: v.array(v.id("bots")).max(MAX_SITE_LOGIN_TEAMMATES * 2),
         username: v.string().max(USERNAME_MAX),
     })
     .output(v.id("savedSiteLogins"))
@@ -170,6 +173,11 @@ export const saveSiteLogin = authMutation
         }
 
         const teammateIds = await assertOwnTeammates(ctx, userId, args.teammateIds);
+
+        if (teammateIds.length > MAX_SITE_LOGIN_TEAMMATES) {
+            throw new LunoraError("BAD_REQUEST", `A login can name at most ${MAX_SITE_LOGIN_TEAMMATES} bots`);
+        }
+
         const encryptedPassword = args.password === undefined ? undefined : await encryptKey(args.password, "site-logins");
         const fields = { label: trimmedLabel(args.label), teammateIds, updatedAt: ctx.now, username };
 
@@ -237,23 +245,82 @@ export const deleteSiteLogin = authMutation
     });
 
 /**
- * The logins a run of `threadId` may use, for the agent's browser. Only a turn the thread's owner started
- * (`startedBy`), and only in a thread nobody else's text can reach (`loadEligibleThread`: not shared, public, a group
- * chat, a messenger conversation or deleted), since whoever can steer the model could otherwise sign in as the owner.
- * The owner's own chats get every login; a teammate's thread only the logins naming that teammate, while it still
- * exists and is theirs.
+ * What a run knows about the turn it belongs to, as the tool that asks for a login reads it from its `ToolCtx` and the
+ * turn's record. Every field is required, so a caller that does not know one cannot fall back to an allowing default.
+ */
+const siteLoginTurnFields = {
+    /** `ToolCtx.headless`: a sub-agent, trigger, task, eval or messenger reply. Nobody is at the app to see the run. */
+    headless: v.boolean(),
+    /** Whether an admin acting as the owner sent the turn. Recorded on the turn when it starts; a turn that cannot say is not usable. */
+    impersonated: v.boolean(),
+    /** `ToolCtx.dispatchOrigin`: `"lead"` for the owner's own chat, else what started the run (an outside agent, a trigger, a messenger reply). */
+    origin: v.string().max(40),
+    /**
+     * The turn's prompt row (the tool context's `promptMessageId`, `agent/client/start.ts`): who wrote it is read from the
+     * row, never taken from the run. After a resume or an approval that id is a reply or tool row, which is refused.
+     */
+    promptMessageId: v.id("messages"),
+    /** `ToolCtx.startedBy`: who started the turn. A continuation runs as the owner whoever that was. */
+    startedBy: v.string().max(64),
+};
+
+export type SiteLoginTurn = { headless: boolean; impersonated: boolean; origin: string; promptMessageId: Id<"messages">; startedBy: string };
+
+/**
+ * Whether the run is the owner's own turn at the app: the owner started it themselves, signed in as themselves, in their
+ * own chat (origin `lead`, not headless). Anything else is refused, including an origin this check does not know, so a new
+ * way to start a run gets no logins until it is added here on purpose. A public API run records the key's owner as
+ * `startedBy`, so `startedBy` alone does not prove a person typed the turn.
+ */
+export const isOwnInteractiveTurn = (turn: SiteLoginTurn, userId: string): boolean =>
+    turn.startedBy === userId && turn.origin === "lead" && turn.headless === false && turn.impersonated === false;
+
+/**
+ * Threads an unattended run opened (`triggers/execute.ts`, `tasks/execute.ts`, `evals/execute.ts`): their first prompt is
+ * a webhook payload, a task or an eval input, saved as the owner's row, so a regenerate there would pass as the owner's.
+ */
+const UNATTENDED_THREAD_TAGS: ReadonlySet<string> = new Set(["eval", "task", "trigger"]);
+
+/**
+ * The turn's prompt is the owner's own words: a user row of this thread that the owner wrote, carrying no outside agent's
+ * text (a regenerate of a public API prompt runs with no origin, so its saved mark is what tells) and no guest's note. A
+ * row an agent wrote under the owner's id (a goal's next round, `agentName`) is not theirs, nor is one with no author.
+ */
+const isOwnPrompt = async (ctx: Pick<QueryCtx, "db">, promptMessageId: Id<"messages">, threadId: Id<"threads">, userId: string): Promise<boolean> => {
+    const prompt = await ctx.db.get("messages", promptMessageId);
+
+    if (!prompt || prompt.threadId !== threadId || prompt.userId !== userId || prompt.agentName !== undefined) {
+        return false;
+    }
+
+    const message = prompt.message as Parameters<typeof messageCarriesOutsideAgentText>[0];
+
+    return message?.role === "user" && !messageCarriesOutsideAgentText(message) && !messageCarriesGuestText(message);
+};
+
+/**
+ * The logins a run of `threadId` may use, for the agent's browser. Only the owner's own turn at the app
+ * (`isOwnInteractiveTurn`, with a prompt the owner wrote), and only in a thread nobody else's text can reach
+ * (`loadEligibleThread`: not shared, public, a group chat, a messenger conversation or deleted; nor one a trigger, task
+ * or eval opened), since whoever can steer
+ * the model could otherwise sign in as the owner. The owner's own chats get every login; a teammate's thread only the
+ * logins naming that teammate, while it still exists and is theirs.
  */
 export const usableSiteLogins = async (
     ctx: Pick<QueryCtx, "db">,
-    args: { startedBy: string; threadId: Id<"threads">; userId: string },
+    args: { threadId: Id<"threads">; turn: SiteLoginTurn; userId: string },
 ): Promise<Doc<"savedSiteLogins">[]> => {
-    if (args.startedBy !== args.userId) {
+    if (!isOwnInteractiveTurn(args.turn, args.userId)) {
         return [];
     }
 
     const thread = await loadEligibleThread(ctx, args.threadId, args.userId);
 
-    if (!thread) {
+    if (
+        !thread ||
+        (thread.tags ?? []).some((tag) => UNATTENDED_THREAD_TAGS.has(tag)) ||
+        !(await isOwnPrompt(ctx, args.turn.promptMessageId, args.threadId, args.userId))
+    ) {
         return [];
     }
 
@@ -275,7 +342,7 @@ export const usableSiteLogins = async (
 
 /** What the model may see of the logins a run may use: the site and the label. No username, no password. */
 export const listUsableSiteLogins = internalQuery
-    .input({ startedBy: v.string(), threadId: v.id("threads"), userId: v.string() })
+    .input({ threadId: v.id("threads"), turn: v.object({ ...siteLoginTurnFields }), userId: v.string() })
     .output(v.array(v.object({ label: v.optional(v.string()), site: v.string() })))
     .query(async ({ args, ctx }) => {
         const rows = await usableSiteLogins(ctx, args);
@@ -292,7 +359,7 @@ export const listUsableSiteLogins = internalQuery
  * from a workflow step or puts it in a queue payload, where it would be kept.
  */
 export const siteLoginForFill = internalQuery
-    .input({ site: v.string().max(SITE_ORIGIN_MAX * 4), startedBy: v.string(), threadId: v.id("threads"), userId: v.string() })
+    .input({ site: v.string().max(SITE_ORIGIN_MAX * 4), threadId: v.id("threads"), turn: v.object({ ...siteLoginTurnFields }), userId: v.string() })
     .output(v.union(v.null(), v.object({ encryptedPassword: v.string(), site: v.string(), username: v.string() })))
     .query(async ({ args, ctx }) => {
         const origin = normalizeSiteOrigin(args.site);

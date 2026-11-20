@@ -725,7 +725,7 @@ for a schema table that is neither policed nor listed:
 | `vault_functions.syncMetadata` | action | authAction | — | caller-scoped (ctx.user) | **fixed** (low) — patches only the caller's row |
 | `vault_site_logins.deleteSiteLogin` | mutation | authMutation + RL | savedSiteLogins | refused while impersonating; row.userId == caller | ok |
 | `vault_site_logins.listSiteLogins` | query | authQuery | savedSiteLogins | caller-scoped (ctx.user), impersonating admin included (as the API key list: it carries no secret); never the password or its ciphertext | ok |
-| `vault_site_logins.saveSiteLogin` | mutation | authMutation + RL | savedSiteLogins, bots | refused while impersonating (the agent types a login in the owner's own turns, so a planted or swapped one, or a teammate added to it, would outlive the impersonation); row.userId == caller; only the caller's own bots are stored as teammates (other ids are dropped); the site never changes on edit; password `v.sensitive`, stored encrypted | ok |
+| `vault_site_logins.saveSiteLogin` | mutation | authMutation + RL | savedSiteLogins, bots | refused while impersonating (the agent types a login in the owner's own turns, so a planted or swapped one, or a teammate added to it, would outlive the impersonation); row.userId == caller; only the caller's own existing bots are stored as teammates (deleted ids are dropped), at most 20 kept; the site never changes on edit; password `v.sensitive`, stored encrypted | ok |
 | `voice_functions.authorizeScribeToken` | mutation | authMutation + RL | user | caller-scoped (ctx.user) | ok |
 | `voice_speech.synthesizeSpeech` | action | authAction + RL | — (rate limits, gateway) | caller-scoped (ctx.user); no id in args, nothing persisted; guests refused; text capped per call, charged by length to `voice/dailySpeechChars` before the gateway call, and the gateway deducts the per-character cost from the caller's credits (BYOK FAL key → `byok`) | ok |
 | `voice_transcription.transcribeClip` | action | authAction + RL | — (rate limits, gateway) | caller-scoped (ctx.user); no id in args; the clip and its text are persisted nowhere; guests refused; clip capped by size and stated length, its seconds charged to `voice/dailyTranscribeSeconds` before the gateway call, and the gateway deducts the provider-measured cost from the caller's credits (BYOK OpenAI key → `byok`) | ok |
@@ -756,6 +756,14 @@ for a schema table that is neither policed nor listed:
 | `workflow_presence.listVersions` | query | authQuery | projects | workflow owner | ok |
 | `workflow_presence.restoreVersion` | query | authQuery | — | workflow owner | ok |
 | `workflow_presence.saveVersion` | mutation | authMutation | projects, workflowVersions | workflow owner | accepted — no rate limit; `v.any()` content into the caller's own workflow |
+
+  Saved site logins reach a run only through the internal `vault_site_logins.listUsableSiteLogins` and
+  `siteLoginForFill`, never a client procedure. Both admit only the owner's own turn at the app
+  (`isOwnInteractiveTurn`): `startedBy` is the owner, origin `lead`, not headless, not sent by an impersonating admin,
+  and its prompt row is one the owner typed (their `userId`, no `agentName`, no outside agent's or guest's text). A public API run records the key's
+  owner as `startedBy`, so `startedBy` alone is not enough; triggers, tasks, evals, messenger replies, sub-agents and any
+  origin not named there get none. The thread must pass `loadEligibleThread` and not be one a trigger, task or eval opened; a teammate's thread gets only the logins
+  naming it.
 
 ## Removed from the client surface in this audit
 
