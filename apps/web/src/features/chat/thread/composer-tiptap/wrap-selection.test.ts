@@ -459,6 +459,15 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor)).toBe("see [**docs**](https://example.com) now");
     });
 
+    it("wraps a whole code span that holds link syntax, which is literal there", () => {
+        const editor = editorWith("<p>x `[foo](https://e.com)` y</p>");
+
+        select(editor, 3, 25);
+        wrapSelectionOnTextInput(editor.view, 3, 25, "*");
+
+        expect(text(editor)).toBe("x **`[foo](https://e.com)`** y");
+    });
+
     it("uses a fence length that an earlier unmatched backtick cannot pair with", () => {
         const editor = editorWith("<p>`a foo bar</p>");
 

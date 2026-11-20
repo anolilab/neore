@@ -134,7 +134,8 @@ const markupAround = (parent: ProseMirrorNode, from: number, to: number): { bloc
     const { spans, unmatched } = scanBackticks(text);
     const inCode = spans.map((span) => toOffsets(span)).some(([start, end]) => (from > start && from < end) || (to > start && to < end));
     const inLink = [...text.matchAll(LINK_DESTINATION)]
-        .filter((match) => (match[1] ?? "") !== "")
+        // Link syntax inside a code span is literal text, not a link.
+        .filter((match) => (match[1] ?? "") !== "" && spans.every(([start, end]) => match.index < start || match.index >= end))
         .map((match) => toOffsets([match.index + 2, match.index + 2 + (match[1] ?? "").length]))
         .some(([start, end]) => from < end && to > start);
 
