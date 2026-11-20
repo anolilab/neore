@@ -35,6 +35,9 @@ export const eraseBotsForUser = async (ctx: MutationCtx, userId: string): Promis
 };
 
 /** The user's bots for the GDPR export (`gdpr/workflows/export-workflow.ts`). */
+/** Owner records read per page for the export. */
+const OWNER_EXPORT_PAGE = 500;
+
 export const collectBotsForExport = internalQuery
     .input({ userId: v.string() })
     .output(v.object({ botOwners: v.array(v.any()), bots: v.array(v.any()) }))
@@ -43,8 +46,27 @@ export const collectBotsForExport = internalQuery
             .query("bots")
             .withIndex("by_userId", (q) => q.eq("userId", userId))
             .take(BATCH);
-        // The owner records outlive deleted bots (`botOwners`), so they are the user's data too. Primary, as for the erasure.
-        const owners = await ctx.db.botOwners.findMany({ consistency: "primary", where: { ownerId: userId } });
+        // The owner records outlive deleted bots (`botOwners`), so they are the user's data too: every one, page by page (a
+        // single read stops at a page). Primary, as for the erasure.
+        const botOwners: unknown[] = [];
+        let cursor: string | null = null;
 
-        return { botOwners: owners.page, bots };
+        for (;;) {
+            const page: { continueCursor?: string | null; isDone: boolean; page: unknown[] } = await ctx.db.botOwners.findMany({
+                consistency: "primary",
+                cursor,
+                limit: OWNER_EXPORT_PAGE,
+                where: { ownerId: userId },
+            });
+
+            botOwners.push(...page.page);
+
+            if (page.isDone || !page.continueCursor) {
+                break;
+            }
+
+            cursor = page.continueCursor;
+        }
+
+        return { botOwners, bots };
     });

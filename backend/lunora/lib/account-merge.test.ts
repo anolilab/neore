@@ -95,7 +95,7 @@ const fakeShards = (seed: Record<string, Record<string, Row[]>>, pageSize = 2) =
             case "reassignGlobalRows": {
                 reassigned.push({ from: args.from as string, to: args.to as string });
 
-                return { reassigned: 0 } as never;
+                return { done: true, reassigned: 0 } as never;
             }
             default: {
                 throw new Error(`unexpected ${String(name)}`);

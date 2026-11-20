@@ -128,6 +128,30 @@ describe("a bot with two owner rows", () => {
     });
 });
 
+describe("account conversion in batches", () => {
+    it("moves a guest's many global rows over several calls, never more than a batch at a time", async () => {
+        expect.assertions(3);
+
+        const guest = "guest-with-many-bots";
+
+        await harness.run(async (ctx: any) => {
+            for (let i = 0; i < 250; i += 1) {
+                await ctx.db.insert("botOwners", { botId: `guest-bot-${i}`, createdAt: 1, ownerId: guest });
+            }
+        });
+
+        const first = await harness.run(async (ctx: any) => await ctx.runMutation(reassignGlobalRows, { from: guest, to: OWNER }));
+        const second = await harness.run(async (ctx: any) => await ctx.runMutation(reassignGlobalRows, { from: guest, to: OWNER }));
+
+        expect(first).toEqual({ done: false, reassigned: 200 });
+        expect(second).toEqual({ done: true, reassigned: 50 });
+
+        const left = await harness.run(async (ctx: any) => await ctx.db.botOwners.findMany({ where: { ownerId: guest } }));
+
+        expect(left.page).toHaveLength(0);
+    });
+});
+
 describe("account conversion", () => {
     it("re-points the bot owner row to the new account and keeps a shared bot another owner's", async () => {
         const guest = "guest";

@@ -80,10 +80,11 @@ const MemorySettings: FC = () => {
 
     // Fetch memories list (skip when memory is disabled to avoid unnecessary API calls)
     const { data: memories, refetch: refetchMemories } = useQuery({
-        ...crpc.memory.functions.listUserMemories.queryOptions({}),
+        // Read by refetches, not a subscription: a shared bot's label comes from the global `botOwners` table, whose writes
+        // on the bot owner's shard never reach a live query (docs/agents/lunora-upstream.md). It is read again whenever the
+        // person comes back to the page, and after each change made here (`refresh`).
+        ...crpc.memory.functions.listUserMemories.queryOptions({}, { live: false }),
         enabled: memoryEnabled,
-        // A shared bot's label comes from the global `botOwners` table, whose writes on the bot owner's shard never
-        // reach this live query: read it again whenever the person comes back to the page.
         refetchOnWindowFocus: "always",
     });
 

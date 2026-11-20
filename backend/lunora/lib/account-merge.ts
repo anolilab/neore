@@ -223,33 +223,42 @@ export const deleteShardRows = internalMutation
     });
 
 /** Re-point every `.global()` row naming the guest to the new user, and drop the guest's census row. */
+/**
+ * Global rows one `reassignGlobalRows` call moves: each is one D1 statement, and an invocation may run only so many, so a
+ * guest with more is moved over several calls (`mergeGuestInto` repeats it until `done`).
+ */
+const REASSIGN_BATCH = 200;
+
 export const reassignGlobalRows = internalMutation
     .input({ from: v.string(), to: v.string() })
-    .output(v.object({ reassigned: v.number() }))
+    .output(v.object({ done: v.boolean(), reassigned: v.number() }))
     .mutation(async ({ args, ctx }) => {
         const facades = ctx.db as unknown as Record<
             string,
             {
-                findMany: (options: { consistency: "primary"; where: Record<string, string> }) => Promise<{ page: Record<string, unknown>[] }>;
+                findMany: (options: { consistency: "primary"; limit: number; where: Record<string, string> }) => Promise<{ page: Record<string, unknown>[] }>;
             }
         >;
         let reassigned = 0;
 
         for (const [table, columns] of Object.entries(GLOBAL_USER_COLUMNS)) {
             for (const column of columns) {
-                // One read returns at most a page (4096 rows): read again until none is left. Each patch moves its row out of
-                // the filter, and a primary read sees that at once, so the loop ends.
-                for (;;) {
-                    const { page } = await facades[table]!.findMany({ consistency: "primary", where: { [column]: args.from } });
+                const room = REASSIGN_BATCH - reassigned;
 
-                    if (page.length === 0) {
-                        break;
-                    }
+                if (room <= 0) {
+                    // Primary reads: a patch moves its row out of the filter, so the next call starts where this one stopped.
+                    return { done: false, reassigned };
+                }
 
-                    for (const row of page) {
-                        await ctx.db.patch(table as never, row._id as never, { [column]: args.to } as never);
-                        reassigned += 1;
-                    }
+                const { page } = await facades[table]!.findMany({ consistency: "primary", limit: room + 1, where: { [column]: args.from } });
+
+                for (const row of page.slice(0, room)) {
+                    await ctx.db.patch(table as never, row._id as never, { [column]: args.to } as never);
+                    reassigned += 1;
+                }
+
+                if (page.length > room) {
+                    return { done: false, reassigned };
                 }
             }
         }
@@ -263,7 +272,7 @@ export const reassignGlobalRows = internalMutation
             await ctx.db.delete("shardActivity", row._id);
         }
 
-        return { reassigned };
+        return { done: true, reassigned };
     });
 
 /** A caller into a named shard, as `createShardClient(...).call` is. */
@@ -322,7 +331,14 @@ export const mergeGuestInto = async (call: ShardCall, references: MergeReference
         drained &&= emptied;
     }
 
-    await call(references.reassignGlobal, { from, to }, to);
+    // In batches: each call moves at most `REASSIGN_BATCH` rows, so a guest with many never hits the statement cap.
+    for (;;) {
+        const { done } = await call<{ done: boolean }>(references.reassignGlobal, { from, to }, to);
+
+        if (done) {
+            break;
+        }
+    }
 
     // Only once nothing of the guest's is left to move: a later run still needs to find it otherwise.
     if (drained) {
