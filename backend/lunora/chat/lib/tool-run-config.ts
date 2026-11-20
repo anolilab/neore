@@ -16,6 +16,12 @@ import { vGroupRunSnapshot } from "../group/validators";
 export const vToolRunConfig = v.object({
     autoMediaEnrichment: v.boolean(),
     /**
+     * Where a headless run that paused found its bot (`headless-run.ts`): the bot it named, else the thread it took the bot's mode
+     * from. The continuation looks there again, so the bot's tool selection and mode hold for the rest of the run; a named bot
+     * that is gone, or no longer the owner's, leaves it no tools. Absent (interactive, or older) = the bot of the run's thread.
+     */
+    botLookup: v.optional(v.object({ botId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.optional(v.string().max(MAX_LENGTH.id)) })),
+    /**
      * The task, trigger or eval whose sub-agent chain the paused child belongs to (`sub-agents/logic.ts:chainSourceKey`): the
      * continuation names it on what the child delegates, so the per-source limit holds after an answer. Absent on a snapshot
      * that predates it, or for a chat-started chain.
@@ -50,6 +56,11 @@ export const vToolRunConfig = v.object({
      * run an approved call whose tool's fingerprint changed or is gone. Absent on a snapshot that predates it: no check.
      */
     mcpToolFingerprints: v.optional(v.record(v.string(), v.string())),
+    /**
+     * Runtime name -> origin of each MCP tool the run offered (`mcpToolOrigin`): which server's which tool the name stood
+     * for. A continuation does not run an approved call whose name now stands for another. Absent on an older snapshot: no check.
+     */
+    mcpToolOrigins: v.optional(v.record(v.string(), v.string())),
     /**
      * Set when the run that paused fed memory extraction (it extracted its own prompt
      * and steers at the pause). The continuation then extracts only what it adds: the

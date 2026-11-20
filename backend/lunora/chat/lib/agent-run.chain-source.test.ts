@@ -59,6 +59,7 @@ beforeEach(async () => {
         mcpLabels: {},
         mcpServerNames: [],
         mcpToolFingerprints: {},
+        mcpToolOrigins: {},
         permissionKeys: {},
         repeatable: [],
         requiresApproval: [],

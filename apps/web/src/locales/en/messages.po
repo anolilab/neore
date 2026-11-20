@@ -118,6 +118,10 @@ msgstr "(deleted case)"
 msgid "(deleted task)"
 msgstr "(deleted task)"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:388
+msgid "(disconnected)"
+msgstr "(disconnected)"
+
 #: src/features/evals/components/run-detail.tsx:110
 msgid "(expected)"
 msgstr "(expected)"
@@ -1803,6 +1807,10 @@ msgstr "A {requestNoun} title is at most {0} characters."
 msgid "A background run never stops to wait for you. Questions to you are dropped from it, so it finishes on its own or fails."
 msgstr "A background run never stops to wait for you. Questions to you are dropped from it, so it finishes on its own or fails."
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:517
+msgid "A built-in tool by its name, a server's tool as server:tool, or a whole server as server:*."
+msgstr "A built-in tool by its name, a server's tool as server:tool, or a whole server as server:*."
+
 #: src/features/develop/components/watched-repositories.tsx:72
 msgid "a change is waiting to be read"
 msgstr "a change is waiting to be read"
@@ -1880,12 +1888,16 @@ msgstr "A key is saved. Leave blank to keep it."
 msgid "A key is saved. Leave blank to keep it. Changing the endpoint, region or access key id requires entering it again."
 msgstr "A key is saved. Leave blank to keep it. Changing the endpoint, region or access key id requires entering it again."
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:369
+msgid "A listed built-in tool no longer exists. Remove it before saving."
+msgstr "A listed built-in tool no longer exists. Remove it before saving."
+
 #: src/features/chat/guest-links/guest-link-panel.tsx:159
 #: src/features/chat/guest-links/guest-link-panel.tsx:360
 msgid "A locked chat cannot have a guest link."
 msgstr "A locked chat cannot have a guest link."
 
-#: src/features/vault/components/site-logins.tsx:537
+#: src/features/vault/components/site-logins.tsx:542
 msgid "A login can name at most {MAX_TEAMMATES} bots."
 msgstr "A login can name at most {MAX_TEAMMATES} bots."
 
@@ -1995,7 +2007,7 @@ msgstr "A run never writes into a chat that is locked or shared by link. It star
 msgid "A run's thread is filed in this project. Moving the task to another project starts a new thread."
 msgstr "A run's thread is filed in this project. Moving the task to another project starts a new thread."
 
-#: src/features/settings/components/chat/bots-settings.tsx:225
+#: src/features/settings/components/chat/bots-settings.tsx:435
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 
@@ -2046,6 +2058,11 @@ msgstr "A tool cannot be both added and disabled"
 #: src/features/marketing/use-cases/use-case-data.ts:91
 msgid "A tool that needs your approval pauses the turn with a card. Only the owner answers, and the queued speakers continue afterwards."
 msgstr "A tool that needs your approval pauses the turn with a card. Only the owner answers, and the queued speakers continue afterwards."
+
+#: src/features/settings/components/chat/bots-settings.tsx:220
+#: src/features/settings/components/chat/bots-settings.tsx:272
+msgid "A tool you typed was not added. Add it or clear the field first."
+msgstr "A tool you typed was not added. Add it or clear the field first."
 
 #: src/features/settings/components/chat/trigger-settings.tsx:344
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
@@ -2289,6 +2306,7 @@ msgstr "Activity per month"
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:225
 #: src/features/projects/components/project-repositories.tsx:425
+#: src/features/settings/components/chat/bot-tool-selection.tsx:359
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:102
 #: src/features/workflow/components/gallery/publish-dialog.tsx:220
 msgid "Add"
@@ -3387,6 +3405,10 @@ msgstr "All shards measured."
 msgid "All tasks"
 msgstr "All tasks"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:476
+msgid "All tools"
+msgstr "All tools"
+
 #: src/features/admin/components/users-management-card.tsx:141
 msgid "All Types"
 msgstr "All Types"
@@ -3453,6 +3475,10 @@ msgstr "Allowed Providers"
 #: src/features/settings/components/chat/model-filter-settings.tsx:164
 msgid "Allowed Regions"
 msgstr "Allowed Regions"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:519
+msgid "Allowed tools"
+msgstr "Allowed tools"
 
 #: src/features/workflow/components/nodes/audio-node.tsx:17
 msgid "Alloy (Neutral)"
@@ -3566,6 +3592,10 @@ msgstr "An error occurred while loading the {routeName} page."
 #: src/features/settings/components/personalization/memory-item.tsx:347
 msgid "An event cannot end before it starts."
 msgstr "An event cannot end before it starts."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:532
+msgid "An excluded server was removed or its address changed. Until you remove it here, the bot gets none of your own servers' tools."
+msgstr "An excluded server was removed or its address changed. Until you remove it here, the bot gets none of your own servers' tools."
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:358
 msgid "An IAM user's secret access key with bedrock:InvokeModel. Encrypted at rest and never shown again."
@@ -4439,7 +4469,7 @@ msgstr "auto"
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
-#: src/features/settings/components/chat/bots-settings.tsx:58
+#: src/features/settings/components/chat/bots-settings.tsx:131
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Auto"
 msgstr "Auto"
@@ -5147,11 +5177,11 @@ msgstr "Bosnian"
 msgid "Bosnian (Bosnia)"
 msgstr "Bosnian (Bosnia)"
 
-#: src/features/settings/components/chat/bots-settings.tsx:137
+#: src/features/settings/components/chat/bots-settings.tsx:240
 msgid "Bot created"
 msgstr "Bot created"
 
-#: src/features/settings/components/chat/bots-settings.tsx:171
+#: src/features/settings/components/chat/bots-settings.tsx:361
 msgid "Bot deleted"
 msgstr "Bot deleted"
 
@@ -5175,7 +5205,7 @@ msgstr "Bot token from the Discord Developer Portal"
 msgid "Bots"
 msgstr "Bots"
 
-#: src/features/vault/components/site-logins.tsx:532
+#: src/features/vault/components/site-logins.tsx:537
 msgid "Bots that may use it"
 msgstr "Bots that may use it"
 
@@ -5703,6 +5733,7 @@ msgstr "Canada"
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
 #: src/features/settings/components/chat/api-keys-settings.tsx:439
+#: src/features/settings/components/chat/bots-settings.tsx:548
 #: src/features/settings/components/chat/custom-providers-settings.tsx:638
 #: src/features/settings/components/chat/mcp/server-form.tsx:334
 #: src/features/settings/components/chat/native-providers-settings.tsx:709
@@ -5725,7 +5756,7 @@ msgstr "Canada"
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:636
-#: src/features/vault/components/site-logins.tsx:561
+#: src/features/vault/components/site-logins.tsx:566
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -6057,7 +6088,7 @@ msgstr "chat"
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
 #: src/features/settings/components/account/account-settings.tsx:341
-#: src/features/settings/components/chat/bots-settings.tsx:262
+#: src/features/settings/components/chat/bots-settings.tsx:498
 #: src/features/settings/lib/settings-keywords.ts:33
 #: src/features/settings/lib/settings-navigation.ts:98
 msgid "Chat"
@@ -7436,7 +7467,7 @@ msgid "Compressing context..."
 msgstr "Compressing context..."
 
 #: src/features/auth/components/device-code-parts.tsx:76
-#: src/features/settings/components/chat/bots-settings.tsx:224
+#: src/features/settings/components/chat/bots-settings.tsx:434
 msgid "Computer"
 msgstr "Computer"
 
@@ -8444,7 +8475,7 @@ msgstr "Could not change Auto. Please try again."
 msgid "Could not change push notifications. Try again."
 msgstr "Could not change push notifications. Try again."
 
-#: src/features/settings/components/chat/bots-settings.tsx:159
+#: src/features/settings/components/chat/bots-settings.tsx:262
 msgid "Could not change the bot's permission mode."
 msgstr "Could not change the bot's permission mode."
 
@@ -8473,6 +8504,10 @@ msgstr "Could not compact the conversation. Try again."
 #: src/features/develop/components/checks-tab.tsx:124
 msgid "Could not confirm that {0} was started again. Check on {hostLabel} before you try again."
 msgstr "Could not confirm that {0} was started again. Check on {hostLabel} before you try again."
+
+#: src/features/settings/components/chat/bots-settings.tsx:325
+msgid "Could not confirm that the bot's tools were saved. Check them and try again."
+msgstr "Could not confirm that the bot's tools were saved. Check them and try again."
 
 #: src/features/develop/components/review-panel.tsx:162
 msgid "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
@@ -8529,7 +8564,7 @@ msgstr "Could not copy; select the text instead"
 msgid "Could not create a collection for this import. Try again."
 msgstr "Could not create a collection for this import. Try again."
 
-#: src/features/settings/components/chat/bots-settings.tsx:139
+#: src/features/settings/components/chat/bots-settings.tsx:242
 msgid "Could not create the bot."
 msgstr "Could not create the bot."
 
@@ -8542,7 +8577,7 @@ msgstr "Could not create the group chat"
 msgid "Could not create the page"
 msgstr "Could not create the page"
 
-#: src/features/settings/components/chat/bots-settings.tsx:173
+#: src/features/settings/components/chat/bots-settings.tsx:363
 msgid "Could not delete the bot."
 msgstr "Could not delete the bot."
 
@@ -8550,7 +8585,7 @@ msgstr "Could not delete the bot."
 msgid "Could not delete the comment"
 msgstr "Could not delete the comment"
 
-#: src/features/vault/components/site-logins.tsx:383
+#: src/features/vault/components/site-logins.tsx:388
 msgid "Could not delete the login."
 msgstr "Could not delete the login."
 
@@ -8778,6 +8813,10 @@ msgstr "Could not retry. Please try again."
 msgid "Could not save that choice. Try again."
 msgstr "Could not save that choice. Try again."
 
+#: src/features/settings/components/chat/bots-settings.tsx:317
+msgid "Could not save the bot's tools. Its tools are unchanged."
+msgstr "Could not save the bot's tools. Its tools are unchanged."
+
 #: src/features/notifications/components/notification-settings.tsx:110
 msgid "Could not save the Daily Brief setting."
 msgstr "Could not save the Daily Brief setting."
@@ -8786,7 +8825,7 @@ msgstr "Could not save the Daily Brief setting."
 msgid "Could not save the email setting."
 msgstr "Could not save the email setting."
 
-#: src/features/vault/components/site-logins.tsx:336
+#: src/features/vault/components/site-logins.tsx:341
 msgid "Could not save the login."
 msgstr "Could not save the login."
 
@@ -8846,7 +8885,7 @@ msgstr "Could not sign out"
 msgid "Could not snooze the thread. Please try again."
 msgstr "Could not snooze the thread. Please try again."
 
-#: src/features/settings/components/chat/bots-settings.tsx:149
+#: src/features/settings/components/chat/bots-settings.tsx:252
 msgid "Could not start a chat with this bot."
 msgstr "Could not start a chat with this bot."
 
@@ -9041,7 +9080,7 @@ msgstr "Create and manage API keys for programmatic access to your account."
 msgid "Create API Key"
 msgstr "Create API Key"
 
-#: src/features/settings/components/chat/bots-settings.tsx:234
+#: src/features/settings/components/chat/bots-settings.tsx:445
 msgid "Create bot"
 msgstr "Create bot"
 
@@ -9205,6 +9244,11 @@ msgstr "Created: {createdAt}"
 #: src/features/pages/components/page-share-dialog.tsx:93
 msgid "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
 msgstr "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
+
+#: src/features/settings/components/chat/bots-settings.tsx:445
+#: src/features/settings/components/chat/bots-settings.tsx:448
+msgid "Creating bot…"
+msgstr "Creating bot…"
 
 #: src/features/chat/thread-list/thread-node.tsx:743
 #: src/features/chat/thread-list/thread-node.tsx:766
@@ -9403,6 +9447,7 @@ msgstr "Currently restricted"
 #: src/features/marketing/components/gateway-landing-page.tsx:792
 #: src/features/marketing/components/landing-page.tsx:1014
 #: src/features/prompts/components/prompt-form-dialog.tsx:444
+#: src/features/settings/components/chat/bot-tool-selection.tsx:480
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:77
 msgid "Custom"
 msgstr "Custom"
@@ -9465,6 +9510,10 @@ msgstr "custom styles"
 #: src/features/chat/sidebar/thread-sidebar.tsx:186
 msgid "Custom System Prompt"
 msgstr "Custom System Prompt"
+
+#: src/features/settings/components/chat/bots-settings.tsx:467
+msgid "Custom tools"
+msgstr "Custom tools"
 
 #: src/features/marketing/data/models-data.ts:445
 msgid "Custom-style video generation with LoRA support at the lowest possible cost and fastest speed"
@@ -9975,15 +10024,15 @@ msgstr "Delegate tasks to Devin, the AI software engineer"
 #: src/features/prompts/components/prompt-list-view.tsx:227
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:709
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:848
-#: src/features/settings/components/chat/bots-settings.tsx:271
-#: src/features/settings/components/chat/bots-settings.tsx:280
+#: src/features/settings/components/chat/bots-settings.tsx:507
+#: src/features/settings/components/chat/bots-settings.tsx:561
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
 #: src/features/settings/components/chat/trigger-settings.tsx:1096
 #: src/features/skills/components/skill-list.tsx:307
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
-#: src/features/vault/components/site-logins.tsx:569
+#: src/features/vault/components/site-logins.tsx:574
 msgid "Delete"
 msgstr "Delete"
 
@@ -10004,7 +10053,7 @@ msgstr "Delete “{pendingDeleteTitle}”?"
 #. placeholder {0}: model.name
 #. placeholder {0}: server.name
 #: src/features/local-models/components/ollama-model-manager.tsx:265
-#: src/features/settings/components/chat/bots-settings.tsx:265
+#: src/features/settings/components/chat/bots-settings.tsx:501
 #: src/features/settings/components/chat/mcp/server-list.tsx:171
 #: src/features/skills/components/skill-item.tsx:189
 msgid "Delete {0}"
@@ -10018,7 +10067,7 @@ msgstr "Delete {0} users"
 #. placeholder {0}: deleting.name
 #. placeholder {0}: pendingDelete?.name ?? ""
 #: src/features/local-models/components/ollama-model-manager.tsx:342
-#: src/features/settings/components/chat/bots-settings.tsx:290
+#: src/features/settings/components/chat/bots-settings.tsx:571
 msgid "Delete {0}?"
 msgstr "Delete {0}?"
 
@@ -10098,7 +10147,7 @@ msgid "Delete group and children"
 msgstr "Delete group and children"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:454
+#: src/features/vault/components/site-logins.tsx:459
 msgid "Delete login for {0}"
 msgstr "Delete login for {0}"
 
@@ -10232,7 +10281,7 @@ msgstr "Delete the open thread after you confirm ({0})"
 msgid "Delete this case?"
 msgstr "Delete this case?"
 
-#: src/features/vault/components/site-logins.tsx:579
+#: src/features/vault/components/site-logins.tsx:584
 msgid "Delete this login?"
 msgstr "Delete this login?"
 
@@ -10498,7 +10547,7 @@ msgstr "Describe your workflow... e.g., 'Generate an image from text, upscale it
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
 #: src/features/prompts/components/variable-definitions.tsx:122
-#: src/features/settings/components/chat/bots-settings.tsx:188
+#: src/features/settings/components/chat/bots-settings.tsx:384
 #: src/features/skills/components/bundle-import-dialog.tsx:115
 #: src/features/skills/components/bundle-import-dialog.tsx:148
 #: src/features/skills/components/skill-builder-diff.tsx:28
@@ -11532,12 +11581,12 @@ msgstr "edit image"
 msgid "Edit Image"
 msgstr "Edit Image"
 
-#: src/features/vault/components/site-logins.tsx:471
+#: src/features/vault/components/site-logins.tsx:476
 msgid "Edit login"
 msgstr "Edit login"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:444
+#: src/features/vault/components/site-logins.tsx:449
 msgid "Edit login for {0}"
 msgstr "Edit login for {0}"
 
@@ -12563,6 +12612,10 @@ msgstr "Event ends on"
 msgid "Every 6 hours"
 msgstr "Every 6 hours"
 
+#: src/features/settings/components/chat/bots-settings.tsx:526
+msgid "Every chat and scheduled run of this bot gets only these tools. Your tool permissions still apply."
+msgstr "Every chat and scheduled run of this bot gets only these tools. Your tool permissions still apply."
+
 #: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
 msgstr "Every day at 09:00 UTC"
@@ -12721,6 +12774,10 @@ msgstr "Exceptional text rendering inside images"
 #: src/features/marketing/data/models-data.ts:174
 msgid "Exceptionally sharp detail and clarity"
 msgstr "Exceptionally sharp detail and clarity"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:529
+msgid "Excluded tools"
+msgstr "Excluded tools"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:329
 msgid "Execute"
@@ -15197,7 +15254,7 @@ msgstr "Full 1080p high-definition video output"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
 #: src/features/chat/thread/composer-permission-mode.tsx:42
-#: src/features/settings/components/chat/bots-settings.tsx:59
+#: src/features/settings/components/chat/bots-settings.tsx:132
 msgid "Full access"
 msgstr "Full access"
 
@@ -16249,7 +16306,7 @@ msgstr "Hands-free voice updated"
 msgid "Happens on"
 msgstr "Happens on"
 
-#: src/features/settings/components/chat/bots-settings.tsx:252
+#: src/features/settings/components/chat/bots-settings.tsx:466
 msgid "Has a computer"
 msgstr "Has a computer"
 
@@ -17565,7 +17622,7 @@ msgstr "instruct"
 msgid "instructions"
 msgstr "instructions"
 
-#: src/features/settings/components/chat/bots-settings.tsx:197
+#: src/features/settings/components/chat/bots-settings.tsx:394
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:155
@@ -18248,7 +18305,7 @@ msgstr "Kyrgyzstan"
 msgid "Label"
 msgstr "Label"
 
-#: src/features/vault/components/site-logins.tsx:509
+#: src/features/vault/components/site-logins.tsx:514
 msgid "Label (optional)"
 msgstr "Label (optional)"
 
@@ -18665,7 +18722,7 @@ msgstr "Leave empty for \"any model\"."
 msgid "Leave empty for transparent background"
 msgstr "Leave empty for transparent background"
 
-#: src/features/vault/components/site-logins.tsx:502
+#: src/features/vault/components/site-logins.tsx:507
 msgid "Leave empty to keep the saved password"
 msgstr "Leave empty to keep the saved password"
 
@@ -19327,6 +19384,10 @@ msgstr "Loading your overview…"
 msgid "Loading your projects…"
 msgstr "Loading your projects…"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:488
+msgid "Loading your servers, connectors and computers…"
+msgstr "Loading your servers, connectors and computers…"
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:178
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:62
 #: src/components/default-loading.tsx:8
@@ -19353,7 +19414,7 @@ msgstr "Loading..."
 #: src/features/chat/thread/request-secret-prompt.tsx:478
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
-#: src/features/settings/components/chat/bots-settings.tsx:242
+#: src/features/settings/components/chat/bots-settings.tsx:456
 #: src/features/settings/components/personalization/memory-item.tsx:129
 #: src/routes/auth/extension.tsx:68
 msgid "Loading…"
@@ -19447,7 +19508,7 @@ msgstr "Log out"
 msgid "Login"
 msgstr "Login"
 
-#: src/features/vault/components/site-logins.tsx:379
+#: src/features/vault/components/site-logins.tsx:384
 msgid "Login deleted"
 msgstr "Login deleted"
 
@@ -19455,11 +19516,11 @@ msgstr "Login deleted"
 msgid "login refused"
 msgstr "login refused"
 
-#: src/features/vault/components/site-logins.tsx:335
+#: src/features/vault/components/site-logins.tsx:340
 msgid "Login saved"
 msgstr "Login saved"
 
-#: src/features/vault/components/site-logins.tsx:335
+#: src/features/vault/components/site-logins.tsx:340
 msgid "Login updated"
 msgstr "Login updated"
 
@@ -19467,7 +19528,7 @@ msgstr "Login updated"
 msgid "Logins"
 msgstr "Logins"
 
-#: src/features/vault/components/site-logins.tsx:395
+#: src/features/vault/components/site-logins.tsx:400
 msgid "Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it."
 msgstr "Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it."
 
@@ -20673,7 +20734,7 @@ msgstr "Mode:"
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
-#: src/features/settings/components/chat/bots-settings.tsx:206
+#: src/features/settings/components/chat/bots-settings.tsx:404
 #: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:407
 #: src/features/workflow/components/nodes/ai-node.tsx:34
@@ -21272,7 +21333,7 @@ msgstr "name"
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
-#: src/features/settings/components/chat/bots-settings.tsx:184
+#: src/features/settings/components/chat/bots-settings.tsx:374
 #: src/features/settings/components/chat/custom-providers-settings.tsx:494
 #: src/features/settings/components/chat/mcp/server-form.tsx:194
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
@@ -21634,6 +21695,10 @@ msgstr "Never covers a tool you set to Ask yourself, built-in tools, device tool
 msgid "Never expires"
 msgstr "Never expires"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:527
+msgid "Never given to the bot, even when allowed above."
+msgstr "Never given to the bot, even when allowed above."
+
 #: src/features/auth/components/settings/api-key/api-key-cell.tsx:46
 msgid "Never used"
 msgstr "Never used"
@@ -21649,7 +21714,7 @@ msgstr "New"
 msgid "New Azure Bots are single-tenant: set the Teams Tenant ID key, or replies cannot authenticate."
 msgstr "New Azure Bots are single-tenant: set the Teams Tenant ID key, or replies cannot authenticate."
 
-#: src/features/settings/components/chat/bots-settings.tsx:182
+#: src/features/settings/components/chat/bots-settings.tsx:372
 msgid "New bot"
 msgstr "New bot"
 
@@ -21694,7 +21759,7 @@ msgstr "New chats start permanent"
 msgid "New chats start temporary"
 msgstr "New chats start temporary"
 
-#: src/features/settings/components/chat/bots-settings.tsx:157
+#: src/features/settings/components/chat/bots-settings.tsx:260
 msgid "New chats with this bot start in the chosen mode"
 msgstr "New chats with this bot start in the chosen mode"
 
@@ -21740,7 +21805,7 @@ msgstr "New high quality model for photorealism and text rendering"
 msgid "New line in message"
 msgstr "New line in message"
 
-#: src/features/vault/components/site-logins.tsx:471
+#: src/features/vault/components/site-logins.tsx:476
 msgid "New login"
 msgstr "New login"
 
@@ -22017,13 +22082,17 @@ msgstr "No audit logs found"
 msgid "No bot"
 msgstr "No bot"
 
-#: src/features/settings/components/chat/bots-settings.tsx:245
+#: src/features/settings/components/chat/bots-settings.tsx:459
 msgid "No bots yet."
 msgstr "No bots yet."
 
 #: src/features/settings/components/chat/usage-settings.tsx:670
 msgid "No budget alerts configured."
 msgstr "No budget alerts configured."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:208
+msgid "No built-in tool is named {unknownBuiltIn}."
+msgstr "No built-in tool is named {unknownBuiltIn}."
 
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:38
 msgid "No camera selected"
@@ -22480,6 +22549,10 @@ msgstr "No results found."
 #: src/features/evals/components/dataset-panel.tsx:215
 msgid "No runs yet. Start one to score every case."
 msgstr "No runs yet. Start one to score every case."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:218
+msgid "No server, connector or computer matches {unknownServer}."
+msgstr "No server, connector or computer matches {unknownServer}."
 
 #: src/features/admin/components/user-sessions-dialog.tsx:134
 msgid "No sessions found"
@@ -23289,6 +23362,10 @@ msgstr "Only continue if you started this just now by running `neore-host pair` 
 #: src/features/evals/components/run-comparison.tsx:54
 msgid "Only in one run"
 msgstr "Only in one run"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:501
+msgid "Only listed tools"
+msgstr "Only listed tools"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:336
 msgid "Only organization owners can manage billing settings"
@@ -24655,7 +24732,7 @@ msgstr "Passkeys allow you to sign in securely using your device's biometric aut
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
-#: src/features/vault/components/site-logins.tsx:496
+#: src/features/vault/components/site-logins.tsx:501
 msgid "Password"
 msgstr "Password"
 
@@ -24702,7 +24779,7 @@ msgstr "Password reset email sent"
 msgid "Password reset successful"
 msgstr "Password reset successful"
 
-#: src/features/vault/components/site-logins.tsx:438
+#: src/features/vault/components/site-logins.tsx:443
 msgid "Password set"
 msgstr "Password set"
 
@@ -24919,12 +24996,12 @@ msgid "Permission Level"
 msgstr "Permission Level"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:89
-#: src/features/settings/components/chat/bots-settings.tsx:210
+#: src/features/settings/components/chat/bots-settings.tsx:412
 msgid "Permission mode"
 msgstr "Permission mode"
 
 #. placeholder {0}: bot.name
-#: src/features/settings/components/chat/bots-settings.tsx:256
+#: src/features/settings/components/chat/bots-settings.tsx:471
 msgid "Permission mode for {0}"
 msgstr "Permission mode for {0}"
 
@@ -27409,6 +27486,10 @@ msgstr "Remove {modelId} from blocked list"
 msgid "Remove {name}"
 msgstr "Remove {name}"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:390
+msgid "Remove {shown}"
+msgstr "Remove {shown}"
+
 #: src/features/admin/components/update-user-role-dialog.tsx:64
 #: src/features/admin/components/user-cell.tsx:110
 msgid "Remove Admin"
@@ -27599,6 +27680,10 @@ msgstr "Removed"
 #: src/features/prompts/components/prompt-list.tsx:330
 msgid "Removed from favorites"
 msgstr "Removed from favorites"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:245
+msgid "Removed server"
+msgstr "Removed server"
 
 #: src/features/skills/components/skill-builder-diff.tsx:40
 msgid "Removed:"
@@ -28093,6 +28178,7 @@ msgstr "retry"
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/onboarding/components/setup-checklist.tsx:238
 #: src/features/settings/components/chat/agent-settings.tsx:224
+#: src/features/settings/components/chat/bot-tool-selection.tsx:495
 #: src/features/tasks/components/task-detail-dialog.tsx:108
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -28753,7 +28839,7 @@ msgstr "Save case"
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
 #: src/features/tasks/components/task-form-dialog.tsx:639
-#: src/features/vault/components/site-logins.tsx:557
+#: src/features/vault/components/site-logins.tsx:562
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "Save changes"
@@ -28770,7 +28856,7 @@ msgstr "Save failed"
 msgid "Save Image"
 msgstr "Save Image"
 
-#: src/features/vault/components/site-logins.tsx:557
+#: src/features/vault/components/site-logins.tsx:562
 msgid "Save login"
 msgstr "Save login"
 
@@ -28793,6 +28879,10 @@ msgstr "Save skill"
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:56
 msgid "Save these backup codes in a safe place. You can use them to access your account if you lose your two-factor authentication device."
 msgstr "Save these backup codes in a safe place. You can use them to access your account if you lose your two-factor authentication device."
+
+#: src/features/settings/components/chat/bots-settings.tsx:551
+msgid "Save tools"
+msgstr "Save tools"
 
 #: src/features/prompts/components/thread-variables-config.tsx:263
 msgid "Save Variables"
@@ -28843,6 +28933,11 @@ msgstr "Saved on {hostLabel}."
 #: src/features/evals/components/save-eval-case-action.tsx:70
 msgid "Saved to \"{0}\""
 msgstr "Saved to \"{0}\""
+
+#: src/features/settings/components/chat/bots-settings.tsx:551
+#: src/features/settings/components/chat/bots-settings.tsx:554
+msgid "Saving tools…"
+msgstr "Saving tools…"
 
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
@@ -29434,7 +29529,7 @@ msgstr "Select model"
 msgid "Select Model"
 msgstr "Select Model"
 
-#: src/features/prompts/components/prompt-model-selector.tsx:42
+#: src/features/prompts/components/prompt-model-selector.tsx:44
 msgid "Select model (optional)"
 msgstr "Select model (optional)"
 
@@ -30488,15 +30583,15 @@ msgstr "Sinhala"
 msgid "Sinhala (Sri Lanka)"
 msgstr "Sinhala (Sri Lanka)"
 
-#: src/features/vault/components/site-logins.tsx:473
+#: src/features/vault/components/site-logins.tsx:478
 msgid "Site"
 msgstr "Site"
 
-#: src/features/vault/components/site-logins.tsx:393
+#: src/features/vault/components/site-logins.tsx:398
 msgid "Site logins"
 msgstr "Site logins"
 
-#: src/features/vault/components/site-logins.tsx:416
+#: src/features/vault/components/site-logins.tsx:421
 msgid "Site logins can't be saved, changed or deleted while impersonating."
 msgstr "Site logins can't be saved, changed or deleted while impersonating."
 
@@ -32282,7 +32377,7 @@ msgid "Superior understanding of complex visual concepts"
 msgstr "Superior understanding of complex visual concepts"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:43
-#: src/features/settings/components/chat/bots-settings.tsx:60
+#: src/features/settings/components/chat/bots-settings.tsx:133
 msgid "Supervised"
 msgstr "Supervised"
 
@@ -33293,7 +33388,7 @@ msgid "The agent on your computer is reading the change…"
 msgstr "The agent on your computer is reading the change…"
 
 #. placeholder {0}: pendingDelete?.site ?? ""
-#: src/features/vault/components/site-logins.tsx:570
+#: src/features/vault/components/site-logins.tsx:575
 msgid "The agent's browser won't be able to use it to sign in to {0}."
 msgstr "The agent's browser won't be able to use it to sign in to {0}."
 
@@ -33342,13 +33437,21 @@ msgstr "The assistant is asking for a secret"
 msgid "The assistant needs a secret"
 msgstr "The assistant needs a secret"
 
-#: src/features/settings/components/chat/bots-settings.tsx:281
+#: src/features/settings/components/chat/bots-settings.tsx:562
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr "The bot and its computer are removed. Its chats stay, as plain chats."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:503
+msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
+msgstr "The bot gets only the tools you allow. With none allowed, it gets no tools."
 
 #: src/features/chat/thread/composer-model-selector.tsx:137
 msgid "The bot sets the model for this chat."
 msgstr "The bot sets the model for this chat."
+
+#: src/features/settings/components/chat/bots-settings.tsx:349
+msgid "The bot's tools were saved"
+msgstr "The bot's tools were saved"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:77
 msgid "The browser cannot read this video to capture a frame"
@@ -33357,6 +33460,14 @@ msgstr "The browser cannot read this video to capture a frame"
 #: src/features/skills/components/skill-builder-dialog.tsx:108
 msgid "The builder could not answer. Try again."
 msgstr "The builder could not answer. Try again."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:207
+msgid "The built-in tools are still loading. Try again in a moment."
+msgstr "The built-in tools are still loading. Try again in a moment."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:203
+msgid "The built-in tools could not be loaded. Reload the page to add one."
+msgstr "The built-in tools could not be loaded. Reload the page to add one."
 
 #: src/features/skills/components/bundle-export-dialog.tsx:141
 msgid "The bundle could not be exported."
@@ -33767,7 +33878,7 @@ msgstr "The MCP Registry is unavailable right now. Showing popular servers inste
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "The message could not be sent. Check your connection and try again."
 
-#: src/features/settings/components/chat/bots-settings.tsx:212
+#: src/features/settings/components/chat/bots-settings.tsx:414
 msgid "The mode each new chat with this bot starts in. You can still change it per chat. Scheduled runs use it only when it asks more."
 msgstr "The mode each new chat with this bot starts in. You can still change it per chat. Scheduled runs use it only when it asks more."
 
@@ -34201,6 +34312,14 @@ msgstr "This action cannot be undone. This will permanently delete the organizat
 msgid "This agent cannot resume its own session, so the conversation was handed over"
 msgstr "This agent cannot resume its own session, so the conversation was handed over"
 
+#: src/features/settings/components/chat/bots-settings.tsx:296
+msgid "This bot's tools were changed elsewhere. Close this dialog and open it again to see them."
+msgstr "This bot's tools were changed elsewhere. Close this dialog and open it again to see them."
+
+#: src/features/settings/components/chat/bots-settings.tsx:310
+msgid "This bot's tools were changed elsewhere. They are shown as saved now; make your change again."
+msgstr "This bot's tools were changed elsewhere. They are shown as saved now; make your change again."
+
 #: src/features/develop/components/merge-panel.tsx:80
 msgid "This branch has conflicts with its base branch."
 msgstr "This branch has conflicts with its base branch."
@@ -34542,11 +34661,15 @@ msgstr "This link is not complete. Ask for the full link."
 msgid "This link is not taking messages right now. Try again later."
 msgstr "This link is not taking messages right now. Try again later."
 
-#: src/features/vault/components/site-logins.tsx:302
+#: src/features/settings/components/chat/bot-tool-selection.tsx:365
+msgid "This list is full: remove a tool before adding another."
+msgstr "This list is full: remove a tool before adding another."
+
+#: src/features/vault/components/site-logins.tsx:307
 msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
 msgstr "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
 
-#: src/features/vault/components/site-logins.tsx:312
+#: src/features/vault/components/site-logins.tsx:317
 msgid "This login was changed elsewhere. Reload the page to see it before saving again."
 msgstr "This login was changed elsewhere. Reload the page to see it before saving again."
 
@@ -35234,6 +35357,10 @@ msgstr "too large"
 msgid "Too large to attach: {0}. Reduce the file and attach it again."
 msgstr "Too large to attach: {0}. Reduce the file and attach it again."
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:366
+msgid "Too long to add: the server's address or the tool's name is too long."
+msgstr "Too long to add: the server's address or the tool's name is too long."
+
 #: src/features/workflow/components/nodes/text-node.tsx:78
 msgid "Too long to check as JSON"
 msgstr "Too long to check as JSON"
@@ -35306,12 +35433,21 @@ msgstr "Tool Permissions"
 msgid "Tool Provider Keys"
 msgstr "Tool Provider Keys"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:467
+#: src/features/settings/components/chat/bots-settings.tsx:495
 #: src/features/settings/components/chat/custom-providers-settings.tsx:373
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:134
 #: src/features/skills/components/skill-form-dialog.tsx:408
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:447
 msgid "Tools"
 msgstr "Tools"
+
+#. placeholder {0}: bot.name
+#. placeholder {0}: editingTools?.name ?? ""
+#: src/features/settings/components/chat/bots-settings.tsx:477
+#: src/features/settings/components/chat/bots-settings.tsx:525
+msgid "Tools for {0}"
+msgstr "Tools for {0}"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
@@ -35652,8 +35788,8 @@ msgstr "Try adjusting your search terms."
 #: src/features/projects/components/project-repo-picker.tsx:198
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/tasks/components/task-form-dialog.tsx:459
-#: src/features/vault/components/site-logins.tsx:410
-#: src/features/vault/components/site-logins.tsx:526
+#: src/features/vault/components/site-logins.tsx:415
+#: src/features/vault/components/site-logins.tsx:531
 msgid "Try again"
 msgstr "Try again"
 
@@ -36832,7 +36968,7 @@ msgstr "Username"
 msgid "Username is required"
 msgstr "Username is required"
 
-#: src/features/vault/components/site-logins.tsx:485
+#: src/features/vault/components/site-logins.tsx:490
 msgid "Username or email"
 msgstr "Username or email"
 
@@ -37834,6 +37970,10 @@ msgstr "Webhook URL copied to clipboard"
 msgid "WebP (Smaller)"
 msgstr "WebP (Smaller)"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:346
+msgid "webSearch or server:tool"
+msgstr "webSearch or server:tool"
+
 #: src/features/canvas/components/design-preset-selector.tsx:69
 msgid "Website Banner"
 msgstr "Website Banner"
@@ -38758,11 +38898,11 @@ msgstr "Your Azure OpenAI resource: endpoint, API version and deployment names."
 msgid "Your background, preferences, or location to help the AI understand you better"
 msgstr "Your background, preferences, or location to help the AI understand you better"
 
-#: src/features/settings/components/chat/bots-settings.tsx:239
+#: src/features/settings/components/chat/bots-settings.tsx:453
 msgid "Your bots"
 msgstr "Your bots"
 
-#: src/features/vault/components/site-logins.tsx:515
+#: src/features/vault/components/site-logins.tsx:520
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 msgstr "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 
@@ -38779,11 +38919,11 @@ msgid "Your browser talks to the server on this computer directly — the prompt
 msgstr "Your browser talks to the server on this computer directly — the prompt and reply never pass through our AI servers, and nothing is billed."
 
 #. placeholder {0}: teammates.join(", ")
-#: src/features/vault/components/site-logins.tsx:427
+#: src/features/vault/components/site-logins.tsx:432
 msgid "Your chats and {0}"
 msgstr "Your chats and {0}"
 
-#: src/features/vault/components/site-logins.tsx:429
+#: src/features/vault/components/site-logins.tsx:434
 msgid "Your chats and the bots you chose"
 msgstr "Your chats and the bots you chose"
 
@@ -38945,11 +39085,11 @@ msgstr "Your overview could not be loaded."
 msgid "Your own Anthropic key. Required to delegate work to Claude Code."
 msgstr "Your own Anthropic key. Required to delegate work to Claude Code."
 
-#: src/features/vault/components/site-logins.tsx:534
+#: src/features/vault/components/site-logins.tsx:539
 msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
 msgstr "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
 
-#: src/features/vault/components/site-logins.tsx:424
+#: src/features/vault/components/site-logins.tsx:429
 msgid "Your own chats only"
 msgstr "Your own chats only"
 
@@ -39003,13 +39143,25 @@ msgstr "Your review is kept."
 msgid "Your review was requested"
 msgstr "Your review was requested"
 
-#: src/features/vault/components/site-logins.tsx:401
+#: src/features/vault/components/site-logins.tsx:406
 msgid "Your saved logins could not be loaded."
 msgstr "Your saved logins could not be loaded."
 
 #: src/features/chat/thread/request-secret-prompt.tsx:465
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."
 msgstr "Your saved MCP servers could not be loaded, so this cannot be saved yet."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:217
+msgid "Your servers, connectors and computers are still loading. Try again in a moment."
+msgstr "Your servers, connectors and computers are still loading. Try again in a moment."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:493
+msgid "Your servers, connectors and computers could not be loaded."
+msgstr "Your servers, connectors and computers could not be loaded."
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:213
+msgid "Your servers, connectors and computers could not be loaded. Retry above to add one by name."
+msgstr "Your servers, connectors and computers could not be loaded. Retry above to add one by name."
 
 #: src/lib/toast.ts:236
 msgid "Your session has expired"
