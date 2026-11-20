@@ -581,7 +581,8 @@ const ComposerInput = ({
     const attachedReferences = useChatUIStore(selectAttachedReferences);
     const removeAttachedReference = useChatUIStore(selectRemoveAttachedReference);
 
-    // True while any attachment is still uploading — blocks send and shows spinner on button
+    // True while any attachment is still uploading: the input area shows the send-when-uploads-finish tooltip and holds
+    // back steer, queue and voice. Send stays enabled; a send pressed now waits through `uploadWait` below.
     const hasUploadingAttachments = attachments.some((a) => a.status === "pending" || a.status === "uploading");
     // A send pressed while uploads run waits for them here; `settleUploadWait` decides when it goes out or stops.
     const [uploadWait, setUploadWait] = useState<UploadWait | null>(null);
