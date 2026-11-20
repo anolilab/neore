@@ -217,11 +217,31 @@ export default defineConfig({
             cache: true,
         },
         test: {
-            inputs: ["default", "^production", "{projectRoot}/vite.config.ts", "{projectRoot}/vitest.config.ts"],
+            inputs: [
+                "default",
+                "^production",
+                "{projectRoot}/vite.config.ts",
+                "{projectRoot}/vitest.config.ts",
+                // Which files a shard runs: the split, the timings it is made from, and the shard itself.
+                "{workspaceRoot}/scripts/vitest/time-sharding.ts",
+                "{workspaceRoot}/scripts/vitest/timings/*.json",
+                { env: "VITEST_SHARD" },
+                { env: "VITEST_RECORD_TIMINGS" },
+            ],
             cache: true,
         },
         "test:coverage": {
-            inputs: ["default", "^production", "{projectRoot}/vite.config.ts", "{projectRoot}/vitest.config.ts"],
+            inputs: [
+                "default",
+                "^production",
+                "{projectRoot}/vite.config.ts",
+                "{projectRoot}/vitest.config.ts",
+                // Which files a shard runs: the split, the timings it is made from, and the shard itself.
+                "{workspaceRoot}/scripts/vitest/time-sharding.ts",
+                "{workspaceRoot}/scripts/vitest/timings/*.json",
+                { env: "VITEST_SHARD" },
+                { env: "VITEST_RECORD_TIMINGS" },
+            ],
             cache: true,
         },
         // Every story of the project, in Chromium, once per mode (`apps/web/vitest.storybook.config.ts`).

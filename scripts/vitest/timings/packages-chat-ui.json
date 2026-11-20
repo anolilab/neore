@@ -1,0 +1,14 @@
+{
+    "src/chat/mcp-tool-call.test.ts": 40,
+    "src/chat/turn-summary.test.ts": 50,
+    "src/utils/auto-approval.test.ts": 37,
+    "src/utils/citation-marker.test.ts": 38,
+    "src/utils/device-tool-name.test.ts": 39,
+    "src/utils/host-run-text.test.ts": 39,
+    "src/utils/markdown-text.test.ts": 41,
+    "src/utils/page-context.test.ts": 38,
+    "src/utils/sandbox-files.test.ts": 41,
+    "src/utils/stream-line.test.ts": 18,
+    "src/utils/tool-image-source.test.ts": 14,
+    "src/utils/tool-progress.test.ts": 18
+}

@@ -1,0 +1,8 @@
+{
+    "src/features/chat/chat-helpers.test.ts": 903,
+    "src/features/chat/stream.test.ts": 864,
+    "src/lib/extension-grant.test.ts": 879,
+    "src/manifest/build-manifest.test.ts": 864,
+    "src/page-context/build.test.ts": 873,
+    "src/page-context/extract.test.ts": 860
+}
