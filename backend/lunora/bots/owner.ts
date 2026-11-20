@@ -25,7 +25,7 @@ const ORPHAN_PAGE = 200;
 export const BOT_OWNER_SWEEP_STATEMENTS = 40;
 
 /** What is left of a run's statement budget; `spend` takes one and says whether there was one to take. */
-export interface StatementBudget {
+interface StatementBudget {
     left: number;
 }
 
