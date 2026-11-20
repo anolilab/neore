@@ -2584,8 +2584,8 @@ fn an_install_in_the_older_version_named_folder_still_starts_and_is_kept_by_a_pr
 
     assert!(state.acp_spawn_plan("fixture", None).is_ok());
 
+    // A prune moves what it drops into the trash at once, so a folder still here was kept.
     state.acp_install_prune("fixture");
-    std::thread::sleep(Duration::from_millis(100));
 
     assert!(
         legacy.exists(),
