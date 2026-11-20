@@ -117,7 +117,7 @@ const optionalEnvSchema = z.object({
     AUTH_GITHUB_CLIENT_ID: z.string().trim().optional(),
     AUTH_GITHUB_CLIENT_SECRET: z.string().trim().optional(),
     // Read-only live view of the agent's cloud browser (`browser/live-view.ts`), with CLOUDFLARE_ACCOUNT_ID.
-    // A token with Browser Rendering Write; unset, the thread shows no live view.
+    // A token with Browser Rendering Write; unset, the browser card still shows, and Watch live answers "not available".
     BROWSER_LIVE_VIEW_API_TOKEN: z.string().trim().optional(),
     BROWSERBASE_API_KEY: z.string().trim().optional(),
     BROWSERBASE_PROJECT_ID: z.string().trim().optional(),

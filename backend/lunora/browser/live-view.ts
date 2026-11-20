@@ -117,7 +117,7 @@ export const getReaderBrowser = internalQuery
         ),
     )
     .query(async ({ args: { threadId, userId }, ctx }) => {
-        const browser = await readerBrowser(ctx, threadId, userId, Date.now(), { primary: true });
+        const browser = await readerBrowser(ctx, threadId, userId, ctx.now, { primary: true });
 
         return browser.kind === "watchable" ? { kind: browser.kind, providerSessionId: browser.providerSessionId } : browser;
     });
@@ -144,10 +144,15 @@ export const openLiveView = authAction
         }
 
         if (browser.kind === "none") {
+            ctx.log.event("browser.live_view_opened", { ok: false, reason: "ended" });
+
             return { status: "ended" as const };
         }
 
+        // The card still offers the view on such a deploy, and says it is not available when asked: this event tells why.
         if (CLOUDFLARE_ACCOUNT_ID === "" || BROWSER_LIVE_VIEW_API_TOKEN === "") {
+            ctx.log.event("browser.live_view_opened", { ok: false, reason: "not_configured" });
+
             return { status: "unavailable" as const };
         }
 
@@ -166,9 +171,9 @@ export const openLiveView = authAction
 
         const url = liveViewUrlFrom(await response.json().catch(() => null));
 
-        ctx.log.event("browser.live_view_opened", { ok: url !== undefined, status: response.status });
-
         if (url === undefined) {
+            ctx.log.event("browser.live_view_opened", { ok: false, status: response.status });
+
             return { status: "unavailable" as const };
         }
 
@@ -176,12 +181,18 @@ export const openLiveView = authAction
         const after = await ctx.runQuery(internal.browser.live_view.getReaderBrowser, { threadId, userId: ctx.user.userId });
 
         if (after.kind === "denied") {
+            ctx.log.event("browser.live_view_opened", { ok: false, reason: "denied_after_mint" });
+
             return throwThreadNotFound();
         }
 
         if (after.kind === "none") {
+            ctx.log.event("browser.live_view_opened", { ok: false, reason: "ended_after_mint" });
+
             return { status: "ended" as const };
         }
+
+        ctx.log.event("browser.live_view_opened", { ok: true, status: response.status });
 
         return { connectBy: Date.now() + LIVE_VIEW_CONNECT_DEADLINE_MS, status: "ok" as const, url };
     });
