@@ -4,6 +4,7 @@
     "add-agent-commands-acp-sessions",
     "add-agent-commands-persistent-chunks",
     "add-approval-chain-source",
+    "add-group-pause-file-ids",
     "add-headless-approved",
     "add-headless-resume-bounds",
     "add-steer-text-length",
@@ -28904,6 +28905,19 @@
                   "nullable": false,
                   "optional": false,
                   "unique": false
+                },
+                "fileIds": {
+                  "kind": "array",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "of": {
+                    "kind": "string",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false
+                  },
+                  "refined": true
                 },
                 "isAnonymous": {
                   "kind": "boolean",

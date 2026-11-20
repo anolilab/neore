@@ -314,11 +314,13 @@ export const deleteProject = internalMutation
             });
         }
 
-        // Its repositories and rule files go last before the row, so a check or thread move that fails above leaves them in
-        // place. The delete's marker stays until the caller is done (`projects/functions.ts#deleteProject`).
+        // Its repositories go last before the row, so a check or thread move that fails above leaves them in place. The
+        // delete's marker stays until the caller is done (`projects/functions.ts#deleteProject`).
         await eraseProjectRepositories(ctx, args.projectId, { keepMarker: true });
-        await eraseProjectRuleFiles(ctx, args.projectId);
         await ctx.db.delete("projects", args.projectId);
+        // Its rule files only once the row is gone: a `.global()` write does not roll back, so a delete that failed in
+        // between would leave a live project without its instructions. Nothing reads them without the project.
+        await eraseProjectRuleFiles(ctx, args.projectId);
         await recountWorkflowImages(ctx, project.userId, project.workflowContent, undefined);
 
         return null;

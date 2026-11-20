@@ -63,6 +63,8 @@ vi.mock("@/features/auth/lib/utilities", () => {
     return { getLocalizedError: ({ error }: { error: Error }) => error.message };
 });
 
+const NEEDS_A_PATTERN = /needs at least one pattern/u;
+
 const renderEditor = (onDirtyChange?: (dirty: boolean) => void, onSavingChange?: (saving: boolean) => void) =>
     render(
         <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -127,6 +129,44 @@ describe("project rule files", () => {
 
         expect(backend.save).not.toHaveBeenCalled();
         expect(screen.getByRole("alert").textContent).toContain("needs at least one pattern");
+
+        // The field it names says so to a screen reader, is described by the error and takes the focus.
+        const patterns = within(screen.getByRole("listitem", { name: "Empty" })).getByRole("textbox", {
+            description: NEEDS_A_PATTERN,
+            name: "File patterns, one per line",
+        });
+
+        expect(patterns.getAttribute("aria-invalid")).toBe("true");
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        expect(document.activeElement).toBe(patterns);
+        expect(
+            within(screen.getByRole("listitem", { name: "SQL" }))
+                .getByLabelText("File patterns, one per line")
+                .hasAttribute("aria-invalid"),
+        ).toBe(false);
+    });
+
+    it("marks and focuses the first unnamed file's name, again on each refused save", async () => {
+        const user = userEvent.setup();
+
+        renderEditor();
+
+        await user.click(await screen.findByRole("button", { name: "Add rule file" }));
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        const name = within(screen.getByRole("listitem", { name: "Rule file 3" })).getByRole("textbox", {
+            description: "Give every rule file a name.",
+            name: "Name",
+        });
+
+        expect(name.getAttribute("aria-invalid")).toBe("true");
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        expect(document.activeElement).toBe(name);
+
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        expect(document.activeElement).toBe(name);
     });
 
     it("keeps the draft and says what to do when the files were saved elsewhere meanwhile", async () => {
@@ -244,6 +284,8 @@ describe("project rule files", () => {
 
         expect(backend.save).not.toHaveBeenCalled();
         expect(screen.getByRole("alert").textContent).toContain("is longer than");
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        expect(document.activeElement).toBe(within(screen.getByRole("listitem", { name: "Project context" })).getByLabelText("Instructions"));
     });
 
     it("tells the dialog while unsaved changes are open", async () => {

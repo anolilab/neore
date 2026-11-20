@@ -601,14 +601,15 @@ export const runProjectFor = internalQuery
     .output(v.union(v.null(), v.object({ context: v.optional(v.string()), projectId: v.id("projects") })))
     .query(async ({ args, ctx }) => {
         const task = await ctx.db.get("tasks", args.taskId);
-        const project = task?.projectId ? await writableProject(ctx, task.projectId, task.userId) : null;
+        const project = task?.projectId ? await writableProject(ctx, task.projectId, task.userId, { primary: true }) : null;
 
         if (!project) {
             return null;
         }
 
-        // A task's run attaches no files: its project's `always` rule files, a legacy `context` first, as a chat gets them.
-        const context = projectRunContext(ctx, project._id, await readProjectRuleFiles(ctx, project), []);
+        // A task's run attaches no files: its project's `always` rule files, a legacy `context` first, as a chat gets them;
+        // read on the primary, as a chat's are (`getProjectContextForRun`).
+        const context = projectRunContext(ctx, project._id, await readProjectRuleFiles(ctx, project, { primary: true }), []);
 
         return { projectId: project._id, ...(context && { context }) };
     });

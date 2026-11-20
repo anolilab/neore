@@ -67,6 +67,13 @@ vi.mock("./rule-file-rows", async (importOriginal) => {
     return { ...original, readProjectRuleFiles: vi.fn(original.readProjectRuleFiles) };
 });
 
+// Watched for when a project's delete erases its rule files.
+vi.mock("./gdpr", async (importOriginal) => {
+    const original = await importOriginal<typeof import("./gdpr")>();
+
+    return { ...original, eraseProjectRuleFiles: vi.fn(original.eraseProjectRuleFiles) };
+});
+
 vi.mock("../lib/audit-triggers", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../lib/audit-triggers")>()),
@@ -160,7 +167,7 @@ describe("a project's rule files in a run", () => {
         expect(await contextFor(projectId, [large, sql])).toBe("Be brief.");
     });
 
-    it("gives a task's run its project's always files", async () => {
+    it("gives a task's run its project's always files, read on the primary as a chat's are", async () => {
         const projectId = await project({
             createdAt: 0,
             ruleFiles: [{ content: "Be brief.", id: "a", mode: "always", title: "A" }, sqlRules],
@@ -184,6 +191,10 @@ describe("a project's rule files in a run", () => {
             context: "Be brief.",
             projectId,
         });
+        expect(await contextFor(projectId)).toBe("Be brief.");
+        // On the primary for a task and a chat alike: the first save clears `context` as it writes the list, so a project row
+        // and a rule-file row read from replicas at different points could leave the run no instructions.
+        expect(vi.mocked(readProjectRuleFiles).mock.calls.map((call) => call[2])).toStrictEqual([{ primary: true }, { primary: true }]);
     });
 
     it("holds a chat run and a task run to the same rule-text cap, separators and marker included", async () => {
@@ -294,6 +305,18 @@ describe("changing a project's rule files", () => {
         await expect(list(OWNER, projectId)).resolves.toMatchObject({ files: [{ id: "context" }, { id: "sql" }], revision });
     });
 
+    it("saves a changed context sent with keepContext instead of dropping it, and clears the old one", async () => {
+        const context = "x".repeat(150_000);
+        const projectId = await insert("projects", { context, createdAt: 0, title: "p", userId: OWNER });
+        const changed = { content: "Short now.", id: "context", mode: "always" as const, title: "Project context" };
+
+        await save(OWNER, projectId, [changed, sqlRules], undefined, { keepContext: true });
+
+        await expect(row(projectId)).resolves.not.toHaveProperty("context");
+        await expect(savedFiles(projectId)).resolves.toStrictEqual([changed, sqlRules]);
+        expect(await contextFor(projectId)).toBe("Short now.");
+    });
+
     it("keeps a saved file named like the kept context, which reads under another id beside it", async () => {
         const mine = { content: "Mine.", id: "context", mode: "always" as const, title: "Mine" };
         const projectId = await project({ context: "x".repeat(150_000), createdAt: 0, ruleFiles: [mine], title: "p", userId: OWNER });
@@ -366,8 +389,18 @@ describe("changing a project's rule files", () => {
         const kept = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "kept", userId: OWNER });
         const deleted = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "deleted", userId: OWNER });
 
+        const projectAtErase: unknown[] = [];
+
+        vi.mocked(eraseProjectRuleFiles).mockImplementationOnce(async (ctx, projectId) => {
+            projectAtErase.push(await ctx.db.projects.findFirst({ where: { _id: projectId } }));
+            const { eraseProjectRuleFiles: erase } = await vi.importActual<typeof import("./gdpr")>("./gdpr");
+
+            await erase(ctx, projectId);
+        });
         await harness.run(async (ctx: any) => await ctx.runMutation(eraseProject as never, { projectId: deleted }));
 
+        // Only once the project row is gone: a delete failing before it never leaves a live project without its rules.
+        expect(projectAtErase).toStrictEqual([null]);
         await expect(savedFiles(deleted)).resolves.toBeUndefined();
         await expect(savedFiles(kept)).resolves.toStrictEqual([sqlRules]);
 

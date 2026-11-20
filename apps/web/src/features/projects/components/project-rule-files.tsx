@@ -33,6 +33,15 @@ const errorCode = (error: unknown): unknown => {
 
 type RuleFileMode = "always" | "glob";
 
+/** A file's field a save was refused for: marked invalid, described by the error and focused. */
+type RuleFileField = "content" | "patterns" | "title";
+
+interface RuleFileProblem {
+    field: RuleFileField;
+    fileId: string;
+    message: string;
+}
+
 /** A rule file as the editor holds it: its patterns as typed, one per line. */
 interface RuleFileDraft {
     content: string;
@@ -121,26 +130,47 @@ const withSavedFiles = (
     };
 };
 
-/** One file's fields; every control is named after the file, so a list of them stays told apart. */
+/**
+ * One file's fields; every control is named after the file, so a list of them stays told apart. `invalid` names the
+ * field a save was refused for: it is marked invalid, described by the error (`errorId`) and focused on each refused
+ * save (`focusRequest`).
+ */
 const RuleFileFields: FC<{
+    errorId: string;
     file: RuleFileDraft;
+    focusRequest: number;
     index: number;
+    invalid: RuleFileField | undefined;
     isFirst: boolean;
     isLast: boolean;
     onChange: (file: RuleFileDraft) => void;
     onMove: (offset: -1 | 1) => void;
     onRemove: () => void;
-}> = ({ file, index, isFirst, isLast, onChange, onMove, onRemove }) => {
+}> = ({ errorId, file, focusRequest, index, invalid, isFirst, isLast, onChange, onMove, onRemove }) => {
     const { t } = useLingui();
     const id = useId();
     const name = file.title.trim() || t`Rule file ${index + 1}`;
+    const invalidProps = (field: RuleFileField) => (invalid === field ? { "aria-describedby": errorId, "aria-invalid": true } : {});
+
+    // By id, not a ref: `Textarea` would hand a ref past its field control's own (`packages/ui` `Textarea`).
+    useEffect(() => {
+        if (invalid) {
+            document.querySelector<HTMLElement>(`#${CSS.escape(`${id}-${invalid}`)}`)?.focus();
+        }
+    }, [focusRequest, id, invalid]);
 
     return (
         <li aria-label={name} className="space-y-3 rounded-md border p-3">
             <div className="flex items-end gap-2">
                 <div className="flex-1 space-y-1">
                     <Label htmlFor={`${id}-title`}>{t`Name`}</Label>
-                    <Input autoComplete="off" id={`${id}-title`} onChange={(event) => onChange({ ...file, title: event.target.value })} value={file.title} />
+                    <Input
+                        autoComplete="off"
+                        id={`${id}-title`}
+                        onChange={(event) => onChange({ ...file, title: event.target.value })}
+                        value={file.title}
+                        {...invalidProps("title")}
+                    />
                 </div>
                 <Button aria-label={t`Move ${name} up`} disabled={isFirst} onClick={() => onMove(-1)} size="icon" type="button" variant="ghost">
                     <ArrowUp aria-hidden="true" className="size-4" />
@@ -175,6 +205,7 @@ const RuleFileFields: FC<{
                         onChange={(event) => onChange({ ...file, patterns: event.target.value })}
                         placeholder="**/*.sql"
                         value={file.patterns}
+                        {...invalidProps("patterns")}
                     />
                 </div>
             )}
@@ -185,6 +216,7 @@ const RuleFileFields: FC<{
                     id={`${id}-content`}
                     onChange={(event) => onChange({ ...file, content: event.target.value })}
                     value={file.content}
+                    {...invalidProps("content")}
                 />
             </div>
         </li>
@@ -206,6 +238,7 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
+    const errorId = useId();
     const queryClient = useQueryClient();
     const args = { projectId: projectId as Id<"projects"> };
     const listOptions = crpc.projects.functions.listProjectRuleFiles.queryOptions(args);
@@ -221,6 +254,9 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
     const [baseRevision, setBaseRevision] = useState("");
     const [error, setError] = useState<string | undefined>(undefined);
     const [status, setStatus] = useState("");
+    // The field the last refused save named, and how many times one was refused, so each refusal moves focus there again.
+    const [invalid, setInvalid] = useState<Pick<RuleFileProblem, "field" | "fileId"> | undefined>(undefined);
+    const [focusRequest, setFocusRequest] = useState(0);
     const legacyTitle = t`Project context`;
     const savedFiles = (data?.files ?? []).map((file) =>
         // The older single context arrives under the backend's English name; it shows in the person's language.
@@ -256,13 +292,18 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
         setStatus("");
     };
 
-    const problem = (): string | undefined => {
-        if (files.some((file) => !file.title.trim())) {
-            return t`Give every rule file a name.`;
+    /** The first file and field a save would be refused for, in the order the list shows them. */
+    const problem = (): RuleFileProblem | undefined => {
+        const unnamed = files.find((file) => !file.title.trim());
+
+        if (unnamed) {
+            return { field: "title", fileId: unnamed.id, message: t`Give every rule file a name.` };
         }
 
-        if (files.some((file) => file.mode === "glob" && patternsOf(file.patterns).length === 0)) {
-            return t`A file applied when files match needs at least one pattern.`;
+        const unmatched = files.find((file) => file.mode === "glob" && patternsOf(file.patterns).length === 0);
+
+        if (unmatched) {
+            return { field: "patterns", fileId: unmatched.id, message: t`A file applied when files match needs at least one pattern.` };
         }
 
         const long = files.find((file) => file.id !== keptLegacyId && file.content.length > MAX_RULE_FILE_LENGTH);
@@ -271,7 +312,7 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
             const limit = formatNumber(MAX_RULE_FILE_LENGTH, i18n.locale);
             const name = long.title.trim();
 
-            return t`"${name}" is longer than ${limit} characters. Shorten it or split it into several files.`;
+            return { field: "content", fileId: long.id, message: t`"${name}" is longer than ${limit} characters. Shorten it or split it into several files.` };
         }
 
         return undefined;
@@ -280,8 +321,11 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
     const save = async () => {
         const refusal = problem();
 
+        setInvalid(refusal && { field: refusal.field, fileId: refusal.fileId });
+
         if (refusal) {
-            setError(refusal);
+            setError(refusal.message);
+            setFocusRequest((count) => count + 1);
 
             return;
         }
@@ -338,8 +382,11 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
                         <ol className="space-y-3">
                             {files.map((file, index) => (
                                 <RuleFileFields
+                                    errorId={errorId}
                                     file={file}
+                                    focusRequest={focusRequest}
                                     index={index}
+                                    invalid={invalid?.fileId === file.id ? invalid.field : undefined}
                                     isFirst={index === 0}
                                     isLast={index === files.length - 1}
                                     key={file.id}
@@ -381,6 +428,7 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
                                         refetch().catch(() => undefined);
                                         setDraft(null);
                                         setError(undefined);
+                                        setInvalid(undefined);
                                     }}
                                     size="sm"
                                     type="button"
@@ -394,7 +442,7 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
                 </>
             )}
             {error && (
-                <p className="text-destructive text-sm" role="alert">
+                <p className="text-destructive text-sm" id={errorId} role="alert">
                     {error}
                 </p>
             )}

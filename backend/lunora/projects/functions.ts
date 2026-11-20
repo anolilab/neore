@@ -213,8 +213,13 @@ export const projectWithEditableSettings = async (
  * organization) AND owned by `userId` or by nobody. The same rule as moving a thread into a project
  * (`moveThreadToProject` here) and updating one: a member never files into another member's project.
  */
-export const writableProject = async (context: QueryCtx | MutationCtx, projectId: Id<"projects">, userId: string): Promise<Doc<"projects"> | null> => {
-    const project = await readableProject(context, projectId, userId);
+export const writableProject = async (
+    context: QueryCtx | MutationCtx,
+    projectId: Id<"projects">,
+    userId: string,
+    options: { primary?: boolean } = {},
+): Promise<Doc<"projects"> | null> => {
+    const project = await readableProject(context, projectId, userId, options);
 
     return project && (!project.userId || project.userId === userId) ? project : null;
 };
@@ -289,13 +294,15 @@ export const getProjectContextForRun = internalQuery
     .input({ fileIds: v.optional(v.array(v.id("chatFiles")).max(MAX_RUN_FILE_IDS)), projectId: v.id("projects"), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.union(v.string(), v.null()))
     .query(async ({ args: { fileIds, projectId, userId }, ctx: context }) => {
-        const project = await readableProject(context, projectId, userId);
+        // Both on the primary: the first save writes the rule-file row and clears `context` together, so a project row and
+        // a rule-file row read from replicas at different points could leave the run, anyone's, with no instructions.
+        const project = await readableProject(context, projectId, userId, { primary: true });
 
         if (!project) {
             return null;
         }
 
-        const files = await readProjectRuleFiles(context, project);
+        const files = await readProjectRuleFiles(context, project, { primary: true });
         let paths: string[] = [];
 
         // The names are read only when a file could match one.
@@ -413,8 +420,12 @@ export const setProjectRuleFiles = authMutation
             throw new LunoraError("CONFLICT", "The rule files were changed meanwhile. Reload them and save again.");
         }
 
-        // A kept context reads as the list's first file under its own id: a file sent under that id is that file again.
-        const kept = keepContext && project.context ? current[0]?.id : undefined;
+        // A kept context reads as the list's first file under its own id: a file sent under that id is that file again,
+        // left out of the list, unless it was changed. A changed one is saved as an ordinary file, held to its limits, and
+        // the `context` is cleared, so a change is never reported saved while the old text stays.
+        const legacy = keepContext && project.context ? current[0] : undefined;
+        const sent = legacy && ruleFiles.find((file) => file.id === legacy.id);
+        const kept = legacy && (!sent || ruleFilesRevision([sent]) === ruleFilesRevision([legacy])) ? legacy.id : undefined;
         const normalized = normalizeRuleFiles(kept ? ruleFiles.filter((file) => file.id !== kept) : ruleFiles);
 
         await writeProjectRuleFiles(context, projectId, normalized);

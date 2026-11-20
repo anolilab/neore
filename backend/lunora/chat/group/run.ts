@@ -38,6 +38,7 @@ import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import type { ResearchDepth } from "../../agent/client/create-tool";
+import { MAX_ATTACHED_FILES } from "../../agent/file-attach-claim";
 import { streamLogger } from "../../lib/logger";
 import { gatewayFetch, type ServiceFetch } from "../../lib/services";
 import { defaultModelUnderRules, getUtilityModel, readsImagesAndCallsTools } from "../../lib/utility-model";
@@ -157,6 +158,8 @@ interface TurnContext {
     baseModel: string;
     /** Memory, knowledge base, project and thread instructions — appended to each speaker's system prompt. */
     extraContext: string[];
+    /** The files the user message attaches, kept in a pause's snapshot so the turn's later speakers get the same project rules. */
+    fileIds: string[] | undefined;
     isAnonymous: boolean;
     mcpServerNames: string[] | undefined;
     organizationId: string | undefined;
@@ -521,6 +524,8 @@ const groupSnapshot = (turn: TurnContext, skillId: string, position: QueuePositi
 
     return {
         baseModel: turn.baseModel,
+        // Within the snapshot's cap, as `loadRunContext` reads them.
+        ...(turn.fileIds && turn.fileIds.length > 0 && { fileIds: turn.fileIds.slice(0, MAX_ATTACHED_FILES) }),
         isAnonymous: turn.isAnonymous,
         ...(turn.organizationId && { organizationId: turn.organizationId }),
         queue: remaining.kind === "speakers" ? remaining.queue : remaining.steps.map((step) => step.skillId),
@@ -705,6 +710,7 @@ const loadTurnContext = async (
         agentPrefs,
         baseModel: args.baseModel,
         extraContext: runContext.contextParts,
+        fileIds: args.fileIds,
         isAnonymous: args.isAnonymous,
         mcpServerNames: args.mcpServerNames,
         organizationId: args.organizationId,
@@ -910,6 +916,7 @@ export const continueGroupAfterToolApproval = async (
     const turn = await loadTurnContext(ctx, {
         baseModel: group.baseModel,
         config: groupConfig,
+        fileIds: group.fileIds,
         isAnonymous: group.isAnonymous,
         mcpServerNames: config.mcpServerNames,
         organizationId: group.organizationId,

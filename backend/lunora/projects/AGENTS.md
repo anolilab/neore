@@ -10,19 +10,23 @@
   after the project's own check (`readProjectRuleFiles`); the table has no owner column, so organization moves,
   sharing and account merges follow the project. A new reader of the table is a decision: the source check in
   `functions.rule-files.test.ts` lists who touches it. A fork does not copy them.
-- Deleting a project deletes its row (`agent.projects.deleteProject` → `eraseProjectRuleFiles`); account deletion
-  erases it per project in `deleteUserWorkflowData`, before the project rows go.
+- Deleting a project deletes its row (`agent.projects.deleteProject` → `eraseProjectRuleFiles`) AFTER the project row:
+  a `.global()` write does not roll back, so the other order could leave a live project without its rules. Account
+  deletion erases it per project in `deleteUserWorkflowData`, before the project rows go.
 - Changing them follows `updateProject` exactly: the owner only (`mayEditProject` in `edit-access.ts`, through
   `projectWithEditableSettings`), decided in the transaction that writes. Never widen one alone. `updateProject`
   re-checks the owner in its writing mutation (`settingsEditorId`).
 - The legacy `context` text reads as the first `always` file (`projectRuleFiles`) everywhere: runs, the editor and
   the export. `defineMigration` does not reach `.global()` rows, so nothing rewrites it in bulk: the first
   `setProjectRuleFiles` saves it into the list and clears `context` in the same transaction; an unchanged one longer
-  than a rule file may be stays in `context` (`keepContext`). A project with only a `context` gives a run exactly that
-  text; keep that true when changing the rendering.
+  than a rule file may be stays in `context` (`keepContext`); a file sent under its id that differs from it is saved and
+  the `context` cleared, never dropped. A project with only a `context` gives a run exactly that text; keep that true
+  when changing the rendering.
 - A run's text comes from `projectRunContext` (`functions.ts`) only, framed `PROJECT CONTEXT:` by the caller: chat,
   edit and group runs through `getProjectContextForRun` (via `loadRunContext` or `streamAsync`), task runs from
-  `tasks/internal.ts#runProjectFor` with no paths. A filter, budget or log change goes there, not in one caller.
+  `tasks/internal.ts#runProjectFor` with no paths. A filter, budget or log change goes there, not in one caller. Both
+  read the project and its rule-file row on the primary: replicas at different points around a first save would give
+  a run neither. A group turn's pause keeps the message's file ids (`GroupRunSnapshot.fileIds`) for later speakers.
   `glob` files match the names of the run message's attachments (`chatFiles.filename`), read one row at a time:
   `chatFiles` is `.global()`, each row charged whole with its `extractedText`, so past `RUN_FILE_NAMES_READ_BYTES` the
   rest go unmatched rather than the run failing. The rendered text past
