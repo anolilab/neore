@@ -947,6 +947,17 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor)).toBe("`[x](https://e.com)`tail");
     });
 
+    it("leaves a selection ending in a backslash that escapes the next character alone", () => {
+        const editor = editorWith("<p>[a&#92;[b](url)</p>");
+        const before = text(editor);
+
+        select(editor, 2, 4);
+
+        expect(selectedText(editor)).toBe(`a${BACKSLASH}`);
+        expect(wrapSelectionOnTextInput(editor.view, 2, 4, "*")).toBe(true);
+        expect(text(editor)).toBe(before);
+    });
+
     it("wraps literal ](url) text that has no link label before it", () => {
         const editor = editorWith("<p>literal ](url) text</p>");
 

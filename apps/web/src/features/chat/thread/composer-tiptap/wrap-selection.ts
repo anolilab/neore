@@ -16,6 +16,9 @@ const PUNCTUATION = /[\p{P}\p{S}]/u;
 
 const WHITESPACE = /\s/u;
 
+/** The characters a backslash escapes in Markdown: ASCII punctuation. */
+const ASCII_PUNCTUATION: ReadonlySet<string> = new Set("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~");
+
 const isMarker = (typed: string): typed is Marker => MARKERS.has(typed);
 
 /** The last whole character of `text`, so an astral letter is one character, not two halves. */
@@ -44,8 +47,11 @@ const joinsRun = (beforeOpen: string, openBefore: string, closeAfter: string, de
     closeAfter === delimiter || (openBefore === delimiter && trailingBackslashes(beforeOpen.slice(0, -openBefore.length)) % 2 === 0);
 
 /** Whether an odd run of backslashes before the opener would escape it, or a backtick beside a code wrap would join its fence. */
-const collidesWithMarkup = (beforeOpen: string, typed: string, openBefore: string, closeAfter: string): boolean =>
-    trailingBackslashes(beforeOpen) % 2 === 1 || (typed === "`" && (openBefore === "`" || closeAfter === "`"));
+const collidesWithMarkup = (beforeOpen: string, typed: string, openBefore: string, closeAfter: string, selectionEnd: string): boolean =>
+    trailingBackslashes(beforeOpen) % 2 === 1 ||
+    // A selection ending in a backslash that escapes the next character: the closer would split the escape (`a\[`).
+    (trailingBackslashes(selectionEnd) % 2 === 1 && ASCII_PUNCTUATION.has(closeAfter)) ||
+    (typed === "`" && (openBefore === "`" || closeAfter === "`"));
 
 /**
  * A copy of `character` in the text is escaped, unless an odd run of backslashes before it already escapes it. Text
@@ -207,7 +213,7 @@ const planWrap = (state: EditorState, from: number, to: number, typed: string): 
 
     // An odd run of backslashes before the opener would escape it, a backtick beside a code fence would join it, and a
     // wrap inside code, a link or other Markdown syntax would show literally or break it.
-    if (markup.blocked || collidesWithMarkup(beforeOpen, typed, openBefore, closeAfter)) {
+    if (markup.blocked || collidesWithMarkup(beforeOpen, typed, openBefore, closeAfter, `${body}${trail}`)) {
         return REFUSED;
     }
 
