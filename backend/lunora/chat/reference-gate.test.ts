@@ -1,6 +1,7 @@
 /**
- * The reference images of `/chat/media` are checked on the caller's shard (`chat/reference-gate.ts`): a reference is the caller's
- * own row, under that row's own URL, in a chat the caller may read with the proof the request carries for that chat.
+ * The reference images of `/chat/media` are checked in two steps (`chat/reference-gate.ts`): the rows on the caller's shard, then
+ * each referenced chat on its owner's shard. The harness keeps one database for every shard, so these tests check the decisions;
+ * the routing between shards is covered only by e2e.
  */
 import { REFERENCE_MEDIA_CAPS } from "@neore/ai/models";
 import { lunoraTest } from "@lunora/testing";
@@ -8,7 +9,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
 import schema from "../schema";
-import { gateReferencesOnCallerShard } from "./reference-gate";
+import { gateReferenceRowsOnCallerShard, threadReadableOnShard } from "./reference-gate";
 
 const SECRET = "test-storage-signing-secret";
 const OWNER = "reference-owner";
@@ -16,6 +17,7 @@ const COLLAB = "reference-collaborator";
 const OPEN_URL = "https://files.example.test/open.png";
 const LOCKED_URL = "https://files.example.test/locked.png";
 const COLLAB_LOCKED_URL = "https://files.example.test/collab-locked.png";
+const COLLAB_OPEN_URL = "https://files.example.test/collab-open.png";
 const DOC_URL = "data:image/png;base64,AAAA";
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -58,26 +60,52 @@ const insertFile = async (userId: string, chatId: string, url: string) =>
 const insertDocument = async (userId: string, threadId: string, content: string) =>
     await run(async (ctx) => (await ctx.db.insert("documents", { content, kind: "image", threadId, title: "Image", userId, version: 1 })) as string);
 
+const grant = async (threadId: string, userId: string) =>
+    await run(async (ctx) => await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId, userId }));
+
 const proofFor = async (threadId: string, userId: string) => {
     const { proof } = await mintUnlockProof({ epoch, threadId, userId }, SECRET, Date.now());
 
     return proof;
 };
 
-/** The gate's answer for one reference: the picker's id and URL, asked for in `targetThreadId` with `unlockProof`. */
+/** The two steps as `/chat/media` runs them: the rows on the caller's shard, then each chat on its owner's shard. */
 const refusedFor = async (userId: string, references: { id: string; url: string }[], targetThreadId: string, unlockProof?: string): Promise<boolean> => {
-    const { refused } = await run(
+    const rows = await run(
         async (ctx) =>
-            await ctx.runQuery(gateReferencesOnCallerShard as never, {
+            await ctx.runQuery(gateReferenceRowsOnCallerShard as never, {
                 referenceIds: references.map((reference) => reference.id),
                 referenceImages: references.map((reference) => reference.url),
-                targetThreadId,
-                ...(unlockProof !== undefined && { unlockProof }),
                 userId,
             }),
     );
 
-    return refused as boolean;
+    if ((rows as { refused: boolean }).refused) {
+        return true;
+    }
+
+    for (const chatId of (rows as { chatIds: string[] }).chatIds) {
+        const { readable } = await run(
+            async (ctx) =>
+                await ctx.runQuery(threadReadableOnShard as never, {
+                    threadId: chatId,
+                    unlockProof: chatId === targetThreadId ? unlockProof : undefined,
+                    userId,
+                }),
+        );
+
+        if (!(readable as boolean)) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
+const readableFor = async (threadId: string, userId: string, unlockProof?: string): Promise<boolean> => {
+    const { readable } = await run(async (ctx) => await ctx.runQuery(threadReadableOnShard as never, { threadId, unlockProof, userId }));
+
+    return readable as boolean;
 };
 
 beforeEach(async () => {
@@ -95,12 +123,12 @@ beforeEach(async () => {
     openDocId = await insertDocument(OWNER, ownerOpenId, DOC_URL);
 });
 
-describe("a media request's references are checked on the caller's shard", () => {
-    it("serves the caller's own file in an unlocked chat", async () => {
+describe("a media request's references: the rows on the caller's shard", () => {
+    it("serves the caller's own file", async () => {
         await expect(refusedFor(OWNER, [{ id: `file:${openFileId}`, url: OPEN_URL }], ownerOpenId)).resolves.toBe(false);
     });
 
-    it("serves the caller's own document in an unlocked chat", async () => {
+    it("serves the caller's own document", async () => {
         await expect(refusedFor(OWNER, [{ id: `doc:${openDocId}`, url: DOC_URL }], ownerOpenId)).resolves.toBe(false);
     });
 
@@ -112,14 +140,64 @@ describe("a media request's references are checked on the caller's shard", () =>
         await expect(refusedFor(COLLAB, [{ id: `file:${openFileId}`, url: OPEN_URL }], ownerOpenId)).resolves.toBe(true);
     });
 
-    it("refuses the caller's own file from a locked chat when no proof is given", async () => {
-        await expect(refusedFor(OWNER, [{ id: `file:${lockedFileId}`, url: LOCKED_URL }], ownerLockedId)).resolves.toBe(true);
+    it("refuses any one reference when another is refused", async () => {
+        await expect(
+            refusedFor(
+                OWNER,
+                [
+                    { id: `file:${openFileId}`, url: OPEN_URL },
+                    { id: `file:${lockedFileId}`, url: LOCKED_URL },
+                ],
+                ownerOpenId,
+            ),
+        ).resolves.toBe(true);
     });
 
-    it("serves a locked chat's file when the request carries that chat's proof and names that chat as its target", async () => {
+    it("refuses a malformed id", async () => {
+        await expect(refusedFor(OWNER, [{ id: "not-an-id", url: OPEN_URL }], ownerOpenId)).resolves.toBe(true);
+    });
+
+    it("refuses a list longer than the media cap, before any row is read", async () => {
+        const repeated = Array.from({ length: REFERENCE_MEDIA_CAPS.images + 1 }, () => {
+            return { id: `file:${openFileId}`, url: OPEN_URL };
+        });
+
+        await expect(refusedFor(OWNER, repeated, ownerOpenId)).resolves.toBe(true);
+    });
+});
+
+describe("a media request's references: each chat on its owner's shard", () => {
+    it("reads the caller's own unlocked chat", async () => {
+        await expect(readableFor(ownerOpenId, OWNER)).resolves.toBe(true);
+    });
+
+    it("refuses the caller's own locked chat when no proof is given", async () => {
+        await expect(readableFor(ownerLockedId, OWNER)).resolves.toBe(false);
+    });
+
+    it("reads a locked chat with that chat's proof", async () => {
         const proof = await proofFor(ownerLockedId, OWNER);
 
-        await expect(refusedFor(OWNER, [{ id: `file:${lockedFileId}`, url: LOCKED_URL }], ownerLockedId, proof)).resolves.toBe(false);
+        await expect(readableFor(ownerLockedId, OWNER, proof)).resolves.toBe(true);
+    });
+
+    it("serves a collaborator's own file attached to a chat shared with them", async () => {
+        await grant(ownerOpenId, COLLAB);
+        const sharedFileId = await insertFile(COLLAB, ownerOpenId, COLLAB_OPEN_URL);
+
+        await expect(refusedFor(COLLAB, [{ id: `file:${sharedFileId}`, url: COLLAB_OPEN_URL }], ownerOpenId)).resolves.toBe(false);
+    });
+
+    it("refuses a collaborator's file attached to a chat shared with them when the grant is missing", async () => {
+        const unsharedFileId = await insertFile(COLLAB, ownerOpenId, COLLAB_OPEN_URL);
+
+        await expect(refusedFor(COLLAB, [{ id: `file:${unsharedFileId}`, url: COLLAB_OPEN_URL }], ownerOpenId)).resolves.toBe(true);
+    });
+
+    it("refuses a shared chat that is locked, even for a collaborator with a grant", async () => {
+        await grant(ownerLockedId, COLLAB);
+
+        await expect(readableFor(ownerLockedId, COLLAB)).resolves.toBe(false);
     });
 
     it("refuses a locked chat's file when the proof is for another chat than the target", async () => {
@@ -134,28 +212,9 @@ describe("a media request's references are checked on the caller's shard", () =>
         await expect(refusedFor(COLLAB, [{ id: `file:${collabLockedFileId}`, url: COLLAB_LOCKED_URL }], ownerLockedId, proof)).resolves.toBe(true);
     });
 
-    it("refuses when any one reference is refused", async () => {
-        await expect(
-            refusedFor(
-                OWNER,
-                [
-                    { id: `file:${openFileId}`, url: OPEN_URL },
-                    { id: `file:${lockedFileId}`, url: LOCKED_URL },
-                ],
-                ownerOpenId,
-            ),
-        ).resolves.toBe(true);
-    });
+    it("serves the caller's locked-chat file when the request carries that chat's proof and names it as the target", async () => {
+        const proof = await proofFor(ownerLockedId, OWNER);
 
-    it("refuses a list longer than the media cap, before any row is read", async () => {
-        const repeated = Array.from({ length: REFERENCE_MEDIA_CAPS.images + 1 }, () => {
-            return { id: `file:${openFileId}`, url: OPEN_URL };
-        });
-
-        await expect(refusedFor(OWNER, repeated, ownerOpenId)).resolves.toBe(true);
-    });
-
-    it("refuses a malformed id", async () => {
-        await expect(refusedFor(OWNER, [{ id: "not-an-id", url: OPEN_URL }], ownerOpenId)).resolves.toBe(true);
+        await expect(refusedFor(OWNER, [{ id: `file:${lockedFileId}`, url: LOCKED_URL }], ownerLockedId, proof)).resolves.toBe(false);
     });
 });

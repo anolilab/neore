@@ -1,10 +1,11 @@
 /**
- * The reference images of a media request (`/chat/media`), checked on the CALLER's shard.
+ * The reference images of a media request (`/chat/media`), checked in two steps.
  *
- * The picker lists every image the caller has, locked chats' included, and the request names each one by its URL and its id
- * (`file:<id>` or `doc:<id>`). A reference is refused unless its id is the caller's own row, its URL is that row's URL, and the
- * row's chat is one the caller may read here. The caller's files, documents and passcode rows live on the caller's shard, so
- * only that shard sees a lock of the caller's chat: the check cannot run on the thread's shard alone.
+ * 1. `gateReferenceRowsOnCallerShard`, on the CALLER's shard: each id is the caller's own row, and the request's URL is that
+ *    row's URL. The caller's files and documents live there, and each names the chat it sits in (`chatIds`).
+ * 2. `threadReadableOnShard`, on each chat's OWNER's shard (`referenceChatsRefused` in `chat/http.ts` reaches it through
+ *    `threadShardFor`): the caller may read that chat. A shared chat, and its passcode rows, live on the owner's shard. The
+ *    request's unlock proof applies only to the chat it generates into.
  */
 import { REFERENCE_MEDIA_CAPS } from "@neore/ai/models";
 import { v } from "lunorash/server";
@@ -17,41 +18,15 @@ import { threadGateOutcome } from "./lib/thread-gate";
 
 const REFERENCE_ID = /^(file|doc):([\w-]+)$/u;
 
-/** Whether the row's chat may be read by the caller. A row in no chat is the caller's own, so it may. */
-const chatRefused = async (
+/** Whether one reference is the caller's own row under its own URL, and the chat that row sits in (if any). */
+const rowChecked = async (
     ctx: Pick<QueryCtx, "db">,
-    { chatId, targetThreadId, unlockProof, userId }: { chatId: string | undefined; targetThreadId: string; unlockProof: string | undefined; userId: string },
-): Promise<boolean> => {
-    if (chatId === undefined) {
-        return false;
-    }
-
-    // The request's proof opens its own chat only; another locked chat needs its own proof, which the request does not carry.
-    const outcome = await threadGateOutcome(ctx, {
-        level: "read",
-        threadId: chatId as Id<"threads">,
-        unlockProof: chatId === targetThreadId ? unlockProof : undefined,
-        userId,
-    });
-
-    return outcome !== "ok";
-};
-
-/** Whether one reference is refused: not the caller's row, not that row's URL, or in a chat the caller may not read here. */
-const referenceRefused = async (
-    ctx: Pick<QueryCtx, "db">,
-    {
-        referenceId,
-        referenceUrl,
-        targetThreadId,
-        unlockProof,
-        userId,
-    }: { referenceId: string; referenceUrl: string; targetThreadId: string; unlockProof: string | undefined; userId: string },
-): Promise<boolean> => {
+    { referenceId, referenceUrl, userId }: { referenceId: string; referenceUrl: string; userId: string },
+): Promise<{ chatId: string | undefined; refused: boolean }> => {
     const match = REFERENCE_ID.exec(referenceId);
 
     if (!match) {
-        return true;
+        return { chatId: undefined, refused: true };
     }
 
     const [, kind = "", rowId = ""] = match;
@@ -60,52 +35,70 @@ const referenceRefused = async (
         const file = await ctx.db.get("files", rowId as Id<"files">);
 
         if (!file || file.userId !== userId || file.url !== referenceUrl) {
-            return true;
+            return { chatId: undefined, refused: true };
         }
 
-        return await chatRefused(ctx, { chatId: file.chatId, targetThreadId, unlockProof, userId });
+        return { chatId: file.chatId, refused: false };
     }
 
     const document = await ctx.db.get("documents", rowId as Id<"documents">);
 
     if (!document || document.userId !== userId || document.content !== referenceUrl) {
-        return true;
+        return { chatId: undefined, refused: true };
     }
 
-    return await chatRefused(ctx, { chatId: document.threadId, targetThreadId, unlockProof, userId });
+    return { chatId: document.threadId, refused: false };
 };
 
-/** Whether any of the request's references is refused. Ids and URLs are paired by position; the caller checks the counts. */
-export const gateReferencesOnCallerShard = internalQuery
+/** Step 1: every id is the caller's own row under its own URL. Ids and URLs are paired by position; the caller checks the counts. */
+export const gateReferenceRowsOnCallerShard = internalQuery
     .input({
         referenceIds: v.array(v.string().max(MAX_LENGTH.id)),
         referenceImages: v.array(v.string()),
-        targetThreadId: v.string().max(MAX_LENGTH.id),
-        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         userId: v.string(),
     })
-    .output(v.object({ refused: v.boolean() }))
+    .output(v.object({ chatIds: v.array(v.string()), refused: v.boolean() }))
     .query(async ({ args, ctx }) => {
         // Refused before any read: the list is caller-controlled and the reads below run once per entry.
         if (args.referenceIds.length > REFERENCE_MEDIA_CAPS.images || args.referenceImages.length > REFERENCE_MEDIA_CAPS.images) {
-            return { refused: true };
+            return { chatIds: [], refused: true };
         }
 
-        for (const [index, referenceId] of args.referenceIds.entries()) {
-            const referenceUrl = args.referenceImages[index] ?? "";
+        const chatIds: string[] = [];
 
-            if (
-                await referenceRefused(ctx, {
-                    referenceId,
-                    referenceUrl,
-                    targetThreadId: args.targetThreadId,
-                    unlockProof: args.unlockProof,
-                    userId: args.userId,
-                })
-            ) {
-                return { refused: true };
+        for (const [index, referenceId] of args.referenceIds.entries()) {
+            const row = await rowChecked(ctx, { referenceId, referenceUrl: args.referenceImages[index] ?? "", userId: args.userId });
+
+            if (row.refused) {
+                return { chatIds: [], refused: true };
+            }
+
+            if (row.chatId !== undefined) {
+                chatIds.push(row.chatId);
             }
         }
 
-        return { refused: false };
+        return { chatIds: [...new Set(chatIds)], refused: false };
+    });
+
+/**
+ * Step 2, on the chat's owner's shard: whether the caller may read the thread. The unlock proof is the caller's passcode proof for
+ * THIS thread only; a reference's other locked chats need their own proof, which the request does not carry.
+ */
+export const threadReadableOnShard = internalQuery
+    .input({
+        threadId: v.string().max(MAX_LENGTH.id),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+        userId: v.string(),
+    })
+    .output(v.object({ readable: v.boolean() }))
+    .query(async ({ args, ctx }) => {
+        const outcome = await threadGateOutcome(ctx, {
+            level: "read",
+            threadId: args.threadId as Id<"threads">,
+            unlockProof: args.unlockProof,
+            userId: args.userId,
+        });
+
+        return { readable: outcome === "ok" };
     });

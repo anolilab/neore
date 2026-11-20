@@ -2155,6 +2155,35 @@ const MAX_IMAGES_PER_REQUEST = 4;
 /** The daily quota each media content type is charged to. */
 const MEDIA_LIMIT_KIND: Partial<Record<string, Exclude<DailyLimitKind, "Text">>> = { audio: "Audio", image: "Image", video: "Video" };
 
+/**
+ * Whether any chat a media reference sits in is refused to the caller. Each chat is read on its OWNER's shard
+ * (`threadShardFor`), where its passcode rows and messages live; the unlock proof applies to the target chat only.
+ */
+const referenceChatsRefused = async (
+    context: HttpActionCtx,
+    { chatIds, threadId, unlockProof, userId }: { chatIds: string[]; threadId: string; unlockProof: string | undefined; userId: string },
+): Promise<boolean> => {
+    for (const chatId of chatIds) {
+        const shardKey = await threadShardFor(context, userId, chatId);
+        const { readable } = await inShard(
+            context,
+            shardKey,
+            async (shardCtx) =>
+                await shardCtx.runQuery(internal.chat.reference_gate.threadReadableOnShard, {
+                    threadId: chatId,
+                    unlockProof: chatId === threadId ? unlockProof : undefined,
+                    userId,
+                }),
+        );
+
+        if (!readable) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
 export const mediaGenerationHttpAction = async (context: HttpActionCtx, request: Request) => {
     const traceId = request.headers.get("x-request-id") || crypto.randomUUID();
 
@@ -2282,16 +2311,15 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
 
     if (references.length > 0) {
         const referenceIds = streamingConfig.referenceIds ?? [];
-        const { refused } =
+        const rows =
             referenceIds.length === references.length
-                ? await context.forShard(authenticatedUserId).runQuery(internal.chat.reference_gate.gateReferencesOnCallerShard, {
+                ? await context.forShard(authenticatedUserId).runQuery(internal.chat.reference_gate.gateReferenceRowsOnCallerShard, {
                       referenceIds,
                       referenceImages: references,
-                      targetThreadId: threadId,
-                      unlockProof,
                       userId: authenticatedUserId,
                   })
-                : { refused: true };
+                : { chatIds: [], refused: true };
+        const refused = rows.refused || (await referenceChatsRefused(context, { chatIds: rows.chatIds, threadId, unlockProof, userId: authenticatedUserId }));
 
         if (refused) {
             return Response.json({ error: "File not found" }, { headers: { "Content-Type": "application/json" }, status: 404 });
