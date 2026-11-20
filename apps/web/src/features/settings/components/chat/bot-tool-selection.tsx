@@ -120,12 +120,14 @@ export const resolveTypedSelector = (typed: string, servers: ReadonlyArray<Known
     const longest = named[0]?.name.length;
     const matches = named.filter((server) => server.name.length === longest);
     const usable = matches.filter((server) => server.disconnected !== true);
+    // Two saved entries with one name and address share a key: that server is named once.
+    const selectorsFor = (picked: KnownToolServer[]) => [...new Set(picked.map((server) => `${server.key}:${typed.slice(server.name.length + 1)}`))];
 
     if (usable.length > 0) {
-        return usable.map((server) => `${server.key}:${typed.slice(server.name.length + 1)}`);
+        return selectorsFor(usable);
     }
 
-    return matches.length === 0 ? null : matches.map((server) => `${server.key}:${typed.slice(server.name.length + 1)}`);
+    return matches.length === 0 ? null : selectorsFor(matches);
 };
 
 interface SelectorListProps {
@@ -193,8 +195,8 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
             ? t`Your servers, connectors and computers are still loading. Try again in a moment.`
             : t`No server, connector or computer matches ${unknownServer}.`;
     };
-    // A connector that is not connected is not offered, but its name can still be typed.
-    const suggestions = [...catalog.builtIns, ...catalog.servers.flatMap((server) => (server.disconnected ? [] : [`${server.name}:*`]))];
+    // A connector that is not connected is not offered, but its name can still be typed. Servers sharing a name are offered once.
+    const suggestions = [...new Set([...catalog.builtIns, ...catalog.servers.flatMap((server) => (server.disconnected ? [] : [`${server.name}:*`]))])];
 
     /** A selector as the user reads it: a server's current name in place of its key. */
     const labelOf = (selector: string): string => {

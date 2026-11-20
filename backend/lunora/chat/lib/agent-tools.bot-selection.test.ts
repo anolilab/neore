@@ -186,7 +186,8 @@ describe("buildAgentTools with a bot's tool selection", () => {
         expect(await chatInBotThread("collaborator")).toStrictEqual(["mcp_mail__send", "webSearch"]);
         ownerServerKeys = [];
 
-        // An exact key still names the collaborator's server at the same address, and an allow list still keeps only what it names.
+        // A new selection, no longer excluding dateTime: an exact key still names the collaborator's server at the same address,
+        // and an allow list still keeps only what it names.
         selection = { exclude: [`${DOCS}:read`] };
 
         expect(await chatInBotThread("collaborator")).toStrictEqual(["dateTime", "mcp_docs__search", "mcp_mail__send", "webSearch"]);
