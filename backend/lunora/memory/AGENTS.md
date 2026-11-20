@@ -63,3 +63,34 @@
   Extraction (its facts, and its revision wordings), compression, reflection, the import save and the manual edit
   log one `memory.secret_redaction` event each (path, counts; no text); the backstops do not. A new write path
   calls the same helpers and `logRedaction`.
+- **Dates** (`memory/dates.ts`): extraction writes relative dates out as absolute
+  ones in the user's timezone and may set `validUntil` (last day a fact holds) and
+  `eventStart`/`eventEnd` (local `YYYY-MM-DD`); yearly dates set none. Retrieval
+  and dedup (`activeOn`, also on rows read past the window) skip an unpinned fact
+  past `validUntil`; reflection retires it over every row read, before the 120-row
+  selection (`splitExpired`), and keeps expired rows out of merges and revisions.
+  **The newer statement decides the dates** (`restatedDates`, the one place): a
+  revision or confirming restatement writes the newer statement's three dates in
+  place of the old, clearing one it does not carry (`dates` on
+  `reviseExtractedMemory` and `updateMemoryInternal` replaces all three columns). The person's own edit in
+  settings is the newest statement (`updateMemory` `dates`, checked by
+  `userFactDates`). Extraction: UPDATE takes them; a restatement with other dates
+  supersedes the row with the new statement, text and dates together
+  (`restatementOutcome`), or is saved beside a pinned one (UPDATE and SUPERSEDE
+  too: a pinned row's text and dates never change). An event on another day is
+  another occurrence (`differentEventDays`): saved beside, never revised; a row
+  superseded or confirmed in a run is not matched again (a revised one is, by its
+  revised text and dates), and a statement the extractor returned twice is saved once. Relative dates resolve against the
+  saved prompt's time; a steer sent on another day carries `[sent on <day>]`
+  (`labelSentDays`, from the time the user queued it).
+  Reflection: only rows with the same dates cluster, so a merge never changes
+  dates (a pinned row's included) and never leaves text naming another day;
+  two events on different days are never paired for revision either. UPDATE and
+  SUPERSEDE keep the newer row with its own dates (UPDATE takes the merged
+  wording, which belief revision writes for the newer row's dates when the two
+  rows' dates differ); IGNORE with other dates keeps the newer row.
+  Dated rows are never promoted or compressed (both rewrite text without dates).
+  An import carries no dates and leaves a row's dates alone: a pasted line is
+  not a newer statement. Like extraction it never matches, confirms or merges
+  into an unpinned row past its end date (action and save both check; the save's
+  exact-text check skips it too): the fact is saved beside it.

@@ -9,7 +9,19 @@ import { afterRun, createRunSteering } from "./agent-run";
 
 describe(createRunSteering, () => {
     it("records the text of each delivered steer, and nothing for a delivery that took none", async () => {
-        const deliveries = [{ messageId: "m1", text: "actually, I'm vegetarian" }, null, { messageId: "m2", text: "and no nuts" }];
+        const deliveries = [
+            { messageId: "m1", text: "actually, I'm vegetarian" },
+            null,
+            // Two steers joined in one delivery stay two, each with its own send time.
+            {
+                messageId: "m2",
+                parts: [
+                    { sentAt: 2, text: "and no nuts" },
+                    { sentAt: 3, text: "I fly tomorrow" },
+                ],
+                text: "and no nuts\n\nI fly tomorrow",
+            },
+        ];
         const ctx = { runMutation: vi.fn(async () => deliveries.shift() ?? null) };
         const steering = createRunSteering(ctx as never, { streamId: "s", threadId: "t", userId: "u" });
 
@@ -17,7 +29,9 @@ describe(createRunSteering, () => {
         await steering.takeSteer({ pendingMessageId: "p2" } as never);
         await steering.takeSteer({ pendingMessageId: "p3" } as never);
 
-        expect(steering.steeredTexts()).toStrictEqual(["actually, I'm vegetarian", "and no nuts"]);
+        expect(steering.steeredTexts()).toStrictEqual(["actually, I'm vegetarian", "and no nuts", "I fly tomorrow"]);
+        // When the user sent each, not when the run took it; an untimed one falls back to the delivery.
+        expect(steering.steeredAt().slice(1)).toStrictEqual([2, 3]);
     });
 });
 
@@ -44,8 +58,10 @@ describe(afterRun, () => {
             extractMemory: true,
             firstTokenTime: undefined,
             prompt: "Plan my dinner",
+            promptAt: Date.UTC(2026, 10, 17, 23, 58),
             savedMessages: [{ _id: "r1", message: { content: "Here is a plan.", role: "assistant" }, order: 1, stepOrder: 1 }] as never,
-            steeredTexts: ["actually, I'm vegetarian"],
+            steeredAt: [Date.UTC(2026, 10, 17, 23, 59), Date.UTC(2026, 10, 18, 0, 3)],
+            steeredTexts: ["actually, I'm vegetarian", "I fly tomorrow"],
             summarizeThread: false,
             threadId: "thread-1",
             timingStart: Date.now(),
@@ -55,8 +71,12 @@ describe(afterRun, () => {
         const extraction = runAfter.mock.calls.find((call) => (call as unknown[])[1] === internal.memory.extract.extractMemories);
 
         expect((extraction as unknown[] | undefined)?.[2]).toMatchObject({
+            // Relative dates are read against when the user asked, not when a reply that crossed midnight ended.
+            messageAt: Date.UTC(2026, 10, 17, 23, 58),
+            steeredAt: Date.UTC(2026, 10, 18, 0, 3),
             steeredFrom: "Plan my dinner".length + 2,
-            userMessage: "Plan my dinner\n\nactually, I'm vegetarian",
+            // A steer sent after midnight says so, and only that one: "tomorrow" in it is the 19th.
+            userMessage: "Plan my dinner\n\nactually, I'm vegetarian\n\n[sent on 2026-11-18] I fly tomorrow",
         });
     });
 });

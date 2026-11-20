@@ -10482,6 +10482,18 @@
           "optional": true,
           "unique": false
         },
+        "eventEnd": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "eventStart": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "importance": {
           "kind": "number",
           "nullable": false,
@@ -10656,6 +10668,12 @@
           "unique": false
         },
         "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "validUntil": {
           "kind": "string",
           "nullable": false,
           "optional": true,
@@ -20894,6 +20912,12 @@
               },
               "pendingMessageId": {
                 "kind": "string",
+                "nullable": false,
+                "optional": true,
+                "unique": false
+              },
+              "sentAt": {
+                "kind": "number",
                 "nullable": false,
                 "optional": true,
                 "unique": false

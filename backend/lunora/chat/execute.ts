@@ -751,9 +751,11 @@ export const runStreamingAgent = internalAction
                         // A run resumed after a pause records the whole reply: its earlier rows come first, so the key is the reply's first row.
                         savedMessages: [...priorRows, ...(result.savedMessages ?? [])],
                         ...(skill && { skill }),
+                        steeredAt: steering.steeredAt(),
                         steeredTexts: steering.steeredTexts(),
                         summarizeThread: runContext.prefs.threadSummariesEnabled,
                         threadId,
+                        ...(message && { promptAt: message._creationTime }),
                         ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }),
                         timingStart,
                         userId,

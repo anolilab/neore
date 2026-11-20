@@ -98,6 +98,8 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
     }
 
     const rules = await loadModelFilterRules(ctx, args.userId);
+    // As in extraction, an unpinned fact past its end date is no match: the pasted fact is saved anew.
+    const activeOn = Date.now();
     const embeddings = await embedMemoryFacts(
         ctx,
         args.userId,
@@ -113,6 +115,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
     // The working set is the near-match window. It is widened once, the first time a fact has to be matched by words
     // (no vector, or past the vector budget), so an import that every fact can match by vector never reads the wide window.
     let existing: DedupMemory[] = await ctx.runQuery(internal.memory.functions.getActiveMemoriesForUser, {
+        activeOn,
         limit: IMPORT_DEDUP_WINDOW,
         userId: args.userId,
     });
@@ -133,6 +136,7 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
         widened = true;
 
         const fetched: DedupMemory[] = await ctx.runQuery(internal.memory.functions.getActiveMemoriesForUser, {
+            activeOn,
             limit: IMPORT_WIDE_WINDOW_ROWS,
             userId: args.userId,
         });
@@ -156,11 +160,13 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
 
         if (embedding && vectorAllowed) {
             lookups += 1;
-            byVector = await findSimilarMemoryByVector(ctx, { botId: undefined, embedding, existing, retired, userId: args.userId }).catch((error: unknown) => {
-                console.warn("[memory/import] Vector dedup failed, deduping by text:", error);
+            byVector = await findSimilarMemoryByVector(ctx, { activeOn, botId: undefined, embedding, existing, retired, userId: args.userId }).catch(
+                (error: unknown) => {
+                    console.warn("[memory/import] Vector dedup failed, deduping by text:", error);
 
-                return null;
-            });
+                    return null;
+                },
+            );
         }
 
         // A row read past the window joins the working set, so later facts and the pinned check see it too.

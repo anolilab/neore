@@ -18,6 +18,9 @@ import { isMemoryType, MEMORY_TYPE_COLORS, MEMORY_TYPES, useMemoryTypeLabels } f
 export interface MemoryItemData {
     _id: string;
     createdAt: number;
+    /** Local calendar days, `YYYY-MM-DD`: the days an event happens, and the last day a fact holds. */
+    eventEnd?: string;
+    eventStart?: string;
     importedFrom?: ImportApp;
     lastConfirmedAt: number;
     memory: string;
@@ -25,13 +28,21 @@ export interface MemoryItemData {
     source?: string;
     threadId?: string;
     type: MemoryType;
+    validUntil?: string;
 }
+
+/** The three dates as the editor holds them: an empty string is no date. */
+export type MemoryDates = Required<Pick<MemoryItemData, "eventEnd" | "eventStart" | "validUntil">>;
+
+const datesOf = (memory: MemoryItemData): MemoryDates => {
+    return { eventEnd: memory.eventEnd ?? "", eventStart: memory.eventStart ?? "", validUntil: memory.validUntil ?? "" };
+};
 
 interface MemoryItemProps {
     busy: boolean;
     memory: MemoryItemData;
     onDelete: (memoryId: string) => void;
-    onSave: (memoryId: string, changes: { memory?: string; type?: MemoryType }) => void;
+    onSave: (memoryId: string, changes: { dates?: MemoryDates; memory?: string; type?: MemoryType }) => void;
     onTogglePin: (memoryId: string, pinned: boolean) => void;
     /** Relative-time label, computed by the list so `Date.now()` stays out of render. */
     relativeTime: (timestamp: number) => string;
@@ -42,27 +53,68 @@ interface MemoryItemProps {
  * decays), the thread it came from, when it was last confirmed, and delete.
  */
 const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTogglePin, relativeTime }) => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
+    // A stored day is a calendar day, not an instant: formatted in UTC so no timezone moves it.
+    const day = (value: string): string => i18n.date(new Date(`${value}T00:00:00Z`), { dateStyle: "medium", timeZone: "UTC" });
+    let eventLabel: string | undefined;
+
+    if (memory.eventStart && memory.eventEnd) {
+        eventLabel = t`${day(memory.eventStart)} – ${day(memory.eventEnd)}`;
+    } else if (memory.eventStart) {
+        eventLabel = t`On ${day(memory.eventStart)}`;
+    }
+
+    const untilLabel = memory.validUntil ? t`Until ${day(memory.validUntil)}` : undefined;
     const typeLabels = useMemoryTypeLabels();
     const appLabels = useImportAppLabels();
     const importedFromLabel = appLabels[memory.importedFrom ?? "other"];
     const [isEditing, setIsEditing] = useState(false);
     const [draft, setDraft] = useState(memory.memory);
+    const [draftDates, setDraftDates] = useState<MemoryDates>(() => datesOf(memory));
+    // The dates as the edit began: a save sends them only when the person changed a date, not when another tab did.
+    const [datesAtEditStart, setDatesAtEditStart] = useState<MemoryDates>(() => datesOf(memory));
     const textareaId = useId();
+    const dateIds = { eventEnd: useId(), eventStart: useId(), validUntil: useId() };
+    const dateErrorId = useId();
+    // An event cannot end before it starts, nor without a start (the server checks the same).
+    const datesInvalid = draftDates.eventEnd !== "" && (draftDates.eventStart === "" || draftDates.eventEnd < draftDates.eventStart);
+    const dateFields: { key: keyof MemoryDates; label: string }[] = [
+        { key: "eventStart", label: t`Happens on` },
+        { key: "eventEnd", label: t`Event ends on` },
+        { key: "validUntil", label: t`Holds until` },
+    ];
     const typeItems = MEMORY_TYPES.map((type) => {
         return { label: typeLabels[type], value: type };
     });
 
     const startEditing = () => {
         setDraft(memory.memory);
+        setDraftDates(datesOf(memory));
+        setDatesAtEditStart(datesOf(memory));
         setIsEditing(true);
     };
 
     const save = () => {
         const text = draft.trim();
+        const keys = Object.keys(datesAtEditStart) as (keyof MemoryDates)[];
+        const datesChanged = keys.some((key) => datesAtEditStart[key] !== draftDates[key]);
+        // A date the person did not change keeps the stored value, so another tab's edit to it survives this save.
+        const stored = datesOf(memory);
+        const dates = Object.fromEntries(keys.map((key) => [key, datesAtEditStart[key] === draftDates[key] ? stored[key] : draftDates[key]])) as MemoryDates;
 
-        if (text && text !== memory.memory) {
-            onSave(memory._id, { memory: text });
+        // Two edits to different ends can meet in an impossible range: the editor shows that range, with its error, rather
+        // than send it. The stored dates become the edit's start, so the next save compares against them.
+        if (dates.eventEnd !== "" && (dates.eventStart === "" || dates.eventEnd < dates.eventStart)) {
+            setDraftDates(dates);
+            setDatesAtEditStart(stored);
+
+            return;
+        }
+
+        const textChanged = text !== "" && text !== memory.memory;
+
+        if (textChanged || datesChanged) {
+            onSave(memory._id, { ...(textChanged && { memory: text }), ...(datesChanged && { dates }) });
         }
 
         setIsEditing(false);
@@ -92,6 +144,8 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
                         ))}
                     </SelectContent>
                 </Select>
+                {eventLabel && <span className="text-[10px] font-medium">{eventLabel}</span>}
+                {untilLabel && <span className="text-[10px] font-medium">{untilLabel}</span>}
                 <span className="text-muted-foreground text-[10px]">{t`Last confirmed ${relativeTime(memory.lastConfirmedAt)}`}</span>
                 {memory.source === "imported" && <span className="text-muted-foreground text-[10px]">{t`Imported from ${importedFromLabel}`}</span>}
                 {memory.threadId && (
@@ -141,12 +195,34 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
                         }}
                         value={draft}
                     />
+                    <div className="flex flex-wrap gap-2 text-xs">
+                        {dateFields.map(({ key, label }) => (
+                            <div className="flex items-center gap-1" key={key}>
+                                <label htmlFor={dateIds[key]}>{label}</label>
+                                <input
+                                    aria-describedby={key === "eventEnd" && datesInvalid ? dateErrorId : undefined}
+                                    aria-invalid={key === "eventEnd" && datesInvalid}
+                                    className="bg-background rounded border px-1.5 py-0.5"
+                                    id={dateIds[key]}
+                                    min={key === "eventEnd" ? draftDates.eventStart || undefined : undefined}
+                                    onChange={(event) =>
+                                        setDraftDates((previous) => {
+                                            return { ...previous, [key]: event.target.value };
+                                        })
+                                    }
+                                    type="date"
+                                    value={draftDates[key]}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                    {datesInvalid && <p className="text-destructive text-xs" id={dateErrorId} role="alert">{t`An event cannot end before it starts.`}</p>}
                     <div className="flex justify-end gap-1">
                         <Button onClick={() => setIsEditing(false)} size="xs" variant="ghost">
                             <XIcon aria-hidden="true" className="size-3" />
                             {t`Cancel`}
                         </Button>
-                        <Button disabled={!draft.trim()} onClick={save} size="xs">
+                        <Button disabled={!draft.trim() || datesInvalid} onClick={save} size="xs">
                             <CheckIcon aria-hidden="true" className="size-3" />
                             {t`Save`}
                         </Button>

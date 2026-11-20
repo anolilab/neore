@@ -8,8 +8,9 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { memoryLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
-import { patchRow, withoutUndefined } from "../lib/patch";
+import { patchById, patchRow, withoutUndefined } from "../lib/patch";
 import { runAfterOnShard } from "../lib/shard-scheduler";
+import { dateColumns, factDatesOf, hasFactDates, isExpired, normalizeFactDates, restatedDates, sameFactDates, userFactDates } from "./dates";
 import {
     type ImportApp,
     importDedupKey,
@@ -20,6 +21,7 @@ import {
     vImportApp,
 } from "./import-logic";
 import { logRedaction, redactMemoryText } from "./redact";
+import { localDayOf } from "./reflection-logic";
 import { lastConfirmedOf, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { requireOwnedThread } from "../agent/thread-read-access";
@@ -56,6 +58,7 @@ const toMemoryView = (m: Doc<"memories">) => {
         lastConfirmedAt: lastConfirmedOf(m),
         memory: m.memory,
         pinned: m.pinned === true,
+        ...factDatesOf(m),
         source: m.source ?? undefined,
         supersededBy: m.supersededBy ?? undefined,
         supersedes: m.supersedes ?? undefined,
@@ -81,6 +84,16 @@ const requireOwnMemory = async (ctx: Pick<MutationCtx, "db">, memoryId: string, 
     return memory;
 };
 
+/** The user's timezone (`userSettings.timezone`); unset reads as UTC wherever it is used. */
+const userTimeZone = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<string | undefined> => {
+    const settings = await ctx.db
+        .query("userSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+
+    return settings?.timezone ?? undefined;
+};
+
 // ============================================================================
 // cRPC Functions (user-facing, authenticated)
 // ============================================================================
@@ -100,6 +113,8 @@ export const listUserMemories = authQuery
                 _id: v.string(),
                 confidence: v.optional(v.number()),
                 createdAt: v.number(),
+                eventEnd: v.optional(v.string()),
+                eventStart: v.optional(v.string()),
                 importance: v.optional(v.number()),
                 importedFrom: v.optional(vImportApp),
                 lastConfirmedAt: v.number(),
@@ -111,6 +126,7 @@ export const listUserMemories = authQuery
                 threadId: v.optional(v.string()),
                 type: v.union(v.literal("identity"), v.literal("preference"), v.literal("context"), v.literal("activity"), v.literal("experience")),
                 updatedAt: v.optional(v.number()),
+                validUntil: v.optional(v.string()),
                 version: v.optional(v.number()),
             }),
         ),
@@ -296,12 +312,20 @@ export const deleteMemory = authMutation
 export const updateMemory = authMutation
     .use(rateLimit("memory/update"))
     .input({
+        // All three dates as the person left them in the editor; an empty or absent one is cleared (`userFactDates`).
+        dates: v.optional(
+            v.object({
+                eventEnd: v.optional(v.string().max(MAX_LENGTH.id)),
+                eventStart: v.optional(v.string().max(MAX_LENGTH.id)),
+                validUntil: v.optional(v.string().max(MAX_LENGTH.id)),
+            }),
+        ),
         memory: v.optional(v.string().max(MAX_LENGTH.document)),
         memoryId: v.string().max(MAX_LENGTH.id),
         type: v.optional(v.union(v.literal("identity"), v.literal("preference"), v.literal("context"), v.literal("activity"), v.literal("experience"))),
     })
     .output(v.null())
-    .mutation(async ({ args: { memory, memoryId, type }, ctx: context }) => {
+    .mutation(async ({ args: { dates, memory, memoryId, type }, ctx: context }) => {
         const { userId } = context.user;
         const existing = await requireOwnMemory(context, memoryId, userId);
         const trimmed = memory?.trim();
@@ -322,20 +346,27 @@ export const updateMemory = authMutation
             throw new LunoraError("BAD_REQUEST", "A memory must be between 1 and 1000 characters");
         }
 
+        const typedDates = dates && userFactDates(dates);
+
+        if (dates && !typedDates) {
+            throw new LunoraError("BAD_REQUEST", "Dates must be real days, and an event cannot end before it starts");
+        }
+
+        // The person's own edit is the newest statement: its dates replace the row's (`restatedDates`).
+        const nextDates = typedDates && restatedDates(factDatesOf(existing), typedDates);
         const { now } = context;
         const textChanged = text !== undefined && text !== existing.memory;
 
-        await context.db.patch(
-            "memories",
-            existing._id,
-            withoutUndefined({
+        await patchRow(context.db, "memories", existing, {
+            ...withoutUndefined({
                 lastConfirmedAt: now,
                 memory: textChanged ? text : undefined,
                 source: textChanged ? ("manual" as const) : undefined,
                 type,
                 updatedAt: now,
             }),
-        );
+            ...(nextDates && dateColumns(nextDates)),
+        });
 
         // The previous embedding vector is stale once the text changed.
         if (textChanged) {
@@ -343,7 +374,7 @@ export const updateMemory = authMutation
         }
 
         logRedaction(context.log, "edit", { dropped: 0, redacted: text !== undefined && text !== trimmed ? 1 : 0 });
-        context.log.event("memory.update_memory", { textChanged, typeChanged: type !== undefined });
+        context.log.event("memory.update_memory", { datesChanged: nextDates !== undefined, textChanged, typeChanged: type !== undefined });
 
         return null;
     });
@@ -478,6 +509,8 @@ export const getMessageMemoryUsage = authQuery
 const vMemoryInsertFields = {
     botId: v.optional(v.string()),
     confidence: v.optional(v.number()),
+    eventEnd: v.optional(v.string()),
+    eventStart: v.optional(v.string()),
     importance: v.optional(v.number()),
     importedFrom: v.optional(vImportApp),
     memory: v.string(),
@@ -486,11 +519,14 @@ const vMemoryInsertFields = {
     threadId: v.optional(v.id("threads")),
     type: v.union(v.literal("identity"), v.literal("preference"), v.literal("context"), v.literal("activity"), v.literal("experience")),
     userId: v.string(),
+    validUntil: v.optional(v.string()),
 };
 
 type MemoryInsert = {
     botId?: string;
     confidence?: number;
+    eventEnd?: string;
+    eventStart?: string;
     importance?: number;
     importedFrom?: ImportApp;
     memory: string;
@@ -499,6 +535,7 @@ type MemoryInsert = {
     threadId?: Id<"threads">;
     type: MemoryType;
     userId: string;
+    validUntil?: string;
 };
 
 /**
@@ -516,6 +553,8 @@ const insertMemory = async (ctx: Pick<MutationCtx, "db">, mem: MemoryInsert, now
     const memoryId = await ctx.db.insert("memories", {
         botId: mem.botId as Id<"bots"> | undefined,
         confidence: mem.confidence,
+        eventEnd: mem.eventEnd,
+        eventStart: mem.eventStart,
         importance: mem.importance,
         importedFrom: mem.importedFrom,
         lastConfirmedAt: now,
@@ -526,6 +565,7 @@ const insertMemory = async (ctx: Pick<MutationCtx, "db">, mem: MemoryInsert, now
         type: mem.type,
         updatedAt: now,
         userId: mem.userId,
+        validUntil: mem.validUntil,
         version: 1,
     });
 
@@ -543,7 +583,18 @@ export const saveMemory = internalMutation
 
 export const saveMemoryBatch = internalMutation
     .input({
-        memories: v.array(v.object({ ...vMemoryInsertFields, supersedesBase: v.optional(v.string()) })),
+        // Compression: the rows the saved facts replace. Checked and retired in this same write, so a row given dates
+        // meanwhile (its text would be lost undated) stops the whole save, and nothing is written.
+        compressedFrom: v.optional(v.array(v.id("memories"))),
+        memories: v.array(
+            v.object({
+                ...vMemoryInsertFields,
+                supersedesBase: v.optional(v.string()),
+                supersedesDates: v.optional(
+                    v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) }),
+                ),
+            }),
+        ),
     })
     // One entry per memory, in order: `null` where the fact was nothing but a secret and was not saved.
     .output(v.array(v.union(v.id("memories"), v.null())))
@@ -551,9 +602,21 @@ export const saveMemoryBatch = internalMutation
         const { now } = ctx;
         const memoryIds: (Id<"memories"> | null)[] = [];
 
-        for (const { supersedesBase, ...mem } of args.memories) {
-            // A supersession applies only while its target still reads as the text the decision was made on, in the same
-            // scope, unpinned and active. Otherwise the new memory is saved beside it.
+        if (args.compressedFrom !== undefined) {
+            const owner = args.memories[0]?.userId;
+            const originals = await Promise.all(args.compressedFrom.map((id) => ctx.db.get("memories", id)));
+            const stillCompressible = originals.every(
+                (row) => row && row.userId === owner && !row.supersededBy && row.pinned !== true && !hasFactDates(factDatesOf(row)),
+            );
+
+            if (!stillCompressible) {
+                return args.memories.map(() => null);
+            }
+        }
+
+        for (const { supersedesBase, supersedesDates, ...mem } of args.memories) {
+            // A supersession applies only while its target still reads as the text, and holds the dates, the decision was
+            // made on, in the same scope, unpinned and active. Otherwise the new memory is saved beside it.
             const target = mem.supersedes ? await ctx.db.get("memories", mem.supersedes) : null;
             const supersedes =
                 target &&
@@ -562,11 +625,19 @@ export const saveMemoryBatch = internalMutation
                 (target.botId ?? undefined) === (mem.botId ?? undefined) &&
                 !target.supersededBy &&
                 target.pinned !== true &&
-                target.memory === supersedesBase
+                target.memory === supersedesBase &&
+                (supersedesDates === undefined || sameFactDates(factDatesOf(target), normalizeFactDates(supersedesDates)))
                     ? mem.supersedes
                     : undefined;
 
             memoryIds.push(await insertMemory(ctx, { ...mem, supersedes }, now));
+        }
+
+        // The originals are retired by the same write. Each points at itself: `supersededBy` is its own id when compression retired it.
+        const compressedFrom = args.compressedFrom ?? [];
+
+        for (const id of compressedFrom) {
+            await ctx.db.patch("memories", id, { supersededBy: id, updatedAt: now });
         }
 
         return memoryIds;
@@ -594,6 +665,8 @@ type PendingFact = { memory: string; supersede?: { base: string; memoryId: Id<"m
  *   action's dedup window is still found.
  * A row this save confirmed or reworded is never superseded by a later fact of the same save,
  * because its text is what the save is keeping.
+ * An unpinned row past its end date is no match for any of these, as in extraction: it is
+ * neither reworded, confirmed nor superseded, and the fact is saved beside it.
  */
 export const saveImportedMemoryBatch = internalMutation
     .input({
@@ -633,7 +706,9 @@ export const saveImportedMemoryBatch = internalMutation
             throw new LunoraError("FORBIDDEN", IMPORT_MEMORY_OFF_MESSAGE);
         }
 
-        const ownActive = (row: Doc<"memories"> | null): row is Doc<"memories"> => row?.userId === args.userId && !row.botId && !row.supersededBy;
+        const today = localDayOf(now, await userTimeZone(ctx, args.userId));
+        const ownActive = (row: Doc<"memories"> | null): row is Doc<"memories"> =>
+            row?.userId === args.userId && !row.botId && !row.supersededBy && (row.pinned === true || !isExpired(row, today));
 
         // The user's own active rows, newest first: a bot's rows and superseded history never use up the read. Kept in step
         // with every reword and retirement below, so each check sees the texts as this save leaves them.
@@ -669,8 +744,11 @@ export const saveImportedMemoryBatch = internalMutation
         };
         const knownId = (key: string): Id<"memories"> | undefined => idsByText.get(key)?.at(-1);
 
+        // An unpinned row past its end date is no match: it is not indexed, so a fact with its text is saved beside it.
         for (const row of own) {
-            indexRow(row._id, importDedupKey(row.memory));
+            if (ownActive(row)) {
+                indexRow(row._id, importDedupKey(row.memory));
+            }
         }
 
         const reword = (memoryId: Id<"memories">, key: string) => {
@@ -875,9 +953,13 @@ export const reviseExtractedMemory = internalMutation
         base: v.string(),
         botId: v.optional(v.string()),
         confidence: v.number(),
+        // The newer statement's dates, replacing all three columns (`restatedDates`); absent keeps the row's.
+        dates: v.optional(v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) })),
         lastConfirmedAt: v.number(),
         memory: v.string(),
         memoryId: v.id("memories"),
+        // The row's dates as the revision was planned: a person's date edit made since then is not overwritten.
+        observed: v.optional(v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) })),
         userId: v.string(),
     })
     .output(v.boolean())
@@ -896,11 +978,16 @@ export const reviseExtractedMemory = internalMutation
             return false;
         }
 
-        await ctx.db.patch("memories", args.memoryId, {
+        if (args.observed && !sameFactDates(factDatesOf(row), normalizeFactDates(args.observed))) {
+            return false;
+        }
+
+        await patchRow(ctx.db, "memories", row, {
             confidence: args.confidence,
             lastConfirmedAt: args.lastConfirmedAt,
             memory,
             updatedAt: ctx.now,
+            ...(args.dates && dateColumns(args.dates)),
         });
 
         if (memory !== row.memory) {
@@ -913,6 +1000,8 @@ export const reviseExtractedMemory = internalMutation
 export const updateMemoryInternal = internalMutation
     .input({
         confidence: v.optional(v.number()),
+        // Replaces all three date columns; a date left out is removed (`restatedDates`).
+        dates: v.optional(v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) })),
         embeddingId: v.optional(v.string()),
         importance: v.optional(v.number()),
         lastConfirmedAt: v.optional(v.number()),
@@ -930,10 +1019,9 @@ export const updateMemoryInternal = internalMutation
         const text = args.memory === undefined ? undefined : (redactMemoryText(args.memory) ?? undefined);
         const textChanged = text !== undefined && text !== existing.memory;
 
-        await ctx.db.patch(
-            "memories",
-            args.memoryId,
-            withoutUndefined({
+        // Absent fields keep their value; `dates` replaces the three date columns (`patchById` removes an `undefined` key).
+        await patchById(ctx.db, "memories", args.memoryId, {
+            ...withoutUndefined({
                 confidence: args.confidence,
                 embeddingId: args.embeddingId,
                 importance: args.importance,
@@ -941,7 +1029,9 @@ export const updateMemoryInternal = internalMutation
                 memory: textChanged ? text : undefined,
                 updatedAt: ctx.now,
             }),
-        );
+            // Cleaned as an extractor's dates are: no malformed day, no end without a start or before it.
+            ...(args.dates && dateColumns(normalizeFactDates(args.dates))),
+        });
 
         // The old vector encodes the old wording: replace it, so search never finds a row by text it no longer holds.
         if (textChanged && existing.userId) {
@@ -974,22 +1064,30 @@ export const confirmMemories = internalMutation
         return unconfirmed;
     });
 
+/** Rows one scope's active read reads at most, unless `limit` (one page) is more. */
+const ACTIVE_READ_MAX_ROWS = 1500;
+
 /**
  * Memories a run may read or dedupe against. Without `botId` only the user's own
  * memories (no bot). With `botId`, that bot's memories, plus the user's own ones
  * when `includeUserWide` (a bot chat reads what the user already knows). Writes
  * pass `botId` WITHOUT `includeUserWide`: a bot's extraction never matches or
- * edits a user memory.
+ * edits a user memory. With `activeOn` (an instant), an unpinned fact whose end
+ * date is before that day in the user's timezone is left out: retrieval never injects it.
  */
 export const getActiveMemoriesForUser = internalQuery
     .input({
+        activeOn: v.optional(v.number()),
         botId: v.optional(v.string()),
         includeUserWide: v.optional(v.boolean()),
         limit: v.optional(v.number()),
+        /** The day of `activeOn` is read in this timezone; without it, in the user's stored one. */
+        timeZone: v.optional(v.string()),
         userId: v.string(),
     })
     .query(async ({ args, ctx }) => {
         const limit = args.limit ?? 50;
+        const today = args.activeOn === undefined ? undefined : localDayOf(args.activeOn, args.timeZone ?? (await userTimeZone(ctx, args.userId)));
 
         // Each scope is read through its own index, so one scope's rows never use up
         // another's window. A null `botId` is the user's own memories.
@@ -999,11 +1097,20 @@ export const getActiveMemoriesForUser = internalQuery
             scopes.push(null);
         }
 
-        // The active-row index: superseded rows are never read, so the window is always `limit` active rows when they exist.
+        // A pinned fact stays past its end date: pinning is how the user keeps it.
+        const usable = (m: Doc<"memories">): boolean => today === undefined || m.pinned === true || !isExpired(m, today);
+
+        // The active-row index, so superseded rows are never read. Paged until `limit` usable rows or the scope ends,
+        // so expired rows cannot fill the window; at most `ACTIVE_READ_MAX_ROWS` rows (or one page), a bounded read.
         const perScope = await Promise.all(
-            scopes.map(
-                async (scope) =>
-                    await ctx.db
+            scopes.map(async (scope) => {
+                const kept: Doc<"memories">[] = [];
+                let cursor: string | null = null;
+
+                const maxRows = Math.max(limit, ACTIVE_READ_MAX_ROWS);
+
+                for (let read = 0; read < maxRows && kept.length < limit; read += limit) {
+                    const result = await ctx.db
                         .query("memories")
                         .withIndex("by_userId_botId_active", (q) =>
                             q
@@ -1012,8 +1119,19 @@ export const getActiveMemoriesForUser = internalQuery
                                 .eq("supersededBy", null),
                         )
                         .order("desc")
-                        .take(limit),
-            ),
+                        .paginate({ cursor, numItems: limit });
+
+                    kept.push(...result.page.filter((m) => usable(m)));
+
+                    if (result.isDone) {
+                        break;
+                    }
+
+                    cursor = result.continueCursor;
+                }
+
+                return kept;
+            }),
         );
 
         // Each scope keeps up to `limit` of its own, so a busy bot cannot push the user's memories out. Merged in
@@ -1039,6 +1157,7 @@ export const getActiveMemoriesForUser = internalQuery
                 memory: m.memory,
                 pinned: m.pinned === true,
                 type: m.type,
+                ...factDatesOf(m),
             };
         });
     });
@@ -1065,10 +1184,14 @@ export const getMemoryByEmbeddingId = internalQuery.input({ embeddingId: v.strin
 
 export const getMemoriesByEmbeddingIds = internalQuery
     .input({
+        /** As in `getActiveMemoriesForUser`: an unpinned fact past its end date on that day is left out. */
+        activeOn: v.optional(v.number()),
         embeddingIds: v.array(v.string()),
+        timeZone: v.optional(v.string()),
         userId: v.string(),
     })
     .query(async ({ args, ctx }) => {
+        const today = args.activeOn === undefined ? undefined : localDayOf(args.activeOn, args.timeZone ?? (await userTimeZone(ctx, args.userId)));
         const settled = await Promise.all(
             args.embeddingIds.map(async (embeddingId) => {
                 const memory = await ctx.db
@@ -1076,7 +1199,12 @@ export const getMemoriesByEmbeddingIds = internalQuery
                     .withIndex("embeddingId", (q) => q.eq("embeddingId", embeddingId))
                     .unique();
 
-                if (!memory || memory.userId !== args.userId || memory.supersededBy) {
+                if (
+                    !memory ||
+                    memory.userId !== args.userId ||
+                    memory.supersededBy ||
+                    (today !== undefined && memory.pinned !== true && isExpired(memory, today))
+                ) {
                     return null;
                 }
 
@@ -1090,35 +1218,13 @@ export const getMemoriesByEmbeddingIds = internalQuery
                     memory: memory.memory,
                     pinned: memory.pinned === true,
                     type: memory.type,
+                    ...factDatesOf(memory),
                 };
             }),
         );
 
         return settled.filter((r): r is NonNullable<typeof r> => r !== null);
     });
-
-export const markMemorySupersededByCompression = internalMutation.input({ memoryId: v.id("memories"), userId: v.string() }).mutation(async ({ args, ctx }) => {
-    const memory = await ctx.db.get("memories", args.memoryId);
-
-    // Ownership guard: skip silently if memory doesn't exist or belongs to another user
-    if (!memory || memory.userId !== args.userId) {
-        return;
-    }
-
-    // Idempotency guard: if already superseded (e.g. by a concurrent compression run),
-    // do nothing. This is the defence-in-depth layer for H1.
-    if (memory.supersededBy) {
-        return;
-    }
-
-    await ctx.db.patch("memories", args.memoryId, {
-        // Sentinel: memory points to itself to signal "retired by compression".
-        // All active-memory queries filter by !supersededBy, so this record
-        // is hidden from normal queries without needing a separate boolean field.
-        supersededBy: args.memoryId,
-        updatedAt: ctx.now,
-    });
-});
 
 export const getMemoryById = internalQuery.input({ memoryId: v.id("memories") }).query(async ({ args, ctx }) => ctx.db.get("memories", args.memoryId));
 
@@ -1151,6 +1257,11 @@ export const recordRetrievedMemories = internalMutation
 
         return null;
     });
+
+export const getUserTimeZone = internalQuery
+    .input({ userId: v.string() })
+    .output(v.union(v.string(), v.null()))
+    .query(async ({ args, ctx }) => (await userTimeZone(ctx, args.userId)) ?? null);
 
 export const isMemoryEnabled = internalQuery
     .input({ userId: v.string() })

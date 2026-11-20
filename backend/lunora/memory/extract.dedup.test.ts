@@ -372,4 +372,127 @@ describe("extraction vector dedup", () => {
         // The secret-only revision is no revision: its fact is saved as new, as for one that cannot apply.
         expect(rows.map((row) => row.memory)).toContain("The user owns a blue vase from Lisbon today");
     });
+
+    it("saves a restatement the extractor returned twice once", async () => {
+        expect.assertions(2);
+
+        const STAY = "The user is in Lisbon until 2026-12-05";
+
+        const oldRow = await harness.run(async (ctx: any) => {
+            const vector = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: VECTOR });
+
+            searchVectors.mockResolvedValue([{ _id: vector, _score: 1 }]);
+
+            return await ctx.db.insert("memories", {
+                embeddingId: vector,
+                memory: "The user is in Lisbon until 2026-11-20",
+                type: "context",
+                userId: USER,
+                validUntil: "2026-11-20",
+            });
+        });
+        const fact = { confidence: 90, importance: 80, memory: STAY, type: "context", validUntil: "2026-12-05" };
+
+        generateText.mockResolvedValue({ output: { facts: [fact, fact] } });
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "Enjoy Lisbon.",
+                    messageAt: Date.UTC(2026, 10, 18, 12),
+                    threadId,
+                    userId: USER,
+                    userMessage: "I'm staying in Lisbon until December 5th now, remember that",
+                }),
+        );
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("memories").collect());
+
+        expect(rows.filter((row: { memory: string }) => row.memory === STAY)).toHaveLength(1);
+        expect(rows.find((row: { _id: string }) => row._id === oldRow)?.supersededBy).toBeTypeOf("string");
+    });
+
+    it("keeps a second trip on another day beside the first, whatever belief revision says", async () => {
+        expect.assertions(2);
+
+        const SECOND = "The user flies to Paris on 2026-12-18";
+
+        const firstTrip = await harness.run(async (ctx: any) => {
+            const vector = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: VECTOR });
+
+            searchVectors.mockResolvedValue([{ _id: vector, _score: 0.9 }]);
+
+            return await ctx.db.insert("memories", {
+                embeddingId: vector,
+                eventStart: "2026-11-20",
+                memory: "The user flies to Paris on 2026-11-20",
+                type: "activity",
+                userId: USER,
+            });
+        });
+
+        generateText
+            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, eventStart: "2026-12-18", importance: 80, memory: SECOND, type: "activity" }] } })
+            .mockResolvedValue({ output: { action: "SUPERSEDE" } });
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "Bon voyage again.",
+                    messageAt: Date.UTC(2026, 10, 18, 12),
+                    threadId,
+                    userId: USER,
+                    userMessage: "I fly to Paris again on December 18th, remember that",
+                }),
+        );
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("memories").collect());
+
+        expect(rows.find((row: { _id: string }) => row._id === firstTrip)?.supersededBy).toBeUndefined();
+        expect(rows.filter((row: { memory: string }) => row.memory === SECOND)).toHaveLength(1);
+    });
+
+    it("saves an update beside a pinned memory, leaving its text and dates", async () => {
+        expect.assertions(3);
+
+        const PINNED = "The user is in Lisbon until 2026-11-20";
+        const NEWER = "The user is in Lisbon working from a cafe";
+
+        const pinnedRow = await harness.run(async (ctx: any) => {
+            const vector = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: VECTOR });
+
+            searchVectors.mockResolvedValue([{ _id: vector, _score: 0.9 }]);
+
+            return await ctx.db.insert("memories", {
+                embeddingId: vector,
+                memory: PINNED,
+                pinned: true,
+                type: "context",
+                userId: USER,
+                validUntil: "2026-11-20",
+            });
+        });
+
+        generateText
+            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, importance: 80, memory: NEWER, type: "context" }] } })
+            .mockResolvedValue({ output: { action: "UPDATE", mergedMemory: "The user is in Lisbon, working from a cafe" } });
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "Sounds lovely.",
+                    messageAt: Date.UTC(2026, 10, 18, 12),
+                    threadId,
+                    userId: USER,
+                    userMessage: "I'm working from a cafe in Lisbon, remember that",
+                }),
+        );
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("memories").collect());
+        const pinned = rows.find((row: { _id: string }) => row._id === pinnedRow);
+
+        expect(pinned?.memory).toBe(PINNED);
+        expect(pinned?.validUntil).toBe("2026-11-20");
+        expect(rows.filter((row: { memory: string }) => row.memory === NEWER)).toHaveLength(1);
+    });
 });

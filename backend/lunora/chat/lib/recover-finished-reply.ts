@@ -71,6 +71,7 @@ export const recoverFinishedReply = async (ctx: Pick<ActionCtx, "runMutation" | 
         extractMemory,
         firstTokenTime: undefined,
         prompt: userPrompt,
+        ...(prompt[0] && { promptAt: prompt[0]._creationTime }),
         recordUsage: false,
         savedMessages: rows,
         ...(skill && { skill }),

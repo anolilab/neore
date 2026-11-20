@@ -776,6 +776,32 @@ describe("runHeadlessAgent with a goal and memory", () => {
 
         expect(extractions(ctx as never)).toEqual(["only answer"]);
     });
+
+    it("reads relative dates against when the prompt was saved, not when the run started", async () => {
+        const savedAt = Date.UTC(2026, 10, 18, 0, 1);
+
+        seen.replies = ["only answer"];
+        seen.saved = [[{ _creationTime: savedAt, _id: "p1", message: { content: "Book it for tomorrow", role: "user" }, order: 0, stepOrder: 0 }]];
+
+        const ctx = fakeCtx({ ...PREFS, memoryEnabled: true });
+
+        await runHeadlessAgent(ctx, {
+            memory: true,
+            model: "test-model",
+            organizationId: null,
+            origin: "lead",
+            personalization: "none",
+            prompt: "Book it for tomorrow",
+            thread: { title: "t" },
+            tools: "none",
+            userId: "owner",
+        });
+
+        const { runAfter } = (ctx as unknown as { scheduler: { runAfter: ReturnType<typeof vi.fn> } }).scheduler;
+        const extraction = runAfter.mock.calls.find((call) => (call[2] as { assistantResponse?: string } | undefined)?.assistantResponse);
+
+        expect(extraction?.[2]).toMatchObject({ messageAt: savedAt });
+    });
 });
 
 describe("runHeadlessAgent failure on a thread it continues", () => {

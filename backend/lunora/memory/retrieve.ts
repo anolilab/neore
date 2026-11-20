@@ -108,6 +108,8 @@ export const retrieveRelevantMemories = internalAction
     .input({
         /** The bot the chat runs as: its memories join the user's own. Unset = the user's own only. */
         botId: v.optional(v.string()),
+        // The user's local day when the caller asked: part of the chat-side cache key, not read by the search.
+        localDay: v.optional(v.string()),
         searchText: v.string(),
         userId: v.string(),
     })
@@ -132,7 +134,7 @@ export const retrieveRelevantMemories = internalAction
             return [];
         }
 
-        // 2. Fetch all active memories for the user
+        // 2. Fetch the user's active memories still in effect today
         type ActiveMemory = {
             _id: string;
             confidence?: number | null;
@@ -144,7 +146,9 @@ export const retrieveRelevantMemories = internalAction
             pinned?: boolean;
             type: string;
         };
+        // A fact past its end date in the user's timezone is never injected (`activeOn`).
         const activeMemories = (await ctx.runQuery(internal.memory.functions.getActiveMemoriesForUser, {
+            activeOn: Date.now(),
             botId: args.botId,
             includeUserWide: true,
             limit: 100,

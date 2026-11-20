@@ -693,6 +693,7 @@ Does <user_message> reveal a durable fact about its writer?`;
 /**
  * Stable dedup key input for one processed user statement. The question is part
  * of the key when present — otherwise one "yes" would mute every later "yes" for a day.
+ * The user's local day is part of it too: "tomorrow" sent again on another day is a new statement.
  */
-export const processedExchangeFingerprint = (userId: string, userMessage: string, assistantQuestion?: string): string =>
-    JSON.stringify({ message: userMessage.trim().replaceAll(WHITESPACE_RE, " "), question: assistantQuestion ?? null, userId });
+export const processedExchangeFingerprint = (userId: string, userMessage: string, assistantQuestion?: string, localDay?: string): string =>
+    JSON.stringify({ day: localDay ?? null, message: userMessage.trim().replaceAll(WHITESPACE_RE, " "), question: assistantQuestion ?? null, userId });

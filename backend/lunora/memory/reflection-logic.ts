@@ -12,6 +12,7 @@
  * prompt injection hidden in a memory can at worst rephrase the rows this plan
  * already selected, never reach others.
  */
+import { differentEventDays, type FactDates, factDatesOf, hasFactDates, isExpired, sameFactDates } from "./dates";
 import type { MemoryType } from "./taxonomy";
 
 // ============================================================================
@@ -91,7 +92,7 @@ const MAX_PROMOTED_CONFIDENCE = 95;
 // Types
 // ============================================================================
 
-export interface ReflectionMemory {
+export interface ReflectionMemory extends FactDates {
     confidence: number;
     createdAt: number;
     id: string;
@@ -132,10 +133,29 @@ export interface ReflectionPlan {
     retire: string[];
 }
 
-/** A write the apply mutation performs. `supersede` with `byMemoryId === memoryId` retires a row. */
+/**
+ * A write the apply mutation performs. `supersede` with `byMemoryId === memoryId` retires a row; with `expiredOn`,
+ * only while the row is still past its end date on that day, so an end date moved after planning keeps it.
+ */
 export type ReflectionOp =
-    | { byMemoryId: string; kind: "supersede"; memoryId: string }
-    | { confidence?: number; kind: "patch"; lastConfirmedAt?: number; memory?: string; memoryId: string }
+    | {
+          byMemoryId: string;
+          checkDates?: {
+              by: { eventEnd?: string; eventStart?: string; validUntil?: string };
+              memory: { eventEnd?: string; eventStart?: string; validUntil?: string };
+          };
+          expiredOn?: string;
+          kind: "supersede";
+          memoryId: string;
+      }
+    | {
+          checkDates?: { memory: { eventEnd?: string; eventStart?: string; validUntil?: string } };
+          confidence?: number;
+          kind: "patch";
+          lastConfirmedAt?: number;
+          memory?: string;
+          memoryId: string;
+      }
     | { confidence: number; importance: number; kind: "promote"; memory: string; sourceIds: string[]; threadId?: string; type: MemoryType };
 
 // ============================================================================
@@ -212,7 +232,12 @@ export const similarity = (a: string, b: string): number => {
     return intersection / (wordsA.size + wordsB.size - intersection);
 };
 
-/** Groups memories whose pairwise similarity reaches `threshold`, transitively (union-find). Only multi-member groups are returned. */
+/**
+ * Groups memories whose pairwise similarity reaches `threshold`, transitively (union-find). Only multi-member groups are
+ * returned. Only rows with the same dates group: two events on different days are separate occurrences, however alike
+ * their text, and a merge keeps one row's text, so rows of different dates would leave a text naming one day beside
+ * columns holding another. Restatements with other dates are settled when they are said (`restatementOutcome`).
+ */
 export const clusterBySimilarity = (memories: ReadonlyArray<ReflectionMemory>, threshold: number): ReflectionMemory[][] => {
     const parent = memories.map((_, index) => index);
     const find = (index: number): number => {
@@ -229,8 +254,16 @@ export const clusterBySimilarity = (memories: ReadonlyArray<ReflectionMemory>, t
 
     for (let i = 0; i < memories.length; i += 1) {
         for (let j = i + 1; j < memories.length; j += 1) {
-            if (memories[i]!.type === memories[j]!.type && similarity(memories[i]!.text, memories[j]!.text) >= threshold) {
-                parent[find(j)] = find(i);
+            const rootI = find(i);
+            const rootJ = find(j);
+
+            if (
+                rootI !== rootJ &&
+                memories[i]!.type === memories[j]!.type &&
+                sameFactDates(factDatesOf(memories[i]!), factDatesOf(memories[j]!)) &&
+                similarity(memories[i]!.text, memories[j]!.text) >= threshold
+            ) {
+                parent[rootJ] = rootI;
             }
         }
     }
@@ -258,11 +291,12 @@ const bySurvivorPreference = (a: ReflectionMemory, b: ReflectionMemory): number 
 
 /**
  * Repeated activities, largest groups first. Pinned memories are never
- * promotion material: a pin is the user saying "keep this as it is".
+ * promotion material: a pin is the user saying "keep this as it is". Neither
+ * are dated ones: the promoted pattern has no dates, so it would outlive them.
  */
 export const findPromotionCandidates = (memories: ReadonlyArray<ReflectionMemory>, limits: Pick<ReflectionLimits, "maxPromotions">): PromotionCandidate[] =>
     clusterBySimilarity(
-        memories.filter((m) => m.type === "activity" && !m.pinned),
+        memories.filter((m) => m.type === "activity" && !m.pinned && !hasFactDates(m)),
         PROMOTION_SIMILARITY,
     )
         .filter((group) => group.length >= PROMOTION_MIN_OCCURRENCES)
@@ -305,7 +339,8 @@ export const findMergeCandidates = (memories: ReadonlyArray<ReflectionMemory>, l
 /**
  * Same-type pairs that overlap without being duplicates — "prefers tabs" vs
  * "prefers spaces". Each memory joins at most one pair; pinned memories are
- * left alone (the user asserted them).
+ * left alone (the user asserted them). Two events on different days are two
+ * occurrences, not a changed plan, so they are never paired.
  */
 export const findContradictionCandidates = (
     memories: ReadonlyArray<ReflectionMemory>,
@@ -319,7 +354,7 @@ export const findContradictionCandidates = (
             const a = eligible[i]!;
             const b = eligible[j]!;
 
-            if (a.type !== b.type) {
+            if (a.type !== b.type || differentEventDays(a, b)) {
                 continue;
             }
 
@@ -388,6 +423,28 @@ export const planDecay = (memories: ReadonlyArray<ReflectionMemory>, now: number
 };
 
 /**
+ * A scope's rows split by `today` (the user's local day). A fact past its end
+ * date is left out of every planning step, so it never survives a merge or
+ * revision in place of a live one; an unpinned one is retired. This runs over
+ * every row read, before the capped selection, so an old expired fact is
+ * reached too.
+ */
+export const splitExpired = (memories: ReadonlyArray<ReflectionMemory>, today: string): { expire: string[]; live: ReflectionMemory[] } => {
+    const expire: string[] = [];
+    const live: ReflectionMemory[] = [];
+
+    for (const m of memories) {
+        if (!isExpired(m, today)) {
+            live.push(m);
+        } else if (!m.pinned) {
+            expire.push(m.id);
+        }
+    }
+
+    return { expire, live };
+};
+
+/**
  * The whole plan. Each memory is claimed by at most one step, in order:
  * promotion, then merge, then contradiction, then decay — so a row is never
  * both merged away and decayed in the same run.
@@ -451,24 +508,43 @@ export type BeliefRevisionAction = "ADD" | "IGNORE" | "SUPERSEDE" | "UPDATE";
  * contradiction pair, where the OLDER memory plays "existing" and the NEWER one
  * "new fact".
  */
-export const revisionToOps = (pair: ContradictionCandidate, decision: { action: BeliefRevisionAction; mergedMemory?: string }, now: number): ReflectionOp[] => {
+export const revisionToOps = (
+    pair: ContradictionCandidate,
+    decision: { action: BeliefRevisionAction; mergedMemory?: string },
+    now: number,
+    memories: ReadonlyMap<string, ReflectionMemory> = new Map(),
+): ReflectionOp[] => {
+    const older = memories.get(pair.olderId);
+    const newer = memories.get(pair.newerId);
+
     switch (decision.action) {
         case "IGNORE": {
-            // The newer one said nothing new — the older one stands, reconfirmed.
-            return [
-                { byMemoryId: pair.olderId, kind: "supersede", memoryId: pair.newerId },
-                { kind: "patch", lastConfirmedAt: now, memoryId: pair.olderId },
-            ];
+            // The newer one said nothing new: the older one stands, reconfirmed. Unless their dates differ — the newer
+            // statement decides the dates (`restatedDates`), so the newer row stands with its own text and dates.
+            if (older && newer && !sameFactDates(older, newer)) {
+                return [{ kind: "patch", lastConfirmedAt: now, memoryId: pair.newerId }, supersedeChecked(pair.olderId, pair.newerId, memories)];
+            }
+
+            return [supersedeChecked(pair.newerId, pair.olderId, memories), { kind: "patch", lastConfirmedAt: now, memoryId: pair.olderId }];
         }
         case "SUPERSEDE": {
-            return [{ byMemoryId: pair.newerId, kind: "supersede", memoryId: pair.olderId }];
+            return [supersedeChecked(pair.olderId, pair.newerId, memories)];
         }
         case "UPDATE": {
+            // The newer row keeps its own dates: they are the newer statement's. When the rows' dates differ, the merged
+            // wording was written for the newer row's dates (`runBeliefRevision`'s `newDates`).
             const merged = decision.mergedMemory?.trim();
 
+            // The wording is planned on the newer row's dates too: a wording written for dates the row no longer holds is not written.
             return [
-                { kind: "patch", lastConfirmedAt: now, memoryId: pair.newerId, ...(merged && { memory: merged }) },
-                { byMemoryId: pair.newerId, kind: "supersede", memoryId: pair.olderId },
+                {
+                    checkDates: newer ? { memory: factDatesOf(newer) } : undefined,
+                    kind: "patch",
+                    lastConfirmedAt: now,
+                    memoryId: pair.newerId,
+                    ...(merged && { memory: merged }),
+                },
+                supersedeChecked(pair.olderId, pair.newerId, memories),
             ];
         }
         default: {
@@ -477,19 +553,40 @@ export const revisionToOps = (pair: ContradictionCandidate, decision: { action: 
     }
 };
 
+/** A supersession planned on the dates both rows held then: applying it checks they still hold them. */
+const supersedeChecked = (memoryId: string, byMemoryId: string, memories: ReadonlyMap<string, ReflectionMemory>): ReflectionOp => {
+    const row = memories.get(memoryId);
+    const by = memories.get(byMemoryId);
+
+    return {
+        byMemoryId,
+        kind: "supersede",
+        memoryId,
+        ...(row && by && { checkDates: { by: factDatesOf(by), memory: factDatesOf(row) } }),
+    };
+};
+
 /**
  * A merge: the survivor takes the model's merged wording when it offered one,
  * the highest confidence in the cluster, and is reconfirmed; the rest point at it.
+ * Its dates stay: every row of a cluster has the same ones (`clusterBySimilarity`).
  */
 export const mergeToOps = (merge: MergeCandidate, memories: ReadonlyMap<string, ReflectionMemory>, now: number, mergedText?: string): ReflectionOp[] => {
     const confidence = Math.max(...[merge.survivorId, ...merge.absorbedIds].map((id) => memories.get(id)?.confidence ?? 0));
     const text = mergedText?.trim();
+    const survivor = memories.get(merge.survivorId);
 
+    // Each source is checked against the dates the merge was planned on: a source a person moved meanwhile is not merged away.
     return [
-        { confidence, kind: "patch", lastConfirmedAt: now, memoryId: merge.survivorId, ...(text && { memory: text }) },
-        ...merge.absorbedIds.map((memoryId): ReflectionOp => {
-            return { byMemoryId: merge.survivorId, kind: "supersede", memoryId };
-        }),
+        {
+            confidence,
+            kind: "patch",
+            lastConfirmedAt: now,
+            memoryId: merge.survivorId,
+            ...(text && { memory: text }),
+            ...(survivor && { checkDates: { memory: factDatesOf(survivor) } }),
+        },
+        ...merge.absorbedIds.map((memoryId) => supersedeChecked(memoryId, merge.survivorId, memories)),
     ];
 };
 
@@ -543,6 +640,12 @@ export const promotionToOp = (
         ...(latest?.threadId && { threadId: latest.threadId }),
     };
 };
+
+/** Retirements of rows past their end date, re-checked against `today` when applied. */
+export const expiryToOps = (memoryIds: ReadonlyArray<string>, today: string): ReflectionOp[] =>
+    memoryIds.map((memoryId): ReflectionOp => {
+        return { byMemoryId: memoryId, expiredOn: today, kind: "supersede", memoryId };
+    });
 
 /** Decay and retirement as writes. A retired row supersedes itself — the sentinel the rest of the pipeline already reads. */
 export const decayToOps = (plan: Pick<ReflectionPlan, "decay" | "retire">): ReflectionOp[] => [

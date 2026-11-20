@@ -20,6 +20,7 @@ import { gatewayFetch } from "../lib/services";
 import { getUtilityModel } from "../lib/utility-model";
 import { logRedaction, redactMemoryFacts } from "./redact";
 import { MEMORY_TYPE_GUIDE, MEMORY_TYPES } from "./taxonomy";
+import { factDatesOf, hasFactDates } from "./dates";
 
 const COMPRESSION_SYSTEM_PROMPT = `You are a memory consolidation system. Given a list of related memories, synthesize them into a smaller set of high-quality, comprehensive facts.
 
@@ -39,6 +40,7 @@ ${MEMORY_TYPE_GUIDE}`;
 type ThreadMemory = {
     _id: string;
     confidence?: number | null;
+    dated?: boolean;
     importance?: number | null;
     memory: string;
     pinned?: boolean;
@@ -131,6 +133,8 @@ export const getThreadMemoriesForCompression = internalQuery
                     return {
                         _id: m._id,
                         confidence: m.confidence,
+                        // Compression rewrites text without dates, so a dated fact is kept as it is.
+                        dated: hasFactDates(factDatesOf(m)),
                         importance: m.importance,
                         memory: m.memory,
                         pinned: m.pinned === true,
@@ -206,10 +210,10 @@ export const compressThreadMemories = internalAction
             userId: args.userId,
         })) as ThreadMemory[];
 
-        // Skip manually-added and pinned memories; only compress auto-extracted ones. A row saved before redaction
+        // Skip manually-added, pinned and dated memories; only compress undated auto-extracted ones. A row saved before redaction
         // existed goes to the model redacted, and one that is nothing but a secret stays out: it is neither sent nor
         // superseded, so the model never restates it and one such row cannot block every later run.
-        const autoMemories = redactMemoryFacts(threadMemories.filter((m: ThreadMemory) => m.source === "auto" && !m.pinned)).facts;
+        const autoMemories = redactMemoryFacts(threadMemories.filter((m: ThreadMemory) => m.source === "auto" && !m.pinned && !m.dated)).facts;
 
         if (autoMemories.length < COMPRESSION_THRESHOLD) {
             return;
@@ -271,6 +275,8 @@ export const compressThreadMemories = internalAction
 
         // Save compressed memories
         await ctx.runMutation(internal.memory.functions.saveMemoryBatch, {
+            // The originals are checked and retired in the same write as the facts that replace them.
+            compressedFrom: oldIds,
             // `supersedes: undefined` is explicit — a nested `v.optional()`
             // renders as a required key.
             memories: synthesizedFacts.map((f) => {
@@ -287,12 +293,4 @@ export const compressThreadMemories = internalAction
                 };
             }),
         });
-
-        // Mark originals as superseded (use a sentinel string to indicate compression)
-        for (const oldId of oldIds) {
-            await ctx.runMutation(internal.memory.functions.markMemorySupersededByCompression, {
-                memoryId: oldId,
-                userId: args.userId,
-            });
-        }
     });

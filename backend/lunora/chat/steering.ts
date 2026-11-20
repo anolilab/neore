@@ -95,7 +95,7 @@ export const steerRun = authMutation
         }
 
         const steerId = requestedId ?? ctx.newId();
-        const steers = queueSteer(stream.steers ?? [], { id: steerId, text });
+        const steers = queueSteer(stream.steers ?? [], { id: steerId, sentAt: ctx.now, text });
 
         if (!steers) {
             throw new LunoraError("TOO_MANY_REQUESTS", "Wait for the reply to take the messages already sent");
@@ -158,7 +158,12 @@ export const deliverSteers = internalMutation
         threadId: v.id("threads"),
         userId: v.string().max(MAX_LENGTH.id),
     })
-    .output(v.union(v.null(), v.object({ messageId: v.string(), text: v.string() })))
+    .output(
+        v.union(
+            v.null(),
+            v.object({ messageId: v.string(), parts: v.array(v.object({ sentAt: v.optional(v.number()), text: v.string() })), text: v.string() }),
+        ),
+    )
     .mutation(async ({ args: { pendingMessageId, streamId, threadId, userId }, ctx }) => {
         const stream = await ctx.db.persistentStreams.findFirst({ where: { _id: streamId } });
 
@@ -188,5 +193,5 @@ export const deliverSteers = internalMutation
 
         await patchRow(ctx.db, "persistentStreams", stream, { steers: taken.deliver(row.messageId, pendingMessageId) });
 
-        return { messageId: row.messageId, text: taken.text };
+        return { messageId: row.messageId, parts: taken.parts, text: taken.text };
     });
