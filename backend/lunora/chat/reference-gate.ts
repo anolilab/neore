@@ -13,7 +13,7 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
-import { FILE_ATTACH_THREAD_SCOPE, FILE_ATTACH_TTL_MS } from "../agent/file-attach-claim";
+import { FILE_ATTACH_THREAD_SCOPE } from "../agent/file-attach-claim";
 import { claimFence } from "../lib/claim-once";
 import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
@@ -141,6 +141,13 @@ export const chatHeldOnShard = internalQuery
     });
 
 /**
+ * How long a media job's hold on its chats lasts. It outlives the attach window (`FILE_ATTACH_TTL_MS`): the job checks its chats one
+ * after another and then waits for the provider, which can take minutes, and a lock must not land while the reference is still in use.
+ * A job that dies keeps the hold this long, so its chats stay unlockable meanwhile (fail closed).
+ */
+export const REFERENCE_HOLD_TTL_MS = 15 * 60 * 1000;
+
+/**
  * {@link chatHeld} as the job's recheck. For an unlocked chat the caller may read, it also holds the chat against a lock until the
  * job is done: an attach claim on the chat's owner shard (`agent/file-attach-thread.ts`), which `enableThreadLock` refuses while it is
  * held. The claim is taken in the same transaction as the check, so no lock can commit between the two. A locked chat needs no hold,
@@ -166,7 +173,7 @@ export const holdReferenceChatOnShard = internalMutation
         }
 
         const claimedAt = await claimFence(ctx, FILE_ATTACH_THREAD_SCOPE, `${args.threadId}:${args.requestId}`, {
-            ttlMs: FILE_ATTACH_TTL_MS,
+            ttlMs: REFERENCE_HOLD_TTL_MS,
             userId: args.userId,
         });
 

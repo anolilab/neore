@@ -5,7 +5,7 @@
  */
 import { REFERENCE_MEDIA_CAPS } from "@neore/ai/models";
 import { lunoraTest } from "@lunora/testing";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { endThreadAttach } from "../agent/file-attach-thread";
 import { fileAttachInThread } from "../agent/file-attach-claim";
@@ -287,5 +287,28 @@ describe("a queued media job holds the chats it reads against a lock until the p
         expect(held).toBe(false);
         expect(claimedAt).toBeUndefined();
         await expect(attachInFlight(ownerOpenId)).resolves.toBe(false);
+    });
+
+    it("keeps the hold past the attach TTL, so a slow chat check or provider call cannot lose it, and lapses after the hold's own TTL", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+
+        try {
+            vi.setSystemTime(new Date("2026-11-20T12:00:00Z"));
+            const { claimedAt } = await holdFor(ownerOpenId, OWNER, "job-long", 1);
+
+            // Past the 3-minute attach window, still inside the hold.
+            vi.setSystemTime(new Date("2026-11-20T12:04:00Z"));
+            await expect(attachInFlight(ownerOpenId)).resolves.toBe(true);
+
+            vi.setSystemTime(new Date("2026-11-20T12:14:00Z"));
+            await expect(attachInFlight(ownerOpenId)).resolves.toBe(true);
+
+            // Past the hold's TTL: a job that never released it no longer blocks locks.
+            vi.setSystemTime(new Date("2026-11-20T12:16:00Z"));
+            await expect(attachInFlight(ownerOpenId)).resolves.toBe(false);
+            expect(claimedAt).toBeDefined();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
