@@ -43,13 +43,32 @@ vi.mock("@/hooks/use-feature-flagged-models", () => {
     return { default: () => [] };
 });
 
-// The rule files section stands in as a control that opens unsaved changes, as an edit there does.
+const { toastInfo } = vi.hoisted(() => {
+    return { toastInfo: vi.fn() };
+});
+
+vi.mock("sonner", () => {
+    return { toast: { error: vi.fn(), info: toastInfo } };
+});
+
+// The rule files section stands in as controls that open unsaved changes, as an edit there does, and start a save of them.
 vi.mock("@/features/projects/components/project-rule-files", () => {
     return {
-        default: ({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void }) => (
-            <button onClick={() => onDirtyChange(true)} type="button">
-                Edit a rule file
-            </button>
+        default: ({ onDirtyChange, onSavingChange }: { onDirtyChange: (dirty: boolean) => void; onSavingChange: (saving: boolean) => void }) => (
+            <>
+                <button onClick={() => onDirtyChange(true)} type="button">
+                    Edit a rule file
+                </button>
+                <button
+                    onClick={() => {
+                        onDirtyChange(true);
+                        onSavingChange(true);
+                    }}
+                    type="button"
+                >
+                    Save a rule file
+                </button>
+            </>
         ),
     };
 });
@@ -124,6 +143,27 @@ describe("project form dialog", () => {
         await waitFor(() => {
             expect(screen.queryByRole("alertdialog")).toBeNull();
         });
+    });
+
+    it("neither closes nor offers to discard while a rule file save is on its way", async () => {
+        const user = userEvent.setup();
+        const onClose = vi.fn();
+
+        render(<ProjectFormDialog editingProject={project} onClose={onClose} open />);
+
+        await user.click(screen.getByRole("button", { name: "Save a rule file" }));
+        await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+        expect(toastInfo).toHaveBeenCalledWith("Your rule files are still saving.");
+        expect(screen.queryByRole("alertdialog")).toBeNull();
+
+        toastInfo.mockClear();
+        await user.click(screen.getByRole("button", { name: "Update Project" }));
+
+        await waitFor(() => {
+            expect(toastInfo).toHaveBeenCalledWith("Your rule files are still saving.");
+        });
+        expect(onClose).not.toHaveBeenCalled();
     });
 
     it("closes at once with no unsaved rule file changes", async () => {

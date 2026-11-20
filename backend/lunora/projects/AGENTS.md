@@ -23,7 +23,9 @@
 - A run's text comes from `projectRunContext` (`functions.ts`) only, framed `PROJECT CONTEXT:` by the caller: chat,
   edit and group runs through `getProjectContextForRun` (via `loadRunContext` or `streamAsync`), task runs from
   `tasks/internal.ts#runProjectFor` with no paths. A filter, budget or log change goes there, not in one caller.
-  `glob` files match the names of the run message's attachments (`chatFiles.filename`). The rendered text past
+  `glob` files match the names of the run message's attachments (`chatFiles.filename`), read one row at a time:
+  `chatFiles` is `.global()`, each row charged whole with its `extractedText`, so past `RUN_FILE_NAMES_READ_BYTES` the
+  rest go unmatched rather than the run failing. The rendered text past
   `MAX_RULE_TEXT_PER_RUN`, separators and the cut marker counted, is cut (marked) and later files left out, except a
   legacy `context`, which is never cut, as before, and not counted, so files kept beside it still reach runs. Only
   counts are logged, never file text.

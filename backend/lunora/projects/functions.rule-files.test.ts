@@ -20,7 +20,16 @@ import { eraseProjectsForUser } from "../agent/gdpr";
 import schema from "../schema";
 import { runProjectFor } from "../tasks/internal";
 import { getWorkflow } from "../workflow/functions";
-import { getProject, getProjectContextForRun, listPinnedProjects, listProjectRuleFiles, listProjects, setProjectRuleFiles, updateProject } from "./functions";
+import {
+    getProject,
+    getProjectContextForRun,
+    listPinnedProjects,
+    listProjectRuleFiles,
+    listProjects,
+    RUN_FILE_NAMES_READ_BYTES,
+    setProjectRuleFiles,
+    updateProject,
+} from "./functions";
 import { collectProjectRuleFilesForExport, eraseProjectRuleFiles } from "./gdpr";
 import { readProjectRuleFiles } from "./rule-file-rows";
 import { MAX_RULE_TEXT_PER_RUN } from "./rule-files";
@@ -126,6 +135,29 @@ describe("a project's rule files in a run", () => {
         expect(await contextFor(projectId)).toBe("Be brief.");
         expect(await contextFor(projectId, [pdf])).toBe("Be brief.");
         expect(await contextFor(projectId, [pdf, sql])).toBe("Be brief.\n\nUse snake_case columns.");
+    });
+
+    it("stops reading attachment names past the read budget and runs with what it matched so far", async () => {
+        const projectId = await project({
+            createdAt: 0,
+            ruleFiles: [{ content: "Be brief.", id: "a", mode: "always", title: "A" }, sqlRules],
+            title: "p",
+            userId: OWNER,
+        });
+        // Charged whole, extracted text included: this one row spends the budget.
+        const large = await insert("chatFiles", {
+            extractedText: "x".repeat(RUN_FILE_NAMES_READ_BYTES),
+            filename: "scan.pdf",
+            hash: "large",
+            lastTouchedAt: 0,
+            mediaType: "application/pdf",
+            refcount: 1,
+            storageId: "large",
+        });
+        const sql = await chatFile("migrations/002_orders.sql");
+
+        expect(await contextFor(projectId, [sql, large])).toBe("Be brief.\n\nUse snake_case columns.");
+        expect(await contextFor(projectId, [large, sql])).toBe("Be brief.");
     });
 
     it("gives a task's run its project's always files", async () => {

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -63,10 +63,10 @@ vi.mock("@/features/auth/lib/utilities", () => {
     return { getLocalizedError: ({ error }: { error: Error }) => error.message };
 });
 
-const renderEditor = (onDirtyChange?: (dirty: boolean) => void) =>
+const renderEditor = (onDirtyChange?: (dirty: boolean) => void, onSavingChange?: (saving: boolean) => void) =>
     render(
         <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-            <ProjectRuleFiles onDirtyChange={onDirtyChange} projectId="p1" />
+            <ProjectRuleFiles onDirtyChange={onDirtyChange} onSavingChange={onSavingChange} projectId="p1" />
         </QueryClientProvider>,
     );
 
@@ -256,6 +256,32 @@ describe("project rule files", () => {
         expect(onDirtyChange).toHaveBeenLastCalledWith(true);
         await user.click(screen.getByRole("button", { name: "Discard changes" }));
         expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+    });
+
+    it("offers no discard while a save is on its way, and tells the dialog it is saving", async () => {
+        const user = userEvent.setup();
+        const onSavingChange = vi.fn();
+
+        // A save that takes a while to answer, as one over a slow connection does.
+        backend.save.mockImplementation(async () => {
+            await new Promise((resolve) => {
+                setTimeout(resolve, 300);
+            });
+
+            return { files: [{ content: "Old notes", id: "context", mode: "always", title: "Project context" }], revision: "r2" };
+        });
+        renderEditor(undefined, onSavingChange);
+
+        await user.click(await screen.findByRole("button", { name: "Delete SQL" }));
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        await waitFor(() => {
+            expect((screen.getByRole("button", { name: "Discard changes" }) as HTMLButtonElement).disabled).toBe(true);
+        });
+        expect(onSavingChange).toHaveBeenLastCalledWith(true);
+
+        expect(await screen.findByText("Rule files saved.")).toBeTruthy();
+        expect(onSavingChange).toHaveBeenLastCalledWith(false);
     });
 
     it("shows a member who may not edit the files what they say, without any control to change them", async () => {

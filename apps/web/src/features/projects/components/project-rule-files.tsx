@@ -195,9 +195,14 @@ const RuleFileFields: FC<{
  * A project's rule files: instructions added to the project's runs, each always or only when the run's files match its
  * patterns. Edited as one list and saved together (`setProjectRuleFiles`), so adding, changing, reordering and deleting
  * are one save. A project's older single context shows as its first file. Only the project's owner edits them, the
- * rule of the project's other settings; others read them. `onDirtyChange` says whether unsaved changes are open.
+ * rule of the project's other settings; others read them. `onDirtyChange` says whether unsaved changes are open, and
+ * `onSavingChange` whether a save is on its way: it cannot be called back, so nothing may offer to discard it meanwhile.
  */
-const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; projectId: string }> = ({ onDirtyChange, projectId }) => {
+const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingChange?: (saving: boolean) => void; projectId: string }> = ({
+    onDirtyChange,
+    onSavingChange,
+    projectId,
+}) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
@@ -230,9 +235,15 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; projectId
     const keptLegacyId =
         legacy && legacy.id === data?.legacyContextId && legacy.content.length > MAX_RULE_FILE_LENGTH && sameFile(files[0], legacy) ? legacy.id : undefined;
 
+    const isSaving = saved.isPending;
+
     useEffect(() => {
         onDirtyChange?.(isDirty);
     }, [isDirty, onDirtyChange]);
+
+    useEffect(() => {
+        onSavingChange?.(isSaving);
+    }, [isSaving, onSavingChange]);
 
     const conflictMessage = t`These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again.`;
 
@@ -363,6 +374,8 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; projectId
                                     {saved.isPending ? t`Saving...` : t`Save rule files`}
                                 </Button>
                                 <Button
+                                    // A save on its way still lands: discarding now would only hide what it writes.
+                                    disabled={isSaving}
                                     onClick={() => {
                                         // Read again: after a refused save the cached list is the one another save replaced.
                                         refetch().catch(() => undefined);

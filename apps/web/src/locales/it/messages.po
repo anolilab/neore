@@ -81,7 +81,7 @@ msgstr "«{fileName}» è troppo grande. I documenti possono essere al massimo d
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "«{fileName}» è troppo grande. I file di questo tipo possono essere al massimo di {maxMegabytes} MB."
 
-#: src/features/projects/components/project-rule-files.tsx:263
+#: src/features/projects/components/project-rule-files.tsx:274
 msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
 msgstr ""
 
@@ -1845,7 +1845,7 @@ msgstr "Un editor di documenti che pensa con te."
 msgid "A few questions first"
 msgstr "Prima qualche domanda"
 
-#: src/features/projects/components/project-rule-files.tsx:254
+#: src/features/projects/components/project-rule-files.tsx:265
 msgid "A file applied when files match needs at least one pattern."
 msgstr ""
 
@@ -2546,7 +2546,7 @@ msgstr "Aggiungi immagini di riferimento per mantenere la coerenza"
 msgid "Add row"
 msgstr "Aggiungi riga"
 
-#: src/features/projects/components/project-rule-files.tsx:351
+#: src/features/projects/components/project-rule-files.tsx:362
 msgid "Add rule file"
 msgstr ""
 
@@ -3484,7 +3484,7 @@ msgid "Also viewing"
 msgstr "Stanno visualizzando anche"
 
 #: src/features/projects/components/project-rule-files.tsx:160
-#: src/features/projects/components/project-rule-files.tsx:317
+#: src/features/projects/components/project-rule-files.tsx:328
 msgid "Always"
 msgstr ""
 
@@ -3873,7 +3873,7 @@ msgid "App Secret from your Meta app's App settings > Basic, used to verify X-Hu
 msgstr "App Secret da App settings > Basic della tua app Meta, usato per verificare X-Hub-Signature-256"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:316
-#: src/features/projects/components/project-form-dialog.tsx:276
+#: src/features/projects/components/project-form-dialog.tsx:290
 #: src/features/settings/components/account/account-settings.tsx:180
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Appearance"
@@ -5265,7 +5265,7 @@ msgstr "Brasile"
 msgid "Break down complex tasks into numbered steps with progress tracking. Ideal for multi-step projects and development tasks."
 msgstr "Suddividi le attività complesse in passaggi numerati con monitoraggio dei progressi. Ideale per progetti in più fasi e attività di sviluppo."
 
-#: src/features/projects/components/project-form-dialog.tsx:264
+#: src/features/projects/components/project-form-dialog.tsx:278
 msgid "Brief description of this project"
 msgstr "Breve descrizione di questo progetto"
 
@@ -5710,7 +5710,7 @@ msgstr "Canada"
 #: src/features/pages/components/page-comments-panel.tsx:87
 #: src/features/projects/components/add-project-dialog.tsx:682
 #: src/features/projects/components/move-to-project-dialog.tsx:95
-#: src/features/projects/components/project-form-dialog.tsx:450
+#: src/features/projects/components/project-form-dialog.tsx:471
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
@@ -7028,7 +7028,7 @@ msgid "Colombia"
 msgstr "Colombia"
 
 #: src/features/canvas/canvas-panel.tsx:123
-#: src/features/projects/components/project-form-dialog.tsx:283
+#: src/features/projects/components/project-form-dialog.tsx:297
 msgid "Color"
 msgstr "Colore"
 
@@ -7471,7 +7471,7 @@ msgstr "Configura moduli avanzati dell'agente IA per un'esecuzione migliore dell
 msgid "Configure chat behavior and preferences."
 msgstr "Configura il comportamento e le preferenze della chat."
 
-#: src/features/projects/components/project-form-dialog.tsx:390
+#: src/features/projects/components/project-form-dialog.tsx:404
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "Configura il modello predefinito, l'impegno di ragionamento e le funzioni per le nuove chat create in questo progetto."
 
@@ -7929,7 +7929,7 @@ msgstr "Slide di contenuto"
 msgid "Context"
 msgstr "Contesto"
 
-#: src/features/projects/components/project-form-dialog.tsx:363
+#: src/features/projects/components/project-form-dialog.tsx:377
 msgid "Context / Instructions"
 msgstr "Contesto / istruzioni"
 
@@ -8986,7 +8986,7 @@ msgstr "Crea un nuovo ramo da questo messaggio. Dagli un nome per riconoscerlo p
 msgid "Create a new organization to collaborate with your team"
 msgstr "Crea una nuova organizzazione per collaborare con il tuo team"
 
-#: src/features/projects/components/project-form-dialog.tsx:229
+#: src/features/projects/components/project-form-dialog.tsx:243
 msgid "Create a new project to group related chats with shared context."
 msgstr "Crea un nuovo progetto per raggruppare chat correlate con un contesto condiviso."
 
@@ -9124,8 +9124,8 @@ msgstr "Crea PR"
 msgid "Create project"
 msgstr "Crea progetto"
 
-#: src/features/projects/components/project-form-dialog.tsx:227
-#: src/features/projects/components/project-form-dialog.tsx:463
+#: src/features/projects/components/project-form-dialog.tsx:241
+#: src/features/projects/components/project-form-dialog.tsx:484
 msgid "Create Project"
 msgstr "Crea progetto"
 
@@ -9498,7 +9498,7 @@ msgstr "Personalizza le scorciatoie da tastiera per le azioni comuni. Clicca \"R
 msgid "Customize the appearance of the application."
 msgstr "Personalizza l'aspetto dell'applicazione."
 
-#: src/features/projects/components/project-form-dialog.tsx:277
+#: src/features/projects/components/project-form-dialog.tsx:291
 msgid "Customize the visual appearance of this project."
 msgstr "Personalizza l'aspetto visivo di questo progetto."
 
@@ -9831,7 +9831,7 @@ msgstr "Agente predefinito"
 msgid "Default AI Response Language"
 msgstr "Lingua predefinita delle risposte dell'IA"
 
-#: src/features/projects/components/project-form-dialog.tsx:388
+#: src/features/projects/components/project-form-dialog.tsx:402
 msgid "Default AI Settings"
 msgstr "Impostazioni IA predefinite"
 
@@ -9869,7 +9869,7 @@ msgstr "Lingua predefinita aggiornata"
 msgid "default model"
 msgstr "modello predefinito"
 
-#: src/features/projects/components/project-form-dialog.tsx:398
+#: src/features/projects/components/project-form-dialog.tsx:412
 msgid "Default Model"
 msgstr "Modello predefinito"
 
@@ -10490,7 +10490,7 @@ msgstr "Descrivi il tuo workflow... ad es. \"Genera un'immagine da un testo, aum
 #: src/features/develop/components/pull-request-view.tsx:74
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
-#: src/features/projects/components/project-form-dialog.tsx:257
+#: src/features/projects/components/project-form-dialog.tsx:271
 #: src/features/prompts/components/prompt-form-dialog.tsx:266
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
@@ -10745,8 +10745,8 @@ msgstr "Disattivazione..."
 msgid "Discard"
 msgstr "Scarta"
 
-#: src/features/projects/components/project-form-dialog.tsx:491
-#: src/features/projects/components/project-rule-files.tsx:376
+#: src/features/projects/components/project-form-dialog.tsx:512
+#: src/features/projects/components/project-rule-files.tsx:389
 msgid "Discard changes"
 msgstr ""
 
@@ -10754,7 +10754,7 @@ msgstr ""
 msgid "Discard comments"
 msgstr "Scarta i commenti"
 
-#: src/features/projects/components/project-form-dialog.tsx:478
+#: src/features/projects/components/project-form-dialog.tsx:499
 msgid "Discard rule file changes?"
 msgstr ""
 
@@ -11322,7 +11322,7 @@ msgstr "ad es. Lavoro"
 msgid "e.g., Emphasize concise outputs, target a beginner audience..."
 msgstr "ad es. Privilegia risposte concise, rivolgiti a un pubblico principiante..."
 
-#: src/features/projects/components/project-form-dialog.tsx:245
+#: src/features/projects/components/project-form-dialog.tsx:259
 msgid "e.g., Financial Planning"
 msgstr "ad es. Pianificazione finanziaria"
 
@@ -11563,7 +11563,7 @@ msgstr "Modifica o elimina le memorie elencate nelle impostazioni. «Cancella tu
 msgid "Edit preset"
 msgstr "Modifica preset"
 
-#: src/features/projects/components/project-form-dialog.tsx:227
+#: src/features/projects/components/project-form-dialog.tsx:241
 msgid "Edit Project"
 msgstr "Modifica progetto"
 
@@ -15622,7 +15622,7 @@ msgstr "GitLab"
 msgid "GitLab secret token (X-Gitlab-Token)"
 msgstr "Token segreto GitLab (X-Gitlab-Token)"
 
-#: src/features/projects/components/project-rule-files.tsx:250
+#: src/features/projects/components/project-rule-files.tsx:261
 msgid "Give every rule file a name."
 msgstr ""
 
@@ -16797,7 +16797,7 @@ msgstr "Islandese"
 msgid "Icelandic (Iceland)"
 msgstr "Islandese (Islanda)"
 
-#: src/features/projects/components/project-form-dialog.tsx:318
+#: src/features/projects/components/project-form-dialog.tsx:332
 msgid "Icon"
 msgstr "Icona"
 
@@ -17579,7 +17579,7 @@ msgstr "istruzioni"
 msgid "Instructions"
 msgstr "Istruzioni"
 
-#: src/features/projects/components/project-rule-files.tsx:303
+#: src/features/projects/components/project-rule-files.tsx:314
 msgid "Instructions added to this project's chats: always, or only when the chat's attached files match a pattern such as **/*.sql."
 msgstr ""
 
@@ -18063,7 +18063,7 @@ msgstr "Continua ad accettare il vecchio segreto per 24 ore"
 msgid "Keep current rows"
 msgstr "Mantieni le righe attuali"
 
-#: src/features/projects/components/project-form-dialog.tsx:482
+#: src/features/projects/components/project-form-dialog.tsx:503
 msgid "Keep editing"
 msgstr ""
 
@@ -26014,11 +26014,11 @@ msgstr "Progetto"
 msgid "Project actions"
 msgstr "Azioni del progetto"
 
-#: src/features/projects/components/project-rule-files.tsx:219
+#: src/features/projects/components/project-rule-files.tsx:224
 msgid "Project context"
 msgstr ""
 
-#: src/features/projects/components/project-form-dialog.tsx:368
+#: src/features/projects/components/project-form-dialog.tsx:382
 msgid "Project Context"
 msgstr "Contesto del progetto"
 
@@ -27333,8 +27333,8 @@ msgstr "Ricordami"
 #: src/features/chat/thread/composer-input.tsx:418
 #: src/features/devices/components/devices-settings.tsx:334
 #: src/features/devices/components/devices-settings.tsx:340
-#: src/features/projects/components/project-form-dialog.tsx:307
-#: src/features/projects/components/project-form-dialog.tsx:348
+#: src/features/projects/components/project-form-dialog.tsx:321
+#: src/features/projects/components/project-form-dialog.tsx:362
 #: src/features/settings/components/chat/custom-providers-settings.tsx:653
 #: src/features/settings/components/chat/favorite-models-settings.tsx:186
 #: src/features/settings/components/chat/native-providers-settings.tsx:724
@@ -28432,11 +28432,11 @@ msgstr "Rubrica"
 msgid "Rule file {0}"
 msgstr ""
 
-#: src/features/projects/components/project-rule-files.tsx:301
+#: src/features/projects/components/project-rule-files.tsx:312
 msgid "Rule files"
 msgstr ""
 
-#: src/features/projects/components/project-rule-files.tsx:291
+#: src/features/projects/components/project-rule-files.tsx:302
 msgid "Rule files saved."
 msgstr ""
 
@@ -28764,7 +28764,7 @@ msgstr "Salvataggio non riuscito"
 msgid "Save Image"
 msgstr "Salva immagine"
 
-#: src/features/projects/components/project-form-dialog.tsx:127
+#: src/features/projects/components/project-form-dialog.tsx:141
 msgid "Save or discard your rule file changes first."
 msgstr ""
 
@@ -28776,7 +28776,7 @@ msgstr "Salva preset"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "Salva prompt di sistema riutilizzabili e associali a modelli specifici. Usa il pulsante Ottimizza per perfezionare ogni preset con l'ottimizzatore di prompt."
 
-#: src/features/projects/components/project-rule-files.tsx:363
+#: src/features/projects/components/project-rule-files.tsx:374
 msgid "Save rule files"
 msgstr ""
 
@@ -28844,8 +28844,8 @@ msgstr "Salvato in \"{0}\""
 
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
-#: src/features/projects/components/project-form-dialog.tsx:467
-#: src/features/projects/components/project-rule-files.tsx:363
+#: src/features/projects/components/project-form-dialog.tsx:488
+#: src/features/projects/components/project-rule-files.tsx:374
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -29358,8 +29358,8 @@ msgid "Select all cells"
 msgstr "Seleziona tutte le celle"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:470
-#: src/features/projects/components/project-form-dialog.tsx:330
-#: src/features/projects/components/project-form-dialog.tsx:343
+#: src/features/projects/components/project-form-dialog.tsx:344
+#: src/features/projects/components/project-form-dialog.tsx:357
 msgid "Select an icon"
 msgstr "Seleziona un'icona"
 
@@ -33901,7 +33901,7 @@ msgstr "Il nuovo tentativo sta richiedendo più tempo del previsto"
 msgid "The right model, every time."
 msgstr "Il modello giusto, ogni volta."
 
-#: src/features/projects/components/project-rule-files.tsx:308
+#: src/features/projects/components/project-rule-files.tsx:319
 msgid "The rule files could not be loaded."
 msgstr ""
 
@@ -34066,7 +34066,7 @@ msgstr "Questi ricordi sono stati aggiunti al contesto dell'IA per questa rispos
 msgid "These providers will never be used for your requests."
 msgstr "Questi provider non verranno mai usati per le tue richieste."
 
-#: src/features/projects/components/project-rule-files.tsx:237
+#: src/features/projects/components/project-rule-files.tsx:248
 msgid "These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again."
 msgstr ""
 
@@ -34337,11 +34337,11 @@ msgstr "L’orologio di questo computer è indietro di circa {minutes} minuti ri
 msgid "This connection needs to be renewed."
 msgstr "Questa connessione deve essere rinnovata."
 
-#: src/features/projects/components/project-form-dialog.tsx:372
+#: src/features/projects/components/project-form-dialog.tsx:386
 msgid "This context will be automatically added to each chat in your project. You can include instructions, background information, or any shared knowledge."
 msgstr "Questo contesto verrà aggiunto automaticamente a ogni chat del progetto. Puoi includere istruzioni, informazioni di contesto o qualsiasi conoscenza condivisa."
 
-#: src/features/projects/components/project-form-dialog.tsx:377
+#: src/features/projects/components/project-form-dialog.tsx:391
 msgid "This context will be prepended to the system prompt for all chats in this project."
 msgstr "Questo contesto verrà anteposto al prompt di sistema di tutte le chat di questo progetto."
 
@@ -35022,7 +35022,7 @@ msgstr "Fuso orario aggiornato"
 
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:148
 #: src/features/develop/components/pull-request-edit-action.tsx:124
-#: src/features/projects/components/project-form-dialog.tsx:238
+#: src/features/projects/components/project-form-dialog.tsx:252
 #: src/features/slides/components/slide-editor-dialog.tsx:90
 #: src/features/tasks/components/goal-form-dialog.tsx:88
 #: src/features/tasks/components/task-form-dialog.tsx:221
@@ -36219,7 +36219,7 @@ msgstr "Aggiorna durata"
 msgid "Update failed"
 msgstr "Aggiornamento non riuscito"
 
-#: src/features/projects/components/project-form-dialog.tsx:463
+#: src/features/projects/components/project-form-dialog.tsx:484
 msgid "Update Project"
 msgstr "Aggiorna progetto"
 
@@ -36253,7 +36253,7 @@ msgstr "Aggiorna il ruolo di questo membro"
 msgid "Update your account email address"
 msgstr "Aggiorna l'indirizzo email del tuo account"
 
-#: src/features/projects/components/project-form-dialog.tsx:229
+#: src/features/projects/components/project-form-dialog.tsx:243
 msgid "Update your project details below."
 msgstr "Aggiorna qui sotto i dettagli del progetto."
 
@@ -38720,7 +38720,7 @@ msgstr "Il browser non indica quale processore hai, quindi scegli il programma d
 msgid "Your browser talks to the server on this computer directly — the prompt and reply never pass through our AI servers, and nothing is billed."
 msgstr "Il tuo browser comunica direttamente con il server su questo computer: il prompt e la risposta non passano mai dai nostri server di IA e non viene addebitato nulla."
 
-#: src/features/projects/components/project-form-dialog.tsx:479
+#: src/features/projects/components/project-form-dialog.tsx:500
 msgid "Your changes to this project's rule files are not saved. Closing drops them."
 msgstr ""
 
@@ -38931,6 +38931,11 @@ msgstr "La tua revisione è conservata."
 #: src/features/notifications/lib/notification-labels.ts:58
 msgid "Your review was requested"
 msgstr "È stata richiesta la tua revisione"
+
+#: src/features/projects/components/project-form-dialog.tsx:117
+#: src/features/projects/components/project-form-dialog.tsx:135
+msgid "Your rule files are still saving."
+msgstr ""
 
 #: src/features/chat/thread/request-secret-prompt.tsx:465
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."

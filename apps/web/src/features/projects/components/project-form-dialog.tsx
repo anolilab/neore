@@ -97,6 +97,8 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
     const { mutateAsync: updateProject } = useMutation(crpc.projects.functions.updateProject.mutationOptions());
     // Whether the rule files section holds unsaved changes: closing would drop them.
     const ruleFilesDirty = useRef(false);
+    // Whether a rule-file save is on its way: it lands whatever happens here, so closing never offers to drop it.
+    const ruleFilesSaving = useRef(false);
     // Asking whether to drop those changes, after a close (Cancel, Escape, outside click, the close button) while they are open.
     const [confirmingDiscard, setConfirmingDiscard] = useState(false);
     const [wasOpen, setWasOpen] = useState(open);
@@ -111,6 +113,12 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
     }
 
     const requestClose = () => {
+        if (editingProject && ruleFilesSaving.current) {
+            toast.info(t`Your rule files are still saving.`);
+
+            return;
+        }
+
         if (editingProject && ruleFilesDirty.current) {
             setConfirmingDiscard(true);
 
@@ -123,6 +131,12 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
     const form = useAppForm({
         defaultValues: getDefaultValues(editingProject),
         onSubmit: async ({ value }) => {
+            if (editingProject && ruleFilesSaving.current) {
+                toast.info(t`Your rule files are still saving.`);
+
+                return;
+            }
+
             if (editingProject && ruleFilesDirty.current) {
                 toast.error(t`Save or discard your rule file changes first.`);
 
@@ -436,6 +450,13 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                                     key={`rule-files-${editingProject._id}`}
                                     onDirtyChange={(dirty: boolean) => {
                                         ruleFilesDirty.current = dirty;
+                                    }}
+                                    onSavingChange={(saving: boolean) => {
+                                        ruleFilesSaving.current = saving;
+
+                                        if (saving) {
+                                            setConfirmingDiscard(false);
+                                        }
                                     }}
                                     projectId={editingProject._id}
                                 />

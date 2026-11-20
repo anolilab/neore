@@ -31,6 +31,7 @@ import {
 } from "./repositories";
 import { mayEditProject } from "./edit-access";
 import { forViewer, resolveProjectLocation } from "./machine-location";
+import { projectRowsReadBytes } from "./project-row";
 import { readProjectRuleFiles, writeProjectRuleFiles } from "./rule-file-rows";
 import {
     MAX_RULE_FILE_LENGTH,
@@ -242,6 +243,43 @@ export const projectRunContext = (context: QueryCtx, projectId: Id<"projects">, 
 const MAX_RUN_FILE_IDS = MAX_ATTACHED_FILES;
 
 /**
+ * What reading attachment names may cost one run's setup. `chatFiles` is `.global()`, so each row read is charged
+ * whole, its `extractedText` included, whatever it selects: twenty large attachments read at once would pass the
+ * transaction's read limit and fail the run. Past this, the files left are not matched rather than the run failing.
+ */
+export const RUN_FILE_NAMES_READ_BYTES = 4 * 1024 * 1024;
+
+/**
+ * The names of `fileIds` for a run's pattern match, one row per read, each charged whole (`projectRowsReadBytes`).
+ * Once {@link RUN_FILE_NAMES_READ_BYTES} is spent the rest are not read (`skipped`), so the most a run's setup reads
+ * here is that budget plus one row, which the attachment path reads anyway.
+ */
+const attachmentNamesForRun = async (context: QueryCtx, fileIds: ReadonlyArray<Id<"chatFiles">>): Promise<{ paths: string[]; skipped: number }> => {
+    const paths: string[] = [];
+    // A file named twice is read once.
+    const unique = [...new Set(fileIds)];
+    let readBytes = 0;
+
+    for (const [index, fileId] of unique.entries()) {
+        if (readBytes >= RUN_FILE_NAMES_READ_BYTES) {
+            return { paths, skipped: unique.length - index };
+        }
+
+        const row = await context.db.chatFiles.findFirst({ where: { _id: fileId } });
+
+        if (row) {
+            readBytes += projectRowsReadBytes([row]);
+
+            if (row.filename) {
+                paths.push(row.filename);
+            }
+        }
+    }
+
+    return { paths, skipped: 0 };
+};
+
+/**
  * A project's instructions for a run on behalf of `userId`, under the same access rule as `createThread` (owner or
  * organization member): its `always` rule files, and its `glob` files that match the names of `fileIds`, the files the
  * run's message attaches. Its legacy `context` is the first `always` file, so a project without rule files gives
@@ -260,11 +298,15 @@ export const getProjectContextForRun = internalQuery
         const files = await readProjectRuleFiles(context, project);
         let paths: string[] = [];
 
-        // The names are read only when a file could match one: the rows also hold the files' extracted text, never returned here.
+        // The names are read only when a file could match one.
         if (fileIds && fileIds.length > 0 && files.some((file) => file.mode === "glob")) {
-            const { page } = await context.db.chatFiles.findMany({ select: ["filename"] as const, where: { _id: { in: fileIds } } });
+            const names = await attachmentNamesForRun(context, fileIds);
 
-            paths = (page as unknown as { filename?: string }[]).flatMap((row) => (row.filename ? [row.filename] : []));
+            paths = names.paths;
+
+            if (names.skipped > 0) {
+                context.log.event("projects.rule_file_names_over_budget", { projectId, skipped: names.skipped });
+            }
         }
 
         return projectRunContext(context, projectId, files, paths);
