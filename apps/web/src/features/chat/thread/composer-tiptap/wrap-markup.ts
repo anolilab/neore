@@ -225,12 +225,43 @@ const isSeparatorRow = (line: string): boolean =>
         .split("|")
         .every((cell) => SEPARATOR_CELL.test(cell));
 
-/** The number of cells in a table row. */
-const cellCount = (line: string): number => line.trim().replaceAll(OUTER_PIPES, "").split("|").length;
+/** `line` without the blockquote markers it starts with, so a table inside a quote reads as one. */
+const withoutQuotes = (line: string): string => {
+    let offset = 0;
+    let marker = matchAt("quote", line, offset);
+
+    while (marker !== "") {
+        offset += marker.length;
+        marker = matchAt("quote", line, offset);
+    }
+
+    return line.slice(offset);
+};
+
+/** The number of cells in a table row: GFM splits cells at every `|` that no odd run of backslashes escapes. */
+const cellCount = (line: string): number => {
+    const row = line.trim().replaceAll(OUTER_PIPES, "");
+    let cells = 1;
+    let backslashes = 0;
+
+    for (const character of row) {
+        if (character === "|" && backslashes % 2 === 0) {
+            cells += 1;
+        }
+
+        backslashes = character === "\\" ? backslashes + 1 : 0;
+    }
+
+    return cells;
+};
 
 /** Whether `header` over `separator` starts a GFM table: a separator row under a line with as many cells. */
-const headsTable = (header: string, separator: string): boolean =>
-    header.trim() !== "" && isSeparatorRow(separator) && cellCount(header) === cellCount(separator);
+const headsTable = (header: string, separator: string): boolean => {
+    const headerRow = withoutQuotes(header);
+    const separatorRow = withoutQuotes(separator);
+
+    return headerRow.trim() !== "" && isSeparatorRow(separatorRow) && cellCount(headerRow) === cellCount(separatorRow);
+};
 
 /** The line of `text` that starts at `start`, without its line break; empty when `start` is -1. */
 const lineFrom = (text: string, start: number): string => {
@@ -286,7 +317,7 @@ const breaksTable = (text: string, from: number, to: number): boolean => {
         cursor = previousStart;
     }
 
-    return inTable && (isSeparatorRow(line) || hasCellPipe(text, from, to));
+    return inTable && (isSeparatorRow(withoutQuotes(line)) || hasCellPipe(text, from, to));
 };
 
 /**
@@ -449,17 +480,18 @@ const bareEmails = (text: string): [number, number][] => {
 /** Punctuation GFM leaves out of the end of a bare link. */
 const TRAILING_PUNCTUATION: ReadonlySet<string> = new Set(["!", '"', "'", ")", "*", ",", ".", ":", "?", "]", "_", "~"]);
 
-/** Whether the parentheses of `address` pair up, so its last `)` closes one of its own. */
-const balanced = (address: string): boolean => address.split("(").length === address.split(")").length;
-
 /** The bare links in `text`, as constructs a wrap may hold whole but not split. */
 const bareLinks = (text: string): Construct[] =>
     [...[...text.matchAll(BARE_WEB_ADDRESS)].map((match): [number, number] => [match.index, match.index + match[0].length]), ...bareEmails(text)].map(
         ([start, matchEnd]) => {
+            const address = text.slice(start, matchEnd);
+            // GFM keeps a closing parenthesis that a `(` inside the address balances (`.../Foo_(bar)`): the counts are
+            // taken once, and each trimmed `)` lowers its own.
+            let unbalanced = address.split(")").length - address.split("(").length;
             let end = matchEnd;
 
-            // GFM keeps a closing parenthesis that a `(` inside the address balances (`.../Foo_(bar)`).
-            while (end > start && TRAILING_PUNCTUATION.has(text[end - 1] ?? "") && !(text[end - 1] === ")" && balanced(text.slice(start, end)))) {
+            while (end > start && TRAILING_PUNCTUATION.has(text[end - 1] ?? "") && (text[end - 1] !== ")" || unbalanced > 0)) {
+                unbalanced -= text[end - 1] === ")" ? 1 : 0;
                 end -= 1;
             }
 

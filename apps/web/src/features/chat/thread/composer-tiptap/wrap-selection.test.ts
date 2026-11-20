@@ -907,6 +907,37 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor)).toBe("|`---`|");
     });
 
+    it("finds a table whose header holds an escaped pipe, and leaves a wrap across its cells alone", () => {
+        const editor = editorWith("<p>| a&#92;|b | c |</p><p>| --- | --- |</p><p>| x | y |</p>");
+        const before = text(editor);
+
+        select(editor, 32, 37);
+
+        expect(selectedText(editor)).toBe("x | y");
+        expect(wrapSelectionOnTextInput(editor.view, 32, 37, "*")).toBe(true);
+        expect(text(editor)).toBe(before);
+    });
+
+    it("finds a table inside a blockquote, and leaves a wrap across its cells alone", () => {
+        const editor = editorWith("<p>&gt; a | b</p><p>&gt; --- | ---</p>");
+        const before = text(editor);
+
+        select(editor, 3, 8);
+
+        expect(selectedText(editor)).toBe("a | b");
+        expect(wrapSelectionOnTextInput(editor.view, 3, 8, "*")).toBe(true);
+        expect(text(editor)).toBe(before);
+    });
+
+    it("wraps quickly beside a web address with thousands of closing parentheses", () => {
+        const editor = editorWith(`<p>hello https://e.com/${"(".repeat(2000)}${")".repeat(6000)}</p>`);
+
+        select(editor, 1, 6);
+
+        expect(wrapSelectionOnTextInput(editor.view, 1, 6, "*")).toBe(true);
+        expect(text(editor).startsWith("**hello** https://e.com/")).toBe(true);
+    });
+
     it("wraps literal ](url) text that has no link label before it", () => {
         const editor = editorWith("<p>literal ](url) text</p>");
 
