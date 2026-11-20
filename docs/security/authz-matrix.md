@@ -760,7 +760,9 @@ for a schema table that is neither policed nor listed:
   Saved site logins reach a run only through the internal `vault_site_logins.listUsableSiteLogins` and
   `siteLoginForFill`, never a client procedure. Both admit only the owner's own turn at the app
   (`isOwnInteractiveTurn`): `startedBy` is the owner, origin `lead`, not headless, not sent by an impersonating admin,
-  and its prompt row is one the owner typed (their `userId`, no `agentName`, no outside agent's or guest's text). A public API run records the key's
+  and its prompt row is one the owner typed (their `userId`, no `agentName`, no outside agent's or guest's text, no
+  attached document, captured page, file or image or `fileIds`; any part that is not text refuses), and the run has read
+  nothing untrusted (the turn's `taintedBy`, and `threadPathTaint` over the prompt's path, summaries and handoff). A public API run records the key's
   owner as `startedBy`, so `startedBy` alone is not enough; triggers, tasks, evals, messenger replies, sub-agents and any
   origin not named there get none. The thread must pass `loadEligibleThread` and not be one a trigger, task or eval opened; a teammate's thread gets only the logins
   naming it.

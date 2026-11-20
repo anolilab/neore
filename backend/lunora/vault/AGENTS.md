@@ -11,7 +11,10 @@
   never changes on edit.
 - Which run may use a login is decided from its THREAD and TURN (`usableSiteLogins`), never from client input: only
   the owner's own turn at the app (`isOwnInteractiveTurn`: `startedBy` is the owner, origin `lead`, not headless, not
-  impersonated), whose prompt row the owner typed (theirs, no `agentName`, no outside agent's or guest's text), in a
+  impersonated), whose prompt row the owner typed (theirs, no `agentName`, no outside agent's or guest's text, no
+  attached document, captured page, file or image part or `fileIds`, only text parts: an unknown part refuses), with
+  nothing untrusted read yet (`turn.taintedBy` from the step's messages, and the prompt's path, summaries and handoff
+  via `agent/thread-summary-taint.ts#threadPathTaint`), in a
   thread `devices/internal.ts#loadEligibleThread` admits (not shared, public, a group chat, a messenger conversation or
   deleted) that no trigger, task or eval opened. `startedBy` alone proves nothing: a public API run records the key's owner. A new run origin gets no login
   until it is added there on purpose. Then the owner's own chats get every login; a teammate's thread only the logins
@@ -31,6 +34,7 @@
   `siteLoginForFill` the origin of the page the browser is on, never a site the model names; checks that origin again
   inside the browser-renderer right before typing, after any navigation; and decrypts and types in one action, never
   returning the ciphertext from a workflow step or putting it in a queue payload. It fills the turn from its tool context
-  (`dispatchOrigin`, `headless`, `startedBy`, `promptMessageId`; `ToolCtx.messageId` is never set). No turn records
+  (`dispatchOrigin`, `headless`, `startedBy`, `promptMessageId`; `ToolCtx.messageId` is never set) and `taintedBy`
+  from `computeTaint` plus `messagesCarryAttachedText` over `ToolExecutionOptions.messages`, never `[]` by default. No turn records
   impersonation yet: record it on the turn at `/chat/start` and carry it through a pause's snapshot, never default it to
   `false`. A resumed or approved run's `promptMessageId` is not the prompt, so it gets no login until that is carried too.

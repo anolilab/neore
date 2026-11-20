@@ -12,8 +12,11 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalQuery, type MutationCtx, type QueryCtx } from "../_generated/server";
-import { messageCarriesGuestText, messageCarriesOutsideAgentText } from "../chat/lib/attached-text";
+import { threadPathTaint } from "../agent/thread-summary-taint";
+import { messageCarriesGuestText, messageCarriesOutsideAgentText, messagesCarryAttachedText } from "../chat/lib/attached-text";
 import { loadEligibleThread } from "../devices/internal";
+import { computeTaint } from "../devices/lib/taint";
+import { vDeviceTaintSource } from "../devices/validators";
 import { encryptKey } from "../lib/encryption";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
@@ -262,9 +265,22 @@ const siteLoginTurnFields = {
     promptMessageId: v.id("messages"),
     /** `ToolCtx.startedBy`: who started the turn. A continuation runs as the owner whoever that was. */
     startedBy: v.string().max(64),
+    /**
+     * What the run had read before it asked: `computeTaint` and `messagesCarryAttachedText` over the messages the model saw for that step (AI SDK
+     * `ToolExecutionOptions.messages`, as a device call computes it), so a page, a file or a tool result read earlier in
+     * the turn or the thread counts. Any entry refuses every login.
+     */
+    taintedBy: v.array(vDeviceTaintSource),
 };
 
-export type SiteLoginTurn = { headless: boolean; impersonated: boolean; origin: string; promptMessageId: Id<"messages">; startedBy: string };
+export type SiteLoginTurn = {
+    headless: boolean;
+    impersonated: boolean;
+    origin: string;
+    promptMessageId: Id<"messages">;
+    startedBy: string;
+    taintedBy: ReadonlyArray<string>;
+};
 
 /**
  * Whether the run is the owner's own turn at the app: the owner started it themselves, signed in as themselves, in their
@@ -283,24 +299,58 @@ const UNATTENDED_THREAD_TAGS: ReadonlySet<string> = new Set(["eval", "task", "tr
 
 /**
  * The turn's prompt is the owner's own words: a user row of this thread that the owner wrote, carrying no outside agent's
- * text (a regenerate of a public API prompt runs with no origin, so its saved mark is what tells) and no guest's note. A
- * row an agent wrote under the owner's id (a goal's next round, `agentName`) is not theirs, nor is one with no author.
+ * text (a regenerate of a public API prompt runs with no origin, so its saved mark is what tells), no guest's note and no
+ * content the owner attached rather than typed: a document's extracted text or a captured page
+ * (`messagesCarryAttachedText`), a file or image part or a goal's review note (`computeTaint`), or files named only by
+ * `fileIds`. A row an agent wrote under the owner's id (a goal's next round, `agentName`) is not theirs, nor is one with no
+ * author. A part that is not text is refused, so a new kind gets no logins until it is classified here on purpose.
  */
-const isOwnPrompt = async (ctx: Pick<QueryCtx, "db">, promptMessageId: Id<"messages">, threadId: Id<"threads">, userId: string): Promise<boolean> => {
+const ownPromptRow = async (
+    ctx: Pick<QueryCtx, "db">,
+    promptMessageId: Id<"messages">,
+    threadId: Id<"threads">,
+    userId: string,
+): Promise<Doc<"messages"> | undefined> => {
     const prompt = await ctx.db.get("messages", promptMessageId);
 
-    if (!prompt || prompt.threadId !== threadId || prompt.userId !== userId || prompt.agentName !== undefined) {
-        return false;
+    if (!prompt || prompt.threadId !== threadId || prompt.userId !== userId || prompt.agentName !== undefined || (prompt.fileIds?.length ?? 0) > 0) {
+        return undefined;
     }
 
     const message = prompt.message as Parameters<typeof messageCarriesOutsideAgentText>[0];
+    const typedOnly =
+        typeof message?.content === "string" ||
+        (Array.isArray(message?.content) && (message.content as ReadonlyArray<{ type?: unknown }>).every((part) => part.type === "text"));
 
-    return message?.role === "user" && !messageCarriesOutsideAgentText(message) && !messageCarriesGuestText(message);
+    const own =
+        message?.role === "user" &&
+        typedOnly &&
+        !messageCarriesOutsideAgentText(message) &&
+        !messageCarriesGuestText(message) &&
+        !messagesCarryAttachedText([message]) &&
+        computeTaint([message]).length === 0;
+
+    return own ? prompt : undefined;
+};
+
+/**
+ * Whether the run has read anything untrusted before it asked: what it reports from the step's messages
+ * (`turn.taintedBy`: this turn's tool results), and, read here whatever the caller says, the prompt's path up to it, the
+ * thread's context summaries and a coding agent's handoff (`threadPathTaint`).
+ */
+const turnIsTainted = async (ctx: Pick<QueryCtx, "db">, turn: SiteLoginTurn, threadId: Id<"threads">, prompt: Doc<"messages">): Promise<boolean> => {
+    if (turn.taintedBy.length > 0) {
+        return true;
+    }
+
+    const read = await threadPathTaint(ctx, threadId, prompt);
+
+    return read.length > 0;
 };
 
 /**
  * The logins a run of `threadId` may use, for the agent's browser. Only the owner's own turn at the app
- * (`isOwnInteractiveTurn`, with a prompt the owner wrote), and only in a thread nobody else's text can reach
+ * (`isOwnInteractiveTurn`, with a prompt the owner typed and nothing untrusted read so far, `turnIsTainted`), and only in a thread nobody else's text can reach
  * (`loadEligibleThread`: not shared, public, a group chat, a messenger conversation or deleted; nor one a trigger, task
  * or eval opened), since whoever can steer
  * the model could otherwise sign in as the owner. The owner's own chats get every login; a teammate's thread only the
@@ -316,11 +366,13 @@ export const usableSiteLogins = async (
 
     const thread = await loadEligibleThread(ctx, args.threadId, args.userId);
 
-    if (
-        !thread ||
-        (thread.tags ?? []).some((tag) => UNATTENDED_THREAD_TAGS.has(tag)) ||
-        !(await isOwnPrompt(ctx, args.turn.promptMessageId, args.threadId, args.userId))
-    ) {
+    if (!thread || (thread.tags ?? []).some((tag) => UNATTENDED_THREAD_TAGS.has(tag))) {
+        return [];
+    }
+
+    const prompt = await ownPromptRow(ctx, args.turn.promptMessageId, args.threadId, args.userId);
+
+    if (!prompt || (await turnIsTainted(ctx, args.turn, args.threadId, prompt))) {
         return [];
     }
 
