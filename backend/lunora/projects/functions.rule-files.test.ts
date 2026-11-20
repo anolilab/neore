@@ -299,7 +299,7 @@ describe("changing a project's rule files", () => {
 
         await save(OWNER, projectId, [sqlRules, ...files]);
 
-        await expect(row(projectId)).resolves.not.toHaveProperty("context");
+        await expect(row(projectId)).resolves.toMatchObject({ context: "" });
         await expect(savedFiles(projectId)).resolves.toEqual([sqlRules, { content: "Old notes", id: "context", mode: "always", title: "Project context" }]);
         expect(await contextFor(projectId)).toBe("Old notes");
     });
@@ -355,7 +355,7 @@ describe("changing a project's rule files", () => {
 
         await save(OWNER, projectId, [changed, sqlRules], undefined, { keepContext: true });
 
-        await expect(row(projectId)).resolves.not.toHaveProperty("context");
+        await expect(row(projectId)).resolves.toMatchObject({ context: "" });
         await expect(savedFiles(projectId)).resolves.toStrictEqual([changed, sqlRules]);
         expect(await contextFor(projectId)).toBe("Short now.");
     });
@@ -641,7 +641,7 @@ describe("changing a project's rule files", () => {
 
         await save(OWNER, projectId, (await list(OWNER, projectId))!.files);
 
-        await expect(row(projectId)).resolves.not.toHaveProperty("context");
+        await expect(row(projectId)).resolves.toMatchObject({ context: "" });
         expect(await contextFor(projectId)).toBe("Old notes");
     });
 
@@ -669,7 +669,7 @@ describe("changing a project's rule files", () => {
 
         await save(OWNER, emptied, []);
 
-        await expect(row(emptied)).resolves.not.toHaveProperty("context");
+        await expect(row(emptied)).resolves.toMatchObject({ context: "" });
         expect(await contextFor(emptied)).toBeNull();
     });
 
@@ -687,6 +687,39 @@ describe("changing a project's rule files", () => {
 
         await expect(row(projectId)).resolves.toMatchObject({ context: "Newer notes" });
         expect((await list(OWNER, projectId))!.files.map((file) => file.id)).toStrictEqual(["context-2", "sql", "context"]);
+    });
+
+    it("clears the carried context with one guarded write: a title or a context written just before it stays", async () => {
+        const titled = await insert("projects", { context: "Old notes", createdAt: 0, title: "p", userId: OWNER });
+        const rewritten = await insert("projects", { context: "Old notes", createdAt: 0, title: "p", userId: OWNER });
+        // Another write lands right before the clear's own, after any read the clear made.
+        const clearRacing = async (projectId: string, write: Record<string, unknown>) =>
+            await harness.run(async (ctx: any) => {
+                const raced = async <T>(apply: () => Promise<T>): Promise<T> => {
+                    await ctx.db.patch("projects", projectId, write);
+
+                    return await apply();
+                };
+                const db = new Proxy(ctx.db, {
+                    get: (target, key) => {
+                        const value = Reflect.get(target, key);
+
+                        if (key === "patchIf" || key === "replace") {
+                            return async (...args: unknown[]) => await raced(() => value.apply(target, args));
+                        }
+
+                        return typeof value === "function" ? value.bind(target) : value;
+                    },
+                });
+
+                await markRuleFilesSaved(db, projectId as never, 5, { clearContext: "Old notes" });
+            });
+
+        await clearRacing(titled, { title: "Renamed" });
+        await clearRacing(rewritten, { context: "Newer notes", title: "Renamed" });
+
+        await expect(row(titled)).resolves.toMatchObject({ context: "", title: "Renamed", updatedAt: 5 });
+        await expect(row(rewritten)).resolves.toMatchObject({ context: "Newer notes", title: "Renamed", updatedAt: 5 });
     });
 
     it("erases rule files a failed delete left: the sweep once the project is gone, and the owner's account", async () => {

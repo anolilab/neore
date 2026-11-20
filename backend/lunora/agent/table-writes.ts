@@ -265,9 +265,10 @@ export const deleteVectorRow = async (db: Database, vectorId: Id<VectorTableName
 
 /**
  * Marks a project changed by a save of its rule files (`projects.functions.setProjectRuleFiles`), and with
- * `clearContext`, the legacy `context` text the save moved into the list, removes it while it is still that text: one
- * written since never reached the list, so it stays. The row is read again right before the write: removing a column
- * rewrites the whole row, which must not carry back an older copy of another column.
+ * `clearContext`, the legacy `context` text the save moved into the list, empties it while it is still that text, in
+ * one conditional write (`patchIf`): a `.global()` read and a later write are not one transaction, and removing the
+ * column would replace the whole row from a copy another write may have overtaken. An empty `context` reads as none
+ * everywhere. A `context` written since never reached the list, so it stays, for the next save to carry.
  */
 export const markRuleFilesSaved = async (
     db: Database,
@@ -275,15 +276,13 @@ export const markRuleFilesSaved = async (
     now: number,
     { clearContext }: { clearContext?: string } = {},
 ): Promise<void> => {
-    if (!clearContext) {
-        await db.patch("projects", projectId, { updatedAt: now });
+    if (clearContext) {
+        const { applied, doc } = await db.patchIf("projects", projectId, { patch: { context: "", updatedAt: now }, where: { context: clearContext } });
 
-        return;
+        if (applied || !doc) {
+            return;
+        }
     }
 
-    const project = await db.projects.findFirst({ consistency: "primary", where: { _id: projectId } });
-
-    if (project) {
-        await patchRow(db, "projects", project, { ...(project.context === clearContext && { context: undefined }), updatedAt: now });
-    }
+    await db.patch("projects", projectId, { updatedAt: now });
 };
