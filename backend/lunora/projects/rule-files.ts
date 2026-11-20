@@ -20,8 +20,16 @@ export interface RuleFile {
 export const MAX_RULE_FILES = 20;
 /** Characters one rule file holds. */
 export const MAX_RULE_FILE_LENGTH = 100_000;
-/** UTF-8 bytes all of a project's rule files hold together: the project row lives in D1, whose rows stay under 2 MB. */
+/**
+ * UTF-8 bytes all of a project's rule files take together as stored, JSON-encoded (escapes included): the project row
+ * lives in D1, whose rows stay under 2 MB.
+ */
 export const MAX_RULE_FILES_BYTES = 1_000_000;
+/**
+ * UTF-8 bytes the list and a legacy `context` kept beside it (`keepContext`) take together: what stays of a D1 row's
+ * 2 MB for the project's other columns.
+ */
+export const MAX_PROJECT_INSTRUCTION_BYTES = 1_800_000;
 /** Characters of rule-file text one run takes; the rest is left out ({@link selectRuleFiles}). */
 export const MAX_RULE_TEXT_PER_RUN = 200_000;
 export const MAX_RULE_TITLE_LENGTH = 200;
@@ -120,6 +128,13 @@ export interface MatchBudget {
  * an exhausted budget answers no match.
  */
 const matchPattern = (pattern: string, subject: string, budget: MatchBudget): boolean => {
+    // The setup below walks the subject once: charged too, so a spent budget stops every later call before any work.
+    budget.steps -= subject.length + 1;
+
+    if (budget.steps <= 0) {
+        return false;
+    }
+
     const memo = new Map<number, boolean>();
     const width = subject.length + 1;
     // Where the next `/` at or after each position is, so skipping a folder is one step.
@@ -178,6 +193,11 @@ const matchPattern = (pattern: string, subject: string, budget: MatchBudget): bo
  */
 export const matchesGlob = (glob: string, path: string, shared?: MatchBudget): boolean => {
     const budget = shared ?? { steps: GLOB_MATCH_STEPS_PER_RUN };
+
+    if (budget.steps <= 0) {
+        return false;
+    }
+
     const normalized = path.replaceAll("\\", "/").replace(LEADING_ROOT, "").slice(0, MAX_MATCHED_PATH_LENGTH);
     const trimmed = glob.trim().replace(LEADING_ROOT, "");
 
@@ -261,15 +281,15 @@ const assertGlob = (glob: string): void => {
 
 /**
  * The list as it is saved: trimmed titles and patterns, no patterns on an `always` file. Refuses a list past the
- * caps, a repeated id, an empty title, or a `glob` file without a pattern.
+ * caps (with `keptContext`, the legacy text that stays on the row beside it), a repeated id, an empty title, or a
+ * `glob` file without a pattern.
  */
-export const normalizeRuleFiles = (files: RuleFile[]): RuleFile[] => {
+export const normalizeRuleFiles = (files: RuleFile[], { keptContext = "" }: { keptContext?: string } = {}): RuleFile[] => {
     if (files.length > MAX_RULE_FILES) {
         throw new LunoraError("BAD_REQUEST", `A project holds at most ${MAX_RULE_FILES} rule files`);
     }
 
     const ids = new Set<string>();
-    let bytes = 0;
 
     const normalized = files.map((file) => {
         const title = file.title.trim();
@@ -288,8 +308,6 @@ export const normalizeRuleFiles = (files: RuleFile[]): RuleFile[] => {
             throw new LunoraError("BAD_REQUEST", `A rule file holds at most ${MAX_RULE_FILE_LENGTH} characters`);
         }
 
-        bytes += utf8Bytes(file.content) + utf8Bytes(title);
-
         if (file.mode === "always") {
             return { content: file.content, id: file.id, mode: file.mode, title };
         }
@@ -307,7 +325,10 @@ export const normalizeRuleFiles = (files: RuleFile[]): RuleFile[] => {
         return { content: file.content, globs, id: file.id, mode: file.mode, title };
     });
 
-    if (bytes > MAX_RULE_FILES_BYTES) {
+    const bytes = utf8Bytes(JSON.stringify(normalized));
+
+    // A kept context is already on the row: only files added beside it can push the row past its limit.
+    if (bytes > MAX_RULE_FILES_BYTES || (normalized.length > 0 && bytes + utf8Bytes(keptContext) > MAX_PROJECT_INSTRUCTION_BYTES)) {
         throw new LunoraError("BAD_REQUEST", "The project's rule files are too large together");
     }
 

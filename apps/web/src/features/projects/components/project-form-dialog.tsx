@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@neore/ui/components/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@neore/ui/components/tooltip";
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useEffectEvent } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 import { toast } from "sonner";
 import * as z from "zod";
 
@@ -85,10 +85,18 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
     const crpc = useCRPC();
     const { mutateAsync: createProject } = useMutation(crpc.projects.functions.createProject.mutationOptions());
     const { mutateAsync: updateProject } = useMutation(crpc.projects.functions.updateProject.mutationOptions());
+    // Whether the rule files section holds unsaved changes: closing would drop them.
+    const ruleFilesDirty = useRef(false);
 
     const form = useAppForm({
         defaultValues: getDefaultValues(editingProject),
         onSubmit: async ({ value }) => {
+            if (editingProject && ruleFilesDirty.current) {
+                toast.error(t`Save or discard your rule file changes first.`);
+
+                return;
+            }
+
             try {
                 if (editingProject) {
                     // `patch` fields are `v.optional(...)` nested inside a `v.object`, which
@@ -391,7 +399,15 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                             </div>
                             {/* Links, saved as they change — only a saved project has an id to link to. */}
                             {/* Keyed: an unsaved draft for one project never stays for the next one edited. */}
-                            {editingProject && <ProjectRuleFiles key={editingProject._id} projectId={editingProject._id} />}
+                            {editingProject && (
+                                <ProjectRuleFiles
+                                    key={editingProject._id}
+                                    onDirtyChange={(dirty: boolean) => {
+                                        ruleFilesDirty.current = dirty;
+                                    }}
+                                    projectId={editingProject._id}
+                                />
+                            )}
                             {editingProject && <ProjectKnowledgeCollections projectId={editingProject._id} />}
                             {editingProject && <ProjectUsageSummary projectId={editingProject._id} />}
                             {/* Keyed: a draft typed for one project never stays for the next one edited. */}

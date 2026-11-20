@@ -3,11 +3,14 @@
 ## INVARIANTS
 
 - **Rule files** (`projects.ruleFiles`, `rule-files.ts`) — the owner's instructions for a project's runs, at most
-  `MAX_RULE_FILES`, each `always` or `glob`. They live ON the project row, so reading, editing (the rule of
-  `updateProject`), deletion and organization moves follow the project with no table of their own.
+  `MAX_RULE_FILES`, each `always` or `glob`. They live ON the project row, so reading, deletion and organization moves
+  follow the project with no table of their own. Project rows the other procedures return leave them out (`publicProject`).
+- Changing them follows `updateProject` exactly: the owner only (`mayEditProject` in `edit-access.ts`, through
+  `projectWithEditableSettings`), re-checked in the writing transaction (`settingsEditorId`). Never widen one alone.
 - The legacy `context` text reads as the first `always` file (`projectRuleFiles`) everywhere: runs, the editor and
   the export. `defineMigration` does not reach `.global()` rows, so nothing rewrites it in bulk: the first
-  `setProjectRuleFiles` saves it into the list and clears `context` in the same patch. A project with only a
+  `setProjectRuleFiles` saves it into the list and clears `context` in the same patch; an unchanged one longer than a
+  rule file may be stays in `context` (`keepContext`). A project with only a
   `context` gives a run exactly that text; keep that true when changing the rendering.
 - A run gets its files through `getProjectContextForRun` only (chat, edit and group runs via `loadRunContext` or
   `streamAsync`, tasks via `runProjectFor`), framed `PROJECT CONTEXT:` by the caller. `glob` files match the names of

@@ -1,14 +1,15 @@
 /**
  * A project's rule files: what a run gets (always files, and pattern files only when the run's files match) and who may
- * change them (the rule of `updateProject`).
+ * change them (the rule of `updateProject`: its owner only).
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 
+import { publicProject, updateProject as writeProject } from "../agent/projects";
 import schema from "../schema";
-import { getProjectContextForRun, listProjectRuleFiles, setProjectRuleFiles } from "./functions";
+import { getProjectContextForRun, listProjectRuleFiles, setProjectRuleFiles, updateProject } from "./functions";
 
 const OWNER = "user-owner";
 const MEMBER = "user-member";
@@ -103,11 +104,16 @@ describe("changing a project's rule files", () => {
             revision: string;
         } | null>;
     // A save from the list as the caller reads it now, unless a revision is named.
-    const save = async (userId: string, projectId: string, ruleFiles: unknown[], revision?: string) => {
+    const save = async (userId: string, projectId: string, ruleFiles: unknown[], revision?: string, extra: Record<string, unknown> = {}) => {
         const listed = revision === undefined ? await list(userId, projectId) : null;
 
-        return await as(userId).mutation(setProjectRuleFiles as never, { projectId, revision: revision ?? listed?.revision ?? "", ruleFiles } as never);
+        return await as(userId).mutation(
+            setProjectRuleFiles as never,
+            { projectId, revision: revision ?? listed?.revision ?? "", ruleFiles, ...extra } as never,
+        );
     };
+    const row = async (projectId: string) =>
+        (await harness.run(async (ctx: any) => await ctx.db.projects.findFirst({ where: { _id: projectId } }))) as Record<string, unknown>;
 
     it("moves the legacy context into the list on the first save, in the order saved", async () => {
         const projectId = await insert("projects", { context: "Old notes", createdAt: 0, title: "p", userId: OWNER });
@@ -122,18 +128,68 @@ describe("changing a project's rule files", () => {
         expect(await contextFor(projectId)).toBe("Old notes");
     });
 
-    it("lets the owner, and a member only on a project nobody owns, save; tells a stranger nothing", async () => {
+    it("lets only the owner save, as updateProject: never a member, not even on a project nobody owns", async () => {
         await insert("member", { createdAt: 1, organizationId: ORG, role: "member", userId: MEMBER });
 
         const owned = await insert("projects", { createdAt: 0, organizationId: ORG, title: "owned", userId: OWNER });
         const shared = await insert("projects", { createdAt: 0, organizationId: ORG, title: "shared" });
 
-        await expect(save(MEMBER, owned, [sqlRules])).rejects.toMatchObject({ code: "FORBIDDEN" });
-        await expect(list(MEMBER, owned)).resolves.toMatchObject({ canEdit: false });
-        await expect(save(MEMBER, shared, [sqlRules])).resolves.toBeNull();
-        await expect(list(MEMBER, shared)).resolves.toMatchObject({ canEdit: true, files: [{ id: "sql" }] });
+        const { revision } = (await save(OWNER, owned, [sqlRules])) as { revision: string };
+
+        await expect(list(OWNER, owned)).resolves.toMatchObject({ canEdit: true, files: [{ id: "sql" }], revision });
+        await expect(save(MEMBER, owned, [], (await list(OWNER, owned))!.revision)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await expect(list(MEMBER, owned)).resolves.toMatchObject({ canEdit: false, files: [{ id: "sql" }] });
+        await expect(save(MEMBER, shared, [sqlRules])).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await expect(list(MEMBER, shared)).resolves.toMatchObject({ canEdit: false, files: [] });
         await expect(save(STRANGER, owned, [sqlRules])).rejects.toMatchObject({ code: "NOT_FOUND" });
         await expect(list(STRANGER, owned)).resolves.toBeNull();
+    });
+
+    it("keeps updateProject to the owner: a member is refused on an owned and on an ownerless project", async () => {
+        await insert("member", { createdAt: 1, organizationId: ORG, role: "member", userId: MEMBER });
+
+        const owned = await insert("projects", { createdAt: 0, organizationId: ORG, title: "owned", userId: OWNER });
+        const shared = await insert("projects", { createdAt: 0, organizationId: ORG, title: "shared" });
+        const rename = (userId: string, projectId: string) => as(userId).mutation(updateProject as never, { patch: { title: "renamed" }, projectId } as never);
+
+        await expect(rename(OWNER, owned)).resolves.toBe(owned);
+        await expect(rename(MEMBER, owned)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await expect(rename(MEMBER, shared)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await expect(rename(STRANGER, owned)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
+
+    it("keeps an unchanged context longer than a rule file in place, and saves the other files", async () => {
+        const context = "x".repeat(150_000);
+        const projectId = await insert("projects", { context, createdAt: 0, title: "p", userId: OWNER });
+
+        await expect(list(OWNER, projectId)).resolves.toMatchObject({ legacyContextId: "context" });
+        const { revision } = (await save(OWNER, projectId, [sqlRules], undefined, { keepContext: true })) as { revision: string };
+
+        expect(await row(projectId)).toMatchObject({ context, ruleFiles: [sqlRules] });
+        await expect(list(OWNER, projectId)).resolves.toMatchObject({ files: [{ id: "context" }, { id: "sql" }], revision });
+    });
+
+    it("refuses files that, beside a kept context, would outgrow the project row", async () => {
+        const projectId = await insert("projects", { context: "x".repeat(1_500_000), createdAt: 0, title: "p", userId: OWNER });
+        const big = Array.from({ length: 4 }, (_, index) => {
+            return { content: "y".repeat(99_000), id: `f${index}`, mode: "always", title: "t" };
+        });
+
+        await expect(save(OWNER, projectId, big, undefined, { keepContext: true })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        await expect(save(OWNER, projectId, [], undefined, { keepContext: true })).resolves.toMatchObject({ revision: expect.any(String) });
+    });
+
+    it("re-checks the owner in the writing transaction", async () => {
+        const projectId = await insert("projects", { createdAt: 0, title: "p", userId: OWNER });
+        const write = (settingsEditorId: string) =>
+            harness.run(async (ctx: any) => await ctx.runMutation(writeProject as never, { patch: { title: "t" }, projectId, settingsEditorId }));
+
+        await expect(write(MEMBER)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await expect(write(OWNER)).resolves.toMatchObject({ title: "t" });
+    });
+
+    it("leaves rule files out of the project rows the project procedures return", () => {
+        expect(publicProject({ _id: "p", ruleFiles: [sqlRules], title: "p" } as never)).not.toHaveProperty("ruleFiles");
     });
 
     it("refuses a save from a view older than another save, and keeps that save", async () => {

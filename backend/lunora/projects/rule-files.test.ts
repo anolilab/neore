@@ -51,6 +51,18 @@ describe("matchesGlob", () => {
 
         expect(result).toMatchObject({ files: [], matchingCut: true });
     });
+
+    it("charges each path it walks, and does nothing once the budget is spent", () => {
+        const budget = { steps: 10_000 };
+
+        expect(matchesGlob("x", "a".repeat(500), budget)).toBe(false);
+        expect(budget.steps).toBeLessThanOrEqual(10_000 - 500);
+
+        const spent = { steps: 0 };
+
+        expect(matchesGlob("*.sql", "a.sql", spent)).toBe(false);
+        expect(spent.steps).toBe(0);
+    });
 });
 
 describe("projectRuleFiles", () => {
@@ -128,6 +140,8 @@ describe("normalizeRuleFiles", () => {
         ["a pattern with a line break", [{ ...sql, globs: ["*.sql\n*.md"] }]],
         ["a file past its size", [always("a", "x".repeat(100_001))]],
         ["files past their size together", Array.from({ length: 11 }, (_, index) => always(`f${index}`, "x".repeat(99_999)))],
+        // 600,000 characters, but twice that once stored: each backslash is written escaped.
+        ["files past their size as stored", Array.from({ length: 6 }, (_, index) => always(`f${index}`, "\\".repeat(99_999)))],
     ])("refuses %s", (_, files) => {
         expect(() => normalizeRuleFiles(files)).toThrow();
     });

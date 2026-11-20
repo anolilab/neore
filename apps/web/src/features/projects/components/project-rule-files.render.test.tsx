@@ -19,7 +19,7 @@ vi.mock("@lingui/react/macro", () => {
 
 const backend = vi.hoisted(() => {
     return {
-        listed: { canEdit: true, files: [] as unknown[], revision: "r1" },
+        listed: { canEdit: true, files: [] as unknown[], revision: "r1" } as { canEdit: boolean; files: unknown[]; legacyContextId?: string; revision: string },
         save: vi.fn(),
     };
 });
@@ -51,16 +51,16 @@ vi.mock("@/features/auth/lib/utilities", () => {
     return { getLocalizedError: ({ error }: { error: Error }) => error.message };
 });
 
-const renderEditor = () =>
+const renderEditor = (onDirtyChange?: (dirty: boolean) => void) =>
     render(
         <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-            <ProjectRuleFiles projectId="p1" />
+            <ProjectRuleFiles onDirtyChange={onDirtyChange} projectId="p1" />
         </QueryClientProvider>,
     );
 
 beforeEach(() => {
     backend.save.mockReset();
-    backend.save.mockResolvedValue(null);
+    backend.save.mockResolvedValue({ revision: "r2" });
     backend.listed = {
         canEdit: true,
         revision: "r1",
@@ -127,11 +127,95 @@ describe("project rule files", () => {
         expect(screen.getByRole("button", { name: "Discard changes" })).toBeTruthy();
     });
 
-    it("shows a member who may not edit the files without any control to change them", async () => {
+    it("shows the saved list after discarding a draft a save elsewhere made stale", async () => {
+        const user = userEvent.setup();
+
+        backend.save.mockRejectedValue(Object.assign(new Error("changed"), { code: "CONFLICT" }));
+        renderEditor();
+
+        await user.click(await screen.findByRole("button", { name: "Delete SQL" }));
+        backend.listed = { ...backend.listed, files: [{ content: "New", id: "new", mode: "always", title: "Saved elsewhere" }], revision: "r2" };
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+        await user.click(screen.getByRole("button", { name: "Discard changes" }));
+
+        expect(await screen.findByRole("listitem", { name: "Saved elsewhere" })).toBeTruthy();
+    });
+
+    it("keeps edits typed while a save runs, based on the list just saved", async () => {
+        const user = userEvent.setup();
+        const resolvers: ((value: { revision: string }) => void)[] = [];
+
+        backend.save.mockImplementationOnce(
+            async () =>
+                await new Promise<{ revision: string }>((resolve) => {
+                    resolvers.push(resolve);
+                }),
+        );
+        renderEditor();
+
+        await user.click(await screen.findByRole("button", { name: "Delete Project context" }));
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+        await user.type(within(screen.getByRole("listitem", { name: "SQL" })).getByLabelText("Instructions"), " Always.");
+        backend.listed = { ...backend.listed, files: [backend.listed.files[1]], revision: "r2" };
+        resolvers[0]?.({ revision: "r2" });
+
+        await screen.findByRole("button", { name: "Save rule files" });
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(backend.save.mock.calls[1]?.[0]).toMatchObject({ revision: "r2", ruleFiles: [{ content: "Use snake_case. Always.", id: "sql" }] });
+    });
+
+    it("leaves an unchanged older context longer than a rule file where it is, and saves the rest", async () => {
+        const user = userEvent.setup();
+
+        backend.listed = {
+            ...backend.listed,
+            files: [{ content: "x".repeat(100_001), id: "context", mode: "always", title: "Project context" }, backend.listed.files[1]],
+            legacyContextId: "context",
+        };
+        renderEditor();
+
+        await user.type(within(await screen.findByRole("listitem", { name: "SQL" })).getByLabelText("Name"), "!");
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(backend.save.mock.calls[0]?.[0]).toMatchObject({ keepContext: true, ruleFiles: [{ id: "sql", title: "SQL!" }] });
+    });
+
+    it("holds an older context longer than a rule file to the limits once it was changed", async () => {
+        const user = userEvent.setup();
+
+        backend.listed = {
+            ...backend.listed,
+            files: [{ content: "x".repeat(100_001), id: "context", mode: "always", title: "Project context" }, backend.listed.files[1]],
+            legacyContextId: "context",
+        };
+        renderEditor();
+
+        await user.click(await screen.findByRole("button", { name: "Move SQL up" }));
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(backend.save).not.toHaveBeenCalled();
+        expect(screen.getByRole("alert").textContent).toContain("is longer than");
+    });
+
+    it("tells the dialog while unsaved changes are open", async () => {
+        const user = userEvent.setup();
+        const onDirtyChange = vi.fn();
+
+        renderEditor(onDirtyChange);
+
+        await user.click(await screen.findByRole("button", { name: "Delete SQL" }));
+        expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+        await user.click(screen.getByRole("button", { name: "Discard changes" }));
+        expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+    });
+
+    it("shows a member who may not edit the files what they say, without any control to change them", async () => {
         backend.listed = { ...backend.listed, canEdit: false };
         renderEditor();
 
         expect(await screen.findByText("SQL")).toBeTruthy();
+        expect(screen.getByText("Use snake_case.")).toBeTruthy();
         expect(screen.getByText("**/*.sql")).toBeTruthy();
         expect(screen.queryByRole("button", { name: "Add rule file" })).toBeNull();
         expect(screen.queryByRole("textbox")).toBeNull();

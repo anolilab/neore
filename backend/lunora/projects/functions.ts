@@ -28,6 +28,7 @@ import {
     ProjectRepoError,
     withDefault,
 } from "./repositories";
+import { mayEditProject } from "./edit-access";
 import { forViewer, resolveProjectLocation } from "./machine-location";
 import {
     MAX_RULE_FILE_LENGTH,
@@ -189,9 +190,24 @@ export const readableProjectTitles = async (
 };
 
 /**
+ * The project when `userId` may change its settings ({@link mayEditProject}), else `null` (also for a missing one): the one
+ * check of `updateProject` and `setProjectRuleFiles`, so the two cannot drift. `primary` decides on the authoritative row.
+ */
+export const projectWithEditableSettings = async (
+    context: QueryCtx | MutationCtx,
+    projectId: Id<"projects">,
+    userId: string,
+    { primary = false } = {},
+): Promise<Doc<"projects"> | null> => {
+    const project = await context.db.projects.findFirst({ where: { _id: projectId }, ...(primary && { consistency: "primary" as const }) });
+
+    return project && mayEditProject(project, userId) ? project : null;
+};
+
+/**
  * The project when `userId` may file threads in it, else `null`: readable (owner or a current member of its
  * organization) AND owned by `userId` or by nobody. The same rule as moving a thread into a project
- * (`moveThreadToProject` here) and updating one: a member never files into another member's project.
+ * (`moveThreadToProject` here): a member never files into another member's project.
  */
 export const writableProject = async (context: QueryCtx | MutationCtx, projectId: Id<"projects">, userId: string): Promise<Doc<"projects"> | null> => {
     const project = await readableProject(context, projectId, userId);
@@ -243,8 +259,9 @@ export const getProjectContextForRun = internalQuery
     });
 
 /**
- * A project's rule files for its settings, a legacy `context` first (`projectRuleFiles`), and whether the caller may
- * change them: the rule of `updateProject`, its owner, or any reader of a project nobody owns.
+ * A project's rule files for its settings, a legacy `context` first (`projectRuleFiles`, its id as `legacyContextId`),
+ * and whether the caller may change them: the rule of `updateProject` ({@link mayEditProject}), its owner only. Read on
+ * the primary, where a save compares its revision: a lagging replica would hand the editor a revision already replaced.
  */
 export const listProjectRuleFiles = authQuery
     .input({ projectId: v.id("projects") })
@@ -262,13 +279,14 @@ export const listProjectRuleFiles = authQuery
                         title: v.string(),
                     }),
                 ),
+                legacyContextId: v.optional(v.string()),
                 revision: v.string(),
             }),
         ),
     )
     .query(async ({ args: { projectId }, ctx: context }) => {
         const { userId } = context.user;
-        const project = await readableProject(context, projectId, userId);
+        const project = await readableProject(context, projectId, userId, { primary: true });
 
         if (!project) {
             return null;
@@ -276,19 +294,27 @@ export const listProjectRuleFiles = authQuery
 
         const files = projectRuleFiles(project);
 
-        return { canEdit: !project.userId || project.userId === userId, files, revision: ruleFilesRevision(files) };
+        return {
+            canEdit: mayEditProject(project, userId),
+            files,
+            ...(project.context && { legacyContextId: files[0]!.id }),
+            revision: ruleFilesRevision(files),
+        };
     });
 
 /**
  * Replaces a project's rule files with `ruleFiles`, in their order: adding, editing, reordering and deleting are one
- * save of the whole list. The legacy `context` is cleared in the same write, as the list carries it from now on. Who
- * may: the rule of `updateProject`, decided on the primary. `revision` is the one `listProjectRuleFiles` gave with the
- * list the editor started from; a list changed since is refused (CONFLICT) in the transaction that writes.
+ * save of the whole list. The legacy `context` is cleared in the same write, as the list carries it from now on, unless
+ * `keepContext`: an unchanged `context` longer than a rule file may be stays where it is, still read first, and the list
+ * holds the other files. Who may: the rule of `updateProject` ({@link projectWithEditableSettings}, its owner only),
+ * decided on the primary and again in the writing transaction. `revision` is the one `listProjectRuleFiles` gave with
+ * the list the editor started from; a list changed since is refused (CONFLICT) in the transaction that writes.
  */
 export const setProjectRuleFiles = authMutation
     .use(rateLimit("projects/update"))
     // Spelled inline: codegen cannot read a const reference (`backend/AGENTS.md`).
     .input({
+        keepContext: v.optional(v.boolean()),
         projectId: v.id("projects"),
         revision: v.string().max(MAX_LENGTH.short),
         ruleFiles: v
@@ -303,25 +329,29 @@ export const setProjectRuleFiles = authMutation
             )
             .max(MAX_RULE_FILES),
     })
-    .output(v.null())
-    .mutation(async ({ args: { projectId, revision, ruleFiles }, ctx: context }) => {
+    .output(v.object({ revision: v.string() }))
+    .mutation(async ({ args: { keepContext = false, projectId, revision, ruleFiles }, ctx: context }) => {
         const { userId } = context.user;
-        const project = await readableProject(context, projectId, userId, { primary: true });
+        const project = await projectWithEditableSettings(context, projectId, userId, { primary: true });
 
         if (!project) {
             throw new LunoraError("NOT_FOUND", "Project not found");
         }
 
-        if (project.userId && project.userId !== userId) {
-            throwForbidden("Cannot update another user's project");
-        }
-
-        const normalized = normalizeRuleFiles(ruleFiles);
+        // A kept context reads as the list's first file under its own id: a file sent under that id is that file again.
+        const kept = keepContext && project.context ? projectRuleFiles(project)[0]?.id : undefined;
+        const normalized = kept
+            ? normalizeRuleFiles(
+                  ruleFiles.filter((file) => file.id !== kept),
+                  { keptContext: project.context },
+              )
+            : normalizeRuleFiles(ruleFiles);
 
         await context.runMutation(internal.agent.projects.updateProject, {
-            patch: { context: "", ruleFiles: normalized },
+            patch: kept ? { ruleFiles: normalized } : { context: "", ruleFiles: normalized },
             projectId,
             ruleFilesRevision: revision,
+            settingsEditorId: userId,
         });
 
         context.log.event("projects.set_rule_files", {
@@ -330,7 +360,8 @@ export const setProjectRuleFiles = authMutation
             ruleFiles: normalized.length,
         });
 
-        return null;
+        // The revision of the list as written, for the editor's next save: never one read back from a lagging replica.
+        return { revision: ruleFilesRevision(projectRuleFiles({ context: kept ? project.context : undefined, ruleFiles: normalized })) };
     });
 
 export const getProject = authQuery
@@ -444,17 +475,9 @@ export const updateProject = authMutation
     .mutation(async ({ args: { patch, projectId }, ctx: context }) => {
         const { userId } = context.user;
 
-        // Verify project exists and user has access
-        const project = await context.runQuery(api.agent.projects.getProject, {
-            projectId: projectId as Id<"projects">,
-        });
-
-        if (!project) {
+        // Its owner only, the rule rule files share (`projectWithEditableSettings`); anyone else is told the project does not exist.
+        if (!(await projectWithEditableSettings(context, projectId as Id<"projects">, userId))) {
             throw new LunoraError("NOT_FOUND", "Project not found");
-        }
-
-        if (project.userId && project.userId !== userId) {
-            throwForbidden("Cannot update another user's project");
         }
 
         assertOwnOrganizationId(context.user, patch.organizationId);
@@ -466,6 +489,7 @@ export const updateProject = authMutation
                 icon: typeof patch.icon === "string" ? patch.icon : undefined,
             },
             projectId: projectId as Id<"projects">,
+            settingsEditorId: userId,
         });
 
         // The repository rows copy the project's organization for `findRepoProject`; a move carries them along.

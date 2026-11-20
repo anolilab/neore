@@ -12,7 +12,7 @@ import { formatNumber } from "@neore/ui/utils/locale-format";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import type { FC } from "react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -65,6 +65,15 @@ const moved = (files: RuleFileDraft[], index: number, offset: -1 | 1): RuleFileD
 /** A refused save in the person's language: `conflict` for one from an older view, else the error as the app words it. */
 const refusalMessage = (error: unknown, conflict: string, t: Parameters<typeof getLocalizedError>[0]["t"]): string =>
     errorCode(error) === "CONFLICT" ? conflict : getLocalizedError({ error, t });
+
+/** Whether a draft file is `saved` as it was: same id, name, mode, patterns and text. */
+const sameFile = (file: RuleFileDraft | undefined, saved: RuleFileDraft): boolean =>
+    file !== undefined &&
+    file.id === saved.id &&
+    file.title === saved.title &&
+    file.mode === saved.mode &&
+    file.patterns === saved.patterns &&
+    file.content === saved.content;
 
 /** The list as `setProjectRuleFiles` takes it: patterns only on a file applied by pattern. */
 const toSaved = (files: RuleFileDraft[]) =>
@@ -151,10 +160,10 @@ const RuleFileFields: FC<{
 /**
  * A project's rule files: instructions added to the project's runs, each always or only when the run's files match its
  * patterns. Edited as one list and saved together (`setProjectRuleFiles`), so adding, changing, reordering and deleting
- * are one save. A project's older single context shows as its first file. Only the project's owner (a member, for an
- * organization project nobody owns) edits them; others read them.
+ * are one save. A project's older single context shows as its first file. Only the project's owner edits them, the
+ * rule of the project's other settings; others read them. `onDirtyChange` says whether unsaved changes are open.
  */
-const ProjectRuleFiles: FC<{ projectId: string }> = ({ projectId }) => {
+const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; projectId: string }> = ({ onDirtyChange, projectId }) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
@@ -171,13 +180,22 @@ const ProjectRuleFiles: FC<{ projectId: string }> = ({ projectId }) => {
     const [baseRevision, setBaseRevision] = useState("");
     const [error, setError] = useState<string | undefined>(undefined);
     const [status, setStatus] = useState("");
-    const files =
-        draft ??
-        (data?.files ?? []).map((file) =>
-            // The older single context arrives under the backend's English name; it shows in the person's language.
-            toDraft(file.id === LEGACY_CONTEXT_ID && file.title === LEGACY_CONTEXT_TITLE ? { ...file, title: t`Project context` } : file),
-        );
+    const savedFiles = (data?.files ?? []).map((file) =>
+        // The older single context arrives under the backend's English name; it shows in the person's language.
+        toDraft(file.id === LEGACY_CONTEXT_ID && file.title === LEGACY_CONTEXT_TITLE ? { ...file, title: t`Project context` } : file),
+    );
+    const files = draft ?? savedFiles;
     const canEdit = data?.canEdit === true;
+    const isDirty = draft !== null;
+    // An older context longer than a rule file may be, left exactly as it was (first, same name, mode and text): it stays
+    // where it is, as the backend keeps it. Any change to it makes it an ordinary file, held to the limits.
+    const legacy = savedFiles[0];
+    const keptLegacyId =
+        legacy && legacy.id === data?.legacyContextId && legacy.content.length > MAX_RULE_FILE_LENGTH && sameFile(files[0], legacy) ? legacy.id : undefined;
+
+    useEffect(() => {
+        onDirtyChange?.(isDirty);
+    }, [isDirty, onDirtyChange]);
 
     const conflictMessage = t`These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again.`;
 
@@ -199,7 +217,7 @@ const ProjectRuleFiles: FC<{ projectId: string }> = ({ projectId }) => {
             return t`A file applied when files match needs at least one pattern.`;
         }
 
-        const long = files.find((file) => file.content.length > MAX_RULE_FILE_LENGTH);
+        const long = files.find((file) => file.id !== keptLegacyId && file.content.length > MAX_RULE_FILE_LENGTH);
 
         if (long) {
             const limit = formatNumber(MAX_RULE_FILE_LENGTH, i18n.locale);
@@ -220,10 +238,17 @@ const ProjectRuleFiles: FC<{ projectId: string }> = ({ projectId }) => {
             return;
         }
 
+        const submitted = draft;
+        const ruleFiles = toSaved(keptLegacyId === undefined ? files : files.filter((file) => file.id !== keptLegacyId));
+        const keep = keptLegacyId === undefined ? {} : { keepContext: true };
+
         try {
-            await saved.mutateAsync({ ...args, revision: baseRevision, ruleFiles: toSaved(files) });
+            const written = await saved.mutateAsync({ ...args, ...keep, revision: baseRevision, ruleFiles });
+
+            // Edits typed while the save ran stay, now based on the list just saved.
+            setDraft((current) => (current === submitted ? null : current));
+            setBaseRevision(written.revision);
             await refetch();
-            setDraft(null);
             setError(undefined);
             setStatus(t`Rule files saved.`);
         } catch (saveError) {
@@ -245,11 +270,14 @@ const ProjectRuleFiles: FC<{ projectId: string }> = ({ projectId }) => {
                 </p>
             )}
             {data && !canEdit && (
-                <ul className="space-y-2">
+                <ul className="space-y-3">
                     {files.map((file) => (
-                        <li className="flex items-center gap-2 text-sm" key={file.id}>
-                            <span className="font-medium">{file.title}</span>
-                            <Badge variant="outline">{file.mode === "always" ? t`Always` : patternsOf(file.patterns).join(", ")}</Badge>
+                        <li className="space-y-1 text-sm" key={file.id}>
+                            <div className="flex items-center gap-2">
+                                <span className="font-medium">{file.title}</span>
+                                <Badge variant="outline">{file.mode === "always" ? t`Always` : patternsOf(file.patterns).join(", ")}</Badge>
+                            </div>
+                            <p className="text-muted-foreground max-h-48 overflow-y-auto break-words whitespace-pre-wrap">{file.content}</p>
                         </li>
                     ))}
                 </ul>
@@ -297,6 +325,8 @@ const ProjectRuleFiles: FC<{ projectId: string }> = ({ projectId }) => {
                                 </Button>
                                 <Button
                                     onClick={() => {
+                                        // Read again: after a refused save the cached list is the one another save replaced.
+                                        refetch().catch(() => undefined);
                                         setDraft(null);
                                         setError(undefined);
                                     }}

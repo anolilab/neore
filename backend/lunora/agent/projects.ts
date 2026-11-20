@@ -25,6 +25,7 @@ import { countedWorkflowFileIds } from "../workflow/images";
 import { changeRefcount } from "./files";
 import { listThreadItem } from "./threads";
 import { eraseProjectRepositories } from "../projects/gdpr";
+import { mayEditProject } from "../projects/edit-access";
 import { forViewer } from "../projects/machine-location";
 import { projectRuleFiles, ruleFilesRevision } from "../projects/rule-files";
 
@@ -45,10 +46,19 @@ const recountWorkflowImages = async (ctx: MutationCtx, ownerId: string | undefin
     await changeRefcount(ctx, previous, next);
 };
 
-export const publicProject = (project: Doc<"projects">): ProjectDocument =>
+/**
+ * A project row as the project procedures return it, without its rule files: up to 1 MB a project, which a list of
+ * projects would carry for every row. They are read through `projects.functions.listProjectRuleFiles` only.
+ */
+export const publicProject = (project: Doc<"projects">): ProjectDocument => {
+    const rest: Partial<Doc<"projects">> = { ...project };
+
+    Reflect.deleteProperty(rest, "ruleFiles");
+
     // Safe cast: optional fields are never null at runtime (only undefined).
     // The column builders generate null|T types in TypeScript only.
-    project as unknown as ProjectDocument;
+    return rest as unknown as ProjectDocument;
+};
 
 export const getProject = query
     .input({ projectId: v.id("projects") })
@@ -249,12 +259,21 @@ export const updateProject = internalMutation
         projectId: v.id("projects"),
         /** When set, the rule files' revision the change was made from (`ruleFilesRevision`); another one is refused. */
         ruleFilesRevision: v.optional(v.string()),
+        /**
+         * When set, the user the change is made for: refused (NOT_FOUND) unless they still own the project in this
+         * transaction, so a change checked in an earlier one cannot land after the project changed hands.
+         */
+        settingsEditorId: v.optional(v.string()),
     })
     .output(v.from(vProjectDocument))
     .mutation(async ({ args, ctx }) => {
         const project = await ctx.db.projects.findFirst({ consistency: "primary", where: { _id: args.projectId } });
 
         assert(project, `Project ${args.projectId} not found`);
+
+        if (args.settingsEditorId !== undefined && !mayEditProject(project, args.settingsEditorId)) {
+            throw new LunoraError("NOT_FOUND", "Project not found");
+        }
 
         // Read and written in this one transaction: a save from a view older than another save is refused, never applied over it.
         if (args.ruleFilesRevision !== undefined && args.ruleFilesRevision !== ruleFilesRevision(projectRuleFiles(project))) {
