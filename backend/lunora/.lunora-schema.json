@@ -4435,6 +4435,12 @@
               "optional": false,
               "unique": false
             },
+            "claim": {
+              "kind": "string",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
             "ended": {
               "kind": "union",
               "nullable": false,

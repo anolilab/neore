@@ -39,7 +39,7 @@ const REPLACED_NOTE_FOR_A = /at the same time.*https:\/\/example\.com\/a.*screen
 const NOW = Date.UTC(2026, 10, 20, 12);
 
 interface SessionRow {
-    control?: { by: string; ended?: "handed_back" | "left"; since: number; until: number };
+    control?: { by: string; claim: string; ended?: "handed_back" | "left"; since: number; until: number };
     currentUrl?: string;
     inUseHolds?: number[];
     lastActivityAt: number;
@@ -374,7 +374,9 @@ describe("a browser action after the provider reaped the browser", () => {
 
 describe("a browser a person took control of", () => {
     const giveControl = async (control: Record<string, unknown>): Promise<void> => {
-        await harness.run(async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { control: { by: OWNER, since: NOW - 1000, ...control } }));
+        await harness.run(
+            async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { control: { by: OWNER, claim: "c-1", since: NOW - 1000, ...control } }),
+        );
     };
 
     it("refuses the agent's action while the person drives it, and never reaches the renderer", async () => {
@@ -434,7 +436,9 @@ describe("a browser session closed while an action ran", () => {
         await addSession(NOW - 1000);
         await harness.run(
             async (ctx: any) =>
-                await ctx.db.patch("browserSessions", sessionId, { control: { by: OWNER, ended: "handed_back", since: NOW - 5000, until: NOW - 1 } }),
+                await ctx.db.patch("browserSessions", sessionId, {
+                    control: { by: OWNER, claim: "c-1", ended: "handed_back", since: NOW - 5000, until: NOW - 1 },
+                }),
         );
         renderer.mockImplementationOnce(async () => {
             await harness.run(async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { status: "terminated" }));

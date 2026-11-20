@@ -5302,8 +5302,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Sfoglia, duplica e rielabora i workflow condivisi dalla community"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
-#: src/features/chat/browser-live-view/browser-live-view.tsx:188
-#: src/features/chat/browser-live-view/browser-live-view.tsx:251
+#: src/features/chat/browser-live-view/browser-live-view.tsx:209
+#: src/features/chat/browser-live-view/browser-live-view.tsx:303
 msgid "Browser"
 msgstr "Browser"
 
@@ -8804,7 +8804,7 @@ msgstr "Impossibile salvare la tua risposta. Riprova."
 msgid "Could not send the change."
 msgstr "Impossibile inviare la modifica."
 
-#: src/features/sub-agents/components/worker-composer.tsx:69
+#: src/features/sub-agents/components/worker-composer.tsx:70
 msgid "Could not send the message."
 msgstr "Impossibile inviare il messaggio."
 
@@ -16324,7 +16324,7 @@ msgstr "Nascondi colonna"
 msgid "Hide follow-up suggestions"
 msgstr "Nascondi suggerimenti di follow-up"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:192
+#: src/features/chat/browser-live-view/browser-live-view.tsx:227
 msgid "Hide live view"
 msgstr ""
 
@@ -18969,7 +18969,7 @@ msgstr "Anteprima dal vivo: viene mostrata quando il componente ha finito lo str
 msgid "Live preview — updating as the artifact streams"
 msgstr "Anteprima dal vivo: si aggiorna durante lo streaming dell'artefatto"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:228
+#: src/features/chat/browser-live-view/browser-live-view.tsx:263
 msgid "Live view of the agent's browser (read-only)"
 msgstr ""
 
@@ -20271,11 +20271,11 @@ msgstr "Selezione dei messaggi"
 msgid "Message the agent on your computer"
 msgstr "Scrivi all’agente sul tuo computer"
 
-#: src/features/sub-agents/components/worker-composer.tsx:103
+#: src/features/sub-agents/components/worker-composer.tsx:106
 msgid "Message the worker"
 msgstr "Scrivi al worker"
 
-#: src/features/sub-agents/components/worker-composer.tsx:115
+#: src/features/sub-agents/components/worker-composer.tsx:118
 msgid "Message the worker..."
 msgstr "Scrivi al worker..."
 
@@ -23935,7 +23935,7 @@ msgstr "Apertura della pull request…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "Aprire l'assistente senza una conversazione ti porta alla più recente invece che a una chat vuota."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:199
+#: src/features/chat/browser-live-view/browser-live-view.tsx:234
 msgid "Opening the live view…"
 msgstr ""
 
@@ -29496,7 +29496,7 @@ msgstr "Stile visivo semi-realistico"
 #: src/features/chat/guest-links/guest-link-panel.tsx:430
 #: src/features/chat/host/host-composer.tsx:707
 #: src/features/feedback/components/send-feedback-dialog.tsx:389
-#: src/features/sub-agents/components/worker-composer.tsx:118
+#: src/features/sub-agents/components/worker-composer.tsx:121
 msgid "Send"
 msgstr "Invia"
 
@@ -30765,6 +30765,10 @@ msgstr "Alcune immagini di questa esecuzione non sono state salvate."
 #: src/features/chat/thread/message-cost-badge.tsx:80
 msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "Per alcuni passaggi mancano i dati sui prezzi; il totale è un minimo."
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:213
+msgid "Someone else has control of this browser."
+msgstr ""
 
 #: src/components/error-boundary.tsx:200
 #: src/components/settings/settings-modal.tsx:128
@@ -33179,7 +33183,7 @@ msgstr "L’agente sta ancora aprendo la sua sessione. Riprova tra un attimo."
 msgid "The agent is still working on the last message."
 msgstr "L’agente sta ancora lavorando all’ultimo messaggio."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:189
+#: src/features/chat/browser-live-view/browser-live-view.tsx:210
 msgid "The agent is using a browser"
 msgstr ""
 
@@ -33613,7 +33617,7 @@ msgstr "Il link potrebbe essere errato oppure il proprietario ha reso privata la
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "Il link potrebbe essere errato oppure il proprietario ha annullato la pubblicazione o eliminato la pagina."
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:210
+#: src/features/chat/browser-live-view/browser-live-view.tsx:245
 msgid "The live view could not be opened."
 msgstr ""
 
@@ -33621,7 +33625,7 @@ msgstr ""
 #~ msgid "The live view could not be opened. Try again."
 #~ msgstr ""
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:204
+#: src/features/chat/browser-live-view/browser-live-view.tsx:239
 msgid "The live view is not available right now."
 msgstr ""
 
@@ -33942,11 +33946,11 @@ msgstr "La voce con cui la modalità a mani libere legge le risposte. Una skill 
 msgid "The whole answer, exactly"
 msgstr "L'intera risposta, esattamente"
 
-#: src/features/sub-agents/components/worker-composer.tsx:53
+#: src/features/sub-agents/components/worker-composer.tsx:54
 msgid "The worker is busy. Your message runs after the earlier ones."
 msgstr "Il worker è occupato. Il tuo messaggio viene eseguito dopo quelli precedenti."
 
-#: src/features/sub-agents/components/worker-composer.tsx:53
+#: src/features/sub-agents/components/worker-composer.tsx:54
 msgid "The worker is working on an earlier message."
 msgstr "Il worker sta lavorando a un messaggio precedente."
 
@@ -34755,7 +34759,7 @@ msgstr "Questi {0} file verranno rimossi definitivamente dalla tua base di conos
 msgid "This workbook has {sheetCount} sheets — only the first sheet was imported."
 msgstr "Questa cartella di lavoro ha {sheetCount} fogli: è stato importato solo il primo."
 
-#: src/features/sub-agents/components/worker-composer.tsx:51
+#: src/features/sub-agents/components/worker-composer.tsx:52
 msgid "This worker is archived. Restore it to message it again."
 msgstr "Questo worker è archiviato. Ripristinalo per scrivergli di nuovo."
 
@@ -35145,7 +35149,7 @@ msgstr "Troppi tentativi. Attendi qualche secondo, poi riprova."
 msgid "too many files"
 msgstr "troppi file"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:210
+#: src/features/chat/browser-live-view/browser-live-view.tsx:245
 msgid "Too many live views were opened. Try again later."
 msgstr ""
 
@@ -35539,8 +35543,8 @@ msgstr "Prova a modificare i termini di ricerca."
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
-#: src/features/chat/browser-live-view/browser-live-view.tsx:214
-#: src/features/chat/browser-live-view/browser-live-view.tsx:265
+#: src/features/chat/browser-live-view/browser-live-view.tsx:249
+#: src/features/chat/browser-live-view/browser-live-view.tsx:318
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -37611,7 +37615,7 @@ msgstr "Vuoi continuare da qui?"
 msgid "Watch"
 msgstr "Monitora"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:192
+#: src/features/chat/browser-live-view/browser-live-view.tsx:227
 msgid "Watch live"
 msgstr ""
 
@@ -38007,7 +38011,7 @@ msgstr "Dove i pensieri<0/><1>diventano azioni.</1>"
 msgid "Where you stay in control"
 msgstr "Dove resti tu al comando"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:253
+#: src/features/chat/browser-live-view/browser-live-view.tsx:305
 msgid "Whether the agent is using a browser could not be checked."
 msgstr ""
 

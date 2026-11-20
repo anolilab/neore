@@ -557,6 +557,60 @@ describe("taking control of the browser", () => {
 
         await expect(as(WRITER).mutation(keepControl as never, { threadId } as never)).resolves.toBeNull();
     });
+    it("returns no URL when the lease was handed back, or the grant lowered, while the provider minted it", async () => {
+        await addSession();
+        fetchMock.mockImplementationOnce(async () => {
+            await as(OWNER).mutation(handBack as never, { reason: "left", threadId } as never);
+
+            return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
+        });
+
+        await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+        // The hand back stands: the agent still hears of it.
+        await expect(control()).resolves.toMatchObject({ by: OWNER, ended: "left" });
+
+        fetchMock.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => {
+                const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: WRITER } });
+
+                await ctx.db.patch("threadAccess", grant._id, { permission: "read" });
+            });
+
+            return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
+        });
+
+        await expect(take(WRITER)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        // The writer's claim is gone, and the agent's note of the owner's hand back is back.
+        await expect(control()).resolves.toMatchObject({ by: WRITER, ended: "left", until: NOW });
+    });
+
+    it("keeps a lease its holder renewed while their first claim's mint failed", async () => {
+        await addSession();
+        fetchMock
+            .mockImplementationOnce(async () => {
+                // A second request of the same person renews the lease and gets its view first.
+                await expect(take(OWNER)).resolves.toMatchObject({ status: "ok" });
+
+                return answer(500, {});
+            })
+            .mockResolvedValueOnce(answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-2" }));
+
+        await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+        await expect(control()).resolves.toMatchObject({ by: OWNER, until: NOW + CONTROL_IDLE_MS });
+        await expect(statusFor(READER)).resolves.toMatchObject({ control: { byYou: false } });
+    });
+
+    it("keeps the agent's note of an earlier hand back when a new claim's mint fails", async () => {
+        await addSession({ control: { by: WRITER, claim: "c-0", ended: "handed_back", since: NOW - 5000, until: NOW - 1 } });
+        fetchMock.mockResolvedValue(answer(500, {}));
+
+        await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+
+        const after = await control();
+
+        expect(after).toMatchObject({ ended: "handed_back" });
+        expect(after.until).toBeLessThanOrEqual(NOW);
+    });
 });
 
 describe("opening a page while in control", () => {
@@ -614,6 +668,113 @@ describe("opening a page while in control", () => {
         // Loaded: the lease ends now, and the agent's next action hears of the hand back.
         const loaded = await session();
 
-        expect(loaded.control).toEqual({ by: OWNER, ended: "handed_back", since: NOW, until: NOW });
+        expect(loaded.control).toMatchObject({ by: OWNER, ended: "handed_back", since: NOW, until: NOW });
+        expect(loaded.control).not.toHaveProperty("navigatingUntil");
+    });
+
+    it("refuses a second page while one loads, and any page once handed back mid-load", async () => {
+        await addSession();
+        await take(OWNER);
+        const during: unknown[] = [];
+
+        renderer.mockImplementationOnce(async () => {
+            during.push(await navigate(OWNER, "https://example.com/other"));
+            await as(OWNER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
+            during.push(await navigate(OWNER, "https://example.com/other"));
+
+            return { data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } };
+        });
+
+        await navigate(OWNER);
+
+        expect(during).toEqual([
+            { error: "The page you opened is still loading.", status: "refused" },
+            { error: "You do not have control of the browser.", status: "refused" },
+        ]);
+        expect(renderer).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps a lease taken again mid-load after a hand back, once the page loaded", async () => {
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+        await addSession();
+        await take(OWNER);
+
+        renderer.mockImplementationOnce(async () => {
+            await as(OWNER).mutation(handBack as never, { reason: "left", threadId } as never);
+            vi.setSystemTime(NOW + 1000);
+            await expect(take(OWNER)).resolves.toMatchObject({ status: "ok" });
+
+            return { data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } };
+        });
+
+        await navigate(OWNER);
+
+        const after = await session();
+
+        expect(after.control).not.toHaveProperty("ended");
+        expect(after.control.until).toBe(NOW + 1000 + CONTROL_IDLE_MS);
+        await expect(as(OWNER).mutation(keepControl as never, { threadId } as never)).resolves.toEqual({ until: NOW + 1000 + CONTROL_IDLE_MS });
+    });
+
+    it("hands the lease back again when taking it back mid-load fails to mint", async () => {
+        await addSession();
+        await take(OWNER);
+
+        renderer.mockImplementationOnce(async () => {
+            await as(OWNER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
+            fetchMock.mockResolvedValueOnce(answer(500, {}));
+            await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+            await expect(session()).resolves.toMatchObject({ control: { ended: "handed_back", until: NOW + 60_000 } });
+
+            return { data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } };
+        });
+
+        await navigate(OWNER);
+
+        await expect(session()).resolves.toMatchObject({ control: { ended: "handed_back", until: NOW } });
+    });
+
+    it("refuses every page when the owner turned browsing off", async () => {
+        await addSession();
+        await take(WRITER);
+        await harness.run(async (ctx: any) => await ctx.db.insert("aiUserPreferences", { browserSettings: { enabled: false }, userId: OWNER }));
+
+        await expect(navigate(WRITER)).resolves.toEqual({ error: "Browser automation is disabled in your settings", status: "refused" });
+        expect(renderer).not.toHaveBeenCalled();
+    });
+
+    it("forgets a browser the renderer closed after a blocked redirect, and ends the lease with it", async () => {
+        await addSession();
+        await take(OWNER);
+        renderer.mockResolvedValueOnce({ data: { error: "Redirected to blocked URL", success: false }, response: { ok: true } });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ error: "Redirected to blocked URL", status: "refused" });
+
+        const after = await session();
+
+        expect(after.providerSessionId).toBe("cf-browser-rendering");
+        expect(after.control.until).toBeLessThanOrEqual(NOW);
+        await expect(statusFor(OWNER)).resolves.toBeNull();
+    });
+
+    it("audits a navigation on the session it began on, not on one opened while it ran", async () => {
+        const first = await addSession();
+
+        await take(OWNER);
+        let second = "";
+
+        renderer.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => await ctx.db.patch("browserSessions", first, { status: "completed" }));
+            second = await addSession({ providerSessionId: "s-2" });
+
+            return { data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } };
+        });
+
+        await navigate(OWNER);
+
+        const audits = (await harness.run(async (ctx: any) => await ctx.db.query("browserActions").collect())) as { sessionId: string }[];
+
+        expect(audits.map((row) => row.sessionId)).toEqual([first]);
+        expect(second).not.toBe(first);
     });
 });

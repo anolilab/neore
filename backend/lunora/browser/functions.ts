@@ -259,11 +259,16 @@ export const logAction = internalMutation
             // Every action keeps the provider's browser alive for another idle window; the live view reads this to tell
             // a running browser from one the provider has reaped (`browser/live-view-logic.ts`). This action's hold ends;
             // the holds of actions still running stay.
+            // A person's lease is on the browser their view shows: once it is gone, the lease ends with it, and the
+            // agent's next action hears that a person drove.
+            const leaseEnds = replaced && session.control !== undefined && controlStateOf(session, ctx.now) === "person";
+
             await patchRow(ctx.db, "browserSessions", session, {
                 inUseHolds,
                 // Never back in time: an older action finishing late must not shorten the window a newer one opened.
                 lastActivityAt: Math.max(session.lastActivityAt, ctx.now),
                 ...page,
+                ...(leaseEnds && session.control !== undefined && { control: { ...session.control, navigatingUntil: undefined, until: ctx.now } }),
             });
 
             return { replaced: false };

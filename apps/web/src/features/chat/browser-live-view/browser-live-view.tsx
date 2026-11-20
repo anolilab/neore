@@ -107,7 +107,12 @@ const loadedFor =
 const isForOtherBrowser = (view: View, browserId: string): boolean => (view.kind === "open" || view.kind === "opening") && view.browserId !== browserId;
 
 /** The card for one thread's browser. It unmounts when the browser stops, so its view and the view's credential go with it. */
-const BrowserCard: FC<{ browserId: string; currentUrl: string | undefined; threadId: Id<"threads"> }> = ({ browserId, currentUrl, threadId }) => {
+const BrowserCard: FC<{ browserId: string; controlledByOther: boolean; currentUrl: string | undefined; threadId: Id<"threads"> }> = ({
+    browserId,
+    controlledByOther,
+    currentUrl,
+    threadId,
+}) => {
     const { t } = useLingui();
     const headingId = useId();
     const viewId = useId();
@@ -176,6 +181,18 @@ const BrowserCard: FC<{ browserId: string; currentUrl: string | undefined; threa
         askForReplacement();
     }, [browserId]);
 
+    // Someone else took control and may type a password: an open view goes (the frame unmounts, ending its connection),
+    // and a request still out is dropped. The provider cannot revoke a view, so the card must close it.
+    const [closedForControl, setClosedForControl] = useState(controlledByOther);
+
+    if (closedForControl !== controlledByOther) {
+        setClosedForControl(controlledByOther);
+
+        if (controlledByOther) {
+            setView(CLOSED);
+        }
+    }
+
     const toggle = (): void => {
         if (expanded) {
             setView(CLOSED);
@@ -195,8 +212,22 @@ const BrowserCard: FC<{ browserId: string; currentUrl: string | undefined; threa
                 <div className="min-w-0 flex-1">
                     <h3 className="text-xs font-medium text-gray-700 dark:text-gray-300" id={headingId}>{t`Browser`}</h3>
                     <p className="text-muted-foreground truncate text-xs">{currentUrl ?? t`The agent is using a browser`}</p>
+                    {controlledByOther && (
+                        <p className="text-muted-foreground text-xs" role="status">
+                            {t`Someone else has control of this browser.`}
+                        </p>
+                    )}
                 </div>
-                <Button aria-controls={viewId} aria-expanded={expanded} className={TOUCH_TARGET} onClick={toggle} size="sm" type="button" variant="outline">
+                <Button
+                    aria-controls={viewId}
+                    aria-expanded={expanded}
+                    className={TOUCH_TARGET}
+                    disabled={controlledByOther}
+                    onClick={toggle}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                >
                     {expanded ? t`Hide live view` : t`Watch live`}
                 </Button>
             </div>
@@ -251,6 +282,8 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
     // A grantee's grant ended: nothing re-runs the live query when only the clock moves, so the card goes at once and the
     // status is asked again; the server answers nothing after the grant's end.
     const accessEnded = usePassed(browser?.accessUntil);
+    // Another person's lease ends on the clock too: the view may be asked for again then.
+    const controlEnded = usePassed(browser?.control?.until);
     const refetchStatus = useEffectEvent((): void => {
         status.refetch().catch(() => undefined);
     });
@@ -297,7 +330,15 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
         return null;
     }
 
-    return <BrowserCard browserId={browser.browserId} currentUrl={browser.currentUrl} key={threadId} threadId={threadId} />;
+    return (
+        <BrowserCard
+            browserId={browser.browserId}
+            controlledByOther={browser.control !== undefined && !browser.control.byYou && !controlEnded}
+            currentUrl={browser.currentUrl}
+            key={threadId}
+            threadId={threadId}
+        />
+    );
 };
 
 export default BrowserLiveView;

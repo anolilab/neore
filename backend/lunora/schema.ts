@@ -430,6 +430,8 @@ export const schema = defineSchema({
         control: v.optional(
             v.object({
                 by: v.string(),
+                /** New on every claim and renewal: a failed claim drops the lease only while it is still this one. */
+                claim: v.string(),
                 ended: v.optional(v.union(v.literal("handed_back"), v.literal("left"))),
                 /** A page the person asked for loads until then: the lease lasts at least as long. */
                 navigatingUntil: v.optional(v.number()),

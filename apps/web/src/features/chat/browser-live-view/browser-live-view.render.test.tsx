@@ -18,7 +18,13 @@ vi.mock("@lingui/react/macro", () => {
 const { backend } = vi.hoisted(() => {
     return {
         backend: {
-            browser: null as { accessUntil?: number; browserId: string; currentUrl?: string; idleUntil: number } | null,
+            browser: null as {
+                accessUntil?: number;
+                browserId: string;
+                control?: { byYou: boolean; until: number };
+                currentUrl?: string;
+                idleUntil: number;
+            } | null,
             /** When set, the status read fails with it. */
             statusError: undefined as Error | undefined,
             open: vi.fn(),
@@ -361,6 +367,35 @@ describe("BrowserLiveView", () => {
             expect(frameSource()).toBe(OTHER_URL);
         });
         expect(backend.open).toHaveBeenCalledTimes(2);
+    });
+
+    it("closes an open view while someone else has control, and offers it again once their control ends", async () => {
+        backend.browser = { browserId: "b-1", idleUntil: Date.now() + 600_000 };
+        backend.open.mockResolvedValue({ connectBy: Date.now() + 60_000, status: "ok", url: URL });
+        const queryClient = mountCard();
+
+        await userEvent.click(await screen.findByRole("button", { name: "Watch live" }));
+        await screen.findByTitle(LIVE_VIEW);
+
+        backend.browser = { browserId: "b-1", control: { byYou: false, until: Date.now() + 120_000 }, idleUntil: Date.now() + 600_000 };
+        await act(async () => {
+            await queryClient.invalidateQueries();
+        });
+
+        await vi.waitFor(() => {
+            expect(screen.queryByTitle(LIVE_VIEW)).toBeNull();
+        });
+        expect(screen.getByRole("status").textContent).toBe("Someone else has control of this browser.");
+        expect(screen.getByRole("button", { name: "Watch live" })).toHaveProperty("disabled", true);
+
+        backend.browser = { browserId: "b-1", idleUntil: Date.now() + 600_000 };
+        await act(async () => {
+            await queryClient.invalidateQueries();
+        });
+
+        await vi.waitFor(() => {
+            expect(screen.getByRole("button", { name: "Watch live" })).toHaveProperty("disabled", false);
+        });
     });
 
     it("says the browser status could not be read, instead of hiding the card, and reads it again on request", async () => {
