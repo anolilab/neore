@@ -44,12 +44,16 @@ const QUOTE_MARKER = /[ \t]{0,3}>[ \t]?/y;
 /** A list bullet or number, or heading `#`s, and the spaces after them, matched at `lastIndex`. */
 const LIST_OR_HEADING_MARKER = /[ \t]{0,3}(?:[-+*]|\d{1,9}[.)]|#{1,6})(?=[ \t]|$)[ \t]*/y;
 
+/** A GFM task-list box (`[ ]`, `[x]`) and the spaces after it, matched at `lastIndex`. */
+const TASK_MARKER = /\[[ x]\][ \t]+/iy;
+
 /** The block marker at `offset` in `line`, or an empty string. */
 const markerAt = (line: string, offset: number): string => {
     QUOTE_MARKER.lastIndex = offset;
     LIST_OR_HEADING_MARKER.lastIndex = offset;
+    TASK_MARKER.lastIndex = offset;
 
-    return (QUOTE_MARKER.exec(line) ?? LIST_OR_HEADING_MARKER.exec(line))?.[0] ?? "";
+    return (QUOTE_MARKER.exec(line) ?? LIST_OR_HEADING_MARKER.exec(line) ?? TASK_MARKER.exec(line))?.[0] ?? "";
 };
 
 /** The length of the block markers at the start of `line`, nested ones included (`> - item`), read in one pass. */
@@ -394,6 +398,58 @@ const offsetText = (parent: ProseMirrorNode): string => {
 /** A character reference (`&amp;`, `&#93;`, `&#x5D;`): a wrap inside one changes the character it stands for. */
 const CHARACTER_REFERENCE = /&(?:#\d{1,7}|#x[\da-f]{1,6}|[a-z][\da-z]{1,31});/gi;
 
+/** A bare web address, which the GFM message renderer links although GFM is not parsed here. */
+const BARE_WEB_ADDRESS = /(?:https?:\/\/|www\.)[^\s<]+/gi;
+
+/** A character of an email address before its `@`, and one after it. */
+const EMAIL_LOCAL = /[\w.+-]/;
+
+const EMAIL_DOMAIN = /[\w.-]/;
+
+/**
+ * The bare email addresses in `text`, which GFM links too: each `@` grown to the address characters on either side, with
+ * a dot in the domain. Found from each `@` rather than by a pattern, so a long word without one costs a single pass.
+ */
+const bareEmails = (text: string): [number, number][] => {
+    const emails: [number, number][] = [];
+
+    for (let at = text.indexOf("@"); at !== -1; at = text.indexOf("@", at + 1)) {
+        let start = at;
+        let end = at + 1;
+
+        while (start > 0 && EMAIL_LOCAL.test(text[start - 1] ?? "")) {
+            start -= 1;
+        }
+
+        while (end < text.length && EMAIL_DOMAIN.test(text[end] ?? "")) {
+            end += 1;
+        }
+
+        if (start < at && text.slice(at + 1, end).includes(".")) {
+            emails.push([start, end]);
+        }
+    }
+
+    return emails;
+};
+
+/** Punctuation GFM leaves out of the end of a bare link. */
+const TRAILING_PUNCTUATION: ReadonlySet<string> = new Set(["!", '"', "'", ")", "*", ",", ".", ":", "?", "]", "_", "~"]);
+
+/** The bare links in `text`, as constructs a wrap may hold whole but not split. */
+const bareLinks = (text: string): Construct[] =>
+    [...[...text.matchAll(BARE_WEB_ADDRESS)].map((match): [number, number] => [match.index, match.index + match[0].length]), ...bareEmails(text)].map(
+        ([start, matchEnd]) => {
+            let end = matchEnd;
+
+            while (end > start && TRAILING_PUNCTUATION.has(text[end - 1] ?? "")) {
+                end -= 1;
+            }
+
+            return { code: false, holdable: true, range: [start, end] };
+        },
+    );
+
 /** The number of backslashes right before `index`. */
 const trailingBackslashCount = (text: string, index: number): number => {
     let count = 0;
@@ -467,7 +523,7 @@ export const markupAround = (
         blocked:
             from < markers ||
             breaksTable(text, draftFrom, draftTo) ||
-            [...constructs, ...characterReferences(text)].some((construct) => breaks(construct, draftFrom, draftTo)),
+            [...constructs, ...characterReferences(text), ...bareLinks(text)].some((construct) => breaks(construct, draftFrom, draftTo)),
         paragraph,
         takenFences: new Set(unmatched.filter((run) => run.start < draftFrom).map((run) => run.length)),
     };

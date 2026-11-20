@@ -534,14 +534,15 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(wrapSelectionOnTextInput(editor.view, 1, 6, "*")).toBe(false);
     });
 
-    it("wraps text inside an escaped autolink, which is literal text", () => {
+    it("leaves part of an escaped autolink's address alone, which GFM still links as a bare address", () => {
         const editor = editorWith("<p>go &#92;&lt;https://example.com&gt; now</p>");
+        const before = text(editor);
 
         select(editor, 6, 11);
 
         expect(selectedText(editor)).toBe("https");
         expect(wrapSelectionOnTextInput(editor.view, 6, 11, "*")).toBe(true);
-        expect(text(editor)).toBe(String.raw`go \<**https**://example.com> now`);
+        expect(text(editor)).toBe(before);
     });
 
     it("leaves an image's ! alone, which would turn the image into a link", () => {
@@ -820,6 +821,46 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(selectedText(editor)).toBe("#93");
         expect(wrapSelectionOnTextInput(editor.view, 8, 11, "*")).toBe(true);
         expect(text(editor)).toBe("see [a&#93;b](url)");
+    });
+
+    it("leaves part of a bare web address alone, and still wraps the whole address", () => {
+        const editor = editorWith("<p>see https://example.com now</p>");
+
+        select(editor, 13, 20);
+
+        expect(selectedText(editor)).toBe("example");
+        expect(wrapSelectionOnTextInput(editor.view, 13, 20, "*")).toBe(true);
+        expect(text(editor)).toBe("see https://example.com now");
+
+        select(editor, 5, 24);
+        wrapSelectionOnTextInput(editor.view, 5, 24, "*");
+
+        expect(text(editor)).toBe("see **https://example.com** now");
+    });
+
+    it("leaves part of a bare email address alone", () => {
+        const editor = editorWith("<p>mail foo@bar.com now</p>");
+
+        select(editor, 10, 13);
+
+        expect(selectedText(editor)).toBe("bar");
+        expect(wrapSelectionOnTextInput(editor.view, 10, 13, "*")).toBe(true);
+        expect(text(editor)).toBe("mail foo@bar.com now");
+    });
+
+    it("leaves a task-list box alone, and still wraps the task's text", () => {
+        const editor = editorWith("<p>- [ ] task</p>");
+
+        select(editor, 3, 6);
+
+        expect(selectedText(editor)).toBe("[ ]");
+        expect(wrapSelectionOnTextInput(editor.view, 3, 6, "*")).toBe(true);
+        expect(text(editor)).toBe("- [ ] task");
+
+        select(editor, 7, 11);
+        wrapSelectionOnTextInput(editor.view, 7, 11, "*");
+
+        expect(text(editor)).toBe("- [ ] **task**");
     });
 
     it("wraps literal ](url) text that has no link label before it", () => {
