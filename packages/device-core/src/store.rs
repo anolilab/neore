@@ -303,10 +303,35 @@ pub fn load_nonces(path: &Path) -> HashMap<String, u64> {
         .unwrap_or_default()
 }
 
+/// Like [`load_nonces`], but a file that exists and cannot be read or parsed is an error rather than an empty
+/// history: an empty one would let a call that was already accepted be accepted again. A missing file is a new start.
+pub fn load_nonces_strict(path: &Path) -> Result<HashMap<String, u64>, String> {
+    match fs::read_to_string(path) {
+        Ok(text) => {
+            serde_json::from_str(&text).map_err(|_| format!("{} is damaged", path.display()))
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(HashMap::new()),
+        Err(error) => Err(format!("{} could not be read: {error}", path.display())),
+    }
+}
+
 pub fn save_nonces(path: &Path, nonces: &HashMap<String, u64>) -> Result<(), String> {
     let text = serde_json::to_string(nonces).map_err(|error| error.to_string())?;
 
     write_owner_only(path, &text)
+}
+
+/// Puts the folder entry of `path` on disk, so a rename that replaced it survives a power loss. Unix only: elsewhere a
+/// folder cannot be opened to sync.
+pub fn sync_folder_of(path: &Path) -> Result<(), String> {
+    #[cfg(unix)]
+    if let Some(parent) = path.parent() {
+        fs::File::open(parent)
+            .and_then(|dir| dir.sync_all())
+            .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
 }
 
 fn write_owner_only(path: &Path, text: &str) -> Result<(), String> {
