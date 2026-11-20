@@ -4,9 +4,11 @@
  * its vector id instead of being taken as "no match".
  */
 import { lunoraTest } from "@lunora/testing";
+import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { internalQuery } from "../_generated/server";
 import schema from "../schema";
 import { extractMemories } from "./extract";
 
@@ -175,6 +177,88 @@ describe("extraction vector dedup", () => {
 
         expect(rows.find((row: { _id: string }) => row._id === pinned)?.memory).toBe("The user owns a blue vase");
         expect(rows).toHaveLength(2);
+    });
+
+    it("saves the fact as new when a revision says UPDATE without merged text", async () => {
+        expect.assertions(2);
+
+        const rowId = await harness.run(async (ctx: any) => {
+            const vector = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: VECTOR });
+
+            searchVectors.mockResolvedValue([{ _id: vector, _score: 0.9 }]);
+
+            return await ctx.db.insert("memories", { embeddingId: vector, memory: "The user owns a blue vase", type: "activity", userId: USER });
+        });
+
+        generateText
+            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, importance: 80, memory: FACT, type: "activity" }] } })
+            .mockResolvedValueOnce({ output: { action: "UPDATE" } });
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "A lovely vase.",
+                    threadId,
+                    userId: USER,
+                    userMessage: "I bought a blue vase in Lisbon, please remember that about me",
+                }),
+        );
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("memories").collect());
+
+        expect(rows.find((row: { _id: string }) => row._id === rowId)?.memory).toBe("The user owns a blue vase");
+        expect(rows.map((row: { memory: string }) => row.memory)).toContain(FACT);
+    });
+
+    it("saves the fact as new when reading a revised row past the window fails", async () => {
+        expect.assertions(2);
+
+        const rowId = await harness.run(async (ctx: any) => {
+            const vector = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: VECTOR });
+
+            searchVectors.mockResolvedValue([{ _id: vector, _score: 0.9 }]);
+
+            const id = await ctx.db.insert("memories", { embeddingId: vector, memory: "The user owns a blue vase", type: "activity", userId: USER });
+
+            // The window reads by type first: newer preferences push the activity row out of its 50.
+            for (let index = 0; index < 60; index += 1) {
+                await ctx.db.insert("memories", { memory: `Preference number ${String(index)} of the user`, type: "preference", userId: USER });
+            }
+
+            return id;
+        });
+
+        generateText
+            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, importance: 80, memory: FACT, type: "activity" }] } })
+            .mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: `${FACT} and keeps it on a shelf` } });
+
+        const getMemoryById = registry.get("memory_functions:getMemoryById");
+
+        registry.set(
+            "memory_functions:getMemoryById",
+            internalQuery.input({ memoryId: v.id("memories") }).query(async () => {
+                throw new Error("read failed");
+            }),
+        );
+
+        try {
+            await harness.action(
+                async (ctx: any) =>
+                    await ctx.runAction(extractMemories, {
+                        assistantResponse: "A lovely vase.",
+                        threadId,
+                        userId: USER,
+                        userMessage: "I bought a blue vase in Lisbon, please remember that about me",
+                    }),
+            );
+        } finally {
+            registry.set("memory_functions:getMemoryById", getMemoryById);
+        }
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("memories").collect());
+
+        expect(rows.find((row: { _id: string }) => row._id === rowId)?.memory).toBe("The user owns a blue vase");
+        expect(rows.map((row: { memory: string }) => row.memory)).toContain(FACT);
     });
 
     it("schedules a new vector for a row an extraction merged into", async () => {
