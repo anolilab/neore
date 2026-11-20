@@ -15,7 +15,7 @@ import { getMembersByUserId, getOrganization, getUser } from "../auth/lib/better
 import { resolveUserPlan } from "../auth/lib/plan";
 import { claimOnce, releaseClaim } from "../lib/claim-once";
 import { createRatelimit } from "../lib/rate-limiter";
-import { applyLimit } from "../lib/rate-limiter-mutations";
+import { applyLimit, refundLimitUnits } from "../lib/rate-limiter-mutations";
 import { MAX_LENGTH } from "../lib/validators";
 import { dailyLimitKeyOf, dailyLimitTierOf } from "./lib/daily-limit";
 
@@ -97,17 +97,51 @@ export const chargeDailyUnit = internalMutation
  */
 export const chargeDailyLimitOnce = internalMutation
     .input({ chargeKey: v.string().max(MAX_LENGTH.long), count: v.optional(v.number()), identifier: v.string(), key: v.string() })
-    .output(v.object({ ok: v.boolean(), retryAfter: v.optional(v.number()) }))
+    .output(v.object({ ok: v.boolean(), retryAfter: v.optional(v.number()), windowStart: v.optional(v.number()) }))
     .mutation(async ({ args: { chargeKey, count, identifier, key }, ctx }) => {
         if (!(await claimOnce(ctx, DAILY_CHARGE_SCOPE, chargeKey, DAILY_CHARGE_CLAIM_TTL_MS, identifier))) {
             return { ok: true };
         }
 
-        const { ok, retryAfter } = await applyLimit(ctx, { count, identifier, key });
+        const { ok, retryAfter, windowStart } = await applyLimit(ctx, { count, identifier, key });
 
         if (!ok) {
             await releaseClaim(ctx, DAILY_CHARGE_SCOPE, chargeKey);
         }
 
-        return { ok, ...(retryAfter !== undefined && { retryAfter }) };
+        return {
+            ok,
+            ...(retryAfter !== undefined && { retryAfter }),
+            ...(windowStart !== undefined && { windowStart }),
+        };
+    });
+
+/**
+ * Undoes a charge for a send that was then refused, after the units were taken: the window gets its units back
+ * (`refundLimitUnits`), if the charge's window (`windowStart`) is still current. A keyed charge's claim is released with it, so
+ * the send's retry is charged normally rather than found already charged. Without a `windowStart` (a keyed retry that found its
+ * claim already held, so this attempt took no units) nothing is given back and the claim stays: the first attempt's unit then
+ * pays for the send that succeeds, instead of that send being charged a second time.
+ */
+export const refundDailyCharge = internalMutation
+    .input({
+        chargeKey: v.optional(v.string().max(MAX_LENGTH.long)),
+        count: v.number(),
+        identifier: v.string(),
+        key: v.string(),
+        windowStart: v.optional(v.number()),
+    })
+    .output(v.null())
+    .mutation(async ({ args: { chargeKey, count, identifier, key, windowStart }, ctx }) => {
+        if (windowStart === undefined) {
+            return null;
+        }
+
+        if (chargeKey !== undefined) {
+            await releaseClaim(ctx, DAILY_CHARGE_SCOPE, chargeKey);
+        }
+
+        await refundLimitUnits(ctx, { count, identifier, key, windowStart });
+
+        return null;
     });
