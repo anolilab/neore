@@ -2169,6 +2169,7 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
             {
                 customSystemPrompt: appThread?.customSystemPrompt,
                 enabledFeatures: appThread?.enabledFeatures,
+                ...(fileIds && fileIds.length > 0 && { fileIds: fileIds.slice(0, MAX_ATTACHED_FILES) as Id<"chatFiles">[] }),
                 messageId: editedMessageId,
                 model: model as string,
                 parentId: editedMessageId, // Use the edited message as parent

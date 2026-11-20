@@ -3,6 +3,7 @@ import { isHostRunThread, refuseHostThread } from "../acp/lib/host-thread";
 import { rowsAfterContextReset } from "../agent/context-reset";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { withoutSwitchIds } from "../agent/agent-switch-logic";
+import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -4768,6 +4769,8 @@ export const streamAsync = internalAction
     .input({
         customSystemPrompt: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
+        /** The files the edited message attaches: the project's rule files applied by pattern match their names. */
+        fileIds: v.optional(v.array(v.id("chatFiles")).max(MAX_ATTACHED_FILES)),
         /** Set by `runJobOnce` when `/chat/edit` enqueues this; nothing reads it. */
         jobId: v.optional(v.string()),
         messageId: v.string(),
@@ -4837,6 +4840,7 @@ export const streamAsync = internalAction
             // The access `createThread` applied (owner or organization member), not the owner-only read.
             projectContext =
                 (await context.runQuery(internal.projects.functions.getProjectContextForRun, {
+                    ...(args.fileIds && args.fileIds.length > 0 && { fileIds: args.fileIds }),
                     projectId: appThread.projectId as Id<"projects">,
                     userId,
                 })) ?? undefined;

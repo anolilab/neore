@@ -143,6 +143,7 @@ const NEVER_LIVE: ReadonlySet<string> = new Set<ApiPath>([
     "gdpr_functions:getDataAccessSummary",
     "pages_functions:searchPages",
     "projects_functions:listProjectRepos",
+    "projects_functions:listProjectRuleFiles",
     "skills_marketplace:browseSkills",
     "skills_marketplace:searchSkills",
     "workflow_gallery:browseGallery",

@@ -2160,6 +2160,35 @@ export const schema = defineSchema({
         .index("by_user_and_url", ["userId", "url"])
         .index("by_organization_and_url", ["organizationId", "url"]),
 
+    // A project's rule files, one row per project holding the whole list in order (`projects/rule-files.ts`): kept off the
+    // project row, which every project read is charged for whole. Access follows the project's; `userId` copies its owner
+    // only so account deletion finds a row whose project is gone (`projects/rule-file-rows.ts`).
+    projectRuleFiles: defineTable({
+        // The fingerprint of the legacy `context` this list took over, "" or absent for none (`rule-files.ts#contextFingerprint`).
+        carriedContext: v.optional(v.string()),
+        // When a project delete started erasing it, 0 or absent when none: a sweep finishes one the delete left (`projects/gdpr.ts`).
+        deletingAt: v.optional(v.number()),
+        files: v.array(
+            v.object({
+                content: v.string(),
+                globs: v.optional(v.array(v.string())),
+                id: v.string(),
+                mode: v.union(v.literal("always"), v.literal("glob")),
+                title: v.string(),
+            }),
+        ),
+        projectId: v.id("projects"),
+        updatedAt: v.number(),
+        userId: v.optional(v.string()),
+        // Counts the saves, absent before the first counted one, so a save writes only over the row it compared against
+        // (`writeProjectRuleFiles`).
+        version: v.optional(v.number()),
+    })
+        .global()
+        .index("by_project", ["projectId"], { unique: true })
+        .index("by_user", ["userId"])
+        .index("by_deleting_at", ["deletingAt"]),
+
     projects: defineTable({
         color: v.optional(v.string()),
         context: v.optional(v.string()),

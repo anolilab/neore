@@ -294,6 +294,7 @@ export const runStreamingAgent = internalAction
                 const runContextPromise = loadRunContext(ctx, {
                     admittedRun: true,
                     customSystemPrompt,
+                    fileIds,
                     promptText: prompt,
                     researchDepth: streamingConfig.researchDepth,
                     threadId,

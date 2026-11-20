@@ -72,6 +72,7 @@ describe("the single cron trigger", () => {
             sweepExpiredRateLimits: { everyMinutes: 60, kind: "interval" },
             sweepOrphanedOrganizationPolicies: { hourUTC: 4, kind: "daily", minuteUTC: 15 },
             sweepOrphanedOrganizationRepositories: { hourUTC: 4, kind: "daily", minuteUTC: 30 },
+            sweepUnfinishedRuleFileErasures: { hourUTC: 4, kind: "daily", minuteUTC: 45 },
             vacuumDocumentHistory: { hourUTC: 3, kind: "daily", minuteUTC: 30 },
         });
     });

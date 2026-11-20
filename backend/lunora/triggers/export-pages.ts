@@ -4,6 +4,8 @@ interface ExportPage {
 }
 
 interface TriggersPage extends ExportPage {
+    /** The bytes the page read, whole rows; without it each trigger's exported settings are counted instead. */
+    readBytes?: number;
     triggers?: unknown[];
 }
 
@@ -69,13 +71,14 @@ const collectRuns = async (readRuns: ReadRuns, triggerId: string, left: Budget):
  * `maxReadBytes` read, whichever comes first; a page that starts under the read budget may end over it by one page and
  * the row `paginate` reads ahead. Past either, no run is read again and every later trigger is marked (`runsTruncated`)
  * whether it has runs or not: no field counts every run row, and the export must never drop runs without saying so.
+ * `readBytes` is what the settings and run pages actually read, so a later section is charged that, not `maxReadBytes`.
  */
 export const collectAllTriggers = async (
     readTriggers: (cursor: string | null) => Promise<TriggersPage>,
     readRuns: ReadRuns,
     maxBytes: number,
     maxReadBytes: number,
-): Promise<{ triggers: unknown[] }> => {
+): Promise<{ readBytes: number; triggers: unknown[] }> => {
     const triggers: unknown[] = [];
     const left: Budget = { readBytes: maxReadBytes, writtenBytes: maxBytes };
     let isSpent = false;
@@ -85,12 +88,19 @@ export const collectAllTriggers = async (
         const page: TriggersPage = await readTriggers(cursor);
         const pageTriggers = (page.triggers ?? []) as { id: string }[];
 
+        if (page.readBytes !== undefined) {
+            left.readBytes -= page.readBytes;
+        }
+
         for (const trigger of pageTriggers) {
-            // Settings are read whole and exported whole: they count against both budgets.
+            // Settings are exported whole; they count against the read budget too when the page did not say what it read.
             const settingsBytes = byteLength(trigger);
 
             left.writtenBytes -= settingsBytes;
-            left.readBytes -= settingsBytes;
+
+            if (page.readBytes === undefined) {
+                left.readBytes -= settingsBytes;
+            }
 
             const collected: { isCut: boolean; runs: { startedAt: number }[] } = isSpent
                 ? { isCut: true, runs: [] }
@@ -106,5 +116,5 @@ export const collectAllTriggers = async (
         cursor = page.cursor ?? null;
     } while (cursor !== null);
 
-    return { triggers };
+    return { readBytes: maxReadBytes - left.readBytes, triggers };
 };
