@@ -9,7 +9,7 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { logAction } from "./functions";
 import { getThreadBrowser, handBack, keepControl, navigateInControl, openLiveView, takeControl } from "./live-view";
-import { BROWSER_IDLE_REAP_MS, CONTROL_IDLE_MS } from "./live-view-logic";
+import { BROWSER_IDLE_REAP_MS, BROWSER_REAP_MARGIN_MS, CONTROL_IDLE_MS } from "./live-view-logic";
 
 const OWNER = "user-owner";
 const READER = "user-reader";
@@ -524,6 +524,20 @@ describe("taking control of the browser", () => {
         await expect(control()).resolves.toMatchObject({ ended: "left", until: NOW + 60_000 });
         await expect(statusFor(READER)).resolves.not.toHaveProperty("control");
         await expect(as(OWNER).mutation(keepControl as never, { threadId } as never)).resolves.toBeNull();
+    });
+
+    it("keeps the browser watchable after a hand back that ends control longer than the idle window", async () => {
+        await addSession();
+        await take(OWNER);
+
+        for (const minute of [1, 2, 3]) {
+            vi.setSystemTime(NOW + minute * 60_000);
+            await as(OWNER).mutation(keepControl as never, { threadId } as never);
+        }
+
+        await as(OWNER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
+
+        await expect(statusFor(READER)).resolves.toMatchObject({ idleUntil: NOW + 3 * 60_000 + BROWSER_IDLE_REAP_MS - BROWSER_REAP_MARGIN_MS });
     });
 
     it("returns control on its own after the idle timeout", async () => {

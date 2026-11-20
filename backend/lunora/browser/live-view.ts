@@ -273,6 +273,15 @@ export const openLiveView = authAction
         return { connectBy: Date.now() + LIVE_VIEW_CONNECT_DEADLINE_MS, status: "ok" as const, url };
     });
 
+/**
+ * A person's control is activity on the browser: their view is connected to it, so the provider's idle clock starts
+ * only when they stop. Stamped on each claim, renewal and hand back, so the browser does not read as reaped the moment
+ * a long session of control ends.
+ */
+const activeNow = (session: Doc<"browserSessions">, now: number): { lastActivityAt: number } => {
+    return { lastActivityAt: Math.max(session.lastActivityAt, now) };
+};
+
 // ── Taking control ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -326,6 +335,7 @@ export const claimControl = internalMutation
         // The holder's lease goes on: its start and a page still loading stay, a hand back does not.
         if (browser.control !== undefined && current !== undefined) {
             await patchRow(ctx.db, "browserSessions", browser.session, {
+                ...activeNow(browser.session, ctx.now),
                 control: {
                     by: userId,
                     claim,
@@ -346,7 +356,10 @@ export const claimControl = internalMutation
 
         const returned = current !== undefined && controlStateOf(browser.session, ctx.now) === "returned" ? (current.ended ?? ("idle" as const)) : undefined;
 
-        await patchRow(ctx.db, "browserSessions", browser.session, { control: { by: userId, claim, since: ctx.now, until } });
+        await patchRow(ctx.db, "browserSessions", browser.session, {
+            ...activeNow(browser.session, ctx.now),
+            control: { by: userId, claim, since: ctx.now, until },
+        });
 
         return { claim, fresh: true, kind: "ok" as const, providerSessionId: browser.providerSessionId, ...(returned !== undefined && { returned }) };
     });
@@ -509,7 +522,10 @@ export const keepControl = authMutation
 
         const until = ctx.now + CONTROL_IDLE_MS;
 
-        await patchRow(systemDb(ctx), "browserSessions", browser.session, { control: { ...browser.session.control, by: browser.control.by, until } });
+        await patchRow(systemDb(ctx), "browserSessions", browser.session, {
+            ...activeNow(browser.session, ctx.now),
+            control: { ...browser.session.control, by: browser.control.by, until },
+        });
 
         return { until };
     });
@@ -528,7 +544,10 @@ export const handBack = authMutation
             // A page the person asked for is still loading: the agent waits for it too, then the lease ends with it.
             const until = Math.max(ctx.now, session.control.navigatingUntil ?? 0);
 
-            await patchRow(systemDb(ctx), "browserSessions", session, { control: { ...session.control, ended: reason, until } });
+            await patchRow(systemDb(ctx), "browserSessions", session, {
+                ...activeNow(session, ctx.now),
+                control: { ...session.control, ended: reason, until },
+            });
             ctx.log.event("browser.control_returned", { reason });
         }
 

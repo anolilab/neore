@@ -52,17 +52,6 @@ export const executeBrowserAction = internalAction
                 }
             }
 
-            // Rate limiting
-            const tier = args.userTier ?? "free";
-            const rlResult = await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, {
-                identifier: userId,
-                key: `browser/action:${tier}`,
-            });
-
-            if (!rlResult.ok) {
-                return { error: "Browser automation rate limit exceeded.", success: false };
-            }
-
             const startTime = Date.now();
             // The session this action holds while it runs, and its hold's deadline; released if the action fails.
             let held: { sessionId: Id<"browserSessions">; until: number } | undefined;
@@ -93,6 +82,20 @@ export const executeBrowserAction = internalAction
                     held = use.held ? { sessionId: sessionDocument._id, until } : undefined;
                     returned = use.returned;
                     inspecting = use.inspecting;
+                }
+
+                // Rate limiting: only an action that runs is counted, not one refused while a person drives the browser.
+                const rlResult = await ctx.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, {
+                    identifier: userId,
+                    key: `browser/action:${args.userTier ?? "free"}`,
+                });
+
+                if (!rlResult.ok) {
+                    if (held !== undefined) {
+                        await ctx.runMutation(internal.browser.functions.endSessionUse, held);
+                    }
+
+                    return { error: "Browser automation rate limit exceeded.", success: false };
                 }
 
                 // After a hand back the page is not the one the agent planned against: it looks before it acts.

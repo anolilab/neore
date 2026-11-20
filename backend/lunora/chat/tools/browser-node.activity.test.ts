@@ -385,6 +385,8 @@ describe("a browser a person took control of", () => {
 
         await expect(act("click")).resolves.toEqual({ error: PERSON_HAS_CONTROL, success: false });
         expect(renderer).not.toHaveBeenCalled();
+        // A refused action costs the agent none of its hourly browser actions.
+        await expect(harness.run(async (ctx: any) => await ctx.db.query("rateLimits").collect())).resolves.toEqual([]);
         const after = await row();
 
         expect(after.inUseHolds).toBeUndefined();
