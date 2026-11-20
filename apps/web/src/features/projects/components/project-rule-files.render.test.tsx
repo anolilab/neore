@@ -20,6 +20,8 @@ vi.mock("@lingui/react/macro", () => {
 const backend = vi.hoisted(() => {
     return {
         listed: { canEdit: true, files: [] as unknown[], revision: "r1" } as { canEdit: boolean; files: unknown[]; legacyContextId?: string; revision: string },
+        // When set, how a read answers instead of with `listed`.
+        read: undefined as (() => Promise<unknown>) | undefined,
         save: vi.fn(),
     };
 });
@@ -32,7 +34,10 @@ vi.mock("@/lib/lunora/crpc", () => {
                     functions: {
                         listProjectRuleFiles: {
                             queryOptions: (args: unknown) => {
-                                return { queryFn: async () => structuredClone(backend.listed), queryKey: ["listProjectRuleFiles", args] };
+                                return {
+                                    queryFn: async () => await (backend.read?.() ?? structuredClone(backend.listed)),
+                                    queryKey: ["listProjectRuleFiles", args],
+                                };
                             },
                         },
                         setProjectRuleFiles: {
@@ -60,7 +65,10 @@ const renderEditor = (onDirtyChange?: (dirty: boolean) => void) =>
 
 beforeEach(() => {
     backend.save.mockReset();
-    backend.save.mockResolvedValue({ revision: "r2" });
+    backend.read = undefined;
+    backend.save.mockImplementation(async ({ ruleFiles }: { ruleFiles: unknown[] }) => {
+        return { files: ruleFiles, revision: "r2" };
+    });
     backend.listed = {
         canEdit: true,
         revision: "r1",
@@ -143,11 +151,11 @@ describe("project rule files", () => {
 
     it("keeps edits typed while a save runs, based on the list just saved", async () => {
         const user = userEvent.setup();
-        const resolvers: ((value: { revision: string }) => void)[] = [];
+        const resolvers: ((value: { files: unknown[]; revision: string }) => void)[] = [];
 
         backend.save.mockImplementationOnce(
             async () =>
-                await new Promise<{ revision: string }>((resolve) => {
+                await new Promise<{ files: unknown[]; revision: string }>((resolve) => {
                     resolvers.push(resolve);
                 }),
         );
@@ -157,12 +165,31 @@ describe("project rule files", () => {
         await user.click(screen.getByRole("button", { name: "Save rule files" }));
         await user.type(within(screen.getByRole("listitem", { name: "SQL" })).getByLabelText("Instructions"), " Always.");
         backend.listed = { ...backend.listed, files: [backend.listed.files[1]], revision: "r2" };
-        resolvers[0]?.({ revision: "r2" });
+        resolvers[0]?.({ files: [backend.listed.files[0]], revision: "r2" });
 
         await screen.findByRole("button", { name: "Save rule files" });
         await user.click(screen.getByRole("button", { name: "Save rule files" }));
 
         expect(backend.save.mock.calls[1]?.[0]).toMatchObject({ revision: "r2", ruleFiles: [{ content: "Use snake_case. Always.", id: "sql" }] });
+    });
+
+    it("shows the list just saved at once, before the list is read again", async () => {
+        const user = userEvent.setup();
+
+        renderEditor();
+
+        await user.click(await screen.findByRole("button", { name: "Delete SQL" }));
+        // A read that never answers: what shows is what the save itself put there.
+        backend.read = async () =>
+            await new Promise(() => {
+                // Never settles.
+            });
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(await screen.findByText("Rule files saved.")).toBeTruthy();
+        expect(screen.queryByRole("listitem", { name: "SQL" })).toBeNull();
+        expect(screen.getByRole("listitem", { name: "Project context" })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Save rule files" })).toBeNull();
     });
 
     it("leaves an unchanged older context longer than a rule file where it is, and saves the rest", async () => {

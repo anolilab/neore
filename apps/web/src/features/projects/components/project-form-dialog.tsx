@@ -2,6 +2,16 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@neore/ui/components/alert-dialog";
 import { Button } from "@neore/ui/components/button";
 import { ColorPicker } from "@neore/ui/components/color-picker";
 import { useAppForm } from "@neore/ui/components/form";
@@ -14,7 +24,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@neore/ui/components/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@neore/ui/components/tooltip";
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useEffectEvent, useRef } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { toast } from "sonner";
 import * as z from "zod";
 
@@ -87,6 +97,18 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
     const { mutateAsync: updateProject } = useMutation(crpc.projects.functions.updateProject.mutationOptions());
     // Whether the rule files section holds unsaved changes: closing would drop them.
     const ruleFilesDirty = useRef(false);
+    // Asking whether to drop those changes, after a close (Cancel, Escape, outside click, the close button) while they are open.
+    const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+
+    const requestClose = () => {
+        if (editingProject && ruleFilesDirty.current) {
+            setConfirmingDiscard(true);
+
+            return;
+        }
+
+        onClose();
+    };
 
     const form = useAppForm({
         defaultValues: getDefaultValues(editingProject),
@@ -178,7 +200,7 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
     }, [editingProject, open]);
 
     return (
-        <Dialog onOpenChange={(nextOpen) => !nextOpen && onClose()} open={open}>
+        <Dialog onOpenChange={(nextOpen) => !nextOpen && requestClose()} open={open}>
             <DialogContent className="max-h-screen max-w-2xl overflow-y-auto">
                 <form.AppForm>
                     <form
@@ -401,7 +423,7 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                             {/* Keyed: an unsaved draft for one project never stays for the next one edited. */}
                             {editingProject && (
                                 <ProjectRuleFiles
-                                    key={editingProject._id}
+                                    key={`rule-files-${editingProject._id}`}
                                     onDirtyChange={(dirty: boolean) => {
                                         ruleFilesDirty.current = dirty;
                                     }}
@@ -414,7 +436,7 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                             {editingProject && <ProjectRepositories key={editingProject._id} projectId={editingProject._id} />}
                         </DialogPanel>
                         <DialogFooter>
-                            <Button onClick={onClose} type="button" variant="outline">
+                            <Button onClick={requestClose} type="button" variant="outline">
                                 {t`Cancel`}
                             </Button>
                             <form.Subscribe
@@ -440,6 +462,27 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                         </DialogFooter>
                     </form>
                 </form.AppForm>
+                <AlertDialog onOpenChange={setConfirmingDiscard} open={confirmingDiscard}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>{t`Discard rule file changes?`}</AlertDialogTitle>
+                            <AlertDialogDescription>{t`Your changes to this project's rule files are not saved. Closing drops them.`}</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>{t`Keep editing`}</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={() => {
+                                    ruleFilesDirty.current = false;
+                                    setConfirmingDiscard(false);
+                                    onClose();
+                                }}
+                                variant="destructive"
+                            >
+                                {t`Discard changes`}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </DialogContent>
         </Dialog>
     );

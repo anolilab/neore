@@ -329,7 +329,21 @@ export const setProjectRuleFiles = authMutation
             )
             .max(MAX_RULE_FILES),
     })
-    .output(v.object({ revision: v.string() }))
+    .output(
+        v.object({
+            // The list as written, a kept `context` left out (the editor still has it), so it shows the save at once.
+            files: v.array(
+                v.object({
+                    content: v.string(),
+                    globs: v.optional(v.array(v.string())),
+                    id: v.string(),
+                    mode: v.union(v.literal("always"), v.literal("glob")),
+                    title: v.string(),
+                }),
+            ),
+            revision: v.string(),
+        }),
+    )
     .mutation(async ({ args: { keepContext = false, projectId, revision, ruleFiles }, ctx: context }) => {
         const { userId } = context.user;
         const project = await projectWithEditableSettings(context, projectId, userId, { primary: true });
@@ -340,12 +354,8 @@ export const setProjectRuleFiles = authMutation
 
         // A kept context reads as the list's first file under its own id: a file sent under that id is that file again.
         const kept = keepContext && project.context ? projectRuleFiles(project)[0]?.id : undefined;
-        const normalized = kept
-            ? normalizeRuleFiles(
-                  ruleFiles.filter((file) => file.id !== kept),
-                  { keptContext: project.context },
-              )
-            : normalizeRuleFiles(ruleFiles);
+        // The row's room beside a kept context and the other columns is checked where it is written (`assertProjectRowFits`).
+        const normalized = normalizeRuleFiles(kept ? ruleFiles.filter((file) => file.id !== kept) : ruleFiles);
 
         await context.runMutation(internal.agent.projects.updateProject, {
             patch: kept ? { ruleFiles: normalized } : { context: "", ruleFiles: normalized },
@@ -361,7 +371,7 @@ export const setProjectRuleFiles = authMutation
         });
 
         // The revision of the list as written, for the editor's next save: never one read back from a lagging replica.
-        return { revision: ruleFilesRevision(projectRuleFiles({ context: kept ? project.context : undefined, ruleFiles: normalized })) };
+        return { files: normalized, revision: ruleFilesRevision(projectRuleFiles({ context: kept ? project.context : undefined, ruleFiles: normalized })) };
     });
 
 export const getProject = authQuery

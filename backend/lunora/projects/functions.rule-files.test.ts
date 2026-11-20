@@ -163,20 +163,27 @@ describe("changing a project's rule files", () => {
         const projectId = await insert("projects", { context, createdAt: 0, title: "p", userId: OWNER });
 
         await expect(list(OWNER, projectId)).resolves.toMatchObject({ legacyContextId: "context" });
-        const { revision } = (await save(OWNER, projectId, [sqlRules], undefined, { keepContext: true })) as { revision: string };
+        const { files, revision } = (await save(OWNER, projectId, [sqlRules], undefined, { keepContext: true })) as { files: unknown[]; revision: string };
+
+        expect(files).toStrictEqual([sqlRules]);
 
         expect(await row(projectId)).toMatchObject({ context, ruleFiles: [sqlRules] });
         await expect(list(OWNER, projectId)).resolves.toMatchObject({ files: [{ id: "context" }, { id: "sql" }], revision });
     });
 
-    it("refuses files that, beside a kept context, would outgrow the project row", async () => {
-        const projectId = await insert("projects", { context: "x".repeat(1_500_000), createdAt: 0, title: "p", userId: OWNER });
-        const big = Array.from({ length: 4 }, (_, index) => {
+    it("refuses files that would outgrow the project row beside a kept context or a large workflow, and keeps the row", async () => {
+        const big = Array.from({ length: 5 }, (_, index) => {
             return { content: "y".repeat(99_000), id: `f${index}`, mode: "always", title: "t" };
         });
+        const withContext = await insert("projects", { context: "x".repeat(1_500_000), createdAt: 0, title: "p", userId: OWNER });
+        const workflowContent = { edges: [], nodes: [{ data: { prompt: "w".repeat(1_500_000) }, id: "n", position: { x: 0, y: 0 }, type: "text" }] };
+        const withWorkflow = await insert("projects", { createdAt: 0, title: "w", userId: OWNER, workflowContent });
 
-        await expect(save(OWNER, projectId, big, undefined, { keepContext: true })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-        await expect(save(OWNER, projectId, [], undefined, { keepContext: true })).resolves.toMatchObject({ revision: expect.any(String) });
+        await expect(save(OWNER, withContext, big, undefined, { keepContext: true })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        await expect(save(OWNER, withContext, [], undefined, { keepContext: true })).resolves.toMatchObject({ revision: expect.any(String) });
+        await expect(save(OWNER, withWorkflow, big)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        await expect(save(OWNER, withWorkflow, big.slice(0, 2))).resolves.toMatchObject({ revision: expect.any(String) });
+        expect(await row(withWorkflow)).toMatchObject({ ruleFiles: big.slice(0, 2), workflowContent });
     });
 
     it("re-checks the owner in the writing transaction", async () => {

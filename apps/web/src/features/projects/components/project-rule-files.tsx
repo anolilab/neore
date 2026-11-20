@@ -9,7 +9,7 @@ import { Label } from "@neore/ui/components/label";
 import { RadioGroup, RadioGroupItem } from "@neore/ui/components/radio-group";
 import { Textarea } from "@neore/ui/components/textarea";
 import { formatNumber } from "@neore/ui/utils/locale-format";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useId, useState } from "react";
@@ -86,6 +86,33 @@ const toSaved = (files: RuleFileDraft[]) =>
             title: file.title.trim(),
         };
     });
+
+interface ListedRuleFiles {
+    canEdit: boolean;
+    files: { content: string; globs?: string[]; id: string; mode: RuleFileMode; title: string }[];
+    legacyContextId?: string;
+    revision: string;
+}
+
+/** The listed files after a save wrote `written`: a kept legacy context stays first, as the backend keeps it. */
+const withSavedFiles = (
+    listed: ListedRuleFiles | null | undefined,
+    written: Pick<ListedRuleFiles, "files" | "revision">,
+    keptId: string | undefined,
+): ListedRuleFiles | null | undefined => {
+    if (!listed) {
+        return listed;
+    }
+
+    const kept = keptId === undefined ? undefined : listed.files.find((file) => file.id === keptId);
+
+    return {
+        canEdit: listed.canEdit,
+        files: kept ? [kept, ...written.files] : written.files,
+        ...(kept && { legacyContextId: keptId }),
+        revision: written.revision,
+    };
+};
 
 /** One file's fields; every control is named after the file, so a list of them stays told apart. */
 const RuleFileFields: FC<{
@@ -167,10 +194,12 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; projectId
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
+    const queryClient = useQueryClient();
     const args = { projectId: projectId as Id<"projects"> };
+    const listOptions = crpc.projects.functions.listProjectRuleFiles.queryOptions(args);
     // Not live (`NEVER_LIVE`): a `.global()` write reaches no other member's subscription; read again on focus.
     const { data, isError, refetch } = useQuery({
-        ...crpc.projects.functions.listProjectRuleFiles.queryOptions(args),
+        ...listOptions,
         refetchOnWindowFocus: true,
         staleTime: 0,
     });
@@ -245,12 +274,14 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; projectId
         try {
             const written = await saved.mutateAsync({ ...args, ...keep, revision: baseRevision, ruleFiles });
 
+            // The list as written shows at once, before any read lands: the cached one is the list from before the save.
+            queryClient.setQueryData(listOptions.queryKey, (current: typeof data) => withSavedFiles(current, written, keptLegacyId));
             // Edits typed while the save ran stay, now based on the list just saved.
             setDraft((current) => (current === submitted ? null : current));
             setBaseRevision(written.revision);
-            await refetch();
             setError(undefined);
             setStatus(t`Rule files saved.`);
+            refetch().catch(() => undefined);
         } catch (saveError) {
             setError(refusalMessage(saveError, conflictMessage, t));
         }

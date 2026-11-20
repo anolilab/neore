@@ -19,6 +19,8 @@
   as before. Only counts are logged, never file text.
 - Glob matching is `matchesGlob`, never a `RegExp` built from a pattern: one constant-cost step per (pattern, path)
   position, spent from a per-run budget (`GLOB_MATCH_STEPS_PER_RUN`); past it nothing more matches.
+- Size: `normalizeRuleFiles` caps the list at `MAX_RULE_FILES_BYTES` of stored JSON; the room left on the row (a kept
+  `context`, a workflow) is checked where the row is written, `assertProjectRowFits` in `agent.projects.updateProject`.
 - A save names the revision of the list it started from (`ruleFilesRevision`); `agent.projects.updateProject`
   compares it in the transaction that writes and refuses a stale one (CONFLICT).
 - The export reads rule files in their own pass (`attachProjectRuleFiles`), after the owned-projects page, which must

@@ -27,7 +27,7 @@ import { listThreadItem } from "./threads";
 import { eraseProjectRepositories } from "../projects/gdpr";
 import { mayEditProject } from "../projects/edit-access";
 import { forViewer } from "../projects/machine-location";
-import { projectRuleFiles, ruleFilesRevision } from "../projects/rule-files";
+import { assertProjectRowFits, projectRuleFiles, ruleFilesRevision } from "../projects/rule-files";
 
 /**
  * A workflow keeps its images and reference media as chat-file references
@@ -288,6 +288,11 @@ export const updateProject = internalMutation
             if (args.patch[key] === "") {
                 changes[key] = undefined;
             }
+        }
+
+        // A rule-file save is the one that can grow the row by up to a megabyte: refuse it here, on the row as written.
+        if (args.patch.ruleFiles !== undefined) {
+            assertProjectRowFits({ ...project, ...changes });
         }
 
         await patchRow(ctx.db, "projects", project, changes);

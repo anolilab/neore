@@ -26,10 +26,11 @@ export const MAX_RULE_FILE_LENGTH = 100_000;
  */
 export const MAX_RULE_FILES_BYTES = 1_000_000;
 /**
- * UTF-8 bytes the list and a legacy `context` kept beside it (`keepContext`) take together: what stays of a D1 row's
- * 2 MB for the project's other columns.
+ * UTF-8 bytes a whole project row takes, JSON-encoded, after a rule-file save ({@link assertProjectRowFits}): D1 refuses a
+ * row past 2,000,000 bytes, and the rest is the margin for the row's own encoding. The JSON of the whole document is never
+ * smaller than what D1 stores for it, so a row this check lets through fits.
  */
-export const MAX_PROJECT_INSTRUCTION_BYTES = 1_800_000;
+export const MAX_PROJECT_ROW_BYTES = 1_900_000;
 /** Characters of rule-file text one run takes; the rest is left out ({@link selectRuleFiles}). */
 export const MAX_RULE_TEXT_PER_RUN = 200_000;
 export const MAX_RULE_TITLE_LENGTH = 200;
@@ -282,10 +283,10 @@ const assertGlob = (glob: string): void => {
 
 /**
  * The list as it is saved: trimmed titles and patterns, no patterns on an `always` file. Refuses a list past the
- * caps (with `keptContext`, the legacy text that stays on the row beside it), a repeated id, an empty title, or a
- * `glob` file without a pattern.
+ * caps, a repeated id, an empty title, or a `glob` file without a pattern. What the rest of the row leaves room for is
+ * checked where the row is written ({@link assertProjectRowFits}).
  */
-export const normalizeRuleFiles = (files: RuleFile[], { keptContext = "" }: { keptContext?: string } = {}): RuleFile[] => {
+export const normalizeRuleFiles = (files: RuleFile[]): RuleFile[] => {
     if (files.length > MAX_RULE_FILES) {
         throw new LunoraError("BAD_REQUEST", `A project holds at most ${MAX_RULE_FILES} rule files`);
     }
@@ -326,12 +327,20 @@ export const normalizeRuleFiles = (files: RuleFile[], { keptContext = "" }: { ke
         return { content: file.content, globs, id: file.id, mode: file.mode, title };
     });
 
-    const bytes = utf8Bytes(JSON.stringify(normalized));
-
-    // A kept context is already on the row: only files added beside it can push the row past its limit.
-    if (bytes > MAX_RULE_FILES_BYTES || (normalized.length > 0 && bytes + utf8Bytes(keptContext) > MAX_PROJECT_INSTRUCTION_BYTES)) {
+    if (utf8Bytes(JSON.stringify(normalized)) > MAX_RULE_FILES_BYTES) {
         throw new LunoraError("BAD_REQUEST", "The project's rule files are too large together");
     }
 
     return normalized;
+};
+
+/**
+ * Refuses a rule-file save that would leave the project row past {@link MAX_PROJECT_ROW_BYTES}: the row as it would be
+ * written, its other columns (a kept `context`, a workflow) included. Called in the transaction that writes, on the row
+ * read there, so a refusal says why instead of failing at the database.
+ */
+export const assertProjectRowFits = (row: unknown): void => {
+    if (utf8Bytes(JSON.stringify(row)) > MAX_PROJECT_ROW_BYTES) {
+        throw new LunoraError("BAD_REQUEST", "The rule files do not fit beside the project's other settings. Shorten them or remove some.");
+    }
 };
