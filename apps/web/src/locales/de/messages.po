@@ -81,6 +81,10 @@ msgstr "„{fileName}“ ist zu groß. Dokumente dürfen höchstens {maxMegabyte
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "„{fileName}“ ist zu groß. Dateien dieses Typs dürfen höchstens {maxMegabytes} MB groß sein."
 
+#: src/features/projects/components/project-rule-files.tsx:263
+msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
+msgstr ""
+
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:232
 msgid "\"{truncatedName}\" and {moreCount} more rejected"
 msgstr "\"{truncatedName}\" und {moreCount} weitere abgelehnt"
@@ -415,7 +419,7 @@ msgstr "{0, plural, one {Nicht unterstützter Query-Parameter} other {Nicht unte
 
 #. placeholder {0}: day(memory.eventStart)
 #. placeholder {1}: day(memory.eventEnd)
-#: src/features/settings/components/personalization/memory-item.tsx:168
+#: src/features/settings/components/personalization/memory-item.tsx:178
 msgid "{0} – {1}"
 msgstr "{0} – {1}"
 
@@ -571,7 +575,7 @@ msgid "{0} lines"
 msgstr "{0} Zeilen"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:185
+#: src/features/settings/components/personalization/memory-settings.tsx:186
 msgid "{0} memories"
 msgstr "{0} Erinnerungen"
 
@@ -661,7 +665,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0} auf {1}, in {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:186
+#: src/features/settings/components/personalization/memory-settings.tsx:187
 msgid "{0} pinned"
 msgstr "{0} angeheftet"
 
@@ -1841,6 +1845,10 @@ msgstr "Ein Dokumenteditor, der mit dir mitdenkt."
 msgid "A few questions first"
 msgstr "Zuerst ein paar Fragen"
 
+#: src/features/projects/components/project-rule-files.tsx:254
+msgid "A file applied when files match needs at least one pattern."
+msgstr ""
+
 #: src/features/auth/components/device-code-parts.tsx:114
 msgid "A file only its owner can read (no keychain available)"
 msgstr "Eine Datei, die nur ihr Besitzer lesen kann (kein Schlüsselbund verfügbar)"
@@ -2538,6 +2546,10 @@ msgstr "Referenzbilder hinzufügen, um die Konsistenz zu wahren"
 msgid "Add row"
 msgstr "Zeile hinzufügen"
 
+#: src/features/projects/components/project-rule-files.tsx:351
+msgid "Add rule file"
+msgstr ""
+
 #: src/features/settings/components/chat/mcp-settings.tsx:416
 #: src/features/settings/components/chat/mcp/server-form.tsx:337
 msgid "Add Server"
@@ -3226,7 +3238,7 @@ msgid "All"
 msgstr "Alle"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:207
+#: src/features/settings/components/personalization/memory-settings.tsx:208
 msgid "All ({0})"
 msgstr "Alle ({0})"
 
@@ -3471,6 +3483,11 @@ msgstr "Bereits mit diesem Thread verknüpft."
 msgid "Also viewing"
 msgstr "Sehen sich das auch an"
 
+#: src/features/projects/components/project-rule-files.tsx:160
+#: src/features/projects/components/project-rule-files.tsx:317
+msgid "Always"
+msgstr ""
+
 #: src/features/chat/thread/tool-approval.tsx:134
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
@@ -3560,7 +3577,7 @@ msgstr "Beim Generieren der Antwort ist ein Fehler aufgetreten."
 msgid "An error occurred while loading the {routeName} page."
 msgstr "Beim Laden der Seite {routeName} ist ein Fehler aufgetreten."
 
-#: src/features/settings/components/personalization/memory-item.tsx:336
+#: src/features/settings/components/personalization/memory-item.tsx:347
 msgid "An event cannot end before it starts."
 msgstr "Ein Ereignis kann nicht vor seinem Beginn enden."
 
@@ -3856,7 +3873,7 @@ msgid "App Secret from your Meta app's App settings > Basic, used to verify X-Hu
 msgstr "App Secret aus \"App settings > Basic\" deiner Meta-App, wird zur Prüfung von X-Hub-Signature-256 verwendet"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:316
-#: src/features/projects/components/project-form-dialog.tsx:234
+#: src/features/projects/components/project-form-dialog.tsx:276
 #: src/features/settings/components/account/account-settings.tsx:180
 #: src/features/settings/lib/settings-keywords.ts:27
 msgid "Appearance"
@@ -3869,6 +3886,10 @@ msgstr "AppID aus der Grundkonfiguration deines Official Account"
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:189
 msgid "Application Error"
 msgstr "Anwendungsfehler"
+
+#: src/features/projects/components/project-rule-files.tsx:156
+msgid "Applies"
+msgstr ""
 
 #: src/features/canvas/canvas-panel.tsx:119
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:330
@@ -5244,7 +5265,7 @@ msgstr "Brasilien"
 msgid "Break down complex tasks into numbered steps with progress tracking. Ideal for multi-step projects and development tasks."
 msgstr "Komplexe Aufgaben in nummerierte Schritte mit Fortschrittsverfolgung aufteilen. Ideal für mehrstufige Projekte und Entwicklungsaufgaben."
 
-#: src/features/projects/components/project-form-dialog.tsx:222
+#: src/features/projects/components/project-form-dialog.tsx:264
 msgid "Brief description of this project"
 msgstr "Kurzbeschreibung dieses Projekts"
 
@@ -5689,7 +5710,7 @@ msgstr "Kanada"
 #: src/features/pages/components/page-comments-panel.tsx:87
 #: src/features/projects/components/add-project-dialog.tsx:682
 #: src/features/projects/components/move-to-project-dialog.tsx:95
-#: src/features/projects/components/project-form-dialog.tsx:395
+#: src/features/projects/components/project-form-dialog.tsx:450
 #: src/features/prompts/components/prompt-form-dialog.tsx:501
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
@@ -5703,8 +5724,8 @@ msgstr "Kanada"
 #: src/features/settings/components/chat/usage-settings.tsx:573
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
-#: src/features/settings/components/personalization/memory-item.tsx:340
-#: src/features/settings/components/personalization/memory-settings.tsx:256
+#: src/features/settings/components/personalization/memory-item.tsx:351
+#: src/features/settings/components/personalization/memory-settings.tsx:257
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6523,11 +6544,11 @@ msgstr "Alle löschen"
 msgid "Clear All"
 msgstr "Alle löschen"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:246
+#: src/features/settings/components/personalization/memory-settings.tsx:247
 msgid "Clear All Memories"
 msgstr "Alle Erinnerungen löschen"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:250
+#: src/features/settings/components/personalization/memory-settings.tsx:251
 msgid "Clear all memories?"
 msgstr "Alle Erinnerungen löschen?"
 
@@ -6574,7 +6595,7 @@ msgstr "Tag-Filter zurücksetzen"
 msgid "Clear the queue"
 msgstr "Warteschlange leeren"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:136
+#: src/features/settings/components/personalization/memory-settings.tsx:137
 msgid "Cleared {count} memories"
 msgstr "{count} Erinnerungen gelöscht"
 
@@ -7007,7 +7028,7 @@ msgid "Colombia"
 msgstr "Kolumbien"
 
 #: src/features/canvas/canvas-panel.tsx:123
-#: src/features/projects/components/project-form-dialog.tsx:241
+#: src/features/projects/components/project-form-dialog.tsx:283
 msgid "Color"
 msgstr "Farbe"
 
@@ -7450,7 +7471,7 @@ msgstr "Erweiterte KI-Agent-Module für eine bessere Aufgabenausführung konfigu
 msgid "Configure chat behavior and preferences."
 msgstr "Chat-Verhalten und Einstellungen konfigurieren."
 
-#: src/features/projects/components/project-form-dialog.tsx:345
+#: src/features/projects/components/project-form-dialog.tsx:390
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "Standardmodell, Reasoning-Aufwand und Funktionen für neue Chats in diesem Projekt konfigurieren."
 
@@ -7908,7 +7929,7 @@ msgstr "Inhaltsfolie"
 msgid "Context"
 msgstr "Kontext"
 
-#: src/features/projects/components/project-form-dialog.tsx:319
+#: src/features/projects/components/project-form-dialog.tsx:363
 msgid "Context / Instructions"
 msgstr "Kontext / Anweisungen"
 
@@ -8639,7 +8660,7 @@ msgstr "Die Nutzung dieses Projekts konnte nicht geladen werden."
 msgid "Could not load tools: {error}"
 msgstr "Tools konnten nicht geladen werden: {error}"
 
-#: src/features/settings/components/personalization/memory-item.tsx:122
+#: src/features/settings/components/personalization/memory-item.tsx:123
 msgid "Could not load where this memory came from."
 msgstr "Es konnte nicht geladen werden, woher diese Erinnerung stammt."
 
@@ -8890,6 +8911,10 @@ msgstr "Der Kommentar konnte nicht aktualisiert werden"
 msgid "Could not update the participants"
 msgstr "Die Teilnehmer konnten nicht aktualisiert werden"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:100
+msgid "Couldn't load follow state"
+msgstr ""
+
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
 msgstr "Land"
@@ -8961,7 +8986,7 @@ msgstr "Einen neuen Branch aus dieser Nachricht erstellen. Gib ihm einen Namen, 
 msgid "Create a new organization to collaborate with your team"
 msgstr "Eine neue Organisation erstellen, um mit deinem Team zusammenzuarbeiten"
 
-#: src/features/projects/components/project-form-dialog.tsx:187
+#: src/features/projects/components/project-form-dialog.tsx:229
 msgid "Create a new project to group related chats with shared context."
 msgstr "Ein neues Projekt erstellen, um verwandte Chats mit gemeinsamem Kontext zu gruppieren."
 
@@ -9099,8 +9124,8 @@ msgstr "PR erstellen"
 msgid "Create project"
 msgstr "Projekt erstellen"
 
-#: src/features/projects/components/project-form-dialog.tsx:185
-#: src/features/projects/components/project-form-dialog.tsx:408
+#: src/features/projects/components/project-form-dialog.tsx:227
+#: src/features/projects/components/project-form-dialog.tsx:463
 msgid "Create Project"
 msgstr "Projekt erstellen"
 
@@ -9473,7 +9498,7 @@ msgstr "Tastenkürzel für häufige Aktionen anpassen. Klicke auf \"Aufzeichnen\
 msgid "Customize the appearance of the application."
 msgstr "Das Erscheinungsbild der Anwendung anpassen."
 
-#: src/features/projects/components/project-form-dialog.tsx:235
+#: src/features/projects/components/project-form-dialog.tsx:277
 msgid "Customize the visual appearance of this project."
 msgstr "Das visuelle Erscheinungsbild dieses Projekts anpassen."
 
@@ -9806,7 +9831,7 @@ msgstr "Standard-Agent"
 msgid "Default AI Response Language"
 msgstr "Standard-KI-Antwortsprache"
 
-#: src/features/projects/components/project-form-dialog.tsx:343
+#: src/features/projects/components/project-form-dialog.tsx:388
 msgid "Default AI Settings"
 msgstr "Standard-KI-Einstellungen"
 
@@ -9844,7 +9869,7 @@ msgstr "Standardsprache aktualisiert"
 msgid "default model"
 msgstr "Standardmodell"
 
-#: src/features/projects/components/project-form-dialog.tsx:353
+#: src/features/projects/components/project-form-dialog.tsx:398
 msgid "Default Model"
 msgstr "Standardmodell"
 
@@ -10007,6 +10032,10 @@ msgstr "{fileName} löschen"
 msgid "Delete {itemName}"
 msgstr "{itemName} löschen"
 
+#: src/features/projects/components/project-rule-files.tsx:151
+msgid "Delete {name}"
+msgstr ""
+
 #: src/features/tasks/components/task-card.tsx:113
 msgid "Delete {title}"
 msgstr "{title} löschen"
@@ -10022,7 +10051,7 @@ msgstr "Konto löschen"
 msgid "Delete alert \"{ruleName}\""
 msgstr "Alarm \"{ruleName}\" löschen"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:257
+#: src/features/settings/components/personalization/memory-settings.tsx:258
 msgid "Delete All"
 msgstr "Alle löschen"
 
@@ -10079,7 +10108,7 @@ msgstr "Gruppe und untergeordnete Elemente löschen"
 msgid "Delete Logo"
 msgstr "Logo löschen"
 
-#: src/features/settings/components/personalization/memory-item.tsx:294
+#: src/features/settings/components/personalization/memory-item.tsx:305
 msgid "Delete memory"
 msgstr "Erinnerung löschen"
 
@@ -10461,7 +10490,7 @@ msgstr "Beschreibe deinen Workflow... z. B. „Ein Bild aus Text generieren, hoc
 #: src/features/develop/components/pull-request-view.tsx:74
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
-#: src/features/projects/components/project-form-dialog.tsx:215
+#: src/features/projects/components/project-form-dialog.tsx:257
 #: src/features/prompts/components/prompt-form-dialog.tsx:266
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
@@ -10716,9 +10745,18 @@ msgstr "Wird deaktiviert..."
 msgid "Discard"
 msgstr "Verwerfen"
 
+#: src/features/projects/components/project-form-dialog.tsx:491
+#: src/features/projects/components/project-rule-files.tsx:376
+msgid "Discard changes"
+msgstr ""
+
 #: src/features/chat/host/diff-comments-draft.tsx:90
 msgid "Discard comments"
 msgstr "Kommentare verwerfen"
+
+#: src/features/projects/components/project-form-dialog.tsx:478
+msgid "Discard rule file changes?"
+msgstr ""
 
 #: src/features/develop/components/review-panel.tsx:275
 msgid "Discard the review"
@@ -11284,7 +11322,7 @@ msgstr "z. B. Arbeit"
 msgid "e.g., Emphasize concise outputs, target a beginner audience..."
 msgstr "z. B. Betone knappe Ausgaben, richte dich an Einsteiger..."
 
-#: src/features/projects/components/project-form-dialog.tsx:203
+#: src/features/projects/components/project-form-dialog.tsx:245
 msgid "e.g., Financial Planning"
 msgstr "z. B. Finanzplanung"
 
@@ -11508,7 +11546,7 @@ msgstr "MCP-Server bearbeiten"
 msgid "Edit me"
 msgstr "Bearbeite mich"
 
-#: src/features/settings/components/personalization/memory-item.tsx:290
+#: src/features/settings/components/personalization/memory-item.tsx:301
 msgid "Edit memory"
 msgstr "Erinnerung bearbeiten"
 
@@ -11525,7 +11563,7 @@ msgstr "Bearbeite oder lösche die Erinnerungen, die in den Einstellungen aufgef
 msgid "Edit preset"
 msgstr "Vorlage bearbeiten"
 
-#: src/features/projects/components/project-form-dialog.tsx:185
+#: src/features/projects/components/project-form-dialog.tsx:227
 msgid "Edit Project"
 msgstr "Projekt bearbeiten"
 
@@ -11905,7 +11943,7 @@ msgstr "Folgevorschläge aktivieren"
 msgid "Enable for Next Chat"
 msgstr "Für nächsten Chat aktivieren"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:170
+#: src/features/settings/components/personalization/memory-settings.tsx:171
 msgid "Enable memory"
 msgstr "Erinnerungen aktivieren"
 
@@ -12514,7 +12552,7 @@ msgstr "JS auswerten"
 msgid "Event"
 msgstr "Event"
 
-#: src/features/settings/components/personalization/memory-item.tsx:196
+#: src/features/settings/components/personalization/memory-item.tsx:207
 msgid "Event ends on"
 msgstr "Ereignis endet am"
 
@@ -13182,7 +13220,7 @@ msgstr "Tag-Farbe konnte nicht geändert werden"
 msgid "Failed to clear filter rules"
 msgstr "Filterregeln konnten nicht gelöscht werden"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:132
+#: src/features/settings/components/personalization/memory-settings.tsx:133
 msgid "Failed to clear memories"
 msgstr "Erinnerungen konnten nicht gelöscht werden"
 
@@ -13275,7 +13313,7 @@ msgstr "Datei konnte nicht gelöscht werden. Bitte versuch es erneut."
 msgid "Failed to delete files"
 msgstr "Dateien konnten nicht gelöscht werden"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:104
+#: src/features/settings/components/personalization/memory-settings.tsx:105
 msgid "Failed to delete memory"
 msgstr "Erinnerung konnte nicht gelöscht werden"
 
@@ -13789,8 +13827,8 @@ msgstr "Tastenkürzel konnten nicht aktualisiert werden"
 msgid "Failed to update MCP server"
 msgstr "MCP-Server konnte nicht aktualisiert werden"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:115
-#: src/features/settings/components/personalization/memory-settings.tsx:123
+#: src/features/settings/components/personalization/memory-settings.tsx:116
+#: src/features/settings/components/personalization/memory-settings.tsx:124
 msgid "Failed to update memory"
 msgstr "Erinnerung konnte nicht aktualisiert werden"
 
@@ -13818,7 +13856,7 @@ msgstr "Die Pull-Request-Einstellungen konnten nicht aktualisiert werden"
 msgid "Failed to update reply tools"
 msgstr "Antwort-Tools konnten nicht aktualisiert werden"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:147
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Failed to update setting"
 msgstr "Einstellung konnte nicht aktualisiert werden"
 
@@ -14347,6 +14385,10 @@ msgstr "In anderem Projekt ablegen"
 msgid "File input"
 msgstr "Dateieingabe"
 
+#: src/features/projects/components/project-rule-files.tsx:170
+msgid "File patterns, one per line"
+msgstr ""
+
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:97
 msgid "File removed from knowledge base"
 msgstr "Datei aus der Wissensdatenbank entfernt"
@@ -14487,7 +14529,7 @@ msgstr "Nach Typ filtern"
 msgid "Filter condition"
 msgstr "Filterbedingung"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:193
+#: src/features/settings/components/personalization/memory-settings.tsx:194
 msgid "Filter memories by type"
 msgstr "Erinnerungen nach Typ filtern"
 
@@ -14706,6 +14748,10 @@ msgstr "Systemeinstellung folgen (Standard)"
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:130
 msgid "Follow these steps to connect your {platform} account."
 msgstr "Folge diesen Schritten, um dein {platform}-Konto zu verbinden."
+
+#: src/features/chat/thread-list/thread-options-menu.tsx:105
+msgid "Follow thread"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "follow up"
@@ -15576,6 +15622,10 @@ msgstr "GitLab"
 msgid "GitLab secret token (X-Gitlab-Token)"
 msgstr "GitLab-Secret-Token (X-Gitlab-Token)"
 
+#: src/features/projects/components/project-rule-files.tsx:250
+msgid "Give every rule file a name."
+msgstr ""
+
 #: src/features/pages/components/page-share-dialog.tsx:231
 msgid "Give people access to this page, or publish a read-only link."
 msgstr "Gib anderen Zugriff auf diese Seite oder veröffentliche einen schreibgeschützten Link."
@@ -16200,7 +16250,7 @@ msgstr "Freihand-Sprachmodus — sprich, und Antworten werden vorgelesen"
 msgid "Hands-free voice updated"
 msgstr "Stimme für den Freihandmodus aktualisiert"
 
-#: src/features/settings/components/personalization/memory-item.tsx:195
+#: src/features/settings/components/personalization/memory-item.tsx:206
 msgid "Happens on"
 msgstr "Findet statt am"
 
@@ -16554,7 +16604,7 @@ msgstr "Trefferquote"
 msgid "HLS playback is not supported in this browser."
 msgstr "HLS-Wiedergabe wird in diesem Browser nicht unterstützt."
 
-#: src/features/settings/components/personalization/memory-item.tsx:197
+#: src/features/settings/components/personalization/memory-item.tsx:208
 msgid "Holds until"
 msgstr "Gilt bis"
 
@@ -16747,7 +16797,7 @@ msgstr "Isländisch"
 msgid "Icelandic (Iceland)"
 msgstr "Isländisch (Island)"
 
-#: src/features/projects/components/project-form-dialog.tsx:276
+#: src/features/projects/components/project-form-dialog.tsx:318
 msgid "Icon"
 msgstr "Symbol"
 
@@ -17129,7 +17179,7 @@ msgstr "{added} Notion-Seite(n) importiert."
 msgid "Imported as /{0}."
 msgstr "Als /{0} importiert."
 
-#: src/features/settings/components/personalization/memory-item.tsx:264
+#: src/features/settings/components/personalization/memory-item.tsx:275
 msgid "Imported from {importedFromLabel}"
 msgstr "Importiert aus {importedFromLabel}"
 
@@ -17516,6 +17566,7 @@ msgstr "Instruct"
 msgid "instructions"
 msgstr "Anweisungen"
 
+#: src/features/projects/components/project-rule-files.tsx:182
 #: src/features/settings/components/chat/bots-settings.tsx:197
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
@@ -17527,6 +17578,10 @@ msgstr "Anweisungen"
 #: src/features/tasks/components/task-form-dialog.tsx:239
 msgid "Instructions"
 msgstr "Anweisungen"
+
+#: src/features/projects/components/project-rule-files.tsx:303
+msgid "Instructions added to this project's chats: always, or only when the chat's attached files match a pattern such as **/*.sql."
+msgstr ""
 
 #: src/features/skills/components/skill-form-dialog.tsx:69
 #: src/features/tasks/components/task-form-dialog.tsx:89
@@ -18008,6 +18063,10 @@ msgstr "Das alte Secret noch 24 Stunden weiter akzeptieren"
 msgid "Keep current rows"
 msgstr "Aktuelle Zeilen behalten"
 
+#: src/features/projects/components/project-form-dialog.tsx:482
+msgid "Keep editing"
+msgstr ""
+
 #: src/features/knowledge/components/collection-picker.tsx:114
 msgid "Keep files"
 msgstr "Dateien behalten"
@@ -18314,7 +18373,7 @@ msgid "Last activity {lastActivityAgo}"
 msgstr "Letzte Aktivität {lastActivityAgo}"
 
 #. placeholder {0}: relativeTime(memory.lastConfirmedAt)
-#: src/features/settings/components/personalization/memory-item.tsx:263
+#: src/features/settings/components/personalization/memory-item.tsx:274
 msgid "Last confirmed {0}"
 msgstr "Zuletzt bestätigt {0}"
 
@@ -19293,7 +19352,7 @@ msgstr "Wird geladen..."
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:242
-#: src/features/settings/components/personalization/memory-item.tsx:128
+#: src/features/settings/components/personalization/memory-item.tsx:129
 #: src/routes/auth/extension.tsx:68
 msgid "Loading…"
 msgstr "Wird geladen…"
@@ -20102,7 +20161,7 @@ msgid "memories"
 msgstr "Erinnerungen"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:219
+#: src/features/settings/components/personalization/memory-settings.tsx:220
 msgid "Memories"
 msgstr "Erinnerungen"
 
@@ -20120,7 +20179,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "Für diese Antwort verwendete Erinnerungen ({0})"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:163
+#: src/features/settings/components/personalization/memory-settings.tsx:164
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "Erinnerungen"
@@ -20129,15 +20188,15 @@ msgstr "Erinnerungen"
 msgid "Memory — what the agent keeps across chats"
 msgstr "Erinnerung – was der Agent über Chats hinweg behält"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:108
+#: src/features/settings/components/personalization/memory-settings.tsx:109
 msgid "Memory deleted"
 msgstr "Erinnerung gelöscht"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:145
+#: src/features/settings/components/personalization/memory-settings.tsx:146
 msgid "Memory disabled"
 msgstr "Erinnerungen deaktiviert"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:145
+#: src/features/settings/components/personalization/memory-settings.tsx:146
 msgid "Memory enabled"
 msgstr "Erinnerungen aktiviert"
 
@@ -20153,7 +20212,7 @@ msgstr "Erinnerung ist aus, bis du sie einschaltest. Temporäre und gesperrte Ch
 msgid "Memory is off. Turn it on to bring in memories; nothing is saved while it is off."
 msgstr "Erinnerung ist aus. Schalte sie ein, um Erinnerungen zu übernehmen; solange sie aus ist, wird nichts gespeichert."
 
-#: src/features/settings/components/personalization/memory-item.tsx:302
+#: src/features/settings/components/personalization/memory-item.tsx:313
 msgid "Memory text"
 msgstr "Text der Erinnerung"
 
@@ -20161,7 +20220,7 @@ msgstr "Text der Erinnerung"
 msgid "Memory the agent keeps across chats"
 msgstr "Erinnerung, die der Agent chatübergreifend behält"
 
-#: src/features/settings/components/personalization/memory-item.tsx:249
+#: src/features/settings/components/personalization/memory-item.tsx:260
 msgid "Memory type"
 msgstr "Art der Erinnerung"
 
@@ -20969,6 +21028,14 @@ msgstr "{label} in Markierungen nach unten verschieben"
 msgid "Move {label} up in starred"
 msgstr "{label} in Markierungen nach oben verschieben"
 
+#: src/features/projects/components/project-rule-files.tsx:148
+msgid "Move {name} down"
+msgstr ""
+
+#: src/features/projects/components/project-rule-files.tsx:145
+msgid "Move {name} up"
+msgstr ""
+
 #: src/features/pages/components/page-tree-item.tsx:161
 msgid "Move down"
 msgstr "Nach unten verschieben"
@@ -21139,6 +21206,10 @@ msgstr "Musik"
 msgid "Mute"
 msgstr "Stummschalten"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:115
+msgid "Mute thread"
+msgstr ""
+
 #: src/features/settings/lib/settings-keywords.ts:105
 msgid "my data"
 msgstr "meine Daten"
@@ -21188,6 +21259,7 @@ msgstr "Name"
 #: src/features/devices/components/devices-settings.tsx:479
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
+#: src/features/projects/components/project-rule-files.tsx:142
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
@@ -22180,11 +22252,11 @@ msgstr "Keine MCP-Server konfiguriert. Füge einen Server hinzu, um die KI zu er
 msgid "No members in this team yet"
 msgstr "Noch keine Mitglieder in diesem Team"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:235
+#: src/features/settings/components/personalization/memory-settings.tsx:236
 msgid "No memories of this type."
 msgstr "Keine Erinnerungen dieser Art."
 
-#: src/features/settings/components/personalization/memory-settings.tsx:236
+#: src/features/settings/components/personalization/memory-settings.tsx:237
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "Noch keine Erinnerungen. Die KI lernt automatisch aus deinen Unterhaltungen."
 
@@ -22344,7 +22416,7 @@ msgstr "Keine öffentlichen Skills entsprechen deiner Suche."
 msgid "No public skills yet. Publish one by setting a skill's visibility to Public."
 msgstr "Noch keine öffentlichen Skills. Veröffentliche einen, indem du die Sichtbarkeit eines Skills auf Öffentlich setzt."
 
-#: src/features/settings/components/personalization/memory-item.tsx:137
+#: src/features/settings/components/personalization/memory-item.tsx:138
 msgid "No quote was kept for this memory."
 msgstr "Für diese Erinnerung wurde kein Zitat gespeichert."
 
@@ -23036,7 +23108,7 @@ msgid "Ollama or LM Studio on localhost, called by your browser. Text only, not 
 msgstr "Ollama oder LM Studio auf localhost, direkt von deinem Browser aufgerufen. Nur Text, wird nicht abgerechnet."
 
 #. placeholder {0}: day(memory.eventStart)
-#: src/features/settings/components/personalization/memory-item.tsx:170
+#: src/features/settings/components/personalization/memory-item.tsx:180
 msgid "On {0}"
 msgstr "Am {0}"
 
@@ -23362,7 +23434,7 @@ msgstr "Einen Revert dieses {requestNoun} öffnen?"
 msgid "Open as page"
 msgstr "Als Seite öffnen"
 
-#: src/features/settings/components/personalization/memory-item.tsx:149
+#: src/features/settings/components/personalization/memory-item.tsx:159
 msgid "Open chat"
 msgstr "Chat öffnen"
 
@@ -23425,7 +23497,7 @@ msgid "Open in new window"
 msgstr "In neuem Fenster öffnen"
 
 #: src/features/chat/thread-list/thread-node.tsx:590
-#: src/features/chat/thread-list/thread-options-menu.tsx:73
+#: src/features/chat/thread-list/thread-options-menu.tsx:79
 msgid "Open in split view"
 msgstr "In geteilter Ansicht öffnen"
 
@@ -23445,7 +23517,7 @@ msgstr "Links öffnen"
 msgid "Open menu"
 msgstr "Menü öffnen"
 
-#: src/features/settings/components/personalization/memory-item.tsx:149
+#: src/features/settings/components/personalization/memory-item.tsx:159
 msgid "Open message"
 msgstr "Nachricht öffnen"
 
@@ -25013,7 +25085,7 @@ msgstr "Anheften"
 msgid "Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own."
 msgstr "Hefte eine Erinnerung an, damit sie nicht verblasst, zusammengeführt oder befördert wird. Nur Aktivitätserinnerungen verblassen von selbst."
 
-#: src/features/settings/components/personalization/memory-item.tsx:280
+#: src/features/settings/components/personalization/memory-item.tsx:291
 msgid "Pin memory"
 msgstr "Erinnerung anheften"
 
@@ -25942,7 +26014,11 @@ msgstr "Projekt"
 msgid "Project actions"
 msgstr "Projektaktionen"
 
-#: src/features/projects/components/project-form-dialog.tsx:324
+#: src/features/projects/components/project-rule-files.tsx:219
+msgid "Project context"
+msgstr ""
+
+#: src/features/projects/components/project-form-dialog.tsx:368
 msgid "Project Context"
 msgstr "Projektkontext"
 
@@ -27080,12 +27156,12 @@ msgstr "Neu generieren"
 msgid "Regenerate response"
 msgstr "Antwort neu generieren"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:91
+#: src/features/chat/thread-list/thread-options-menu.tsx:97
 msgid "Regenerate title"
 msgstr "Titel neu generieren"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:85
-#: src/features/chat/thread-list/thread-options-menu.tsx:98
+#: src/features/chat/thread-list/thread-options-menu.tsx:91
+#: src/features/chat/thread-list/thread-options-menu.tsx:122
 msgid "Regenerating the title"
 msgstr "Titel wird neu generiert"
 
@@ -27257,8 +27333,8 @@ msgstr "Angemeldet bleiben"
 #: src/features/chat/thread/composer-input.tsx:418
 #: src/features/devices/components/devices-settings.tsx:334
 #: src/features/devices/components/devices-settings.tsx:340
-#: src/features/projects/components/project-form-dialog.tsx:265
-#: src/features/projects/components/project-form-dialog.tsx:306
+#: src/features/projects/components/project-form-dialog.tsx:307
+#: src/features/projects/components/project-form-dialog.tsx:348
 #: src/features/settings/components/chat/custom-providers-settings.tsx:653
 #: src/features/settings/components/chat/favorite-models-settings.tsx:186
 #: src/features/settings/components/chat/native-providers-settings.tsx:724
@@ -27510,7 +27586,7 @@ msgstr "Aus Favoriten entfernt"
 msgid "Removed:"
 msgstr "Entfernt:"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:72
+#: src/features/chat/thread-list/thread-options-menu.tsx:78
 msgid "Rename"
 msgstr "Umbenennen"
 
@@ -28351,6 +28427,19 @@ msgstr "rtl"
 msgid "Rubric"
 msgstr "Bewertungsrubrik"
 
+#. placeholder {0}: index + 1
+#: src/features/projects/components/project-rule-files.tsx:136
+msgid "Rule file {0}"
+msgstr ""
+
+#: src/features/projects/components/project-rule-files.tsx:301
+msgid "Rule files"
+msgstr ""
+
+#: src/features/projects/components/project-rule-files.tsx:291
+msgid "Rule files saved."
+msgstr ""
+
 #: src/features/settings/components/chat/usage-settings.tsx:192
 msgid "Rule name is required"
 msgstr "Regelname ist erforderlich"
@@ -28614,7 +28703,7 @@ msgstr "Saudi-Arabien"
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:641
 #: src/features/settings/components/chat/native-providers-settings.tsx:712
-#: src/features/settings/components/personalization/memory-item.tsx:344
+#: src/features/settings/components/personalization/memory-item.tsx:355
 #: src/features/slides/components/slide-editor-dialog.tsx:118
 #: src/features/workflow/components/canvas/workflow-controls.tsx:401
 msgid "Save"
@@ -28675,6 +28764,10 @@ msgstr "Speichern fehlgeschlagen"
 msgid "Save Image"
 msgstr "Bild speichern"
 
+#: src/features/projects/components/project-form-dialog.tsx:127
+msgid "Save or discard your rule file changes first."
+msgstr ""
+
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 msgid "Save preset"
 msgstr "Vorlage speichern"
@@ -28682,6 +28775,10 @@ msgstr "Vorlage speichern"
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:257
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "Speichere wiederverwendbare System-Prompts und verknüpfe sie mit bestimmten Modellen. Nutze die Schaltfläche Optimieren, um jede Vorlage mit dem Prompt-Optimierer zu verfeinern."
+
+#: src/features/projects/components/project-rule-files.tsx:363
+msgid "Save rule files"
+msgstr ""
 
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:416
 msgid "Save Shortcuts"
@@ -28747,7 +28844,8 @@ msgstr "In \"{0}\" gespeichert"
 
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
-#: src/features/projects/components/project-form-dialog.tsx:412
+#: src/features/projects/components/project-form-dialog.tsx:467
+#: src/features/projects/components/project-rule-files.tsx:363
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -29260,8 +29358,8 @@ msgid "Select all cells"
 msgstr "Alle Zellen auswählen"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:470
-#: src/features/projects/components/project-form-dialog.tsx:288
-#: src/features/projects/components/project-form-dialog.tsx:301
+#: src/features/projects/components/project-form-dialog.tsx:330
+#: src/features/projects/components/project-form-dialog.tsx:343
 msgid "Select an icon"
 msgstr "Symbol auswählen"
 
@@ -33181,7 +33279,7 @@ msgstr "Der Plan des Agenten"
 msgid "The agent's tool calls"
 msgstr "Die Tool-Aufrufe des Agenten"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:162
+#: src/features/settings/components/personalization/memory-settings.tsx:163
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "Die KI lernt aus deinen Unterhaltungen, um ihre Antworten zu personalisieren, und reflektiert jede Nacht, was sie gelernt hat. Alles, woran sie sich erinnert, ist hier aufgelistet – bearbeite, ändere den Typ, hefte an oder lösche beliebige Einträge."
 
@@ -33747,7 +33845,7 @@ msgstr "Die Warteschlange ist pausiert. Wähle „Als Nächstes senden“, um mi
 msgid "The quick check only looks at tools from servers you trust. A trusted server's tool descriptions reach the model, so they can influence which calls are approved automatically. Changing a server's address ends its trust."
 msgstr "Die Schnellprüfung betrachtet nur Tools von Servern, denen du vertraust. Die Tool-Beschreibungen eines vertrauenswürdigen Servers erreichen das Modell und können beeinflussen, welche Aufrufe automatisch genehmigt werden. Wird die Adresse eines Servers geändert, endet das Vertrauen."
 
-#: src/features/settings/components/personalization/memory-item.tsx:137
+#: src/features/settings/components/personalization/memory-item.tsx:138
 msgid "The quote stays hidden while you can't open its chat."
 msgstr "Das Zitat bleibt verborgen, solange du seinen Chat nicht öffnen kannst."
 
@@ -33802,6 +33900,10 @@ msgstr "Der neue Versuch dauert länger als erwartet"
 #: src/features/marketing/components/gateway-landing-page.tsx:52
 msgid "The right model, every time."
 msgstr "Das richtige Modell, jedes Mal."
+
+#: src/features/projects/components/project-rule-files.tsx:308
+msgid "The rule files could not be loaded."
+msgstr ""
 
 #: src/features/marketing/use-cases/use-case-data.ts:37
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
@@ -33963,6 +34065,10 @@ msgstr "Diese Erinnerungen wurden für diese Antwort in den Kontext der KI aufge
 #: src/features/settings/components/chat/model-filter-settings.tsx:252
 msgid "These providers will never be used for your requests."
 msgstr "Diese Anbieter werden nie für deine Anfragen verwendet."
+
+#: src/features/projects/components/project-rule-files.tsx:237
+msgid "These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again."
+msgstr ""
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:196
 msgid "These tools run without asking until the time shown. Revoke one to be asked again from your next message."
@@ -34231,11 +34337,11 @@ msgstr "Die Uhr dieses Computers geht etwa {minutes} Minuten hinter der des Serv
 msgid "This connection needs to be renewed."
 msgstr "Diese Verbindung muss erneuert werden."
 
-#: src/features/projects/components/project-form-dialog.tsx:328
+#: src/features/projects/components/project-form-dialog.tsx:372
 msgid "This context will be automatically added to each chat in your project. You can include instructions, background information, or any shared knowledge."
 msgstr "Dieser Kontext wird automatisch zu jedem Chat in deinem Projekt hinzugefügt. Du kannst Anweisungen, Hintergrundinformationen oder gemeinsames Wissen einschließen."
 
-#: src/features/projects/components/project-form-dialog.tsx:333
+#: src/features/projects/components/project-form-dialog.tsx:377
 msgid "This context will be prepended to the system prompt for all chats in this project."
 msgstr "Dieser Kontext wird dem System-Prompt für alle Chats in diesem Projekt vorangestellt."
 
@@ -34688,7 +34794,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "Dies wird {0} anonyme Benutzerkonten und alle ihre Daten dauerhaft löschen. Diese Aktion kann nicht rückgängig gemacht werden."
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:252
+#: src/features/settings/components/personalization/memory-settings.tsx:253
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "Dadurch werden alle {0} Erinnerungen und ihre täglichen Zusammenfassungen dauerhaft gelöscht. Die KI lernt ab deiner nächsten Unterhaltung von vorn."
 
@@ -34789,11 +34895,11 @@ msgstr "Thread-Verwaltung"
 msgid "Thread not found or you don't have access to it"
 msgstr "Thread nicht gefunden oder du hast keinen Zugriff darauf"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:69
+#: src/features/chat/thread-list/thread-options-menu.tsx:75
 msgid "Thread options"
 msgstr "Thread-Optionen"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:57
+#: src/features/chat/thread-list/thread-options-menu.tsx:63
 msgid "Thread options: {label}"
 msgstr "Thread-Optionen: {label}"
 
@@ -34916,7 +35022,7 @@ msgstr "Zeitzone aktualisiert"
 
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:148
 #: src/features/develop/components/pull-request-edit-action.tsx:124
-#: src/features/projects/components/project-form-dialog.tsx:196
+#: src/features/projects/components/project-form-dialog.tsx:238
 #: src/features/slides/components/slide-editor-dialog.tsx:90
 #: src/features/tasks/components/goal-form-dialog.tsx:88
 #: src/features/tasks/components/task-form-dialog.tsx:221
@@ -35867,6 +35973,10 @@ msgstr "Rückgängig"
 msgid "Undo (Ctrl+Z)"
 msgstr "Rückgängig (Strg+Z)"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:110
+msgid "Unfollow thread"
+msgstr ""
+
 #. placeholder {0}: String(index + 1)
 #: src/features/evals/components/dataset-panel.tsx:181
 msgid "Unfreeze case {0}"
@@ -35997,7 +36107,7 @@ msgstr "Links lösen"
 msgid "Unpin from right"
 msgstr "Rechts lösen"
 
-#: src/features/settings/components/personalization/memory-item.tsx:280
+#: src/features/settings/components/personalization/memory-item.tsx:291
 msgid "Unpin memory"
 msgstr "Erinnerung nicht mehr anheften"
 
@@ -36041,7 +36151,7 @@ msgid "until {0}"
 msgstr "bis {0}"
 
 #. placeholder {0}: day(memory.validUntil)
-#: src/features/settings/components/personalization/memory-item.tsx:173
+#: src/features/settings/components/personalization/memory-item.tsx:183
 msgid "Until {0}"
 msgstr "Bis {0}"
 
@@ -36109,7 +36219,7 @@ msgstr "Dauer aktualisieren"
 msgid "Update failed"
 msgstr "Aktualisierung fehlgeschlagen"
 
-#: src/features/projects/components/project-form-dialog.tsx:408
+#: src/features/projects/components/project-form-dialog.tsx:463
 msgid "Update Project"
 msgstr "Projekt aktualisieren"
 
@@ -36143,7 +36253,7 @@ msgstr "Die Rolle für dieses Mitglied aktualisieren"
 msgid "Update your account email address"
 msgstr "Deine Konto-E-Mail-Adresse aktualisieren"
 
-#: src/features/projects/components/project-form-dialog.tsx:187
+#: src/features/projects/components/project-form-dialog.tsx:229
 msgid "Update your project details below."
 msgstr "Aktualisiere deine Projektdetails unten."
 
@@ -37915,6 +38025,10 @@ msgstr "Wenn ein neuer Fakt einem alten widerspricht, wird die alte Erinnerung a
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr "Wird eine Antwort durch ein Update oder einen Ausfall abgebrochen, wird sie ab ihrem letzten abgeschlossenen Schritt bis zu 3-mal fortgesetzt. Eine Antwort, die unterbrochen wurde, während ein Tool lief, wird nie fortgesetzt."
 
+#: src/features/projects/components/project-rule-files.tsx:164
+msgid "When files match"
+msgstr ""
+
 #: src/features/settings/components/chat/model-filter-settings.tsx:165
 msgid "When set, only models hosted in these regions will be available."
 msgstr "Wenn gesetzt, sind nur Modelle verfügbar, die in diesen Regionen gehostet werden."
@@ -37977,11 +38091,11 @@ msgstr "Warum {0}"
 msgid "Why <0>Neore.</0>"
 msgstr "Warum <0>Neore.</0>"
 
-#: src/features/settings/components/personalization/memory-item.tsx:269
+#: src/features/settings/components/personalization/memory-item.tsx:280
 msgid "Why was this remembered?"
 msgstr "Warum wurde das gemerkt?"
 
-#: src/features/settings/components/personalization/memory-item.tsx:274
+#: src/features/settings/components/personalization/memory-item.tsx:285
 msgid "Why?"
 msgstr "Warum?"
 
@@ -38605,6 +38719,10 @@ msgstr "Dein Browser verrät nicht, welchen Prozessor du hast. Wähle daher unte
 #: src/features/local-models/components/local-setup-guide.tsx:85
 msgid "Your browser talks to the server on this computer directly — the prompt and reply never pass through our AI servers, and nothing is billed."
 msgstr "Dein Browser spricht direkt mit dem Server auf diesem Computer – Prompt und Antwort laufen nie über unsere KI-Server, und es wird nichts abgerechnet."
+
+#: src/features/projects/components/project-form-dialog.tsx:479
+msgid "Your changes to this project's rule files are not saved. Closing drops them."
+msgstr ""
 
 #: src/features/develop/components/review-diff.tsx:212
 msgid "Your comments on lines this diff does not show"
