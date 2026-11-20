@@ -146,6 +146,24 @@ describe("importing another assistant's memory", () => {
         expect(await memories()).toHaveLength(0);
     });
 
+    it("asks the model for low reasoning effort when it labels a paste and when it revises a near-match", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER });
+        });
+        generateText.mockResolvedValueOnce({ output: { keep: [{ line: 1, type: "identity" }] } }).mockResolvedValueOnce({ output: { action: "ADD" } });
+
+        await harness.action(async (ctx: any) => await labelImportedText(ctx, USER, "The user is a nurse in Hamburg"));
+        await save([{ memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" }]);
+
+        const low = { "workers-ai": { reasoning_effort: "low" } };
+
+        expect(generateText.mock.calls[0]?.[0].providerOptions).toStrictEqual(low);
+        expect(generateText.mock.calls[1]?.[0].providerOptions).toStrictEqual(low);
+    });
+
     it("marks every saved row as imported from the chosen app", async () => {
         expect.assertions(2);
 

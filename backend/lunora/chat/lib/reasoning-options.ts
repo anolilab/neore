@@ -90,3 +90,11 @@ export const buildReasoningProviderOptions = (
         }
     }
 };
+
+/**
+ * `providerOptions` for a small structured utility call with an output cap (belief revision, labelling an import).
+ * The default utility model (`cf-gpt-oss-20b` on Workers AI) reasons before it answers, the adapter sends the cap as
+ * `max_tokens`, and nothing in the gateway reserves room for reasoning, so low effort keeps the cap for the answer.
+ * Only the Workers AI adapter reads this key; the fallback models on other providers ignore it.
+ */
+export const LOW_REASONING_UTILITY_OPTIONS = { "workers-ai": { reasoning_effort: "low" } } as const;

@@ -13,6 +13,7 @@ import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
 import { getUtilityModelForUser, loadModelFilterRules } from "../chat/lib/model-filter-rules";
+import { LOW_REASONING_UTILITY_OPTIONS } from "../chat/lib/reasoning-options";
 import { authAction, rateLimit } from "../lib/crpc";
 import { gatewayFetch } from "../lib/services";
 import { type DedupMemory, embedMemoryFacts, findSimilarMemoryByJaccard, findSimilarMemoryByVector, saveMemoryVectors, type WordSetCache } from "./dedup";
@@ -48,7 +49,7 @@ import { MEMORY_TYPES, vMemoryType } from "./taxonomy";
  */
 const IMPORT_DEDUP_WINDOW = 1000;
 
-/** Reasoning utility models spend output tokens before they answer: the caps leave room for that. */
+/** Reasoning utility models spend output tokens before they answer: the calls ask for low effort, and the caps leave room. */
 const REVISION_MAX_OUTPUT_TOKENS = REFLECTION_LIMITS.maxOutputTokensPerCall;
 const LABEL_MAX_OUTPUT_TOKENS = 8000;
 
@@ -344,6 +345,7 @@ export const labelImportedText = async (ctx: ActionCtx, userId: string, text: st
             }),
         }),
         prompt: buildImportLabelPrompt(lines),
+        providerOptions: LOW_REASONING_UTILITY_OPTIONS,
         system: IMPORT_LABEL_SYSTEM_PROMPT,
     });
     const facts = applyImportLabels(lines, output?.keep ?? []);
