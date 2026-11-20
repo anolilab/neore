@@ -177,6 +177,7 @@ const generateFollowupSuggestionsInternal = async (
     language?: string,
     timezone?: string,
     location?: string,
+    timeoutMs = FOLLOWUP_DISPATCH_TTL_MS / 2,
 ): Promise<{
     suggestions: string[];
 }> => {
@@ -198,9 +199,9 @@ const generateFollowupSuggestionsInternal = async (
         model: model as LanguageModelV3,
     });
 
-    // The call is cut off at half the dispatch claim's life, so it ends before a lock that waited for it can commit (`agent/thread-lock.ts`).
+    // The call is cut off before the dispatch claim lapses, so a lock that waited for it cannot commit while the request is still live (`agent/thread-lock.ts`).
     const result = await generateText({
-        abortSignal: AbortSignal.timeout(FOLLOWUP_DISPATCH_TTL_MS / 2),
+        abortSignal: AbortSignal.timeout(timeoutMs),
         model: wrappedModel,
         output: Output.object({
             schema: z
@@ -4526,6 +4527,12 @@ export const getCachedFollowupSuggestions = authQuery
 /** Pages of messages read for one reply's turn, so a very long tool turn cannot make the job read without end. */
 const MAX_TURN_PAGES = 20;
 
+/** The model call's deadline is the claim's life left at its start, measured from when the claim was taken. */
+const modelBudgetMs = (claimedAt: number): number => claimedAt + FOLLOWUP_DISPATCH_TTL_MS / 2 - Date.now();
+
+/** A call with less budget than this cannot finish, so it is not started. */
+const MIN_MODEL_BUDGET_MS = 10 * 1000;
+
 export const generateFollowupSuggestionsForThread = internalAction
     .input({
         threadId: v.string(),
@@ -4751,6 +4758,14 @@ export const generateFollowupSuggestionsForThread = internalAction
                     threadId,
                 });
 
+                // The charge and the freshness read took part of the claim's life: a call that cannot finish inside what is left is not started.
+                if (modelBudgetMs(dispatchedAt) < MIN_MODEL_BUDGET_MS) {
+                    chatLogger.debug(`[generateFollowupSuggestionsForThread] The claim is too close to lapsing to call the model: ${threadId}`);
+                    await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { lastMessageId, threadId, userId });
+
+                    return;
+                }
+
                 const modelMessages = docsToModelMessages(filteredMessageDocuments);
 
                 const output = await generateFollowupSuggestionsInternal(
@@ -4759,6 +4774,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                     language,
                     timezone,
                     location,
+                    modelBudgetMs(dispatchedAt),
                 );
 
                 // A newer message may have landed while the model worked. Its own run suggests for it, so this one must not overwrite that.
