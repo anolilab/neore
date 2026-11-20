@@ -58,8 +58,9 @@ export interface BuildAgentToolsOptions {
     /**
      * Where the bot whose tool selection narrows these tools is found (`bots/tool-selection.ts`): the bot a run names, or the
      * thread it runs for (a sub-agent child's chain leads to its lead's bot). Omitted, `threadId`, else `permissionModeThreadId`.
+     * `ownerId` (a continuation): a named bot that is gone or not that user's gives no tools.
      */
-    botLookup?: { botId?: string; threadId?: string };
+    botLookup?: { botId?: string; ownerId?: string; threadId?: string };
     /**
      * The thread an INTERACTIVE run is in: offers the user's online devices'
      * tools (`device-tools.ts`), when that thread may reach them at all (the

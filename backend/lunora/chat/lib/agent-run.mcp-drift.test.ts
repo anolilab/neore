@@ -56,6 +56,7 @@ const resume = async (
     decision?: { approved: boolean; denyReason?: string },
     // `null`: a snapshot written before origins were recorded.
     savedOrigins: Record<string, string> | null = DOCS_ORIGIN,
+    extra: Record<string, unknown> = {},
 ) => {
     const ctx = {
         // Every read answers like the approval lookup: the request is still the open one, for `TOOL`.
@@ -73,6 +74,7 @@ const resume = async (
         searchMode: "chat",
         shouldAutoContinue: false,
         toolNames: [TOOL],
+        ...extra,
     } as never;
 
     return await resumeApprovedRun(ctx as never, {
@@ -90,6 +92,19 @@ describe("an approved MCP call after a pause", () => {
         agent.approveToolCall.mockClear();
         agent.denyToolCall.mockClear();
         vi.mocked(getAgent).mockResolvedValue(agent as never);
+    });
+
+    it("rebuilds the tools under the bot the paused run named, held to the run's owner, else under its thread's", async () => {
+        rebuiltWith("aaa");
+        vi.mocked(buildAgentTools).mockClear();
+
+        await resume({ [TOOL]: "aaa" }, undefined, DOCS_ORIGIN, { botLookup: { botId: "bot-1", threadId: "lead-1" } });
+        await resume({ [TOOL]: "aaa" });
+
+        expect(vi.mocked(buildAgentTools).mock.calls.map(([, options]) => options.botLookup)).toStrictEqual([
+            { botId: "bot-1", ownerId: "owner-1", threadId: "lead-1" },
+            { threadId: "thread-1" },
+        ]);
     });
 
     it("runs as approved when the tool is unchanged", async () => {

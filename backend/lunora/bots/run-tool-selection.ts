@@ -55,9 +55,14 @@ const subAgentParentOf = async (ctx: QueryCtx, threadId: Id<"threads">): Promise
  * sub-agent chain's lead. Unlike `findRunBot` (`functions.ts`) it does not ask who owns the thread or the bot: a selection only
  * removes tools, so a write collaborator's turn in a bot's chat is narrowed by the owner's selection too. It runs where the
  * thread lives (the owner's shard). Fails closed: a thread that cannot be read, or a chain deeper than a sub-agent can
- * go, gives no tools. `null` = no bot (or a deleted one, which reads as the plain assistant), or a bot that keeps every tool.
+ * go, gives no tools. So does a named bot that is gone or not `ownerId`'s, when a continuation gives `ownerId` (a run's start
+ * checked its bot's owner before it ran). `null` = no bot (or a deleted one, which reads as the plain assistant), or a bot that
+ * keeps every tool.
  */
-export const readRunToolSelection = async (ctx: QueryCtx, { botId, threadId }: { botId?: string; threadId?: string }): Promise<RunToolSelection | null> => {
+export const readRunToolSelection = async (
+    ctx: QueryCtx,
+    { botId, ownerId, threadId }: { botId?: string; ownerId?: string; threadId?: string },
+): Promise<RunToolSelection | null> => {
     let id = botId;
     let next = id === undefined ? threadId : undefined;
 
@@ -95,6 +100,12 @@ export const readRunToolSelection = async (ctx: QueryCtx, { botId, threadId }: {
     }
 
     const bot = id === undefined ? null : await ctx.db.get("bots", id as Id<"bots">);
+
+    // A continuation that names the bot its run had (`ToolRunConfig.botLookup`): one that is gone or has another owner by now
+    // cannot be told apart from a bot that would narrow the run, so it keeps nothing rather than everything.
+    if (botId !== undefined && ownerId !== undefined && bot?.userId !== ownerId) {
+        return NO_TOOLS_RUN_SELECTION;
+    }
 
     if (!bot?.toolSelection) {
         return null;

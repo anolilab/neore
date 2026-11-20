@@ -3,6 +3,7 @@
   "migrationIds": [
     "add-agent-commands-acp-sessions",
     "add-agent-commands-persistent-chunks",
+    "add-approval-bot-lookup",
     "add-approval-chain-source",
     "add-approval-tool-origins",
     "add-headless-approved",
@@ -28806,6 +28807,28 @@
               "nullable": false,
               "optional": false,
               "unique": false
+            },
+            "botLookup": {
+              "kind": "object",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "fields": {
+                "botId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                },
+                "threadId": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false,
+                  "refined": true
+                }
+              }
             },
             "chainSource": {
               "kind": "string",

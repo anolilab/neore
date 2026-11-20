@@ -16,6 +16,12 @@ import { vGroupRunSnapshot } from "../group/validators";
 export const vToolRunConfig = v.object({
     autoMediaEnrichment: v.boolean(),
     /**
+     * Where a headless run that paused found its bot (`headless-run.ts`): the bot it named, else the thread it took the bot's mode
+     * from. The continuation looks there again, so the bot's tool selection and mode hold for the rest of the run; a named bot
+     * that is gone, or no longer the owner's, leaves it no tools. Absent (interactive, or older) = the bot of the run's thread.
+     */
+    botLookup: v.optional(v.object({ botId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.optional(v.string().max(MAX_LENGTH.id)) })),
+    /**
      * The task, trigger or eval whose sub-agent chain the paused child belongs to (`sub-agents/logic.ts:chainSourceKey`): the
      * continuation names it on what the child delegates, so the per-source limit holds after an answer. Absent on a snapshot
      * that predates it, or for a chat-started chain.

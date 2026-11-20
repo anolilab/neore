@@ -473,6 +473,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // or a messenger reply's child still dispatches as that source, not as the lead.
             const snapshot: ToolRunConfig = {
                 autoMediaEnrichment: false,
+                // The bot this run was narrowed by: its thread may not name it (a continued thread is never stamped).
+                ...((options.botId !== undefined || modeThreadId !== undefined) && {
+                    botLookup: { ...(options.botId !== undefined && { botId: options.botId }), ...(modeThreadId !== undefined && { threadId: modeThreadId }) },
+                }),
                 // The continuation's own children stay on the chain, so its source's one-waiting-child limit still holds.
                 ...(options.chainSource !== undefined && { chainSource: options.chainSource }),
                 ...(options.origin !== "lead" && { dispatchOrigin: options.origin }),

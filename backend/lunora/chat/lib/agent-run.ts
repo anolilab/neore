@@ -1325,9 +1325,14 @@ export const resumeApprovedRun = async (
         throw new AgentRunError("left-organization", LEFT_ORGANIZATION_MESSAGE);
     }
 
+    // Where the paused run found its bot (a headless one keeps it, as its thread may not name the bot), else this thread's.
+    // A named bot must still be the owner's (`readRunToolSelection`), so one deleted or handed on meanwhile leaves no tools.
+    const storedLookup = config.botLookup ?? { threadId };
+    const botLookup = { ...storedLookup, ...(storedLookup.botId !== undefined && { ownerId: userId }) };
+
     // A sub-agent child is rebuilt under its chain's bot's mode, as it ran (`runHeadlessAgent`); a failed read fails closed.
     const childBotMode = subAgentChild
-        ? await ctx.runQuery(internal.bots.functions.getBotPermissionModeForRun, { threadId, userId }).catch((error: unknown) => {
+        ? await ctx.runQuery(internal.bots.functions.getBotPermissionModeForRun, { ...storedLookup, userId }).catch((error: unknown) => {
               console.warn("[agent-run] bot permission mode unavailable, using supervised", error);
 
               return "supervised" as const;
@@ -1338,6 +1343,7 @@ export const resumeApprovedRun = async (
         buildAgentTools(ctx, {
             ...(options.admittedRun && { admittedRun: true }),
             autoMediaEnrichment: config.autoMediaEnrichment,
+            botLookup,
             // A person just answered in the chat; a sub-agent child is still rebuilt headless below.
             deviceThreadId: threadId,
             ...(subAgentChild && {

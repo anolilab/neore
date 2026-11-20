@@ -222,3 +222,15 @@ export const addApprovalToolOrigins = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/**
+ * The stored config gained an optional `botLookup` (`chat/lib/tool-run-config.ts`): where a paused headless run found its bot.
+ * Nothing to fill: a row without it looks the bot up by its thread, as before it. A no-op, so `lunora prepare` records the
+ * added optional key in the baseline.
+ */
+export const addApprovalBotLookup = defineMigration({
+    id: "add-approval-bot-lookup",
+    table: "toolApprovalRuns",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});

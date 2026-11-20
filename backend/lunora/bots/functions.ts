@@ -380,7 +380,11 @@ export const getBotPermissionModeForRun = internalQuery
 
 /** `readRunToolSelection` (`run-tool-selection.ts`) for an action. Internal: `chat/lib/agent-tools.ts`, which applies it to every run's tools. */
 export const getBotToolSelectionForRun = internalQuery
-    .input({ botId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.optional(v.string().max(MAX_LENGTH.id)) })
+    .input({
+        botId: v.optional(v.string().max(MAX_LENGTH.id)),
+        ownerId: v.optional(v.string().max(MAX_LENGTH.id)),
+        threadId: v.optional(v.string().max(MAX_LENGTH.id)),
+    })
     .output(v.union(v.object({ ownerId: v.string(), ownerServerKeys: v.array(v.string()), selection: vToolSelection }), v.null()))
     .query(async ({ args, ctx }) => await readRunToolSelection(ctx, args));
 

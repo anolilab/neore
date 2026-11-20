@@ -960,6 +960,18 @@ describe("runHeadlessAgent pauseForApproval", () => {
         expect(recorded!.config).toMatchObject({ chainSource: "task:t1", dispatchOrigin: "trigger" });
     });
 
+    it("saves where it found its bot, so a continuation on a thread that names none is still narrowed by it", async () => {
+        seen.saved = [approvalRequest];
+
+        const ctx = fakeCtx();
+
+        await run(ctx, { botId: "bot-1", pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+        expect(recorded!.config.botLookup).toStrictEqual({ botId: "bot-1", threadId: "child-1" });
+    });
+
     it("saves the run's organization, whose cap the continuation reads when the thread has none", async () => {
         seen.saved = [approvalRequest];
 

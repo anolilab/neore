@@ -92,7 +92,10 @@ const selectionOf = async (botId: string): Promise<unknown> => {
     return row.toolSelection;
 };
 
-const read = async (args: { botId?: string; threadId?: string }) =>
+/** What a run reads when its bot cannot be told (`NO_TOOLS_RUN_SELECTION`). */
+const NO_TOOLS = { ownerId: "", ownerServerKeys: [], selection: { allow: [], exclude: [] } };
+
+const read = async (args: { botId?: string; ownerId?: string; threadId?: string }) =>
     await harness.run(async (ctx: any) => await ctx.runQuery(getBotToolSelectionForRun as never, args));
 
 describe("a bot's tool selection", () => {
@@ -225,12 +228,30 @@ describe("a bot's tool selection", () => {
         expect(await read({ threadId: childThreadId })).toStrictEqual({ ownerId: OWNER, ownerServerKeys: [], selection: { exclude: ["webSearch"] } });
     });
 
+    it("reads a resumed run's named bot as it is now, and gives no tools once that bot is gone or not the run's owner's", async () => {
+        const botId = await created({ exclude: [] });
+
+        // An exclusion added while the run was paused holds for its continuation.
+        await as(OWNER).mutation(updateBot as never, { botId, patch: { toolSelection: { exclude: ["webSearch"] } } } as never);
+
+        expect(await read({ botId, ownerId: OWNER })).toStrictEqual({ ownerId: OWNER, ownerServerKeys: [], selection: { exclude: ["webSearch"] } });
+        expect(await read({ botId, ownerId: "someone-else" })).toStrictEqual(NO_TOOLS);
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.delete("bots", botId);
+        });
+
+        expect(await read({ botId, ownerId: OWNER })).toStrictEqual(NO_TOOLS);
+        // A fresh run naming no owner reads a deleted bot as the plain assistant, as before.
+        expect(await read({ botId })).toBeNull();
+    });
+
     it("gives no tools for a thread it cannot read, and every tool for a plain chat", async () => {
         const plainThreadId = (await harness.run(
             async (ctx: any) => await ctx.db.insert("threads", { status: "active", title: "Plain", userId: OWNER }),
         )) as string;
 
-        expect(await read({ threadId: "not-a-thread" })).toStrictEqual({ ownerId: "", ownerServerKeys: [], selection: { allow: [], exclude: [] } });
+        expect(await read({ threadId: "not-a-thread" })).toStrictEqual(NO_TOOLS);
         expect(await read({ threadId: plainThreadId })).toBeNull();
     });
 });
