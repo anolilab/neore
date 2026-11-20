@@ -450,6 +450,9 @@ const MAX_EXPORT_BYTES = 32 * 1024 * 1024;
 /** The share of the export trigger run history may take; past it, the oldest runs are left out and marked as cut. */
 const TRIGGER_EXPORT_BYTES = 8 * 1024 * 1024;
 
+/** The share of the export the projects' legacy `context` texts may take; past it, a project's is left out and marked. */
+const PROJECT_CONTEXT_EXPORT_BYTES = 8 * 1024 * 1024;
+
 /**
  * Sub-agent delegations (their task text and results) and knowledge
  * collections — user data the export used to leave out. The usage rollup is
@@ -677,6 +680,7 @@ export const generateExportFile = internalAction
             projectDetailsReadBudget(
                 earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes + threadFollows.readBytes + triggers.readBytes,
             ),
+            PROJECT_CONTEXT_EXPORT_BYTES,
         );
         const exportData = {
             acpSessions,

@@ -510,8 +510,8 @@ describe("changing a project's rule files", () => {
 
         await expect(savedFiles(kept)).resolves.toBeUndefined();
 
-        // The account's last project step takes the rule files with each page of projects, a row saved after the earlier
-        // step too, once the project rows are gone, as a delete does.
+        // The account's project step takes the rule files with each page of projects, once the project rows are gone, as a
+        // delete does.
         const last = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "last", userId: OWNER });
 
         vi.mocked(eraseProjectsRuleFiles).mockImplementationOnce(async (ctx, projectIds) => {

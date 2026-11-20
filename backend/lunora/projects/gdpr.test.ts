@@ -243,7 +243,7 @@ describe("owned projects in the GDPR export", () => {
 describe("project rule files in the GDPR export", () => {
     const sql = { content: "Use snake_case.", globs: ["**/*.sql"], id: "sql", mode: "glob", title: "SQL" };
     /** As the export runs it: the owned projects' pages, then their rule files within `maxBytes`, counting each read. */
-    const withRules = async (maxBytes = Infinity) => {
+    const withRules = async (maxBytes = Infinity, contextMaxBytes = Infinity) => {
         const reads: string[] = [];
         const harnessRead = async (query: string, run: (ctx: any) => Promise<unknown>) => {
             reads.push(query);
@@ -260,6 +260,7 @@ describe("project rule files in the GDPR export", () => {
             async (projectIds) =>
                 (await harnessRead("ruleFiles", async (ctx) => await ctx.runQuery(collectProjectRuleFilesForExport, { projectIds }))) as never,
             maxBytes,
+            contextMaxBytes,
         );
 
         return { ...result, reads };
@@ -342,6 +343,40 @@ describe("project rule files in the GDPR export", () => {
         const title = (omitted[0] as { title?: string } | undefined)?.title ?? "";
 
         expect(omitted).toMatchObject([{ ruleFiles: [{ content: `Context ${title.slice(1)}.`, id: "context" }], ruleFilesOmitted: true }]);
+    });
+
+    it("leaves out a legacy context past the export's share for them, marked, and keeps the project's saved files", async () => {
+        await harness.run((async (ctx: any) => {
+            // Carried into the list already (a clear that failed): exported once, from the list, and not counted.
+            const carried = await ctx.db.insert("projects", { context: "k".repeat(1000), createdAt: 0, title: "carried", userId: A });
+            const carriedFile = { content: "k".repeat(1000), id: "context", mode: "always", title: "Project context" };
+
+            await ctx.db.insert("projectRuleFiles", {
+                carriedContext: contextFingerprint("k".repeat(1000)),
+                files: [carriedFile],
+                projectId: carried,
+                updatedAt: 0,
+                userId: A,
+            });
+
+            for (let index = 1; index <= 3; index += 1) {
+                const projectId = await ctx.db.insert("projects", { context: "c".repeat(1000), createdAt: index, title: `p${index}`, userId: A });
+
+                await ctx.db.insert("projectRuleFiles", { files: [sql], projectId, updatedAt: 0, userId: A });
+            }
+        }) as never);
+
+        // Room for two of the three contexts not carried (each about 1 KB as JSON).
+        const { projects } = await withRules(Infinity, 2500);
+        const byName = byTitle(projects);
+        const omitted = projects.filter((project) => "ruleFilesOmitted" in project);
+
+        expect(projects).toHaveLength(4);
+        expect(byName.get("carried")).not.toHaveProperty("ruleFilesOmitted");
+        expect((byName.get("carried") as { ruleFiles: unknown[] }).ruleFiles).toHaveLength(1);
+        // Every other project keeps its saved files; only one goes without its context, and says so.
+        expect(omitted).toMatchObject([{ ruleFiles: [sql], ruleFilesOmitted: true }]);
+        expect(projects.filter((project) => (project as { ruleFiles: { content: string }[] }).ruleFiles[0]?.content === "c".repeat(1000))).toHaveLength(2);
     });
 
     it("reads no project row again: large rows cost the projects' page only, not the rule files' budget", async () => {

@@ -13,9 +13,10 @@
 - Deleting a project marks its row (`deletingAt`), deletes the project row, then erases its row
   (`agent.projects.deleteProject`): a `.global()` write does not roll back, so erasing first could leave a live project
   without its rules. A row a failed delete left marked is finished by the daily `sweepUnfinishedRuleFileErasures` once
-  its project is gone (unmarked while it lives). Account deletion erases by owner (`eraseProjectRuleFilesForUser`, in
-  `deleteUserWorkflowData`), orphans included, and again with each page of projects in `eraseProjectsForUser` (`RULE_FILE_ROWS_PER_PAGE` per
-  step, drained by the workflow), then by owner once no project is left, for a page that failed after its deletes.
+  its project is gone (unmarked while it lives). Account deletion erases them with each page of projects in
+  `eraseProjectsForUser` (`RULE_FILE_ROWS_PER_PAGE` per step, drained by the workflow), then by owner
+  (`eraseProjectRuleFilesForUser`, orphans included) once no project is left; never in an earlier step, which a
+  deletion stopped before the projects would leave live projects without their rules.
 - A save refuses while the project's delete is under way (`deleteUnderway`, as the repository mutations do), and
   erases its own row when the project is gone after its write.
 - Changing them follows `updateProject` exactly: the owner only (`mayEditProject` in `edit-access.ts`, through
@@ -56,5 +57,7 @@
   projects), so a read that budgets its cost measures whole rows: `findProjectRowsMeasured` / `projectRowsReadBytes`.
   The export returns rule files only from their own pass (`attachProjectRuleFiles`, which reads and counts only the
   rule-file rows: each legacy `context` comes from the owned-projects page, which read the project rows), after that
-  page; past the budget a project is marked `ruleFilesOmitted`, still with that `context`. Their budget counts the bytes
+  page; past the budget a project is marked `ruleFilesOmitted`, still with that `context`. The exported contexts
+  share `PROJECT_CONTEXT_EXPORT_BYTES` of the output (`gdpr/steps.ts`; a carried one is neither exported nor counted);
+  one past it is left out, its project marked `ruleFilesOmitted` too. The rule files' read budget counts the bytes
   the triggers actually read (`collectAllTriggers` reports `readBytes`), not the triggers' allowance.

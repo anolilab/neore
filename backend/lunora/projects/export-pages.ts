@@ -1,6 +1,6 @@
 import { LunoraError } from "lunorash/server";
 
-import { projectRuleFiles, type RuleFile } from "./rule-files";
+import { isLegacyContextFile, projectRuleFiles, type RuleFile } from "./rule-files";
 
 /** One page of `collectProjectRepositoriesForExport`: its rows, and where the next page starts (`null` after the last). */
 interface RepositoriesPage {
@@ -108,7 +108,8 @@ interface OwnedProjectsPage {
  * every page is read, each costing its whole rows (`findProjectRowsMeasured`), and a page that takes the reads past
  * `maxBytes` has its projects' sharing flag dropped and marked `{ detailsOmitted: true }`, the same way the
  * repositories' project details are. The id, title, machine and folder stay on every row. A project's legacy `context`
- * is not one of its exported fields: it comes back apart (`contexts`, by project id), for {@link attachProjectRuleFiles}.
+ * is not one of its exported fields: it comes back apart (`contexts`, by project id), for {@link attachProjectRuleFiles},
+ * which decides how much of it is exported.
  */
 export const collectAllOwnedProjects = async (
     readPage: (cursor: string | null) => Promise<unknown>,
@@ -161,59 +162,60 @@ interface RuleFilesPage {
  * The user's projects from {@link collectAllOwnedProjects}, each with its rule files (`ruleFiles`), a legacy `context`
  * first (`projectRuleFiles`, from `contexts`, the project rows already read), the saved rows read
  * {@link PROJECTS_PER_DETAILS_READ} projects to a query. Once the reads reach `maxBytes` the remaining projects' files are
- * not read and the project says so (`ruleFilesOmitted: true`), still with its legacy `context`, which costs no read; the
- * export still completes. A project without rule files is left as it is.
+ * not read and the project says so (`ruleFilesOmitted: true`), still with its legacy `context`, which costs no read.
+ * The legacy contexts exported share `contextMaxBytes` of the export's output (as JSON, UTF-8), in project order; one
+ * that does not fit is left out and its project marked the same way. A `context` the saved list carries already is
+ * neither exported nor counted. The export still completes. A project without rule files gets no `ruleFiles`.
  */
 export const attachProjectRuleFiles = async (
     projects: object[],
     contexts: ReadonlyMap<string, string>,
     readRuleFiles: (projectIds: string[]) => Promise<RuleFilesPage>,
     maxBytes: number,
+    contextMaxBytes: number,
 ): Promise<{ projects: object[]; readBytes: number }> => {
     const projectIds = projects.map((project) => (project as { projectId: string }).projectId);
-    const ruleFiles = new Map<string, unknown[]>();
-    const omitted = new Set<string>();
+    const rows = new Map<string, RuleFilesPage["projects"][number] | undefined>();
+    let contextBytes = 0;
     let readBytes = 0;
 
-    for (let index = 0; index < projectIds.length; index += PROJECTS_PER_DETAILS_READ) {
+    for (let index = 0; index < projectIds.length && readBytes < maxBytes; index += PROJECTS_PER_DETAILS_READ) {
         const batch = projectIds.slice(index, index + PROJECTS_PER_DETAILS_READ);
-
-        if (readBytes >= maxBytes) {
-            for (const projectId of batch) {
-                omitted.add(projectId);
-            }
-
-            continue;
-        }
-
         const page = await readRuleFiles(batch);
-        const rows = new Map(page.projects.map((row) => [row.projectId, row] as const));
+        const read = new Map(page.projects.map((row) => [row.projectId, row] as const));
 
         readBytes += page.readBytes;
 
         for (const projectId of batch) {
-            const row = rows.get(projectId);
-            const files = projectRuleFiles({ carriedContext: row?.carriedContext, context: contexts.get(projectId), ruleFiles: row?.files });
-
-            if (files.length > 0) {
-                ruleFiles.set(projectId, files);
-            }
+            rows.set(projectId, read.get(projectId));
         }
     }
 
     return {
         projects: projects.map((project) => {
             const { projectId } = project as { projectId: string };
+            // A project in no batch read had its files left out; `rows` holds `undefined` for one read without a row.
+            const unread = !rows.has(projectId);
+            const row = rows.get(projectId);
+            let files = projectRuleFiles({ carriedContext: row?.carriedContext, context: contexts.get(projectId), ruleFiles: row?.files });
+            let contextOmitted = false;
 
-            if (omitted.has(projectId)) {
-                const kept = projectRuleFiles({ context: contexts.get(projectId) });
+            if (files[0] && isLegacyContextFile(files[0])) {
+                const bytes = utf8Bytes(files[0].content);
 
-                return { ...project, ...(kept.length > 0 && { ruleFiles: kept }), ruleFilesOmitted: true };
+                if (contextBytes + bytes <= contextMaxBytes) {
+                    contextBytes += bytes;
+                } else {
+                    files = files.slice(1);
+                    contextOmitted = true;
+                }
             }
 
-            const files = ruleFiles.get(projectId);
-
-            return files ? { ...project, ruleFiles: files } : project;
+            return {
+                ...project,
+                ...(files.length > 0 && { ruleFiles: files }),
+                ...((unread || contextOmitted) && { ruleFilesOmitted: true }),
+            };
         }),
         readBytes,
     };

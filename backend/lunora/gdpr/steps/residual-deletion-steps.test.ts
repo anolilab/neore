@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { jobsQueueMessages } from "../../../test/stubs/cloudflare-workers";
 import { schemaWithShardedTables, withTableFacades } from "../../lib/test-schema";
+import { deleteUserProjects } from "./deletion-steps";
 import {
     anonymiseGatewayUsageDeductions,
     BATCH,
@@ -189,6 +190,12 @@ describe("residual account-deletion steps", () => {
         await drain(deleteUserStreamingMessages, args);
         await drain(deleteUserIntegrations, args);
         await drain(deleteUserWorkflowData, args);
+
+        // A deletion stopped here leaves A's projects with their rule files: the step before the projects erases none.
+        expect(await countFor("projectRuleFiles", A)).toBe(11);
+        expect(await countFor("projects", A)).toBe(1);
+
+        await drain(deleteUserProjects, args);
         await drain(anonymiseGatewayUsageDeductions, args);
 
         for (const table of [...Object.keys(ROWS), "knowledgeChunks"]) {
@@ -204,7 +211,7 @@ describe("residual account-deletion steps", () => {
             `https://github.com/${B}/r.git`,
         ]);
 
-        // A's projects' rule files go with them, those of A's deleted projects too; B's stay.
+        // A's projects' rule files go with the projects, those of A's deleted projects too; B's stay.
         const ruleFiles = await rowsOf("projectRuleFiles");
 
         expect(ruleFiles.map((row) => row.userId)).toStrictEqual([B, B]);

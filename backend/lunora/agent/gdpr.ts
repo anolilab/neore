@@ -153,13 +153,14 @@ export const eraseThreadSummariesForUser = async (ctx: MutationCtx, userId: stri
 };
 
 /**
- * One page of the user's projects (`.global()`, read through the ORM facade), each with its rule files, a row a save
- * wrote since `deleteUserWorkflowData` too: marked, then erased once the project rows are gone, as a project delete
- * does, so a save after the erase finds no project and takes its own back. A page is a few reads and at most three
+ * One page of the user's projects (`.global()`, read through the ORM facade), each with its rule files: marked, then
+ * erased once the project rows are gone, as a project delete does, so a save after the erase finds no project and takes
+ * its own back. No earlier step erases rule files: one stopped before this would leave live projects without them. A page is a few reads and at most three
  * writes per project, so an account with many projects never runs one transaction into the subrequest limit.
  *
  * Once the last page is gone, the user's rule files are erased by owner too: a round that failed after its project
- * rows went left their rows marked, and its retry no longer finds those projects. No project of theirs is left then.
+ * rows went left their rows marked, and its retry no longer finds those projects; a failed project delete left some
+ * too. No project of theirs is left then.
  */
 export const eraseProjectsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
     const { page: projects } = await ctx.db.projects.findMany({ consistency: "primary", limit: RULE_FILE_ROWS_PER_PAGE, where: { userId } });
