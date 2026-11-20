@@ -5,7 +5,6 @@
  */
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { QueryCtx } from "../../_generated/server";
-import { findProjectRow, findProjectRows } from "../../projects/project-row";
 
 /** The thread's project is the one that counts, and a thread without one is outside every project scope. */
 export const isDeviceInScope = (device: Pick<Doc<"devices">, "projectIds">, threadProjectId: Id<"projects"> | undefined): boolean =>
@@ -23,7 +22,7 @@ export const filterOwnProjectIds = async (ctx: Pick<QueryCtx, "db">, userId: str
         batches.push(unique.slice(start, start + IDS_PER_READ));
     }
 
-    const pages = await Promise.all(batches.map(async (batch) => await findProjectRows(ctx.db.projects, { where: { _id: { in: batch }, userId } })));
+    const pages = await Promise.all(batches.map(async (batch) => await ctx.db.projects.findMany({ where: { _id: { in: batch }, userId } })));
 
     return new Set(pages.flatMap(({ page }) => page.map((project) => project._id)));
 };
@@ -42,7 +41,7 @@ export const resolveThreadProject = async (
         return undefined;
     }
 
-    const project = await findProjectRow(ctx.db.projects, { where: { _id: thread.projectId, userId } });
+    const project = await ctx.db.projects.findFirst({ where: { _id: thread.projectId, userId } });
 
     return project?._id;
 };

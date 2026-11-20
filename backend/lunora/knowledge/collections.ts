@@ -31,7 +31,6 @@ import { isThreadLocked } from "../lib/thread-lock";
 import { DELETING_STATUS } from "./file-removal";
 import { canReadCollection, planRetrievalScope } from "./scope";
 import { MAX_LENGTH } from "../lib/validators";
-import { findProjectRow } from "../projects/project-row";
 
 export const MAX_COLLECTIONS = 100;
 export const MAX_COLLECTION_NAME = 80;
@@ -402,7 +401,7 @@ export const getThreadCollections = authQuery
     });
 
 const requireOwnedProject = async (db: Db, projectId: Id<"projects">, userId: string): Promise<void> => {
-    const project = await findProjectRow(db.projects, { where: { _id: projectId } });
+    const project = await db.projects.findFirst({ where: { _id: projectId } });
 
     if (!project || project.userId !== userId) {
         throw new LunoraError("NOT_FOUND", "Project not found");

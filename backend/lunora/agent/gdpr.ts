@@ -8,9 +8,9 @@ import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, deleteParentsWithChildren, full } from "../gdpr/batch";
 import { gdprLogger } from "../lib/logger";
+import { eraseProjectRuleFiles } from "../projects/gdpr";
 import { deleteVectorRow } from "./table-writes";
 import type { VectorTableName } from "./vector/tables";
-import { findProjectRows } from "../projects/project-row";
 
 const EMBEDDING_TABLES = [
     "embeddings_128",
@@ -154,9 +154,15 @@ export const eraseThreadSummariesForUser = async (ctx: MutationCtx, userId: stri
 
 /** The user's projects (`.global()`, read through the ORM facade). */
 export const eraseProjectsForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
-    const { page: projects } = await findProjectRows(ctx.db.projects, { where: { userId } });
+    const { page: projects } = await ctx.db.projects.findMany({ where: { userId } });
 
-    await Promise.all(projects.map((p) => ctx.db.delete("projects", p._id)));
+    // Each with its rule files: a save between `deleteUserWorkflowData` and this step wrote a row for it again.
+    await Promise.all(
+        projects.map(async (p) => {
+            await eraseProjectRuleFiles(ctx, p._id);
+            await ctx.db.delete("projects", p._id);
+        }),
+    );
 };
 
 /** Deletes a batch of executions, each after its node rows; `true` when one was left for the next round. */

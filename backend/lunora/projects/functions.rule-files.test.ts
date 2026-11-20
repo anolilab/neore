@@ -2,25 +2,27 @@
  * A project's rule files: what a run gets (always files, and pattern files only when the run's files match) and who may
  * change them (the rule of `updateProject`: its owner only).
  */
+import { readdirSync, readFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 
-import { getProject as getOwnProject, unpinProject, updateProject as writeProject } from "../agent/projects";
+import {
+    deleteProject as eraseProject,
+    getProject as getOwnProject,
+    listPinnedProjects as listOwnPinned,
+    updateProject as writeProject,
+} from "../agent/projects";
+import { eraseProjectsForUser } from "../agent/gdpr";
 import schema from "../schema";
 import { runProjectFor } from "../tasks/internal";
 import { getWorkflow } from "../workflow/functions";
-import {
-    getProject,
-    getProjectContextForRun,
-    listPinnedProjects,
-    listProjectRuleFiles,
-    listProjects,
-    readableProject,
-    setProjectRuleFiles,
-    updateProject,
-} from "./functions";
+import { getProject, getProjectContextForRun, listPinnedProjects, listProjectRuleFiles, listProjects, setProjectRuleFiles, updateProject } from "./functions";
+import { collectProjectRuleFilesForExport, eraseProjectRuleFiles } from "./gdpr";
+import { readProjectRuleFiles } from "./rule-file-rows";
 import { MAX_RULE_TEXT_PER_RUN } from "./rule-files";
 
 const OWNER = "user-owner";
@@ -49,6 +51,13 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     };
 });
 
+// Counts the reads of the rule-file table, which only the editor, a run's setup and a save make.
+vi.mock("./rule-file-rows", async (importOriginal) => {
+    const original = await importOriginal<typeof import("./rule-file-rows")>();
+
+    return { ...original, readProjectRuleFiles: vi.fn(original.readProjectRuleFiles) };
+});
+
 vi.mock("../lib/audit-triggers", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("../lib/audit-triggers")>()),
@@ -71,11 +80,31 @@ beforeEach(() => {
 
 afterEach(() => {
     harness.close();
+    vi.mocked(readProjectRuleFiles).mockClear();
 });
 
 const sqlRules = { content: "Use snake_case columns.", globs: ["**/*.sql"], id: "sql", mode: "glob" as const, title: "SQL" };
 
 const insert = async (table: string, fields: Record<string, unknown>) => (await harness.run(async (ctx: any) => await ctx.db.insert(table, fields))) as string;
+
+/** A project, with `ruleFiles` saved in their own table. */
+const project = async ({ ruleFiles, ...fields }: Record<string, unknown> & { ruleFiles?: unknown[] }) => {
+    const projectId = await insert("projects", fields);
+
+    if (ruleFiles) {
+        await insert("projectRuleFiles", { files: ruleFiles, projectId, updatedAt: 0 });
+    }
+
+    return projectId;
+};
+
+/** The files saved in the rule-file table for `projectId`, `undefined` without a row. */
+const savedFiles = async (projectId: string) =>
+    (await harness.run(async (ctx: any) => {
+        const saved = await ctx.db.projectRuleFiles.findFirst({ where: { projectId } });
+
+        return saved?.files;
+    })) as unknown[] | undefined;
 
 const chatFile = async (filename: string) =>
     await insert("chatFiles", { filename, hash: filename, lastTouchedAt: 0, mediaType: "text/plain", refcount: 1, storageId: filename });
@@ -85,7 +114,7 @@ const contextFor = async (projectId: string, fileIds?: string[]) =>
 
 describe("a project's rule files in a run", () => {
     it("adds a **/*.sql file only for a run whose files include SQL", async () => {
-        const projectId = await insert("projects", {
+        const projectId = await project({
             createdAt: 0,
             ruleFiles: [{ content: "Be brief.", id: "a", mode: "always", title: "A" }, sqlRules],
             title: "p",
@@ -100,7 +129,7 @@ describe("a project's rule files in a run", () => {
     });
 
     it("gives a task's run its project's always files", async () => {
-        const projectId = await insert("projects", {
+        const projectId = await project({
             createdAt: 0,
             ruleFiles: [{ content: "Be brief.", id: "a", mode: "always", title: "A" }, sqlRules],
             title: "p",
@@ -129,7 +158,7 @@ describe("a project's rule files in a run", () => {
         const ruleFiles = Array.from({ length: 5 }, (_, index) => {
             return { content: String(index).repeat(60_000), id: `f${index}`, mode: "always", title: `F${index}` };
         });
-        const projectId = await insert("projects", { createdAt: 0, ruleFiles, title: "p", userId: OWNER });
+        const projectId = await project({ createdAt: 0, ruleFiles, title: "p", userId: OWNER });
         const taskId = await insert("tasks", {
             attemptCount: 0,
             createdAt: 0,
@@ -184,10 +213,8 @@ describe("changing a project's rule files", () => {
 
         await save(OWNER, projectId, [sqlRules, ...files]);
 
-        const project = (await harness.run(async (ctx: any) => await ctx.db.projects.findFirst({ where: { _id: projectId } }))) as Record<string, unknown>;
-
-        expect(project.context).toBeUndefined();
-        expect(project.ruleFiles).toEqual([sqlRules, { content: "Old notes", id: "context", mode: "always", title: "Project context" }]);
+        await expect(row(projectId)).resolves.not.toHaveProperty("context");
+        await expect(savedFiles(projectId)).resolves.toEqual([sqlRules, { content: "Old notes", id: "context", mode: "always", title: "Project context" }]);
         expect(await contextFor(projectId)).toBe("Old notes");
     });
 
@@ -230,13 +257,14 @@ describe("changing a project's rule files", () => {
 
         expect(files).toStrictEqual([sqlRules]);
 
-        expect(await row(projectId)).toMatchObject({ context, ruleFiles: [sqlRules] });
+        expect(await row(projectId)).toMatchObject({ context });
+        await expect(savedFiles(projectId)).resolves.toStrictEqual([sqlRules]);
         await expect(list(OWNER, projectId)).resolves.toMatchObject({ files: [{ id: "context" }, { id: "sql" }], revision });
     });
 
     it("keeps a saved file named like the kept context, which reads under another id beside it", async () => {
         const mine = { content: "Mine.", id: "context", mode: "always" as const, title: "Mine" };
-        const projectId = await insert("projects", { context: "x".repeat(150_000), createdAt: 0, ruleFiles: [mine], title: "p", userId: OWNER });
+        const projectId = await project({ context: "x".repeat(150_000), createdAt: 0, ruleFiles: [mine], title: "p", userId: OWNER });
         const { files, legacyContextId } = (await list(OWNER, projectId)) as unknown as { files: { id: string }[]; legacyContextId: string };
 
         expect(legacyContextId).not.toBe("context");
@@ -248,33 +276,20 @@ describe("changing a project's rule files", () => {
             undefined,
             { keepContext: true },
         );
-        await expect(row(projectId)).resolves.toMatchObject({ ruleFiles: [mine] });
+        await expect(savedFiles(projectId)).resolves.toStrictEqual([mine]);
     });
 
-    it("refuses files that would outgrow the project row beside a kept context or a large workflow, and keeps the row", async () => {
+    it("saves a full list beside a large workflow, the project row left as it was", async () => {
         const big = Array.from({ length: 5 }, (_, index) => {
             return { content: "y".repeat(99_000), id: `f${index}`, mode: "always", title: "t" };
         });
-        const withContext = await insert("projects", { context: "x".repeat(1_500_000), createdAt: 0, title: "p", userId: OWNER });
         const workflowContent = { edges: [], nodes: [{ data: { prompt: "w".repeat(1_500_000) }, id: "n", position: { x: 0, y: 0 }, type: "text" }] };
         const withWorkflow = await insert("projects", { createdAt: 0, title: "w", userId: OWNER, workflowContent });
 
-        await expect(save(OWNER, withContext, big, undefined, { keepContext: true })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-        await expect(save(OWNER, withContext, [], undefined, { keepContext: true })).resolves.toMatchObject({ revision: expect.any(String) });
-        await expect(save(OWNER, withWorkflow, big)).rejects.toMatchObject({ code: "BAD_REQUEST" });
-        await expect(save(OWNER, withWorkflow, big.slice(0, 2))).resolves.toMatchObject({ revision: expect.any(String) });
-        expect(await row(withWorkflow)).toMatchObject({ ruleFiles: big.slice(0, 2), workflowContent });
-    });
-
-    it("still lets a row already past the margin lose files", async () => {
-        const projectId = await insert("projects", { context: "x".repeat(1_950_000), createdAt: 0, ruleFiles: [sqlRules], title: "p", userId: OWNER });
-
-        await expect(
-            save(OWNER, projectId, [{ ...sqlRules, content: `${sqlRules.content} And more.` }], undefined, { keepContext: true }),
-        ).rejects.toMatchObject({
-            code: "BAD_REQUEST",
-        });
-        await expect(save(OWNER, projectId, [], undefined, { keepContext: true })).resolves.toMatchObject({ revision: expect.any(String) });
+        await expect(save(OWNER, withWorkflow, big)).resolves.toMatchObject({ revision: expect.any(String) });
+        await expect(savedFiles(withWorkflow)).resolves.toStrictEqual(big);
+        expect(await row(withWorkflow)).toMatchObject({ workflowContent });
+        expect(await row(withWorkflow)).not.toHaveProperty("ruleFiles");
     });
 
     it("re-checks the owner in the writing transaction", async () => {
@@ -286,48 +301,75 @@ describe("changing a project's rule files", () => {
         await expect(write(OWNER)).resolves.toMatchObject({ title: "t" });
     });
 
-    it("leaves rule files unread in project lists and single-project reads; only the editor and a run read them", async () => {
+    it("reads no rule files for project lists and single-project reads; the editor and a run do", async () => {
         // The lists name their caller through a user row.
         const owner = await insert("user", { createdAt: 0, email: "owner@example.com", emailVerified: true, name: "Owner", updatedAt: 0 });
-        const projectId = await insert("projects", { context: "Old notes", createdAt: 0, pinnedAt: 1, ruleFiles: [sqlRules], title: "p", userId: owner });
-        const read = (ruleFiles: boolean) =>
-            harness.run(
-                async (ctx: any) =>
-                    await (ruleFiles ? readableProject(ctx, projectId as never, owner, { ruleFiles }) : readableProject(ctx, projectId as never, owner)),
-            );
-        const { page } = (await as(owner).query(listProjects as never, { paginationOpts: { cursor: null, numItems: 10 } } as never)) as { page: object[] };
-
-        expect(page).toHaveLength(1);
-        expect(page[0]).not.toHaveProperty("ruleFiles");
-        await expect(as(owner).query(listPinnedProjects as never, {} as never)).resolves.toStrictEqual([
-            expect.not.objectContaining({ ruleFiles: expect.anything() }),
-        ]);
-        await expect(as(owner).query(getProject as never, { projectId } as never)).resolves.toMatchObject({ context: "Old notes", title: "p" });
-        await expect(as(owner).query(getProject as never, { projectId } as never)).resolves.not.toHaveProperty("ruleFiles");
-        await expect(as(owner).query(getOwnProject as never, { projectId } as never)).resolves.not.toHaveProperty("ruleFiles");
-        await expect(read(false)).resolves.not.toHaveProperty("ruleFiles");
-        await expect(read(true)).resolves.toMatchObject({ ruleFiles: [sqlRules] });
-        await expect(list(owner, projectId)).resolves.toMatchObject({ files: [{ id: "context" }, { id: "sql" }] });
-    });
-
-    it("leaves rule files out of the workflow editor's read, and a whole-row write keeps them", async () => {
-        const projectId = await insert("projects", {
+        const projectId = await project({ context: "Old notes", createdAt: 0, pinnedAt: 1, ruleFiles: [sqlRules], title: "p", userId: owner });
+        const workflowId = await project({
             createdAt: 0,
-            pinnedAt: 1,
             projectType: "workflow",
             ruleFiles: [sqlRules],
             title: "w",
-            userId: OWNER,
+            userId: owner,
             workflowContent: { edges: [], nodes: [] },
         });
+        const { page } = (await as(owner).query(listProjects as never, { paginationOpts: { cursor: null, numItems: 10 } } as never)) as { page: object[] };
 
-        await expect(as(OWNER).query(getWorkflow as never, { projectId } as never)).resolves.toMatchObject({ _id: projectId, title: "w" });
-        await expect(as(OWNER).query(getWorkflow as never, { projectId } as never)).resolves.not.toHaveProperty("ruleFiles");
+        expect(page).toHaveLength(2);
+        await as(owner).query(listPinnedProjects as never, {} as never);
+        await as(owner).query(listOwnPinned as never, {} as never);
+        await expect(as(owner).query(getProject as never, { projectId } as never)).resolves.toMatchObject({ context: "Old notes", title: "p" });
+        await as(owner).query(getOwnProject as never, { projectId } as never);
+        await expect(as(owner).query(getWorkflow as never, { projectId: workflowId } as never)).resolves.toMatchObject({ _id: workflowId, title: "w" });
+        expect(readProjectRuleFiles).not.toHaveBeenCalled();
 
-        // Removing `pinnedAt` replaces the row (`patchRow`): it is read whole, so the rule files stay.
-        await harness.run(async (ctx: any) => await ctx.runMutation(unpinProject as never, { projectId }));
+        await expect(list(owner, projectId)).resolves.toMatchObject({ files: [{ id: "context" }, { id: "sql" }] });
+        await expect(harness.run(async (ctx: any) => await ctx.runQuery(getProjectContextForRun as never, { projectId, userId: owner }))).resolves.toBe(
+            "Old notes",
+        );
+        expect(readProjectRuleFiles).toHaveBeenCalledTimes(2);
+    });
 
-        await expect(harness.run(async (ctx: any) => await ctx.db.get("projects", projectId))).resolves.toMatchObject({ ruleFiles: [sqlRules] });
+    it("deletes a project's rule files with the project, and with the owner's account", async () => {
+        const kept = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "kept", userId: OWNER });
+        const deleted = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "deleted", userId: OWNER });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(eraseProject as never, { projectId: deleted }));
+
+        await expect(savedFiles(deleted)).resolves.toBeUndefined();
+        await expect(savedFiles(kept)).resolves.toStrictEqual([sqlRules]);
+
+        await harness.run(async (ctx: any) => await eraseProjectRuleFiles(ctx, kept as never));
+
+        await expect(savedFiles(kept)).resolves.toBeUndefined();
+
+        // The account's last project step takes the rule files with each project, a row saved after the earlier step too.
+        const last = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "last", userId: OWNER });
+
+        await harness.run(async (ctx: any) => await eraseProjectsForUser(ctx, OWNER));
+
+        await expect(savedFiles(last)).resolves.toBeUndefined();
+    });
+
+    it("marks the project changed on every save, a list without a context too", async () => {
+        const projectId = await insert("projects", { createdAt: 0, title: "p", updatedAt: 0, userId: OWNER });
+
+        await save(OWNER, projectId, [sqlRules]);
+
+        await expect(row(projectId)).resolves.toMatchObject({ updatedAt: expect.any(Number) });
+        await expect(row(projectId)).resolves.not.toMatchObject({ updatedAt: 0 });
+    });
+
+    it("exports the saved files of the user's own projects only, and counts the rule-file rows it read", async () => {
+        const mine = await project({ createdAt: 0, ruleFiles: [{ ...sqlRules, content: "z".repeat(50_000) }], title: "mine", userId: OWNER });
+        const theirs = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "theirs", userId: STRANGER });
+        const exported = (await harness.run(
+            async (ctx: any) => await ctx.runQuery(collectProjectRuleFilesForExport as never, { projectIds: [mine, theirs], userId: OWNER }),
+        )) as { projects: { projectId: string; ruleFiles: { content: string }[] }[]; readBytes: number };
+
+        expect(exported.projects).toHaveLength(1);
+        expect(exported.projects[0]).toMatchObject({ projectId: mine, ruleFiles: [{ content: "z".repeat(50_000) }] });
+        expect(exported.readBytes).toBeGreaterThan(50_000);
     });
 
     it("refuses a save from a view older than another save, and keeps that save", async () => {
@@ -339,9 +381,52 @@ describe("changing a project's rule files", () => {
         expect((await list(OWNER, projectId))!.files).toMatchObject([{ id: "sql" }]);
     });
 
+    it("refuses the second of two first saves that both found no row as stale, not with the database's error", async () => {
+        const { writeProjectRuleFiles } = await vi.importActual<typeof import("./rule-file-rows")>("./rule-file-rows");
+        const db = {
+            insert: vi.fn(async () => {
+                throw Object.assign(new Error("UNIQUE constraint failed: projectRuleFiles.projectId"), { kind: "unique" });
+            }),
+            projectRuleFiles: { findFirst: vi.fn(async () => null) },
+        };
+
+        await expect(writeProjectRuleFiles({ db, now: 1 } as never, "p" as never, [])).rejects.toMatchObject({ code: "CONFLICT" });
+    });
+
     it("refuses a pattern file without a pattern", async () => {
         const projectId = await insert("projects", { createdAt: 0, title: "p", userId: OWNER });
 
         await expect(save(OWNER, projectId, [{ ...sqlRules, globs: [] }])).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
+});
+
+const LUNORA_DIR = resolve(import.meta.dirname, "..");
+// A read or write of the table: `db.projectRuleFiles.…` or `("projectRuleFiles", …)`.
+const TABLE_ACCESS = /projectRuleFiles(?:\s*\.|["'],)/u;
+
+describe("the rule-file table's readers", () => {
+    const sources = (directory: string, found: string[] = []): string[] => {
+        const entries = readdirSync(directory, { withFileTypes: true });
+
+        for (const entry of entries) {
+            const full = join(directory, entry.name);
+
+            if (entry.isDirectory() && entry.name !== "_generated" && entry.name !== "node_modules") {
+                sources(full, found);
+            } else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts") && !entry.name.endsWith(".d.ts")) {
+                found.push(full);
+            }
+        }
+
+        return found;
+    };
+
+    it("are its storage helpers and the GDPR pass alone, so no other read pays for rule files", () => {
+        const touching = sources(LUNORA_DIR)
+            .filter((file) => TABLE_ACCESS.test(readFileSync(file, "utf8")))
+            .map((file) => relative(LUNORA_DIR, file))
+            .toSorted((left, right) => left.localeCompare(right));
+
+        expect(touching).toStrictEqual(["projects/gdpr.ts", "projects/rule-file-rows.ts"]);
     });
 });

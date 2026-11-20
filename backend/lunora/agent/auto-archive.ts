@@ -20,7 +20,6 @@ import type { ScanPage } from "../lib/scan-pages";
 import { MAX_LENGTH } from "../lib/validators";
 import { type AutoArchiveCandidate, autoArchiveCutoff, isAutoArchiveDays, runArchivePass, selectAutoArchiveDue } from "./auto-archive-logic";
 import { markThreadArchived } from "./threads";
-import { findProjectRow } from "../projects/project-row";
 
 /** Threads archived per pass. The rest wait for the next pass, which is idempotent. */
 const ARCHIVE_BATCH = 100;
@@ -107,7 +106,7 @@ export const archiveIfStillIdle = internalMutation
         }
 
         // The project pin is read per thread, not from a capped list of pinned projects.
-        const project = thread.projectId ? await findProjectRow(ctx.db.projects, { where: { _id: thread.projectId } }) : null;
+        const project = thread.projectId ? await ctx.db.projects.findFirst({ where: { _id: thread.projectId } }) : null;
         const pinnedProjectIds = new Set<string>(project && project.pinnedAt !== undefined && thread.projectId ? [thread.projectId] : []);
 
         // The row checks run first, so a thread that is not due never reads its streams.

@@ -6,7 +6,6 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
 import { ownedStorageRefsInUrlFields, signOwnedUrlFieldsForDisplay } from "../lib/stored-url-fields";
 import { assertJsonWithinLimit, MAX_LENGTH, vJsonObject } from "../lib/validators";
-import { findProjectRow } from "../projects/project-row";
 
 /**
  * The caller may use this workflow's room and history. Owner-only, the same
@@ -15,7 +14,7 @@ import { findProjectRow } from "../projects/project-row";
  * every saved version of their graph, and write versions into it.
  */
 const requireWorkflowAccess = async (context: Pick<QueryCtx, "db">, projectId: string, userId: string): Promise<void> => {
-    const project = await findProjectRow(context.db.projects, { where: { _id: projectId as Id<"projects"> } });
+    const project = await context.db.projects.findFirst({ where: { _id: projectId as Id<"projects"> } });
 
     if (!project || project.userId !== userId || project.projectType !== "workflow") {
         throw new LunoraError("NOT_FOUND", "Workflow not found");

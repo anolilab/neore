@@ -9,6 +9,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { requireOwnedThread } from "../agent/thread-read-access";
 import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
+import { markRuleFilesSaved } from "../agent/table-writes";
 import { assertOwnOrganizationId } from "../auth/lib/organization-helpers";
 import { authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../lib/crpc";
 import { isUniqueViolation, throwForbidden } from "../lib/error-helpers";
@@ -30,7 +31,7 @@ import {
 } from "./repositories";
 import { mayEditProject } from "./edit-access";
 import { forViewer, resolveProjectLocation } from "./machine-location";
-import { findProjectRow, findProjectRowsMeasured, PROJECT_ROW_COLUMNS, type ProjectRow } from "./project-row";
+import { readProjectRuleFiles, writeProjectRuleFiles } from "./rule-file-rows";
 import {
     MAX_RULE_FILE_LENGTH,
     MAX_RULE_FILES,
@@ -56,41 +57,20 @@ type MembershipCheck = (organizationId: string) => Promise<boolean>;
 const mayReadProject = async (project: Pick<Doc<"projects">, "organizationId" | "userId">, userId: string, isMember: MembershipCheck): Promise<boolean> =>
     project.userId === userId || (Boolean(project.organizationId) && (await isMember(project.organizationId!)));
 
-/** A project row as read: whole, or without its rule files (`ProjectRow`). */
-type ProjectRead = Doc<"projects"> | ProjectRow;
-
 /**
  * The project when the caller owns it or belongs to its organization, else `null` (also for a missing one). `primary`
  * decides on the authoritative row, for a change a lagging D1 replica must not authorize (a project moved meanwhile).
- * Read without its rule files (up to 1 MB) unless `ruleFiles`: only the rule-file editor and a run's setup ask for them.
  */
-export async function readableProject(
+export const readableProject = async (
     context: QueryCtx | MutationCtx,
     projectId: Id<"projects">,
     userId: string,
-    options: { primary?: boolean; ruleFiles: true },
-): Promise<Doc<"projects"> | null>;
-export async function readableProject(
-    context: QueryCtx | MutationCtx,
-    projectId: Id<"projects">,
-    userId: string,
-    options?: { primary?: boolean; ruleFiles?: false },
-): Promise<ProjectRow | null>;
-export async function readableProject(
-    context: QueryCtx | MutationCtx,
-    projectId: Id<"projects">,
-    userId: string,
-    { primary = false, ruleFiles = false }: { primary?: boolean; ruleFiles?: boolean } = {},
-): Promise<ProjectRead | null> {
+    { primary = false } = {},
+): Promise<Doc<"projects"> | null> => {
     const consistency = primary ? { consistency: "primary" as const } : {};
     // Decide on the row's owner and organization past RLS: a project of a member's
     // NON-active organization is invisible to the guarded `ctx.db` until the org is admitted.
-    // The typed `select` result is a union of one-column picks, which the checks below do not fit.
-    const found = (await systemDb(context).projects.findFirst({
-        select: ["organizationId", "userId"] as const,
-        where: { _id: projectId },
-        ...consistency,
-    })) as Pick<Doc<"projects">, "organizationId" | "userId"> | null;
+    const found = await systemDb(context).projects.findFirst({ where: { _id: projectId }, ...consistency });
 
     // On the primary too when asked: a membership revoked a moment ago must not admit the project from a lagging replica.
     const isMember: MembershipCheck = async (organizationId) =>
@@ -105,13 +85,8 @@ export async function readableProject(
         admitOrganization(context, found.organizationId!);
     }
 
-    // The typed `select` result is a union of one-column picks; the columns read are all but `ruleFiles`.
-    return (await context.db.projects.findFirst({
-        where: { _id: projectId },
-        ...consistency,
-        ...(!ruleFiles && { select: PROJECT_ROW_COLUMNS }),
-    })) as ProjectRead | null;
-}
+    return await context.db.projects.findFirst({ where: { _id: projectId }, ...consistency });
+};
 
 /** Ids one `in` read binds: D1 takes at most 100 parameters a statement, and the read binds others beside them. */
 const IDS_PER_READ = 90;
@@ -146,8 +121,8 @@ export const readableProjectGrants = async (
 };
 
 /**
- * The grants of {@link readableProjectGrants}, with the bytes its project documents cost to read: the whole rows' JSON size,
- * what the read budget counts. A caller that budgets its reads uses this, so each document is counted when it is read.
+ * The grants of {@link readableProjectGrants}, with the bytes its project documents cost to read: their JSON size, a fair measure
+ * of what the read budget counts. A caller that budgets its reads uses this, so each document is counted when it is read.
  */
 export const readableProjectGrantsMeasured = async (
     context: QueryCtx | MutationCtx,
@@ -162,32 +137,19 @@ export const readableProjectGrantsMeasured = async (
     // The export's own reads come from the primary; a view that only names projects reads from a replica.
     const consistency = options.primary === true ? { consistency: "primary" as const } : {};
 
-    const rows: Pick<Doc<"projects">, "_id" | "organizationId" | "title" | "userId">[] = [];
+    const rows = [];
     let readBytes = 0;
 
     for (const ids of inBatches(projectIds)) {
-        if (options.measure === false) {
-            const { page: picked } = await systemDb(context).projects.findMany({
-                ...consistency,
-                // Only what the grant is decided on and names: a whole row carries the context, the workflow and the rule files.
-                select: ["organizationId", "title", "userId"] as const,
-                where: { _id: { in: ids } },
-            });
+        const { page } = await systemDb(context).projects.findMany({ ...consistency, where: { _id: { in: ids } } });
 
-            // The typed `select` result is a union of one-column picks.
-            rows.push(...(picked as unknown as typeof rows));
-            continue;
+        if (options.measure !== false) {
+            for (const row of page) {
+                readBytes += new TextEncoder().encode(JSON.stringify(row)).byteLength;
+            }
         }
 
-        // Measured, the rows are read whole: a `select` would not lower what the read is charged (`findProjectRowsMeasured`).
-        const measured = await findProjectRowsMeasured(systemDb(context).projects, { ...consistency, where: { _id: { in: ids } } });
-
-        readBytes += measured.readBytes;
-        rows.push(
-            ...measured.page.map((row) => {
-                return { _id: row._id, organizationId: row.organizationId, title: row.title, userId: row.userId };
-            }),
-        );
+        rows.push(...page);
     }
 
     const organizations = [...new Set(rows.filter((row) => row.userId !== userId && row.organizationId).map((row) => row.organizationId!))];
@@ -239,8 +201,8 @@ export const projectWithEditableSettings = async (
     projectId: Id<"projects">,
     userId: string,
     { primary = false } = {},
-): Promise<ProjectRow | null> => {
-    const project = await findProjectRow(context.db.projects, { where: { _id: projectId }, ...(primary && { consistency: "primary" as const }) });
+): Promise<Doc<"projects"> | null> => {
+    const project = await context.db.projects.findFirst({ where: { _id: projectId }, ...(primary && { consistency: "primary" as const }) });
 
     return project && mayEditProject(project, userId) ? project : null;
 };
@@ -248,39 +210,16 @@ export const projectWithEditableSettings = async (
 /**
  * The project when `userId` may file threads in it, else `null`: readable (owner or a current member of its
  * organization) AND owned by `userId` or by nobody. The same rule as moving a thread into a project
- * (`moveThreadToProject` here): a member never files into another member's project.
+ * (`moveThreadToProject` here) and updating one: a member never files into another member's project.
  */
-export async function writableProject(
-    context: QueryCtx | MutationCtx,
-    projectId: Id<"projects">,
-    userId: string,
-    options: { ruleFiles: true },
-): Promise<Doc<"projects"> | null>;
-export async function writableProject(context: QueryCtx | MutationCtx, projectId: Id<"projects">, userId: string): Promise<ProjectRow | null>;
-export async function writableProject(
-    context: QueryCtx | MutationCtx,
-    projectId: Id<"projects">,
-    userId: string,
-    { ruleFiles = false }: { ruleFiles?: boolean } = {},
-): Promise<ProjectRead | null> {
-    // Rule files only when asked (a task run's setup), as `readableProject` reads them.
-    const project = ruleFiles ? await readableProject(context, projectId, userId, { ruleFiles: true }) : await readableProject(context, projectId, userId);
+export const writableProject = async (context: QueryCtx | MutationCtx, projectId: Id<"projects">, userId: string): Promise<Doc<"projects"> | null> => {
+    const project = await readableProject(context, projectId, userId);
 
     return project && (!project.userId || project.userId === userId) ? project : null;
-}
-
-/** The rule files stored on `projectId`, read on the primary, as the save that compares against them. */
-const storedRuleFiles = async (context: MutationCtx, projectId: Id<"projects">): Promise<RuleFile[] | undefined> => {
-    const row = (await context.db.projects.findFirst({ consistency: "primary", select: ["ruleFiles"] as const, where: { _id: projectId } })) as Pick<
-        Doc<"projects">,
-        "ruleFiles"
-    > | null;
-
-    return row?.ruleFiles ?? undefined;
 };
 
 /**
- * The text a run takes from a project's rule files (`projectRuleFiles`), given the names of the files its message
+ * The text a run takes from a project's rule files (`readProjectRuleFiles`), given the names of the files its message
  * attaches (`paths`; none for a task): what every run path uses, chat, edit, group and task runs alike, so the per-run
  * cap (`selectRuleFiles`) and the logging apply to each the same way. Only counts are logged, never text.
  */
@@ -312,13 +251,13 @@ export const getProjectContextForRun = internalQuery
     .input({ fileIds: v.optional(v.array(v.id("chatFiles")).max(MAX_RUN_FILE_IDS)), projectId: v.id("projects"), userId: v.string().max(MAX_LENGTH.id) })
     .output(v.union(v.string(), v.null()))
     .query(async ({ args: { fileIds, projectId, userId }, ctx: context }) => {
-        const project = await readableProject(context, projectId, userId, { ruleFiles: true });
+        const project = await readableProject(context, projectId, userId);
 
         if (!project) {
             return null;
         }
 
-        const files = projectRuleFiles(project);
+        const files = await readProjectRuleFiles(context, project);
         let paths: string[] = [];
 
         // The names are read only when a file could match one: the rows also hold the files' extracted text, never returned here.
@@ -332,7 +271,7 @@ export const getProjectContextForRun = internalQuery
     });
 
 /**
- * A project's rule files for its settings, a legacy `context` first (`projectRuleFiles`, its id as `legacyContextId`),
+ * A project's rule files for its settings, a legacy `context` first (`readProjectRuleFiles`, its id as `legacyContextId`),
  * and whether the caller may change them: the rule of `updateProject` ({@link mayEditProject}), its owner only. Read on
  * the primary, where a save compares its revision: a lagging replica would hand the editor a revision already replaced.
  */
@@ -359,13 +298,13 @@ export const listProjectRuleFiles = authQuery
     )
     .query(async ({ args: { projectId }, ctx: context }) => {
         const { userId } = context.user;
-        const project = await readableProject(context, projectId, userId, { primary: true, ruleFiles: true });
+        const project = await readableProject(context, projectId, userId, { primary: true });
 
         if (!project) {
             return null;
         }
 
-        const files = projectRuleFiles(project);
+        const files = await readProjectRuleFiles(context, project, { primary: true });
 
         return {
             canEdit: mayEditProject(project, userId),
@@ -380,8 +319,9 @@ export const listProjectRuleFiles = authQuery
  * save of the whole list. The legacy `context` is cleared in the same write, as the list carries it from now on, unless
  * `keepContext`: an unchanged `context` longer than a rule file may be stays where it is, still read first, and the list
  * holds the other files. Who may: the rule of `updateProject` ({@link projectWithEditableSettings}, its owner only),
- * decided on the primary and again in the writing transaction. `revision` is the one `listProjectRuleFiles` gave with
- * the list the editor started from; a list changed since is refused (CONFLICT) in the transaction that writes.
+ * decided on the primary. `revision` is the one `listProjectRuleFiles` gave with the list the editor started from; a list
+ * changed since is refused (CONFLICT). The check, the rule-file row and the `context` are read and written in this one
+ * transaction.
  */
 export const setProjectRuleFiles = authMutation
     .use(rateLimit("projects/update"))
@@ -425,21 +365,20 @@ export const setProjectRuleFiles = authMutation
             throw new LunoraError("NOT_FOUND", "Project not found");
         }
 
+        const current = await readProjectRuleFiles(context, project, { primary: true });
+
+        if (revision !== ruleFilesRevision(current)) {
+            throw new LunoraError("CONFLICT", "The rule files were changed meanwhile. Reload them and save again.");
+        }
+
         // A kept context reads as the list's first file under its own id: a file sent under that id is that file again.
-        // The id steps aside for one the stored list already uses (`projectRuleFiles`), so that list's ids are read too.
-        const kept =
-            keepContext && project.context
-                ? projectRuleFiles({ context: project.context, ruleFiles: await storedRuleFiles(context, projectId) })[0]?.id
-                : undefined;
-        // The row's room beside a kept context and the other columns is checked where it is written (`assertProjectRowFits`).
+        const kept = keepContext && project.context ? current[0]?.id : undefined;
         const normalized = normalizeRuleFiles(kept ? ruleFiles.filter((file) => file.id !== kept) : ruleFiles);
 
-        await context.runMutation(internal.agent.projects.updateProject, {
-            patch: kept ? { ruleFiles: normalized } : { context: "", ruleFiles: normalized },
-            projectId,
-            ruleFilesRevision: revision,
-            settingsEditorId: userId,
-        });
+        await writeProjectRuleFiles(context, projectId, normalized);
+
+        // The list carries the context from now on.
+        await markRuleFilesSaved(context.db, projectId, context.now, { clearContext: !kept && Boolean(project.context) });
 
         context.log.event("projects.set_rule_files", {
             globFiles: normalized.filter((file) => file.mode === "glob").length,
@@ -603,7 +542,7 @@ const RESTAMP_PASSES = 3;
 const restampRepositories = async (context: MutationCtx, projectId: Id<"projects">, retry = 0): Promise<void> => {
     // One read more than there are passes: the last only checks that the last pass settled the rows.
     for (let pass = 0; pass <= RESTAMP_PASSES; pass += 1) {
-        const project = await findProjectRow(systemDb(context).projects, { consistency: "primary", where: { _id: projectId } });
+        const project = await systemDb(context).projects.findFirst({ consistency: "primary", where: { _id: projectId } });
 
         if (!project) {
             return;
@@ -877,7 +816,7 @@ export const addProjectRepo = authMutation
         const rows = await repoRows(context, projectId, { primary: true });
         const overCap = rows.length > MAX_PROJECT_REPOSITORIES;
         // Gone, or a delete under way (its marker, written before it erases anything): either way the row goes.
-        const current = await findProjectRow(systemDb(context).projects, { consistency: "primary", where: { _id: projectId } });
+        const current = await systemDb(context).projects.findFirst({ consistency: "primary", where: { _id: projectId } });
         const projectGone = !current || (await deleteUnderway(context, projectId));
         // Moved to another organization since it was authorized above: decide again on the project as it is now, so a
         // member of the organization it left cannot add to it.
@@ -1062,14 +1001,14 @@ export const setDefaultProjectRepo = authMutation
     .mutation(async ({ args, ctx: context }) => {
         const repo = await editableRepo(context, args.repoId as Id<"projectRepositories">, context.user.userId);
         // The owner and organization the counter copies, from the project as it is now, not the row's copy of them.
-        const project = await findProjectRow(systemDb(context).projects, { consistency: "primary", where: { _id: repo.projectId } });
+        const project = await systemDb(context).projects.findFirst({ consistency: "primary", where: { _id: repo.projectId } });
 
         if (!project || (await deleteUnderway(context, repo.projectId))) {
             throw new LunoraError("NOT_FOUND", "Repository not found");
         }
 
         const stamped = await stampDefault(context, repo, { organizationId: project.organizationId, userId: project.userId });
-        const current = await findProjectRow(systemDb(context).projects, { consistency: "primary", where: { _id: repo.projectId } });
+        const current = await systemDb(context).projects.findFirst({ consistency: "primary", where: { _id: repo.projectId } });
 
         if (!current || (await deleteUnderway(context, repo.projectId))) {
             const counter = await context.db.projectRepositories.findFirst({
@@ -1197,7 +1136,7 @@ export const deleteProject = authMutation
 
         // Threads may only be moved into another project of the caller's.
         if (moveThreadsToProjectId) {
-            const target = await findProjectRow(context.db.projects, { where: { _id: context.db.asId("projects", moveThreadsToProjectId) } });
+            const target = await context.db.projects.findFirst({ where: { _id: context.db.asId("projects", moveThreadsToProjectId) } });
 
             if (!target || target.userId !== userId) {
                 throw new LunoraError("NOT_FOUND", "Project not found");

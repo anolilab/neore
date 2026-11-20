@@ -114,7 +114,7 @@ const drain = async (step: unknown, args: Record<string, string>): Promise<numbe
 
 beforeEach(() => {
     // `projects` is `.global()`; the harness has no D1 backend (see lib/test-schema.ts).
-    harness = lunoraTest(schemaWithShardedTables(["projects"]) as never);
+    harness = lunoraTest(schemaWithShardedTables(["projects", "projectRuleFiles"]) as never);
 });
 
 afterEach(() => {
@@ -139,6 +139,7 @@ describe("residual account-deletion steps", () => {
                 };
 
                 await ctx.db.insert("projectRepositories", { createdAt: NOW, projectId: refs.project, url: `https://github.com/${userId}/r.git`, userId });
+                await ctx.db.insert("projectRuleFiles", { files: [], projectId: refs.project, updatedAt: NOW });
 
                 // Left by a project delete that failed part way: the project is gone, the row names its owner.
                 const gone = await ctx.db.insert("projects", { name: "gone", userId });
@@ -194,6 +195,11 @@ describe("residual account-deletion steps", () => {
             `https://github.com/${B}/left.git`,
             `https://github.com/${B}/r.git`,
         ]);
+
+        // A's projects' rule files go with them; B's stay.
+        const ruleFiles = await rowsOf("projectRuleFiles");
+
+        expect(ruleFiles).toHaveLength(1);
 
         // The ledger keeps its amounts under the marker.
         const ledger = await rowsOf("gatewayUsageDeductions");

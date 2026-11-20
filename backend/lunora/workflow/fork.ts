@@ -11,7 +11,6 @@ import { throwForbidden, throwNotFound } from "../lib/error-helpers";
 import { MAX_LENGTH } from "../lib/validators";
 import { grantWorkflowFiles } from "./images";
 import { findOwnedVaultRows, insertVaultCopies, rewriteStorageKeys, scheduleVaultObjectCopies, vVaultRowToCopy, type VaultRowToCopy } from "../vault/fork-copy";
-import { findProjectRow, findProjectRows } from "../projects/project-row";
 
 /**
  * Fork a public workflow into the user's own workspace.
@@ -75,7 +74,7 @@ export const getForkSource = internalQuery
     .input({ sourceProjectId: v.string() })
     .output(v.union(v.null(), v.object({ isPublic: v.optional(v.boolean()), projectType: v.optional(v.string()), userId: v.optional(v.string()) })))
     .query(async ({ args, ctx }) => {
-        const project = await findProjectRow(ctx.db.projects, { where: { _id: args.sourceProjectId as Id<"projects"> } });
+        const project = await ctx.db.projects.findFirst({ where: { _id: args.sourceProjectId as Id<"projects"> } });
 
         if (!project) {
             return null;
@@ -89,7 +88,7 @@ export const getAuthorVaultRows = internalQuery
     .input({ authorId: v.string(), sourceProjectId: v.string() })
     .output(v.array(vVaultRowToCopy))
     .query(async ({ args, ctx }) => {
-        const source = await findProjectRow(ctx.db.projects, { where: { _id: args.sourceProjectId as Id<"projects"> } });
+        const source = await ctx.db.projects.findFirst({ where: { _id: args.sourceProjectId as Id<"projects"> } });
 
         if (!source || source.userId !== args.authorId) {
             return [];
@@ -103,7 +102,7 @@ export const completeFork = internalMutation
     .input({ sourceProjectId: v.string(), userId: v.string(), vaultRows: v.array(vVaultRowToCopy) })
     .output(v.object({ projectId: v.string() }))
     .mutation(async ({ args: { sourceProjectId, userId, vaultRows }, ctx: context }) => {
-        const source = await findProjectRow(context.db.projects, { where: { _id: sourceProjectId as Id<"projects"> } });
+        const source = await context.db.projects.findFirst({ where: { _id: sourceProjectId as Id<"projects"> } });
 
         assertForkable(source, userId);
 
@@ -150,7 +149,7 @@ export const completeFork = internalMutation
         // number. Each fork recounts after its own insert, so the last recount runs
         // after every insert that finished before it. Capped at MAX_COUNTED_FORKS.
         if (source.isPublic) {
-            const forks = await findProjectRows(context.db.projects, { limit: MAX_COUNTED_FORKS, where: { forkedFromId: sourceProjectId } });
+            const forks = await context.db.projects.findMany({ limit: MAX_COUNTED_FORKS, where: { forkedFromId: sourceProjectId } });
 
             await context.runMutation(internal.agent.projects.updateProject, {
                 patch: {

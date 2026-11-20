@@ -17,7 +17,6 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internalQuery } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
-import { findProjectRow } from "../projects/project-row";
 // ============================================================================
 // Internal Queries
 // ============================================================================
@@ -86,7 +85,7 @@ export const assignToProject = authMutation
             throw new LunoraError("NOT_FOUND", "Knowledge file not found");
         }
 
-        const project = await findProjectRow(ctx.db.projects, { where: { _id: projectId } });
+        const project = await ctx.db.projects.findFirst({ where: { _id: projectId } });
 
         if (!project || project.userId !== ctx.user.userId) {
             throw new LunoraError("NOT_FOUND", "Project not found");
@@ -127,7 +126,7 @@ export const unassignFromProject = authMutation
         const knowledgeFileId = input.knowledgeFileId as Id<"knowledgeFiles">;
 
         // Verify ownership
-        const project = await findProjectRow(ctx.db.projects, { where: { _id: projectId } });
+        const project = await ctx.db.projects.findFirst({ where: { _id: projectId } });
 
         if (!project || project.userId !== ctx.user.userId) {
             throw new LunoraError("NOT_FOUND", "Project not found");
@@ -160,7 +159,7 @@ export const getProjectKnowledge = authQuery
         const projectId = input.projectId as Id<"projects">;
 
         // Verify ownership
-        const project = await findProjectRow(ctx.db.projects, { where: { _id: projectId } });
+        const project = await ctx.db.projects.findFirst({ where: { _id: projectId } });
 
         if (!project || project.userId !== ctx.user.userId) {
             throw new LunoraError("NOT_FOUND", "Project not found");

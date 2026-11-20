@@ -1,5 +1,5 @@
 /**
- * A project's rule files (`projects.ruleFiles`): the owner's instructions for the project's runs, each with a mode. An
+ * A project's rule files (stored in `projectRuleFiles`, `rule-file-rows.ts`): the owner's instructions for the project's runs, each with a mode. An
  * `always` file reaches every run; a `glob` file only a run whose files match one of its patterns. A project written
  * before rule files keeps its `context` text, which reads as the first `always` file ({@link projectRuleFiles}) until
  * the rule files are first saved, which moves it into the list. The text is the owner's: never logged.
@@ -21,16 +21,10 @@ export const MAX_RULE_FILES = 20;
 /** Characters one rule file holds. */
 export const MAX_RULE_FILE_LENGTH = 100_000;
 /**
- * UTF-8 bytes all of a project's rule files take together as stored, JSON-encoded (escapes included): the project row
- * lives in D1, whose rows stay under 2 MB.
+ * UTF-8 bytes all of a project's rule files take together as stored, JSON-encoded (escapes included): their row lives in
+ * D1, whose rows stay under 2 MB.
  */
 export const MAX_RULE_FILES_BYTES = 1_000_000;
-/**
- * UTF-8 bytes a whole project row takes, JSON-encoded, after a rule-file save ({@link assertProjectRowFits}): D1 refuses a
- * row past 2,000,000 bytes, and the rest is the margin for the row's own encoding. The JSON of the whole document is never
- * smaller than what D1 stores for it, so a row this check lets through fits.
- */
-export const MAX_PROJECT_ROW_BYTES = 1_900_000;
 /** Characters of rule-file text one run takes; the rest is left out ({@link selectRuleFiles}). */
 export const MAX_RULE_TEXT_PER_RUN = 200_000;
 export const MAX_RULE_TITLE_LENGTH = 200;
@@ -301,8 +295,7 @@ const assertGlob = (glob: string): void => {
 
 /**
  * The list as it is saved: trimmed titles and patterns, no patterns on an `always` file. Refuses a list past the
- * caps, a repeated id, an empty title, or a `glob` file without a pattern. What the rest of the row leaves room for is
- * checked where the row is written ({@link assertProjectRowFits}).
+ * caps, a repeated id, an empty title, or a `glob` file without a pattern.
  */
 export const normalizeRuleFiles = (files: RuleFile[]): RuleFile[] => {
     if (files.length > MAX_RULE_FILES) {
@@ -350,18 +343,4 @@ export const normalizeRuleFiles = (files: RuleFile[]): RuleFile[] => {
     }
 
     return normalized;
-};
-
-/**
- * Refuses a rule-file save that would leave the project row past {@link MAX_PROJECT_ROW_BYTES}: the row as it would be
- * `written`, its other columns (a kept `context`, a workflow) included. A save that does not grow the row past `current`
- * is never refused, so a row already near the limit can still lose files. Called in the transaction that writes, on the
- * row read there, so a refusal says why instead of failing at the database.
- */
-export const assertProjectRowFits = (written: unknown, current: unknown): void => {
-    const bytes = utf8Bytes(JSON.stringify(written));
-
-    if (bytes > MAX_PROJECT_ROW_BYTES && bytes > utf8Bytes(JSON.stringify(current))) {
-        throw new LunoraError("BAD_REQUEST", "The rule files do not fit beside the project's other settings. Shorten them or remove some.");
-    }
 };

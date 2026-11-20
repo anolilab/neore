@@ -59,7 +59,7 @@ import { eraseWorkflowVersionsAndPresenceForProject, eraseWorkflowVersionsAndPre
 import { eraseSkillRatingRows } from "../../skills/gdpr";
 import { purgeObject } from "../../usage/gdpr";
 import { eraseKnowledgeForUser, eraseProjectKnowledgeForProject } from "../../knowledge/gdpr";
-import { eraseProjectRepositories, eraseProjectRepositoriesForUser } from "../../projects/gdpr";
+import { eraseProjectRepositories, eraseProjectRepositoriesForUser, eraseProjectRuleFiles } from "../../projects/gdpr";
 import { eraseBotsForUser } from "../../bots/gdpr";
 import { eraseFeedbackForUser } from "../../feedback/gdpr";
 import { eraseTriggersForUser } from "../../triggers/gdpr";
@@ -79,7 +79,6 @@ import { recomputeSkillRatings } from "../../skills/rating-cascade";
 import { anonymiseGatewayUsage, deleteIdentityRows, deleteUserRecord, readIdentityRows } from "../../auth/gdpr";
 import { eraseUsageForUser } from "../../usage/gdpr";
 import { eraseGatewayNotificationsForUser } from "../../saas/gdpr";
-import { findProjectRows } from "../../projects/project-row";
 
 const vBatchResult = v.object({ hasMore: v.boolean() });
 
@@ -387,8 +386,8 @@ export const deleteUserIntegrations = internalMutation
  * project for everything attached to projects the user owns — including other
  * people's presence rows, which point at a project that is about to vanish.
  * Runs BEFORE `deleteUserProjects`, which only removes the project rows.
- * Executions and project knowledge are erased by their owners
- * (`agent/gdpr.ts`, `knowledge/gdpr.ts`).
+ * Executions, project knowledge, repositories and rule files are erased by
+ * their owners (`agent/gdpr.ts`, `knowledge/gdpr.ts`, `projects/gdpr.ts`).
  */
 export const deleteUserWorkflowData = internalMutation
     .input({ userId: v.string() })
@@ -407,7 +406,7 @@ export const deleteUserWorkflowData = internalMutation
 
         hasMore ||= ownRepositories.hasMore;
 
-        const { page: projects } = await findProjectRows(context.db.projects, { where: { userId } });
+        const { page: projects } = await context.db.projects.findMany({ where: { userId } });
 
         for (const project of projects) {
             // Versions and presence attached to the project (`workflow/gdpr.ts`).
@@ -416,6 +415,7 @@ export const deleteUserWorkflowData = internalMutation
             const knowledge = await eraseProjectKnowledgeForProject(context, project._id);
             const repositories = await eraseProjectRepositories(context, project._id);
 
+            await eraseProjectRuleFiles(context, project._id);
             hasMore ||= projectRows.hasMore || executions.hasMore || knowledge.hasMore || repositories.hasMore;
         }
 

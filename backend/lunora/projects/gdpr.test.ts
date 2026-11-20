@@ -250,11 +250,18 @@ describe("project rule files in the GDPR export", () => {
         );
 
     it("exports each of the user's projects' rule files, a legacy context first, never another user's", async () => {
-        const [mine, plain, theirs] = (await harness.run((async (ctx: any) => [
-            await ctx.db.insert("projects", { context: "Answer briefly.", createdAt: 1, ruleFiles: [sql], title: "rules", userId: A }),
-            await ctx.db.insert("projects", { createdAt: 2, title: "plain", userId: A }),
-            await ctx.db.insert("projects", { context: "secret", createdAt: 3, title: "theirs", userId: B }),
-        ]) as never)) as [string, string, string];
+        const [mine, plain, theirs] = (await harness.run((async (ctx: any) => {
+            const ids = [
+                await ctx.db.insert("projects", { context: "Answer briefly.", createdAt: 1, title: "rules", userId: A }),
+                await ctx.db.insert("projects", { createdAt: 2, title: "plain", userId: A }),
+                await ctx.db.insert("projects", { context: "secret", createdAt: 3, title: "theirs", userId: B }),
+            ];
+
+            await ctx.db.insert("projectRuleFiles", { files: [sql], projectId: ids[0], updatedAt: 0 });
+            await ctx.db.insert("projectRuleFiles", { files: [sql], projectId: ids[2], updatedAt: 0 });
+
+            return ids;
+        }) as never)) as [string, string, string];
 
         const { projects } = await withRules([{ projectId: mine }, { projectId: plain }, { projectId: theirs }]);
 
