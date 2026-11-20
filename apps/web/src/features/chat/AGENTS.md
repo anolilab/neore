@@ -78,5 +78,5 @@ Tabs: `"summary"` | `"prompts"` | `"variables"` | `"pins"` (and any future tabs 
 - Don't import `@tiptap/extension-emoji` statically in the composer: its data is ~64 KB gzipped. Load it through
   `thread/composer-tiptap/emoji-shortcode/emoji-index.ts`, which the composer starts once the list can open.
 - Never send a draft attachment that is not complete. A send pressed during an upload waits (`thread/upload-send-wait.ts`);
-  a failed upload stops it, any edit (removing a file included) ends it with a notice, and only a chat or account change
-  cancels it quietly. Keep the pending check in `handleSubmit` when changing it.
+  a failed upload stops it, any edit (removing a file included) ends it with a notice, and a chat or account change, a
+  manual Stop or a manual send that goes out ends it quietly. Keep the pending check in `handleSubmit` when changing it.
