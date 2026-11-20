@@ -6,6 +6,7 @@
  */
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { useUnlockProof } from "@neore/client-runtime";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import cn from "@neore/ui/utils/cn";
 import { useQuery } from "@tanstack/react-query";
@@ -30,6 +31,8 @@ import { useIsAtBottom } from "./at-bottom-context";
 const ComposerFollowupSuggestions: FC = () => {
     const { t } = useLingui();
     const { threadId } = useChatThread();
+    // A locked chat's cache is read only with its unlock proof, as the next-prompt read is.
+    const unlockProof = useUnlockProof(threadId);
     const { messages } = useChatMessages();
     const isRunning = useChatIsRunning();
     // Booleans, so typing does not re-render the suggestions on every keystroke.
@@ -91,7 +94,7 @@ const ComposerFollowupSuggestions: FC = () => {
 
     // Read the suggestions the backend cached after the reply. Reactive, so they appear when the generator writes them. Nothing here calls a model.
     const { data: cachedFollowups, isFetching: isFetchingCached } = useQuery({
-        ...crpc.chat.functions.getCachedFollowupSuggestions.queryOptions({ threadId: validThreadId as Id<"threads"> }),
+        ...crpc.chat.functions.getCachedFollowupSuggestions.queryOptions({ threadId: validThreadId as Id<"threads">, unlockProof }),
         enabled: Boolean(shouldFetchConditions),
     });
 

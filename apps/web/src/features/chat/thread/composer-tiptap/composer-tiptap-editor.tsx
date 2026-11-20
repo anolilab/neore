@@ -668,7 +668,8 @@ const ComposerTiptapEditor = ({
             return undefined;
         }
 
-        if (!nextPromptSuggestion || readComposerText(editor) !== "") {
+        // A disabled composer holds no prompt, because Tab would otherwise insert it into a draft that cannot be edited.
+        if (!nextPromptSuggestion || disabled || readComposerText(editor) !== "") {
             editor.commands.setSuggestedPrompt(null);
             // The cleanup below cancels this suggestion's clear timer, so its line is cleared here instead of being left in the live region.
             setGhostAnnouncement("");
@@ -699,7 +700,7 @@ const ComposerTiptapEditor = ({
             editor.off("transaction", onTransaction);
             clearTimeout(clearAnnouncement);
         };
-    }, [editor, nextPromptScope, nextPromptSuggestion, promptAnnouncementText]);
+    }, [disabled, editor, nextPromptScope, nextPromptSuggestion, promptAnnouncementText]);
 
     useEffect(() => {
         if (!editor || !hasCompletionSource) {
