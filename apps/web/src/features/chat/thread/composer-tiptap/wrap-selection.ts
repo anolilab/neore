@@ -1,4 +1,5 @@
 import { Extension } from "@tiptap/core";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
 import { Plugin, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
@@ -24,6 +25,89 @@ const firstCharacter = (text: string): string => [...text.slice(0, 2)][0] ?? "";
 
 const isSpace = (character: string): boolean => character === "" || WHITESPACE.test(character);
 
+const runLength = (text: string, start: number): number => {
+    let end = start;
+
+    while (end < text.length && text[end] === "`") {
+        end += 1;
+    }
+
+    return end - start;
+};
+
+/** The index of the next backtick run of exactly `length` at or after `start`, or -1. */
+const findRun = (text: string, start: number, length: number): number => {
+    let index = start;
+
+    while (index < text.length) {
+        if (text[index] === "`") {
+            const run = runLength(text, index);
+
+            if (run === length) {
+                return index;
+            }
+
+            index += run;
+        } else {
+            index += 1;
+        }
+    }
+
+    return -1;
+};
+
+/**
+ * The inline code spans of a paragraph, as parent offsets. Markdown shows everything inside one literally, so a delimiter
+ * inserted there would not render. A backtick escaped by a backslash outside code does not open a span.
+ */
+const codeSpans = (parent: ProseMirrorNode): [number, number][] => {
+    const offsets: number[] = [];
+    let text = "";
+
+    parent.forEach((child, offset) => {
+        if (!child.isText) {
+            return;
+        }
+
+        for (let index = 0; index < (child.text ?? "").length; index += 1) {
+            offsets.push(offset + index);
+        }
+
+        text += child.text ?? "";
+    });
+
+    const spans: [number, number][] = [];
+    let index = 0;
+
+    while (index < text.length) {
+        if (text[index] === "\\") {
+            index += 2;
+        } else if (text[index] === "`") {
+            const length = runLength(text, index);
+            const closing = findRun(text, index + length, length);
+
+            if (closing === -1) {
+                index += length;
+            } else {
+                // Every index of `text` has an offset, so both lookups exist; `?? 0` only narrows the type.
+                spans.push([offsets[index] ?? 0, (offsets[closing + length - 1] ?? 0) + 1]);
+                index = closing + length;
+            }
+        } else {
+            index += 1;
+        }
+    }
+
+    return spans;
+};
+
+/**
+ * Whether either end of the selection is strictly inside an inline code span: a delimiter inserted there would show as
+ * literal text. A selection that only holds a whole span is fine, because both of its ends are outside it.
+ */
+const insideCodeSpan = (parent: ProseMirrorNode, from: number, to: number): boolean =>
+    codeSpans(parent).some(([start, end]) => (from > start && from < end) || (to > start && to < end));
+
 const trailingBackslashes = (text: string): number => {
     let count = 0;
 
@@ -33,6 +117,10 @@ const trailingBackslashes = (text: string): number => {
 
     return count;
 };
+
+/** Whether an odd run of backslashes before the opener would escape it, or a backtick beside a code wrap would join its fence. */
+const collidesWithMarkup = (beforeOpen: string, typed: string, openBefore: string, closeAfter: string): boolean =>
+    trailingBackslashes(beforeOpen) % 2 === 1 || (typed === "`" && (openBefore === "`" || closeAfter === "`"));
 
 /** A copy of `character` in the text is escaped, unless an odd run of backslashes before it already escapes it. */
 const escapeCharacter = (text: string, character: string): string => {
@@ -165,7 +253,11 @@ const planWrap = (state: EditorState, from: number, to: number, typed: string): 
     const insideWord = (lead === 0 && WORD_CHARACTER.test(openBefore)) || (trail.length === 0 && WORD_CHARACTER.test(closeAfter));
 
     // An odd run of backslashes before the opener would escape it, and a backtick beside a code fence would join it.
-    if (trailingBackslashes(beforeOpen) % 2 === 1 || (typed === "`" && (openBefore === "`" || closeAfter === "`"))) {
+    if (collidesWithMarkup(beforeOpen, typed, openBefore, closeAfter)) {
+        return REFUSED;
+    }
+
+    if (insideCodeSpan(parent, $from.parentOffset, $to.parentOffset)) {
         return REFUSED;
     }
 

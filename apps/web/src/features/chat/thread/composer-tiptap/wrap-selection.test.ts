@@ -409,4 +409,22 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(wrapSelectionOnTextInput(editor.view, 4, 7, "*")).toBe(true);
         expect(text(editor)).toBe("a**foo");
     });
+
+    it("leaves a wrap alone inside an inline code span, where the delimiters would show literally", () => {
+        const editor = editorWith("<p>x `foo` y</p>");
+
+        select(editor, 4, 7);
+
+        expect(wrapSelectionOnTextInput(editor.view, 4, 7, "*")).toBe(true);
+        expect(text(editor)).toBe("x `foo` y");
+    });
+
+    it("wraps a selection that holds a whole inline code span, since both of its ends are outside the span", () => {
+        const editor = editorWith("<p>x `foo` y</p>");
+
+        select(editor, 3, 8);
+
+        expect(wrapSelectionOnTextInput(editor.view, 3, 8, "*")).toBe(true);
+        expect(text(editor)).toBe("x **`foo`** y");
+    });
 });
