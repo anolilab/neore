@@ -55,7 +55,8 @@ import { captureScreenFrame, isScreenCaptureSupported } from "@/features/chat/co
 import type { ComposerRestoreFile } from "@/features/chat/core/utils/composer-restore";
 import { loadRestoreFile, onComposerRestore, textAfterRestore } from "@/features/chat/core/utils/composer-restore";
 import { onComposerAttachRequest, onComposerSubmitRequest } from "@/features/chat/core/utils/composer-submit";
-import { draftFromField } from "@/features/chat/core/utils/draft-origin";
+import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
+import { composerDraftFrom, draftFromField, markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 import { isSendStarting } from "@/features/chat/core/utils/send-in-flight";
 import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button";
 import { draftOwnership } from "@/features/chat/split/composer-drafts";
@@ -229,7 +230,7 @@ interface ComposerInputProps {
      * Used by comparison parent threads to fan-out the message to all child threads.
      * When set, neither sendMessage nor sendComparisonMessage is called.
      */
-    onSubmitOverride?: (text: string, attachments: PendingAttachment[]) => Promise<void>;
+    onSubmitOverride?: (text: string, attachments: PendingAttachment[], draftFrom?: DraftOrigin) => Promise<void>;
     placeholder?: string;
 }
 
@@ -1086,7 +1087,8 @@ const ComposerInput = ({
 
     const handleSteer = useCallback(() => {
         const streamId = sseStreamState;
-        const steerText = text;
+        // From the store, as the mark below is: a key pressed right after an edit runs the previous render's handler.
+        const steerText = useChatUIStore.getState().composerText;
 
         if (
             !canSteer ||
@@ -1107,10 +1109,14 @@ const ComposerInput = ({
         }
 
         promptHistory.reset();
+
+        // Read before the draft is cleared: the steer, or the queued message it may become, carries it.
+        const draftFrom = composerDraftFrom();
+
         clear();
 
         if (followUp === "steer-restart") {
-            interruptAndSend(threadId, steerText, cancelStream);
+            interruptAndSend(threadId, steerText, cancelStream, draftFrom);
 
             return;
         }
@@ -1125,12 +1131,12 @@ const ComposerInput = ({
         // The chip exists before the call is made: the text is in the (persisted)
         // queue the moment it leaves the draft, and a prompt queued while the call
         // is out lands behind it. `pending` keeps the queue from acting on it.
-        enqueue(threadId, { attachments: [], steer: { id: steerId, pending: true, streamId }, text: steerText });
+        enqueue(threadId, { attachments: [], ...(draftFrom !== undefined && { draftFrom }), steer: { id: steerId, pending: true, streamId }, text: steerText });
 
         const unanswered = setTimeout(settleSteer, STEER_ANSWER_MS, threadId, steerId, "accepted");
 
         void steerRun({
-            ...draftFromField(steerText),
+            ...draftFromField(draftFrom),
             steerId,
             streamId: streamId as Id<"persistentStreams">,
             text: steerText,
@@ -1139,7 +1145,7 @@ const ComposerInput = ({
             .then(() => settleSteer(threadId, steerId, "accepted"))
             .catch((error: unknown) => settleSteer(threadId, steerId, wasRefused(error) ? "refused" : "accepted"))
             .finally(() => clearTimeout(unanswered));
-    }, [canSteer, cancelStream, clear, isOffline, disabled, followUp, promptHistory, sseStreamState, steerRun, t, text, threadId]);
+    }, [canSteer, cancelStream, clear, isOffline, disabled, followUp, promptHistory, sseStreamState, steerRun, t, threadId]);
 
     // Handle submit — fully synchronous, fire-and-forget network call.
     // Optimistic state (user message + Thinking...) is shown immediately inside
@@ -1148,7 +1154,8 @@ const ComposerInput = ({
     const handleSubmit = useCallback(() => {
         // Read the draft from the store, not the render: a key pressed right after typing runs the handler of
         // the previous render, which still sees the old (possibly empty) draft.
-        const { composerAttachments: draftAttachments, composerText: draftText } = useChatUIStore.getState();
+        // The draft's not-typed mark goes with it, down every path out (`draft-origin.ts`).
+        const { composerAttachments: draftAttachments, composerDraftFrom: draftFrom, composerText: draftText } = useChatUIStore.getState();
 
         if (!draftText.trim() && draftAttachments.length === 0) {
             return;
@@ -1231,9 +1238,12 @@ const ComposerInput = ({
         // when the stream finishes (see ComposerPromptQueue). A composer without a queue waits.
         if (intent === "queue" || intent === "wait") {
             if (intent === "queue" && threadId) {
-                usePromptQueueStore
-                    .getState()
-                    .enqueue(threadId, { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, text: draftText });
+                usePromptQueueStore.getState().enqueue(threadId, {
+                    attachments: draftAttachments,
+                    ...(draftFrom !== undefined && { draftFrom }),
+                    references: useChatUIStore.getState().attachedReferences,
+                    text: draftText,
+                });
                 clear();
             }
 
@@ -1243,7 +1253,7 @@ const ComposerInput = ({
         // A comparison send does not go through `sendMessage`, where a guest's send is held under invite-only, so hold
         // it here: the draft stays and sign-in opens.
         if (mustSignIn && (onSubmitOverride || isComparisonValid)) {
-            holdForSignIn(draftText);
+            holdForSignIn(draftText, draftFrom);
 
             return;
         }
@@ -1253,14 +1263,14 @@ const ComposerInput = ({
 
         if (onSubmitOverride) {
             // Comparison parent: fan-out to all child threads
-            void onSubmitOverride(draftText, draftAttachments).then(() => {
+            void onSubmitOverride(draftText, draftAttachments, draftFrom).then(() => {
                 clear();
                 useChatUIStore.getState().setIsSubmitting(false);
 
                 return undefined;
             });
         } else if (isComparisonValid) {
-            void sendComparisonMessage(draftText, selectedModelsForComparison, draftAttachments).then(() => {
+            void sendComparisonMessage(draftText, selectedModelsForComparison, draftAttachments, draftFrom).then(() => {
                 useChatUIStore.getState().setIsSubmitting(false);
 
                 return undefined;
@@ -1268,7 +1278,7 @@ const ComposerInput = ({
         } else {
             // Fire-and-forget: sendMessage updates optimistic state synchronously
             // (clears composer, shows Thinking...) then runs the fetch in the background
-            void sendMessage(draftText, draftAttachments);
+            void sendMessage(draftText, draftAttachments, { draftFrom });
         }
 
         onSubmitProp?.();
@@ -1314,16 +1324,23 @@ const ComposerInput = ({
             draftOwnership.prefill = requested;
             autoSubmitTextRef.current = requested;
             setText(requested);
+            // The shell hands over text from outside the page (a share, the Quick Composer): none of it counts as typed here.
+            markComposerDraft("shellLink");
             setAutoSubmitRequest((count) => count + 1);
         });
     }, [isAutoSubmitTarget, setText]);
 
     // The message a visitor sent before signing in (invite-only), sent once a real account's token is on the client.
     // The new-chat composer and a thread's composer both take it: sign-in returns to the URL it started from.
-    usePendingSend(!onSubmitOverride && !compact, (pending) => {
+    usePendingSend(!onSubmitOverride && !compact, ({ draftFrom, text: pending }) => {
         draftOwnership.prefill = pending;
         autoSubmitTextRef.current = pending;
         setText(pending);
+
+        if (draftFrom !== undefined) {
+            markComposerDraft(draftFrom);
+        }
+
         setAutoSubmitRequest((count) => count + 1);
     });
 
@@ -1463,6 +1480,13 @@ const ComposerInput = ({
                     setText(quoteRestoreDraft(editor, payload.quote, payload.append === true ? getComposerText() : ""));
                 } else {
                     setText(textAfterRestore(getComposerText(), payload));
+                }
+
+                // A marked restore marks the draft it joins. One that replaced the draft as a whole leaves none of the old text.
+                if (payload.draftFrom !== undefined) {
+                    markComposerDraft(payload.draftFrom);
+                } else if (payload.append !== true) {
+                    useChatUIStore.getState().setComposerDraftFrom(undefined);
                 }
 
                 void Promise.all(payload.files.map((file, index) => restoreFile(file, index)));

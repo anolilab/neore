@@ -10,18 +10,23 @@
  * signing in never has it posted there. It waits for that chat until it
  * expires; closing the sign-in prompt drops it.
  *
- * Text only: attachments belong to an upload session the visitor does not have
+ * Text only, with its not-typed mark (`draft-origin.ts`): attachments belong to an upload session the visitor does not have
  * (signed out) or to a guest account that is not the one signing in.
  *
  * ✅ Safe to import in client components
  */
+
+import type { NotTypedDraft } from "@neore/backend/not-typed-text";
+import { parseNotTypedDraft } from "@neore/backend/not-typed-text";
 
 const PENDING_SEND_KEY = "neore:pending-send";
 
 /** An abandoned sign-in should not send a message hours later. */
 export const PENDING_SEND_MAX_AGE_MS = 30 * 60 * 1000;
 
-interface PendingSend {
+export interface PendingSend {
+    /** Text in it the visitor did not type came from here. */
+    draftFrom?: NotTypedDraft;
     /** The pathname of the chat it was typed in. */
     path: string;
     savedAt: number;
@@ -40,9 +45,9 @@ const storage = (): Storage | undefined => {
     }
 };
 
-export const savePendingSend = (text: string, path: string = currentPath(), now: number = Date.now()): void => {
+export const savePendingSend = (text: string, path: string = currentPath(), now: number = Date.now(), draftFrom?: NotTypedDraft): void => {
     try {
-        storage()?.setItem(PENDING_SEND_KEY, JSON.stringify({ path, savedAt: now, text } satisfies PendingSend));
+        storage()?.setItem(PENDING_SEND_KEY, JSON.stringify({ ...(draftFrom !== undefined && { draftFrom }), path, savedAt: now, text } satisfies PendingSend));
     } catch {
         // Quota or blocked storage: the draft stays in the composer either way.
     }
@@ -62,11 +67,16 @@ const parse = (raw: string | null | undefined): PendingSend | undefined => {
     }
 
     try {
-        const value = JSON.parse(raw) as Partial<PendingSend> | null;
+        const value = JSON.parse(raw) as Partial<Record<keyof PendingSend, unknown>> | null;
 
-        return typeof value?.text === "string" && typeof value.savedAt === "number" && typeof value.path === "string"
-            ? { path: value.path, savedAt: value.savedAt, text: value.text }
-            : undefined;
+        if (typeof value?.text !== "string" || typeof value.savedAt !== "number" || typeof value.path !== "string") {
+            return undefined;
+        }
+
+        // An unknown mark still marks: the message is not read as typed because its mark is unreadable.
+        const mark = parseNotTypedDraft(value.draftFrom);
+
+        return { ...(mark !== undefined && { draftFrom: mark ?? "promptLink" }), path: value.path, savedAt: value.savedAt, text: value.text };
     } catch {
         return undefined;
     }
@@ -78,7 +88,7 @@ const parse = (raw: string | null | undefined): PendingSend | undefined => {
  * run, a second composer) gets nothing. One held for another chat is left in
  * place; a stale, empty or unreadable one is dropped.
  */
-export const takePendingSend = (path: string, now: number = Date.now()): string | undefined => {
+export const takePendingSend = (path: string, now: number = Date.now()): Pick<PendingSend, "draftFrom" | "text"> | undefined => {
     let raw: string | null | undefined;
 
     try {
@@ -101,5 +111,5 @@ export const takePendingSend = (path: string, now: number = Date.now()): string 
 
     clearPendingSend();
 
-    return isStale ? undefined : pending.text;
+    return isStale ? undefined : { ...(pending.draftFrom !== undefined && { draftFrom: pending.draftFrom }), text: pending.text };
 };

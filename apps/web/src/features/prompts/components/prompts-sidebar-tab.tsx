@@ -219,8 +219,8 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
             content = replaceVariables(content, values, { keepUnmatched: true });
 
             // Use Zustand store to set the composer text
-            noteSavedPrompt(prompt, sessionData?.user?.id, content);
             setComposerText(content);
+            noteSavedPrompt(prompt, sessionData?.user?.id, { replaced: true });
             toast.success(t`Prompt added to input`);
             // Record usage
             recordUsage({ promptId: prompt._id });
@@ -232,11 +232,12 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
         (content: string, _newValues: Record<string, string>) => {
             // Use the content with filled variables
             // Note: newValues could be saved to thread variables in the future
+            setComposerText(content);
+
             if (fillDialogPrompt) {
-                noteSavedPrompt(fillDialogPrompt, sessionData?.user?.id, content);
+                noteSavedPrompt(fillDialogPrompt, sessionData?.user?.id, { replaced: true });
             }
 
-            setComposerText(content);
             toast.success(t`Prompt added to input`);
 
             // Record usage
@@ -251,11 +252,12 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
 
     const handleFillDialogUseAnyway = useCallback(
         (content: string) => {
+            setComposerText(content);
+
             if (fillDialogPrompt) {
-                noteSavedPrompt(fillDialogPrompt, sessionData?.user?.id, content);
+                noteSavedPrompt(fillDialogPrompt, sessionData?.user?.id, { replaced: true });
             }
 
-            setComposerText(content);
             toast.success(t`Prompt added with placeholders`);
 
             // Record usage

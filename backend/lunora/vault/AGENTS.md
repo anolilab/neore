@@ -54,9 +54,11 @@
   impersonation yet: record it on the turn at `/chat/start` and carry it through a pause's snapshot, never default it to
   `false`. A resumed or approved run's `promptMessageId` is not the prompt, so it gets no login until that is carried too.
   Text the owner did not type is marked where it is saved (`lib/not-typed-text.ts`, `neore.notTyped`) and refused by
-  name: a prompt, edit, steer or local turn an admin sent while impersonating, and a composer draft from a `?prompt=`
-  link, a desktop `neore://new?text=` link or someone else's saved prompt (the web client notes that text,
-  `features/chat/core/utils/draft-origin.ts`, and each send names it as `draftFrom`). An edit keeps the original's mark;
+  name: a prompt, edit, steer or local turn an admin sent while impersonating, and a composer draft from a `?prompt=` or
+  `?initialMessage=` link, anything the desktop shell hands over (a `neore://new?text=` link, a share, the Quick
+  Composer) or someone else's saved prompt. The web client marks the draft itself, never matches text: the mark stays
+  through edits, pane switches, a reload, the queue and a failed send, and goes when the draft is sent or emptied
+  (`features/chat/core/utils/draft-origin.ts`); each send names it as `draftFrom`. An edit keeps the original's mark;
   a steer's lives in `persistentStreams.notTypedSteers` until delivery. A plain-text paste stays unseen. Still unmarked:
   bot instructions and personalization an impersonating admin wrote: mark them (a `systemContext` kind that refuses)
   before the fill ships. The allowlist refuses a step holding a page's result or an approval's

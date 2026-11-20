@@ -30,6 +30,7 @@ import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import type { ComposerMode } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
+import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
 import ForwardSelectionBar from "@/features/chat/forward/forward-selection-bar";
 import useStoredDrafts, { keepsStoredDraft } from "@/features/chat/split/use-stored-drafts";
 import { hasUnseenReply } from "@/features/chat/thread-list/lib/thread-state-rules";
@@ -214,12 +215,12 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
     const { sendToExistingChildren } = useComparisonChat({ jwtToken });
 
     // Submit handler for the comparison parent composer: fans message to all children
-    const handleComparisonParentSubmit = async (text: string, attachments: PendingAttachment[]) => {
+    const handleComparisonParentSubmit = async (text: string, attachments: PendingAttachment[], draftFrom?: DraftOrigin) => {
         const children = comparisonBranches.map((b) => {
             return { model: b.model, threadId: b.threadId };
         });
 
-        await sendToExistingChildren(text, children, attachments);
+        await sendToExistingChildren(text, children, attachments, draftFrom);
     };
 
     // Get mode from thread data (source of truth) or store (for new threads or user changes)

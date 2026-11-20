@@ -83,13 +83,9 @@ const NativeBridge = (): JSX.Element | null => {
             onNativeDraft((text) => {
                 void (async () => {
                     // Into the composer, not sent: a link cannot send a message the user did not submit.
-                    const [{ requestComposerRestore }, { noteDraftOrigin }] = await Promise.all([
-                        import("@/features/chat/core/utils/composer-restore"),
-                        import("@/features/chat/core/utils/draft-origin"),
-                    ]);
+                    const { requestComposerRestore } = await import("@/features/chat/core/utils/composer-restore");
 
-                    noteDraftOrigin("shellLink", text);
-                    requestComposerRestore({ append: true, files: [], text });
+                    requestComposerRestore({ append: true, draftFrom: "shellLink", files: [], text });
                     await openNewChat();
                 })();
             }),

@@ -1,4 +1,5 @@
 import { stripHiddenText } from "@neore/ai/utils";
+import type { NotTypedDraft } from "@neore/backend/not-typed-text";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { ComposerMode, PendingSettings } from "@/features/chat/core/stores/model-store";
@@ -59,12 +60,20 @@ export const isOwnerLive = (ownerId: string | undefined): boolean => {
     return layout.panes[layout.focus] === ownerId;
 };
 
-type ComposerContent = Pick<ComposerDraft, "attachedReferences" | "composerAttachments" | "composerText">;
+type ComposerContent = Pick<ComposerDraft, "attachedReferences" | "composerAttachments" | "composerDraftFrom" | "composerText">;
 
-/** Hands a failed send's text back to the chat that sent it: its live composer when it is focused, else its parked draft. */
-export const restoreTextFor = (ownerId: string | undefined, text: string): void => {
+/**
+ * Hands a failed send's text back to the chat that sent it: its live composer when it is focused, else its parked draft. The
+ * send's not-typed mark (`draftFrom`) comes back with it.
+ */
+export const restoreTextFor = (ownerId: string | undefined, text: string, draftFrom?: NotTypedDraft): void => {
     if (ownerId === undefined || isOwnerLive(ownerId)) {
         useChatUIStore.getState().setComposerText(text);
+
+        // After the text, which replaced the draft, so the mark is the sent text's: an empty draft holds none.
+        if (useChatUIStore.getState().composerText !== "") {
+            useChatUIStore.getState().setComposerDraftFrom(draftFrom);
+        }
 
         return;
     }
@@ -75,7 +84,7 @@ export const restoreTextFor = (ownerId: string | undefined, text: string): void 
         return;
     }
 
-    saveComposerDraft(ownerId, { ...parked, composerText: stripHiddenText(text).text });
+    saveComposerDraft(ownerId, { ...parked, composerDraftFrom: draftFrom, composerText: stripHiddenText(text).text });
 };
 
 /** Puts a failed send back, unless the owner started a new draft meanwhile: its live one when focused, else its parked one. */
@@ -100,6 +109,7 @@ const parkLiveComposer = (threadId: string): void => {
     saveComposerDraft(threadId, {
         attachedReferences: ui.attachedReferences,
         composerAttachments: ui.composerAttachments,
+        composerDraftFrom: ui.composerDraftFrom,
         composerText: ui.composerText,
     });
     ui.clearComposer();

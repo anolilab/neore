@@ -101,8 +101,8 @@ const usePromptLoader = (promptId: string | undefined) => {
         const content = replaceVariables(prompt.content, values, { keepUnmatched: true });
 
         // Set the composer text with the prompt content
-        noteSavedPrompt(prompt, sessionData?.user?.id, content);
         setComposerText(content);
+        noteSavedPrompt(prompt, sessionData?.user?.id, { replaced: true });
         toast.success(t`Prompt loaded`);
         handledPromptId.current = promptId;
     }, [promptId, prompt, models, modelsSettled, setComposerText, setSelectedModel, setPendingSettings, sessionData, activeOrganization, t]);

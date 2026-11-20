@@ -15,6 +15,8 @@ import { useLoginPromptStore } from "@/features/auth/stores/login-prompt-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { requestComposerRestore } from "@/features/chat/core/utils/composer-restore";
+import { requestComposerSubmit } from "@/features/chat/core/utils/composer-submit";
 import { clearSendStarting, markSendStarting } from "@/features/chat/core/utils/send-in-flight";
 
 import type { ComposerInputAreaRef } from "./composer-input-area";
@@ -232,7 +234,7 @@ describe("ComposerInput under invite-only", () => {
         renderComposer({ onSubmitOverride });
         fireEvent.click(screen.getByRole("button", { name: "Send message" }));
 
-        expect(onSubmitOverride).toHaveBeenCalledWith("compare these", []);
+        expect(onSubmitOverride).toHaveBeenCalledWith("compare these", [], undefined);
         expect(useLoginPromptStore.getState().isOpen).toBe(false);
     });
 });
@@ -403,7 +405,7 @@ describe("ComposerInput while the connection is down", () => {
         renderComposer();
         fireEvent.click(screen.getByRole("button", { name: "Send message" }));
 
-        expect(harness.sendMessage).toHaveBeenCalledWith("a follow-up", []);
+        expect(harness.sendMessage).toHaveBeenCalledWith("a follow-up", [], { draftFrom: undefined });
     });
 
     it("queues a follow-up while another send in the thread has begun, and does not send it beside that one", () => {
@@ -430,5 +432,66 @@ describe("ComposerInput while the connection is down", () => {
 
         expect(harness.sendMessage).not.toHaveBeenCalled();
         expect(usePromptQueueStore.getState().queues["thread-1"]?.items.map((item: QueuedChatPrompt) => item.text)).toStrictEqual(["a follow-up"]);
+    });
+});
+
+describe("ComposerInput and the draft's not-typed mark", () => {
+    beforeEach(() => {
+        harness.mustSignIn = false;
+    });
+
+    afterEach(() => {
+        harness.isStreaming = false;
+        harness.threadId = undefined;
+        usePromptQueueStore.setState({ queues: {} });
+        useChatUIStore.getState().clearComposer();
+        useChatUIStore.getState().setIsSubmitting(false);
+        vi.clearAllMocks();
+    });
+
+    it("sends a marked draft with its mark, also once edited", () => {
+        useChatUIStore.getState().setComposerText("ok");
+        useChatUIStore.getState().setComposerDraftFrom("promptLink");
+        useChatUIStore.getState().setComposerText("ok, and book it");
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        expect(harness.sendMessage).toHaveBeenCalledWith("ok, and book it", [], { draftFrom: "promptLink" });
+    });
+
+    it("queues a marked draft with its mark", () => {
+        harness.isStreaming = true;
+        harness.threadId = "thread-1";
+        useChatUIStore.getState().setComposerText("a colleague's prompt");
+        useChatUIStore.getState().setComposerDraftFrom("sharedPrompt");
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        expect(usePromptQueueStore.getState().queues["thread-1"]?.items[0]).toMatchObject({ draftFrom: "sharedPrompt", text: "a colleague's prompt" });
+    });
+
+    it("sends text the desktop shell hands over (a share, the Quick Composer) as not typed", async () => {
+        renderComposer();
+        requestComposerSubmit({ text: "typed in the Quick Composer" });
+
+        await waitFor(() => {
+            expect(harness.sendMessage).toHaveBeenCalledWith("typed in the Quick Composer", [], { draftFrom: "shellLink" });
+        });
+    });
+
+    it("marks the draft a marked restore joins, and an unmarked restore that replaces the draft drops the mark", async () => {
+        useChatUIStore.getState().setComposerText("my own words");
+        renderComposer();
+        requestComposerRestore({ append: true, draftFrom: "shellLink", files: [], text: "from a desktop link" });
+
+        await waitFor(() => {
+            expect(useChatUIStore.getState()).toMatchObject({ composerDraftFrom: "shellLink", composerText: "my own words\nfrom a desktop link" });
+        });
+
+        requestComposerRestore({ files: [], text: "my earlier message" });
+
+        await waitFor(() => {
+            expect(useChatUIStore.getState()).toMatchObject({ composerDraftFrom: undefined, composerText: "my earlier message" });
+        });
     });
 });

@@ -8,12 +8,23 @@
  */
 
 import { stripHiddenText } from "@neore/ai/utils";
+import type { NotTypedDraft } from "@neore/backend/not-typed-text";
 import { forgetPdfUrls } from "@neore/ui/utils/pdf-preview-event";
 import { create } from "zustand";
 import { devtools, subscribeWithSelector } from "zustand/middleware";
 
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
 import { updateParkedAttachment } from "@/features/chat/split/composer-drafts";
+
+/**
+ * The draft's mark once text the owner did not type entered it (`core/utils/draft-origin.ts`). It stays through edits (an edited
+ * draft still started from someone else's words) and goes only with the draft: once it is empty, sent or cleared.
+ */
+const keptDraftFrom = (
+    draft: { attachedReferences: ReadonlyArray<unknown>; composerAttachments: ReadonlyArray<unknown>; composerText: string },
+    current: NotTypedDraft | undefined,
+): NotTypedDraft | undefined =>
+    draft.composerText === "" && draft.composerAttachments.length === 0 && draft.attachedReferences.length === 0 ? undefined : current;
 
 /**
  * Batching utility for high-frequency updates
@@ -115,6 +126,8 @@ interface ChatUIStore {
 
     // Banned content error returned by the server — restores composer text + shows inline error
     composerBannedContent: { message: string; words: string[] } | null;
+    /** Where text in the draft that the owner did not type came from; its send carries it (`core/utils/draft-origin.ts`). */
+    composerDraftFrom: NotTypedDraft | undefined;
     /** Hidden characters (tag block, bidi controls, ...) taken out of the draft since it was last empty; drives the composer's notice. */
     composerHiddenRemoved: number;
     // Composer state
@@ -147,7 +160,12 @@ interface ChatUIStore {
     // Reset
     reset: () => void;
     /** Puts a failed send back into the composer, unless a new draft was started meanwhile. */
-    restoreComposer: (draft: { attachedReferences: ReferenceSelection[]; composerAttachments: PendingAttachment[]; composerText: string }) => void;
+    restoreComposer: (draft: {
+        attachedReferences: ReferenceSelection[];
+        composerAttachments: PendingAttachment[];
+        composerDraftFrom?: NotTypedDraft;
+        composerText: string;
+    }) => void;
     setActiveDocumentId: (documentId: string | null) => void;
     // Right sidebar tab actions
     setActiveRightSidebarTab: (tab: string) => void;
@@ -163,6 +181,8 @@ interface ChatUIStore {
 
     // Banned content actions
     setComposerBannedContent: (value: { message: string; words: string[] } | null) => void;
+    /** Marks the draft as holding text from `origin`; `undefined` only when that text was replaced as a whole. */
+    setComposerDraftFrom: (origin: NotTypedDraft | undefined) => void;
     setComposerText: (text: string) => void;
 
     setCopiedMessageId: (id: string | null) => void;
@@ -213,6 +233,7 @@ const initialState = {
     canvasViewMode: "editor" as "editor" | "history",
     composerAttachments: [] as PendingAttachment[],
     composerBannedContent: null as { message: string; words: string[] } | null,
+    composerDraftFrom: undefined as NotTypedDraft | undefined,
     composerHiddenRemoved: 0,
     composerText: "",
     copiedMessageId: null as string | null,
@@ -282,6 +303,7 @@ export const useChatUIStore = create<ChatUIStore>()(
                         attachedReferences: [],
                         composerAttachments: [],
                         composerBannedContent: null,
+                        composerDraftFrom: undefined,
                         composerHiddenRemoved: 0,
                         composerText: "",
                     });
@@ -334,16 +356,22 @@ export const useChatUIStore = create<ChatUIStore>()(
 
                 removeAttachedReference: (id) => {
                     set((state) => {
+                        const attachedReferences = state.attachedReferences.filter((r) => r.id !== id);
+
                         return {
-                            attachedReferences: state.attachedReferences.filter((r) => r.id !== id),
+                            attachedReferences,
+                            composerDraftFrom: keptDraftFrom({ ...state, attachedReferences }, state.composerDraftFrom),
                         };
                     });
                 },
 
                 removeAttachment: (id) => {
                     set((state) => {
+                        const composerAttachments = state.composerAttachments.filter((a) => a.id !== id);
+
                         return {
-                            composerAttachments: state.composerAttachments.filter((a) => a.id !== id),
+                            composerAttachments,
+                            composerDraftFrom: keptDraftFrom({ ...state, composerAttachments }, state.composerDraftFrom),
                         };
                     });
                 },
@@ -372,7 +400,13 @@ export const useChatUIStore = create<ChatUIStore>()(
                     const { removed, text: clean } = stripHiddenText(draft.composerText);
 
                     set((state) => {
-                        return { ...draft, composerHiddenRemoved: state.composerHiddenRemoved + removed, composerText: clean };
+                        return {
+                            ...draft,
+                            // The draft's own mark comes back with it; an empty composer holds none to keep.
+                            composerDraftFrom: draft.composerDraftFrom,
+                            composerHiddenRemoved: state.composerHiddenRemoved + removed,
+                            composerText: clean,
+                        };
                     });
                 },
 
@@ -390,7 +424,12 @@ export const useChatUIStore = create<ChatUIStore>()(
                 },
 
                 setAttachedReferences: (references) => {
-                    set({ attachedReferences: references });
+                    set((state) => {
+                        return {
+                            attachedReferences: references,
+                            composerDraftFrom: keptDraftFrom({ ...state, attachedReferences: references }, state.composerDraftFrom),
+                        };
+                    });
                 },
 
                 setCanvasDirty: (dirty) => {
@@ -421,7 +460,18 @@ export const useChatUIStore = create<ChatUIStore>()(
                     const { removed, text: clean } = stripHiddenText(text, { keepTrailingJoiner: true });
 
                     set((state) => {
-                        return { composerHiddenRemoved: clean === "" ? removed : state.composerHiddenRemoved + removed, composerText: clean };
+                        return {
+                            composerDraftFrom: keptDraftFrom({ ...state, composerText: clean }, state.composerDraftFrom),
+                            composerHiddenRemoved: clean === "" ? removed : state.composerHiddenRemoved + removed,
+                            composerText: clean,
+                        };
+                    });
+                },
+
+                setComposerDraftFrom: (origin) => {
+                    // An empty draft holds no mark: set it once the text is in, or it would stick to the next typed draft.
+                    set((state) => {
+                        return { composerDraftFrom: keptDraftFrom(state, origin) };
                     });
                 },
 

@@ -11,7 +11,6 @@ import { toast } from "sonner";
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
 import Assistant from "@/features/chat/assistant";
 import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
-import { noteDraftOrigin } from "@/features/chat/core/utils/draft-origin";
 import { LockedChatGate } from "@/features/chat/lock/locked-chat-gate";
 import { useThreadShard } from "@/features/chat/sharing/use-thread-shard";
 import { createLunoraActionQueryOptions, createLunoraQueryOptions, useCRPC } from "@/lib/lunora/crpc";
@@ -64,13 +63,6 @@ const ChatPage = () => {
     });
     const redactedToken = viewedThread && viewedThread.isPublic && !viewedThread.userId ? viewedThread.publicAccessToken : undefined;
     const shareToken = redactedToken ?? crossShardToken ?? undefined;
-
-    // The address's text fills the composer (`thread/composer.tsx`): a link wrote it, so its send is marked as not typed.
-    useEffect(() => {
-        if (initialMessage) {
-            noteDraftOrigin("promptLink", String(initialMessage));
-        }
-    }, [initialMessage]);
 
     useEffect(() => {
         if (shareToken) {

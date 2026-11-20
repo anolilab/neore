@@ -6,7 +6,6 @@ import { getCreatorSlug } from "@/components/model-picker/utilities";
 
 import { useChatUIStore } from "../stores/chat-ui-store";
 import { useModelStore } from "../stores/model-store";
-import { draftOriginOf, resetDraftOrigins } from "../utils/draft-origin";
 import { useLinkSearchAsWritten, usePromptLinkDraft } from "./use-prompt-link-draft";
 
 const navigate = vi.fn();
@@ -100,17 +99,16 @@ describe(usePromptLinkDraft, () => {
         expect(strippedSearch()).toStrictEqual({ model: undefined, prompt: undefined, promptId: "kept" });
     });
 
-    it("notes the link's draft as not typed, so its send is marked, and leaves a kept draft unmarked", () => {
-        resetDraftOrigins();
+    it("marks the link's draft as not typed, so its send is marked, and leaves a kept draft unmarked", () => {
         renderHook(() => usePromptLinkDraft({ model: undefined, otherDraftSource: false, prompt: "Sign in to my bank for me" }));
 
-        expect(draftOriginOf("Sign in to my bank for me")).toBe("promptLink");
+        expect(useChatUIStore.getState().composerDraftFrom).toBe("promptLink");
 
-        resetDraftOrigins();
+        useChatUIStore.getState().clearComposer();
         useChatUIStore.getState().setComposerText("Mine");
         renderHook(() => usePromptLinkDraft({ model: undefined, otherDraftSource: false, prompt: "Another link's words" }));
 
-        expect(draftOriginOf("Another link's words")).toBeUndefined();
+        expect(useChatUIStore.getState().composerDraftFrom).toBeUndefined();
     });
 
     it("only clears a link with nothing usable in it from the address, with no notice about a draft it never had", () => {

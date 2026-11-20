@@ -7,6 +7,7 @@ import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
+import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
 import { draftFromField } from "@/features/chat/core/utils/draft-origin";
 import type { NewChatTemporaryFields } from "@/features/chat/core/utils/new-chat-temporary";
 import type { LocalModelTarget } from "@/features/settings/lib/custom-models";
@@ -27,6 +28,8 @@ export interface LocalTurnSendOptions {
      * backend saves either as a sibling branch, as the gateway path does.
      */
     branch?: { kind: "edit" | "regenerate"; messageId: string };
+    /** The draft's not-typed mark (`draft-origin.ts`), saved on the prompt. */
+    draftFrom?: DraftOrigin;
     /** The conversation BEFORE this prompt. */
     history: ReadonlyArray<HistoryMessage>;
     language?: string;
@@ -108,7 +111,7 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
     }, []);
 
     const send = useCallback(
-        async ({ branch, history, language, onNotSaved, onSaved, prompt, systemPrompt, temporary, threadId }: LocalTurnSendOptions) => {
+        async ({ branch, draftFrom, history, language, onNotSaved, onSaved, prompt, systemPrompt, temporary, threadId }: LocalTurnSendOptions) => {
             if (!target) {
                 return;
             }
@@ -149,7 +152,7 @@ const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>):
                         const saved = await saveLocalTurn({
                             ...input,
                             ...(branch && { branch: { kind: branch.kind, messageId: branch.messageId as Id<"messages"> } }),
-                            ...draftFromField(prompt),
+                            ...draftFromField(draftFrom),
                             ...(language && { language }),
                             model,
                             ...(!threadId && temporary),

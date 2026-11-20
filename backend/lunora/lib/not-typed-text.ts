@@ -1,6 +1,6 @@
 /**
  * The mark on a user row's text that the owner did not type, though it reaches the row as their own: a draft the composer
- * was filled with from outside (a prompt link, a desktop link, a saved prompt someone else wrote) and anything written
+ * was filled with from outside (a prompt link, the desktop shell, a saved prompt someone else wrote) and anything written
  * while an admin acts as the owner. Saved on the text part as `providerOptions.neore.notTyped`; the mark only ever
  * restricts (`vault/site-login-turn.ts` refuses a turn that holds one). An edit keeps the mark of the row it replaces.
  * No imports: the web app reads the mark too (`@neore/backend/not-typed-text`); the validator is `not-typed-text-validator.ts`.

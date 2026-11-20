@@ -395,8 +395,9 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
                 return;
             }
 
-            noteSavedPrompt(prompt, user?.id, prompt.content);
             onReplace(match.from, match.to, prompt.content);
+            // Into the draft's other text, which keeps its own mark.
+            noteSavedPrompt(prompt, user?.id, { replaced: false });
             onDismiss();
         },
         [match, onReplace, onDismiss, user?.id],

@@ -30,7 +30,7 @@ vi.mock("@/features/chat/core/utils/composer-restore", () => {
 });
 
 const { default: RestoreToInputAction } = await import("./restore-to-input-action");
-const { draftOriginOf, resetDraftOrigins } = await import("@/features/chat/core/utils/draft-origin");
+const { requestComposerRestore } = await import("@/features/chat/core/utils/composer-restore");
 
 const userMessage = (part: { providerMetadata?: { neore: Record<string, unknown> } }): UIMessage =>
     ({
@@ -62,11 +62,17 @@ describe("RestoreToInputAction", () => {
         expect(screen.queryByRole("button", { name: "Restore to input" })).toBeNull();
     });
 
-    it("notes a link's draft again when it goes back to the composer, so its next send is marked", () => {
-        resetDraftOrigins();
+    it("sends a link's draft back to the composer with its mark, so its next send is marked", () => {
         render(<RestoreToInputAction message={userMessage({ providerMetadata: { neore: { notTyped: { draft: "promptLink" } } } })} />);
         fireEvent.click(screen.getByRole("button", { name: "Restore to input" }));
 
-        expect(draftOriginOf("please call me back")).toBe("promptLink");
+        expect(requestComposerRestore).toHaveBeenLastCalledWith({ draftFrom: "promptLink", files: [], text: "please call me back" });
+    });
+
+    it("sends the owner's own message back unmarked", () => {
+        render(<RestoreToInputAction message={userMessage({})} />);
+        fireEvent.click(screen.getByRole("button", { name: "Restore to input" }));
+
+        expect(requestComposerRestore).toHaveBeenLastCalledWith({ files: [], text: "please call me back" });
     });
 });

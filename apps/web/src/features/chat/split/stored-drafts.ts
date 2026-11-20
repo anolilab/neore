@@ -1,3 +1,6 @@
+import type { NotTypedDraft } from "@neore/backend/not-typed-text";
+import { parseNotTypedDraft } from "@neore/backend/not-typed-text";
+
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
@@ -25,7 +28,7 @@ import {
  * sent or emptied here is removed only while its entry still carries this page's last write id: another tab's entry is never
  * removed or rewritten unless edited here. Two tabs editing the same chat are last-write-wins. Reads look only at the current
  * account's entries; sign-out and an account switch remove only the departing account's (`dropStoredDrafts`), or every
- * account's when a sign-out cannot tell whose. What is kept is the text, attachments that finished uploading (by file id, never
+ * account's when a sign-out cannot tell whose. What is kept is the text, its not-typed mark (`o`, `core/utils/draft-origin.ts`), attachments that finished uploading (by file id, never
  * their bytes) and references with a web URL (never a `blob:` or `data:` one; a signed one past its expiry is dropped on read).
  * Every storage access is guarded: a failure only means the draft is not kept.
  */
@@ -41,6 +44,8 @@ export const DRAFT_CLOCK_SKEW_MS = 24 * 60 * 60 * 1000;
 
 export interface StoredDraft {
     a?: StoredAttachment[];
+    /** Text in it the owner did not type came from here (`composerDraftFrom`). */
+    o?: NotTypedDraft;
     r?: ReferenceSelection[];
     t: string;
 }
@@ -51,7 +56,7 @@ interface Entry {
     w: string;
 }
 
-type Content = Pick<ComposerDraft, "attachedReferences" | "composerAttachments" | "composerText">;
+type Content = Pick<ComposerDraft, "attachedReferences" | "composerAttachments" | "composerDraftFrom" | "composerText">;
 
 const storage = (): Storage | undefined => {
     try {
@@ -139,7 +144,13 @@ const readEntry = (key: string, now = Date.now()): Entry | undefined => {
         // An expired reference is dropped, not restored: the rest of the draft comes back, and the image is picked again.
         const r = Array.isArray(parsed.v.r) ? parsed.v.r.filter((value) => isReference(value) && !hasExpired(value.url, now)) : [];
 
-        return parsed.v.t === "" && a.length === 0 && r.length === 0 ? undefined : { t: parsed.t, v: { a, r, t: parsed.v.t }, w: parsed.w };
+        // An unknown mark still marks: the draft is not read as typed because its mark is unreadable.
+        const mark = parseNotTypedDraft(parsed.v.o);
+        const o = mark === null ? "promptLink" : mark;
+
+        return parsed.v.t === "" && a.length === 0 && r.length === 0
+            ? undefined
+            : { t: parsed.t, v: { a, ...(o !== undefined && { o }), r, t: parsed.v.t }, w: parsed.w };
     } catch {
         return undefined;
     }
@@ -192,7 +203,9 @@ const toStoredDraft = (content: Partial<Content> | undefined): StoredDraft | und
         return undefined;
     }
 
-    return t === "" && a.length === 0 && r.length === 0 ? undefined : { a, r, t };
+    const o = content?.composerDraftFrom;
+
+    return t === "" && a.length === 0 && r.length === 0 ? undefined : { a, ...(o !== undefined && { o }), r, t };
 };
 
 /**
@@ -437,6 +450,7 @@ const restore = (owner: string, userId: string): void => {
         ui.restoreComposer({
             attachedReferences: entry.v.r ?? [],
             composerAttachments: (entry.v.a ?? []).map((attachment, index) => fromStoredAttachment(attachment, index)),
+            composerDraftFrom: entry.v.o,
             composerText: entry.v.t,
         });
         // Restored here: sent or emptied before the next write, it is removed.
@@ -494,7 +508,9 @@ const listen = (): void => {
         if (
             next.composerText === previous.composerText &&
             next.composerAttachments === previous.composerAttachments &&
-            next.attachedReferences === previous.attachedReferences
+            next.attachedReferences === previous.attachedReferences &&
+            // The mark is set just after its text: written with it, but no edit on its own.
+            next.composerDraftFrom === previous.composerDraftFrom
         ) {
             return;
         }
