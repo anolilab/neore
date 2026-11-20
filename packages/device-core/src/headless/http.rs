@@ -28,7 +28,33 @@ pub trait Http {
 /// reads it, so a packaged `neore-host` cannot be told to send the secret unencrypted.
 pub const DEV_INSECURE_LOOPBACK_VAR: &str = "NEORE_HOST_DEV_INSECURE_LOOPBACK";
 
-pub(super) fn dev_insecure_loopback() -> bool {
+fn is_loopback(authority: &str) -> bool {
+    let host = if let Some(bracketed) = authority.strip_prefix('[') {
+        bracketed.split(']').next().unwrap_or_default()
+    } else {
+        authority.split(':').next().unwrap_or_default()
+    };
+
+    matches!(host, "localhost" | "127.0.0.1" | "::1")
+}
+
+/// Whether the person may be sent to `link` to approve: https, or plain http to this machine in the same debug-build
+/// development setup the backend address allows. The complete link carries the code, so it never goes out unencrypted.
+pub(super) fn is_approval_link(link: &str) -> bool {
+    is_approval_link_with(link, dev_insecure_loopback())
+}
+
+fn is_approval_link_with(link: &str, dev_loopback: bool) -> bool {
+    match link.split_once("://") {
+        Some(("https", rest)) => !rest.is_empty(),
+        Some(("http", rest)) => {
+            dev_loopback && is_loopback(rest.split(['/', '?', '#']).next().unwrap_or_default())
+        }
+        _ => false,
+    }
+}
+
+fn dev_insecure_loopback() -> bool {
     cfg!(debug_assertions) && std::env::var(DEV_INSECURE_LOOPBACK_VAR).as_deref() == Ok("1")
 }
 
@@ -51,12 +77,7 @@ fn validate_backend_with(raw: &str, dev_loopback: bool) -> Result<String, String
         return Err("the backend address must be an origin, such as https://neore.ai".into());
     }
 
-    let host = if let Some(bracketed) = authority.strip_prefix('[') {
-        bracketed.split(']').next().unwrap_or_default()
-    } else {
-        authority.split(':').next().unwrap_or_default()
-    };
-    let loopback = matches!(host, "localhost" | "127.0.0.1" | "::1");
+    let loopback = is_loopback(authority);
 
     // A loopback address is a development backend: refused whatever the scheme, unless the debug-only flag is set.
     if loopback && !dev_loopback {

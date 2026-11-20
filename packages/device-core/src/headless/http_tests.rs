@@ -1,4 +1,4 @@
-use super::validate_backend_with;
+use super::{is_approval_link_with, validate_backend_with};
 
 #[test]
 fn takes_https_only_and_loopback_only_with_the_dev_flag() {
@@ -40,4 +40,22 @@ fn takes_https_only_and_loopback_only_with_the_dev_flag() {
             );
         }
     }
+}
+
+#[test]
+fn an_approval_link_is_https_or_plain_http_to_this_machine_in_development_only() {
+    assert!(is_approval_link_with("https://neore.ai/auth/device", false));
+    assert!(!is_approval_link_with("http://neore.ai/auth/device", false));
+    assert!(!is_approval_link_with("http://neore.ai/auth/device", true));
+    assert!(!is_approval_link_with(
+        "http://localhost:5173/auth/device",
+        false
+    ));
+    assert!(is_approval_link_with(
+        "http://localhost:5173/auth/device",
+        true
+    ));
+    assert!(is_approval_link_with("http://[::1]:5173/auth/device", true));
+    assert!(!is_approval_link_with("javascript:alert(1)", true));
+    assert!(!is_approval_link_with("https://", false));
 }

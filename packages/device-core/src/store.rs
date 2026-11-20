@@ -318,11 +318,12 @@ pub fn load_nonces_strict(path: &Path) -> Result<HashMap<String, u64>, String> {
 pub fn save_nonces(path: &Path, nonces: &HashMap<String, u64>) -> Result<(), String> {
     let text = serde_json::to_string(nonces).map_err(|error| error.to_string())?;
 
-    write_owner_only(path, &text)?;
+    write_owner_only(path, &text)
+}
 
-    // The rename lives in the folder's entry. Until that is on disk a power loss can bring back the previous history
-    // and make an accepted call replayable, so a failed sync refuses the call. Only here: the settings file's caller
-    // rolls the keychain back on an error, which would be wrong once the new file is already in place.
+/// Puts the folder entry of `path` on disk, so a rename that replaced it survives a power loss. Unix only: elsewhere a
+/// folder cannot be opened to sync.
+pub fn sync_folder_of(path: &Path) -> Result<(), String> {
     #[cfg(unix)]
     if let Some(parent) = path.parent() {
         fs::File::open(parent)

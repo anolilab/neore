@@ -451,11 +451,19 @@ fn does_not_wait_for_approval_when_the_code_cannot_be_shown() {
 
 #[test]
 fn refuses_an_insecure_backend_before_sending_anything() {
+    // A debug run with the development flag set accepts loopback on purpose, so only the other address applies then.
+    let dev_loopback = cfg!(debug_assertions)
+        && std::env::var(super::super::http::DEV_INSECURE_LOOPBACK_VAR).as_deref() == Ok("1");
+
     for address in [
         "http://neore.example",
         "http://localhost:8788",
         "http://127.0.0.1:8788",
     ] {
+        if dev_loopback && address != "http://neore.example" {
+            continue;
+        }
+
         let backend = FakeBackend::new(vec![]);
         let timer = FakeTimer::default();
         let keychain = FakeKeychain::default();

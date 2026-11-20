@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 use serde_json::{json, Value};
 use zeroize::Zeroize;
 
-use super::http::{dev_insecure_loopback, validate_backend, Http, Reply};
+use super::http::{is_approval_link, validate_backend, Http, Reply};
 use super::vault::{NewPairing, Storage, Vault};
 
 /// The client id the backend accepts for a headless machine (`backend/lunora/auth/cli-device-auth.ts`).
@@ -251,13 +251,8 @@ fn request_code(
     let complete = printable(text(&reply.body, "verification_uri_complete").unwrap_or(uri));
     let uri = printable(uri);
 
-    // The person opens these links to approve, so they must be web pages served over https (plain http only in the
-    // same debug-build development setup the backend address allows).
-    let is_web_link = |link: &str| {
-        link.starts_with("https://") || (dev_insecure_loopback() && link.starts_with("http://"))
-    };
-
-    if !is_web_link(&uri) || !is_web_link(&complete) {
+    // The person opens these links to approve, and the complete one carries the code.
+    if !is_approval_link(&uri) || !is_approval_link(&complete) {
         return Err(PairError::Refused(
             "the backend's approval link is not an https address".into(),
         ));
