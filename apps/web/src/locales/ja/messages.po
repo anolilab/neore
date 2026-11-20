@@ -87,7 +87,7 @@ msgstr "「{name}」のファイルパターンが {limit} 個を超えていま
 
 #: src/features/projects/components/project-rule-files.tsx:360
 msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
-msgstr ""
+msgstr "「{name}」は {limit} 文字を超えています。短くするか、複数のファイルに分けてください。"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:232
 msgid "\"{truncatedName}\" and {moreCount} more rejected"
@@ -1851,7 +1851,7 @@ msgstr "まずはいくつか質問させてください"
 
 #: src/features/projects/components/project-rule-files.tsx:367
 msgid "A file applied when files match needs at least one pattern."
-msgstr ""
+msgstr "「ファイルが一致したとき」に適用するファイルには、パターンが 1 つ以上必要です。"
 
 #: src/features/auth/components/device-code-parts.tsx:114
 msgid "A file only its owner can read (no keychain available)"
@@ -2564,7 +2564,7 @@ msgstr "行を追加"
 
 #: src/features/projects/components/project-rule-files.tsx:561
 msgid "Add rule file"
-msgstr ""
+msgstr "ルールファイルを追加"
 
 #: src/features/settings/components/chat/mcp-settings.tsx:416
 #: src/features/settings/components/chat/mcp/server-form.tsx:337
@@ -3502,7 +3502,7 @@ msgstr "他の閲覧者"
 #: src/features/projects/components/project-rule-files.tsx:240
 #: src/features/projects/components/project-rule-files.tsx:524
 msgid "Always"
-msgstr ""
+msgstr "常に"
 
 #: src/features/chat/thread/tool-approval.tsx:134
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
@@ -3905,7 +3905,7 @@ msgstr "アプリケーションエラー"
 
 #: src/features/projects/components/project-rule-files.tsx:236
 msgid "Applies"
-msgstr ""
+msgstr "適用"
 
 #: src/features/canvas/canvas-panel.tsx:119
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:330
@@ -10066,7 +10066,7 @@ msgstr "{itemName} を削除"
 
 #: src/features/projects/components/project-rule-files.tsx:231
 msgid "Delete {name}"
-msgstr ""
+msgstr "{name} を削除"
 
 #: src/features/tasks/components/task-card.tsx:113
 msgid "Delete {title}"
@@ -10789,7 +10789,7 @@ msgstr "破棄"
 #: src/features/projects/components/project-form-dialog.tsx:512
 #: src/features/projects/components/project-rule-files.tsx:591
 msgid "Discard changes"
-msgstr ""
+msgstr "変更を破棄"
 
 #: src/features/chat/host/diff-comments-draft.tsx:90
 msgid "Discard comments"
@@ -10797,7 +10797,7 @@ msgstr "コメントを破棄"
 
 #: src/features/projects/components/project-form-dialog.tsx:499
 msgid "Discard rule file changes?"
-msgstr ""
+msgstr "ルールファイルの変更を破棄しますか？"
 
 #: src/features/develop/components/review-panel.tsx:275
 msgid "Discard the review"
@@ -14441,7 +14441,7 @@ msgstr "ファイル入力"
 
 #: src/features/projects/components/project-rule-files.tsx:251
 msgid "File patterns, one per line"
-msgstr ""
+msgstr "ファイルパターン（1 行に 1 つ）"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:97
 msgid "File removed from knowledge base"
@@ -15678,7 +15678,7 @@ msgstr "GitLab シークレットトークン（X-Gitlab-Token）"
 
 #: src/features/projects/components/project-rule-files.tsx:373
 msgid "Give every rule file a name."
-msgstr ""
+msgstr "すべてのルールファイルに名前を付けてください。"
 
 #: src/features/pages/components/page-share-dialog.tsx:231
 msgid "Give people access to this page, or publish a read-only link."
@@ -17639,7 +17639,7 @@ msgstr "指示"
 
 #: src/features/projects/components/project-rule-files.tsx:510
 msgid "Instructions added to this project's chats: always, or only when the chat's attached files match a pattern such as **/*.sql."
-msgstr ""
+msgstr "このプロジェクトのチャットに追加される指示です。常に、またはチャットの添付ファイルが **/*.sql などのパターンに一致した場合のみ追加されます。"
 
 #: src/features/skills/components/skill-form-dialog.tsx:69
 #: src/features/tasks/components/task-form-dialog.tsx:89
@@ -18123,7 +18123,7 @@ msgstr "現在の行を保持"
 
 #: src/features/projects/components/project-form-dialog.tsx:503
 msgid "Keep editing"
-msgstr ""
+msgstr "編集を続ける"
 
 #: src/features/knowledge/components/collection-picker.tsx:114
 msgid "Keep files"
@@ -21116,11 +21116,11 @@ msgstr "{label} をスター内で上へ移動"
 
 #: src/features/projects/components/project-rule-files.tsx:228
 msgid "Move {name} down"
-msgstr ""
+msgstr "{name} を下へ移動"
 
 #: src/features/projects/components/project-rule-files.tsx:225
 msgid "Move {name} up"
-msgstr ""
+msgstr "{name} を上へ移動"
 
 #: src/features/pages/components/page-tree-item.tsx:161
 msgid "Move down"
@@ -26115,7 +26115,7 @@ msgstr "プロジェクトの操作"
 
 #: src/features/projects/components/project-rule-files.tsx:317
 msgid "Project context"
-msgstr ""
+msgstr "プロジェクトのコンテキスト"
 
 #: src/features/projects/components/project-form-dialog.tsx:382
 msgid "Project Context"
@@ -28529,15 +28529,15 @@ msgstr "ルーブリック"
 #. placeholder {0}: index + 1
 #: src/features/projects/components/project-rule-files.tsx:196
 msgid "Rule file {0}"
-msgstr ""
+msgstr "ルールファイル {0}"
 
 #: src/features/projects/components/project-rule-files.tsx:508
 msgid "Rule files"
-msgstr ""
+msgstr "ルールファイル"
 
 #: src/features/projects/components/project-rule-files.tsx:491
 msgid "Rule files saved."
-msgstr ""
+msgstr "ルールファイルを保存しました。"
 
 #: src/features/settings/components/chat/usage-settings.tsx:192
 msgid "Rule name is required"
@@ -28870,7 +28870,7 @@ msgstr "ログインを保存"
 
 #: src/features/projects/components/project-form-dialog.tsx:141
 msgid "Save or discard your rule file changes first."
-msgstr ""
+msgstr "先にルールファイルの変更を保存または破棄してください。"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 msgid "Save preset"
@@ -28882,7 +28882,7 @@ msgstr "再利用可能なシステムプロンプトを保存し、特定のモ
 
 #: src/features/projects/components/project-rule-files.tsx:575
 msgid "Save rule files"
-msgstr ""
+msgstr "ルールファイルを保存"
 
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:416
 msgid "Save Shortcuts"
@@ -34040,7 +34040,7 @@ msgstr "いつでも、最適なモデルを。"
 
 #: src/features/projects/components/project-rule-files.tsx:515
 msgid "The rule files could not be loaded."
-msgstr ""
+msgstr "ルールファイルを読み込めませんでした。"
 
 #: src/features/marketing/use-cases/use-case-data.ts:37
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
@@ -34205,7 +34205,7 @@ msgstr "これらのプロバイダーがリクエストに使われることは
 
 #: src/features/projects/components/project-rule-files.tsx:341
 msgid "These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again."
-msgstr ""
+msgstr "これらのルールファイルはその間に変更されました。変更を破棄して保存済みの内容を表示してから、もう一度編集してください。"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:196
 msgid "These tools run without asking until the time shown. Revoke one to be asked again from your next message."
@@ -38192,7 +38192,7 @@ msgstr "更新や障害で返信が途切れた場合、最後に完了したス
 
 #: src/features/projects/components/project-rule-files.tsx:244
 msgid "When files match"
-msgstr ""
+msgstr "ファイルが一致したとき"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:165
 msgid "When set, only models hosted in these regions will be available."
@@ -38895,7 +38895,7 @@ msgstr "ブラウザーがこのコンピューター上のサーバーと直接
 
 #: src/features/projects/components/project-form-dialog.tsx:500
 msgid "Your changes to this project's rule files are not saved. Closing drops them."
-msgstr ""
+msgstr "このプロジェクトのルールファイルへの変更は保存されていません。閉じると破棄されます。"
 
 #. placeholder {0}: teammates.join(", ")
 #: src/features/vault/components/site-logins.tsx:432
@@ -39125,7 +39125,7 @@ msgstr "あなたのレビューがリクエストされました"
 #: src/features/projects/components/project-form-dialog.tsx:117
 #: src/features/projects/components/project-form-dialog.tsx:135
 msgid "Your rule files are still saving."
-msgstr ""
+msgstr "ルールファイルはまだ保存中です。"
 
 #: src/features/vault/components/site-logins.tsx:406
 msgid "Your saved logins could not be loaded."

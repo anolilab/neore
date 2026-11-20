@@ -87,7 +87,7 @@ msgstr "„{name}“ hat mehr als {limit} Dateimuster. Entferne einige oder vers
 
 #: src/features/projects/components/project-rule-files.tsx:360
 msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
-msgstr ""
+msgstr "„{name}“ ist länger als {limit} Zeichen. Kürze die Datei oder teile sie auf mehrere Dateien auf."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:232
 msgid "\"{truncatedName}\" and {moreCount} more rejected"
@@ -1851,7 +1851,7 @@ msgstr "Zuerst ein paar Fragen"
 
 #: src/features/projects/components/project-rule-files.tsx:367
 msgid "A file applied when files match needs at least one pattern."
-msgstr ""
+msgstr "Eine Regeldatei mit „Wenn Dateien passen“ braucht mindestens ein Dateimuster."
 
 #: src/features/auth/components/device-code-parts.tsx:114
 msgid "A file only its owner can read (no keychain available)"
@@ -2564,7 +2564,7 @@ msgstr "Zeile hinzufügen"
 
 #: src/features/projects/components/project-rule-files.tsx:561
 msgid "Add rule file"
-msgstr ""
+msgstr "Regeldatei hinzufügen"
 
 #: src/features/settings/components/chat/mcp-settings.tsx:416
 #: src/features/settings/components/chat/mcp/server-form.tsx:337
@@ -3502,7 +3502,7 @@ msgstr "Sehen sich das auch an"
 #: src/features/projects/components/project-rule-files.tsx:240
 #: src/features/projects/components/project-rule-files.tsx:524
 msgid "Always"
-msgstr ""
+msgstr "Immer"
 
 #: src/features/chat/thread/tool-approval.tsx:134
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
@@ -3905,7 +3905,7 @@ msgstr "Anwendungsfehler"
 
 #: src/features/projects/components/project-rule-files.tsx:236
 msgid "Applies"
-msgstr ""
+msgstr "Gilt"
 
 #: src/features/canvas/canvas-panel.tsx:119
 #: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:330
@@ -10066,7 +10066,7 @@ msgstr "{itemName} löschen"
 
 #: src/features/projects/components/project-rule-files.tsx:231
 msgid "Delete {name}"
-msgstr ""
+msgstr "{name} löschen"
 
 #: src/features/tasks/components/task-card.tsx:113
 msgid "Delete {title}"
@@ -10789,7 +10789,7 @@ msgstr "Verwerfen"
 #: src/features/projects/components/project-form-dialog.tsx:512
 #: src/features/projects/components/project-rule-files.tsx:591
 msgid "Discard changes"
-msgstr ""
+msgstr "Änderungen verwerfen"
 
 #: src/features/chat/host/diff-comments-draft.tsx:90
 msgid "Discard comments"
@@ -10797,7 +10797,7 @@ msgstr "Kommentare verwerfen"
 
 #: src/features/projects/components/project-form-dialog.tsx:499
 msgid "Discard rule file changes?"
-msgstr ""
+msgstr "Änderungen an den Regeldateien verwerfen?"
 
 #: src/features/develop/components/review-panel.tsx:275
 msgid "Discard the review"
@@ -14441,7 +14441,7 @@ msgstr "Dateieingabe"
 
 #: src/features/projects/components/project-rule-files.tsx:251
 msgid "File patterns, one per line"
-msgstr ""
+msgstr "Dateimuster, eines pro Zeile"
 
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:97
 msgid "File removed from knowledge base"
@@ -15678,7 +15678,7 @@ msgstr "GitLab-Secret-Token (X-Gitlab-Token)"
 
 #: src/features/projects/components/project-rule-files.tsx:373
 msgid "Give every rule file a name."
-msgstr ""
+msgstr "Gib jeder Regeldatei einen Namen."
 
 #: src/features/pages/components/page-share-dialog.tsx:231
 msgid "Give people access to this page, or publish a read-only link."
@@ -17639,7 +17639,7 @@ msgstr "Anweisungen"
 
 #: src/features/projects/components/project-rule-files.tsx:510
 msgid "Instructions added to this project's chats: always, or only when the chat's attached files match a pattern such as **/*.sql."
-msgstr ""
+msgstr "Anweisungen, die den Chats dieses Projekts hinzugefügt werden: immer oder nur, wenn die angehängten Dateien des Chats einem Muster wie **/*.sql entsprechen."
 
 #: src/features/skills/components/skill-form-dialog.tsx:69
 #: src/features/tasks/components/task-form-dialog.tsx:89
@@ -18123,7 +18123,7 @@ msgstr "Aktuelle Zeilen behalten"
 
 #: src/features/projects/components/project-form-dialog.tsx:503
 msgid "Keep editing"
-msgstr ""
+msgstr "Weiter bearbeiten"
 
 #: src/features/knowledge/components/collection-picker.tsx:114
 msgid "Keep files"
@@ -21116,11 +21116,11 @@ msgstr "{label} in Markierungen nach oben verschieben"
 
 #: src/features/projects/components/project-rule-files.tsx:228
 msgid "Move {name} down"
-msgstr ""
+msgstr "{name} nach unten verschieben"
 
 #: src/features/projects/components/project-rule-files.tsx:225
 msgid "Move {name} up"
-msgstr ""
+msgstr "{name} nach oben verschieben"
 
 #: src/features/pages/components/page-tree-item.tsx:161
 msgid "Move down"
@@ -26115,7 +26115,7 @@ msgstr "Projektaktionen"
 
 #: src/features/projects/components/project-rule-files.tsx:317
 msgid "Project context"
-msgstr ""
+msgstr "Projektkontext"
 
 #: src/features/projects/components/project-form-dialog.tsx:382
 msgid "Project Context"
@@ -28529,15 +28529,15 @@ msgstr "Bewertungsrubrik"
 #. placeholder {0}: index + 1
 #: src/features/projects/components/project-rule-files.tsx:196
 msgid "Rule file {0}"
-msgstr ""
+msgstr "Regeldatei {0}"
 
 #: src/features/projects/components/project-rule-files.tsx:508
 msgid "Rule files"
-msgstr ""
+msgstr "Regeldateien"
 
 #: src/features/projects/components/project-rule-files.tsx:491
 msgid "Rule files saved."
-msgstr ""
+msgstr "Regeldateien gespeichert."
 
 #: src/features/settings/components/chat/usage-settings.tsx:192
 msgid "Rule name is required"
@@ -28870,7 +28870,7 @@ msgstr "Login speichern"
 
 #: src/features/projects/components/project-form-dialog.tsx:141
 msgid "Save or discard your rule file changes first."
-msgstr ""
+msgstr "Speichere oder verwirf zuerst deine Änderungen an den Regeldateien."
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:243
 msgid "Save preset"
@@ -28882,7 +28882,7 @@ msgstr "Speichere wiederverwendbare System-Prompts und verknüpfe sie mit bestim
 
 #: src/features/projects/components/project-rule-files.tsx:575
 msgid "Save rule files"
-msgstr ""
+msgstr "Regeldateien speichern"
 
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:416
 msgid "Save Shortcuts"
@@ -34040,7 +34040,7 @@ msgstr "Das richtige Modell, jedes Mal."
 
 #: src/features/projects/components/project-rule-files.tsx:515
 msgid "The rule files could not be loaded."
-msgstr ""
+msgstr "Die Regeldateien konnten nicht geladen werden."
 
 #: src/features/marketing/use-cases/use-case-data.ts:37
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
@@ -34205,7 +34205,7 @@ msgstr "Diese Anbieter werden nie für deine Anfragen verwendet."
 
 #: src/features/projects/components/project-rule-files.tsx:341
 msgid "These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again."
-msgstr ""
+msgstr "Diese Regeldateien wurden inzwischen geändert. Verwirf deine Änderungen, um die gespeicherten zu sehen, und bearbeite sie dann erneut."
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:196
 msgid "These tools run without asking until the time shown. Revoke one to be asked again from your next message."
@@ -38192,7 +38192,7 @@ msgstr "Wird eine Antwort durch ein Update oder einen Ausfall abgebrochen, wird 
 
 #: src/features/projects/components/project-rule-files.tsx:244
 msgid "When files match"
-msgstr ""
+msgstr "Wenn Dateien passen"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:165
 msgid "When set, only models hosted in these regions will be available."
@@ -38895,7 +38895,7 @@ msgstr "Dein Browser spricht direkt mit dem Server auf diesem Computer – Promp
 
 #: src/features/projects/components/project-form-dialog.tsx:500
 msgid "Your changes to this project's rule files are not saved. Closing drops them."
-msgstr ""
+msgstr "Deine Änderungen an den Regeldateien dieses Projekts sind nicht gespeichert. Beim Schließen gehen sie verloren."
 
 #. placeholder {0}: teammates.join(", ")
 #: src/features/vault/components/site-logins.tsx:432
@@ -39125,7 +39125,7 @@ msgstr "Dein Review wurde angefragt"
 #: src/features/projects/components/project-form-dialog.tsx:117
 #: src/features/projects/components/project-form-dialog.tsx:135
 msgid "Your rule files are still saving."
-msgstr ""
+msgstr "Deine Regeldateien werden noch gespeichert."
 
 #: src/features/vault/components/site-logins.tsx:406
 msgid "Your saved logins could not be loaded."
