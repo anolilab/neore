@@ -528,6 +528,7 @@ export const runStreamingAgent = internalAction
                               mcpLabels: {},
                               mcpServerNames: [],
                               mcpToolFingerprints: {},
+                              mcpToolOrigins: {},
                               permissionKeys: {},
                               repeatable: [],
                               tools: {},
@@ -858,6 +859,7 @@ export const runStreamingAgent = internalAction
                             instructions: streamTextArgs.system ?? agent.options.instructions,
                             mcpServerNames: toolResult.mcpServerNames,
                             mcpToolFingerprints: toolResult.mcpToolFingerprints,
+                            mcpToolOrigins: toolResult.mcpToolOrigins,
                             // A run that pauses extracts at the pause; its continuation extracts only the steers it takes.
                             memory: memoryToCarry({ botId: runContext.botId, extractMemory, prompt }),
                             model,

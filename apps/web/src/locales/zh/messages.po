@@ -127,6 +127,10 @@ msgstr "（已删除的用例）"
 msgid "(deleted task)"
 msgstr "（已删除的任务）"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:388
+msgid "(disconnected)"
+msgstr "（已断开）"
+
 #: src/features/evals/components/run-detail.tsx:110
 msgid "(expected)"
 msgstr "（预期）"
@@ -1812,6 +1816,10 @@ msgstr "{requestNoun}标题最多 {0} 个字符。"
 msgid "A background run never stops to wait for you. Questions to you are dropped from it, so it finishes on its own or fails."
 msgstr "后台运行不会停下来等你。它不会向你提问，因此会自行完成或失败。"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:517
+msgid "A built-in tool by its name, a server's tool as server:tool, or a whole server as server:*."
+msgstr "内置工具用其名称，服务器的工具用 server:tool，整个服务器用 server:*。"
+
 #: src/features/develop/components/watched-repositories.tsx:72
 msgid "a change is waiting to be read"
 msgstr "有变更等待查看"
@@ -1892,6 +1900,10 @@ msgstr "已保存密钥。留空则保持不变。"
 #: src/features/settings/components/chat/native-providers-settings.tsx:349
 msgid "A key is saved. Leave blank to keep it. Changing the endpoint, region or access key id requires entering it again."
 msgstr "已保存密钥。留空即可保留。更改端点、区域或访问密钥 ID 时需要重新输入。"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:369
+msgid "A listed built-in tool no longer exists. Remove it before saving."
+msgstr "列表中的某个内置工具已不存在。请在保存前将其移除。"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:159
 #: src/features/chat/guest-links/guest-link-panel.tsx:360
@@ -2016,7 +2028,7 @@ msgstr "运行绝不会写入已锁定或已通过链接分享的聊天，而会
 msgid "A run's thread is filed in this project. Moving the task to another project starts a new thread."
 msgstr "运行的对话会归入此项目。将任务移到其他项目会新建对话。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:225
+#: src/features/settings/components/chat/bots-settings.tsx:436
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "机器人在多次聊天之间保留的沙盒。空闲时暂停，暂停期间不计费。"
 
@@ -2067,6 +2079,11 @@ msgstr "工具不能同时被添加和禁用"
 #: src/features/marketing/use-cases/use-case-data.ts:91
 msgid "A tool that needs your approval pauses the turn with a card. Only the owner answers, and the queued speakers continue afterwards."
 msgstr "需要你批准的工具会以卡片形式暂停本轮。只有所有者可以作答，排队中的发言者随后继续。"
+
+#: src/features/settings/components/chat/bots-settings.tsx:220
+#: src/features/settings/components/chat/bots-settings.tsx:272
+msgid "A tool you typed was not added. Add it or clear the field first."
+msgstr "{'de': 'Ein eingegebenes Tool wurde nicht hinzugefügt. Füge es hinzu oder leere das Feld zuerst.', 'es': 'Una herramienta que escribiste no se añadió. Añádela o vacía el campo primero.', 'fr': 'Un outil que vous avez saisi n’a pas été ajouté. Ajoutez-le ou videz d’abord le champ.', 'it': 'Uno strumento che hai digitato non è stato aggiunto. Aggiungilo o svuota prima il campo.', 'ja': '入力したツールが追加されていません。先に追加するか、入力欄を空にしてください。', 'pl': 'Wpisane narzędzie nie zostało dodane. Najpierw je dodaj lub wyczyść pole.', 'pt': 'Uma ferramenta que você digitou não foi adicionada. Adicione-a ou limpe o campo primeiro.', 'zh': '你输入的工具尚未添加。请先添加它或清空输入框。'}"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:344
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
@@ -2310,6 +2327,7 @@ msgstr "每月活动"
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:225
 #: src/features/projects/components/project-repositories.tsx:425
+#: src/features/settings/components/chat/bot-tool-selection.tsx:359
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:102
 #: src/features/workflow/components/gallery/publish-dialog.tsx:220
 msgid "Add"
@@ -3412,6 +3430,10 @@ msgstr "所有分片均已测量。"
 msgid "All tasks"
 msgstr "所有任务"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:476
+msgid "All tools"
+msgstr "所有工具"
+
 #: src/features/admin/components/users-management-card.tsx:141
 msgid "All Types"
 msgstr "所有类型"
@@ -3478,6 +3500,10 @@ msgstr "允许的提供商"
 #: src/features/settings/components/chat/model-filter-settings.tsx:164
 msgid "Allowed Regions"
 msgstr "允许的地区"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:519
+msgid "Allowed tools"
+msgstr "允许的工具"
 
 #: src/features/workflow/components/nodes/audio-node.tsx:17
 msgid "Alloy (Neutral)"
@@ -3596,6 +3622,10 @@ msgstr "加载 {routeName} 页面时出错。"
 #: src/features/settings/components/personalization/memory-item.tsx:347
 msgid "An event cannot end before it starts."
 msgstr "活动的结束日期不能早于开始日期。"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:532
+msgid "An excluded server was removed or its address changed. Until you remove it here, the bot gets none of your own servers' tools."
+msgstr "已排除的服务器已被删除或地址已更改。在你从这里移除它之前，机器人不会获得你自己服务器的任何工具。"
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:358
 msgid "An IAM user's secret access key with bedrock:InvokeModel. Encrypted at rest and never shown again."
@@ -4473,7 +4503,7 @@ msgstr "自动"
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:64
 #: src/features/chat/thread/media-gallery-view.tsx:501
-#: src/features/settings/components/chat/bots-settings.tsx:58
+#: src/features/settings/components/chat/bots-settings.tsx:131
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:61
 msgid "Auto"
 msgstr "自动"
@@ -5181,11 +5211,11 @@ msgstr "波斯尼亚语"
 msgid "Bosnian (Bosnia)"
 msgstr "波斯尼亚语（波斯尼亚）"
 
-#: src/features/settings/components/chat/bots-settings.tsx:137
+#: src/features/settings/components/chat/bots-settings.tsx:240
 msgid "Bot created"
 msgstr "机器人已创建"
 
-#: src/features/settings/components/chat/bots-settings.tsx:171
+#: src/features/settings/components/chat/bots-settings.tsx:362
 msgid "Bot deleted"
 msgstr "机器人已删除"
 
@@ -5737,6 +5767,7 @@ msgstr "加拿大"
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
 #: src/features/settings/components/chat/api-keys-settings.tsx:439
+#: src/features/settings/components/chat/bots-settings.tsx:549
 #: src/features/settings/components/chat/custom-providers-settings.tsx:638
 #: src/features/settings/components/chat/mcp/server-form.tsx:334
 #: src/features/settings/components/chat/native-providers-settings.tsx:709
@@ -6091,7 +6122,7 @@ msgstr "聊天"
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
 #: src/features/settings/components/account/account-settings.tsx:341
-#: src/features/settings/components/chat/bots-settings.tsx:262
+#: src/features/settings/components/chat/bots-settings.tsx:499
 #: src/features/settings/lib/settings-keywords.ts:33
 #: src/features/settings/lib/settings-navigation.ts:98
 msgid "Chat"
@@ -7470,7 +7501,7 @@ msgid "Compressing context..."
 msgstr "正在压缩上下文..."
 
 #: src/features/auth/components/device-code-parts.tsx:76
-#: src/features/settings/components/chat/bots-settings.tsx:224
+#: src/features/settings/components/chat/bots-settings.tsx:435
 msgid "Computer"
 msgstr "电脑"
 
@@ -8478,7 +8509,7 @@ msgstr "无法更改 Auto。请重试。"
 msgid "Could not change push notifications. Try again."
 msgstr "无法更改推送通知，请重试。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:159
+#: src/features/settings/components/chat/bots-settings.tsx:262
 msgid "Could not change the bot's permission mode."
 msgstr "无法更改机器人的权限模式。"
 
@@ -8507,6 +8538,10 @@ msgstr "无法压缩对话，请重试。"
 #: src/features/develop/components/checks-tab.tsx:124
 msgid "Could not confirm that {0} was started again. Check on {hostLabel} before you try again."
 msgstr "无法确认 {0} 是否已重新启动。请先在 {hostLabel} 上确认，再重试。"
+
+#: src/features/settings/components/chat/bots-settings.tsx:325
+msgid "Could not confirm that the bot's tools were saved. Check them and try again."
+msgstr "无法确认机器人的工具是否已保存。请检查后重试。"
 
 #: src/features/develop/components/review-panel.tsx:162
 msgid "Could not confirm that the review was submitted. Check on {hostLabel} before you try again. Your review is kept here."
@@ -8563,7 +8598,7 @@ msgstr "无法复制，请手动选择文本"
 msgid "Could not create a collection for this import. Try again."
 msgstr "无法为此次导入创建集合。请重试。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:139
+#: src/features/settings/components/chat/bots-settings.tsx:242
 msgid "Could not create the bot."
 msgstr "无法创建机器人。"
 
@@ -8576,7 +8611,7 @@ msgstr "无法创建群聊"
 msgid "Could not create the page"
 msgstr "无法创建页面"
 
-#: src/features/settings/components/chat/bots-settings.tsx:173
+#: src/features/settings/components/chat/bots-settings.tsx:364
 msgid "Could not delete the bot."
 msgstr "无法删除机器人。"
 
@@ -8812,6 +8847,10 @@ msgstr "无法重试。请重试。"
 msgid "Could not save that choice. Try again."
 msgstr "无法保存该选择，请重试。"
 
+#: src/features/settings/components/chat/bots-settings.tsx:317
+msgid "Could not save the bot's tools. Its tools are unchanged."
+msgstr "无法保存机器人的工具。其工具未改变。"
+
 #: src/features/notifications/components/notification-settings.tsx:110
 msgid "Could not save the Daily Brief setting."
 msgstr "无法保存每日简报设置。"
@@ -8880,7 +8919,7 @@ msgstr "无法退出登录"
 msgid "Could not snooze the thread. Please try again."
 msgstr "无法暂时搁置该对话。请重试。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:149
+#: src/features/settings/components/chat/bots-settings.tsx:252
 msgid "Could not start a chat with this bot."
 msgstr "无法与此机器人开始聊天。"
 
@@ -9075,7 +9114,7 @@ msgstr "创建和管理 API 密钥，以编程方式访问你的账号。"
 msgid "Create API Key"
 msgstr "创建 API 密钥"
 
-#: src/features/settings/components/chat/bots-settings.tsx:234
+#: src/features/settings/components/chat/bots-settings.tsx:446
 msgid "Create bot"
 msgstr "创建机器人"
 
@@ -9239,6 +9278,11 @@ msgstr "创建时间：{createdAt}"
 #: src/features/pages/components/page-share-dialog.tsx:93
 msgid "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
 msgstr "创建一个一次性链接，有效期 7 天。任何已登录的人打开它即可获得访问权限。"
+
+#: src/features/settings/components/chat/bots-settings.tsx:446
+#: src/features/settings/components/chat/bots-settings.tsx:449
+msgid "Creating bot…"
+msgstr "正在创建机器人…"
 
 #: src/features/chat/thread-list/thread-node.tsx:743
 #: src/features/chat/thread-list/thread-node.tsx:766
@@ -9437,6 +9481,7 @@ msgstr "当前受限"
 #: src/features/marketing/components/gateway-landing-page.tsx:792
 #: src/features/marketing/components/landing-page.tsx:1014
 #: src/features/prompts/components/prompt-form-dialog.tsx:444
+#: src/features/settings/components/chat/bot-tool-selection.tsx:480
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:77
 msgid "Custom"
 msgstr "自定义"
@@ -9499,6 +9544,10 @@ msgstr "自定义风格"
 #: src/features/chat/sidebar/thread-sidebar.tsx:186
 msgid "Custom System Prompt"
 msgstr "自定义系统提示词"
+
+#: src/features/settings/components/chat/bots-settings.tsx:468
+msgid "Custom tools"
+msgstr "自定义工具"
 
 #: src/features/marketing/data/models-data.ts:445
 msgid "Custom-style video generation with LoRA support at the lowest possible cost and fastest speed"
@@ -10009,8 +10058,8 @@ msgstr "将任务委派给 AI 软件工程师 Devin"
 #: src/features/prompts/components/prompt-list-view.tsx:227
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:709
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:848
-#: src/features/settings/components/chat/bots-settings.tsx:271
-#: src/features/settings/components/chat/bots-settings.tsx:280
+#: src/features/settings/components/chat/bots-settings.tsx:508
+#: src/features/settings/components/chat/bots-settings.tsx:562
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:343
 #: src/features/settings/components/chat/trigger-settings.tsx:1096
 #: src/features/skills/components/skill-list.tsx:307
@@ -10038,7 +10087,7 @@ msgstr "删除“{pendingDeleteTitle}”？"
 #. placeholder {0}: model.name
 #. placeholder {0}: server.name
 #: src/features/local-models/components/ollama-model-manager.tsx:265
-#: src/features/settings/components/chat/bots-settings.tsx:265
+#: src/features/settings/components/chat/bots-settings.tsx:502
 #: src/features/settings/components/chat/mcp/server-list.tsx:171
 #: src/features/skills/components/skill-item.tsx:189
 msgid "Delete {0}"
@@ -10052,7 +10101,7 @@ msgstr "删除 {0} 个用户"
 #. placeholder {0}: deleting.name
 #. placeholder {0}: pendingDelete?.name ?? ""
 #: src/features/local-models/components/ollama-model-manager.tsx:342
-#: src/features/settings/components/chat/bots-settings.tsx:290
+#: src/features/settings/components/chat/bots-settings.tsx:572
 msgid "Delete {0}?"
 msgstr "删除 {0}？"
 
@@ -10536,7 +10585,7 @@ msgstr "描述你的工作流……例如“根据文本生成图片，放大后
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
 #: src/features/prompts/components/variable-definitions.tsx:122
-#: src/features/settings/components/chat/bots-settings.tsx:188
+#: src/features/settings/components/chat/bots-settings.tsx:385
 #: src/features/skills/components/bundle-import-dialog.tsx:115
 #: src/features/skills/components/bundle-import-dialog.tsx:148
 #: src/features/skills/components/skill-builder-diff.tsx:28
@@ -12614,6 +12663,10 @@ msgstr "活动结束于"
 msgid "Every 6 hours"
 msgstr "每 6 小时"
 
+#: src/features/settings/components/chat/bots-settings.tsx:527
+msgid "Every chat and scheduled run of this bot gets only these tools. Your tool permissions still apply."
+msgstr "此机器人的每次聊天和计划运行只获得这些工具。你的工具权限仍然适用。"
+
 #: src/features/tasks/components/task-form-dialog.tsx:126
 msgid "Every day at 09:00 UTC"
 msgstr "每天 09:00 UTC"
@@ -12772,6 +12825,10 @@ msgstr "卓越的图内文字渲染"
 #: src/features/marketing/data/models-data.ts:174
 msgid "Exceptionally sharp detail and clarity"
 msgstr "细节极其清晰锐利"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:529
+msgid "Excluded tools"
+msgstr "排除的工具"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:329
 msgid "Execute"
@@ -15252,7 +15309,7 @@ msgstr "完整 1080p 高清视频输出"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
 #: src/features/chat/thread/composer-permission-mode.tsx:42
-#: src/features/settings/components/chat/bots-settings.tsx:59
+#: src/features/settings/components/chat/bots-settings.tsx:132
 msgid "Full access"
 msgstr "完全访问"
 
@@ -16308,7 +16365,7 @@ msgstr "免提模式语音已更新"
 msgid "Happens on"
 msgstr "发生于"
 
-#: src/features/settings/components/chat/bots-settings.tsx:252
+#: src/features/settings/components/chat/bots-settings.tsx:467
 msgid "Has a computer"
 msgstr "有电脑"
 
@@ -17625,7 +17682,7 @@ msgid "instructions"
 msgstr "指令"
 
 #: src/features/projects/components/project-rule-files.tsx:269
-#: src/features/settings/components/chat/bots-settings.tsx:197
+#: src/features/settings/components/chat/bots-settings.tsx:395
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:155
@@ -19395,6 +19452,10 @@ msgstr "正在加载概览…"
 msgid "Loading your projects…"
 msgstr "正在加载你的项目…"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:488
+msgid "Loading your servers, connectors and computers…"
+msgstr "正在加载你的服务器、连接器和电脑…"
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:178
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:62
 #: src/components/default-loading.tsx:8
@@ -19421,7 +19482,7 @@ msgstr "正在加载..."
 #: src/features/chat/thread/request-secret-prompt.tsx:478
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
-#: src/features/settings/components/chat/bots-settings.tsx:242
+#: src/features/settings/components/chat/bots-settings.tsx:457
 #: src/features/settings/components/personalization/memory-item.tsx:129
 #: src/routes/auth/extension.tsx:68
 msgid "Loading…"
@@ -20741,7 +20802,7 @@ msgstr "模式："
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
-#: src/features/settings/components/chat/bots-settings.tsx:206
+#: src/features/settings/components/chat/bots-settings.tsx:405
 #: src/features/settings/components/chat/usage-settings.tsx:317
 #: src/features/tasks/components/task-form-dialog.tsx:407
 #: src/features/workflow/components/nodes/ai-node.tsx:34
@@ -21349,7 +21410,7 @@ msgstr "名称"
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
-#: src/features/settings/components/chat/bots-settings.tsx:184
+#: src/features/settings/components/chat/bots-settings.tsx:375
 #: src/features/settings/components/chat/custom-providers-settings.tsx:494
 #: src/features/settings/components/chat/mcp/server-form.tsx:194
 #: src/features/settings/components/chat/native-providers-settings.tsx:507
@@ -21711,6 +21772,10 @@ msgstr "永远不涵盖你自行设为“询问”的工具、内置工具、设
 msgid "Never expires"
 msgstr "永不过期"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:527
+msgid "Never given to the bot, even when allowed above."
+msgstr "即使上面已允许，也绝不提供给机器人。"
+
 #: src/features/auth/components/settings/api-key/api-key-cell.tsx:46
 msgid "Never used"
 msgstr "从未使用"
@@ -21726,7 +21791,7 @@ msgstr "新"
 msgid "New Azure Bots are single-tenant: set the Teams Tenant ID key, or replies cannot authenticate."
 msgstr "新的 Azure Bot 为单租户：请设置 Teams 租户 ID 密钥，否则回复无法通过身份验证。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:182
+#: src/features/settings/components/chat/bots-settings.tsx:373
 msgid "New bot"
 msgstr "新建机器人"
 
@@ -21771,7 +21836,7 @@ msgstr "新聊天默认永久保留"
 msgid "New chats start temporary"
 msgstr "新聊天默认为临时"
 
-#: src/features/settings/components/chat/bots-settings.tsx:157
+#: src/features/settings/components/chat/bots-settings.tsx:260
 msgid "New chats with this bot start in the chosen mode"
 msgstr "与此机器人的新聊天将以所选模式开始"
 
@@ -22094,13 +22159,17 @@ msgstr "没有审计日志"
 msgid "No bot"
 msgstr "无机器人"
 
-#: src/features/settings/components/chat/bots-settings.tsx:245
+#: src/features/settings/components/chat/bots-settings.tsx:460
 msgid "No bots yet."
 msgstr "还没有机器人。"
 
 #: src/features/settings/components/chat/usage-settings.tsx:670
 msgid "No budget alerts configured."
 msgstr "尚未配置预算提醒。"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:208
+msgid "No built-in tool is named {unknownBuiltIn}."
+msgstr "没有名为 {unknownBuiltIn} 的内置工具。"
 
 #: src/features/chat/components/cinema-studio/cinema-option-labels.ts:38
 msgid "No camera selected"
@@ -22557,6 +22626,10 @@ msgstr "未找到结果。"
 #: src/features/evals/components/dataset-panel.tsx:215
 msgid "No runs yet. Start one to score every case."
 msgstr "还没有运行记录。开始一次运行来为每个用例评分。"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:218
+msgid "No server, connector or computer matches {unknownServer}."
+msgstr "没有与 {unknownServer} 匹配的服务器、连接器或电脑。"
 
 #: src/features/admin/components/user-sessions-dialog.tsx:134
 msgid "No sessions found"
@@ -23366,6 +23439,10 @@ msgstr "仅当你刚刚在自己拥有的设备上运行 `neore-host pair` 发�
 #: src/features/evals/components/run-comparison.tsx:54
 msgid "Only in one run"
 msgstr "仅在一次运行中"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:501
+msgid "Only listed tools"
+msgstr "仅列出的工具"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:336
 msgid "Only organization owners can manage billing settings"
@@ -24996,12 +25073,12 @@ msgid "Permission Level"
 msgstr "权限级别"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:89
-#: src/features/settings/components/chat/bots-settings.tsx:210
+#: src/features/settings/components/chat/bots-settings.tsx:413
 msgid "Permission mode"
 msgstr "权限模式"
 
 #. placeholder {0}: bot.name
-#: src/features/settings/components/chat/bots-settings.tsx:256
+#: src/features/settings/components/chat/bots-settings.tsx:472
 msgid "Permission mode for {0}"
 msgstr "{0} 的权限模式"
 
@@ -27490,6 +27567,10 @@ msgstr "从屏蔽列表中移除 {modelId}"
 msgid "Remove {name}"
 msgstr "移除 {name}"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:390
+msgid "Remove {shown}"
+msgstr "移除 {shown}"
+
 #: src/features/admin/components/update-user-role-dialog.tsx:64
 #: src/features/admin/components/user-cell.tsx:110
 msgid "Remove Admin"
@@ -27680,6 +27761,10 @@ msgstr "已移除"
 #: src/features/prompts/components/prompt-list.tsx:330
 msgid "Removed from favorites"
 msgstr "已从收藏中移除"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:245
+msgid "Removed server"
+msgstr "已删除的服务器"
 
 #: src/features/skills/components/skill-builder-diff.tsx:40
 msgid "Removed:"
@@ -28174,6 +28259,7 @@ msgstr "重试"
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/onboarding/components/setup-checklist.tsx:238
 #: src/features/settings/components/chat/agent-settings.tsx:224
+#: src/features/settings/components/chat/bot-tool-selection.tsx:495
 #: src/features/tasks/components/task-detail-dialog.tsx:108
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -28896,6 +28982,10 @@ msgstr "保存技能"
 msgid "Save these backup codes in a safe place. You can use them to access your account if you lose your two-factor authentication device."
 msgstr "请将这些备用码保存在安全的地方。如果你丢失了双重验证设备，可以用它们访问你的账号。"
 
+#: src/features/settings/components/chat/bots-settings.tsx:552
+msgid "Save tools"
+msgstr "保存工具"
+
 #: src/features/prompts/components/thread-variables-config.tsx:263
 msgid "Save Variables"
 msgstr "保存变量"
@@ -28945,6 +29035,11 @@ msgstr "已在 {hostLabel} 上保存。"
 #: src/features/evals/components/save-eval-case-action.tsx:70
 msgid "Saved to \"{0}\""
 msgstr "已保存到“{0}”"
+
+#: src/features/settings/components/chat/bots-settings.tsx:552
+#: src/features/settings/components/chat/bots-settings.tsx:555
+msgid "Saving tools…"
+msgstr "正在保存工具…"
 
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
@@ -29537,7 +29632,7 @@ msgstr "选择模型"
 msgid "Select Model"
 msgstr "选择模型"
 
-#: src/features/prompts/components/prompt-model-selector.tsx:42
+#: src/features/prompts/components/prompt-model-selector.tsx:44
 msgid "Select model (optional)"
 msgstr "选择模型（可选）"
 
@@ -32381,7 +32476,7 @@ msgid "Superior understanding of complex visual concepts"
 msgstr "对复杂视觉概念的理解出众"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:43
-#: src/features/settings/components/chat/bots-settings.tsx:60
+#: src/features/settings/components/chat/bots-settings.tsx:133
 msgid "Supervised"
 msgstr "监督模式"
 
@@ -33441,13 +33536,21 @@ msgstr "助手正在请求一个密钥"
 msgid "The assistant needs a secret"
 msgstr "助手需要一个密钥"
 
-#: src/features/settings/components/chat/bots-settings.tsx:281
+#: src/features/settings/components/chat/bots-settings.tsx:563
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr "机器人及其电脑将被移除。它的聊天会保留，成为普通聊天。"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:503
+msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
+msgstr "机器人只获得你允许的工具。未允许任何工具时，它不会获得任何工具。"
 
 #: src/features/chat/thread/composer-model-selector.tsx:137
 msgid "The bot sets the model for this chat."
 msgstr "机器人为此聊天设置模型。"
+
+#: src/features/settings/components/chat/bots-settings.tsx:351
+msgid "The bot's tools were saved"
+msgstr "已保存机器人的工具"
 
 #: src/features/workflow/components/nodes/video-frames-section.tsx:77
 msgid "The browser cannot read this video to capture a frame"
@@ -33456,6 +33559,14 @@ msgstr "浏览器无法读取此视频，因此无法截取帧"
 #: src/features/skills/components/skill-builder-dialog.tsx:108
 msgid "The builder could not answer. Try again."
 msgstr "构建器无法回答，请重试。"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:207
+msgid "The built-in tools are still loading. Try again in a moment."
+msgstr "内置工具仍在加载中。请稍后再试。"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:203
+msgid "The built-in tools could not be loaded. Reload the page to add one."
+msgstr "无法加载内置工具。请重新加载页面后再添加。"
 
 #: src/features/skills/components/bundle-export-dialog.tsx:141
 msgid "The bundle could not be exported."
@@ -33866,7 +33977,7 @@ msgstr "MCP 注册表当前不可用，改为显示热门服务器。"
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "消息无法发送。请检查网络连接后重试。"
 
-#: src/features/settings/components/chat/bots-settings.tsx:212
+#: src/features/settings/components/chat/bots-settings.tsx:415
 msgid "The mode each new chat with this bot starts in. You can still change it per chat. Scheduled runs use it only when it asks more."
 msgstr "与此机器人的每个新聊天开始时使用的模式。你仍可以在每个聊天中更改它。计划运行仅在它要求更多确认时才使用它。"
 
@@ -34308,6 +34419,14 @@ msgstr "此操作无法撤销。这将永久删除该组织及所有相关数据
 msgid "This agent cannot resume its own session, so the conversation was handed over"
 msgstr "此智能体无法恢复其自身会话，因此已移交对话"
 
+#: src/features/settings/components/chat/bots-settings.tsx:296
+msgid "This bot's tools were changed elsewhere. Close this dialog and open it again to see them."
+msgstr "此机器人的工具已在其他地方更改。请关闭此对话框并重新打开以查看。"
+
+#: src/features/settings/components/chat/bots-settings.tsx:310
+msgid "This bot's tools were changed elsewhere. They are shown as saved now; make your change again."
+msgstr "此机器人的工具已在其他地方更改。现在显示的是已保存的内容，请重新进行更改。"
+
 #: src/features/develop/components/merge-panel.tsx:80
 msgid "This branch has conflicts with its base branch."
 msgstr "此分支与其基础分支有冲突。"
@@ -34648,6 +34767,10 @@ msgstr "此链接不完整。请索取完整链接。"
 #: src/features/chat/guest-links/guest-page.tsx:92
 msgid "This link is not taking messages right now. Try again later."
 msgstr "此链接目前不接收消息。请稍后再试。"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:365
+msgid "This list is full: remove a tool before adding another."
+msgstr "{'de': 'Diese Liste ist voll: Entferne ein Tool, bevor du ein weiteres hinzufügst.', 'es': 'Esta lista está llena: quita una herramienta antes de añadir otra.', 'fr': 'Cette liste est pleine : retirez un outil avant d’en ajouter un autre.', 'it': 'Questo elenco è pieno: rimuovi uno strumento prima di aggiungerne un altro.', 'ja': 'このリストは上限に達しています。別のツールを追加する前に、ツールを1つ削除してください。', 'pl': 'Ta lista jest pełna: usuń narzędzie, zanim dodasz kolejne.', 'pt': 'Esta lista está cheia: remova uma ferramenta antes de adicionar outra.', 'zh': '此列表已满：请先移除一个工具，再添加新的。'}"
 
 #: src/features/vault/components/site-logins.tsx:307
 msgid "This login was changed elsewhere and has been reloaded. Your username and label edits are kept; check its bots, type the password again if you were changing it, and save again."
@@ -35345,6 +35468,10 @@ msgstr "文件过大"
 msgid "Too large to attach: {0}. Reduce the file and attach it again."
 msgstr "文件过大，无法附加：{0}。请缩小文件后重新附加。"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:366
+msgid "Too long to add: the server's address or the tool's name is too long."
+msgstr "过长，无法添加：服务器地址或工具名称过长。"
+
 #: src/features/workflow/components/nodes/text-node.tsx:78
 msgid "Too long to check as JSON"
 msgstr "内容过长，无法按 JSON 检查"
@@ -35417,12 +35544,21 @@ msgstr "工具权限"
 msgid "Tool Provider Keys"
 msgstr "工具提供商密钥"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:467
+#: src/features/settings/components/chat/bots-settings.tsx:496
 #: src/features/settings/components/chat/custom-providers-settings.tsx:373
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:134
 #: src/features/skills/components/skill-form-dialog.tsx:408
 #: src/features/workflow/components/nodes/node-top-toolbar.tsx:447
 msgid "Tools"
 msgstr "工具"
+
+#. placeholder {0}: bot.name
+#. placeholder {0}: editingTools?.name ?? ""
+#: src/features/settings/components/chat/bots-settings.tsx:478
+#: src/features/settings/components/chat/bots-settings.tsx:526
+msgid "Tools for {0}"
+msgstr "{0} 的工具"
 
 #: src/features/chat/thread/composer-permission-mode.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
@@ -37945,6 +38081,10 @@ msgstr "Webhook URL 已复制到剪贴板"
 msgid "WebP (Smaller)"
 msgstr "WebP（更小）"
 
+#: src/features/settings/components/chat/bot-tool-selection.tsx:346
+msgid "webSearch or server:tool"
+msgstr "webSearch 或 server:tool"
+
 #: src/features/canvas/components/design-preset-selector.tsx:69
 msgid "Website Banner"
 msgstr "网站横幅"
@@ -38873,7 +39013,7 @@ msgstr "你的 Azure OpenAI 资源：端点、API 版本和部署名称。"
 msgid "Your background, preferences, or location to help the AI understand you better"
 msgstr "你的背景、偏好或所在地，帮助 AI 更好地了解你"
 
-#: src/features/settings/components/chat/bots-settings.tsx:239
+#: src/features/settings/components/chat/bots-settings.tsx:454
 msgid "Your bots"
 msgstr "你的机器人"
 
@@ -39134,6 +39274,18 @@ msgstr "无法加载你保存的登录信息。"
 #: src/features/chat/thread/request-secret-prompt.tsx:465
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."
 msgstr "无法加载你已保存的 MCP 服务器，因此暂时无法保存。"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:217
+msgid "Your servers, connectors and computers are still loading. Try again in a moment."
+msgstr "你的服务器、连接器和电脑仍在加载中。请稍后再试。"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:493
+msgid "Your servers, connectors and computers could not be loaded."
+msgstr "无法加载你的服务器、连接器和电脑。"
+
+#: src/features/settings/components/chat/bot-tool-selection.tsx:213
+msgid "Your servers, connectors and computers could not be loaded. Retry above to add one by name."
+msgstr "无法加载你的服务器、连接器和电脑。请在上方重试，以便按名称添加。"
 
 #: src/lib/toast.ts:236
 msgid "Your session has expired"

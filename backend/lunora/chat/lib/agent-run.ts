@@ -46,7 +46,7 @@ import { isRunReplaced } from "./run-epoch";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import { labelMcpToolCalls } from "./mcp-tool-labels";
 import { closeMCPClients } from "./mcp-tools";
-import { mcpToolDrift, mcpToolDriftReason } from "./mcp-tool-fingerprint";
+import { mcpToolDrift, mcpToolDriftReason, mcpToolOriginDrift } from "./mcp-tool-fingerprint";
 import { scheduleRepliesUsage } from "./pause-usage";
 import {
     asRefusedWrite,
@@ -1332,9 +1332,14 @@ export const resumeApprovedRun = async (
         throw new AgentRunError("left-organization", LEFT_ORGANIZATION_MESSAGE);
     }
 
+    // Where the paused run found its bot (a headless one keeps it, as its thread may not name the bot), else this thread's.
+    // A named bot must still be the owner's (`readRunToolSelection`), so one deleted or handed on meanwhile leaves no tools.
+    const storedLookup = config.botLookup ?? { threadId };
+    const botLookup = { ...storedLookup, ...(storedLookup.botId !== undefined && { ownerId: userId }) };
+
     // A sub-agent child is rebuilt under its chain's bot's mode, as it ran (`runHeadlessAgent`); a failed read fails closed.
     const childBotMode = subAgentChild
-        ? await ctx.runQuery(internal.bots.functions.getBotPermissionModeForRun, { threadId, userId }).catch((error: unknown) => {
+        ? await ctx.runQuery(internal.bots.functions.getBotPermissionModeForRun, { ...storedLookup, userId }).catch((error: unknown) => {
               console.warn("[agent-run] bot permission mode unavailable, using supervised", error);
 
               return "supervised" as const;
@@ -1345,6 +1350,7 @@ export const resumeApprovedRun = async (
         buildAgentTools(ctx, {
             ...(options.admittedRun && { admittedRun: true }),
             autoMediaEnrichment: config.autoMediaEnrichment,
+            botLookup,
             // A person just answered in the chat; a sub-agent child is still rebuilt headless below.
             deviceThreadId: threadId,
             ...(subAgentChild && {
@@ -1390,10 +1396,16 @@ export const resumeApprovedRun = async (
 
         // The approval was given for the MCP tool as the paused run offered it. One that changed or went away since is not
         // run under it: the call is answered as denied with the reason, so the model can call the tool again, which asks again.
-        const drift =
+        // Nor is one whose name now stands for another server's tool (`mcpToolOriginDrift`), fingerprinted or not.
+        const offered = pending.toolName !== null && Object.hasOwn(toolResult.tools, pending.toolName);
+        const fingerprintDrift =
             approved && pending.toolName !== null
-                ? mcpToolDrift(config.mcpToolFingerprints, toolResult.mcpToolFingerprints, pending.toolName, Object.hasOwn(toolResult.tools, pending.toolName))
+                ? mcpToolDrift(config.mcpToolFingerprints, toolResult.mcpToolFingerprints, pending.toolName, offered)
                 : "unchanged";
+        const drift =
+            fingerprintDrift === "unchanged" && approved && pending.toolName !== null
+                ? mcpToolOriginDrift(config.mcpToolOrigins, toolResult.mcpToolOrigins, pending.toolName, offered)
+                : fingerprintDrift;
         let runApproved = approved && drift === "unchanged";
         let runDenyReason = drift === "unchanged" ? denyReason : mcpToolDriftReason(drift);
 
@@ -1681,6 +1693,7 @@ export const resumeApprovedRun = async (
                     ...config,
                     ...(stepsLeft !== undefined && { stepsLeft }),
                     mcpToolFingerprints: toolResult.mcpToolFingerprints,
+                    mcpToolOrigins: toolResult.mcpToolOrigins,
                     toolPermissionKeys: toolResult.permissionKeys,
                 },
                 streamId,

@@ -298,7 +298,7 @@ const runSpeaker = async (
                   skillTools: speaker.config ? { additionalTools: speaker.config.additionalTools, disabledTools: speaker.config.disabledTools } : undefined,
                   userId: turn.userId,
               })
-            : { mcpClients: [], mcpLabels: {}, mcpServerNames: [], mcpToolFingerprints: {}, permissionKeys: {}, repeatable: [], tools: {} };
+            : { mcpClients: [], mcpLabels: {}, mcpServerNames: [], mcpToolFingerprints: {}, mcpToolOrigins: {}, permissionKeys: {}, repeatable: [], tools: {} };
 
         mcpClients = toolResult.mcpClients;
 
@@ -471,6 +471,7 @@ const runSpeaker = async (
             instructions: system,
             mcpServerNames: toolResult.mcpServerNames,
             mcpToolFingerprints: toolResult.mcpToolFingerprints,
+            mcpToolOrigins: toolResult.mcpToolOrigins,
             model,
             reasoningEffort,
             replyKey: turn.replyKey,

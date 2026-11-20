@@ -28,6 +28,7 @@
         "./auth": "./lunora/auth.ts",
         "./auth/fields": "./lunora/auth/fields.ts",
         "./auth/shortcut": "./lunora/auth/lib/shortcut.ts",
+        "./bots/tool-selectors": "./lunora/bots/tool-selectors.ts",
         "./chat-upload-codes": "./lunora/lib/chat-upload-codes.ts",
         "./chat/fields": "./lunora/chat/fields.ts",
         "./chat/goals": "./lunora/chat/goals/shared.ts",

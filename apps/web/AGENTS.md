@@ -66,7 +66,8 @@ pnpm lint:types           # TypeScript check (NOT pnpm typecheck); inside apps/w
 - Keep live subscriptions few: each re-runs on every write to what it read; cap 32 per socket (`TOO_MANY_SUBSCRIPTIONS`
   silently falls back to one-shot). Keep the `MAX_CONCURRENT_SEEDS` = 3 throttle.
 - The socket authenticates with a single-use ticket, not the JWT (`packages/client-runtime/src/ws-ticket.ts`); it is
-  bounced only on a subject change. Manual `invalidateQueries` after a mutation is a harmless fallback.
+  bounced only on a subject change. Manual `invalidateQueries` after a mutation is a harmless fallback, except after
+  a `setQueryData`: a live key's refetch answers from the subscription's last push and undoes it until the server pushes.
 - E2E: `MOCK_LLM=1` in `services/llm-gateway/.dev.vars` uses `providers/mock-model.ts` (syntax in the reference).
   Under a per-app firewall allow Playwright's Chromium, or use `E2E_BROWSER_CHANNEL=chrome`.
 - Before interacting with an SSR'd form in e2e, call `awaitFormHydrated()` (`e2e/helpers.ts`); `toBeEnabled()` is

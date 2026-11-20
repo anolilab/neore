@@ -250,7 +250,11 @@ describe("a tool-approval continuation", () => {
     });
 
     it("hands the next approval the permission keys and fingerprints of the tools IT offered, not the first run's", async () => {
-        const rebuilt = { mcpToolFingerprints: { mcp_docs__search: "new" }, permissionKeys: { mcp_docs__search: "mcp:docs (work):search" } };
+        const rebuilt = {
+            mcpToolFingerprints: { mcp_docs__search: "new" },
+            mcpToolOrigins: { mcp_docs__search: "docs-work" },
+            permissionKeys: { mcp_docs__search: "mcp:docs (work):search" },
+        };
 
         vi.mocked(buildAgentTools).mockImplementationOnce(async () => {
             return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], repeatable: [], requiresApproval: [], tools: {}, ...rebuilt };
@@ -263,7 +267,7 @@ describe("a tool-approval continuation", () => {
         const recorded = runMutation.mock.calls.find((call) => (call as unknown[])[0] === internal.chat.tool_permissions.recordPendingToolApprovals);
 
         expect((recorded as unknown[] | undefined)?.[1]).toMatchObject({
-            config: { mcpToolFingerprints: rebuilt.mcpToolFingerprints, toolPermissionKeys: rebuilt.permissionKeys },
+            config: { mcpToolFingerprints: rebuilt.mcpToolFingerprints, mcpToolOrigins: rebuilt.mcpToolOrigins, toolPermissionKeys: rebuilt.permissionKeys },
         });
     });
 });
