@@ -36,6 +36,7 @@ import {
     hasPrivacyMarker,
     PROCESSED_EXCHANGE_TTL_MS,
     processedExchangeFingerprint,
+    promptCharsRead,
     truncateUserMessage,
 } from "./gate";
 import { blankQuotedLines, withoutQuotedLines } from "../chat/lib/attached-text";
@@ -953,11 +954,11 @@ export const factEvidence = (
     // Read without the day labels the steers carry: a quote is only ever the person's words.
     const turn = { ...labelledTurn, userMessage: withoutSentDayLabels(labelledTurn.userMessage, labelledTurn.steers ?? []) };
 
-    const fromPrompt = typedEvidenceQuote(
-        claimed,
-        quotablePrompt,
-        turn.steeredFrom === undefined ? turn.userMessage : turn.userMessage.slice(0, turn.steeredFrom),
-    );
+    const rawPrompt = turn.steeredFrom === undefined ? turn.userMessage : turn.userMessage.slice(0, turn.steeredFrom);
+    // Only the part of the prompt extraction read can be the quote's source: a long prompt is cut before the steers
+    // (`truncateUserMessage`), and words past the cut that a steer repeats came from that steer.
+    const promptRead = rawPrompt.slice(0, promptCharsRead(labelledTurn.userMessage, labelledTurn.steeredFrom));
+    const fromPrompt = evidenceMatchEnd(claimed, promptRead) === undefined ? undefined : typedEvidenceQuote(claimed, quotablePrompt, rawPrompt);
     const steered = turn.steeredFrom === undefined ? undefined : turn.userMessage.slice(turn.steeredFrom);
     const quote =
         fromPrompt ??

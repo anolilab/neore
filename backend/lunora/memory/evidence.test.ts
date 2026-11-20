@@ -245,6 +245,20 @@ describe(factEvidence, () => {
         expect(factEvidence("It is hunter22", 5, turn)).toBeUndefined();
     });
 
+    it("links a quote to the steer extraction read, not to the part of a long prompt cut before the model saw it", () => {
+        expect.assertions(2);
+
+        // A prompt longer than extraction reads, whose cut-off end repeats the steer's words.
+        const prompt = `${"Plan my week around the school run. ".repeat(80)}I am vegetarian`;
+        const steer = "actually I am vegetarian";
+        const userMessage = `${prompt}\n\n${steer}`;
+        const steers = [{ at: 300, from: prompt.length + 2, messageId: "s1" }];
+        const turn = { promptAt: 100, promptMessageId: "m1", quotablePrompt: prompt, steeredFrom: prompt.length + 2, steers, threadId: "t1", userMessage };
+
+        expect(factEvidence("I am vegetarian", 999, turn)?.messageId).toBe("s1");
+        expect(factEvidence("I am vegetarian", 999, turn)?.at).toBe(300);
+    });
+
     it("dates a typed quote by the steer that typed it, not by an earlier steer that blockquoted the same words", () => {
         expect.assertions(2);
 

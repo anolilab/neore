@@ -74,10 +74,28 @@ export const truncateUserMessage = (message: string, steeredFrom?: number, limit
     }
 
     const steered = message.slice(steeredFrom, steeredFrom + limit);
-    // The prompt ends two characters before them (the blank line `afterRun` joins with).
-    const room = limit - steered.length - 2;
+    const prompt = promptCharsRead(message, steeredFrom, limit);
 
-    return room > 0 ? `${message.slice(0, Math.min(steeredFrom - 2, room))}\n\n${steered}` : steered;
+    return prompt > 0 ? `${message.slice(0, prompt)}\n\n${steered}` : steered;
+};
+
+/**
+ * How many characters of the prompt, from its start, {@link truncateUserMessage} keeps: words past them never reached
+ * the model, so no memory can have come from them (`factEvidence`).
+ */
+export const promptCharsRead = (message: string, steeredFrom?: number, limit = EXTRACTION_USER_MESSAGE_CHARS): number => {
+    if (steeredFrom === undefined) {
+        return Math.min(message.length, limit);
+    }
+
+    if (message.length <= limit) {
+        return steeredFrom;
+    }
+
+    // The prompt ends two characters before the steers (the blank line `afterRun` joins with), and gives way to them.
+    const room = limit - Math.min(message.length - steeredFrom, limit) - 2;
+
+    return room > 0 ? Math.min(steeredFrom - 2, room) : 0;
 };
 
 /**
