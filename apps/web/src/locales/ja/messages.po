@@ -415,7 +415,7 @@ msgstr "{0, plural, other {未対応のクエリパラメーター}}：{1}"
 
 #. placeholder {0}: day(memory.eventStart)
 #. placeholder {1}: day(memory.eventEnd)
-#: src/features/settings/components/personalization/memory-item.tsx:168
+#: src/features/settings/components/personalization/memory-item.tsx:178
 msgid "{0} – {1}"
 msgstr "{0} – {1}"
 
@@ -571,7 +571,7 @@ msgid "{0} lines"
 msgstr "{0} 行"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:185
+#: src/features/settings/components/personalization/memory-settings.tsx:186
 msgid "{0} memories"
 msgstr "{0} 件のメモリ"
 
@@ -661,7 +661,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{2} の {1} 上の {0}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:186
+#: src/features/settings/components/personalization/memory-settings.tsx:187
 msgid "{0} pinned"
 msgstr "ピン留め {0} 件"
 
@@ -1186,7 +1186,7 @@ msgstr "{minutes} 分前"
 msgid "{minutes}m remaining"
 msgstr "残り {minutes} 分"
 
-#: src/features/chat/thread/composer.tsx:234
+#: src/features/chat/thread/composer.tsx:235
 msgid "{modeLabel} mode — click to change"
 msgstr "{modeLabel}モード — クリックして変更"
 
@@ -3226,7 +3226,7 @@ msgid "All"
 msgstr "すべて"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:207
+#: src/features/settings/components/personalization/memory-settings.tsx:208
 msgid "All ({0})"
 msgstr "すべて（{0}）"
 
@@ -3560,7 +3560,7 @@ msgstr "応答の生成中にエラーが発生しました。"
 msgid "An error occurred while loading the {routeName} page."
 msgstr "{routeName} ページの読み込み中にエラーが発生しました。"
 
-#: src/features/settings/components/personalization/memory-item.tsx:336
+#: src/features/settings/components/personalization/memory-item.tsx:347
 msgid "An event cannot end before it starts."
 msgstr "イベントは開始前に終了できません。"
 
@@ -4232,7 +4232,7 @@ msgstr "何でも質問して新しいチャットを始めましょう…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "GPT-4、Claude、Gemini に同じ質問をしましょう。同じプロンプトを FLUX、Imagen、Stable Diffusion で実行できます。既定ではなく、勝者を選びましょう。"
 
-#: src/features/chat/thread/composer.tsx:270
+#: src/features/chat/thread/composer.tsx:271
 msgid "Ask me anything..."
 msgstr "何でも聞いてください..."
 
@@ -4370,7 +4370,7 @@ msgstr "オークランド"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:781
 #: src/components/model-picker/model-picker.tsx:1291
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:131
+#: src/features/chat/thread/composer.tsx:132
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -5302,6 +5302,7 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "コミュニティが共有したワークフローを閲覧、フォーク、リミックス"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
+#: src/features/chat/browser-live-view/browser-live-view.tsx:101
 msgid "Browser"
 msgstr "ブラウザー"
 
@@ -5703,8 +5704,8 @@ msgstr "カナダ"
 #: src/features/settings/components/chat/usage-settings.tsx:573
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
-#: src/features/settings/components/personalization/memory-item.tsx:340
-#: src/features/settings/components/personalization/memory-settings.tsx:256
+#: src/features/settings/components/personalization/memory-item.tsx:351
+#: src/features/settings/components/personalization/memory-settings.tsx:257
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6523,11 +6524,11 @@ msgstr "すべてクリア"
 msgid "Clear All"
 msgstr "すべてクリア"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:246
+#: src/features/settings/components/personalization/memory-settings.tsx:247
 msgid "Clear All Memories"
 msgstr "すべてのメモリを消去"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:250
+#: src/features/settings/components/personalization/memory-settings.tsx:251
 msgid "Clear all memories?"
 msgstr "すべてのメモリを消去しますか？"
 
@@ -6574,7 +6575,7 @@ msgstr "タグフィルターをクリア"
 msgid "Clear the queue"
 msgstr "キューをクリア"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:136
+#: src/features/settings/components/personalization/memory-settings.tsx:137
 msgid "Cleared {count} memories"
 msgstr "{count} 件のメモリを消去しました"
 
@@ -8639,7 +8640,7 @@ msgstr "このプロジェクトの使用状況を読み込めませんでした
 msgid "Could not load tools: {error}"
 msgstr "ツールを読み込めませんでした：{error}"
 
-#: src/features/settings/components/personalization/memory-item.tsx:122
+#: src/features/settings/components/personalization/memory-item.tsx:123
 msgid "Could not load where this memory came from."
 msgstr "このメモリの取得元を読み込めませんでした。"
 
@@ -8889,6 +8890,10 @@ msgstr "コメントを更新できませんでした"
 #: src/features/chat/group/group-participant-bar.tsx:72
 msgid "Could not update the participants"
 msgstr "参加者を更新できませんでした"
+
+#: src/features/chat/thread-list/thread-options-menu.tsx:100
+msgid "Couldn't load follow state"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
@@ -9678,7 +9683,7 @@ msgstr "ディベートのラウンド数"
 msgid "Debates for {0} rounds."
 msgstr "{0} ラウンドにわたって討論します。"
 
-#: src/features/chat/thread/composer.tsx:276
+#: src/features/chat/thread/composer.tsx:277
 msgid "Debug an error or review my code..."
 msgstr "エラーのデバッグやコードレビューなど..."
 
@@ -10022,7 +10027,7 @@ msgstr "アカウントを削除"
 msgid "Delete alert \"{ruleName}\""
 msgstr "アラート「{ruleName}」を削除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:257
+#: src/features/settings/components/personalization/memory-settings.tsx:258
 msgid "Delete All"
 msgstr "すべて削除"
 
@@ -10079,7 +10084,7 @@ msgstr "グループと子要素を削除"
 msgid "Delete Logo"
 msgstr "ロゴを削除"
 
-#: src/features/settings/components/personalization/memory-item.tsx:294
+#: src/features/settings/components/personalization/memory-item.tsx:305
 msgid "Delete memory"
 msgstr "メモリを削除"
 
@@ -11098,7 +11103,7 @@ msgstr "下書き"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "ソフトウェアエンジニア職のカバーレターを作成する"
 
-#: src/features/chat/thread/composer.tsx:274
+#: src/features/chat/thread/composer.tsx:275
 msgid "Draft an email, report, or essay..."
 msgstr "メール、レポート、エッセイなどの下書き..."
 
@@ -11508,7 +11513,7 @@ msgstr "MCP サーバーを編集"
 msgid "Edit me"
 msgstr "編集してください"
 
-#: src/features/settings/components/personalization/memory-item.tsx:290
+#: src/features/settings/components/personalization/memory-item.tsx:301
 msgid "Edit memory"
 msgstr "メモリを編集"
 
@@ -11905,7 +11910,7 @@ msgstr "フォローアップの提案を有効化"
 msgid "Enable for Next Chat"
 msgstr "次のチャットで有効化"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:170
+#: src/features/settings/components/personalization/memory-settings.tsx:171
 msgid "Enable memory"
 msgstr "メモリを有効化"
 
@@ -12514,7 +12519,7 @@ msgstr "JS を評価"
 msgid "Event"
 msgstr "イベント"
 
-#: src/features/settings/components/personalization/memory-item.tsx:196
+#: src/features/settings/components/personalization/memory-item.tsx:207
 msgid "Event ends on"
 msgstr "イベント終了日"
 
@@ -12899,7 +12904,7 @@ msgstr "有効期限：{expiresAt}"
 msgid "Expiring soon"
 msgstr "まもなく期限切れ"
 
-#: src/features/chat/thread/composer.tsx:277
+#: src/features/chat/thread/composer.tsx:278
 msgid "Explain a concept in simple terms..."
 msgstr "概念をわかりやすく説明して..."
 
@@ -13182,7 +13187,7 @@ msgstr "タグの色を変更できませんでした"
 msgid "Failed to clear filter rules"
 msgstr "フィルタールールをクリアできませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:132
+#: src/features/settings/components/personalization/memory-settings.tsx:133
 msgid "Failed to clear memories"
 msgstr "メモリを消去できませんでした"
 
@@ -13275,7 +13280,7 @@ msgstr "ファイルを削除できませんでした。もう一度お試しく
 msgid "Failed to delete files"
 msgstr "ファイルを削除できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:104
+#: src/features/settings/components/personalization/memory-settings.tsx:105
 msgid "Failed to delete memory"
 msgstr "メモリを削除できませんでした"
 
@@ -13789,8 +13794,8 @@ msgstr "キーボードショートカットを更新できませんでした"
 msgid "Failed to update MCP server"
 msgstr "MCP サーバーを更新できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:115
-#: src/features/settings/components/personalization/memory-settings.tsx:123
+#: src/features/settings/components/personalization/memory-settings.tsx:116
+#: src/features/settings/components/personalization/memory-settings.tsx:124
 msgid "Failed to update memory"
 msgstr "メモリを更新できませんでした"
 
@@ -13818,7 +13823,7 @@ msgstr "プルリクエストの設定を更新できませんでした"
 msgid "Failed to update reply tools"
 msgstr "返信ツールを更新できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:147
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Failed to update setting"
 msgstr "設定を更新できませんでした"
 
@@ -14487,7 +14492,7 @@ msgstr "種類で絞り込み"
 msgid "Filter condition"
 msgstr "フィルター条件"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:193
+#: src/features/settings/components/personalization/memory-settings.tsx:194
 msgid "Filter memories by type"
 msgstr "種類でメモリを絞り込み"
 
@@ -14706,6 +14711,10 @@ msgstr "システムに従う（既定）"
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:130
 msgid "Follow these steps to connect your {platform} account."
 msgstr "次の手順に従って {platform} アカウントを接続してください。"
+
+#: src/features/chat/thread-list/thread-options-menu.tsx:105
+msgid "Follow thread"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "follow up"
@@ -15321,7 +15330,7 @@ msgstr "テキストプロンプトから画像を生成し、4 倍にアップ�
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "暖かい照明と植物に囲まれた居心地のよい読書スペースの画像を生成して。"
 
-#: src/features/chat/thread/composer.tsx:279
+#: src/features/chat/thread/composer.tsx:280
 msgid "Generate an image or video..."
 msgstr "画像または動画を生成..."
 
@@ -16200,7 +16209,7 @@ msgstr "ハンズフリー音声モード — 話しかけると返信が読み�
 msgid "Hands-free voice updated"
 msgstr "ハンズフリーの音声を更新しました"
 
-#: src/features/settings/components/personalization/memory-item.tsx:195
+#: src/features/settings/components/personalization/memory-item.tsx:206
 msgid "Happens on"
 msgstr "日付"
 
@@ -16313,6 +16322,10 @@ msgstr "列を非表示"
 #: src/features/chat/thread/composer-followup-suggestions.tsx:266
 msgid "Hide follow-up suggestions"
 msgstr "フォローアップの提案を非表示"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:105
+msgid "Hide live view"
+msgstr ""
 
 #: src/features/workflow/components/nodes/base-node.tsx:278
 msgid "Hide output"
@@ -16554,7 +16567,7 @@ msgstr "ヒット率"
 msgid "HLS playback is not supported in this browser."
 msgstr "このブラウザーは HLS 再生に対応していません。"
 
-#: src/features/settings/components/personalization/memory-item.tsx:197
+#: src/features/settings/components/personalization/memory-item.tsx:208
 msgid "Holds until"
 msgstr "有効期限"
 
@@ -16819,7 +16832,7 @@ msgstr "イラスト"
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:343
 #: src/components/model-picker/model-picker.tsx:1265
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:129
+#: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:41
@@ -17129,7 +17142,7 @@ msgstr "Notion のページを {added} 件インポートしました。"
 msgid "Imported as /{0}."
 msgstr "/{0} としてインポートしました。"
 
-#: src/features/settings/components/personalization/memory-item.tsx:264
+#: src/features/settings/components/personalization/memory-item.tsx:275
 msgid "Imported from {importedFromLabel}"
 msgstr "{importedFromLabel} からインポート"
 
@@ -18314,7 +18327,7 @@ msgid "Last activity {lastActivityAgo}"
 msgstr "最終アクティビティ {lastActivityAgo}"
 
 #. placeholder {0}: relativeTime(memory.lastConfirmedAt)
-#: src/features/settings/components/personalization/memory-item.tsx:263
+#: src/features/settings/components/personalization/memory-item.tsx:274
 msgid "Last confirmed {0}"
 msgstr "最終確認 {0}"
 
@@ -18955,6 +18968,10 @@ msgstr "ライブプレビュー — コンポーネントのストリーミン�
 msgid "Live preview — updating as the artifact streams"
 msgstr "ライブプレビュー — アーティファクトのストリーミングに合わせて更新中"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:134
+msgid "Live view of the agent's browser (read-only)"
+msgstr ""
+
 #: src/features/marketing/components/gateway-landing-page.tsx:37
 msgid "LLaMA, Mixtral, Gemma — fastest inference"
 msgstr "LLaMA、Mixtral、Gemma — 最速の推論"
@@ -19293,7 +19310,7 @@ msgstr "読み込んでいます..."
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:242
-#: src/features/settings/components/personalization/memory-item.tsx:128
+#: src/features/settings/components/personalization/memory-item.tsx:129
 #: src/routes/auth/extension.tsx:68
 msgid "Loading…"
 msgstr "読み込んでいます…"
@@ -20102,7 +20119,7 @@ msgid "memories"
 msgstr "メモリ"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:219
+#: src/features/settings/components/personalization/memory-settings.tsx:220
 msgid "Memories"
 msgstr "メモリ"
 
@@ -20120,7 +20137,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "この返信で使用したメモリ（{0}）"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:163
+#: src/features/settings/components/personalization/memory-settings.tsx:164
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "メモリ"
@@ -20129,15 +20146,15 @@ msgstr "メモリ"
 msgid "Memory — what the agent keeps across chats"
 msgstr "メモリ — エージェントがチャットをまたいで保持する内容"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:108
+#: src/features/settings/components/personalization/memory-settings.tsx:109
 msgid "Memory deleted"
 msgstr "メモリを削除しました"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:145
+#: src/features/settings/components/personalization/memory-settings.tsx:146
 msgid "Memory disabled"
 msgstr "メモリを無効にしました"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:145
+#: src/features/settings/components/personalization/memory-settings.tsx:146
 msgid "Memory enabled"
 msgstr "メモリを有効にしました"
 
@@ -20153,7 +20170,7 @@ msgstr "オンにするまでメモリは無効です。一時チャットとロ
 msgid "Memory is off. Turn it on to bring in memories; nothing is saved while it is off."
 msgstr "メモリは無効です。メモリを取り込むにはオンにしてください。無効の間は何も保存されません。"
 
-#: src/features/settings/components/personalization/memory-item.tsx:302
+#: src/features/settings/components/personalization/memory-item.tsx:313
 msgid "Memory text"
 msgstr "メモリの内容"
 
@@ -20161,7 +20178,7 @@ msgstr "メモリの内容"
 msgid "Memory the agent keeps across chats"
 msgstr "エージェントがチャットをまたいで保持するメモリ"
 
-#: src/features/settings/components/personalization/memory-item.tsx:249
+#: src/features/settings/components/personalization/memory-item.tsx:260
 msgid "Memory type"
 msgstr "メモリの種類"
 
@@ -20574,7 +20591,7 @@ msgid "Mobile app icon"
 msgstr "モバイルアプリアイコン"
 
 #: src/features/chat/host/host-options.tsx:146
-#: src/features/chat/thread/composer.tsx:223
+#: src/features/chat/thread/composer.tsx:224
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
 #: src/features/workflow/components/nodes/text-node.tsx:123
@@ -21139,6 +21156,10 @@ msgstr "音楽"
 msgid "Mute"
 msgstr "ミュート"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:115
+msgid "Mute thread"
+msgstr ""
+
 #: src/features/settings/lib/settings-keywords.ts:105
 msgid "my data"
 msgstr "自分のデータ"
@@ -21417,7 +21438,7 @@ msgstr "Neore {0}"
 msgid "Neore agent"
 msgstr "Neore エージェント"
 
-#: src/features/chat/thread/composer.tsx:689
+#: src/features/chat/thread/composer.tsx:690
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore は間違えることがあります。重要な情報は確認してください。"
 
@@ -21794,7 +21815,7 @@ msgstr "次の一致"
 msgid "Next option"
 msgstr "次のオプション"
 
-#: src/features/chat/thread/composer.tsx:240
+#: src/features/chat/thread/composer.tsx:241
 msgid "Next output mode"
 msgstr "次の出力モード"
 
@@ -22180,11 +22201,11 @@ msgstr "MCP サーバーが設定されていません。サーバーを追加�
 msgid "No members in this team yet"
 msgstr "このチームにはまだメンバーがいません"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:235
+#: src/features/settings/components/personalization/memory-settings.tsx:236
 msgid "No memories of this type."
 msgstr "この種類のメモリはありません。"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:236
+#: src/features/settings/components/personalization/memory-settings.tsx:237
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "メモリはまだありません。AI は会話から自動的に学習を始めます。"
 
@@ -22344,7 +22365,7 @@ msgstr "検索に一致する公開スキルはありません。"
 msgid "No public skills yet. Publish one by setting a skill's visibility to Public."
 msgstr "公開スキルはまだありません。スキルの公開範囲を「公開」に設定すると公開できます。"
 
-#: src/features/settings/components/personalization/memory-item.tsx:137
+#: src/features/settings/components/personalization/memory-item.tsx:138
 msgid "No quote was kept for this memory."
 msgstr "このメモリには引用が保持されていません。"
 
@@ -23036,7 +23057,7 @@ msgid "Ollama or LM Studio on localhost, called by your browser. Text only, not 
 msgstr "localhost 上の Ollama または LM Studio をブラウザーから呼び出します。テキストのみ、課金なし。"
 
 #. placeholder {0}: day(memory.eventStart)
-#: src/features/settings/components/personalization/memory-item.tsx:170
+#: src/features/settings/components/personalization/memory-item.tsx:180
 msgid "On {0}"
 msgstr "{0}"
 
@@ -23362,7 +23383,7 @@ msgstr "この{requestNoun}のリバートを開きますか？"
 msgid "Open as page"
 msgstr "ページとして開く"
 
-#: src/features/settings/components/personalization/memory-item.tsx:149
+#: src/features/settings/components/personalization/memory-item.tsx:159
 msgid "Open chat"
 msgstr "チャットを開く"
 
@@ -23425,7 +23446,7 @@ msgid "Open in new window"
 msgstr "新しいウィンドウで開く"
 
 #: src/features/chat/thread-list/thread-node.tsx:590
-#: src/features/chat/thread-list/thread-options-menu.tsx:73
+#: src/features/chat/thread-list/thread-options-menu.tsx:79
 msgid "Open in split view"
 msgstr "分割ビューで開く"
 
@@ -23445,7 +23466,7 @@ msgstr "リンクを開く"
 msgid "Open menu"
 msgstr "メニューを開く"
 
-#: src/features/settings/components/personalization/memory-item.tsx:149
+#: src/features/settings/components/personalization/memory-item.tsx:159
 msgid "Open message"
 msgstr "メッセージを開く"
 
@@ -23913,6 +23934,10 @@ msgstr "プルリクエストを作成しています…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "会話なしでアシスタントを開くと、空のチャットではなく最新の会話に移動します。"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:112
+msgid "Opening the live view…"
+msgstr ""
+
 #: src/features/pages/components/page-invite-accept.tsx:54
 msgid "Opening the shared page…"
 msgstr "共有ページを開いています…"
@@ -24268,7 +24293,7 @@ msgstr "出力形式"
 msgid "Output is not loaded in this view."
 msgstr "この表示では出力を読み込んでいません。"
 
-#: src/features/chat/thread/composer.tsx:251
+#: src/features/chat/thread/composer.tsx:252
 msgid "Output Mode"
 msgstr "出力モード"
 
@@ -25013,7 +25038,7 @@ msgstr "ピン留め"
 msgid "Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own."
 msgstr "メモリをピン留めすると、薄れたり、統合されたり、昇格されたりしなくなります。アクティビティのメモリだけが自然に薄れます。"
 
-#: src/features/settings/components/personalization/memory-item.tsx:280
+#: src/features/settings/components/personalization/memory-item.tsx:291
 msgid "Pin memory"
 msgstr "メモリをピン留め"
 
@@ -25086,7 +25111,7 @@ msgstr "プラン"
 msgid "Plan"
 msgstr "プラン"
 
-#: src/features/chat/thread/composer.tsx:273
+#: src/features/chat/thread/composer.tsx:274
 msgid "Plan a project or brainstorm ideas..."
 msgstr "プロジェクトの計画やアイデア出しなど..."
 
@@ -25634,7 +25659,7 @@ msgstr "前の一致"
 msgid "Previous option"
 msgstr "前のオプション"
 
-#: src/features/chat/thread/composer.tsx:206
+#: src/features/chat/thread/composer.tsx:207
 msgid "Previous output mode"
 msgstr "前の出力モード"
 
@@ -27080,12 +27105,12 @@ msgstr "再生成"
 msgid "Regenerate response"
 msgstr "応答を再生成"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:91
+#: src/features/chat/thread-list/thread-options-menu.tsx:97
 msgid "Regenerate title"
 msgstr "タイトルを再生成"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:85
-#: src/features/chat/thread-list/thread-options-menu.tsx:98
+#: src/features/chat/thread-list/thread-options-menu.tsx:91
+#: src/features/chat/thread-list/thread-options-menu.tsx:122
 msgid "Regenerating the title"
 msgstr "タイトルを再生成中"
 
@@ -27510,7 +27535,7 @@ msgstr "お気に入りから削除しました"
 msgid "Removed:"
 msgstr "削除："
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:72
+#: src/features/chat/thread-list/thread-options-menu.tsx:78
 msgid "Rename"
 msgstr "名前を変更"
 
@@ -27754,7 +27779,7 @@ msgstr "リサーチ"
 msgid "Research a topic"
 msgstr "トピックをリサーチ"
 
-#: src/features/chat/thread/composer.tsx:275
+#: src/features/chat/thread/composer.tsx:276
 msgid "Research a topic in depth..."
 msgstr "トピックを深くリサーチ..."
 
@@ -28614,7 +28639,7 @@ msgstr "サウジアラビア"
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:641
 #: src/features/settings/components/chat/native-providers-settings.tsx:712
-#: src/features/settings/components/personalization/memory-item.tsx:344
+#: src/features/settings/components/personalization/memory-item.tsx:355
 #: src/features/slides/components/slide-editor-dialog.tsx:118
 #: src/features/workflow/components/canvas/workflow-controls.tsx:401
 msgid "Save"
@@ -32109,7 +32134,7 @@ msgstr "今日のメモを要約"
 msgid "Summarise my notes in three bullets."
 msgstr "私のメモを 3 つの箇条書きで要約してください。"
 
-#: src/features/chat/thread/composer.tsx:272
+#: src/features/chat/thread/composer.tsx:273
 msgid "Summarize a document or URL..."
 msgstr "ドキュメントや URL を要約..."
 
@@ -32793,7 +32818,7 @@ msgstr "テキスト"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1252
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:128
+#: src/features/chat/thread/composer.tsx:129
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -33153,6 +33178,10 @@ msgstr "エージェントはまだセッションを開いています。しば
 msgid "The agent is still working on the last message."
 msgstr "エージェントはまだ最後のメッセージを処理中です。"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:102
+msgid "The agent is using a browser"
+msgstr ""
+
 #: src/features/chat/host/diff-comments-draft.tsx:74
 msgid "The agent is working. You can send these when it is done."
 msgstr "エージェントが作業中です。完了後にこれらを送信できます。"
@@ -33181,7 +33210,7 @@ msgstr "エージェントのプラン"
 msgid "The agent's tool calls"
 msgstr "エージェントのツール呼び出し"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:162
+#: src/features/settings/components/personalization/memory-settings.tsx:163
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "AI は会話から学習して応答をパーソナライズし、毎晩学んだことを振り返ります。記憶している内容はすべてここに表示され、編集、種類の変更、ピン留め、削除ができます。"
 
@@ -33583,6 +33612,14 @@ msgstr "リンクが間違っているか、所有者が会話を非公開にし
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "リンクが間違っているか、所有者がページの公開を停止したか削除した可能性があります。"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:124
+msgid "The live view could not be opened. Try again."
+msgstr ""
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:117
+msgid "The live view is not available right now."
+msgstr ""
+
 #. placeholder {0}: info.detail
 #: src/features/local-models/lib/local-errors.ts:195
 msgid "The local model reported an error: {0}"
@@ -33747,7 +33784,7 @@ msgstr "キューは一時停止中です。「次を送信」を押すと、キ
 msgid "The quick check only looks at tools from servers you trust. A trusted server's tool descriptions reach the model, so they can influence which calls are approved automatically. Changing a server's address ends its trust."
 msgstr "クイックチェックは、信頼しているサーバーのツールのみを確認します。信頼しているサーバーのツールの説明はモデルに渡されるため、どの呼び出しが自動的に承認されるかに影響する可能性があります。サーバーのアドレスを変更すると、信頼は解除されます。"
 
-#: src/features/settings/components/personalization/memory-item.tsx:137
+#: src/features/settings/components/personalization/memory-item.tsx:138
 msgid "The quote stays hidden while you can't open its chat."
 msgstr "このチャットを開けない間、引用は非表示のままです。"
 
@@ -34688,7 +34725,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "{0} 件の匿名ユーザーアカウントとそのすべてのデータが完全に削除されます。この操作は元に戻せません。"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:252
+#: src/features/settings/components/personalization/memory-settings.tsx:253
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "{0} 件のメモリとその日次ダイジェストがすべて完全に削除されます。AI は次の会話から改めて学習を始めます。"
 
@@ -34789,11 +34826,11 @@ msgstr "スレッド管理"
 msgid "Thread not found or you don't have access to it"
 msgstr "スレッドが見つからないか、アクセス権がありません"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:69
+#: src/features/chat/thread-list/thread-options-menu.tsx:75
 msgid "Thread options"
 msgstr "スレッドのオプション"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:57
+#: src/features/chat/thread-list/thread-options-menu.tsx:63
 msgid "Thread options: {label}"
 msgstr "スレッドのオプション: {label}"
 
@@ -35103,6 +35140,10 @@ msgstr "試行回数が多すぎます。数秒待ってから、もう一度お
 msgid "too many files"
 msgstr "ファイルが多すぎます"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:123
+msgid "Too many live views were opened. Try again later."
+msgstr ""
+
 #: src/features/chat/guest-links/guest-page.tsx:95
 msgid "Too many messages. Please try again later."
 msgstr "メッセージが多すぎます。後でもう一度お試しください。"
@@ -35329,7 +35370,7 @@ msgstr "変換後の画像"
 msgid "Translate"
 msgstr "翻訳"
 
-#: src/features/chat/thread/composer.tsx:278
+#: src/features/chat/thread/composer.tsx:279
 msgid "Translate text to another language..."
 msgstr "テキストを別の言語に翻訳..."
 
@@ -35867,6 +35908,10 @@ msgstr "元に戻す"
 msgid "Undo (Ctrl+Z)"
 msgstr "元に戻す (Ctrl+Z)"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:110
+msgid "Unfollow thread"
+msgstr ""
+
 #. placeholder {0}: String(index + 1)
 #: src/features/evals/components/dataset-panel.tsx:181
 msgid "Unfreeze case {0}"
@@ -35997,7 +36042,7 @@ msgstr "左の固定を解除"
 msgid "Unpin from right"
 msgstr "右の固定を解除"
 
-#: src/features/settings/components/personalization/memory-item.tsx:280
+#: src/features/settings/components/personalization/memory-item.tsx:291
 msgid "Unpin memory"
 msgstr "メモリのピン留めを解除"
 
@@ -36041,7 +36086,7 @@ msgid "until {0}"
 msgstr "{0} まで"
 
 #. placeholder {0}: day(memory.validUntil)
-#: src/features/settings/components/personalization/memory-item.tsx:173
+#: src/features/settings/components/personalization/memory-item.tsx:183
 msgid "Until {0}"
 msgstr "{0}まで"
 
@@ -37018,7 +37063,7 @@ msgstr "動画"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: src/components/model-picker/model-picker.tsx:1278
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:130
+#: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:46
@@ -37559,6 +37604,10 @@ msgstr "ここから続けますか？"
 msgid "Watch"
 msgstr "監視"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:105
+msgid "Watch live"
+msgstr ""
+
 #: src/features/settings/components/chat/event-trigger-fields.tsx:230
 msgid "Watch only this part (optional)"
 msgstr "この部分のみ監視（任意）"
@@ -37977,11 +38026,11 @@ msgstr "{0} を選ぶ理由"
 msgid "Why <0>Neore.</0>"
 msgstr "なぜ <0>Neore</0> なのか。"
 
-#: src/features/settings/components/personalization/memory-item.tsx:269
+#: src/features/settings/components/personalization/memory-item.tsx:280
 msgid "Why was this remembered?"
 msgstr "なぜこれが記憶されたのですか？"
 
-#: src/features/settings/components/personalization/memory-item.tsx:274
+#: src/features/settings/components/personalization/memory-item.tsx:285
 msgid "Why?"
 msgstr "なぜですか？"
 
@@ -38154,7 +38203,7 @@ msgstr "チャットと並行して長文コンテンツを作成"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "横並びのキャンバスエディターで長文コンテンツを作成できます。ツールを切り替えずに、チャットから完成したドキュメントまで。"
 
-#: src/features/chat/thread/composer.tsx:271
+#: src/features/chat/thread/composer.tsx:272
 msgid "Write some code for me..."
 msgstr "コードを書いて..."
 

@@ -63,6 +63,17 @@ Browser sessions are linked to your chat thread. This means:
 | **Failed** | Session encountered an error |
 | **Terminated** | Session was manually stopped |
 
+### Watching the Browser Live
+
+While the AI has a browser running for a chat, a **Browser** card above the composer shows the page it is on.
+Choose **Watch live** to see the page as the AI works on it. The view is read-only: you can watch, but you cannot
+click or type in it. The card goes away when the browser session ends or after about a minute without an action.
+
+- Only people who can read the chat see the card, and a locked chat or a chat in the trash shows none.
+- Each time you open the view, a fresh link is made for you. It is never saved or shared.
+- The deployment needs `CLOUDFLARE_ACCOUNT_ID` and `BROWSER_LIVE_VIEW_API_TOKEN` (an API token with Browser
+  Rendering Write) set on the backend. Without them the card says the live view is not available.
+
 ### URL Safety
 
 Every URL the browser is asked to open is validated before the request leaves

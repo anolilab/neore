@@ -4447,6 +4447,18 @@
           "optional": true,
           "unique": false
         },
+        "inUseHolds": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "number",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
+        },
         "lastActivityAt": {
           "kind": "number",
           "nullable": false,

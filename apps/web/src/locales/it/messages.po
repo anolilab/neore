@@ -415,7 +415,7 @@ msgstr "{0, plural, one {Parametro di query non supportato} other {Parametri di 
 
 #. placeholder {0}: day(memory.eventStart)
 #. placeholder {1}: day(memory.eventEnd)
-#: src/features/settings/components/personalization/memory-item.tsx:168
+#: src/features/settings/components/personalization/memory-item.tsx:178
 msgid "{0} – {1}"
 msgstr "{0} – {1}"
 
@@ -571,7 +571,7 @@ msgid "{0} lines"
 msgstr "{0} righe"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:185
+#: src/features/settings/components/personalization/memory-settings.tsx:186
 msgid "{0} memories"
 msgstr "{0} ricordi"
 
@@ -661,7 +661,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0} su {1}, in {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:186
+#: src/features/settings/components/personalization/memory-settings.tsx:187
 msgid "{0} pinned"
 msgstr "{0} fissati"
 
@@ -1186,7 +1186,7 @@ msgstr "{minutes} min fa"
 msgid "{minutes}m remaining"
 msgstr "{minutes} min rimanenti"
 
-#: src/features/chat/thread/composer.tsx:234
+#: src/features/chat/thread/composer.tsx:235
 msgid "{modeLabel} mode — click to change"
 msgstr "Modalità {modeLabel}: fai clic per cambiarla"
 
@@ -3226,7 +3226,7 @@ msgid "All"
 msgstr "Tutti"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:207
+#: src/features/settings/components/personalization/memory-settings.tsx:208
 msgid "All ({0})"
 msgstr "Tutti ({0})"
 
@@ -3560,7 +3560,7 @@ msgstr "Si è verificato un errore durante la generazione della risposta."
 msgid "An error occurred while loading the {routeName} page."
 msgstr "Si è verificato un errore durante il caricamento della pagina {routeName}."
 
-#: src/features/settings/components/personalization/memory-item.tsx:336
+#: src/features/settings/components/personalization/memory-item.tsx:347
 msgid "An event cannot end before it starts."
 msgstr "Un evento non può finire prima di iniziare."
 
@@ -4232,7 +4232,7 @@ msgstr "Chiedi qualsiasi cosa per iniziare una nuova chat…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "Fai la stessa domanda a GPT-4, Claude e Gemini. Esegui lo stesso prompt su FLUX, Imagen e Stable Diffusion. Scegli il migliore, non quello predefinito."
 
-#: src/features/chat/thread/composer.tsx:270
+#: src/features/chat/thread/composer.tsx:271
 msgid "Ask me anything..."
 msgstr "Chiedimi qualsiasi cosa..."
 
@@ -4370,7 +4370,7 @@ msgstr "Auckland"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:781
 #: src/components/model-picker/model-picker.tsx:1291
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:131
+#: src/features/chat/thread/composer.tsx:132
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -5302,6 +5302,7 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Sfoglia, duplica e rielabora i workflow condivisi dalla community"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
+#: src/features/chat/browser-live-view/browser-live-view.tsx:101
 msgid "Browser"
 msgstr "Browser"
 
@@ -5703,8 +5704,8 @@ msgstr "Canada"
 #: src/features/settings/components/chat/usage-settings.tsx:573
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
-#: src/features/settings/components/personalization/memory-item.tsx:340
-#: src/features/settings/components/personalization/memory-settings.tsx:256
+#: src/features/settings/components/personalization/memory-item.tsx:351
+#: src/features/settings/components/personalization/memory-settings.tsx:257
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6523,11 +6524,11 @@ msgstr "Cancella tutto"
 msgid "Clear All"
 msgstr "Cancella tutto"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:246
+#: src/features/settings/components/personalization/memory-settings.tsx:247
 msgid "Clear All Memories"
 msgstr "Cancella tutti i ricordi"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:250
+#: src/features/settings/components/personalization/memory-settings.tsx:251
 msgid "Clear all memories?"
 msgstr "Cancellare tutti i ricordi?"
 
@@ -6574,7 +6575,7 @@ msgstr "Rimuovi filtro tag"
 msgid "Clear the queue"
 msgstr "Svuota la coda"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:136
+#: src/features/settings/components/personalization/memory-settings.tsx:137
 msgid "Cleared {count} memories"
 msgstr "{count} ricordi cancellati"
 
@@ -8639,7 +8640,7 @@ msgstr "Impossibile caricare l'utilizzo di questo progetto."
 msgid "Could not load tools: {error}"
 msgstr "Impossibile caricare gli strumenti: {error}"
 
-#: src/features/settings/components/personalization/memory-item.tsx:122
+#: src/features/settings/components/personalization/memory-item.tsx:123
 msgid "Could not load where this memory came from."
 msgstr "Impossibile caricare da dove proviene questa memoria."
 
@@ -8889,6 +8890,10 @@ msgstr "Impossibile aggiornare il commento"
 #: src/features/chat/group/group-participant-bar.tsx:72
 msgid "Could not update the participants"
 msgstr "Impossibile aggiornare i partecipanti"
+
+#: src/features/chat/thread-list/thread-options-menu.tsx:100
+msgid "Couldn't load follow state"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:31
 msgid "country"
@@ -9678,7 +9683,7 @@ msgstr "Round del dibattito"
 msgid "Debates for {0} rounds."
 msgstr "Dibatte per {0} round."
 
-#: src/features/chat/thread/composer.tsx:276
+#: src/features/chat/thread/composer.tsx:277
 msgid "Debug an error or review my code..."
 msgstr "Correggi un errore o rivedi il mio codice..."
 
@@ -10022,7 +10027,7 @@ msgstr "Elimina account"
 msgid "Delete alert \"{ruleName}\""
 msgstr "Elimina avviso \"{ruleName}\""
 
-#: src/features/settings/components/personalization/memory-settings.tsx:257
+#: src/features/settings/components/personalization/memory-settings.tsx:258
 msgid "Delete All"
 msgstr "Elimina tutto"
 
@@ -10079,7 +10084,7 @@ msgstr "Elimina gruppo ed elementi figli"
 msgid "Delete Logo"
 msgstr "Elimina logo"
 
-#: src/features/settings/components/personalization/memory-item.tsx:294
+#: src/features/settings/components/personalization/memory-item.tsx:305
 msgid "Delete memory"
 msgstr "Elimina ricordo"
 
@@ -11098,7 +11103,7 @@ msgstr "Bozza"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "Scrivi una lettera di presentazione per una posizione da ingegnere del software"
 
-#: src/features/chat/thread/composer.tsx:274
+#: src/features/chat/thread/composer.tsx:275
 msgid "Draft an email, report, or essay..."
 msgstr "Scrivi una bozza di email, report o saggio..."
 
@@ -11508,7 +11513,7 @@ msgstr "Modifica server MCP"
 msgid "Edit me"
 msgstr "Modificami"
 
-#: src/features/settings/components/personalization/memory-item.tsx:290
+#: src/features/settings/components/personalization/memory-item.tsx:301
 msgid "Edit memory"
 msgstr "Modifica ricordo"
 
@@ -11905,7 +11910,7 @@ msgstr "Attiva suggerimenti di follow-up"
 msgid "Enable for Next Chat"
 msgstr "Attiva per la prossima chat"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:170
+#: src/features/settings/components/personalization/memory-settings.tsx:171
 msgid "Enable memory"
 msgstr "Attiva memoria"
 
@@ -12514,7 +12519,7 @@ msgstr "Esegui JS"
 msgid "Event"
 msgstr "Evento"
 
-#: src/features/settings/components/personalization/memory-item.tsx:196
+#: src/features/settings/components/personalization/memory-item.tsx:207
 msgid "Event ends on"
 msgstr "L’evento termina il"
 
@@ -12899,7 +12904,7 @@ msgstr "Scade: {expiresAt}"
 msgid "Expiring soon"
 msgstr "In scadenza"
 
-#: src/features/chat/thread/composer.tsx:277
+#: src/features/chat/thread/composer.tsx:278
 msgid "Explain a concept in simple terms..."
 msgstr "Spiega un concetto in parole semplici..."
 
@@ -13182,7 +13187,7 @@ msgstr "Impossibile cambiare il colore del tag"
 msgid "Failed to clear filter rules"
 msgstr "Impossibile cancellare le regole di filtro"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:132
+#: src/features/settings/components/personalization/memory-settings.tsx:133
 msgid "Failed to clear memories"
 msgstr "Impossibile cancellare i ricordi"
 
@@ -13275,7 +13280,7 @@ msgstr "Impossibile eliminare il file. Riprova."
 msgid "Failed to delete files"
 msgstr "Impossibile eliminare i file"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:104
+#: src/features/settings/components/personalization/memory-settings.tsx:105
 msgid "Failed to delete memory"
 msgstr "Impossibile eliminare il ricordo"
 
@@ -13789,8 +13794,8 @@ msgstr "Impossibile aggiornare le scorciatoie da tastiera"
 msgid "Failed to update MCP server"
 msgstr "Impossibile aggiornare il server MCP"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:115
-#: src/features/settings/components/personalization/memory-settings.tsx:123
+#: src/features/settings/components/personalization/memory-settings.tsx:116
+#: src/features/settings/components/personalization/memory-settings.tsx:124
 msgid "Failed to update memory"
 msgstr "Impossibile aggiornare il ricordo"
 
@@ -13818,7 +13823,7 @@ msgstr "Impossibile aggiornare le impostazioni delle pull request"
 msgid "Failed to update reply tools"
 msgstr "Impossibile aggiornare gli strumenti di risposta"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:147
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Failed to update setting"
 msgstr "Impossibile aggiornare l'impostazione"
 
@@ -14487,7 +14492,7 @@ msgstr "Filtra per tipo"
 msgid "Filter condition"
 msgstr "Condizione del filtro"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:193
+#: src/features/settings/components/personalization/memory-settings.tsx:194
 msgid "Filter memories by type"
 msgstr "Filtra i ricordi per tipo"
 
@@ -14706,6 +14711,10 @@ msgstr "Segui il sistema (predefinito)"
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:130
 msgid "Follow these steps to connect your {platform} account."
 msgstr "Segui questi passaggi per collegare il tuo account {platform}."
+
+#: src/features/chat/thread-list/thread-options-menu.tsx:105
+msgid "Follow thread"
+msgstr ""
 
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "follow up"
@@ -15321,7 +15330,7 @@ msgstr "Genera un'immagine da un prompt testuale e aumentane la risoluzione di 4
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "Genera l'immagine di un accogliente angolo lettura con luce calda e piante."
 
-#: src/features/chat/thread/composer.tsx:279
+#: src/features/chat/thread/composer.tsx:280
 msgid "Generate an image or video..."
 msgstr "Genera un'immagine o un video..."
 
@@ -16200,7 +16209,7 @@ msgstr "Modalità vocale a mani libere — parla e le risposte vengono lette ad 
 msgid "Hands-free voice updated"
 msgstr "Voce della modalità a mani libere aggiornata"
 
-#: src/features/settings/components/personalization/memory-item.tsx:195
+#: src/features/settings/components/personalization/memory-item.tsx:206
 msgid "Happens on"
 msgstr "Si svolge il"
 
@@ -16313,6 +16322,10 @@ msgstr "Nascondi colonna"
 #: src/features/chat/thread/composer-followup-suggestions.tsx:266
 msgid "Hide follow-up suggestions"
 msgstr "Nascondi suggerimenti di follow-up"
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:105
+msgid "Hide live view"
+msgstr ""
 
 #: src/features/workflow/components/nodes/base-node.tsx:278
 msgid "Hide output"
@@ -16554,7 +16567,7 @@ msgstr "Hit rate"
 msgid "HLS playback is not supported in this browser."
 msgstr "La riproduzione HLS non è supportata in questo browser."
 
-#: src/features/settings/components/personalization/memory-item.tsx:197
+#: src/features/settings/components/personalization/memory-item.tsx:208
 msgid "Holds until"
 msgstr "Valido fino al"
 
@@ -16819,7 +16832,7 @@ msgstr "illustrazione"
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:343
 #: src/components/model-picker/model-picker.tsx:1265
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:129
+#: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:41
@@ -17129,7 +17142,7 @@ msgstr "Importate {added} pagina/e di Notion."
 msgid "Imported as /{0}."
 msgstr "Importato come /{0}."
 
-#: src/features/settings/components/personalization/memory-item.tsx:264
+#: src/features/settings/components/personalization/memory-item.tsx:275
 msgid "Imported from {importedFromLabel}"
 msgstr "Importato da {importedFromLabel}"
 
@@ -18314,7 +18327,7 @@ msgid "Last activity {lastActivityAgo}"
 msgstr "Ultima attività {lastActivityAgo}"
 
 #. placeholder {0}: relativeTime(memory.lastConfirmedAt)
-#: src/features/settings/components/personalization/memory-item.tsx:263
+#: src/features/settings/components/personalization/memory-item.tsx:274
 msgid "Last confirmed {0}"
 msgstr "Ultima conferma {0}"
 
@@ -18955,6 +18968,10 @@ msgstr "Anteprima dal vivo: viene mostrata quando il componente ha finito lo str
 msgid "Live preview — updating as the artifact streams"
 msgstr "Anteprima dal vivo: si aggiorna durante lo streaming dell'artefatto"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:134
+msgid "Live view of the agent's browser (read-only)"
+msgstr ""
+
 #: src/features/marketing/components/gateway-landing-page.tsx:37
 msgid "LLaMA, Mixtral, Gemma — fastest inference"
 msgstr "LLaMA, Mixtral, Gemma: l’inferenza più veloce"
@@ -19293,7 +19310,7 @@ msgstr "Caricamento..."
 #: src/features/code/components/code-workspace.tsx:90
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:242
-#: src/features/settings/components/personalization/memory-item.tsx:128
+#: src/features/settings/components/personalization/memory-item.tsx:129
 #: src/routes/auth/extension.tsx:68
 msgid "Loading…"
 msgstr "Caricamento…"
@@ -20102,7 +20119,7 @@ msgid "memories"
 msgstr "ricordi"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:219
+#: src/features/settings/components/personalization/memory-settings.tsx:220
 msgid "Memories"
 msgstr "Ricordi"
 
@@ -20120,7 +20137,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "Ricordi usati per questa risposta ({0})"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:163
+#: src/features/settings/components/personalization/memory-settings.tsx:164
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "Memoria"
@@ -20129,15 +20146,15 @@ msgstr "Memoria"
 msgid "Memory — what the agent keeps across chats"
 msgstr "Memoria — ciò che l’agente conserva tra le chat"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:108
+#: src/features/settings/components/personalization/memory-settings.tsx:109
 msgid "Memory deleted"
 msgstr "Ricordo eliminato"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:145
+#: src/features/settings/components/personalization/memory-settings.tsx:146
 msgid "Memory disabled"
 msgstr "Memoria disattivata"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:145
+#: src/features/settings/components/personalization/memory-settings.tsx:146
 msgid "Memory enabled"
 msgstr "Memoria attivata"
 
@@ -20153,7 +20170,7 @@ msgstr "La memoria è disattivata finché non la attivi. Le chat temporanee e qu
 msgid "Memory is off. Turn it on to bring in memories; nothing is saved while it is off."
 msgstr "La memoria è disattivata. Attivala per usare le memorie; mentre è disattivata non viene salvato nulla."
 
-#: src/features/settings/components/personalization/memory-item.tsx:302
+#: src/features/settings/components/personalization/memory-item.tsx:313
 msgid "Memory text"
 msgstr "Testo del ricordo"
 
@@ -20161,7 +20178,7 @@ msgstr "Testo del ricordo"
 msgid "Memory the agent keeps across chats"
 msgstr "Memoria che l’agente conserva tra le chat"
 
-#: src/features/settings/components/personalization/memory-item.tsx:249
+#: src/features/settings/components/personalization/memory-item.tsx:260
 msgid "Memory type"
 msgstr "Tipo di ricordo"
 
@@ -20574,7 +20591,7 @@ msgid "Mobile app icon"
 msgstr "Icona app mobile"
 
 #: src/features/chat/host/host-options.tsx:146
-#: src/features/chat/thread/composer.tsx:223
+#: src/features/chat/thread/composer.tsx:224
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
 #: src/features/workflow/components/nodes/text-node.tsx:123
@@ -21139,6 +21156,10 @@ msgstr "Musica"
 msgid "Mute"
 msgstr "Disattiva audio"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:115
+msgid "Mute thread"
+msgstr ""
+
 #: src/features/settings/lib/settings-keywords.ts:105
 msgid "my data"
 msgstr "i miei dati"
@@ -21417,7 +21438,7 @@ msgstr "Neore {0}"
 msgid "Neore agent"
 msgstr "Agente di Neore"
 
-#: src/features/chat/thread/composer.tsx:689
+#: src/features/chat/thread/composer.tsx:690
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore può commettere errori. Verifica le informazioni importanti."
 
@@ -21794,7 +21815,7 @@ msgstr "Risultato successivo"
 msgid "Next option"
 msgstr "Opzione successiva"
 
-#: src/features/chat/thread/composer.tsx:240
+#: src/features/chat/thread/composer.tsx:241
 msgid "Next output mode"
 msgstr "Modalità di output successiva"
 
@@ -22180,11 +22201,11 @@ msgstr "Nessun server MCP configurato. Aggiungi un server per estendere le capac
 msgid "No members in this team yet"
 msgstr "Ancora nessun membro in questo team"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:235
+#: src/features/settings/components/personalization/memory-settings.tsx:236
 msgid "No memories of this type."
 msgstr "Nessun ricordo di questo tipo."
 
-#: src/features/settings/components/personalization/memory-settings.tsx:236
+#: src/features/settings/components/personalization/memory-settings.tsx:237
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "Ancora nessun ricordo. L'IA inizierà a imparare automaticamente dalle tue conversazioni."
 
@@ -22344,7 +22365,7 @@ msgstr "Nessuna skill pubblica corrisponde alla tua ricerca."
 msgid "No public skills yet. Publish one by setting a skill's visibility to Public."
 msgstr "Ancora nessuna skill pubblica. Pubblicane una impostando la visibilità di una skill su Pubblica."
 
-#: src/features/settings/components/personalization/memory-item.tsx:137
+#: src/features/settings/components/personalization/memory-item.tsx:138
 msgid "No quote was kept for this memory."
 msgstr "Per questa memoria non è stata conservata alcuna citazione."
 
@@ -23036,7 +23057,7 @@ msgid "Ollama or LM Studio on localhost, called by your browser. Text only, not 
 msgstr "Ollama o LM Studio su localhost, richiamati dal tuo browser. Solo testo, senza addebiti."
 
 #. placeholder {0}: day(memory.eventStart)
-#: src/features/settings/components/personalization/memory-item.tsx:170
+#: src/features/settings/components/personalization/memory-item.tsx:180
 msgid "On {0}"
 msgstr "Il {0}"
 
@@ -23362,7 +23383,7 @@ msgstr "Aprire un revert di questa {requestNoun}?"
 msgid "Open as page"
 msgstr "Apri come pagina"
 
-#: src/features/settings/components/personalization/memory-item.tsx:149
+#: src/features/settings/components/personalization/memory-item.tsx:159
 msgid "Open chat"
 msgstr "Apri chat"
 
@@ -23425,7 +23446,7 @@ msgid "Open in new window"
 msgstr "Apri in una nuova finestra"
 
 #: src/features/chat/thread-list/thread-node.tsx:590
-#: src/features/chat/thread-list/thread-options-menu.tsx:73
+#: src/features/chat/thread-list/thread-options-menu.tsx:79
 msgid "Open in split view"
 msgstr "Apri in vista divisa"
 
@@ -23445,7 +23466,7 @@ msgstr "Apri link"
 msgid "Open menu"
 msgstr "Apri menu"
 
-#: src/features/settings/components/personalization/memory-item.tsx:149
+#: src/features/settings/components/personalization/memory-item.tsx:159
 msgid "Open message"
 msgstr "Apri messaggio"
 
@@ -23913,6 +23934,10 @@ msgstr "Apertura della pull request…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "Aprire l'assistente senza una conversazione ti porta alla più recente invece che a una chat vuota."
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:112
+msgid "Opening the live view…"
+msgstr ""
+
 #: src/features/pages/components/page-invite-accept.tsx:54
 msgid "Opening the shared page…"
 msgstr "Apertura della pagina condivisa…"
@@ -24268,7 +24293,7 @@ msgstr "Formato di output"
 msgid "Output is not loaded in this view."
 msgstr "L'output non è caricato in questa vista."
 
-#: src/features/chat/thread/composer.tsx:251
+#: src/features/chat/thread/composer.tsx:252
 msgid "Output Mode"
 msgstr "Modalità di output"
 
@@ -25013,7 +25038,7 @@ msgstr "Fissa"
 msgid "Pin a memory to keep it from fading, merging or being promoted. Only activity memories fade on their own."
 msgstr "Fissa una memoria per evitare che sbiadisca, venga unita o promossa. Solo le memorie di attività sbiadiscono da sole."
 
-#: src/features/settings/components/personalization/memory-item.tsx:280
+#: src/features/settings/components/personalization/memory-item.tsx:291
 msgid "Pin memory"
 msgstr "Fissa ricordo"
 
@@ -25086,7 +25111,7 @@ msgstr "piano"
 msgid "Plan"
 msgstr "Piano"
 
-#: src/features/chat/thread/composer.tsx:273
+#: src/features/chat/thread/composer.tsx:274
 msgid "Plan a project or brainstorm ideas..."
 msgstr "Pianifica un progetto o trova idee..."
 
@@ -25634,7 +25659,7 @@ msgstr "Risultato precedente"
 msgid "Previous option"
 msgstr "Opzione precedente"
 
-#: src/features/chat/thread/composer.tsx:206
+#: src/features/chat/thread/composer.tsx:207
 msgid "Previous output mode"
 msgstr "Modalità di output precedente"
 
@@ -27080,12 +27105,12 @@ msgstr "Rigenera"
 msgid "Regenerate response"
 msgstr "Rigenera risposta"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:91
+#: src/features/chat/thread-list/thread-options-menu.tsx:97
 msgid "Regenerate title"
 msgstr "Rigenera titolo"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:85
-#: src/features/chat/thread-list/thread-options-menu.tsx:98
+#: src/features/chat/thread-list/thread-options-menu.tsx:91
+#: src/features/chat/thread-list/thread-options-menu.tsx:122
 msgid "Regenerating the title"
 msgstr "Rigenerazione del titolo"
 
@@ -27510,7 +27535,7 @@ msgstr "Rimosso dai preferiti"
 msgid "Removed:"
 msgstr "Rimossi:"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:72
+#: src/features/chat/thread-list/thread-options-menu.tsx:78
 msgid "Rename"
 msgstr "Rinomina"
 
@@ -27754,7 +27779,7 @@ msgstr "Ricerca"
 msgid "Research a topic"
 msgstr "Fai una ricerca su un argomento"
 
-#: src/features/chat/thread/composer.tsx:275
+#: src/features/chat/thread/composer.tsx:276
 msgid "Research a topic in depth..."
 msgstr "Approfondisci un argomento..."
 
@@ -28614,7 +28639,7 @@ msgstr "Arabia Saudita"
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
 #: src/features/settings/components/chat/custom-providers-settings.tsx:641
 #: src/features/settings/components/chat/native-providers-settings.tsx:712
-#: src/features/settings/components/personalization/memory-item.tsx:344
+#: src/features/settings/components/personalization/memory-item.tsx:355
 #: src/features/slides/components/slide-editor-dialog.tsx:118
 #: src/features/workflow/components/canvas/workflow-controls.tsx:401
 msgid "Save"
@@ -32109,7 +32134,7 @@ msgstr "Riassumi i miei appunti di oggi"
 msgid "Summarise my notes in three bullets."
 msgstr "Riassumi i miei appunti in tre punti."
 
-#: src/features/chat/thread/composer.tsx:272
+#: src/features/chat/thread/composer.tsx:273
 msgid "Summarize a document or URL..."
 msgstr "Riassumi un documento o un URL..."
 
@@ -32793,7 +32818,7 @@ msgstr "testo"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1252
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:128
+#: src/features/chat/thread/composer.tsx:129
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -33153,6 +33178,10 @@ msgstr "L’agente sta ancora aprendo la sua sessione. Riprova tra un attimo."
 msgid "The agent is still working on the last message."
 msgstr "L’agente sta ancora lavorando all’ultimo messaggio."
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:102
+msgid "The agent is using a browser"
+msgstr ""
+
 #: src/features/chat/host/diff-comments-draft.tsx:74
 msgid "The agent is working. You can send these when it is done."
 msgstr "L’agente sta lavorando. Potrai inviarli quando avrà finito."
@@ -33181,7 +33210,7 @@ msgstr "Il piano dell’agente"
 msgid "The agent's tool calls"
 msgstr "Le chiamate agli strumenti dell’agente"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:162
+#: src/features/settings/components/personalization/memory-settings.tsx:163
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "L'IA impara dalle tue conversazioni per personalizzare le risposte e ogni notte riflette su ciò che ha imparato. Tutto ciò che ricorda è elencato qui: puoi modificare, cambiare tipo, fissare o eliminare qualsiasi elemento."
 
@@ -33583,6 +33612,14 @@ msgstr "Il link potrebbe essere errato oppure il proprietario ha reso privata la
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "Il link potrebbe essere errato oppure il proprietario ha annullato la pubblicazione o eliminato la pagina."
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:124
+msgid "The live view could not be opened. Try again."
+msgstr ""
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:117
+msgid "The live view is not available right now."
+msgstr ""
+
 #. placeholder {0}: info.detail
 #: src/features/local-models/lib/local-errors.ts:195
 msgid "The local model reported an error: {0}"
@@ -33747,7 +33784,7 @@ msgstr "La coda è in pausa. Scegli « Invia successivo » per proseguire con i 
 msgid "The quick check only looks at tools from servers you trust. A trusted server's tool descriptions reach the model, so they can influence which calls are approved automatically. Changing a server's address ends its trust."
 msgstr "Il controllo rapido esamina solo gli strumenti dei server di cui ti fidi. Le descrizioni degli strumenti di un server attendibile arrivano al modello, quindi possono influenzare quali chiamate vengono approvate automaticamente. Cambiare l’indirizzo di un server ne revoca l’attendibilità."
 
-#: src/features/settings/components/personalization/memory-item.tsx:137
+#: src/features/settings/components/personalization/memory-item.tsx:138
 msgid "The quote stays hidden while you can't open its chat."
 msgstr "La citazione resta nascosta finché non puoi aprire la sua chat."
 
@@ -34688,7 +34725,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "Verranno eliminati definitivamente {0} account di utenti anonimi e tutti i loro dati. Questa azione non può essere annullata."
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:252
+#: src/features/settings/components/personalization/memory-settings.tsx:253
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "Verranno eliminati definitivamente tutti i {0} ricordi e i relativi riepiloghi giornalieri. L'IA ricomincerà a imparare dalla tua prossima conversazione."
 
@@ -34789,11 +34826,11 @@ msgstr "Gestione delle conversazioni"
 msgid "Thread not found or you don't have access to it"
 msgstr "Conversazione non trovata o non hai accesso"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:69
+#: src/features/chat/thread-list/thread-options-menu.tsx:75
 msgid "Thread options"
 msgstr "Opzioni del thread"
 
-#: src/features/chat/thread-list/thread-options-menu.tsx:57
+#: src/features/chat/thread-list/thread-options-menu.tsx:63
 msgid "Thread options: {label}"
 msgstr "Opzioni del thread: {label}"
 
@@ -35103,6 +35140,10 @@ msgstr "Troppi tentativi. Attendi qualche secondo, poi riprova."
 msgid "too many files"
 msgstr "troppi file"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:123
+msgid "Too many live views were opened. Try again later."
+msgstr ""
+
 #: src/features/chat/guest-links/guest-page.tsx:95
 msgid "Too many messages. Please try again later."
 msgstr "Troppi messaggi. Riprova più tardi."
@@ -35329,7 +35370,7 @@ msgstr "Immagine trasformata"
 msgid "Translate"
 msgstr "Traduci"
 
-#: src/features/chat/thread/composer.tsx:278
+#: src/features/chat/thread/composer.tsx:279
 msgid "Translate text to another language..."
 msgstr "Traduci un testo in un'altra lingua..."
 
@@ -35867,6 +35908,10 @@ msgstr "Annulla"
 msgid "Undo (Ctrl+Z)"
 msgstr "Annulla (Ctrl+Z)"
 
+#: src/features/chat/thread-list/thread-options-menu.tsx:110
+msgid "Unfollow thread"
+msgstr ""
+
 #. placeholder {0}: String(index + 1)
 #: src/features/evals/components/dataset-panel.tsx:181
 msgid "Unfreeze case {0}"
@@ -35997,7 +36042,7 @@ msgstr "Sblocca da sinistra"
 msgid "Unpin from right"
 msgstr "Sblocca da destra"
 
-#: src/features/settings/components/personalization/memory-item.tsx:280
+#: src/features/settings/components/personalization/memory-item.tsx:291
 msgid "Unpin memory"
 msgstr "Sblocca ricordo"
 
@@ -36041,7 +36086,7 @@ msgid "until {0}"
 msgstr "fino al {0}"
 
 #. placeholder {0}: day(memory.validUntil)
-#: src/features/settings/components/personalization/memory-item.tsx:173
+#: src/features/settings/components/personalization/memory-item.tsx:183
 msgid "Until {0}"
 msgstr "Fino al {0}"
 
@@ -37018,7 +37063,7 @@ msgstr "video"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: src/components/model-picker/model-picker.tsx:1278
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:130
+#: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:46
@@ -37559,6 +37604,10 @@ msgstr "Vuoi continuare da qui?"
 msgid "Watch"
 msgstr "Monitora"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:105
+msgid "Watch live"
+msgstr ""
+
 #: src/features/settings/components/chat/event-trigger-fields.tsx:230
 msgid "Watch only this part (optional)"
 msgstr "Monitora solo questa parte (facoltativo)"
@@ -37977,11 +38026,11 @@ msgstr "Perché {0}"
 msgid "Why <0>Neore.</0>"
 msgstr "Perché <0>Neore.</0>"
 
-#: src/features/settings/components/personalization/memory-item.tsx:269
+#: src/features/settings/components/personalization/memory-item.tsx:280
 msgid "Why was this remembered?"
 msgstr "Perché è stato ricordato?"
 
-#: src/features/settings/components/personalization/memory-item.tsx:274
+#: src/features/settings/components/personalization/memory-item.tsx:285
 msgid "Why?"
 msgstr "Perché?"
 
@@ -38154,7 +38203,7 @@ msgstr "Scrivi contenuti lunghi accanto alla chat"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "Scrivi contenuti lunghi in un editor canvas affiancato. Passa dalla chat al documento finito senza cambiare strumento."
 
-#: src/features/chat/thread/composer.tsx:271
+#: src/features/chat/thread/composer.tsx:272
 msgid "Write some code for me..."
 msgstr "Scrivi del codice per me..."
 

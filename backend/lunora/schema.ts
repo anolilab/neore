@@ -426,6 +426,11 @@ export const schema = defineSchema({
         errorMessage: v.optional(v.string()),
         extensionId: v.optional(v.string()),
         extensionVersion: v.optional(v.string()),
+        /**
+         * The deadlines of the browser actions in flight, one per action (its renderer deadline): each holds the browser
+         * until it ends, and removes only its own hold, so overlapping actions never end each other's.
+         */
+        inUseHolds: v.optional(v.array(v.number())),
         lastActivityAt: v.number(),
         providerSessionId: v.optional(v.string()),
         source: v.optional(v.string()),
