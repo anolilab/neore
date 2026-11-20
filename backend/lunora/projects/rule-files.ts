@@ -215,8 +215,8 @@ export const matchesGlob = (glob: string, path: string, shared?: MatchBudget): b
 /**
  * The files a run takes, in the project's order: every `always` file, and each `glob` file one of whose patterns matches
  * one of `paths`. Their text together stays within {@link MAX_RULE_TEXT_PER_RUN}: the file that reaches it is cut there
- * (marked) and the ones after it are left out, counted in `omitted`. A legacy `context` is never cut, as before rule
- * files; it counts against the budget. `matchingCut` says the matching budget ran out, so some pattern was not tried.
+ * (marked) and the ones after it are left out, counted in `omitted`. A legacy `context` is taken whole, as before rule
+ * files, and not counted: one kept beside the files (`keepContext`) would otherwise leave them nothing. `matchingCut` says the matching budget ran out, so some pattern was not tried.
  */
 export const selectRuleFiles = (files: RuleFile[], paths: string[]): { files: RuleFile[]; matchingCut: boolean; omitted: number; truncated: boolean } => {
     const budget: MatchBudget = { steps: GLOB_MATCH_STEPS_PER_RUN };
@@ -228,13 +228,16 @@ export const selectRuleFiles = (files: RuleFile[], paths: string[]): { files: Ru
     let truncated = false;
 
     for (const file of applicable) {
-        const whole = LEGACY_CONTEXT_FILES.has(file);
+        if (LEGACY_CONTEXT_FILES.has(file)) {
+            selected.push(file);
+            continue;
+        }
 
-        if (!whole && left <= 0) {
+        if (left <= 0) {
             break;
         }
 
-        if (!whole && file.content.length > left) {
+        if (file.content.length > left) {
             selected.push({ ...file, content: `${file.content.slice(0, left)}${TRUNCATED_NOTE}` });
             truncated = true;
             left = 0;

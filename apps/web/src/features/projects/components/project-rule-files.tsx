@@ -75,15 +75,22 @@ const sameFile = (file: RuleFileDraft | undefined, saved: RuleFileDraft): boolea
     file.patterns === saved.patterns &&
     file.content === saved.content;
 
+/** The name a file is saved under: the older context's shown in the person's language goes back to the backend's own. */
+const savedTitle = (file: RuleFileDraft, legacyTitle: string): string => {
+    const title = file.title.trim();
+
+    return title === legacyTitle && file.id === LEGACY_CONTEXT_ID ? LEGACY_CONTEXT_TITLE : title;
+};
+
 /** The list as `setProjectRuleFiles` takes it: patterns only on a file applied by pattern. */
-const toSaved = (files: RuleFileDraft[]) =>
+const toSaved = (files: RuleFileDraft[], legacyTitle: string) =>
     files.map((file) => {
         return {
             content: file.content,
             ...(file.mode === "glob" && { globs: patternsOf(file.patterns) }),
             id: file.id,
             mode: file.mode,
-            title: file.title.trim(),
+            title: savedTitle(file, legacyTitle),
         };
     });
 
@@ -209,9 +216,10 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; projectId
     const [baseRevision, setBaseRevision] = useState("");
     const [error, setError] = useState<string | undefined>(undefined);
     const [status, setStatus] = useState("");
+    const legacyTitle = t`Project context`;
     const savedFiles = (data?.files ?? []).map((file) =>
         // The older single context arrives under the backend's English name; it shows in the person's language.
-        toDraft(file.id === LEGACY_CONTEXT_ID && file.title === LEGACY_CONTEXT_TITLE ? { ...file, title: t`Project context` } : file),
+        toDraft(file.id === LEGACY_CONTEXT_ID && file.title === LEGACY_CONTEXT_TITLE ? { ...file, title: legacyTitle } : file),
     );
     const files = draft ?? savedFiles;
     const canEdit = data?.canEdit === true;
@@ -268,7 +276,7 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; projectId
         }
 
         const submitted = draft;
-        const ruleFiles = toSaved(keptLegacyId === undefined ? files : files.filter((file) => file.id !== keptLegacyId));
+        const ruleFiles = toSaved(keptLegacyId === undefined ? files : files.filter((file) => file.id !== keptLegacyId), legacyTitle);
         const keep = keptLegacyId === undefined ? {} : { keepContext: true };
 
         try {

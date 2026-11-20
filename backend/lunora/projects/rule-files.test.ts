@@ -95,12 +95,12 @@ describe("selectRuleFiles", () => {
         expect(renderRuleFiles(selectRuleFiles(projectRuleFiles({ context }), []).files)).toBe(context);
     });
 
-    it("never cuts a legacy context, as before rule files, and counts it against the budget", () => {
+    it("never cuts a legacy context, as before rule files, and leaves the files beside it their whole budget", () => {
         const context = "c".repeat(MAX_RULE_TEXT_PER_RUN + 5);
         const result = selectRuleFiles(projectRuleFiles({ context, ruleFiles: [always("b", "after")] }), []);
 
-        expect(renderRuleFiles(result.files)).toBe(context);
-        expect(result).toMatchObject({ omitted: 1, truncated: false });
+        expect(renderRuleFiles(result.files)).toBe(`${context}\n\nafter`);
+        expect(result).toMatchObject({ omitted: 0, truncated: false });
     });
 
     it("cuts the file that reaches the run's budget and leaves the rest out", () => {

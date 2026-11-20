@@ -16,7 +16,7 @@
   `streamAsync`, tasks via `runProjectFor`), framed `PROJECT CONTEXT:` by the caller. `glob` files match the names of
   the run message's attachments (`chatFiles.filename`, read with `select` so the extracted text is not loaded). Text
   past `MAX_RULE_TEXT_PER_RUN` is cut (marked) and later files left out, except a legacy `context`, which is never cut,
-  as before. Only counts are logged, never file text.
+  as before, and not counted, so files kept beside it still reach runs. Only counts are logged, never file text.
 - Glob matching is `matchesGlob`, never a `RegExp` built from a pattern: one constant-cost step per (pattern, path)
   position, spent from a per-run budget (`GLOB_MATCH_STEPS_PER_RUN`); past it nothing more matches.
 - Size: `normalizeRuleFiles` caps the list at `MAX_RULE_FILES_BYTES` of stored JSON. A rule-file save that grows the

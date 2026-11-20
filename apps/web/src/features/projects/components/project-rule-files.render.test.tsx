@@ -5,13 +5,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ProjectRuleFiles from "./project-rule-files";
 
+// What `t` translates, by source text; empty: every message stays English.
+const translations = vi.hoisted(() => new Map<string, string>());
+
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
 vi.mock("@lingui/react/macro", () => {
     return {
         useLingui: () => {
             return {
                 i18n: { _: (descriptor: { id: string }) => descriptor.id, locale: "en" },
-                t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values),
+                t: (strings: TemplateStringsArray, ...values: unknown[]) => {
+                    const text = String.raw({ raw: strings }, ...values);
+
+                    return translations.get(text) ?? text;
+                },
             };
         },
     };
@@ -64,6 +71,7 @@ const renderEditor = (onDirtyChange?: (dirty: boolean) => void) =>
     );
 
 beforeEach(() => {
+    translations.clear();
     backend.save.mockReset();
     backend.read = undefined;
     backend.save.mockImplementation(async ({ ruleFiles }: { ruleFiles: unknown[] }) => {
@@ -171,6 +179,19 @@ describe("project rule files", () => {
         await user.click(screen.getByRole("button", { name: "Save rule files" }));
 
         expect(backend.save.mock.calls[1]?.[0]).toMatchObject({ revision: "r2", ruleFiles: [{ content: "Use snake_case. Always.", id: "sql" }] });
+    });
+
+    it("saves the older context under the backend's own name, not the one shown in the person's language", async () => {
+        const user = userEvent.setup();
+
+        translations.set("Project context", "Projektkontext");
+        renderEditor();
+
+        await user.click(await screen.findByRole("button", { name: "Move SQL up" }));
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(screen.getByRole("listitem", { name: "Projektkontext" })).toBeTruthy();
+        expect(backend.save.mock.calls[0]?.[0]).toMatchObject({ ruleFiles: [{ id: "sql" }, { id: "context", title: "Project context" }] });
     });
 
     it("shows the list just saved at once, before the list is read again", async () => {
