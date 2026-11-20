@@ -14,7 +14,7 @@ import { internal } from "../../_generated/internal";
 import { applyBotToolSelection } from "../../bots/tool-selection";
 import type { RunToolSelection } from "../../bots/run-tool-selection";
 import { NO_TOOLS_RUN_SELECTION } from "../../bots/run-tool-selection";
-import { deviceServerKey, selectionMayKeepDevices, selectionMayKeepServer, selectionServerKey, serverKeyOf } from "../../bots/tool-selectors";
+import { connectorServerKey, deviceServerKey, selectionMayKeepDevices, selectionMayKeepServer, selectionServerKey } from "../../bots/tool-selectors";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { levelOfConnection, toolOfferedAt } from "../../connectors/access-levels";
@@ -244,6 +244,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
     const [allMcpServers, overrides, timedGrants] = await preferences;
 
+    const selectionRead = readBotToolSelection(ctx, botLookup, userId);
     const [quickCheckOn, connectorServers, pullRequestTools, threadMode, runToolSelection] = await Promise.all([
         // Nobody answers in a headless run, and an outside agent's calls stay `ask` because only the app approves them.
         // Under a cap below `auto` the quick check is off anyway, so its eligibility and trusted servers are not read.
@@ -257,12 +258,23 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
                       return false;
                   }),
-        // A broken connector must never take the run down with it.
-        getConnectorMcpServers(ctx, userId).catch((error: unknown) => {
-            toolsLogger.warn("[TOOLS] Connector servers unavailable:", error);
+        // A broken connector must never take the run down with it. A connector the bot could keep no tool of is not set up at
+        // all: no token is obtained or refreshed for it, and a failed refresh is not recorded against its grant.
+        selectionRead
+            .then(async (read) => {
+                const picked = read?.selection;
 
-            return [];
-        }),
+                return await getConnectorMcpServers(
+                    ctx,
+                    userId,
+                    picked ? (slug: string) => selectionMayKeepServer(picked, connectorServerKey(slug)) : undefined,
+                );
+            })
+            .catch((error: unknown) => {
+                toolsLogger.warn("[TOOLS] Connector servers unavailable:", error);
+
+                return [];
+            }),
         // The pull request tools join only a thread with a linked pull request; a snapshot rebuild already names them.
         snapshot || linkThreadId === undefined
             ? []
@@ -288,7 +300,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
                       return "supervised" as const;
                   }),
-        readBotToolSelection(ctx, botLookup, userId),
+        selectionRead,
     ]);
 
     const botToolSelection = runToolSelection?.selection ?? null;
@@ -318,9 +330,16 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     // does not narrow them — their per-tool permissions do — but a snapshot does.
     selectedServers = [...selectedServers, ...(snapshot ? connectorServers.filter((s) => snapshot.mcpServerNames.includes(s.name)) : connectorServers)];
 
-    // A server none of whose tools the bot could keep is not connected to: nothing is listed only to be dropped below.
+    const savedUrls = (allMcpServers as MCPServerConfig[]).map((server) => server.url);
+    // `savedUrls` are the RUNNING user's; in a collaborator's run the owner's saved keys tell what an exclusion still names.
+    const selectionOwner = { runs: runToolSelection?.ownerId === userId, serverKeys: runToolSelection?.ownerServerKeys ?? [] };
+
+    // A server none of whose tools the bot could keep is not connected to: nothing is listed only to be dropped below. Judged by
+    // the key its tools are matched by below, so a server that keeps none of them (`""`) is not connected to either.
     if (botToolSelection) {
-        selectedServers = selectedServers.filter((server) => selectionMayKeepServer(botToolSelection, serverKeyOf(server)));
+        selectedServers = selectedServers.filter((server) =>
+            selectionMayKeepServer(botToolSelection, selectionServerKey(botToolSelection, server, savedUrls, selectionOwner)),
+        );
     }
 
     const noDevices: DeviceToolsResult = { descriptors: new Map(), tools: {} };
@@ -353,8 +372,6 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         candidates = Object.fromEntries(Object.entries(candidates).filter(([name]) => !disabled.has(name)));
     }
 
-    const savedUrls = (allMcpServers as MCPServerConfig[]).map((server) => server.url);
-
     // The bot's own pick, by built-in name or `<server key>:tool` (`bots/tool-selectors.ts`: a server's stable key, so a rename
     // keeps its selectors matching); it only removes, so every rule below still applies.
     candidates = applyBotToolSelection(candidates, botToolSelection, (name) => {
@@ -362,14 +379,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
         if (mcp) {
             // A server whose key cannot stand for it alone keeps none of its tools (`""`), as one that cannot be told from an excluded one.
-            // `savedUrls` are the RUNNING user's; in a collaborator's run the owner's saved keys tell what an exclusion still names.
-            return {
-                server: selectionServerKey(botToolSelection, mcp, savedUrls, {
-                    runs: runToolSelection?.ownerId === userId,
-                    serverKeys: runToolSelection?.ownerServerKeys ?? [],
-                }),
-                tool: mcp.toolName,
-            };
+            return { server: selectionServerKey(botToolSelection, mcp, savedUrls, selectionOwner), tool: mcp.toolName };
         }
 
         const device = deviceResult.descriptors.get(name);

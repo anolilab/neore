@@ -115,7 +115,25 @@ export const selectionServerKey = (
     return shared || (stale && (owner.runs || ownerKeys.includes(key))) ? "" : key;
 };
 
-const SERVER_KEY = /^(?:mcp|connector|device)=[^\s:]+$/u;
+const SERVER_KEY = /^(mcp|connector|device)=([^\s:]+)$/u;
+
+/**
+ * Whether a key is one the key builders make: decoded and encoded again, it reads the same. Any other spelling of an address
+ * (`mcp=%`, lower-case escapes) names no server, so as an exclusion it would only ever look stale (`selectionServerKey`).
+ */
+const isCanonicalServerKey = (key: string): boolean => {
+    const match = SERVER_KEY.exec(key);
+
+    if (match === null) {
+        return false;
+    }
+
+    try {
+        return keyOf(match[1] ?? "", decodeURIComponent(match[2] ?? "")) === key;
+    } catch {
+        return false;
+    }
+};
 
 // eslint-disable-next-line no-control-regex -- control characters are what this refuses
 const CONTROL_CHARACTERS = /[\u{0}-\u{1F}\u{7F}]/u;
@@ -135,7 +153,7 @@ const isValidSelector = (selector: string): boolean => {
     const parsed = parseServerSelector(selector);
 
     // A server selector must name a server by its key: a display name would stop matching on a rename.
-    return parsed === undefined || (SERVER_KEY.test(parsed.server) && parsed.tool !== "");
+    return parsed === undefined || (isCanonicalServerKey(parsed.server) && parsed.tool !== "");
 };
 
 const normalizeList = (list: ReadonlyArray<string>, builtIns: ReadonlySet<string> | undefined): { error: string } | { selectors: string[] } => {
@@ -210,19 +228,23 @@ export const selectionKeeps = (selection: BotToolSelection | null | undefined, n
 };
 
 /**
- * Whether any tool of a server could be kept: false when the allow list names none of its tools, or the server is excluded
- * whole. A run does not connect to a server none of whose tools it could keep.
+ * Whether any tool of a server could be kept: false when the allow list names none of its tools that the exclusions leave,
+ * or the server is excluded whole. A run does not connect to a server none of whose tools it could keep. `serverKey` is the
+ * key its tools are matched by (`selectionServerKey`), where `""` keeps none of them.
  */
 export const selectionMayKeepServer = (selection: BotToolSelection | null | undefined, serverKey: string | undefined): boolean => {
     if (!selection) {
         return true;
     }
 
-    if (serverKey === undefined || selection.exclude.includes(`${serverKey}:*`)) {
+    if (serverKey === undefined || serverKey === "" || selection.exclude.includes(`${serverKey}:*`)) {
         return false;
     }
 
-    return selection.allow === undefined || selection.allow.some((selector) => parseServerSelector(selector)?.server === serverKey);
+    return (
+        selection.allow === undefined ||
+        selection.allow.some((selector) => parseServerSelector(selector)?.server === serverKey && !selection.exclude.includes(selector))
+    );
 };
 
 /** Whether any device tool could be kept: an allow list must name one (`device=…`). */

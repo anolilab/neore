@@ -29,6 +29,8 @@ const DOCS = mcpServerKey(DOCS_URL) ?? "";
 
 /** The servers each run connected to. */
 const connected = vi.hoisted(() => [] as string[][]);
+/** Of the user's connectors (gmail, slack), the ones each run set up: `null` when it set up every one. */
+const connectorsSetUp = vi.hoisted(() => [] as (string[] | null)[]);
 
 vi.mock("./mcp-tools", () => {
     return {
@@ -59,7 +61,11 @@ vi.mock("./mcp-tools", () => {
 
 vi.mock("../../connectors/lib/grant-runtime", () => {
     return {
-        getConnectorMcpServers: async () => [],
+        getConnectorMcpServers: async (_ctx: unknown, _userId: string, keep?: (slug: string) => boolean) => {
+            connectorsSetUp.push(keep ? ["gmail", "slack"].filter((slug) => keep(slug)) : null);
+
+            return [];
+        },
         withMcpServerGrants: async (_ctx: unknown, _userId: string, servers: unknown[]) => servers,
     };
 });
@@ -140,6 +146,7 @@ const unattendedForBot = async (): Promise<string[]> => {
 
 beforeEach(() => {
     connected.length = 0;
+    connectorsSetUp.length = 0;
     extraServers = [];
     botOwner = "owner";
     ownerServerKeys = [];
@@ -213,6 +220,32 @@ describe("buildAgentTools with a bot's tool selection", () => {
         await chatInBotThread();
 
         expect(connected).toStrictEqual([[], ["mail"]]);
+    });
+
+    it("connects to no user server once an excluded address went stale, nor to a server whose every allowed tool is excluded", async () => {
+        selection = { exclude: [`${mcpServerKey("https://docs.example/old-mcp") ?? ""}:*`] };
+
+        await chatInBotThread();
+
+        selection = { allow: [`${DOCS}:read`, "webSearch"], exclude: [`${DOCS}:read`] };
+
+        expect(await chatInBotThread()).toStrictEqual(["webSearch"]);
+        expect(connected).toStrictEqual([[], []]);
+    });
+
+    it("sets up only the connectors the selection could keep a tool of, and every one with no selection", async () => {
+        await chatInBotThread();
+
+        selection = { allow: [], exclude: [] };
+        await chatInBotThread();
+
+        selection = { allow: ["connector=slack:post"], exclude: [] };
+        await chatInBotThread();
+
+        selection = { exclude: ["connector=gmail:*"] };
+        await chatInBotThread();
+
+        expect(connectorsSetUp).toStrictEqual([null, [], ["slack"], ["slack"]]);
     });
 
     it("gives no tools for an empty allow list, and none when the selection cannot be read", async () => {

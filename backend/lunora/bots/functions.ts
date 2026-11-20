@@ -65,7 +65,26 @@ const selectionCounts = (selection: BotToolSelection | undefined): { allowed: nu
     return { allowed: selection?.allow?.length ?? "all", excluded: selection?.exclude.length ?? 0 };
 };
 
-const sameSelection = (a: BotToolSelection | undefined, b: BotToolSelection | undefined): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+/** Whether two lists name the same selectors, whatever their order or repeats. An absent allow list stays apart from an empty one. */
+const sameList = (a: ReadonlyArray<string> | undefined, b: ReadonlyArray<string> | undefined): boolean => {
+    if (a === undefined || b === undefined) {
+        return a === b;
+    }
+
+    const left = new Set(a);
+    const right = new Set(b);
+
+    return left.size === right.size && [...left].every((selector) => right.has(selector));
+};
+
+/** Whether two selections keep the same tools: each list compared as a set; `null` and absent are every tool. */
+const sameSelection = (a: BotToolSelection | null | undefined, b: BotToolSelection | null | undefined): boolean => {
+    if (!a || !b) {
+        return !a && !b;
+    }
+
+    return sameList(a.allow, b.allow) && sameList(a.exclude, b.exclude);
+};
 
 /**
  * `null` = every tool, stored as no selection; anything else is normalized, or refused when it breaks a cap or names a
@@ -180,6 +199,9 @@ export const updateBot = authMutation
     .use(rateLimit("bots/update"))
     .input({
         botId: v.id("bots"),
+        // The tool selection the change was made from (`null` = every tool): a save is refused when the stored one differs,
+        // so an editor open since before another save cannot overwrite it.
+        expectedToolSelection: v.optional(v.union(vToolSelectionInput, v.null())),
         patch: v.object({
             computerEnabled: v.optional(v.boolean()),
             description: v.optional(v.string().max(MAX_LENGTH.long)),
@@ -193,12 +215,16 @@ export const updateBot = authMutation
     })
     // The bot's tool selection as stored after the patch (`null` = every tool), so the client can show it before its list refreshes.
     .output(v.object({ toolSelection: v.union(vToolSelection, v.null()) }))
-    .mutation(async ({ args: { botId, patch }, ctx: context }) => {
+    .mutation(async ({ args: { botId, expectedToolSelection, patch }, ctx: context }) => {
         const { userId } = context.user;
         const bot = await context.db.get("bots", botId as Id<"bots">);
 
         if (!bot || bot.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Bot not found");
+        }
+
+        if (expectedToolSelection !== undefined && !sameSelection(bot.toolSelection, expectedToolSelection)) {
+            throw new LunoraError("CONFLICT", "The bot's tools were changed elsewhere. Reload them and try again.");
         }
 
         if (patch.model !== undefined) {

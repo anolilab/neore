@@ -143,7 +143,8 @@ const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: s
 /**
  * Whether the bot an app call runs under keeps the tool (`bots/tool-selectors.ts`). The chat's bot when the call names the chat.
  * A call that names none (a client from before the chat was sent) cannot tell which bot it is under, so it is refused when
- * any of the caller's bots has a selection; a failed read refuses it too. Never more tools than the bot chose.
+ * any of the caller's bots has a selection. A failed read refuses it too, as `unavailable`: the call is not run, but the
+ * reason is a lookup to retry, not an excluded tool. Never more tools than the bot chose.
  */
 const botKeepsAppTool = async (
     context: HttpActionCtx,
@@ -151,14 +152,16 @@ const botKeepsAppTool = async (
     thread: ThreadAppAccess | undefined,
     serverConfig: Pick<MCPServerConfig, "connectorSlug" | "url">,
     toolName: string,
-): Promise<boolean> => {
+): Promise<"kept" | "refused" | "unavailable"> => {
+    const verdict = (keeps: boolean): "kept" | "refused" => (keeps ? "kept" : "refused");
+
     try {
         if (!thread) {
-            return !(await context.runQuery(internal.bots.functions.hasBotWithToolSelection, { userId }));
+            return verdict(!(await context.runQuery(internal.bots.functions.hasBotWithToolSelection, { userId })));
         }
 
         if (!thread.toolSelection) {
-            return true;
+            return "kept";
         }
 
         // The caller's saved servers tell whether the key stands for this server alone, as in the run (`selectionServerKey`); for
@@ -167,14 +170,16 @@ const botKeepsAppTool = async (
         const savedUrls = await context.runQuery(internal.bots.functions.getSavedMcpServerUrls, { userId });
         const { ownerId, ownerServerKeys, selection } = thread.toolSelection;
 
-        return selectionKeeps(selection, toolName, {
-            server: selectionServerKey(selection, serverConfig, savedUrls, { runs: ownerId === userId, serverKeys: ownerServerKeys }),
-            tool: toolName,
-        });
+        return verdict(
+            selectionKeeps(selection, toolName, {
+                server: selectionServerKey(selection, serverConfig, savedUrls, { runs: ownerId === userId, serverKeys: ownerServerKeys }),
+                tool: toolName,
+            }),
+        );
     } catch (error: unknown) {
         toolsLogger.warn("[MCP] Bot tool selection lookup failed for an app call; denied:", error, { userId });
 
-        return false;
+        return "unavailable";
     }
 };
 
@@ -497,7 +502,13 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
     }
 
     // The bot the chat runs as narrows what its apps may call, as it narrows the model's tools.
-    if (!(await botKeepsAppTool(context, user._id, thread, serverConfig, toolName))) {
+    const botVerdict = await botKeepsAppTool(context, user._id, thread, serverConfig, toolName);
+
+    if (botVerdict === "unavailable") {
+        return Response.json({ error: `The bot's tools could not be checked for "${toolName}". Try again in a moment.` }, { status: 503 });
+    }
+
+    if (botVerdict === "refused") {
         return Response.json(
             {
                 error: thread

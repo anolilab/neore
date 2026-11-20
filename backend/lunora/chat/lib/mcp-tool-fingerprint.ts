@@ -169,7 +169,7 @@ export const mcpToolOrigin = async (source: {
     return toHex(digest).slice(0, FINGERPRINT_HEX_LENGTH);
 };
 
-export type McpToolDrift = "changed" | "removed" | "replaced" | "unchanged" | "unverified";
+export type McpToolDrift = "ambiguous" | "changed" | "removed" | "replaced" | "unchanged" | "unverified";
 
 /**
  * How the MCP tool `name` stands now against the run that paused. `unchanged` also covers a tool the snapshot did not
@@ -203,15 +203,16 @@ const originNamesIn = (origins: Readonly<Record<string, string>> | undefined, or
 /**
  * How the origin of the tool `name` stands against the run that paused ({@link mcpToolOrigin}). `unchanged` for a name the
  * snapshot recorded no origin for (not an MCP tool, or a snapshot written before origins were). A name the rebuilt run
- * still offers under another origin, or as no MCP tool at all, is `replaced`; so is one whose origin either run lists under two
- * names, as two saved entries of one name and address do.
+ * still offers under another origin, or as no MCP tool at all, is `replaced`. One whose origin either run lists under two
+ * names is `ambiguous`: two saved entries of one name and address (each with its own headers) share an origin, and an entry
+ * has no identity of its own to tell them apart, so the call is never run, and only renaming one of them lets it run.
  */
 export const mcpToolOriginDrift = (
     saved: Readonly<Record<string, string>> | undefined,
     current: Readonly<Record<string, string>>,
     name: string,
     offered: boolean,
-): "removed" | "replaced" | "unchanged" => {
+): "ambiguous" | "removed" | "replaced" | "unchanged" => {
     const before = saved && Object.hasOwn(saved, name) ? saved[name] : undefined;
 
     if (before === undefined) {
@@ -225,7 +226,7 @@ export const mcpToolOriginDrift = (
     // Two saved entries of one name and address (each with its own headers) share an origin, so it cannot tell which one the
     // call was approved for: denied when either run lists the origin under more than one name.
     if (originNamesIn(saved, before) > 1 || originNamesIn(current, before) > 1) {
-        return "replaced";
+        return "ambiguous";
     }
 
     return Object.hasOwn(current, name) && current[name] === before ? "unchanged" : "replaced";
@@ -234,6 +235,9 @@ export const mcpToolOriginDrift = (
 /** What the model reads in place of the result of an approved call whose tool changed, went away or could not be checked. */
 export const mcpToolDriftReason = (drift: Exclude<McpToolDrift, "unchanged">): string => {
     switch (drift) {
+        case "ambiguous": {
+            return "This call was not run: two of the user's saved servers have the same name and address, so which one the call was approved for cannot be told, and calling again would end the same way. Ask the user to rename one of them in Settings, then call the tool again.";
+        }
         case "changed": {
             return "This call was not run: the tool's definition changed on its server after the call was approved. Read the tool's current inputs and call it again if it is still needed.";
         }

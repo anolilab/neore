@@ -1,7 +1,7 @@
 import { dynamicTool, jsonSchema, type JSONSchema7, type ToolSet } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
-import { FINGERPRINT_DEADLINE_MS, fingerprintMcpTool, mcpToolDrift, mcpToolOrigin, mcpToolOriginDrift } from "./mcp-tool-fingerprint";
+import { FINGERPRINT_DEADLINE_MS, fingerprintMcpTool, mcpToolDrift, mcpToolDriftReason, mcpToolOrigin, mcpToolOriginDrift } from "./mcp-tool-fingerprint";
 
 /** An MCP tool shaped like the ones the MCP client builds from a `tools/list` entry. */
 const mcpTool = (schema: JSONSchema7 | PromiseLike<JSONSchema7>): ToolSet[string] =>
@@ -239,11 +239,20 @@ describe(mcpToolOriginDrift, () => {
         expect(mcpToolOriginDrift(saved, { mcp_Docs__search: "bbb" }, "mcp_Docs__search", true)).toBe("replaced");
     });
 
-    // Two saved entries of one name and address share an origin: it cannot say which entry the approval was for.
-    it("is replaced when either run lists the origin under two names", () => {
-        expect(mcpToolOriginDrift(saved, { mcp_Docs__search: "aaa", mcp_Docs__search_2: "aaa" }, "mcp_Docs__search", true)).toBe("replaced");
-        expect(mcpToolOriginDrift({ mcp_Docs__search: "aaa", mcp_Docs__search_2: "aaa" }, { mcp_Docs__search: "aaa" }, "mcp_Docs__search", true)).toBe(
-            "replaced",
+    // Two saved entries of one name and address share an origin: it cannot say which entry the approval was for, and asking
+    // again cannot either, so the reason says how to tell them apart instead of to call again.
+    it("is ambiguous when either run lists the origin under two names", async () => {
+        const docs = { endpoint: "https://docs.example/mcp", protocol: "http", serverName: "Docs", toolName: "search" };
+        const shared = await mcpToolOrigin(docs);
+        const renamed = await mcpToolOrigin({ ...docs, serverName: "Docs (work)" });
+        const twice = { mcp_Docs__search: shared, mcp_Docs__search_2: shared };
+
+        expect(mcpToolOriginDrift({ mcp_Docs__search: shared }, twice, "mcp_Docs__search", true)).toBe("ambiguous");
+        expect(mcpToolOriginDrift(twice, { mcp_Docs__search: shared }, "mcp_Docs__search", true)).toBe("ambiguous");
+        expect(mcpToolDriftReason("ambiguous")).toContain("rename one of them");
+        // Renamed, the two entries have their own origins, and an approval for one runs.
+        expect(mcpToolOriginDrift({ mcp_Docs__search: shared }, { mcp_Docs__search: shared, mcp_Docs__search_2: renamed }, "mcp_Docs__search", true)).toBe(
+            "unchanged",
         );
     });
 });

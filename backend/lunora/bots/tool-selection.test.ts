@@ -112,6 +112,13 @@ describe("normalizeBotToolSelection", () => {
         expect(normalizeBotToolSelection({ exclude: ["docs:*"] })).toHaveProperty("error");
         expect(normalizeBotToolSelection({ allow: ["GitHub:create_issue"], exclude: [] })).toHaveProperty("error");
         expect(normalizeBotToolSelection({ exclude: [`${DOCS}:`] })).toHaveProperty("error");
+        // A spelling no key builder makes names no server: excluded, it would only look like an edited address.
+        expect(normalizeBotToolSelection({ exclude: ["mcp=%:*"] })).toHaveProperty("error");
+        expect(normalizeBotToolSelection({ exclude: [`${DOCS.toLowerCase()}:*`] })).toHaveProperty("error");
+        // A canonical key is taken whether or not the server is still saved or connected.
+        expect(normalizeBotToolSelection({ exclude: ["connector=gone:*", "device=d-1:*"] })).toStrictEqual({
+            selection: { exclude: ["connector=gone:*", "device=d-1:*"] },
+        });
     });
 
     it("refuses, given the built-in names, a built-in selector that names none: a mistyped exclusion would remove nothing", () => {
@@ -135,6 +142,12 @@ describe("selectionMayKeepServer", () => {
         expect(selectionMayKeepServer({ allow: [`${DOCS}:read`], exclude: [] }, DOCS)).toBe(true);
         expect(selectionMayKeepServer({ exclude: [`${DOCS}:*`] }, DOCS)).toBe(false);
         expect(selectionMayKeepServer({ exclude: [] }, undefined)).toBe(false);
+        // A server whose key cannot stand for it alone (`selectionServerKey`) keeps none of its tools.
+        expect(selectionMayKeepServer({ exclude: [] }, "")).toBe(false);
+        // Every allowed tool also excluded: nothing to keep. One allowed tool left over still connects.
+        expect(selectionMayKeepServer({ allow: [`${DOCS}:read`], exclude: [`${DOCS}:read`] }, DOCS)).toBe(false);
+        expect(selectionMayKeepServer({ allow: [`${DOCS}:read`, `${DOCS}:search`], exclude: [`${DOCS}:read`] }, DOCS)).toBe(true);
+        expect(selectionMayKeepServer({ allow: [`${DOCS}:*`], exclude: [`${DOCS}:read`] }, DOCS)).toBe(true);
         expect(selectionMayKeepDevices({ allow: ["webSearch"], exclude: [] })).toBe(false);
         expect(selectionMayKeepDevices({ exclude: [] })).toBe(true);
     });

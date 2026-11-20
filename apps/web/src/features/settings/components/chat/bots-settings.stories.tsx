@@ -77,6 +77,13 @@ const openTools = async (canvas: ReturnType<typeof within>): Promise<HTMLElement
     return await screen.findByRole("dialog");
 };
 
+/** Waits for every list a typed server name resolves against: until all are read, a name is not added. */
+const catalogRead = async (): Promise<void> => {
+    await lunoraAnswered(api.auth.functions.getAIUserPreferences);
+    await lunoraAnswered(api.connectors.user_connectors.listConnectorCatalog);
+    await lunoraAnswered(api.devices.functions.listDevices);
+};
+
 /** A bot with a custom tool pick; the new-bot form starts on all tools and opens the lists under Custom. */
 export const CustomTools: Story = {
     play: async ({ canvas }) => {
@@ -111,9 +118,34 @@ export const SaveFails: Story = {
         await userEvent.click(within(dialog).getByRole("radio", { name: "All tools" }));
         await userEvent.click(within(dialog).getByRole("button", { name: "Save tools" }));
 
-        await waitFor(async () => await expect(await screen.findByText("Could not save the bot's tools. Its tools are unchanged.")).toBeVisible());
+        await waitFor(
+            async () => await expect(await screen.findByText("Could not confirm that the bot's tools were saved. Check them and try again.")).toBeVisible(),
+        );
         await expect(screen.getByRole("dialog")).toBeVisible();
         await expect(canvas.getByText("Custom tools")).toBeVisible();
+    },
+};
+
+/** A save the server refuses outright (a bad pick): nothing was stored, and the server's reason is shown with it. */
+export const SaveRefused: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(...botFixtures(), lunoraError(api.bots.functions.updateBot, "BAD_REQUEST", "No built-in tool is named oldTool", 400)),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await lunoraAnswered(api.bots.functions.listBots);
+        const dialog = await openTools(canvas);
+
+        await waitFor(async () => await expect(within(dialog).getByRole("button", { name: "Remove docs:*" })).toBeVisible());
+        await userEvent.click(within(dialog).getByRole("radio", { name: "All tools" }));
+        await userEvent.click(within(dialog).getByRole("button", { name: "Save tools" }));
+
+        await waitFor(async () => await expect(await screen.findByText("Could not save the bot's tools. Its tools are unchanged.")).toBeVisible());
+        await expect(screen.getByText("No built-in tool is named oldTool")).toBeVisible();
+        await expect(screen.getByRole("dialog")).toBeVisible();
     },
 };
 
@@ -140,6 +172,7 @@ export const SavesTypedName: Story = {
         savedPatches.length = 0;
         await lunoraAnswered(api.bots.functions.listBots);
         await lunoraAnswered(api.chat.tool_permissions.getToolPermissionSettings);
+        await catalogRead();
         const dialog = await openTools(canvas);
 
         await waitFor(async () => await expect(within(dialog).getByRole("combobox", { name: "Excluded tools" })).toBeVisible());
@@ -248,14 +281,14 @@ export const DisconnectedConnector: Story = {
     play: async ({ canvas }) => {
         disconnectedPatches.length = 0;
         await lunoraAnswered(api.bots.functions.listBots);
-        await lunoraAnswered(api.connectors.user_connectors.listConnectorCatalog);
+        await catalogRead();
         const dialog = await openTools(canvas);
 
         // The dialog opens with an animation (a sheet on a phone).
         await waitFor(async () => await expect(within(dialog).getByRole("button", { name: "Remove Gmail:*" })).toBeVisible());
         await expect(within(dialog).getByRole("button", { name: "Remove Gmail:*" }).closest("li")).toHaveTextContent("(disconnected)");
         // A connector that is not in the catalog at all is the one removed.
-        await expect(within(dialog).getByRole("button", { name: "Remove Removed server:*" })).toBeVisible();
+        await expect(await within(dialog).findByRole("button", { name: "Remove Removed server:*" })).toBeVisible();
         // Only a connector a run can use is offered; a disconnected one can still be typed.
         const excluded = within(dialog).getByRole("combobox", { name: "Excluded tools" });
         const offered = excluded instanceof HTMLInputElement ? [...(excluded.list?.options ?? [])].map((option) => option.value) : [];
@@ -344,6 +377,7 @@ export const RefusesUnaddedTool: Story = {
     play: async ({ canvas }) => {
         refusedPatches.length = 0;
         await lunoraAnswered(api.bots.functions.listBots);
+        await catalogRead();
         const dialog = await openTools(canvas);
 
         await waitFor(async () => await expect(within(dialog).getByRole("combobox", { name: "Excluded tools" })).toBeVisible());
@@ -404,6 +438,9 @@ const slowSave: { finish?: () => void } = {};
  * before the save landed, takes the saved pick instead of writing the old one back.
  */
 export const EarlierSaveKeepsReopenedDialog: Story = {
+    beforeEach: () => {
+        slowSave.finish = undefined;
+    },
     parameters: {
         msw: {
             handlers: {
@@ -431,8 +468,11 @@ export const EarlierSaveKeepsReopenedDialog: Story = {
         await waitFor(async () => await expect(screen.queryByRole("dialog")).toBeNull());
 
         await openTools(canvas);
-        await waitFor(async () => await expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Save tools" })).toBeVisible());
+        // The first save is still in flight: the button says so, and takes no second save meanwhile.
+        await waitFor(async () => await expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Saving tools…" })).toBeDisabled());
         await expect(within(screen.getByRole("dialog")).getByRole("radio", { name: "Custom" })).toBeChecked();
+        // Released only once this run's save reached the server.
+        await waitFor(async () => await expect(slowSave.finish).toBeDefined());
         slowSave.finish?.();
         await lunoraAnswered(api.bots.functions.updateBot);
         // The save then refreshes the bots list before it would close a dialog.
@@ -448,7 +488,10 @@ const heldList: { held: boolean; waiting: (() => void)[] } = { held: false, wait
 /** The patches the reopen story below sent. */
 const reopenedPatches: unknown[] = [];
 
-/** A dialog reopened before the bots list refreshed starts from the pick just saved, and saving it again keeps that pick. */
+/**
+ * A dialog reopened before the bots list refreshed starts from the pick just saved; saving it unchanged writes nothing, so
+ * a copy read before a save in another tab can never put the older pick back.
+ */
 export const ReopenBeforeRefresh: Story = {
     beforeEach: () => {
         // Reads a failed run left held are answered, so they do not keep the mock backend busy.
@@ -501,7 +544,8 @@ export const ReopenBeforeRefresh: Story = {
 
         await waitFor(async () => await expect(within(reopened).getByRole("radio", { name: "All tools" })).toBeChecked());
         await userEvent.click(within(reopened).getByRole("button", { name: "Save tools" }));
-        await waitFor(async () => await expect(reopenedPatches).toStrictEqual([{ toolSelection: null }, { toolSelection: null }]));
+        await waitFor(async () => await expect(screen.queryByRole("dialog")).toBeNull());
+        await expect(reopenedPatches).toStrictEqual([{ toolSelection: null }]);
 
         heldList.held = false;
 
@@ -553,6 +597,102 @@ export const CreateLocksForm: Story = {
         await waitFor(async () => await expect(canvas.getByRole("textbox", { name: "Name" })).toBeEnabled());
         await expect(canvas.getByRole("textbox", { name: "Name" })).toHaveValue("");
         await expect(canvas.getByRole("radio", { name: "Custom" })).not.toHaveAttribute("aria-disabled", "true");
+    },
+};
+
+/** The patches the conflict story below sent: one, made from the pick the dialog opened with. */
+const conflictArgs: unknown[] = [];
+
+/** The bot's update, refused as made from a pick saved over since; records what was sent. */
+const conflictingSave = (): LunoraFixture => {
+    const refused = lunoraError(api.bots.functions.updateBot, "CONFLICT", "Changed elsewhere", 409);
+
+    return {
+        answer: async (args) => {
+            conflictArgs.push(args);
+
+            return await refused.answer(args);
+        },
+        functionPath: refused.functionPath,
+    };
+};
+
+/** A save refused because the bot's tools were saved elsewhere since: the dialog shows the stored pick again, to change from there. */
+export const SaveConflicts: Story = {
+    beforeEach: () => {
+        conflictArgs.length = 0;
+    },
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(...botFixtures(), conflictingSave()),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await lunoraAnswered(api.bots.functions.listBots);
+        const dialog = await openTools(canvas);
+
+        await waitFor(async () => await expect(within(dialog).getByRole("radio", { name: "Custom" })).toBeChecked());
+        await userEvent.click(within(dialog).getByRole("radio", { name: "All tools" }));
+        await userEvent.click(within(dialog).getByRole("button", { name: "Save tools" }));
+
+        await waitFor(async () => await expect(await screen.findByText(/This bot's tools were changed elsewhere/u)).toBeVisible());
+        await expect(within(screen.getByRole("dialog")).getByRole("radio", { name: "Custom" })).toBeChecked();
+        await expect(conflictArgs).toStrictEqual([{ botId: BOT._id, expectedToolSelection: BOT.toolSelection, patch: { toolSelection: null } }]);
+    },
+};
+
+/** Until every list is read, a typed name waits in the field: a list still loading may hold another server of that name. */
+export const NameWaitsForEveryList: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(...botFixtures(), lunoraPending(api.devices.functions.listDevices)),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await lunoraAnswered(api.bots.functions.listBots);
+        await lunoraAnswered(api.auth.functions.getAIUserPreferences);
+        const dialog = await openTools(canvas);
+
+        await waitFor(async () => await expect(within(dialog).getByRole("combobox", { name: "Excluded tools" })).toBeVisible());
+        await userEvent.type(within(dialog).getByRole("combobox", { name: "Excluded tools" }), "docs:search{Enter}");
+
+        await expect(within(dialog).getByText(/still loading. Try again in a moment/u)).toBeVisible();
+        await expect(within(dialog).queryByRole("button", { name: "Remove docs:search" })).toBeNull();
+    },
+};
+
+/** Two servers sharing a name are told apart by their address, in the list and in each remove button's name. */
+export const ServersShareName: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...botFixtures(),
+                    // Later wins: the user's servers, two of them named docs.
+                    ...userFixtures({
+                        preferences: {
+                            mcpServers: [
+                                { enabled: true, name: "docs", protocol: "http", url: "https://docs.example/mcp" },
+                                { enabled: true, name: "docs", protocol: "http", url: "https://other.example/mcp" },
+                            ],
+                        },
+                    }),
+                    lunora(api.bots.functions.listBots, [{ ...BOT, toolSelection: { exclude: [`${DOCS}:*`, "mcp=https%3A%2F%2Fother.example%2Fmcp:*"] } }]),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await lunoraAnswered(api.bots.functions.listBots);
+        await catalogRead();
+        const dialog = await openTools(canvas);
+
+        await waitFor(async () => await expect(within(dialog).getByRole("button", { name: "Remove docs (docs.example/mcp):*" })).toBeVisible());
+        await expect(within(dialog).getByRole("button", { name: "Remove docs (other.example/mcp):*" })).toBeVisible();
     },
 };
 

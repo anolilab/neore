@@ -141,6 +141,23 @@ describe("a bot's tool selection", () => {
         expect(await selectionOf(await created())).toBeUndefined();
     });
 
+    it("refuses a save made from a selection that was changed since, and keeps the stored one", async () => {
+        const botId = await created();
+
+        // Another tab restricted the bot while this editor still showed every tool.
+        await as(OWNER).mutation(updateBot as never, { botId, patch: { toolSelection: { exclude: ["webSearch"] } } } as never);
+
+        await expect(
+            as(OWNER).mutation(updateBot as never, { botId, expectedToolSelection: null, patch: { toolSelection: { exclude: [`${DOCS}:*`] } } } as never),
+        ).rejects.toMatchObject({ code: "CONFLICT" });
+        expect(await selectionOf(botId)).toStrictEqual({ exclude: ["webSearch"] });
+
+        // Made from the stored one, it is taken.
+        await expect(
+            as(OWNER).mutation(updateBot as never, { botId, expectedToolSelection: { exclude: ["webSearch"] }, patch: { toolSelection: null } } as never),
+        ).resolves.toStrictEqual({ toolSelection: null });
+    });
+
     it("logs one event per change of a selection, with the bot and counts, never the selectors", async () => {
         const log = (await harness.run(async (ctx: any) => ctx.log)) as { event: (...args: unknown[]) => void };
         const events: unknown[] = [];
@@ -154,13 +171,23 @@ describe("a bot's tool selection", () => {
         const botId = await created({ allow: ["webSearch"], exclude: [`${DOCS}:*`] });
 
         await as(OWNER).mutation(updateBot as never, { botId, patch: { toolSelection: { allow: ["webSearch"], exclude: [`${DOCS}:*`] } } } as never);
+        await as(OWNER).mutation(
+            updateBot as never,
+            { botId, patch: { toolSelection: { allow: ["webSearch"], exclude: [`${DOCS}:*`, `${DOCS}:read`] } } } as never,
+        );
+        // The same selectors in another order keep the same tools: no change to log.
+        await as(OWNER).mutation(
+            updateBot as never,
+            { botId, patch: { toolSelection: { allow: ["webSearch"], exclude: [`${DOCS}:read`, `${DOCS}:*`] } } } as never,
+        );
         await as(OWNER).mutation(updateBot as never, { botId, patch: { name: "renamed" } } as never);
         await as(OWNER).mutation(updateBot as never, { botId, patch: { toolSelection: null } } as never);
         await created();
 
         expect(events).toStrictEqual([
             { botId, fromAllowed: "all", fromExcluded: 0, toAllowed: 1, toExcluded: 1 },
-            { botId, fromAllowed: 1, fromExcluded: 1, toAllowed: "all", toExcluded: 0 },
+            { botId, fromAllowed: 1, fromExcluded: 1, toAllowed: 1, toExcluded: 2 },
+            { botId, fromAllowed: 1, fromExcluded: 2, toAllowed: "all", toExcluded: 0 },
         ]);
         expect(JSON.stringify(events)).not.toContain("docs.example");
     });

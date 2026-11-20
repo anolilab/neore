@@ -3,8 +3,19 @@ import { describe, expect, it } from "vitest";
 
 import { resolveTypedSelector } from "./bot-tool-selection";
 
-const DOCS = mcpServerKey("https://docs.example/mcp") ?? "";
-const OTHER = mcpServerKey("https://other.example/mcp") ?? "";
+/** A server's key, or a failed setup: an empty key would let the cases pass with selectors no server can have. */
+const keyOf = (url: string): string => {
+    const key = mcpServerKey(url);
+
+    if (key === undefined) {
+        throw new Error(`No server key for ${url}`);
+    }
+
+    return key;
+};
+
+const DOCS = keyOf("https://docs.example/mcp");
+const OTHER = keyOf("https://other.example/mcp");
 
 describe(resolveTypedSelector, () => {
     it("names a server saved twice under one name and address once", () => {

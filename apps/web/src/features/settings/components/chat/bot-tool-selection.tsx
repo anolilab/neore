@@ -130,6 +130,27 @@ export const resolveTypedSelector = (typed: string, servers: ReadonlyArray<Known
     return matches.length === 0 ? null : selectorsFor(matches);
 };
 
+/** What tells a server apart from another of its name, from its key: a user server's host and path (never its query or
+ * credentials), a computer's id. */
+const serverPlaceOf = (key: string): string | undefined => {
+    try {
+        if (key.startsWith("device=")) {
+            return decodeURIComponent(key.slice("device=".length));
+        }
+
+        if (!key.startsWith("mcp=")) {
+            return undefined;
+        }
+
+        const url = new URL(decodeURIComponent(key.slice("mcp=".length)));
+
+        return `${url.host}${url.pathname === "/" ? "" : url.pathname}` || undefined;
+    } catch {
+        // Not a key the app made: shown by its name alone.
+        return undefined;
+    }
+};
+
 interface SelectorListProps {
     catalog: ToolCatalog;
     description: string;
@@ -154,6 +175,7 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
     const [unknownServer, setUnknownServer] = useState<string | null>(null);
     const [unknownBuiltIn, setUnknownBuiltIn] = useState<string | null>(null);
     const [overCap, setOverCap] = useState(false);
+    const [tooLong, setTooLong] = useState(false);
     const full = values.length >= BOT_TOOL_SELECTOR_MAX_COUNT;
     // A name refused while the lists were not read was refused for that reason only: once they load (or fail), the reason is
     // dropped and the text waits in the field, still pending, to be added again.
@@ -172,7 +194,7 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
         catalog.builtInNames !== undefined &&
         values.some((selector) => parseServerSelector(selector) === undefined && catalog.builtInNames?.has(selector) !== true);
     // What was typed could not be added.
-    const entryRefused = unknownServer !== null || unknownBuiltIn !== null || overCap;
+    const entryRefused = unknownServer !== null || unknownBuiltIn !== null || overCap || tooLong;
     const describedBy = [descriptionId, entryRefused && errorId, stale && staleId].filter(Boolean).join(" ");
 
     /** Why a bare name was not added: not a built-in, or the built-ins are not read (yet, or at all). */
@@ -209,7 +231,10 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
         const name = catalog.servers.find((server) => server.key === parsed.server)?.name;
 
         if (name !== undefined) {
-            return `${name}:${parsed.tool}`;
+            // Servers sharing a name are told apart by where they are.
+            const where = catalog.servers.some((server) => server.name === name && server.key !== parsed.server) ? serverPlaceOf(parsed.server) : undefined;
+
+            return where === undefined ? `${name}:${parsed.tool}` : `${name} (${where}):${parsed.tool}`;
         }
 
         // Unlisted only means removed once every list was read; until then the stored key is all that is known.
@@ -239,11 +264,23 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
             return;
         }
 
-        const resolved = resolveTypedSelector(typed, catalog.servers);
+        const known = catalog.servers.some((server) => server.key === parseServerSelector(typed)?.server);
+        // A name resolves against every list or none: one still loading (or failed) may hold another server of that name, which
+        // an exclusion must name too. A listed server's key needs no other list.
+        const resolved =
+            parseServerSelector(typed) === undefined || known || catalog.serversState === "ready" ? resolveTypedSelector(typed, catalog.servers) : null;
 
         // Kept in the field with the reason, never saved by name: a name stops matching when the server is renamed.
         if (resolved === null) {
             setUnknownServer(typed);
+
+            return;
+        }
+
+        // A server's key holds its address, so a short name can stand for a selector longer than the server takes (or the tool's
+        // own name is that long).
+        if (resolved.some((selector) => selector.length > BOT_TOOL_SELECTOR_MAX_LENGTH)) {
+            setTooLong(true);
 
             return;
         }
@@ -267,6 +304,7 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
         setUnknownServer(null);
         setUnknownBuiltIn(null);
         setOverCap(false);
+        setTooLong(false);
         setEntry("");
         onPendingChange(false);
     };
@@ -296,6 +334,7 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
                         setUnknownServer(null);
                         setUnknownBuiltIn(null);
                         setOverCap(false);
+                        setTooLong(false);
                         onPendingChange(event.target.value.trim() !== "");
                     }}
                     onKeyDown={(event) => {
@@ -324,6 +363,7 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
                 {unknownServer !== null && unknownServerMessage()}
                 {unknownBuiltIn !== null && unknownBuiltInMessage()}
                 {overCap && t`This list is full: remove a tool before adding another.`}
+                {tooLong && t`Too long to add: the server's address or the tool's name is too long.`}
             </p>
             <p aria-live="polite" className="text-destructive text-xs" id={staleId}>
                 {stale && t`A listed built-in tool no longer exists. Remove it before saving.`}

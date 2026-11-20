@@ -649,9 +649,10 @@ describe("MCP Apps proxy with an OAuth grant", () => {
 
         expect(await statusOf()).toBe(403);
 
+        // A lookup that failed is not an exclusion: still not run, but said to be a check to retry.
         state.savedServers = "fail";
 
-        expect(await statusOf()).toBe(403);
+        expect(await statusOf()).toBe(503);
     });
 
     it("refuses a call that names no chat when any of the caller's bots has a selection, or when that cannot be read", async () => {
@@ -672,7 +673,8 @@ describe("MCP Apps proxy with an OAuth grant", () => {
 
         const unreadable = await callMCPToolFromAppHttpAction(context, bare("search"));
 
-        expect(unreadable.status).toBe(403);
+        expect(unreadable.status).toBe(503);
+        expect(await unreadable.json()).toStrictEqual({ error: expect.stringContaining("could not be checked") });
     });
 
     it("offers a read-only connection only the tools the server marks read only, even one the user allowed to write", async () => {
