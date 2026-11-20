@@ -450,6 +450,36 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor)).toBe("see [docs](https://example.com) now");
     });
 
+    it("protects a link destination past balanced parentheses", () => {
+        const editor = editorWith("<p>see [x](foo(bar)baz) now</p>");
+
+        select(editor, 17, 20);
+
+        expect(selectedText(editor)).toBe("baz");
+        expect(wrapSelectionOnTextInput(editor.view, 17, 20, "*")).toBe(true);
+        expect(text(editor)).toBe("see [x](foo(bar)baz) now");
+    });
+
+    it("protects a link destination past an escaped parenthesis", () => {
+        const editor = editorWith("<p>[d](a&#92;)bc) x</p>");
+        const before = text(editor);
+
+        select(editor, 8, 10);
+
+        expect(selectedText(editor)).toBe("bc");
+        expect(wrapSelectionOnTextInput(editor.view, 8, 10, "*")).toBe(true);
+        expect(text(editor)).toBe(before);
+    });
+
+    it("wraps literal ](url) text that has no link label before it", () => {
+        const editor = editorWith("<p>literal ](url) text</p>");
+
+        select(editor, 11, 14);
+        wrapSelectionOnTextInput(editor.view, 11, 14, "*");
+
+        expect(text(editor)).toBe("literal ](**url**) text");
+    });
+
     it("still wraps a link's label", () => {
         const editor = editorWith("<p>see [docs](https://example.com) now</p>");
 

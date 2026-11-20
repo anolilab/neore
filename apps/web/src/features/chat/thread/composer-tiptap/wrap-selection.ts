@@ -104,8 +104,85 @@ const scanBackticks = (text: string): { spans: [number, number][]; unmatched: Un
     return { spans, unmatched };
 };
 
-/** A link destination `](...)`: the text between the parentheses, as `[start, end)` indices. */
-const LINK_DESTINATION = /\]\(([^)]*)\)/g;
+/**
+ * The index of the `)` that closes a link destination starting at `start`, or -1. A backslash escapes the next
+ * character, and parentheses inside the destination nest, as CommonMark allows.
+ */
+const destinationEnd = (text: string, start: number): number => {
+    let depth = 0;
+    let index = start;
+
+    while (index < text.length) {
+        switch (text[index]) {
+            case "(": {
+                depth += 1;
+
+                break;
+            }
+
+            case ")": {
+                if (depth === 0) {
+                    return index;
+                }
+
+                depth -= 1;
+
+                break;
+            }
+
+            case "\\": {
+                index += 1;
+
+                break;
+            }
+
+            default: {
+                break;
+            }
+        }
+
+        index += 1;
+    }
+
+    return -1;
+};
+
+/**
+ * The destinations of the links `[label](destination)` in `text`, as `[start, end)` indices. A `]` opens a destination
+ * only after an unescaped `[`, and code spans are skipped, because link syntax there is literal text.
+ */
+const linkDestinations = (text: string, spans: ReadonlyArray<[number, number]>): [number, number][] => {
+    const codeEnds = new Map(spans);
+    const destinations: [number, number][] = [];
+    let openLabels = 0;
+    let index = 0;
+
+    while (index < text.length) {
+        const current = text[index];
+        let next = codeEnds.get(index) ?? index + 1;
+
+        if (codeEnds.has(index)) {
+            // The code span is skipped whole.
+        } else if (current === "\\") {
+            next = index + 2;
+        } else if (current === "[") {
+            openLabels += 1;
+        } else if (current === "]" && openLabels > 0) {
+            openLabels -= 1;
+
+            const end = text[index + 1] === "(" ? destinationEnd(text, index + 2) : -1;
+
+            if (end > index + 2) {
+                destinations.push([index + 2, end]);
+                next = end + 1;
+            }
+        }
+
+        index = next;
+    }
+
+    return destinations;
+};
 
 /**
  * What the Markdown already in a paragraph means for a wrap of `from`..`to` (parent offsets). The wrap is `blocked` when
@@ -133,10 +210,8 @@ const markupAround = (parent: ProseMirrorNode, from: number, to: number): { bloc
     const toOffsets = ([start, end]: [number, number]): [number, number] => [offsets[start] ?? 0, (offsets[end - 1] ?? 0) + 1];
     const { spans, unmatched } = scanBackticks(text);
     const inCode = spans.map((span) => toOffsets(span)).some(([start, end]) => (from > start && from < end) || (to > start && to < end));
-    const inLink = [...text.matchAll(LINK_DESTINATION)]
-        // Link syntax inside a code span is literal text, not a link.
-        .filter((match) => (match[1] ?? "") !== "" && spans.every(([start, end]) => match.index < start || match.index >= end))
-        .map((match) => toOffsets([match.index + 2, match.index + 2 + (match[1] ?? "").length]))
+    const inLink = linkDestinations(text, spans)
+        .map((destination) => toOffsets(destination))
         .some(([start, end]) => from < end && to > start);
 
     return {
