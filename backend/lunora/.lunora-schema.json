@@ -4429,6 +4429,12 @@
           "optional": true,
           "unique": false
         },
+        "currentUrlStartedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "errorMessage": {
           "kind": "string",
           "nullable": false,

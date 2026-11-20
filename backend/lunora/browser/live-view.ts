@@ -22,7 +22,7 @@ import { activeThreadSession } from "./functions";
 import { browserAliveUntil, LIVE_VIEW_CONNECT_DEADLINE_MS, liveViewRequest, liveViewUrlFrom, watchableSessionId } from "./live-view-logic";
 
 type ReaderBrowser =
-    | { browserId: string; currentUrl?: string; idleUntil: number; kind: "watchable"; providerSessionId: string }
+    | { accessUntil?: number; browserId: string; currentUrl?: string; idleUntil: number; kind: "watchable"; providerSessionId: string }
     | { kind: "denied" }
     | { kind: "none" };
 
@@ -61,6 +61,7 @@ const readerBrowser = async (ctx: QueryCtx, threadId: Id<"threads">, userId: str
     }
 
     return {
+        ...(access.expiresAt !== undefined && { accessUntil: access.expiresAt }),
         browserId: await browserIdOf(session._id, providerSessionId),
         currentUrl: session.currentUrl,
         idleUntil: browserAliveUntil(session),
@@ -69,14 +70,29 @@ const readerBrowser = async (ctx: QueryCtx, threadId: Id<"threads">, userId: str
     };
 };
 
-/** The thread's running cloud browser, or `null`. A grantee's read goes through the thread decision, then past row-level security. */
+/**
+ * The thread's running cloud browser, or `null`. A grantee's read goes through the thread decision, then past row-level
+ * security. `accessUntil` is when a grantee's grant ends: a live query is re-run only by a write to what it read, not
+ * by the clock, so the client stops showing the status then and asks again, and every answer after it is `null`.
+ */
 export const getThreadBrowser = authQuery
     .input({ threadId: v.id("threads") })
-    .output(v.union(v.null(), v.object({ browserId: v.string(), currentUrl: v.optional(v.string()), idleUntil: v.number() })))
+    .output(
+        v.union(v.null(), v.object({ accessUntil: v.optional(v.number()), browserId: v.string(), currentUrl: v.optional(v.string()), idleUntil: v.number() })),
+    )
     .query(async ({ args: { threadId }, ctx }) => {
         const browser = await readerBrowser(ctx, threadId, ctx.user.userId, ctx.now);
 
-        return browser.kind === "watchable" ? { browserId: browser.browserId, currentUrl: browser.currentUrl, idleUntil: browser.idleUntil } : null;
+        if (browser.kind !== "watchable") {
+            return null;
+        }
+
+        return {
+            ...(browser.accessUntil !== undefined && { accessUntil: browser.accessUntil }),
+            browserId: browser.browserId,
+            currentUrl: browser.currentUrl,
+            idleUntil: browser.idleUntil,
+        };
     });
 
 /** {@link readerBrowser} for the action, which reaches the database only through `runQuery`. */

@@ -150,6 +150,8 @@ export const logAction = internalMutation
         heldUntil: v.optional(v.number()),
         providerSessionId: v.optional(v.string()),
         sessionId: v.id("browserSessions"),
+        /** When the action started: its page is written only if no action that started later wrote one already. */
+        startedAt: v.number(),
         /** The provider session id the row held when the action started (`null`: none), so a stale result is not written. */
         startedWithProviderSessionId: v.union(v.string(), v.null()),
         success: v.boolean(),
@@ -166,6 +168,7 @@ export const logAction = internalMutation
                 heldUntil,
                 providerSessionId,
                 sessionId,
+                startedAt,
                 startedWithProviderSessionId,
                 success,
                 target,
@@ -204,14 +207,24 @@ export const logAction = internalMutation
             // A browser the renderer replaced (the old one expired, or was closed after a blocked redirect) starts with
             // no page of the old one: `currentUrl` is only what this action reported, or nothing.
             const replaced = providerSessionId !== undefined && providerSessionId !== session.providerSessionId;
+            // Two actions on the same browser finish out of order: the page of the one that started later stays.
+            const newerPage = currentUrl !== undefined && startedAt >= (session.currentUrlStartedAt ?? -Infinity);
+            let page = {};
+
+            if (replaced) {
+                page = { currentUrl, currentUrlStartedAt: startedAt, providerSessionId };
+            } else if (newerPage) {
+                page = { currentUrl, currentUrlStartedAt: startedAt };
+            }
 
             // Every action keeps the provider's browser alive for another idle window; the live view reads this to tell
             // a running browser from one the provider has reaped (`browser/live-view-logic.ts`). This action's hold ends;
             // the holds of actions still running stay.
             await patchRow(ctx.db, "browserSessions", session, {
                 inUseHolds,
-                lastActivityAt: ctx.now,
-                ...(replaced ? { currentUrl, providerSessionId } : withoutUndefined({ currentUrl })),
+                // Never back in time: an older action finishing late must not shorten the window a newer one opened.
+                lastActivityAt: Math.max(session.lastActivityAt, ctx.now),
+                ...page,
             });
         },
     );

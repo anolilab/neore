@@ -217,6 +217,31 @@ describe("two browser actions at once", () => {
         expect(watchableSessionId(after, NOW + 2000)).toBe("s-2");
     });
 
+    it("keeps the page of the action that started later when an older one on the same browser finishes after it", async () => {
+        await addSession(NOW - 1000);
+        const older = pendingAnswer();
+        const newer = pendingAnswer();
+
+        const olderRun = act("click");
+
+        await older.reached;
+        vi.setSystemTime(NOW + 1000);
+        const newerRun = act();
+
+        await newer.reached;
+        newer.release(answered({ sessionId: "s-1", success: true, url: "https://example.com/new" }));
+        await newerRun;
+        vi.setSystemTime(NOW + 2000);
+        older.release(answered({ sessionId: "s-1", success: true, url: "https://example.com/old" }));
+        await olderRun;
+
+        const after = await row();
+
+        // The older result's page and activity are older than the newer one's: neither goes back.
+        expect(after).toMatchObject({ currentUrl: "https://example.com/new", lastActivityAt: NOW + 1000, providerSessionId: "s-1" });
+        expect(after.inUseHolds).toBeUndefined();
+    });
+
     it("keeps the hold of an action still running when another one fails", async () => {
         await addSession(NOW - 1000);
         const running = pendingAnswer();

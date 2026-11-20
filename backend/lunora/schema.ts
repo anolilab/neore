@@ -423,6 +423,8 @@ export const schema = defineSchema({
         completedAt: v.optional(v.number()),
         connectUrl: v.optional(v.string()),
         currentUrl: v.optional(v.string()),
+        /** When the action that wrote `currentUrl` started, so an older action finishing later does not overwrite it. */
+        currentUrlStartedAt: v.optional(v.number()),
         errorMessage: v.optional(v.string()),
         extensionId: v.optional(v.string()),
         extensionVersion: v.optional(v.string()),

@@ -18,10 +18,12 @@ vi.mock("@lingui/react/macro", () => {
 const { backend } = vi.hoisted(() => {
     return {
         backend: {
-            browser: null as { browserId: string; currentUrl?: string; idleUntil: number } | null,
+            browser: null as { accessUntil?: number; browserId: string; currentUrl?: string; idleUntil: number } | null,
             /** When set, the status read fails with it. */
             statusError: undefined as Error | undefined,
             open: vi.fn(),
+            /** How often the status was read. */
+            statusReads: 0,
         },
     };
 });
@@ -37,6 +39,8 @@ vi.mock("@/lib/lunora/crpc", () => {
                             queryOptions: (args: unknown) => {
                                 return {
                                     queryFn: async () => {
+                                        backend.statusReads += 1;
+
                                         if (backend.statusError !== undefined) {
                                             throw backend.statusError;
                                         }
@@ -83,6 +87,7 @@ afterEach(() => {
     setVisibility("visible");
     backend.browser = null;
     backend.statusError = undefined;
+    backend.statusReads = 0;
     backend.open.mockReset();
 });
 
@@ -147,6 +152,26 @@ describe("BrowserLiveView", () => {
         });
         expect(screen.queryByRole("region", { name: "Browser" })).toBeNull();
         expect(screen.queryByTitle(LIVE_VIEW)).toBeNull();
+    });
+
+    it("leaves with the open view once a reader's grant ends, and asks the status again", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        backend.browser = { accessUntil: Date.now() + 5000, browserId: "b-1", currentUrl: "https://example.com/login", idleUntil: Date.now() + 60_000 };
+        backend.open.mockResolvedValue({ connectBy: Date.now() + 60_000, status: "ok", url: URL });
+        mountCard();
+
+        await userEvent.click(await screen.findByRole("button", { name: "Watch live" }));
+        await screen.findByTitle(LIVE_VIEW);
+        const readsBefore = backend.statusReads;
+
+        // Past the grant's end the server answers nothing.
+        backend.browser = null;
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(6000);
+        });
+        expect(screen.queryByRole("region", { name: "Browser" })).toBeNull();
+        expect(screen.queryByText("https://example.com/login")).toBeNull();
+        expect(backend.statusReads).toBeGreaterThan(readsBefore);
     });
 
     it("drops a view that arrives after the person hid it again", async () => {

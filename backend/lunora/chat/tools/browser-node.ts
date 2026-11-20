@@ -129,6 +129,7 @@ export const executeBrowserAction = internalAction
                     heldUntil: held?.until,
                     providerSessionId: returnedSessionId,
                     sessionId: sessionDocument!._id,
+                    startedAt: startTime,
                     startedWithProviderSessionId,
                     success: result.success ?? false,
                     target: args.url ?? args.selector,

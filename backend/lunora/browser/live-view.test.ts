@@ -165,6 +165,27 @@ describe("a running browser", () => {
         await expect(open(OWNER)).resolves.toMatchObject({ status: "ok" });
     });
 
+    it("tells a reader when their grant ends, and shows them nothing once it has", async () => {
+        const expiresAt = NOW + 10_000;
+
+        await addSession();
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+            await ctx.db.patch("threadAccess", grant._id, { expiresAt });
+        });
+
+        await expect(statusFor(READER)).resolves.toMatchObject({ accessUntil: expiresAt });
+        // The owner's access does not end.
+        await expect(statusFor(OWNER)).resolves.not.toHaveProperty("accessUntil");
+
+        vi.setSystemTime(expiresAt + 1);
+
+        await expect(statusFor(READER)).resolves.toBeNull();
+        await expect(open(READER)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it("refuses a view URL that does not point at the live view host", async () => {
         await addSession();
         fetchMock.mockResolvedValue(answer(200, { devtoolsFrontendUrl: "https://evil.example/ui/view" }));
@@ -190,7 +211,9 @@ describe("an agent action", () => {
             providerSessionId: string;
         };
     const log = async (args: Record<string, unknown>): Promise<void> =>
-        await harness.run(async (ctx: any) => await ctx.runMutation(logAction, { startedWithProviderSessionId: "s-1", success: true, ...args }));
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(logAction, { startedAt: NOW, startedWithProviderSessionId: "s-1", success: true, ...args }),
+        );
 
     it("keeps the browser watchable past the idle window it started in, and records the page it left it on", async () => {
         const sessionId = await addSession({ lastActivityAt: NOW - BROWSER_IDLE_REAP_MS + 1000 });

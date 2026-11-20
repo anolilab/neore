@@ -240,6 +240,18 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
     const status = useQuery(crpc.browser.live_view.getThreadBrowser.queryOptions(threadId ? { threadId } : skipToken));
     const browser = status.data;
     const idle = usePassed(browser?.idleUntil);
+    // A grantee's grant ended: nothing re-runs the live query when only the clock moves, so the card goes at once and the
+    // status is asked again; the server answers nothing after the grant's end.
+    const accessEnded = usePassed(browser?.accessUntil);
+    const refetchStatus = useEffectEvent((): void => {
+        status.refetch().catch(() => undefined);
+    });
+
+    useEffect(() => {
+        if (accessEnded) {
+            refetchStatus();
+        }
+    }, [accessEnded]);
 
     // The status could not be read: a running browser must not look like no browser, so the card says so and can ask again.
     if (threadId !== undefined && browser === undefined && status.isError) {
@@ -269,7 +281,7 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
         );
     }
 
-    if (threadId === undefined || browser === undefined || browser === null || idle) {
+    if (threadId === undefined || browser === undefined || browser === null || idle || accessEnded) {
         return null;
     }
 
