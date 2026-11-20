@@ -136,6 +136,16 @@ fn unpairing_a_machine_that_is_not_paired_succeeds_and_asks_nothing() {
     let dir = scratch("cli-unpair-none");
     let vault = Vault::new(dir.to_path_buf(), &keychain);
 
+    // A pairing in progress holds the lock with nothing saved yet; the preview says unpair would be refused.
+    let pairing = RunLock::acquire(&dir).unwrap();
+
+    assert_eq!(
+        format!("{:?}", unpair_dry_run(&vault)),
+        format!("{:?}", ExitCode::FAILURE)
+    );
+
+    drop(pairing);
+
     // No `--yes` and no terminal: still a success, because there is nothing to confirm.
     assert_eq!(
         format!("{:?}", unpair(&vault, false)),

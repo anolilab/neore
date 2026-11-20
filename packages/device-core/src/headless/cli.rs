@@ -324,30 +324,34 @@ fn unpair_request(args: &[String]) -> UnpairRequest {
 /// Previews what `unpair --yes` would do, including its refusal while `run` holds the pairing, so a script can use it
 /// as a check before the real command.
 fn unpair_dry_run(vault: &Vault<'_>) -> ExitCode {
+    // The real unpair takes the lock before it looks for a pairing, and `pair` holds it while it waits for approval
+    // with nothing saved yet, so the preview checks the lock first too.
+    match RunLock::is_held(vault.dir()) {
+        Ok(false) => {}
+        Ok(true) => {
+            eprintln!("neore-host: another neore-host command (pair, run or unpair) is using this pairing, so unpair would be refused; let it finish or stop it first. Nothing was changed.");
+
+            return ExitCode::FAILURE;
+        }
+        Err(error) => {
+            eprintln!("neore-host: {error}");
+
+            return ExitCode::FAILURE;
+        }
+    }
+
     match vault.record() {
-        Ok(Some(record)) => match RunLock::is_held(vault.dir()) {
-            Ok(false) => {
-                println!(
-                    "Would forget \"{}\" (device {}) on {}, and remove its secret from {}. Nothing was changed.",
-                    record.name,
-                    record.device_id,
-                    record.backend,
-                    record.storage.describe()
-                );
+        Ok(Some(record)) => {
+            println!(
+                "Would forget \"{}\" (device {}) on {}, and remove its secret from {}. Nothing was changed.",
+                record.name,
+                record.device_id,
+                record.backend,
+                record.storage.describe()
+            );
 
-                ExitCode::SUCCESS
-            }
-            Ok(true) => {
-                eprintln!("neore-host: another neore-host command (pair, run or unpair) is using this pairing, so unpair would be refused; let it finish or stop it first. Nothing was changed.");
-
-                ExitCode::FAILURE
-            }
-            Err(error) => {
-                eprintln!("neore-host: {error}");
-
-                ExitCode::FAILURE
-            }
-        },
+            ExitCode::SUCCESS
+        }
         Ok(None) => {
             // The real unpair also removes what an interrupted pairing or clean-up left, so the preview names it.
             let leftovers: Vec<String> = [vault.temporary_record(), vault.dir().join(NONCE_FILE)]

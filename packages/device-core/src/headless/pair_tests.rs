@@ -648,6 +648,13 @@ fn control_characters_from_the_backend_never_reach_the_terminal() {
         "{shown:?}"
     );
     assert!(shown.contains("https://neore.ai/auth/device[1A"));
+    assert_eq!(
+        describe(&reply(
+            403,
+            json!({ "error_description": "full\r\u{1b}[2Kok" })
+        )),
+        "full[2Kok"
+    );
     assert_eq!(paired.name, "box]0;x");
     assert_eq!(paired.account, "o***@example.com[2K");
 }

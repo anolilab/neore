@@ -165,7 +165,7 @@ fn describe(reply: &Reply) -> String {
         .or_else(|| text(&reply.body, "message"))
         .map_or_else(
             || format!("the backend answered {}", reply.status),
-            str::to_owned,
+            printable,
         )
 }
 
