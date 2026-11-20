@@ -12,8 +12,8 @@
 - Which run may use a login is decided from its THREAD, TURN and the text in front of the model, never from client
   input, by ONE function: `site-login-turn.ts#siteLoginTurnVerdict`, an ALLOWLIST. Both queries use it, and the fill
   tool of the next part must call it too (through `usableSiteLogins`), never a check of its own. Safe, and only this:
-  the owner's own typed text (their row, text parts with no mark, attachment, guest or outside-agent text, goal note or
-  compressed history), the lead model's own replies (text, reasoning, tool calls; no speaker, `acp-host`, sources,
+  the owner's own typed text (their row, text parts with no mark, attachment, guest or outside-agent text, goal note,
+  compressed history or quote-like line, `carriesQuotedLines`: a forward, a quoted reply and a rich paste are unmarked `>` lines), the lead model's own replies (text, reasoning, tool calls; no speaker, `acp-host`, sources,
   memories, file, `neore…` metadata but `neoreGateway`), rows whose `agentName` is a model id or unset
   (`isLeadAgentName`: lead rows and the prompt carry the model id; every other writer names itself, and a test pins
   that none of those names is a model id), results of `SAFE_RESULT_TOOLS`, built-in tools only (`toolSources`), and a
@@ -48,6 +48,8 @@
   impersonation yet: record it on the turn at `/chat/start` and carry it through a pause's snapshot, never default it to
   `false`. A resumed or approved run's `promptMessageId` is not the prompt, so it gets no login until that is carried too.
   Rows, steers, bot instructions and personalization an impersonating admin wrote carry no mark yet either: mark them
-  (and refuse them here) before the fill ships. The allowlist refuses a step holding a page's result or an approval's
+  (and refuse them here) before the fill ships. So must a draft the owner did not write: a prompt link
+  (`?prompt=`), a desktop `neore://new?text=` link and an org member's saved prompt fill the composer unmarked, and one
+  Enter saves them as typed text; mark them in the composer and refuse them here. A plain-text paste stays unseen. The allowlist refuses a step holding a page's result or an approval's
   request and response parts: the fill navigates and types inside its one call, and its own approval parts are admitted
   only for that call's id, added here on purpose.

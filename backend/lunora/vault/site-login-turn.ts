@@ -6,7 +6,8 @@
  * gets no login until it is added here on purpose.
  *
  * Safe, and nothing else:
- * - the owner's own typed text: a user row of theirs, text parts only, with no mark, attachment or note;
+ * - the owner's own typed text: a user row of theirs, text parts only, with no mark, attachment, note or blockquote (a
+ *   forward, a quoted reply and a pasted quote carry no mark, so any `>` line is not theirs);
  * - the lead model's own replies in this thread: assistant text, reasoning and tool calls, with no mark, sources,
  *   memories or file;
  * - rows named by the lead's model id only (`agentName`): a sub-agent's result, a side question, a goal round, a group
@@ -23,7 +24,7 @@ import type { QueryCtx } from "../_generated/server";
 import { HOST_PROVIDER } from "../acp/lib/reply";
 import { walkPath } from "../agent/branch-rows";
 import { parseGoalReviewNote } from "../chat/goals/shared";
-import { messageCarriesGuestText, messageCarriesOutsideAgentText, messagesCarryAttachedText } from "../chat/lib/attached-text";
+import { carriesQuotedLines, messageCarriesGuestText, messageCarriesOutsideAgentText, messagesCarryAttachedText } from "../chat/lib/attached-text";
 import { readCompressedHistory } from "../chat/lib/compressed-history";
 import { loadEligibleThread } from "../devices/internal";
 import { computeTaint } from "../devices/lib/taint";
@@ -106,7 +107,7 @@ const userMessageRefusal = (message: SiteLoginMessage): string | null => {
 
     const notOwn =
         readCompressedHistory(message) !== null ||
-        textOf(content).some((text) => parseGoalReviewNote(text) !== null) ||
+        textOf(content).some((text) => parseGoalReviewNote(text) !== null || carriesQuotedLines(text)) ||
         messageCarriesOutsideAgentText(message) ||
         messageCarriesGuestText(message) ||
         messagesCarryAttachedText([message]) ||
