@@ -187,3 +187,19 @@ fn the_name_shown_is_the_name_the_backend_stores() {
     assert_eq!(stored_name("  "), "unknown-host");
     assert_eq!(stored_name(&"a".repeat(100)).len(), 64);
 }
+
+#[test]
+fn top_level_help_is_a_success_and_names_every_command() {
+    assert_eq!(
+        format!("{:?}", main("--help", std::iter::empty())),
+        format!("{:?}", ExitCode::SUCCESS)
+    );
+
+    for command in ["pair", "run", "unpair", "--stdio"] {
+        assert!(
+            USAGE.contains(&format!("neore-host {command}")),
+            "{command}"
+        );
+    }
+    assert!(!USAGE.contains("built without"));
+}

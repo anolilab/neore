@@ -13,6 +13,7 @@ use std::io::{BufRead, Read, Write};
 use std::path::Path;
 
 use serde_json::{json, Value};
+use zeroize::Zeroizing;
 
 use crate::envelope::{verify_call, NonceSet, Signed};
 
@@ -71,7 +72,7 @@ impl RunLock {
 pub struct Service {
     device_id: String,
     nonces: NonceSet,
-    secret: String,
+    secret: Zeroizing<String>,
 }
 
 /// A call this device accepted.
@@ -93,7 +94,7 @@ impl Service {
         Ok(Service {
             device_id: device_id.to_owned(),
             nonces,
-            secret: secret.to_owned(),
+            secret: Zeroizing::new(secret.to_owned()),
         })
     }
 

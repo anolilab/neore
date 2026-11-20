@@ -44,7 +44,7 @@ pub const USAGE: &str = "usage:
   neore-host pair --backend <https-origin> [--name <machine name>]   show a code to approve in the web app
   neore-host run                                                     decide which signed calls are for this machine
   neore-host unpair [--dry-run | --yes]                              forget the pairing on this machine (asks first; --yes skips the question, --dry-run only shows it)
-  neore-host --stdio [--launch <id> [--desktop <tag>]]               the pipe a desktop drives (built without `headless`)
+  neore-host --stdio [--launch <id> [--desktop <tag>]]               the pipe a desktop drives
 
 The backend can also be given as NEORE_BACKEND_URL. Files live in NEORE_HOST_DIR when set.";
 
@@ -104,6 +104,12 @@ pub fn main(command: &str, args: impl Iterator<Item = String>) -> ExitCode {
     }
 
     // Asking for help is not an error, and it must not do the command's work.
+    if matches!(command, "--help" | "-h" | "help") {
+        println!("{USAGE}");
+
+        return ExitCode::SUCCESS;
+    }
+
     if matches!(command, "pair" | "run" | "unpair") && asks_for_help(args.as_slice()) {
         println!("{}", help_for(command));
 
