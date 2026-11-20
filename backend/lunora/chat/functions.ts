@@ -4520,6 +4520,9 @@ export const getCachedFollowupSuggestions = authQuery
  * The generator is the only thing that pays for a follow-up suggestion: the run that finished a reply schedules it once, and the
  * composer reads the cache (`getCachedFollowupSuggestions`) live. There is no client-triggered generation to race it.
  */
+/** Pages of messages read for one reply's turn, so a very long tool turn cannot make the job read without end. */
+const MAX_TURN_PAGES = 20;
+
 export const generateFollowupSuggestionsForThread = internalAction
     .input({
         threadId: v.string(),
@@ -4545,9 +4548,16 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
-            const gate = await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId });
+            // Media threads keep their prompts out of the chat, so there is no next prompt to suggest and nothing to charge for one.
+            if (threadData.mode !== undefined && threadData.mode !== "text") {
+                return;
+            }
 
-            if (!gate.enabled || gate.guest) {
+            // The owner's setting decides whether the owner's thread gets a suggestion; the run's own guest status decides whether this run pays.
+            const ownerGate = await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId: threadData.userId });
+            const actorGate = await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId });
+
+            if (!ownerGate.enabled || actorGate.guest) {
                 return;
             }
 
@@ -4597,10 +4607,36 @@ export const generateFollowupSuggestionsForThread = internalAction
             }
 
             // The composer keys a reply by the first row of its turn (ui-messages groups a turn by `order`), so cache under that id.
-            const turnRows = (messagesResult.page || []).filter(
-                (messageDocument) => messageDocument.order === newest.order && messageDocument.message?.role !== "user",
-            );
-            const lastMessageId = turnRows.toSorted((first, second) => first.stepOrder - second.stepOrder)[0]?._id ?? newest._id;
+            // A long tool turn can run past one page, so the turn's pages are read until the rows of an older turn appear.
+            let firstRow = newest;
+            let turnPage = messagesResult;
+
+            for (let pages = 0; pages < MAX_TURN_PAGES; pages += 1) {
+                let reachedOlderTurn = false;
+
+                for (const messageDocument of turnPage.page || []) {
+                    if (messageDocument.order < newest.order) {
+                        reachedOlderTurn = true;
+
+                        break;
+                    }
+
+                    if (messageDocument.order === newest.order && messageDocument.message?.role !== "user" && messageDocument.stepOrder < firstRow.stepOrder) {
+                        firstRow = messageDocument;
+                    }
+                }
+
+                if (reachedOlderTurn || turnPage.isDone || !turnPage.continueCursor) {
+                    break;
+                }
+
+                turnPage = await agent.listMessages(context, {
+                    paginationOpts: { cursor: turnPage.continueCursor, numItems: 10 },
+                    threadId,
+                });
+            }
+
+            const lastMessageId = firstRow._id;
 
             chatLogger.debug(`[generateFollowupSuggestionsForThread] Last message found`, {
                 lastMessageId,
@@ -4624,18 +4660,18 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
-            // Only a paid fallback is metered, to the user whose plan unlocked it. The platform's default stays unmetered (see resolveBackgroundModel).
-            // Keyed per reply, so a retry is not charged again.
-            if (background.billedUserId) {
-                const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
-                    kind: "Text",
-                    requestId: `followup:${threadId}:${lastMessageId}`,
-                    userId: background.billedUserId,
-                });
+            // One Text unit per reply, on whoever the background model bills, keyed per reply so a retry is not charged again.
+            const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
+                kind: "Text",
+                requestId: `followup:${threadId}:${lastMessageId}`,
+                userId: background.billedUserId ?? userId,
+            });
 
-                if (!charged) {
-                    return;
-                }
+            if (!charged) {
+                // Nothing was paid for, so the reply's claim is given back and a later run can ask again.
+                await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { lastMessageId, threadId, userId });
+
+                return;
             }
 
             chatLogger.debug(`[generateFollowupSuggestionsForThread] Generating new suggestions`, {
@@ -4647,6 +4683,23 @@ export const generateFollowupSuggestionsForThread = internalAction
             const modelMessages = docsToModelMessages(filteredMessageDocuments);
 
             const output = await generateFollowupSuggestionsInternal(modelMessages, agent.options.languageModel as LanguageModel, language, timezone, location);
+
+            // A newer message may have landed while the model worked. Its own run suggests for it, so this one must not overwrite that.
+            const latestPage = await agent.listMessages(context, {
+                paginationOpts: { cursor: null, numItems: 10 },
+                threadId,
+            });
+            const latestNewest = rowsAfterContextReset(latestPage.page || [], contextReset).find((messageDocument) => {
+                const role = messageDocument.message?.role;
+
+                return role === "user" || role === "assistant";
+            });
+
+            if (latestNewest?._id !== newest._id) {
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] A newer message arrived, not caching: ${threadId}`);
+
+                return;
+            }
 
             // Cache the suggestions
             await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, {

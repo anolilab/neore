@@ -7,12 +7,13 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "../_generated/server";
 import { getUser } from "../auth/lib/better-auth-queries";
-import { claimOnce } from "../lib/claim-once";
+import { claimOnce, releaseClaim } from "../lib/claim-once";
 import { isThreadLocked } from "../lib/thread-lock";
 
 /** One paid suggestion call per reply: keyed `<threadId>:<lastMessageId>`, so a second run of the same reply finds it taken. */
 export const FOLLOWUP_CLAIM_SCOPE = "followup-suggestions";
-const FOLLOWUP_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+/** A reply is paid for once, so its claim outlives any retry of its job: a retry after a failed call is not charged again. */
+const FOLLOWUP_CLAIM_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Whether a reply gets a suggestion for this user: the setting is on (absent = on) and the user is not a guest.
@@ -46,6 +47,16 @@ export const admitFollowupSuggestions = internalMutation
         }
 
         return await claimOnce(context, FOLLOWUP_CLAIM_SCOPE, `${threadId}:${lastMessageId}`, FOLLOWUP_CLAIM_TTL_MS, userId);
+    });
+
+/** Gives a reply's claim back when its charge was refused: nothing was paid, so a later run may ask again. */
+export const releaseFollowupSuggestions = internalMutation
+    .input({ lastMessageId: v.string(), threadId: v.string(), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args: { lastMessageId, threadId }, ctx: context }) => {
+        await releaseClaim(context, FOLLOWUP_CLAIM_SCOPE, `${threadId}:${lastMessageId}`);
+
+        return null;
     });
 
 export const getCachedFollowupSuggestions = internalQuery

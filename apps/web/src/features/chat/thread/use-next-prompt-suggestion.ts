@@ -3,6 +3,7 @@
  * after the reply, with the utility model; this only reads that cache live. Nothing here calls a model.
  */
 import type { Id } from "@neore/backend/dataModel";
+import { useUnlockProof } from "@neore/client-runtime";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
@@ -21,6 +22,7 @@ const useNextPromptSuggestion = (): string | null => {
     const isRunning = useChatIsRunning();
     const { data: userSettings } = useUserSettings();
     const crpc = useCRPC();
+    const unlockProof = useUnlockProof(threadId);
 
     const enabled = userSettings?.enableFollowupSuggestions !== false;
     const validThreadId = getValidThreadId(threadId);
@@ -32,7 +34,7 @@ const useNextPromptSuggestion = (): string | null => {
 
     const { data: cached } = useQuery({
         ...crpc.chat.functions.getCachedFollowupSuggestions.queryOptions(
-            validThreadId && enabled && !isRunning && lastReplyId !== undefined ? { threadId: validThreadId as Id<"threads"> } : skipToken,
+            validThreadId && enabled && !isRunning && lastReplyId !== undefined ? { threadId: validThreadId as Id<"threads">, unlockProof } : skipToken,
         ),
     });
 
