@@ -217,6 +217,7 @@ const OWNER_TABLES = [
     "requestedSecrets",
     "reviewDrafts",
     "sandboxSessions",
+    "savedSiteLogins",
     "session",
     "skillInvocations",
     "subAgentRuns",

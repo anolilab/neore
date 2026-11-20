@@ -2530,6 +2530,26 @@ export const schema = defineSchema({
         .index("by_userId", ["userId"])
         .index("by_status", ["status"]),
 
+    /**
+     * A site login the user saved for the agent's browser (`vault/site-logins.ts`). The password is encrypted
+     * (`site-logins` key purpose) and leaves the server only as the keystrokes the browser types. No audit triggers:
+     * a history snapshot would keep the ciphertext after the row is gone.
+     */
+    savedSiteLogins: defineTable({
+        createdAt: v.number(),
+        encryptedPassword: v.string(),
+        label: v.optional(v.string().max(80)),
+        // The exact origin (`https://example.com`); a fill types only into a page of this origin.
+        origin: v.string().max(255),
+        // Teammates whose threads may use the login. None: only the user's own chats (threads without a teammate).
+        teammateIds: v.optional(v.array(v.id("bots"))),
+        updatedAt: v.number(),
+        userId: v.string(),
+        username: v.string().max(320),
+    })
+        .shardBy("userId")
+        .index("by_userId_origin", ["userId", "origin"]),
+
     session: defineTable({
         activeOrganizationId: v.optional(v.string()),
         activeTeamId: v.optional(v.string()),

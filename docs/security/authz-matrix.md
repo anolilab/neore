@@ -725,6 +725,9 @@ for a schema table that is neither policed nor listed:
 | `vault_functions.saveGeneratedImage` | action | authAction + RL | — | caller-scoped (ctx.user) | **fixed** (low) — MIME allow-list and size cap enforced |
 | `vault_functions.saveVaultFile` | action | authAction + RL | files (via `insertVaultFile`) | org membership/role; key rebuilt under the CALLER's staging prefix from `uploadId`; an object stamped for another purpose is refused; real size (5 MB), type and leading bytes checked before the object moves to a server-minted key | **fixed** (low-medium) — organizationId must be the active org; size/type were client-declared and now come from the stored bytes |
 | `vault_functions.syncMetadata` | action | authAction | — | caller-scoped (ctx.user) | **fixed** (low) — patches only the caller's row |
+| `vault_site_logins.deleteSiteLogin` | mutation | authMutation + RL | savedSiteLogins | refused while impersonating; row.userId == caller | ok |
+| `vault_site_logins.listSiteLogins` | query | authQuery | savedSiteLogins | caller-scoped (ctx.user), impersonating admin included (as the API key list: it carries no secret); never the password or its ciphertext | ok |
+| `vault_site_logins.saveSiteLogin` | mutation | authMutation + RL | savedSiteLogins, bots | refused while impersonating (the agent types a login in the owner's own turns, so a planted or swapped one, or a teammate added to it, would outlive the impersonation); row.userId == caller; only the caller's own existing bots are stored as teammates (deleted ids are dropped), at most 20 kept; the site never changes on edit; password `v.sensitive`, stored encrypted | ok |
 | `voice_functions.authorizeScribeToken` | mutation | authMutation + RL | user | caller-scoped (ctx.user) | ok |
 | `voice_speech.synthesizeSpeech` | action | authAction + RL | — (rate limits, gateway) | caller-scoped (ctx.user); no id in args, nothing persisted; guests refused; text capped per call, charged by length to `voice/dailySpeechChars` before the gateway call, and the gateway deducts the per-character cost from the caller's credits (BYOK FAL key → `byok`) | ok |
 | `voice_transcription.transcribeClip` | action | authAction + RL | — (rate limits, gateway) | caller-scoped (ctx.user); no id in args; the clip and its text are persisted nowhere; guests refused; clip capped by size and stated length, its seconds charged to `voice/dailyTranscribeSeconds` before the gateway call, and the gateway deducts the provider-measured cost from the caller's credits (BYOK OpenAI key → `byok`) | ok |
@@ -755,6 +758,18 @@ for a schema table that is neither policed nor listed:
 | `workflow_presence.listVersions` | query | authQuery | projects | workflow owner | ok |
 | `workflow_presence.restoreVersion` | query | authQuery | — | workflow owner | ok |
 | `workflow_presence.saveVersion` | mutation | authMutation | projects, workflowVersions | workflow owner | accepted — no rate limit; `v.any()` content into the caller's own workflow |
+
+  Saved site logins reach a run only through the internal `vault_site_logins.listUsableSiteLogins` and
+  `siteLoginForFill`, never a client procedure. Both decide only through `vault/site-login-turn.ts#siteLoginTurnVerdict`,
+  an ALLOWLIST: anything not known to be safe refuses. The turn must be the owner's own at the app
+  (`isOwnInteractiveTurn`: `startedBy` the owner, origin `lead`, not headless, not impersonated; a public API run records
+  the key's owner as `startedBy`, so that alone is not enough), offered built-in tools only, its system prompt only the
+  app's instructions, the owner's personalization and the teammate's instructions. The thread must pass
+  `loadEligibleThread`, be tagged `chat` and nothing else, and not be a coding agent's, handed over, imported, derived
+  (any `threadRelationships` row) or summarised. Every saved row on the prompt's path, prompt included, and every one of
+  the step's messages must be the owner's own typed text, the lead model's own reply (`agentName` a model id or unset; no
+  speaker, coding agent, sources, memories, file, marks or unknown parts) or the result of `SAFE_RESULT_TOOLS`. A
+  teammate's thread gets only the logins naming it.
 
 ## Removed from the client surface in this audit
 

@@ -81,7 +81,7 @@ the files from the root down to their working directory, so **read the file for 
 | Branches, agent switch, idle-thread summaries                                       | `backend/lunora/agent/AGENTS.md`                        |
 | Tasks: rounds, the recurrence sweep, skipped slots, where a run goes               | `backend/lunora/tasks/AGENTS.md`                        |
 | Host-run threads, coding agents on a paired computer                                | `backend/lunora/acp/AGENTS.md`                          |
-| Messenger, memory, knowledge, usage, triggers, evals, sub-agents, pages, notifications, connectors, coding agents, chat import, source control, public API, devices, projects (rule files) | `backend/lunora/<folder>/AGENTS.md`                     |
+| Messenger, memory, knowledge, usage, triggers, evals, sub-agents, pages, notifications, connectors, coding agents, chat import, source control, public API, devices, vault, projects (rule files) | `backend/lunora/<folder>/AGENTS.md`                     |
 | AI model registry, prompt optimizer, multi-reference images                         | `packages/ai/AGENTS.md`                                 |
 | LLM gateway, video render queue, FAL media                                          | `services/llm-gateway/AGENTS.md`                        |
 | Web app, frontend lessons, accessibility                                            | `apps/web/AGENTS.md`, `apps/web/src/AGENTS.md`           |
