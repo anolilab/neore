@@ -248,6 +248,23 @@ describe("ComposerInput send during an upload", () => {
         expect(harness.showInfo).not.toHaveBeenCalled();
     });
 
+    it("sends once with the finished file when a placeholder is swapped for the real file while the send waits", async () => {
+        const id = addUpload("uploading");
+
+        renderComposer();
+        pressSend();
+
+        // A vault file, a restored file or a chat reference starts as an empty placeholder and gets its real file mid-upload.
+        useChatUIStore.getState().updateAttachment(id, { file: new File(["real"], "notes.txt") });
+        useChatUIStore.getState().updateAttachment(id, { fileId: "file-1", status: "complete" });
+
+        await waitFor(() => {
+            expect(harness.sendMessage).toHaveBeenCalledTimes(1);
+        });
+        expect(harness.sendMessage).toHaveBeenCalledWith("see notes", [expect.objectContaining({ fileId: "file-1", id, status: "complete" })]);
+        expect(harness.showInfo).not.toHaveBeenCalled();
+    });
+
     it("sends only once, however often send is pressed while waiting", async () => {
         const id = addUpload("uploading");
 
