@@ -17,8 +17,8 @@ const FOLLOWUP_CLAIM_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** A model request in flight for a chat: a lock waits for it, and the claim goes as soon as the request settles. */
 export const FOLLOWUP_DISPATCH_SCOPE = "followup-dispatch";
-/** Long enough for one model call; a job that dies lets the chat be locked again after this. */
-const FOLLOWUP_DISPATCH_TTL_MS = 2 * 60 * 1000;
+/** Long enough for one model call; a job that dies lets the chat be locked again after this. The model call itself is cut off at half of it. */
+export const FOLLOWUP_DISPATCH_TTL_MS = 2 * 60 * 1000;
 
 /** The fields of a message row that decide which row a reply is keyed by. */
 export interface ReplyAnchorRow {

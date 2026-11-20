@@ -4,7 +4,7 @@ import { rowsAfterContextReset } from "../agent/context-reset";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { withoutSwitchIds } from "../agent/agent-switch-logic";
 import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
-import { replyAnchorRow } from "../agent/followup-suggestions";
+import { FOLLOWUP_DISPATCH_TTL_MS, replyAnchorRow } from "../agent/followup-suggestions";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -198,7 +198,9 @@ const generateFollowupSuggestionsInternal = async (
         model: model as LanguageModelV3,
     });
 
+    // The call is cut off at half the dispatch claim's life, so it ends before a lock that waited for it can commit (`agent/thread-lock.ts`).
     const result = await generateText({
+        abortSignal: AbortSignal.timeout(FOLLOWUP_DISPATCH_TTL_MS / 2),
         model: wrappedModel,
         output: Output.object({
             schema: z
