@@ -8,7 +8,15 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 
-import { admitFollowupSuggestions, cacheFollowupSuggestions, getCachedFollowupSuggestionsHandler, replyAnchorRow } from "../agent/followup-suggestions";
+import {
+    admitFollowupSuggestions,
+    beginFollowupDispatch,
+    cacheFollowupSuggestions,
+    endFollowupDispatch,
+    followupDispatchInFlight,
+    getCachedFollowupSuggestionsHandler,
+    replyAnchorRow,
+} from "../agent/followup-suggestions";
 import schema from "../schema";
 import { generateFollowupSuggestionsForThread } from "./functions";
 
@@ -113,8 +121,11 @@ describe("one paid call per reply", () => {
 });
 
 describe("a late run cannot replace a newer cache", () => {
-    const cache = async (lastMessageId: string, order: number, suggestions: string[]) =>
-        await harness.action(async (context: any) => await context.runMutation(cacheFollowupSuggestions, { lastMessageId, order, suggestions, threadId }));
+    // `replyAt` defaults to the turn's order: a plain turn's replies are told apart by their turn alone.
+    const cache = async (lastMessageId: string, order: number, suggestions: string[], replyAt = order) =>
+        await harness.action(
+            async (context: any) => await context.runMutation(cacheFollowupSuggestions, { lastMessageId, order, replyAt, suggestions, threadId }),
+        );
 
     const cached = async () => await harness.run(async (ctx: any) => await getCachedFollowupSuggestionsHandler(ctx, { threadId }));
 
@@ -130,6 +141,49 @@ describe("a late run cannot replace a newer cache", () => {
         await cache("reply-new", 5, ["newer?"]);
 
         await expect(cached()).resolves.toEqual({ lastMessageId: "reply-new", suggestions: ["newer?"] });
+    });
+
+    it("an earlier sibling of the same turn that finishes after a later one is refused", async () => {
+        await cache("sibling-later", 5, ["later?"], 2000);
+        await cache("sibling-earlier", 5, ["earlier?"], 1000);
+
+        await expect(cached()).resolves.toEqual({ lastMessageId: "sibling-later", suggestions: ["later?"] });
+    });
+
+    it("a later sibling of the same turn replaces an earlier one", async () => {
+        await cache("sibling-earlier", 5, ["earlier?"], 1000);
+        await cache("sibling-later", 5, ["later?"], 2000);
+
+        await expect(cached()).resolves.toEqual({ lastMessageId: "sibling-later", suggestions: ["later?"] });
+    });
+});
+
+describe("a model request in flight holds the chat's lock", () => {
+    const begin = async (requestId: string, id = threadId) =>
+        await harness.action(async (context: any) => await context.runMutation(beginFollowupDispatch, { requestId, threadId: id }));
+
+    const end = async (requestId: string, claimedAt: number) =>
+        await harness.action(async (context: any) => await context.runMutation(endFollowupDispatch, { claimedAt, requestId, threadId }));
+
+    const inFlight = async () => await harness.run(async (ctx: any) => await followupDispatchInFlight(ctx, threadId));
+
+    it("is taken for an open thread, and holds until the request settles", async () => {
+        const claimedAt = await begin("reply-1");
+
+        expect(typeof claimedAt).toBe("number");
+        await expect(inFlight()).resolves.toBe(true);
+
+        await end("reply-1", claimedAt as number);
+
+        await expect(inFlight()).resolves.toBe(false);
+    });
+
+    it("is not taken for a locked thread, so nothing is sent", async () => {
+        const locked = await harness.run(
+            async (ctx: any) => await ctx.db.insert("threads", { createdAt: 1, lockedAt: 1000, status: "active", title: "L", updatedAt: 1, userId: OWNER }),
+        );
+
+        await expect(begin("reply-1", locked)).resolves.toBeNull();
     });
 });
 

@@ -4532,6 +4532,9 @@ export const generateFollowupSuggestionsForThread = internalAction
     .action(async ({ args: { threadId, userId }, ctx: context }) => {
         chatLogger.debug(`[generateFollowupSuggestionsForThread] Starting`, { threadId, userId });
 
+        // The reply's paid claim, once taken. A failure before its cache lands gives the claim back (see the catch).
+        let paid: { cached: boolean; lastMessageId: string } | null = null;
+
         try {
             const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
                 threadId: threadId as Id<"threads">, // Cast to any for component query compatibility
@@ -4662,59 +4665,101 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
-            // One Text unit per reply, on whoever the background model bills, keyed per reply so a retry is not charged again.
-            const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
-                kind: "Text",
-                requestId: `followup:${threadId}:${lastMessageId}`,
-                userId: background.billedUserId ?? userId,
-            });
+            paid = { cached: false, lastMessageId };
 
-            if (!charged) {
-                // Nothing was paid for, so the reply's claim is given back and a later run can ask again.
+            // The chat's dispatch claim is taken after the lock check and held until this request settles, so a lock waits for it.
+            const dispatchedAt = await context.runMutation(internal.agent.followup_suggestions.beginFollowupDispatch, { requestId: lastMessageId, threadId });
+
+            if (dispatchedAt === null) {
+                // The chat was locked since admission: nothing was sent, so the reply's claim is given back.
                 await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { lastMessageId, threadId, userId });
 
                 return;
             }
 
-            chatLogger.debug(`[generateFollowupSuggestionsForThread] Generating new suggestions`, {
-                cachedMessageId: cached?.lastMessageId,
-                hasCached: !!cached,
-                threadId,
-            });
+            try {
+                // One Text unit per reply, on whoever the background model bills, keyed per reply so a retry is not charged again.
+                const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
+                    kind: "Text",
+                    requestId: `followup:${threadId}:${lastMessageId}`,
+                    userId: background.billedUserId ?? userId,
+                });
 
-            const modelMessages = docsToModelMessages(filteredMessageDocuments);
+                if (!charged) {
+                    // Nothing was paid for, so the reply's claim is given back and a later run can ask again.
+                    await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { lastMessageId, threadId, userId });
 
-            const output = await generateFollowupSuggestionsInternal(modelMessages, agent.options.languageModel as LanguageModel, language, timezone, location);
+                    return;
+                }
 
-            // A newer message may have landed while the model worked. Its own run suggests for it, so this one must not overwrite that.
-            const latestPage = await agent.listMessages(context, {
-                paginationOpts: { cursor: null, numItems: 10 },
-                threadId,
-            });
-            const latestNewest = rowsAfterContextReset(latestPage.page || [], contextReset).find((messageDocument) => {
-                const role = messageDocument.message?.role;
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] Generating new suggestions`, {
+                    cachedMessageId: cached?.lastMessageId,
+                    hasCached: !!cached,
+                    threadId,
+                });
 
-                return role === "user" || role === "assistant";
-            });
+                const modelMessages = docsToModelMessages(filteredMessageDocuments);
 
-            if (latestNewest?._id !== newest._id) {
-                chatLogger.debug(`[generateFollowupSuggestionsForThread] A newer message arrived, not caching: ${threadId}`);
+                const output = await generateFollowupSuggestionsInternal(
+                    modelMessages,
+                    agent.options.languageModel as LanguageModel,
+                    language,
+                    timezone,
+                    location,
+                );
 
-                return;
+                // A newer message may have landed while the model worked. Its own run suggests for it, so this one must not overwrite that.
+                const latestPage = await agent.listMessages(context, {
+                    paginationOpts: { cursor: null, numItems: 10 },
+                    threadId,
+                });
+                const latestNewest = rowsAfterContextReset(latestPage.page || [], contextReset).find((messageDocument) => {
+                    const role = messageDocument.message?.role;
+
+                    return role === "user" || role === "assistant";
+                });
+
+                if (latestNewest?._id !== newest._id) {
+                    chatLogger.debug(`[generateFollowupSuggestionsForThread] A newer message arrived, not caching: ${threadId}`);
+
+                    return;
+                }
+
+                // The mutation refuses an older turn, and an older sibling of the same turn, than the reply already cached.
+                await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, {
+                    lastMessageId,
+                    order: newest.order,
+                    replyAt: newest.createdAt ?? newest._creationTime,
+                    suggestions: output.suggestions,
+                    threadId,
+                });
+                paid.cached = true;
+
+                chatLogger.info(`[generateFollowupSuggestionsForThread] Generated ${output.suggestions.length} suggestions for thread: ${threadId}`);
+            } finally {
+                // The request has settled, so the chat may be locked again.
+                await context.runMutation(internal.agent.followup_suggestions.endFollowupDispatch, {
+                    claimedAt: dispatchedAt,
+                    requestId: lastMessageId,
+                    threadId,
+                });
             }
-
-            // Cache the suggestions
-            // The mutation refuses a turn older than the one already cached, so a run that finished late cannot replace a newer cache.
-            await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, {
-                lastMessageId,
-                order: newest.order,
-                suggestions: output.suggestions,
-                threadId,
-            });
-
-            chatLogger.info(`[generateFollowupSuggestionsForThread] Generated ${output.suggestions.length} suggestions for thread: ${threadId}`);
         } catch (error) {
             chatLogger.error(`[generateFollowupSuggestionsForThread] Error generating suggestions:`, error);
+
+            // A paid reply whose cache never landed gives its claim back, so a later run can finish it. The charge is keyed per reply,
+            // so that run is not charged twice.
+            if (paid && !paid.cached) {
+                try {
+                    await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, {
+                        lastMessageId: paid.lastMessageId,
+                        threadId,
+                        userId,
+                    });
+                } catch (releaseError) {
+                    chatLogger.error(`[generateFollowupSuggestionsForThread] Could not give the reply's claim back:`, releaseError);
+                }
+            }
         }
     });
 

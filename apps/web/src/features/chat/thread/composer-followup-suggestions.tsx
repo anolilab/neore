@@ -102,10 +102,10 @@ const ComposerFollowupSuggestions: FC = () => {
 
         setIsLoading(isFetchingCached && cachedFollowups === undefined);
 
-        // Only the suggestions for the reply on screen: a cache entry for an older reply is not shown.
-        if (cachedFollowups && cachedFollowups.lastMessageId === lastMessage?.id) {
-            setSuggestions(cachedFollowups.suggestions);
-        }
+        // Only the suggestions for the reply on screen: a cache entry for an older reply, or none, shows nothing.
+        const cachedForReply = cachedFollowups && cachedFollowups.lastMessageId === lastMessage?.id ? cachedFollowups : null;
+
+        setSuggestions(cachedForReply ? cachedForReply.suggestions : []);
     }, [shouldFetchConditions, cachedFollowups, isFetchingCached, lastMessage?.id]);
 
     // Handle new suggestions arriving

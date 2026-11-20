@@ -7,13 +7,18 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "../_generated/server";
 import { getUser } from "../auth/lib/better-auth-queries";
-import { claimOnce, releaseClaim } from "../lib/claim-once";
+import { claimFence, claimOnce, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, releaseClaim } from "../lib/claim-once";
 import { isThreadLocked } from "../lib/thread-lock";
 
 /** One paid suggestion call per reply: keyed `<threadId>:<lastMessageId>`, so a second run of the same reply finds it taken. */
 export const FOLLOWUP_CLAIM_SCOPE = "followup-suggestions";
 /** A reply is paid for once, so its claim outlives any retry of its job: a retry after a failed call is not charged again. */
 const FOLLOWUP_CLAIM_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** A model request in flight for a chat: a lock waits for it, and the claim goes as soon as the request settles. */
+export const FOLLOWUP_DISPATCH_SCOPE = "followup-dispatch";
+/** Long enough for one model call; a job that dies lets the chat be locked again after this. */
+const FOLLOWUP_DISPATCH_TTL_MS = 2 * 60 * 1000;
 
 /** The fields of a message row that decide which row a reply is keyed by. */
 export interface ReplyAnchorRow {
@@ -77,7 +82,7 @@ export const admitFollowupSuggestions = internalMutation
         return await claimOnce(context, FOLLOWUP_CLAIM_SCOPE, `${threadId}:${lastMessageId}`, FOLLOWUP_CLAIM_TTL_MS, userId);
     });
 
-/** Gives a reply's claim back when its charge was refused: nothing was paid, so a later run may ask again. */
+/** Gives a reply's claim back when its charge was refused or its run failed before the cache: a later run may ask again. */
 export const releaseFollowupSuggestions = internalMutation
     .input({ lastMessageId: v.string(), threadId: v.string(), userId: v.string() })
     .output(v.null())
@@ -86,6 +91,41 @@ export const releaseFollowupSuggestions = internalMutation
 
         return null;
     });
+
+/**
+ * Lets one follow-up model request leave: checks the thread is still open and takes the request's dispatch claim, in one
+ * transaction. Locking a chat refuses while the claim is held (`agent/thread-lock.ts`), so either the lock lands first and
+ * nothing is sent, or the request goes out first and the lock waits for it. `null` when the request must not be sent.
+ */
+export const beginFollowupDispatch = internalMutation
+    .input({ requestId: v.string(), threadId: v.string() })
+    .output(v.union(v.null(), v.number()))
+    .mutation(async ({ args: { requestId, threadId }, ctx: context }) => {
+        const thread = await context.db.get("threads", threadId as Id<"threads">);
+
+        if (!thread || thread.deletedAt || isThreadLocked(thread)) {
+            return null;
+        }
+
+        // Dispatches whose end never landed are cleared here, so the lock's check reads a short range.
+        await dropExpiredClaimsWithPrefix(context, FOLLOWUP_DISPATCH_SCOPE, `${threadId}:`);
+
+        return await claimFence(context, FOLLOWUP_DISPATCH_SCOPE, `${threadId}:${requestId}`, { ttlMs: FOLLOWUP_DISPATCH_TTL_MS });
+    });
+
+/** The request has settled: its dispatch claim goes, and the chat may be locked again. */
+export const endFollowupDispatch = internalMutation
+    .input({ claimedAt: v.number(), requestId: v.string(), threadId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args: { claimedAt, requestId, threadId }, ctx: context }) => {
+        await releaseClaim(context, FOLLOWUP_DISPATCH_SCOPE, `${threadId}:${requestId}`, claimedAt);
+
+        return null;
+    });
+
+/** Whether a follow-up model request is in flight for this chat. */
+export const followupDispatchInFlight = async (context: Pick<QueryContext, "db">, threadId: string): Promise<boolean> =>
+    await hasClaimWithPrefix(context, FOLLOWUP_DISPATCH_SCOPE, `${threadId}:`);
 
 export const getCachedFollowupSuggestions = internalQuery
     .input({
@@ -123,18 +163,20 @@ export const getCachedFollowupSuggestionsHandler = async (context: QueryContext,
 };
 
 /**
- * Stores the suggestions for one reply. The check and the write run in one mutation, so a run for an older turn that
- * finishes late is refused when a newer turn's suggestions are already stored.
+ * Stores the suggestions for one reply. The check and the write run in one mutation, so a run for an older reply that
+ * finishes late is refused when a newer reply's suggestions are already stored. A reply is older than the stored one when
+ * its turn is older, or when it is a sibling of the same turn that was created earlier (siblings share `order`).
  */
 export const cacheFollowupSuggestions = internalMutation
     .input({
         lastMessageId: v.string(),
         order: v.number(),
+        replyAt: v.number(),
         suggestions: v.array(v.string()),
         threadId: v.string(),
     })
     .output(v.null())
-    .mutation(async ({ args: { lastMessageId, order, suggestions, threadId }, ctx: context }) => {
+    .mutation(async ({ args: { lastMessageId, order, replyAt, suggestions, threadId }, ctx: context }) => {
         const { now } = context;
 
         const existing = await context.db
@@ -143,14 +185,18 @@ export const cacheFollowupSuggestions = internalMutation
             .first();
 
         if (existing) {
-            // A newer turn's suggestions are already stored: this older run must not replace them.
-            if (existing.order !== undefined && existing.order > order) {
+            const olderTurn = existing.order !== undefined && existing.order > order;
+            const olderSibling = existing.order === order && existing.replyAt !== undefined && existing.replyAt > replyAt;
+
+            // A newer reply's suggestions are already stored: this older run must not replace them.
+            if (olderTurn || olderSibling) {
                 return null;
             }
 
             await context.db.patch("followupSuggestions", existing._id, {
                 lastMessageId,
                 order,
+                replyAt,
                 suggestions,
                 updatedAt: now,
             });
@@ -159,6 +205,7 @@ export const cacheFollowupSuggestions = internalMutation
                 createdAt: now,
                 lastMessageId,
                 order,
+                replyAt,
                 suggestions,
                 threadId,
                 updatedAt: now,

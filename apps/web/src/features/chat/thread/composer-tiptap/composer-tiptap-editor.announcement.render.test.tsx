@@ -4,7 +4,10 @@
  * announcement with it. Fake timers drive the clock; the editor, its extensions and the announcement effect are real.
  */
 import { act, render, screen } from "@testing-library/react";
+import { createRef } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { ComposerTiptapEditorRef } from "./composer-tiptap-editor";
 
 vi.mock("@lingui/react/macro", () => {
     return {
@@ -155,5 +158,47 @@ describe("the suggested next prompt announcement", () => {
         view.rerender(editorWith(null, "", requestCompletion));
 
         expect(announcedText()).toBeNull();
+    });
+
+    // A prompt the person dismisses is gone, so its line goes with it: it is not left to run out on the timer.
+    describe("a prompt the person dismisses", () => {
+        const mountEditor = (nextPromptSuggestion: string) => {
+            const ref = createRef<ComposerTiptapEditorRef>();
+
+            render(
+                <ComposerTiptapEditor
+                    nextPromptScope="thread-1"
+                    nextPromptSuggestion={nextPromptSuggestion}
+                    onChange={() => {}}
+                    onSubmit={() => {}}
+                    ref={ref}
+                    value=""
+                />,
+            );
+
+            return ref;
+        };
+
+        it("Escape clears its line at once", () => {
+            const editorRef = mountEditor("Summarize it");
+
+            expect(announcedText()).not.toBeNull();
+
+            act(() => {
+                editorRef.current!.getEditor()!.commands.clearGhost();
+            });
+
+            expect(announcedText()).toBeNull();
+        });
+
+        it("typing over it clears its line at once", () => {
+            const editorRef = mountEditor("Summarize it");
+
+            act(() => {
+                editorRef.current!.getEditor()!.commands.insertContent("x");
+            });
+
+            expect(announcedText()).toBeNull();
+        });
     });
 });
