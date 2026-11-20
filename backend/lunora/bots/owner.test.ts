@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import { eraseBotsForUser } from "./gdpr";
-import { BOT_OWNER_TOMBSTONE_TTL_MS, markBotOwnerDeleted, pruneBotOwnerTombstonesOf, restoreLiveBotOwnersOf } from "./owner";
+import { BOT_OWNER_SWEEP_STATEMENTS, BOT_OWNER_TOMBSTONE_TTL_MS, markBotOwnerDeleted, pruneBotOwnerTombstonesOf, restoreLiveBotOwnersOf } from "./owner";
 
 vi.mock("../sandbox/functions", () => {
     return { retireBotComputersIn: vi.fn() };
@@ -78,7 +78,7 @@ describe(restoreLiveBotOwnersOf, () => {
 
                 await ctx.db.insert("botOwners", { botId: live, createdAt: 1, deletedAt: 5, ownerId: "user-1" });
                 await ctx.db.insert("botOwners", { botId: "gone-bot", createdAt: 1, deletedAt: 5, ownerId: "user-1" });
-                await restoreLiveBotOwnersOf(ctx, "user-1", 9);
+                await restoreLiveBotOwnersOf(ctx, "user-1", 9, { left: BOT_OWNER_SWEEP_STATEMENTS });
 
                 const { page } = await ctx.db.botOwners.findMany({ where: { ownerId: "user-1" } });
 
@@ -114,7 +114,7 @@ describe("a restore cut short", () => {
                 // The restore inserted the live row, then failed before deleting the tombstoned one.
                 await ctx.db.insert("botOwners", { botId: bot, createdAt: 1, deletedAt: 5, ownerId: "user-1" });
                 await ctx.db.insert("botOwners", { botId: bot, createdAt: 1, ownerId: "user-1" });
-                await restoreLiveBotOwnersOf(ctx, "user-1", 9);
+                await restoreLiveBotOwnersOf(ctx, "user-1", 9, { left: BOT_OWNER_SWEEP_STATEMENTS });
 
                 const { page } = await ctx.db.botOwners.findMany({ where: { ownerId: "user-1" } });
 
@@ -140,7 +140,7 @@ describe(pruneBotOwnerTombstonesOf, () => {
                 await ctx.db.insert("botOwners", { botId: "old", createdAt: 1, deletedAt: 1, ownerId: "user-1" });
                 await ctx.db.insert("botOwners", { botId: "recent", createdAt: 1, deletedAt: now - 1000, ownerId: "user-1" });
                 await ctx.db.insert("botOwners", { botId: "live", createdAt: 1, ownerId: "user-1" });
-                await pruneBotOwnerTombstonesOf(ctx, "user-1", now);
+                await pruneBotOwnerTombstonesOf(ctx, "user-1", now, { left: BOT_OWNER_SWEEP_STATEMENTS });
 
                 const { page } = await ctx.db.botOwners.findMany({ where: { ownerId: "user-1" } });
 
@@ -174,7 +174,7 @@ describe("owner records a cut-short bot write left wrong", () => {
 
                 // A delete that removed its bot but never wrote the tombstone.
                 await ctx.db.insert("botOwners", { botId: "deleted-bot", createdAt: 1, ownerId: "user-1" });
-                await restoreLiveBotOwnersOf(ctx, "user-1", 9);
+                await restoreLiveBotOwnersOf(ctx, "user-1", 9, { left: BOT_OWNER_SWEEP_STATEMENTS });
 
                 const { page } = await ctx.db.botOwners.findMany({ where: { ownerId: "user-1" } });
 

@@ -25,7 +25,7 @@ const ORPHAN_PAGE = 200;
 export const BOT_OWNER_SWEEP_STATEMENTS = 40;
 
 /** What is left of a run's statement budget; `spend` takes one and says whether there was one to take. */
-interface StatementBudget {
+export interface StatementBudget {
     left: number;
 }
 
@@ -61,12 +61,7 @@ export const markBotOwnerDeleted = async (ctx: Pick<MutationCtx, "db">, botId: I
  * other people's lists: a live bot's tombstone is cleared, a live bot with no record gets one, and a live record whose
  * bot is gone is tombstoned.
  */
-export const restoreLiveBotOwnersOf = async (
-    ctx: Pick<MutationCtx, "db">,
-    userId: string,
-    now: number,
-    budget: StatementBudget = { left: BOT_OWNER_SWEEP_STATEMENTS },
-): Promise<void> => {
+export const restoreLiveBotOwnersOf = async (ctx: Pick<MutationCtx, "db">, userId: string, now: number, budget: StatementBudget): Promise<void> => {
     const bots = await ctx.db
         .query("bots")
         .withIndex("by_userId", (q) => q.eq("userId", userId))
@@ -113,22 +108,24 @@ export const restoreLiveBotOwnersOf = async (
         const batchBots = bots.slice(start, start + BOT_OWNER_BATCH);
 
         for (const bot of batchBots) {
-            if (!recorded.has(bot._id as string)) {
-                if (!spend(budget)) {
-                    return;
-                }
-
-                await ctx.db.insert("botOwners", { botId: bot._id, createdAt: bot.createdAt, ownerId: userId });
+            if (recorded.has(bot._id as string)) {
+                continue;
             }
+
+            if (!spend(budget)) {
+                return;
+            }
+
+            await ctx.db.insert("botOwners", { botId: bot._id, createdAt: bot.createdAt, ownerId: userId });
         }
     }
 
     // A live record whose bot is gone (a delete that failed before its tombstone was written) is tombstoned now.
-    const existing = new Set(botIds as string[]);
-
     if (!spend(budget)) {
         return;
     }
+
+    const existing = new Set(botIds as string[]);
 
     const { page: liveRecords } = await ctx.db.botOwners.findMany({
         consistency: "primary",
@@ -137,23 +134,20 @@ export const restoreLiveBotOwnersOf = async (
     });
 
     for (const owner of liveRecords) {
-        if (!existing.has(owner.botId as string)) {
-            if (!spend(budget)) {
-                return;
-            }
-
-            await ctx.db.patch("botOwners", owner._id, { deletedAt: now });
+        if (existing.has(owner.botId as string)) {
+            continue;
         }
+
+        if (!spend(budget)) {
+            return;
+        }
+
+        await ctx.db.patch("botOwners", owner._id, { deletedAt: now });
     }
 };
 
 /** Deletes `userId`'s bot owner records whose bot was deleted more than {@link BOT_OWNER_TOMBSTONE_TTL_MS} before `now`. */
-export const pruneBotOwnerTombstonesOf = async (
-    ctx: Pick<MutationCtx, "db">,
-    userId: string,
-    now: number,
-    budget: StatementBudget = { left: BOT_OWNER_SWEEP_STATEMENTS },
-): Promise<void> => {
+export const pruneBotOwnerTombstonesOf = async (ctx: Pick<MutationCtx, "db">, userId: string, now: number, budget: StatementBudget): Promise<void> => {
     // The read takes one statement and each delete another, so it reads no more rows than the budget can delete.
     if (!spend(budget) || budget.left === 0) {
         return;
