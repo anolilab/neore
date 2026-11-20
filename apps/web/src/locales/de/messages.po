@@ -25,11 +25,11 @@ msgstr " · Modell: {modelFilter}"
 msgid "- {0, plural, one {# row} other {# rows}}, {1, plural, one {# column} other {# columns}}"
 msgstr "- {0, plural, one {# Zeile} other {# Zeilen}}, {1, plural, one {# Spalte} other {# Spalten}}"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:752
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:755
 msgid "-- INSERT --"
 msgstr "-- EINFÜGEN --"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:752
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:755
 msgid "-- NORMAL --"
 msgstr "-- NORMAL --"
 
@@ -61,31 +61,39 @@ msgstr "\"{0}\" startet, sobald seine Abhängigkeiten erledigt sind"
 msgid "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
 msgstr "„{badLogin}“ ist kein gültiger Login. Ein Login beginnt mit einem Buchstaben oder einer Ziffer, hat höchstens {0} Zeichen und enthält nur Buchstaben, Ziffern und einzelne Bindestriche oder Unterstriche."
 
-#: src/features/chat/thread/composer-input.tsx:629
+#: src/features/chat/thread/composer-input.tsx:642
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "„{fileName}“ kann nicht angehängt werden: Dieser Dateityp wird nicht unterstützt."
 
-#: src/features/chat/thread/composer-input.tsx:622
+#: src/features/chat/thread/composer-input.tsx:635
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "„{fileName}“ konnte nicht angehängt werden: Der Inhalt passt nicht zum Dateityp."
 
-#: src/features/chat/thread/composer-input.tsx:624
+#: src/features/chat/thread/composer-input.tsx:1152
+msgid "\"{fileName}\" could not be uploaded, so the message was not sent."
+msgstr "\"{fileName}\" konnte nicht hochgeladen werden, daher wurde die Nachricht nicht gesendet."
+
+#: src/features/chat/thread/composer-input.tsx:637
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "„{fileName}“ konnte nicht hochgeladen werden. Prüfe deine Verbindung und versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:627
+#: src/features/chat/thread/composer-input.tsx:1146
+#~ msgid "\"{fileName}\" could not be uploaded. Remove it to send."
+#~ msgstr "\"{fileName}\" konnte nicht hochgeladen werden. Entferne sie, um zu senden."
+
+#: src/features/chat/thread/composer-input.tsx:640
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "„{fileName}“ ist zu groß. Dokumente dürfen höchstens {maxMegabytes} MB groß sein."
 
-#: src/features/chat/thread/composer-input.tsx:628
+#: src/features/chat/thread/composer-input.tsx:641
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "„{fileName}“ ist zu groß. Dateien dieses Typs dürfen höchstens {maxMegabytes} MB groß sein."
 
-#: src/features/projects/components/project-rule-files.tsx:371
+#: src/features/projects/components/project-rule-files.tsx:402
 msgid "\"{name}\" has more than {limit} file patterns. Remove some, or move them into another file."
 msgstr "„{name}“ hat mehr als {limit} Dateimuster. Entferne einige oder verschiebe sie in eine andere Datei."
 
-#: src/features/projects/components/project-rule-files.tsx:360
+#: src/features/projects/components/project-rule-files.tsx:391
 msgid "\"{name}\" is longer than {limit} characters. Shorten it or split it into several files."
 msgstr "„{name}“ ist länger als {limit} Zeichen. Kürze die Datei oder teile sie auf mehrere Dateien auf."
 
@@ -1011,7 +1019,7 @@ msgstr "{handoff} Credits"
 msgid "{hiddenColumns, plural, one {+# more column is not shown.} other {+# more columns are not shown.}}"
 msgstr "{hiddenColumns, plural, one {+# weitere Spalte wird nicht angezeigt.} other {+# weitere Spalten werden nicht angezeigt.}}"
 
-#: src/features/chat/thread/composer-input-area.tsx:184
+#: src/features/chat/thread/composer-input-area.tsx:187
 msgid "{hiddenRemoved, plural, one {# invisible character was removed from your message.} other {# invisible characters were removed from your message.}}"
 msgstr "{hiddenRemoved, plural, one {# unsichtbares Zeichen wurde aus deiner Nachricht entfernt.} other {# unsichtbare Zeichen wurden aus deiner Nachricht entfernt.}}"
 
@@ -1857,7 +1865,7 @@ msgstr "Ein Dokumenteditor, der mit dir mitdenkt."
 msgid "A few questions first"
 msgstr "Zuerst ein paar Fragen"
 
-#: src/features/projects/components/project-rule-files.tsx:367
+#: src/features/projects/components/project-rule-files.tsx:398
 msgid "A file applied when files match needs at least one pattern."
 msgstr "Eine Regeldatei mit „Wenn Dateien passen“ braucht mindestens ein Dateimuster."
 
@@ -1978,7 +1986,7 @@ msgstr "Ein Platzhalter oder eine @Erwähnung außerhalb von Anführungszeichen 
 msgid "A project can list at most {MAX_REPOSITORIES} repositories."
 msgstr "Ein Projekt kann höchstens {MAX_REPOSITORIES} Repositorys auflisten."
 
-#: src/features/projects/components/project-rule-files.tsx:387
+#: src/features/projects/components/project-rule-files.tsx:418
 msgid "A project holds at most {limit} rule files. Remove one first."
 msgstr "Ein Projekt enthält höchstens {limit} Regeldateien. Entferne zuerst eine."
 
@@ -2016,7 +2024,7 @@ msgstr "Eine Antwort, die Erinnerungen verwendet hat, zeigt eine Liste „Verwen
 msgid "A routed or mentioned turn has at most three speakers. A parallel turn has up to four answers and a synthesis, and a debate runs up to three rounds."
 msgstr "Ein weitergeleiteter oder erwähnter Zug hat höchstens drei Sprecher. Ein paralleler Zug hat bis zu vier Antworten und eine Zusammenfassung, und eine Debatte läuft über höchstens drei Runden."
 
-#: src/features/projects/components/project-rule-files.tsx:377
+#: src/features/projects/components/project-rule-files.tsx:408
 msgid "A rule file's name may be at most {limit} characters."
 msgstr "Der Name einer Regeldatei darf höchstens {limit} Zeichen lang sein."
 
@@ -2413,10 +2421,10 @@ msgstr "Füge mindestens ein Modell hinzu – nutze \"Modelle abrufen\" oder gib
 msgid "Add at least one model id"
 msgstr "Füge mindestens eine Modell-ID hinzu"
 
-#: src/features/chat/thread/composer-input-area.tsx:224
-#: src/features/chat/thread/composer-input-area.tsx:258
-#: src/features/chat/thread/composer-input-area.tsx:265
-#: src/features/chat/thread/composer-input-area.tsx:279
+#: src/features/chat/thread/composer-input-area.tsx:232
+#: src/features/chat/thread/composer-input-area.tsx:266
+#: src/features/chat/thread/composer-input-area.tsx:273
+#: src/features/chat/thread/composer-input-area.tsx:287
 #: src/features/chat/thread/edit-composer.tsx:132
 msgid "Add attachment"
 msgstr "Anhang hinzufügen"
@@ -2580,7 +2588,7 @@ msgstr "Referenzbilder hinzufügen, um die Konsistenz zu wahren"
 msgid "Add row"
 msgstr "Zeile hinzufügen"
 
-#: src/features/projects/components/project-rule-files.tsx:561
+#: src/features/projects/components/project-rule-files.tsx:616
 msgid "Add rule file"
 msgstr "Regeldatei hinzufügen"
 
@@ -3525,8 +3533,8 @@ msgstr "Bereits mit diesem Thread verknüpft."
 msgid "Also viewing"
 msgstr "Sehen sich das auch an"
 
-#: src/features/projects/components/project-rule-files.tsx:240
-#: src/features/projects/components/project-rule-files.tsx:524
+#: src/features/projects/components/project-rule-files.tsx:266
+#: src/features/projects/components/project-rule-files.tsx:572
 msgid "Always"
 msgstr "Immer"
 
@@ -3933,7 +3941,7 @@ msgstr "AppID aus der Grundkonfiguration deines Official Account"
 msgid "Application Error"
 msgstr "Anwendungsfehler"
 
-#: src/features/projects/components/project-rule-files.tsx:236
+#: src/features/projects/components/project-rule-files.tsx:262
 msgid "Applies"
 msgstr "Gilt"
 
@@ -5917,7 +5925,7 @@ msgstr "Bildunterschrift"
 msgid "Caption text"
 msgstr "Bildunterschrift"
 
-#: src/features/chat/thread/composer-input-area.tsx:253
+#: src/features/chat/thread/composer-input-area.tsx:261
 msgid "Capture screen"
 msgstr "Bildschirm aufnehmen"
 
@@ -6695,7 +6703,7 @@ msgstr "Klicke auf das Pin-Symbol bei einer Nachricht, um sie hier zu speichern.
 msgid "Click the star on any model in All models to add it here."
 msgstr "Klicke bei einem beliebigen Modell unter Alle Modelle auf den Stern, um es hier hinzuzufügen."
 
-#: src/features/chat/thread/composer-input.tsx:317
+#: src/features/chat/thread/composer-input.tsx:323
 msgid "Click to edit"
 msgstr "Zum Bearbeiten klicken"
 
@@ -8154,8 +8162,8 @@ msgstr "Unterhaltungen und ausstehende Kommentare zu Dateien, die diese Liste ni
 msgid "Conversations on lines this diff no longer shows"
 msgstr "Unterhaltungen zu Zeilen, die dieser Diff nicht mehr zeigt"
 
-#: src/features/chat/thread/composer-input.tsx:813
-#: src/features/chat/thread/composer-input.tsx:1554
+#: src/features/chat/thread/composer-input.tsx:826
+#: src/features/chat/thread/composer-input.tsx:1714
 msgid "Conversion failed"
 msgstr "Konvertierung fehlgeschlagen"
 
@@ -8485,7 +8493,7 @@ msgstr "{0} konnte nicht angehängt werden. Die übrigen Dateien wurden angehän
 msgid "Could not attach {0}. Try those again."
 msgstr "{0} konnte nicht angehängt werden. Bitte versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:1576
+#: src/features/chat/thread/composer-input.tsx:1738
 msgid "Could not attach the chat"
 msgstr "Der Chat konnte nicht angehängt werden"
 
@@ -8789,11 +8797,11 @@ msgstr "Der Server ist nicht erreichbar, um die Generierung zu starten. Prüfe d
 msgid "Could not reach the server. Try again."
 msgstr "Der Server ist nicht erreichbar. Versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:1579
+#: src/features/chat/thread/composer-input.tsx:1741
 msgid "Could not read that chat"
 msgstr "Dieser Chat konnte nicht gelesen werden"
 
-#: src/features/chat/thread/composer-input.tsx:1580
+#: src/features/chat/thread/composer-input.tsx:1742
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Dieser Chat konnte nicht gelesen werden. Ist er gesperrt, entsperre ihn zuerst."
 
@@ -10113,7 +10121,7 @@ msgstr "{fileName} löschen"
 msgid "Delete {itemName}"
 msgstr "{itemName} löschen"
 
-#: src/features/projects/components/project-rule-files.tsx:231
+#: src/features/projects/components/project-rule-files.tsx:257
 msgid "Delete {name}"
 msgstr "{name} löschen"
 
@@ -10836,7 +10844,7 @@ msgid "Discard"
 msgstr "Verwerfen"
 
 #: src/features/projects/components/project-form-dialog.tsx:512
-#: src/features/projects/components/project-rule-files.tsx:591
+#: src/features/projects/components/project-rule-files.tsx:646
 msgid "Discard changes"
 msgstr "Änderungen verwerfen"
 
@@ -11258,7 +11266,7 @@ msgstr "Dateien hierher ziehen"
 msgid "Draw an image"
 msgstr "Ein Bild zeichnen"
 
-#: src/features/chat/thread/composer-input-area.tsx:247
+#: src/features/chat/thread/composer-input-area.tsx:255
 msgid "Draw image"
 msgstr "Bild zeichnen"
 
@@ -11280,7 +11288,7 @@ msgstr "Datei ablegen oder zum Hochladen klicken"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1765
+#: src/features/chat/thread/composer-input.tsx:1932
 msgid "Drop files here"
 msgstr "Dateien hier ablegen"
 
@@ -11465,7 +11473,7 @@ msgstr "Jede Verbindung erhält ihre eigene Webhook-Adresse, an die die App neue
 msgid "Each Discord channel creates a separate thread in Neore Chat. The AI will auto-respond in the channel."
 msgstr "Jeder Discord-Kanal erstellt einen eigenen Thread in Neore Chat. Die KI antwortet im Kanal automatisch."
 
-#: src/features/projects/components/project-rule-files.tsx:365
+#: src/features/projects/components/project-rule-files.tsx:396
 msgid "Each file pattern in \"{name}\" must be at most {limit} characters on one line."
 msgstr "Jedes Dateimuster in „{name}“ darf höchstens {limit} Zeichen lang sein und muss in einer Zeile stehen."
 
@@ -11593,8 +11601,8 @@ msgstr "Sammlung bearbeiten"
 msgid "Edit comment"
 msgstr "Kommentar bearbeiten"
 
-#: src/features/chat/thread/composer-input.tsx:324
-#: src/features/chat/thread/composer-input.tsx:336
+#: src/features/chat/thread/composer-input.tsx:330
+#: src/features/chat/thread/composer-input.tsx:342
 msgid "Edit content"
 msgstr "Inhalt bearbeiten"
 
@@ -13307,7 +13315,7 @@ msgid "Failed to attach collection"
 msgstr "Sammlung konnte nicht angehängt werden"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1405
+#: src/features/chat/thread/composer-input.tsx:1562
 msgid "Failed to attach file"
 msgstr "Datei konnte nicht angehängt werden"
 
@@ -13717,7 +13725,7 @@ msgstr "Exportanfrage fehlgeschlagen"
 msgid "Failed to reset to defaults"
 msgstr "Zurücksetzen auf Standard fehlgeschlagen"
 
-#: src/features/chat/thread/composer-input.tsx:1437
+#: src/features/chat/thread/composer-input.tsx:1594
 msgid "Failed to restore attachment"
 msgstr "Anhang konnte nicht wiederhergestellt werden"
 
@@ -14496,7 +14504,7 @@ msgstr "In anderem Projekt ablegen"
 msgid "File input"
 msgstr "Dateieingabe"
 
-#: src/features/projects/components/project-rule-files.tsx:251
+#: src/features/projects/components/project-rule-files.tsx:277
 msgid "File patterns, one per line"
 msgstr "Dateimuster, eines pro Zeile"
 
@@ -15733,7 +15741,7 @@ msgstr "GitLab"
 msgid "GitLab secret token (X-Gitlab-Token)"
 msgstr "GitLab-Secret-Token (X-Gitlab-Token)"
 
-#: src/features/projects/components/project-rule-files.tsx:373
+#: src/features/projects/components/project-rule-files.tsx:404
 msgid "Give every rule file a name."
 msgstr "Gib jeder Regeldatei einen Namen."
 
@@ -15813,7 +15821,7 @@ msgstr "Zur vorherigen Seite"
 msgid "Go to Prompts"
 msgstr "Zu den Prompts"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:351
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:352
 msgid "Go to reply"
 msgstr "Zur Antwort"
 
@@ -17681,7 +17689,7 @@ msgstr "Instruct"
 msgid "instructions"
 msgstr "Anweisungen"
 
-#: src/features/projects/components/project-rule-files.tsx:269
+#: src/features/projects/components/project-rule-files.tsx:295
 #: src/features/settings/components/chat/bots-settings.tsx:395
 #: src/features/skills/components/bundle-import-dialog.tsx:116
 #: src/features/skills/components/bundle-import-dialog.tsx:150
@@ -17694,7 +17702,7 @@ msgstr "Anweisungen"
 msgid "Instructions"
 msgstr "Anweisungen"
 
-#: src/features/projects/components/project-rule-files.tsx:510
+#: src/features/projects/components/project-rule-files.tsx:558
 msgid "Instructions added to this project's chats: always, or only when the chat's attached files match a pattern such as **/*.sql."
 msgstr "Anweisungen, die den Chats dieses Projekts hinzugefügt werden: immer oder nur, wenn die angehängten Dateien des Chats einem Muster wie **/*.sql entsprechen."
 
@@ -17741,11 +17749,11 @@ msgstr "Intelligentes Videomodell, das vor dem Generieren nachdenkt"
 msgid "Intensity"
 msgstr "Intensität"
 
-#: src/features/chat/thread/composer-input-area.tsx:340
+#: src/features/chat/thread/composer-input-area.tsx:348
 msgid "Interrupt and restart"
 msgstr "Unterbrechen und neu starten"
 
-#: src/features/chat/thread/composer-input-area.tsx:356
+#: src/features/chat/thread/composer-input-area.tsx:364
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr "Unterbrechen und neu starten – stoppt die aktuelle Antwort und sendet dies"
 
@@ -19660,7 +19668,7 @@ msgstr "Langer Text erkannt"
 msgid "Long text generation in images"
 msgstr "Generierung langer Texte in Bildern"
 
-#: src/features/chat/thread/composer-input.tsx:889
+#: src/features/chat/thread/composer-input.tsx:902
 msgid "Long text was attached as a file."
 msgstr "Der lange Text wurde als Datei angehängt."
 
@@ -20434,8 +20442,8 @@ msgstr "Auf {hostLabel} gemergt."
 msgid "Merging…"
 msgstr "Wird gemergt…"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:301
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:619
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:302
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:622
 msgid "Message"
 msgstr "Nachricht"
 
@@ -21175,11 +21183,11 @@ msgstr "{label} in Markierungen nach unten verschieben"
 msgid "Move {label} up in starred"
 msgstr "{label} in Markierungen nach oben verschieben"
 
-#: src/features/projects/components/project-rule-files.tsx:228
+#: src/features/projects/components/project-rule-files.tsx:254
 msgid "Move {name} down"
 msgstr "{name} nach unten verschieben"
 
-#: src/features/projects/components/project-rule-files.tsx:225
+#: src/features/projects/components/project-rule-files.tsx:251
 msgid "Move {name} up"
 msgstr "{name} nach oben verschieben"
 
@@ -21406,7 +21414,7 @@ msgstr "Name"
 #: src/features/devices/components/devices-settings.tsx:479
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
-#: src/features/projects/components/project-rule-files.tsx:211
+#: src/features/projects/components/project-rule-files.tsx:228
 #: src/features/prompts/components/prompt-form-dialog.tsx:247
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
@@ -26190,7 +26198,7 @@ msgstr "Projekt"
 msgid "Project actions"
 msgstr "Projektaktionen"
 
-#: src/features/projects/components/project-rule-files.tsx:317
+#: src/features/projects/components/project-rule-files.tsx:347
 msgid "Project context"
 msgstr "Projektkontext"
 
@@ -26582,11 +26590,11 @@ msgstr "Frage"
 msgid "Queue"
 msgstr "Warteschlange"
 
-#: src/features/chat/thread/composer-input-area.tsx:367
+#: src/features/chat/thread/composer-input-area.tsx:375
 msgid "Queue message"
 msgstr "Nachricht einreihen"
 
-#: src/features/chat/thread/composer-input-area.tsx:386
+#: src/features/chat/thread/composer-input-area.tsx:394
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Nachricht einreihen – wird gesendet, wenn die aktuelle Antwort fertig ist"
 
@@ -26872,7 +26880,7 @@ msgstr "Schreibgeschützte Vorschau – zum Bearbeiten forken"
 msgid "Read-only shared conversation"
 msgstr "Schreibgeschützte geteilte Unterhaltung"
 
-#: src/features/chat/thread/composer-input.tsx:281
+#: src/features/chat/thread/composer-input.tsx:287
 msgid "Reading \"{attachmentName}\"…"
 msgstr "„{attachmentName}“ wird gelesen …"
 
@@ -27503,10 +27511,10 @@ msgstr "Angemeldet bleiben"
 #: src/features/chat/host/host-composer.tsx:1033
 #: src/features/chat/sharing/thread-share-button.tsx:300
 #: src/features/chat/sharing/thread-share-button.tsx:372
-#: src/features/chat/thread/composer-input.tsx:343
-#: src/features/chat/thread/composer-input.tsx:355
-#: src/features/chat/thread/composer-input.tsx:409
-#: src/features/chat/thread/composer-input.tsx:418
+#: src/features/chat/thread/composer-input.tsx:349
+#: src/features/chat/thread/composer-input.tsx:361
+#: src/features/chat/thread/composer-input.tsx:415
+#: src/features/chat/thread/composer-input.tsx:424
 #: src/features/devices/components/devices-settings.tsx:334
 #: src/features/devices/components/devices-settings.tsx:340
 #: src/features/projects/components/project-form-dialog.tsx:321
@@ -28284,11 +28292,11 @@ msgstr "Jetzt wiederholen"
 msgid "Retry the device check"
 msgstr "Gerätprüfung erneut versuchen"
 
-#: src/features/chat/thread/composer-input.tsx:432
+#: src/features/chat/thread/composer-input.tsx:438
 msgid "Retry upload"
 msgstr "Upload wiederholen"
 
-#: src/features/chat/thread/composer-input.tsx:427
+#: src/features/chat/thread/composer-input.tsx:433
 msgid "Retry upload of {attachmentName}"
 msgstr "Upload von {attachmentName} wiederholen"
 
@@ -28613,15 +28621,15 @@ msgid "Rubric"
 msgstr "Bewertungsrubrik"
 
 #. placeholder {0}: index + 1
-#: src/features/projects/components/project-rule-files.tsx:196
+#: src/features/projects/components/project-rule-files.tsx:198
 msgid "Rule file {0}"
 msgstr "Regeldatei {0}"
 
-#: src/features/projects/components/project-rule-files.tsx:508
+#: src/features/projects/components/project-rule-files.tsx:556
 msgid "Rule files"
 msgstr "Regeldateien"
 
-#: src/features/projects/components/project-rule-files.tsx:491
+#: src/features/projects/components/project-rule-files.tsx:539
 msgid "Rule files saved."
 msgstr "Regeldateien gespeichert."
 
@@ -28966,7 +28974,7 @@ msgstr "Vorlage speichern"
 msgid "Save reusable system prompts and tie them to specific models. Use the Optimize button to refine each preset with the prompt-optimizer."
 msgstr "Speichere wiederverwendbare System-Prompts und verknüpfe sie mit bestimmten Modellen. Nutze die Schaltfläche Optimieren, um jede Vorlage mit dem Prompt-Optimierer zu verfeinern."
 
-#: src/features/projects/components/project-rule-files.tsx:575
+#: src/features/projects/components/project-rule-files.tsx:630
 msgid "Save rule files"
 msgstr "Regeldateien speichern"
 
@@ -29044,7 +29052,7 @@ msgstr "Tools werden gespeichert…"
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/projects/components/project-form-dialog.tsx:488
-#: src/features/projects/components/project-rule-files.tsx:575
+#: src/features/projects/components/project-rule-files.tsx:630
 #: src/features/prompts/components/prompt-form-dialog.tsx:521
 #: src/features/prompts/components/thread-variables-config.tsx:258
 #: src/features/settings/components/chat/api-keys-settings.tsx:436
@@ -29135,7 +29143,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Bewertet jede Antwort mit 0–100 % anhand der erwarteten Antwort oder der Bewertungsrubrik. Fügt pro Testfall einen kleinen Modellaufruf hinzu."
 
-#: src/features/chat/thread/composer-input.tsx:1364
+#: src/features/chat/thread/composer-input.tsx:1521
 msgid "Screen capture failed. Please try again."
 msgstr "Die Bildschirmaufnahme ist fehlgeschlagen. Bitte versuche es erneut."
 
@@ -29834,13 +29842,13 @@ msgid "Send Magic Link"
 msgstr "Magic Link senden"
 
 #: ../../packages/chat-ui/src/chat/composer.tsx:169
-#: src/features/chat/thread/composer-input-area.tsx:179
-#: src/features/chat/thread/composer-input-area.tsx:421
+#: src/features/chat/thread/composer-input-area.tsx:182
+#: src/features/chat/thread/composer-input-area.tsx:429
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:104
 msgid "Send message"
 msgstr "Nachricht senden"
 
-#: src/features/chat/thread/composer-input-area.tsx:179
+#: src/features/chat/thread/composer-input-area.tsx:182
 msgid "Send message ({sendShortcut})"
 msgstr "Nachricht senden ({sendShortcut})"
 
@@ -29895,9 +29903,19 @@ msgstr "Verifizierungscode senden"
 msgid "Send Verification Code"
 msgstr "Verifizierungscode senden"
 
+#: src/features/chat/thread/composer-input-area.tsx:204
+msgid "Send when uploads finish"
+msgstr "Senden, sobald die Uploads abgeschlossen sind"
+
 #: src/features/chat/guest-links/guest-link-panel.tsx:416
 msgid "Send: {snippet}"
 msgstr "Senden: {snippet}"
+
+#: src/features/chat/thread/composer-input-area.tsx:204
+#: src/features/chat/thread/composer-input-area.tsx:206
+#: src/features/chat/thread/composer-input-area.tsx:459
+msgid "Sending once uploads finish…"
+msgstr "Wird gesendet, sobald die Uploads abgeschlossen sind…"
 
 #: src/features/chat/voice-mode/voice-mode-button.tsx:88
 msgid "Sending your message and waiting for the reply"
@@ -31754,11 +31772,11 @@ msgstr "Status"
 msgid "Status Page"
 msgstr "Statusseite"
 
-#: src/features/chat/thread/composer-input-area.tsx:357
+#: src/features/chat/thread/composer-input-area.tsx:365
 msgid "Steer — the current reply reads this at its next step"
 msgstr "Steuern – die aktuelle Antwort liest dies bei ihrem nächsten Schritt"
 
-#: src/features/chat/thread/composer-input-area.tsx:340
+#: src/features/chat/thread/composer-input-area.tsx:348
 msgid "Steer the reply"
 msgstr "Die Antwort steuern"
 
@@ -31839,8 +31857,8 @@ msgstr "Browser-Sitzung stoppen"
 
 #: src/features/chat/thread-list/thread-node.tsx:633
 #: src/features/chat/thread-list/thread-node.tsx:655
-#: src/features/chat/thread/composer-input-area.tsx:394
-#: src/features/chat/thread/composer-input-area.tsx:407
+#: src/features/chat/thread/composer-input-area.tsx:402
+#: src/features/chat/thread/composer-input-area.tsx:415
 msgid "Stop generating"
 msgstr "Generierung stoppen"
 
@@ -32385,7 +32403,7 @@ msgstr "Vorgeschlagen"
 msgid "Suggested answers"
 msgstr "Vorgeschlagene Antworten"
 
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:638
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:641
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Vorschlag verfügbar, zum Übernehmen Pfeil nach rechts drücken"
 
@@ -33159,7 +33177,7 @@ msgstr "Textrichtung auf LTR gesetzt"
 msgid "Text direction set to RTL"
 msgstr "Textrichtung auf RTL gesetzt"
 
-#: src/features/chat/thread/composer-input.tsx:317
+#: src/features/chat/thread/composer-input.tsx:323
 msgid "Text document"
 msgstr "Textdokument"
 
@@ -33592,7 +33610,7 @@ msgstr "die Änderung wurde abgelehnt"
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "Der Chat-Agent erledigt die Aufgabe mit seinen Tools und folgt optional einem Skill."
 
-#: src/features/chat/thread/composer-input.tsx:989
+#: src/features/chat/thread/composer-input.tsx:1002
 msgid "The chat changed before the paste was ready, so it was not inserted."
 msgstr "Der Chat hat gewechselt, bevor das Einfügen fertig war, daher wurde nichts eingefügt."
 
@@ -33628,8 +33646,8 @@ msgstr "Die Kommandozeile wurde nicht angemeldet. Du kannst diesen Tab schließe
 msgid "The comparison could not be loaded."
 msgstr "Der Vergleich konnte nicht geladen werden."
 
-#: src/features/chat/thread/composer-input.tsx:997
-#: src/features/chat/thread/composer-input.tsx:1019
+#: src/features/chat/thread/composer-input.tsx:1010
+#: src/features/chat/thread/composer-input.tsx:1032
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "Der Eingabebereich war gesperrt, bevor das Einfügen fertig war, daher wurde nichts eingefügt."
 
@@ -33995,6 +34013,10 @@ msgstr "Das Modell im Link ist nicht verfügbar. Der Chat behält sein Modell."
 msgid "The model picker now lists {0} models from {1}"
 msgstr "Die Modellauswahl listet jetzt {0} Modelle von {1}"
 
+#: src/features/chat/thread/composer-input.tsx:1456
+msgid "The model selection changed while the uploads ran, so the message was not sent. Press send to send it."
+msgstr "Die Modellauswahl hat sich während der Uploads geändert, daher wurde die Nachricht nicht gesendet. Drücke auf Senden, um sie zu senden."
+
 #: src/features/marketing/data/models-data.ts:1235
 msgid "The most complex reasoning tasks requiring Alibaba's most advanced thinking model"
 msgstr "Die komplexesten Reasoning-Aufgaben, die Alibabas fortschrittlichstes Denkmodell erfordern"
@@ -34056,7 +34078,7 @@ msgstr "Die Seite zeigt jetzt die andere Version. Kopiere alles, was du aus dein
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "Die Seite, alle Unterseiten, ihre Kommentare und ihr Versionsverlauf werden gelöscht. Das kann nicht rückgängig gemacht werden."
 
-#: src/features/chat/thread/composer-input.tsx:1045
+#: src/features/chat/thread/composer-input.tsx:1058
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "Der eingefügte Text konnte nicht angehängt werden und wurde nicht eingefügt."
 
@@ -34149,7 +34171,7 @@ msgstr "Der neue Versuch dauert länger als erwartet"
 msgid "The right model, every time."
 msgstr "Das richtige Modell, jedes Mal."
 
-#: src/features/projects/components/project-rule-files.tsx:515
+#: src/features/projects/components/project-rule-files.tsx:563
 msgid "The rule files could not be loaded."
 msgstr "Die Regeldateien konnten nicht geladen werden."
 
@@ -34226,9 +34248,13 @@ msgstr "Die beiden Passcodes stimmen nicht überein."
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "Das einheitliche LLM-Gateway für moderne KI-Anwendungen."
 
-#: src/features/chat/thread/composer-input.tsx:623
+#: src/features/chat/thread/composer-input.tsx:636
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "Der Upload von „{fileName}“ ist abgelaufen. Bitte hänge die Datei erneut an."
+
+#: src/features/chat/thread/composer-input.tsx:1469
+msgid "The uploads finished, but the message was not sent. Press send to send it."
+msgstr "Die Uploads sind abgeschlossen, aber die Nachricht wurde nicht gesendet. Drücke auf Senden, um sie zu senden."
 
 #: src/features/admin/components/impersonate-user-dialog.tsx:73
 msgid "The user will not be notified of the impersonation"
@@ -34314,7 +34340,7 @@ msgstr "Diese Erinnerungen wurden für diese Antwort in den Kontext der KI aufge
 msgid "These providers will never be used for your requests."
 msgstr "Diese Anbieter werden nie für deine Anfragen verwendet."
 
-#: src/features/projects/components/project-rule-files.tsx:341
+#: src/features/projects/components/project-rule-files.tsx:372
 msgid "These rule files were changed meanwhile. Discard your changes to see the saved ones, then edit again."
 msgstr "Diese Regeldateien wurden inzwischen geändert. Verwirf deine Änderungen, um die gespeicherten zu sehen, und bearbeite sie dann erneut."
 
@@ -35339,7 +35365,7 @@ msgstr "Heute"
 msgid "Today, {label}"
 msgstr "Heute, {label}"
 
-#: src/features/projects/components/project-rule-files.tsx:382
+#: src/features/projects/components/project-rule-files.tsx:413
 msgid "Together these rule files are larger than {limit} MB. Shorten or remove some of them."
 msgstr "Zusammen sind diese Regeldateien größer als {limit} MB. Kürze oder entferne einige davon."
 
@@ -36086,8 +36112,8 @@ msgid "Type your answer…"
 msgstr "Gib deine Antwort ein…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1755
-#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:201
+#: src/features/chat/thread/composer-input.tsx:1922
+#: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:202
 msgid "Type your message..."
 msgstr "Nachricht eingeben..."
 
@@ -36256,7 +36282,7 @@ msgstr "Unterstrichen"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:891
+#: src/features/chat/thread/composer-input.tsx:904
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Rückgängig"
@@ -36508,7 +36534,7 @@ msgstr "Aktuelle Dokumentation für jede Bibliothek und jedes Framework"
 msgid "Update Duration"
 msgstr "Dauer aktualisieren"
 
-#: src/features/chat/thread/composer-input.tsx:1611
+#: src/features/chat/thread/composer-input.tsx:1777
 msgid "Update failed"
 msgstr "Aktualisierung fehlgeschlagen"
 
@@ -36702,18 +36728,18 @@ msgstr "CSVs hochladen, Python-Analysen ausführen und Diagramme exportieren –
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Lade Dokumente in deine Wissensdatenbank hoch und gruppiere sie in Sammlungen. Die KI durchsucht sie nach relevantem Kontext und zitiert die verwendeten Abschnitte."
 
-#: src/features/chat/thread/composer-input.tsx:424
-#: src/features/chat/thread/composer-input.tsx:668
-#: src/features/chat/thread/composer-input.tsx:1532
+#: src/features/chat/thread/composer-input.tsx:430
+#: src/features/chat/thread/composer-input.tsx:681
+#: src/features/chat/thread/composer-input.tsx:1689
 msgid "Upload failed"
 msgstr "Hochladen fehlgeschlagen"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1525
+#: src/features/chat/thread/composer-input.tsx:1682
 msgid "Upload failed: {0}"
 msgstr "Upload fehlgeschlagen: {0}"
 
-#: src/features/chat/thread/composer-input-area.tsx:242
+#: src/features/chat/thread/composer-input-area.tsx:250
 msgid "Upload file"
 msgstr "Datei hochladen"
 
@@ -36759,7 +36785,7 @@ msgstr "Hochgeladen"
 msgid "Uploaded {fileName}"
 msgstr "{fileName} hochgeladen"
 
-#: src/features/chat/thread/composer-input.tsx:361
+#: src/features/chat/thread/composer-input.tsx:367
 msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} wird hochgeladen"
 
@@ -37918,10 +37944,8 @@ msgstr "Wartet auf die Antwort des Eigentümers"
 msgid "Waiting for the owner to approve"
 msgstr "Wartet auf die Genehmigung des Eigentümers"
 
-#: src/features/chat/thread/composer-input-area.tsx:367
-#: src/features/chat/thread/composer-input-area.tsx:386
-#: src/features/chat/thread/composer-input-area.tsx:421
-#: src/features/chat/thread/composer-input-area.tsx:435
+#: src/features/chat/thread/composer-input-area.tsx:206
+#: src/features/chat/thread/composer-input-area.tsx:375
 msgid "Waiting for uploads to complete…"
 msgstr "Wartet, bis die Uploads abgeschlossen sind…"
 
@@ -38330,7 +38354,7 @@ msgstr "Wenn ein neuer Fakt einem alten widerspricht, wird die alte Erinnerung a
 msgid "When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued."
 msgstr "Wird eine Antwort durch ein Update oder einen Ausfall abgebrochen, wird sie ab ihrem letzten abgeschlossenen Schritt bis zu 3-mal fortgesetzt. Eine Antwort, die unterbrochen wurde, während ein Tool lief, wird nie fortgesetzt."
 
-#: src/features/projects/components/project-rule-files.tsx:244
+#: src/features/projects/components/project-rule-files.tsx:270
 msgid "When files match"
 msgstr "Wenn Dateien passen"
 
@@ -38770,8 +38794,8 @@ msgstr "Du beobachtest kein Repository."
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "Du bist offline. Neore verbindet sich wieder, sobald das Netzwerk verfügbar ist."
 
-#: src/features/chat/thread/composer-input.tsx:1103
-#: src/features/chat/thread/composer-input.tsx:1179
+#: src/features/chat/thread/composer-input.tsx:1116
+#: src/features/chat/thread/composer-input.tsx:1230
 #: src/features/chat/thread/composer-prompt-queue.tsx:112
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "Du bist offline. Deine Nachricht bleibt hier; sende sie, sobald du wieder online bist."
@@ -39116,12 +39140,12 @@ msgid "Your First Chat"
 msgstr "Dein erster Chat"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:733
+#: src/features/chat/thread/composer-input.tsx:746
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Deine Eingabe ist groß (~{0} Token) und wird einen erheblichen Teil des Kontextfensters des Modells beanspruchen."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:726
+#: src/features/chat/thread/composer-input.tsx:739
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Deine Eingabe ist zu groß (~{0} Token) und überschreitet das Kontextfenster des Modells. Bitte kürze die Nachricht oder entferne Anhänge, um sie zu senden."
 
@@ -39153,6 +39177,10 @@ msgstr "Dein Standort (z. B. „New York, USA“, „Berlin, Deutschland“)."
 #: src/features/chat/guest-links/guest-page.tsx:240
 msgid "Your message"
 msgstr "Deine Nachricht"
+
+#: src/features/chat/thread/composer-input.tsx:1441
+msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
+msgstr "Deine Nachricht hat sich während der Uploads geändert, daher wurde sie nicht gesendet. Drücke auf Senden, um sie zu senden."
 
 #: src/features/chat/core/context/chat-context.tsx:718
 msgid "Your message contains inappropriate content that cannot be sent."
