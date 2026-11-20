@@ -255,6 +255,19 @@ describe("a queued media job rechecks each referenced chat on its owner's shard"
         await expect(heldFor(ownerLockedId, COLLAB, 3)).resolves.toBe(false);
     });
 
+    it("does not hold a chat its owner is deleting, locked or not", async () => {
+        const lockedDeleting = await insertThread(OWNER, true);
+
+        await run(async (ctx) => await ctx.db.patch("threads", lockedDeleting as never, { deletingAt: 2 }));
+
+        const openDeleted = await insertThread(OWNER, false);
+
+        await run(async (ctx) => await ctx.db.patch("threads", openDeleted as never, { deleted: true, deletedAt: 2 }));
+
+        await expect(heldFor(lockedDeleting, OWNER, 3)).resolves.toBe(false);
+        await expect(heldFor(openDeleted, OWNER, 1)).resolves.toBe(false);
+    });
+
     it("does not hold an unlocked chat a collaborator has no grant to", async () => {
         await expect(heldFor(ownerOpenId, COLLAB, 1)).resolves.toBe(false);
     });

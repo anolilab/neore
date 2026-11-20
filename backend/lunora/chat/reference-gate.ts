@@ -98,6 +98,12 @@ export const threadReadableOnShard = internalQuery
     })
     .output(v.object({ readable: v.boolean() }))
     .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get("threads", args.threadId as Id<"threads">);
+
+        if (!thread || isThreadGoing(thread)) {
+            return { readable: false };
+        }
+
         const outcome = await threadGateOutcome(ctx, {
             level: "read",
             threadId: args.threadId as Id<"threads">,
@@ -108,16 +114,20 @@ export const threadReadableOnShard = internalQuery
         return { readable: outcome === "ok" };
     });
 
+/** A chat being deleted (soft, or the first page of a hard delete) never serves a reference, locked or not. */
+const isThreadGoing = (thread: { deleted?: boolean; deletedAt?: number; deletingAt?: number }): boolean =>
+    thread.deleted === true || thread.deletedAt !== undefined || thread.deletingAt !== undefined;
+
 /**
  * Whether a referenced chat is still held by the caller for a reference checked at `requestedAt`. The job carries no unlock proof.
  * A chat locked when the request was checked was read with that request's proof, so it is still held only while the caller owns it
  * and the lock predates the check. A chat locked since the check is not held, and an unlocked one is held only while the caller may
- * still read it.
+ * still read it. A chat being deleted is never held.
  */
 const chatHeld = async (ctx: Pick<QueryCtx, "db">, { requestedAt, threadId, userId }: { requestedAt: number; threadId: string; userId: string }) => {
     const thread = await ctx.db.get("threads", threadId as Id<"threads">);
 
-    if (!thread) {
+    if (!thread || isThreadGoing(thread)) {
         return false;
     }
 
