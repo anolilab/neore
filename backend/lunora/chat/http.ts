@@ -387,6 +387,8 @@ export interface ChatStartBody {
     prompt?: string;
     quality?: string;
     reasoningEffort?: number;
+    /** One per reference image, in order: the picker's id for it, checked by `/chat/media` (`chat/reference-gate.ts`). */
+    referenceIds?: string[];
     referenceImages?: string[];
     regenerate?: boolean;
     researchDepth?: "speed" | "balanced" | "thorough";
@@ -1137,6 +1139,7 @@ const runChatStartOnShard = async (
         numImages: body.numImages,
         quality: body.quality,
         reasoningEffort: body.reasoningEffort,
+        referenceIds: body.referenceIds,
         referenceImages: body.referenceImages,
         researchDepth: body.researchDepth,
         searchMode: body.searchMode,
@@ -2171,6 +2174,8 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
             negativePrompt?: string;
             numImages?: number;
             quality?: "standard" | "hd";
+            /** One per reference image, in order: the picker's id for it (`chat/reference-gate.ts`). */
+            referenceIds?: string[];
             referenceImages?: string[];
             seed?: number;
             style?: string;
@@ -2269,6 +2274,28 @@ export const mediaGenerationHttpAction = async (context: HttpActionCtx, request:
     // The reply would come from a cloud model, in a thread the desktop owns.
     if (access.hostRun) {
         return hostRunThreadResponse();
+    }
+
+    // Every reference must be the caller's own row, under its own URL, in a chat the caller may read here, checked on the caller's
+    // shard (`chat/reference-gate.ts`). A reference without its id, or with a count that differs, is refused the same way.
+    const references = streamingConfig.referenceImages ?? [];
+
+    if (references.length > 0) {
+        const referenceIds = streamingConfig.referenceIds ?? [];
+        const { refused } =
+            referenceIds.length === references.length
+                ? await context.forShard(authenticatedUserId).runQuery(internal.chat.reference_gate.gateReferencesOnCallerShard, {
+                      referenceIds,
+                      referenceImages: references,
+                      targetThreadId: threadId,
+                      unlockProof,
+                      userId: authenticatedUserId,
+                  })
+                : { refused: true };
+
+        if (refused) {
+            return Response.json({ error: "File not found" }, { headers: { "Content-Type": "application/json" }, status: 404 });
+        }
     }
 
     // Extract config from request body (already validated above)
