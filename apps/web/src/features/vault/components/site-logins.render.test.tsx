@@ -10,7 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 const SITE = "https://example.com";
 const USERNAME_TEXT = /ada@example\.com/u;
@@ -154,6 +154,19 @@ const valueOf = (label: string) => (screen.getByLabelText(label) as HTMLInputEle
 // A native button carries `disabled`; the checkbox is a `role="checkbox"` element marked `aria-disabled`.
 const isDisabled = (element: Element | undefined) =>
     element !== undefined && ((element as HTMLButtonElement).disabled === true || element.getAttribute("aria-disabled") === "true");
+
+// An empty bot list counts as loaded only when it was fetched strictly after the mount. Each clock read moves on by
+// 1 ms, so a fetch never lands in the mount's millisecond.
+const tickingClock = () => {
+    let now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => {
+        now += 1;
+
+        return now;
+    });
+
+    onTestFinished(() => clock.mockRestore());
+};
 
 afterEach(() => {
     harness.bots = [];
@@ -456,6 +469,7 @@ describe("SiteLogins", () => {
     });
 
     it("calls a login whose bots were all deleted owner-only once the empty bot list was fetched for this user", async () => {
+        tickingClock();
         harness.logins = [savedLogin(["bot-deleted"])];
         mount();
 
@@ -464,6 +478,7 @@ describe("SiteLogins", () => {
     });
 
     it("does not call a login owner-only from the last account's empty bot list right after a switch, and does once this user's loads", async () => {
+        tickingClock();
         const view = mount();
 
         await waitFor(() => expect(view.queryClient.getQueryData(["bots"])).toStrictEqual([]));
