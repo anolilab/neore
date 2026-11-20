@@ -27,6 +27,7 @@ import { listThreadItem } from "./threads";
 import { eraseProjectRepositories } from "../projects/gdpr";
 import { mayEditProject } from "../projects/edit-access";
 import { forViewer } from "../projects/machine-location";
+import { PROJECT_ROW_COLUMNS, type ProjectRow } from "../projects/project-row";
 import { assertProjectRowFits, projectRuleFiles, ruleFilesRevision } from "../projects/rule-files";
 
 /**
@@ -47,18 +48,18 @@ const recountWorkflowImages = async (ctx: MutationCtx, ownerId: string | undefin
 };
 
 /**
- * A project row as the project procedures return it, without its rule files: up to 1 MB a project, which a list of
- * projects would carry for every row. They are read through `projects.functions.listProjectRuleFiles` only.
+ * A project row as the project procedures return it: read without its rule files (`PROJECT_ROW_COLUMNS`), up to 1 MB a
+ * project, which a list would read for every row. They are read through `projects.functions.listProjectRuleFiles` only.
  */
-export const publicProject = (project: Doc<"projects">): ProjectDocument => {
-    const rest: Partial<Doc<"projects">> = { ...project };
-
-    Reflect.deleteProperty(rest, "ruleFiles");
-
+export const publicProject = (project: ProjectRow): ProjectDocument =>
     // Safe cast: optional fields are never null at runtime (only undefined).
     // The column builders generate null|T types in TypeScript only.
-    return rest as unknown as ProjectDocument;
-};
+    project as unknown as ProjectDocument;
+
+/** The project `projectId` without its rule files, or `null`. */
+const projectRow = async (ctx: QueryCtx | MutationCtx, projectId: Id<"projects">): Promise<ProjectRow | null> =>
+    // The typed `select` result is a union of one-column picks; the columns read are all but `ruleFiles`.
+    (await ctx.db.projects.findFirst({ select: PROJECT_ROW_COLUMNS, where: { _id: projectId } })) as unknown as ProjectRow | null;
 
 export const getProject = query
     .input({ projectId: v.id("projects") })
@@ -70,7 +71,7 @@ export const getProject = query
             return null;
         }
 
-        const project = await ctx.db.projects.findFirst({ where: { _id: args.projectId } });
+        const project = await projectRow(ctx, args.projectId);
 
         if (!project) {
             return null;
@@ -136,19 +137,21 @@ export const listProjectsHandler = async (
               cursor: paginationOptions.cursor,
               limit: paginationOptions.numItems,
               orderBy: [{ pinnedAt: "desc" }, { _creationTime: "desc" }],
+              select: PROJECT_ROW_COLUMNS,
               where: { userId: args.userId },
           })
         : await ctx.db.projects.findMany({
               cursor: paginationOptions.cursor,
               limit: paginationOptions.numItems,
               orderBy: [{ _creationTime: "desc" }],
+              select: PROJECT_ROW_COLUMNS,
               where: { organizationId: args.organizationId as string },
           });
 
     return {
         continueCursor: projects.continueCursor,
         isDone: projects.isDone,
-        page: (projects.page as unknown as Doc<"projects">[]).map((item) => publicProject(forViewer(item, identity.userId))),
+        page: (projects.page as unknown as ProjectRow[]).map((item) => publicProject(forViewer(item, identity.userId))),
     };
 };
 
@@ -173,11 +176,13 @@ export const listPinnedProjectsHandler = async (ctx: QueryCtx, args: { organizat
     }
 
     if (args.userId) {
-        const { page: projects } = await ctx.db.projects.findMany({
+        const { page } = await ctx.db.projects.findMany({
             limit: 200,
             orderBy: [{ pinnedAt: "asc" }, { _creationTime: "asc" }],
+            select: PROJECT_ROW_COLUMNS,
             where: { pinnedAt: { gte: 0 }, userId: args.userId },
         });
+        const projects = page as unknown as ProjectRow[];
         const pinned = projects.filter((p) => p.pinnedAt !== undefined).toSorted((a, b) => (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0));
 
         return pinned.map((item) => publicProject(forViewer(item, identity.userId)));
@@ -187,11 +192,13 @@ export const listPinnedProjectsHandler = async (ctx: QueryCtx, args: { organizat
     if (args.organizationId && (await getMemberByOrganizationAndUser(ctx, args.organizationId, identity.userId))) {
         admitOrganization(ctx, args.organizationId);
 
-        const { page: allProjects } = await ctx.db.projects.findMany({
+        const { page } = await ctx.db.projects.findMany({
             limit: 200,
             orderBy: [{ _creationTime: "asc" }],
+            select: PROJECT_ROW_COLUMNS,
             where: { organizationId: args.organizationId },
         });
+        const allProjects = page as unknown as ProjectRow[];
         const pinned = allProjects.filter((p) => p.pinnedAt !== undefined).toSorted((a, b) => (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0));
 
         return pinned.map((item) => publicProject(forViewer(item, identity.userId)));
@@ -220,7 +227,7 @@ export const createProject = internalMutation
 
         await recountWorkflowImages(ctx, args.userId, undefined, args.workflowContent);
 
-        const project = await ctx.db.projects.findFirst({ where: { _id: projectId } });
+        const project = await projectRow(ctx, projectId);
 
         assert(project, `Project ${projectId} not found`);
 
@@ -301,7 +308,7 @@ export const updateProject = internalMutation
             await recountWorkflowImages(ctx, project.userId, project.workflowContent, args.patch.workflowContent);
         }
 
-        const updatedProject = await ctx.db.projects.findFirst({ where: { _id: args.projectId } });
+        const updatedProject = await projectRow(ctx, args.projectId);
 
         assert(updatedProject, `Project ${args.projectId} not found`);
 
@@ -357,7 +364,7 @@ export const pinProject = internalMutation
             pinnedAt: ctx.now,
             updatedAt: ctx.now,
         });
-        const updatedProject = (await ctx.db.projects.findFirst({ where: { _id: args.projectId } }))!;
+        const updatedProject = (await projectRow(ctx, args.projectId))!;
 
         return publicProject(updatedProject);
     });
@@ -374,7 +381,7 @@ export const unpinProject = internalMutation
             updatedAt: ctx.now,
         });
 
-        const updatedProject = (await ctx.db.projects.findFirst({ where: { _id: args.projectId } }))!;
+        const updatedProject = (await projectRow(ctx, args.projectId))!;
 
         return publicProject(updatedProject);
     });

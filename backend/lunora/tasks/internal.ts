@@ -601,7 +601,7 @@ export const runProjectFor = internalQuery
     .output(v.union(v.null(), v.object({ context: v.optional(v.string()), projectId: v.id("projects") })))
     .query(async ({ args, ctx }) => {
         const task = await ctx.db.get("tasks", args.taskId);
-        const project = task?.projectId ? await writableProject(ctx, task.projectId, task.userId) : null;
+        const project = task?.projectId ? await writableProject(ctx, task.projectId, task.userId, { ruleFiles: true }) : null;
 
         if (!project) {
             return null;

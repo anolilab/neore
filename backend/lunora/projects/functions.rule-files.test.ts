@@ -7,9 +7,19 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 
-import { publicProject, updateProject as writeProject } from "../agent/projects";
+import { getProject as getOwnProject, updateProject as writeProject } from "../agent/projects";
 import schema from "../schema";
-import { getProjectContextForRun, listProjectRuleFiles, setProjectRuleFiles, updateProject } from "./functions";
+import { runProjectFor } from "../tasks/internal";
+import {
+    getProject,
+    getProjectContextForRun,
+    listPinnedProjects,
+    listProjectRuleFiles,
+    listProjects,
+    readableProject,
+    setProjectRuleFiles,
+    updateProject,
+} from "./functions";
 
 const OWNER = "user-owner";
 const MEMBER = "user-member";
@@ -85,6 +95,32 @@ describe("a project's rule files in a run", () => {
         expect(await contextFor(projectId)).toBe("Be brief.");
         expect(await contextFor(projectId, [pdf])).toBe("Be brief.");
         expect(await contextFor(projectId, [pdf, sql])).toBe("Be brief.\n\nUse snake_case columns.");
+    });
+
+    it("gives a task's run its project's always files", async () => {
+        const projectId = await insert("projects", {
+            createdAt: 0,
+            ruleFiles: [{ content: "Be brief.", id: "a", mode: "always", title: "A" }, sqlRules],
+            title: "p",
+            userId: OWNER,
+        });
+        const taskId = await insert("tasks", {
+            attemptCount: 0,
+            createdAt: 0,
+            dependsOn: [],
+            instructions: "Do it.",
+            maxRepairRounds: 0,
+            projectId,
+            recurring: false,
+            title: "t",
+            updatedAt: 0,
+            userId: OWNER,
+        });
+
+        await expect(harness.run(async (ctx: any) => await ctx.runQuery(runProjectFor as never, { taskId }))).resolves.toStrictEqual({
+            context: "Be brief.",
+            projectId,
+        });
     });
 
     it("gives a project that only has its legacy context exactly that text", async () => {
@@ -171,6 +207,23 @@ describe("changing a project's rule files", () => {
         await expect(list(OWNER, projectId)).resolves.toMatchObject({ files: [{ id: "context" }, { id: "sql" }], revision });
     });
 
+    it("keeps a saved file named like the kept context, which reads under another id beside it", async () => {
+        const mine = { content: "Mine.", id: "context", mode: "always" as const, title: "Mine" };
+        const projectId = await insert("projects", { context: "x".repeat(150_000), createdAt: 0, ruleFiles: [mine], title: "p", userId: OWNER });
+        const { files, legacyContextId } = (await list(OWNER, projectId)) as unknown as { files: { id: string }[]; legacyContextId: string };
+
+        expect(legacyContextId).not.toBe("context");
+        // The editor leaves the kept context out of what it sends.
+        await save(
+            OWNER,
+            projectId,
+            files.filter((file) => file.id !== legacyContextId),
+            undefined,
+            { keepContext: true },
+        );
+        await expect(row(projectId)).resolves.toMatchObject({ ruleFiles: [mine] });
+    });
+
     it("refuses files that would outgrow the project row beside a kept context or a large workflow, and keeps the row", async () => {
         const big = Array.from({ length: 5 }, (_, index) => {
             return { content: "y".repeat(99_000), id: `f${index}`, mode: "always", title: "t" };
@@ -206,8 +259,28 @@ describe("changing a project's rule files", () => {
         await expect(write(OWNER)).resolves.toMatchObject({ title: "t" });
     });
 
-    it("leaves rule files out of the project rows the project procedures return", () => {
-        expect(publicProject({ _id: "p", ruleFiles: [sqlRules], title: "p" } as never)).not.toHaveProperty("ruleFiles");
+    it("leaves rule files unread in project lists and single-project reads; only the editor and a run read them", async () => {
+        // The lists name their caller through a user row.
+        const owner = await insert("user", { createdAt: 0, email: "owner@example.com", emailVerified: true, name: "Owner", updatedAt: 0 });
+        const projectId = await insert("projects", { context: "Old notes", createdAt: 0, pinnedAt: 1, ruleFiles: [sqlRules], title: "p", userId: owner });
+        const read = (ruleFiles: boolean) =>
+            harness.run(
+                async (ctx: any) =>
+                    await (ruleFiles ? readableProject(ctx, projectId as never, owner, { ruleFiles }) : readableProject(ctx, projectId as never, owner)),
+            );
+        const { page } = (await as(owner).query(listProjects as never, { paginationOpts: { cursor: null, numItems: 10 } } as never)) as { page: object[] };
+
+        expect(page).toHaveLength(1);
+        expect(page[0]).not.toHaveProperty("ruleFiles");
+        await expect(as(owner).query(listPinnedProjects as never, {} as never)).resolves.toStrictEqual([
+            expect.not.objectContaining({ ruleFiles: expect.anything() }),
+        ]);
+        await expect(as(owner).query(getProject as never, { projectId } as never)).resolves.toMatchObject({ context: "Old notes", title: "p" });
+        await expect(as(owner).query(getProject as never, { projectId } as never)).resolves.not.toHaveProperty("ruleFiles");
+        await expect(as(owner).query(getOwnProject as never, { projectId } as never)).resolves.not.toHaveProperty("ruleFiles");
+        await expect(read(false)).resolves.not.toHaveProperty("ruleFiles");
+        await expect(read(true)).resolves.toMatchObject({ ruleFiles: [sqlRules] });
+        await expect(list(owner, projectId)).resolves.toMatchObject({ files: [{ id: "context" }, { id: "sql" }] });
     });
 
     it("refuses a save from a view older than another save, and keeps that save", async () => {
