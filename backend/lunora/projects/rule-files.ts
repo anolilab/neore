@@ -336,11 +336,14 @@ export const normalizeRuleFiles = (files: RuleFile[]): RuleFile[] => {
 
 /**
  * Refuses a rule-file save that would leave the project row past {@link MAX_PROJECT_ROW_BYTES}: the row as it would be
- * written, its other columns (a kept `context`, a workflow) included. Called in the transaction that writes, on the row
- * read there, so a refusal says why instead of failing at the database.
+ * `written`, its other columns (a kept `context`, a workflow) included. A save that does not grow the row past `current`
+ * is never refused, so a row already near the limit can still lose files. Called in the transaction that writes, on the
+ * row read there, so a refusal says why instead of failing at the database.
  */
-export const assertProjectRowFits = (row: unknown): void => {
-    if (utf8Bytes(JSON.stringify(row)) > MAX_PROJECT_ROW_BYTES) {
+export const assertProjectRowFits = (written: unknown, current: unknown): void => {
+    const bytes = utf8Bytes(JSON.stringify(written));
+
+    if (bytes > MAX_PROJECT_ROW_BYTES && bytes > utf8Bytes(JSON.stringify(current))) {
         throw new LunoraError("BAD_REQUEST", "The rule files do not fit beside the project's other settings. Shorten them or remove some.");
     }
 };

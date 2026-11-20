@@ -2,6 +2,14 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { Button } from "@neore/ui/components/button";
+import { ColorPicker } from "@neore/ui/components/color-picker";
+import { useAppForm } from "@neore/ui/components/form";
+import type { IconName } from "@neore/ui/components/icon-picker";
+import { IconPicker } from "@neore/ui/components/icon-picker";
+import { Input } from "@neore/ui/components/input";
+import { Label } from "@neore/ui/components/label";
+import LucideIconByName from "@neore/ui/components/lucide-icon-by-name";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -11,15 +19,7 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@neore/ui/components/alert-dialog";
-import { Button } from "@neore/ui/components/button";
-import { ColorPicker } from "@neore/ui/components/color-picker";
-import { useAppForm } from "@neore/ui/components/form";
-import type { IconName } from "@neore/ui/components/icon-picker";
-import { IconPicker } from "@neore/ui/components/icon-picker";
-import { Input } from "@neore/ui/components/input";
-import { Label } from "@neore/ui/components/label";
-import LucideIconByName from "@neore/ui/components/lucide-icon-by-name";
+} from "@neore/ui/components/responsive-alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import { Textarea } from "@neore/ui/components/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@neore/ui/components/tooltip";
@@ -99,6 +99,16 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
     const ruleFilesDirty = useRef(false);
     // Asking whether to drop those changes, after a close (Cancel, Escape, outside click, the close button) while they are open.
     const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+    const [wasOpen, setWasOpen] = useState(open);
+
+    // Closed from outside while it asked: the next open starts without the question.
+    if (wasOpen !== open) {
+        setWasOpen(open);
+
+        if (!open) {
+            setConfirmingDiscard(false);
+        }
+    }
 
     const requestClose = () => {
         if (editingProject && ruleFilesDirty.current) {

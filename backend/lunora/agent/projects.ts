@@ -292,7 +292,7 @@ export const updateProject = internalMutation
 
         // A rule-file save is the one that can grow the row by up to a megabyte: refuse it here, on the row as written.
         if (args.patch.ruleFiles !== undefined) {
-            assertProjectRowFits({ ...project, ...changes });
+            assertProjectRowFits({ ...project, ...changes }, project);
         }
 
         await patchRow(ctx.db, "projects", project, changes);

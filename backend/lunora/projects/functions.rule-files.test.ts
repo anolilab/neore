@@ -186,6 +186,17 @@ describe("changing a project's rule files", () => {
         expect(await row(withWorkflow)).toMatchObject({ ruleFiles: big.slice(0, 2), workflowContent });
     });
 
+    it("still lets a row already past the margin lose files", async () => {
+        const projectId = await insert("projects", { context: "x".repeat(1_950_000), createdAt: 0, ruleFiles: [sqlRules], title: "p", userId: OWNER });
+
+        await expect(
+            save(OWNER, projectId, [{ ...sqlRules, content: `${sqlRules.content} And more.` }], undefined, { keepContext: true }),
+        ).rejects.toMatchObject({
+            code: "BAD_REQUEST",
+        });
+        await expect(save(OWNER, projectId, [], undefined, { keepContext: true })).resolves.toMatchObject({ revision: expect.any(String) });
+    });
+
     it("re-checks the owner in the writing transaction", async () => {
         const projectId = await insert("projects", { createdAt: 0, title: "p", userId: OWNER });
         const write = (settingsEditorId: string) =>

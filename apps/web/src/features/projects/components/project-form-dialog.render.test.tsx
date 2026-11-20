@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -108,6 +108,22 @@ describe("project form dialog", () => {
         await user.keyboard("{Escape}");
         await user.click(await screen.findByRole("button", { name: "Discard changes" }));
         expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it("does not ask again on the next open after it was closed from outside while asking", async () => {
+        const user = userEvent.setup();
+        const onClose = vi.fn();
+        const { rerender } = render(<ProjectFormDialog editingProject={project} onClose={onClose} open />);
+
+        await user.click(screen.getByRole("button", { name: "Edit a rule file" }));
+        await user.click(screen.getByRole("button", { name: "Cancel" }));
+        expect(await screen.findByRole("alertdialog")).toBeTruthy();
+        rerender(<ProjectFormDialog editingProject={project} onClose={onClose} open={false} />);
+        rerender(<ProjectFormDialog editingProject={project} onClose={onClose} open />);
+
+        await waitFor(() => {
+            expect(screen.queryByRole("alertdialog")).toBeNull();
+        });
     });
 
     it("closes at once with no unsaved rule file changes", async () => {
