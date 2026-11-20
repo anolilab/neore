@@ -55,9 +55,10 @@
   that checked the same revision the second is refused too.
 - A metered `.global()` read is charged the whole row whatever it `select`s (Lunora drops the `select`, charges, then
   projects), so a read that budgets its cost measures whole rows: `findProjectRowsMeasured` / `projectRowsReadBytes`.
-  The export returns rule files only from their own pass (`attachProjectRuleFiles`, which reads and counts only the
-  rule-file rows: each legacy `context` comes from the owned-projects page, which read the project rows), after that
-  page; past the budget a project is marked `ruleFilesOmitted`, still with that `context`. The exported contexts
-  share `PROJECT_CONTEXT_EXPORT_BYTES` of the output (`gdpr/steps.ts`; a carried one is neither exported nor counted);
-  one past it is left out, its project marked `ruleFilesOmitted` too. The rule files' read budget counts the bytes
+  The export returns rule files only from their own pass (`attachProjectRuleFiles`; each legacy `context` comes from
+  the owned-projects page), after that page; its query re-reads the project row (one per query, for the read margin)
+  and reads rule files only of one still the exporter's (a merge or move in between), counting both; past the budget a
+  project is marked `ruleFilesOmitted`, still with that `context`. The exported contexts share
+  `PROJECT_CONTEXT_EXPORT_BYTES` of the output (`gdpr/steps.ts`; a carried one is neither exported nor counted); one
+  past it is left out, its project marked `ruleFilesOmitted` too. The rule files' read budget counts the bytes
   the triggers actually read (`collectAllTriggers` reports `readBytes`), not the triggers' allowance.

@@ -15,6 +15,12 @@ interface RepositoriesPage {
  */
 export const PROJECTS_PER_DETAILS_READ = 2;
 
+/**
+ * Projects one rule-files read takes: it reads the project row again (its owner now), up to 4 MB counted as JSON, and
+ * its rule-file row, about 1 MB (`MAX_RULE_FILES_BYTES`): about 5 MB, within the export's 8 MB margin; two would not be.
+ */
+export const PROJECTS_PER_RULE_FILES_READ = 1;
+
 /** What `collectProjectDetailsForExport` gives back for up to {@link PROJECTS_PER_DETAILS_READ} projects. */
 interface ProjectDetails {
     projects: { project: { sharingEnabled: boolean; title: string }; projectId: string }[];
@@ -152,7 +158,7 @@ export const collectAllOwnedProjects = async (
     return { contexts, projects, readBytes };
 };
 
-/** What `collectProjectRuleFilesForExport` gives back for up to {@link PROJECTS_PER_DETAILS_READ} projects: their saved rows. */
+/** What `collectProjectRuleFilesForExport` gives back for up to {@link PROJECTS_PER_RULE_FILES_READ} projects: their saved rows. */
 interface RuleFilesPage {
     projects: { carriedContext?: string; files: RuleFile[]; projectId: string }[];
     readBytes: number;
@@ -160,9 +166,10 @@ interface RuleFilesPage {
 
 /**
  * The user's projects from {@link collectAllOwnedProjects}, each with its rule files (`ruleFiles`), a legacy `context`
- * first (`projectRuleFiles`, from `contexts`, the project rows already read), the saved rows read
- * {@link PROJECTS_PER_DETAILS_READ} projects to a query. Once the reads reach `maxBytes` the remaining projects' files are
- * not read and the project says so (`ruleFilesOmitted: true`), still with its legacy `context`, which costs no read.
+ * first (`projectRuleFiles`, from `contexts`, read with the projects' pages), the saved rows read
+ * {@link PROJECTS_PER_RULE_FILES_READ} project to a query, each with its project row again, so its owner is checked
+ * then; a project no longer the user's gets none. Once the reads reach `maxBytes` the remaining projects' files are not
+ * read and the project says so (`ruleFilesOmitted: true`), still with its legacy `context`, which costs no read.
  * The legacy contexts exported share `contextMaxBytes` of the export's output (as JSON, UTF-8), in project order; one
  * that does not fit is left out and its project marked the same way. A `context` the saved list carries already is
  * neither exported nor counted. The export still completes. A project without rule files gets no `ruleFiles`.
@@ -179,8 +186,8 @@ export const attachProjectRuleFiles = async (
     let contextBytes = 0;
     let readBytes = 0;
 
-    for (let index = 0; index < projectIds.length && readBytes < maxBytes; index += PROJECTS_PER_DETAILS_READ) {
-        const batch = projectIds.slice(index, index + PROJECTS_PER_DETAILS_READ);
+    for (let index = 0; index < projectIds.length && readBytes < maxBytes; index += PROJECTS_PER_RULE_FILES_READ) {
+        const batch = projectIds.slice(index, index + PROJECTS_PER_RULE_FILES_READ);
         const page = await readRuleFiles(batch);
         const read = new Map(page.projects.map((row) => [row.projectId, row] as const));
 

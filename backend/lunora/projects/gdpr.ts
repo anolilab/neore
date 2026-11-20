@@ -15,7 +15,7 @@ import { enqueueJob } from "../lib/job-queue";
 import { logger } from "../lib/logger";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
-import { PROJECTS_PER_DETAILS_READ } from "./export-pages";
+import { PROJECTS_PER_DETAILS_READ, PROJECTS_PER_RULE_FILES_READ } from "./export-pages";
 import { DELETION_MARKER_TTL_MS, DELETION_MARKER_URL, isRepoRow } from "./repositories";
 import { findProjectRowsMeasured, projectRowsReadBytes } from "./project-row";
 
@@ -282,8 +282,8 @@ export const collectOwnedProjectsForExport = internalQuery
             cursor: v.union(v.string(), v.null()),
             projects: v.array(
                 v.object({
-                    // Its legacy context, for the rule files' pass (`attachProjectRuleFiles`), which so reads no project
-                    // row again; never exported as a project's own field.
+                    // Its legacy context, for the rule files' pass (`attachProjectRuleFiles`), read while the project was
+                    // the user's; never exported as a project's own field.
                     context: v.optional(v.string()),
                     machineId: v.optional(v.string()),
                     path: v.optional(v.string()),
@@ -319,14 +319,16 @@ export const collectOwnedProjectsForExport = internalQuery
     });
 
 /**
- * The saved rule-file rows of up to {@link PROJECTS_PER_DETAILS_READ} of the user's projects for the export, and what
- * reading them cost, each row whole. Only the rows: the projects' page (`collectOwnedProjectsForExport`) already read
- * the project rows, their owner and legacy `context` with them, and `attachProjectRuleFiles` puts the two together.
- * Access follows the project, never the row's `userId` (a copy for erasure): pass only ids that page gave for `userId`.
+ * The saved rule-file rows of up to {@link PROJECTS_PER_RULE_FILES_READ} of `userId`'s projects for the export, and what
+ * reading them cost, each row whole. Access follows the project, never the rule-file row's `userId` (a copy for
+ * erasure): the projects' page (`collectOwnedProjectsForExport`) gave these ids, but a project can change owner (an
+ * account merge, an organization move) before this read, so the project rows are read again here, in the same query,
+ * and only the ones still `userId`'s have their rule files read. Both reads are counted. Their legacy `context` still
+ * comes from that page; `attachProjectRuleFiles` puts the two together.
  * A separate read from the projects' page, so the export can leave them out past its budget and keep the rest.
  */
 export const collectProjectRuleFilesForExport = internalQuery
-    .input({ projectIds: v.array(v.id("projects")).max(PROJECTS_PER_DETAILS_READ) })
+    .input({ projectIds: v.array(v.id("projects")).max(PROJECTS_PER_RULE_FILES_READ), userId: v.string().max(MAX_LENGTH.id) })
     .output(
         v.object({
             projects: v.array(
@@ -347,14 +349,21 @@ export const collectProjectRuleFilesForExport = internalQuery
             readBytes: v.number(),
         }),
     )
-    .query(async ({ args: { projectIds }, ctx }) => {
+    .query(async ({ args: { projectIds, userId }, ctx }) => {
+        if (projectIds.length === 0) {
+            return { projects: [], readBytes: 0 };
+        }
+
+        // Owned now, not only when the page was read: a project moved since gives its new owner's rules to no one else.
+        const owners = await findProjectRowsMeasured(ctx.db.projects, { consistency: "primary", where: { _id: { in: projectIds } } });
+        const owned = owners.page.filter((row) => row.userId === userId).map((row) => row._id);
         const { page: rows } =
-            projectIds.length > 0 ? await ctx.db.projectRuleFiles.findMany({ consistency: "primary", where: { projectId: { in: projectIds } } }) : { page: [] };
+            owned.length > 0 ? await ctx.db.projectRuleFiles.findMany({ consistency: "primary", where: { projectId: { in: owned } } }) : { page: [] };
         const projects = rows.map((row) => {
             return { ...(row.carriedContext && { carriedContext: row.carriedContext }), files: row.files, projectId: row.projectId as string };
         });
 
-        return { projects, readBytes: projectRowsReadBytes(rows) };
+        return { projects, readBytes: owners.readBytes + projectRowsReadBytes(rows) };
     });
 
 /**

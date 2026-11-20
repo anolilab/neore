@@ -616,16 +616,23 @@ describe("changing a project's rule files", () => {
         await expect(row(projectId)).resolves.not.toMatchObject({ updatedAt: 0 });
     });
 
-    it("exports the saved files of the projects it is given, and counts the rule-file rows it read", async () => {
+    it("exports the saved files of the project it is given, and counts the project and rule-file rows it read", async () => {
         const mine = await project({ createdAt: 0, ruleFiles: [{ ...sqlRules, content: "z".repeat(50_000) }], title: "mine", userId: OWNER });
         const plain = await project({ createdAt: 0, title: "plain", userId: OWNER });
-        const exported = (await harness.run(
-            async (ctx: any) => await ctx.runQuery(collectProjectRuleFilesForExport as never, { projectIds: [mine, plain] }),
-        )) as { projects: { files: { content: string }[]; projectId: string }[]; readBytes: number };
+        const exportFor = async (projectId: unknown) =>
+            (await harness.run(
+                async (ctx: any) => await ctx.runQuery(collectProjectRuleFilesForExport as never, { projectIds: [projectId], userId: OWNER }),
+            )) as { projects: { files: { content: string }[]; projectId: string }[]; readBytes: number };
+        const exported = await exportFor(mine);
 
         expect(exported.projects).toHaveLength(1);
         expect(exported.projects[0]).toMatchObject({ files: [{ content: "z".repeat(50_000) }], projectId: mine });
         expect(exported.readBytes).toBeGreaterThan(50_000);
+        const none = await exportFor(plain);
+
+        // No rule-file row: what it read is the project row, counted too.
+        expect(none.projects).toStrictEqual([]);
+        expect(none.readBytes).toBeGreaterThan(0);
     });
 
     it("refuses a save from a view older than another save, and keeps that save", async () => {

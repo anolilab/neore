@@ -243,7 +243,7 @@ describe("owned projects in the GDPR export", () => {
 describe("project rule files in the GDPR export", () => {
     const sql = { content: "Use snake_case.", globs: ["**/*.sql"], id: "sql", mode: "glob", title: "SQL" };
     /** As the export runs it: the owned projects' pages, then their rule files within `maxBytes`, counting each read. */
-    const withRules = async (maxBytes = Infinity, contextMaxBytes = Infinity) => {
+    const withRules = async (maxBytes = Infinity, contextMaxBytes = Infinity, betweenReads?: () => Promise<void>) => {
         const reads: string[] = [];
         const harnessRead = async (query: string, run: (ctx: any) => Promise<unknown>) => {
             reads.push(query);
@@ -254,11 +254,14 @@ describe("project rule files in the GDPR export", () => {
             async (cursor) => await harnessRead("owned", async (ctx) => await ctx.runQuery(collectOwnedProjectsForExport, { cursor, userId: A })),
             Infinity,
         );
+
+        await betweenReads?.();
+
         const result = await attachProjectRuleFiles(
             owned.projects as object[],
             owned.contexts,
             async (projectIds) =>
-                (await harnessRead("ruleFiles", async (ctx) => await ctx.runQuery(collectProjectRuleFilesForExport, { projectIds }))) as never,
+                (await harnessRead("ruleFiles", async (ctx) => await ctx.runQuery(collectProjectRuleFilesForExport, { projectIds, userId: A }))) as never,
             maxBytes,
             contextMaxBytes,
         );
@@ -295,6 +298,29 @@ describe("project rule files in the GDPR export", () => {
         }
     });
 
+    it("reads no rule files of a project that changed owner after the projects' page was read", async () => {
+        const moved = (await harness.run((async (ctx: any) => {
+            const projectId = await ctx.db.insert("projects", { createdAt: 1, title: "moved", userId: A });
+
+            await ctx.db.insert("projectRuleFiles", { files: [sql], projectId, updatedAt: 0, userId: A });
+
+            return projectId;
+        }) as never)) as string;
+
+        const { projects: exported } = await withRules(Infinity, Infinity, async () => {
+            // An account merge or an organization move, between the two reads; the rule-file row keeps its old `userId`.
+            await harness.run((async (ctx: any) => {
+                await ctx.db.patch("projects", moved, { userId: B });
+                const row = await ctx.db.projectRuleFiles.findFirst({ where: { projectId: moved } });
+
+                await ctx.db.patch("projectRuleFiles", row._id, { files: [{ ...sql, content: "B's rules." }] });
+            }) as never);
+        });
+
+        expect(byTitle(exported).get("moved")).not.toHaveProperty("ruleFiles");
+        expect(JSON.stringify(exported)).not.toContain("B's rules.");
+    });
+
     it("leaves a context the saved list carries already out, so it is exported once", async () => {
         await harness.run((async (ctx: any) => {
             const projectId = await ctx.db.insert("projects", { context: "Carried.", createdAt: 1, title: "carried", userId: A });
@@ -321,9 +347,12 @@ describe("project rule files in the GDPR export", () => {
         const { projects } = await withRules(100);
 
         expect(projects).toHaveLength(3);
-        // Two to a read: the first read passes the budget, so the third project's files are not read.
-        expect(projects.filter((project) => "ruleFiles" in project)).toHaveLength(2);
-        expect(projects.filter((project) => "ruleFilesOmitted" in project)).toEqual([expect.objectContaining({ ruleFilesOmitted: true })]);
+        // One to a read: the first read passes the budget, so the other two projects' files are not read.
+        expect(projects.filter((project) => "ruleFiles" in project)).toHaveLength(1);
+        expect(projects.filter((project) => "ruleFilesOmitted" in project)).toEqual([
+            expect.objectContaining({ ruleFilesOmitted: true }),
+            expect.objectContaining({ ruleFilesOmitted: true }),
+        ]);
     });
 
     it("still exports a legacy context past the budget: it was read with the project's page, so it costs no read", async () => {
@@ -338,11 +367,14 @@ describe("project rule files in the GDPR export", () => {
         const { projects } = await withRules(100);
         const omitted = projects.filter((project) => "ruleFilesOmitted" in project);
 
-        expect(omitted).toHaveLength(1);
-        // The saved list was not read, the context still is exported, and the project says the rest was left out.
-        const title = (omitted[0] as { title?: string } | undefined)?.title ?? "";
+        expect(omitted).toHaveLength(2);
 
-        expect(omitted).toMatchObject([{ ruleFiles: [{ content: `Context ${title.slice(1)}.`, id: "context" }], ruleFilesOmitted: true }]);
+        // The saved list was not read, the context still is exported, and the project says the rest was left out.
+        for (const project of omitted) {
+            const { title } = project as { title?: string };
+
+            expect(project).toMatchObject({ ruleFiles: [{ content: `Context ${(title ?? "").slice(1)}.`, id: "context" }], ruleFilesOmitted: true });
+        }
     });
 
     it("leaves out a legacy context past the export's share for them, marked, and keeps the project's saved files", async () => {
@@ -379,7 +411,7 @@ describe("project rule files in the GDPR export", () => {
         expect(projects.filter((project) => (project as { ruleFiles: { content: string }[] }).ruleFiles[0]?.content === "c".repeat(1000))).toHaveLength(2);
     });
 
-    it("reads no project row again: large rows cost the projects' page only, not the rule files' budget", async () => {
+    it("counts the project rows it reads again for the owner check, and still exports every legacy context", async () => {
         const workflowContent = { edges: [], nodes: [{ data: { text: "w".repeat(50_000) }, id: "n", position: { x: 0, y: 0 }, type: "note" }] };
 
         await harness.run((async (ctx: any) => {
@@ -390,9 +422,10 @@ describe("project rule files in the GDPR export", () => {
 
         const { projects, readBytes, reads } = await withRules(1000);
 
-        expect(readBytes).toBe(0);
+        // The first project row, read whole again, passes the budget: the others' saved files are not read.
+        expect(readBytes).toBeGreaterThan(50_000);
+        expect(reads).toStrictEqual(["owned", "owned", "ruleFiles"]);
         expect(projects).toEqual(Array.from({ length: 3 }, () => expect.objectContaining({ ruleFiles: [expect.objectContaining({ content: "Be brief." })] })));
-        // Two pages of projects, then two reads of rule-file rows, each project row read once.
-        expect(reads).toStrictEqual(["owned", "owned", "ruleFiles", "ruleFiles"]);
+        expect(projects.filter((project) => "ruleFilesOmitted" in project)).toHaveLength(2);
     });
 });
