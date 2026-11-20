@@ -25,6 +25,9 @@ interface Construct {
 /** Link-like nodes: a delimiter inside their destination, label brackets or syntax changes or ends the link. */
 const LINK_TYPES: ReadonlySet<string> = new Set(["definition", "html", "image", "imageReference", "link", "linkReference", "thematicBreak"]);
 
+/** Containers whose `html` children are HTML blocks, which delimiters before them would turn into inline HTML. */
+const BLOCK_PARENT_TYPES: ReadonlySet<string> = new Set(["blockquote", "listItem", "root"]);
+
 /** Constructs a wrap may not hold whole: delimiters before them end their syntax (a definition, a code fence, a divider). */
 const UNHOLDABLE_TYPES: ReadonlySet<string> = new Set(["code", "definition", "thematicBreak"]);
 
@@ -216,6 +219,21 @@ const lineFrom = (text: string, start: number): string => {
     return text.slice(start, end === -1 ? text.length : end);
 };
 
+/** Whether `from`..`to` holds a `|` that separates cells: one no odd run of backslashes escapes (`\\|` is cell text). */
+const hasCellPipe = (text: string, from: number, to: number): boolean => {
+    let backslashes = 0;
+
+    for (let index = text.lastIndexOf("\n", from - 1) + 1; index < to; index += 1) {
+        if (text[index] === "|" && index >= from && backslashes % 2 === 0) {
+            return true;
+        }
+
+        backslashes = text[index] === "\\" ? backslashes + 1 : 0;
+    }
+
+    return false;
+};
+
 /**
  * Whether a wrap of `from`..`to` (draft indices) would break a GFM table, as the message renderer shows one: a wrap on
  * its separator row, or one across a cell's `|`. GFM is not parsed here, so the table is found from the lines around the
@@ -250,7 +268,7 @@ const breaksTable = (text: string, from: number, to: number): boolean => {
 
     const inTable = separator || isSeparatorRow(lineFrom(text, lineEndIndex === -1 ? -1 : lineEndIndex + 1));
 
-    return inTable && (isSeparatorRow(line) || text.slice(from, to).includes("|"));
+    return inTable && (isSeparatorRow(line) || hasCellPipe(text, from, to));
 };
 
 /**
@@ -260,11 +278,13 @@ const breaksTable = (text: string, from: number, to: number): boolean => {
 const collect = (root: MarkdownNode, text: string): { blocks: [number, number][]; constructs: Construct[] } => {
     const blocks: [number, number][] = [];
     const constructs: Construct[] = [];
-    const pending: MarkdownNode[] = [root];
-    let node = pending.pop();
+    // Each pending node with its parent's type: an `html` node right under a block container is an HTML block.
+    const pending: [MarkdownNode, string][] = [[root, ""]];
+    let [node, parentType] = pending.pop() ?? [undefined, ""];
 
     while (node !== undefined) {
         const range = rangeOf(node);
+        const htmlBlock = node.type === "html" && BLOCK_PARENT_TYPES.has(parentType);
 
         if (range !== undefined && MARKED_BLOCK_TYPES.has(node.type)) {
             blocks.push(range);
@@ -275,7 +295,7 @@ const collect = (root: MarkdownNode, text: string): { blocks: [number, number][]
             // before it, so like a definition it may not be held whole.
             constructs.push({
                 code: node.type === "inlineCode",
-                holdable: !UNHOLDABLE_TYPES.has(node.type),
+                holdable: !UNHOLDABLE_TYPES.has(node.type) && !htmlBlock,
                 inner: labelOf(node, range, text),
                 range,
             });
@@ -287,8 +307,10 @@ const collect = (root: MarkdownNode, text: string): { blocks: [number, number][]
             constructs.push({ code: false, holdable: false, range: underline });
         }
 
-        pending.push(...(node.children ?? []));
-        node = pending.pop();
+        const { type } = node;
+
+        pending.push(...(node.children ?? []).map((child): [MarkdownNode, string] => [child, type]));
+        [node, parentType] = pending.pop() ?? [undefined, ""];
     }
 
     return { blocks, constructs };

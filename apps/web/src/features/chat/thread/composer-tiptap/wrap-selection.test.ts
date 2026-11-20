@@ -764,6 +764,35 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor)).toBe("| a | b |\n| --- | --- |\n| **c** | d |");
     });
 
+    it("leaves a whole HTML block alone, which a wrap would turn into inline HTML", () => {
+        const editor = editorWith("<p>&lt;div&gt;foo&lt;/div&gt;</p>");
+
+        select(editor, 1, 15);
+
+        expect(selectedText(editor)).toBe("<div>foo</div>");
+        expect(wrapSelectionOnTextInput(editor.view, 1, 15, "*")).toBe(true);
+        expect(text(editor)).toBe("<div>foo</div>");
+    });
+
+    it("wraps a whole piece of inline HTML", () => {
+        const editor = editorWith("<p>a &lt;b&gt;x&lt;/b&gt; c</p>");
+
+        select(editor, 3, 11);
+        wrapSelectionOnTextInput(editor.view, 3, 11, "*");
+
+        expect(text(editor)).toBe("a **<b>x</b>** c");
+    });
+
+    it("wraps table cell text that holds an escaped pipe", () => {
+        const editor = editorWith("<p>| a | b |</p><p>| --- | --- |</p><p>| c&#92;|d | e |</p>");
+
+        select(editor, 29, 33);
+
+        expect(selectedText(editor)).toBe(`c${BACKSLASH}|d`);
+        expect(wrapSelectionOnTextInput(editor.view, 29, 33, "*")).toBe(true);
+        expect(text(editor)).toBe(`| a | b |\n| --- | --- |\n| **c${BACKSLASH}|d** | e |`);
+    });
+
     it("wraps literal ](url) text that has no link label before it", () => {
         const editor = editorWith("<p>literal ](url) text</p>");
 
