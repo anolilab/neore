@@ -13,7 +13,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import { internalAction } from "../../_generated/server";
-import { NO_PROVIDER_SESSION } from "../../browser/live-view-logic";
+import { NO_PROVIDER_SESSION, rendererCallBudget, rendererCallHold } from "../../browser/live-view-logic";
 import { FETCH_TIMEOUT_LONG_MS } from "../../lib/fetch-timeout";
 import { isServiceBound, serviceFetch } from "../../lib/services";
 import { validateDomain } from "./utilities";
@@ -59,6 +59,9 @@ export const executeBrowserAction = internalAction
             let returned: BrowserReturn | undefined;
             // The ended lease this action looks at the page for: once a look came back, the next actions act again.
             let inspecting: string | undefined;
+            // The renderer call's deadline, and when it falls: a call that ran until then may still be acting in the renderer.
+            let callSignal: AbortSignal | undefined;
+            let callEndsBy: number | undefined;
 
             try {
                 // Check for existing CF session to enable multi-step workflows
@@ -72,7 +75,8 @@ export const executeBrowserAction = internalAction
                 // The same write refuses the action while a person drives the browser, and tells of a hand back once.
 
                 if (sessionDocument) {
-                    const until = Date.now() + FETCH_TIMEOUT_LONG_MS;
+                    // Past the end of the renderer call, however late it starts: a person cannot take control mid-action.
+                    const until = rendererCallHold(Date.now());
                     const use = await ctx.runMutation(internal.browser.functions.beginSessionUse, { sessionId: sessionDocument._id, until });
 
                     if (use.controlled) {
@@ -95,7 +99,15 @@ export const executeBrowserAction = internalAction
                         await ctx.runMutation(internal.browser.functions.endSessionUse, held);
                     }
 
-                    return { error: "Browser automation rate limit exceeded.", success: false };
+                    if (returned === undefined) {
+                        return { error: "Browser automation rate limit exceeded.", success: false };
+                    }
+
+                    // The note stays on the row (only a look that came back clears it): the next action hears it again.
+                    return {
+                        error: `${handBackNote(returned)} Your ${action} action was not run: the browser automation rate limit was exceeded. Your next browser action shows you the page first.`,
+                        success: false,
+                    };
                 }
 
                 // After a hand back the page is not the one the agent planned against: it looks before it acts. A
@@ -104,6 +116,15 @@ export const executeBrowserAction = internalAction
                 const looksFirst = returned !== undefined && action !== "screenshot" && action !== "extract" && !reopens;
 
                 const client = createBrowserRendererClient({ fetch: serviceFetch(ctx, "browserRenderer") });
+                // A call that starts late is cut off before its hold ends, never after it; one too late for any of it is not sent.
+                const budget = held === undefined ? FETCH_TIMEOUT_LONG_MS : rendererCallBudget(held.until, Date.now());
+
+                if (budget === 0) {
+                    throw new Error("The action started too late and was not sent. Try it again.");
+                }
+
+                callSignal = AbortSignal.timeout(budget);
+                callEndsBy = Date.now() + budget;
 
                 const { data, error, response } = await browserAction({
                     body: looksFirst
@@ -118,7 +139,7 @@ export const executeBrowserAction = internalAction
                               url: args.url,
                           },
                     client,
-                    signal: AbortSignal.timeout(FETCH_TIMEOUT_LONG_MS),
+                    signal: callSignal,
                 });
 
                 if (error || !response?.ok || !data) {
@@ -176,8 +197,13 @@ export const executeBrowserAction = internalAction
 
                 return handedBackResult(result, returned, looksFirst ? action : undefined);
             } catch (error) {
-                if (held !== undefined) {
-                    // Whether the browser survived is unknown: the row falls back to its last confirmed activity.
+                // Whether the browser survived is unknown: the row falls back to its last confirmed activity. A call cut off
+                // at its deadline may still be acting in the renderer: its hold runs out on its own, so no person takes
+                // control while it lands.
+                // The signal, as the clock may lag the timer that fired it.
+                const mayStillAct = callSignal?.aborted === true || (callEndsBy !== undefined && Date.now() >= callEndsBy);
+
+                if (held !== undefined && !mayStillAct) {
                     await ctx.runMutation(internal.browser.functions.endSessionUse, held).catch(() => undefined);
                 }
 
@@ -218,13 +244,16 @@ const RETURN_REASON: Record<BrowserReturn, string> = {
     left: "left the live view, so control returned to you",
 };
 
+/** Why the agent no longer drives the browser alone: a person had it, and gave it back. */
+const handBackNote = (returned: BrowserReturn): string => `The person had control of the browser and ${RETURN_REASON[returned]}; the page may have changed.`;
+
 /**
  * The first action after a person drove the browser: the result says so, and names the page the browser is on now. An
  * action that would change the page (`skipped`) was not run; a screenshot of the page came back in its place.
  */
 const handedBackResult = <T extends { error?: string; success?: boolean; url?: string }>(result: T, returned: BrowserReturn, skipped?: string): T => {
     const page = result.url === undefined ? "The current page is unknown." : `The browser is now on ${result.url}.`;
-    const note = `The person had control of the browser and ${RETURN_REASON[returned]}; the page may have changed. ${page} ${
+    const note = `${handBackNote(returned)} ${page} ${
         skipped === undefined
             ? "Look at this result again before you act."
             : `Your ${skipped} action was not run: this is a screenshot of the page instead. Look at it, then decide what to do.`

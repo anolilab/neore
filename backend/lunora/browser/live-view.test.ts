@@ -10,7 +10,7 @@ import schema from "../schema";
 import { getBrowserActions } from "../chat/functions";
 import { logAction } from "./functions";
 import { getThreadBrowser, handBack, keepControl, navigateInControl, openLiveView, takeControl } from "./live-view";
-import { BROWSER_IDLE_REAP_MS, BROWSER_REAP_MARGIN_MS, CONTROL_IDLE_MS, CONTROL_NAVIGATION_SETTLE_MS, controlNavigationHold } from "./live-view-logic";
+import { BROWSER_IDLE_REAP_MS, BROWSER_REAP_MARGIN_MS, CONTROL_IDLE_MS, RENDERER_CALL_SETTLE_MS, rendererCallHold } from "./live-view-logic";
 
 const OWNER = "user-owner";
 const READER = "user-reader";
@@ -745,7 +745,7 @@ describe("opening a page while in control", () => {
         await navigate(OWNER);
 
         // Handed back mid-load: the lease still runs until the navigation's deadline, so the agent is still refused.
-        expect(duringLoad).toMatchObject({ ended: "handed_back", navigatingUntil: controlNavigationHold(NOW), until: controlNavigationHold(NOW) });
+        expect(duringLoad).toMatchObject({ ended: "handed_back", navigatingUntil: rendererCallHold(NOW), until: rendererCallHold(NOW) });
         // Loaded: the lease ends now, and the agent's next action hears of the hand back.
         const loaded = await session();
 
@@ -805,7 +805,7 @@ describe("opening a page while in control", () => {
             await giveBack(OWNER, "handed_back");
             fetchMock.mockResolvedValueOnce(answer(500, {}));
             await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
-            await expect(session()).resolves.toMatchObject({ control: { ended: "handed_back", until: controlNavigationHold(NOW) } });
+            await expect(session()).resolves.toMatchObject({ control: { ended: "handed_back", until: rendererCallHold(NOW) } });
 
             return { data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } };
         });
@@ -919,7 +919,7 @@ describe("opening a page while in control", () => {
         // On time: the whole request, ending well inside the hold.
         await navigate(OWNER);
         expect(timeout).toHaveBeenLastCalledWith(60_000);
-        expect(loading.navigatingUntil).toBe(controlNavigationHold(NOW));
+        expect(loading.navigatingUntil).toBe(rendererCallHold(NOW));
 
         // Twelve seconds late (a slow round trip after the hold was written): cut so it ends before the hold does.
         vi.setSystemTime(NOW + 1000);
@@ -928,14 +928,14 @@ describe("opening a page while in control", () => {
 
         const [budget] = timeout.mock.lastCall ?? [];
 
-        expect(NOW + 13_000 + Number(budget)).toBe(controlNavigationHold(NOW + 1000) - CONTROL_NAVIGATION_SETTLE_MS);
+        expect(NOW + 13_000 + Number(budget)).toBe(rendererCallHold(NOW + 1000) - RENDERER_CALL_SETTLE_MS);
         expect(renderer).toHaveBeenCalledTimes(2);
     });
 
     it("sends no renderer call that starts after its page's hold ran out, and ends the hold", async () => {
         await addSession();
         await take(OWNER);
-        rendererStart.hook = () => vi.setSystemTime(controlNavigationHold(NOW));
+        rendererStart.hook = () => vi.setSystemTime(rendererCallHold(NOW));
 
         await expect(navigate(OWNER)).resolves.toEqual({ error: "The page could not be opened.", status: "refused" });
         expect(renderer).not.toHaveBeenCalled();

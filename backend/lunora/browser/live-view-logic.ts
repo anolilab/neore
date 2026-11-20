@@ -36,21 +36,24 @@ export const CONTROL_IDLE_MS = 120_000;
 /** The warning before an idle hand back: long enough to read it and press "Keep control" (WCAG 2.2.1 asks for 20 s). */
 export const CONTROL_WARNING_MS = 30_000;
 
-/** How late after the hold is written the renderer call may start and still get its whole `FETCH_TIMEOUT_LONG_MS`, as the agent's `navigate` does. */
-export const CONTROL_NAVIGATION_START_MS = 10_000;
+/** How late after the hold is written the renderer call may start and still get its whole `FETCH_TIMEOUT_LONG_MS`. */
+export const RENDERER_CALL_START_MS = 10_000;
 
 /** How long before the hold ends the renderer call is cut off at the latest, so the hold ends after it, never before. */
-export const CONTROL_NAVIGATION_SETTLE_MS = 5000;
-
-/** The hold a person's navigation writes when it begins at `now`: past the end of its renderer call, wherever that starts. */
-export const controlNavigationHold = (now: number): number => now + CONTROL_NAVIGATION_START_MS + FETCH_TIMEOUT_LONG_MS + CONTROL_NAVIGATION_SETTLE_MS;
+export const RENDERER_CALL_SETTLE_MS = 5000;
 
 /**
- * How long the renderer call that starts at `now` may run under the hold that ends at `navigatingUntil`: the whole
- * request, or what is left of the hold less {@link CONTROL_NAVIGATION_SETTLE_MS} when it starts late. `0`: too late to start.
+ * The hold an action on the browser writes when it begins at `now` (a person's navigation, or the agent's action): past
+ * the end of its renderer call, wherever that starts.
  */
-export const controlNavigationBudget = (navigatingUntil: number, now: number): number =>
-    Math.max(0, Math.min(FETCH_TIMEOUT_LONG_MS, navigatingUntil - CONTROL_NAVIGATION_SETTLE_MS - now));
+export const rendererCallHold = (now: number): number => now + RENDERER_CALL_START_MS + FETCH_TIMEOUT_LONG_MS + RENDERER_CALL_SETTLE_MS;
+
+/**
+ * How long the renderer call that starts at `now` may run under the hold that ends at `holdUntil`: the whole
+ * request, or what is left of the hold less {@link RENDERER_CALL_SETTLE_MS} when it starts late. `0`: too late to start.
+ */
+export const rendererCallBudget = (holdUntil: number, now: number): number =>
+    Math.max(0, Math.min(FETCH_TIMEOUT_LONG_MS, holdUntil - RENDERER_CALL_SETTLE_MS - now));
 
 type SessionRow = Pick<Doc<"browserSessions">, "control" | "inUseHolds" | "lastActivityAt" | "providerSessionId" | "source" | "status">;
 

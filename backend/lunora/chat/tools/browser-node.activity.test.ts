@@ -8,13 +8,23 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../../test/registered-api";
 import schema from "../../schema";
-import { BROWSER_IDLE_REAP_MS, BROWSER_REAP_MARGIN_MS, browserAliveUntil, CONTROL_IDLE_MS, watchableSessionId } from "../../browser/live-view-logic";
+import {
+    BROWSER_IDLE_REAP_MS,
+    BROWSER_REAP_MARGIN_MS,
+    browserAliveUntil,
+    CONTROL_IDLE_MS,
+    RENDERER_CALL_SETTLE_MS,
+    rendererCallHold,
+    watchableSessionId,
+} from "../../browser/live-view-logic";
 import { logAction } from "../../browser/functions";
 import { FETCH_TIMEOUT_LONG_MS } from "../../lib/fetch-timeout";
+import { applyLimit } from "../../lib/rate-limiter-mutations";
 import { BROWSER_CLOSED_DURING_ACTION, executeBrowserAction, PERSON_HAS_CONTROL } from "./browser-node";
 
-const { registry, renderer } = vi.hoisted(() => {
-    return { registry: new Map<string, unknown>(), renderer: vi.fn() };
+const { registry, renderer, rendererStart } = vi.hoisted(() => {
+    // `rendererStart` runs when a renderer call is about to start: a test makes the call start late with it.
+    return { registry: new Map<string, unknown>(), renderer: vi.fn(), rendererStart: { hook: undefined as (() => void) | undefined } };
 });
 
 vi.mock("../../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
@@ -29,7 +39,17 @@ vi.mock("../../lib/services", async (importOriginal) => {
 });
 
 vi.mock("@neore/service-sdk/browser-renderer", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("@neore/service-sdk/browser-renderer")>()), browserAction: renderer };
+    const original = await importOriginal<typeof import("@neore/service-sdk/browser-renderer")>();
+
+    return {
+        ...original,
+        browserAction: renderer,
+        createBrowserRendererClient: (...options: Parameters<typeof original.createBrowserRendererClient>) => {
+            rendererStart.hook?.();
+
+            return original.createBrowserRendererClient(...options);
+        },
+    };
 });
 
 const OWNER = "user-owner";
@@ -74,6 +94,12 @@ const answered = (data: Record<string, unknown>) => {
     return { data, error: undefined, response: { ok: true, status: 200 } };
 };
 
+/** What the agent hears back from an action, as far as these tests read it. */
+interface ActionAnswer {
+    error?: string;
+    success?: boolean;
+}
+
 const act = async (action = "navigate"): Promise<unknown> =>
     await harness.action(
         async (ctx: any) => await ctx.runAction(executeBrowserAction, { action, threadId, url: "https://example.com/", userId: OWNER, userTier: "premium" }),
@@ -105,6 +131,8 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+    rendererStart.hook = undefined;
+    vi.restoreAllMocks();
     harness.close();
     renderer.mockReset();
     vi.useRealTimers();
@@ -147,14 +175,70 @@ describe("a browser action on a running browser", () => {
 
         await act();
 
-        // The hold covers the renderer's whole deadline, not one idle window from the start.
-        expect(heldDuring).toEqual([NOW + FETCH_TIMEOUT_LONG_MS]);
+        // The hold covers the renderer's whole deadline, however late it starts, not one idle window from the start.
+        expect(heldDuring).toEqual([rendererCallHold(NOW)]);
         const after = await row();
 
         expect(after).toMatchObject({ currentUrl: "https://example.com/after", lastActivityAt: NOW });
         expect(after.inUseHolds).toBeUndefined();
         // Never alive past the window the action just opened at the provider.
         expect(browserAliveUntil(after)).toBe(NOW + BROWSER_IDLE_REAP_MS - BROWSER_REAP_MARGIN_MS);
+    });
+
+    it("cuts a renderer call that starts late so it ends before its hold, and sends none once the hold ran out", async () => {
+        await addSession(NOW - 1000);
+        const timeout = vi.spyOn(AbortSignal, "timeout");
+
+        renderer.mockResolvedValue(answered({ sessionId: "s-1", success: true, url: "https://example.com/after" }));
+
+        // On time: the whole request.
+        await act("click");
+        expect(timeout).toHaveBeenLastCalledWith(FETCH_TIMEOUT_LONG_MS);
+
+        // Thirteen seconds late (slow round trips after the hold was written): cut so a person cannot take control mid-action.
+        vi.setSystemTime(NOW + 1000);
+        rendererStart.hook = () => vi.setSystemTime(NOW + 14_000);
+        await act("click");
+        const [budget] = timeout.mock.lastCall ?? [];
+
+        expect(NOW + 14_000 + Number(budget)).toBe(rendererCallHold(NOW + 1000) - RENDERER_CALL_SETTLE_MS);
+        expect(renderer).toHaveBeenCalledTimes(2);
+
+        // Past the hold: not sent, and the hold ends.
+        vi.setSystemTime(NOW + 20_000);
+        rendererStart.hook = () => vi.setSystemTime(rendererCallHold(NOW + 20_000));
+        const late = (await act("click")) as ActionAnswer;
+
+        expect(late).toMatchObject({ success: false });
+        expect(late.error).toContain("not sent");
+        expect(renderer).toHaveBeenCalledTimes(2);
+        const after = await row();
+
+        expect(after.inUseHolds).toBeUndefined();
+    });
+
+    it("keeps the hold of a renderer call cut off at its deadline: the renderer may still be acting", async () => {
+        await addSession(NOW - 1000);
+        renderer.mockImplementationOnce(async () => {
+            vi.setSystemTime(NOW + FETCH_TIMEOUT_LONG_MS);
+
+            throw new DOMException("The operation timed out.", "TimeoutError");
+        });
+
+        await act("click");
+
+        await expect(row()).resolves.toMatchObject({ inUseHolds: [rendererCallHold(NOW)], lastActivityAt: NOW - 1000 });
+    });
+
+    it("gives a first action, with no browser to hold yet, the whole renderer call", async () => {
+        const timeout = vi.spyOn(AbortSignal, "timeout");
+
+        rendererStart.hook = () => vi.setSystemTime(NOW + 30_000);
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-new", success: true, url: "https://example.com/" }));
+
+        await act();
+
+        expect(timeout).toHaveBeenLastCalledWith(FETCH_TIMEOUT_LONG_MS);
     });
 
     it("ends the hold when the renderer fails, without stamping the browser as used", async () => {
@@ -294,7 +378,7 @@ describe("two browser actions at once", () => {
         // The failed action's hold is gone; the running one's is still there, so the browser is still offered.
         const afterFailure = await row();
 
-        expect(afterFailure.inUseHolds).toEqual([NOW + FETCH_TIMEOUT_LONG_MS]);
+        expect(afterFailure.inUseHolds).toEqual([rendererCallHold(NOW)]);
 
         running.release(answered({ sessionId: "s-1", success: true, url: "https://example.com/after" }));
         await runningRun;
@@ -419,6 +503,33 @@ describe("a browser a person took control of", () => {
         expect(after.control).toBeUndefined();
         renderer.mockResolvedValueOnce(answered({ sessionId: "s-1", success: true, url: "https://example.com/next" }));
         await expect(act("click")).resolves.toEqual({ sessionId: "s-1", success: true, url: "https://example.com/next" });
+    });
+
+    it("tells of a hand back on a rate-limited action, and again on the next action", async () => {
+        await addSession(NOW - 1000);
+        await giveControl({ ended: "handed_back", until: NOW - 1 });
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 200, identifier: OWNER, key: "browser/action:premium" }));
+
+        const limited = (await act("click")) as ActionAnswer;
+
+        expect(renderer).not.toHaveBeenCalled();
+        expect(limited.success).toBe(false);
+        expect(limited.error).toContain("handed it back");
+        expect(limited.error).toContain("Your click action was not run: the browser automation rate limit was exceeded.");
+        const after = await row();
+
+        // The note is not used up: no look came back.
+        expect(after).toMatchObject({ control: { ended: "handed_back" } });
+        expect(after.inUseHolds).toBeUndefined();
+
+        // A new hour: the next action looks first, with the note.
+        vi.setSystemTime(NOW + 3_600_000);
+        await harness.run(async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { lastActivityAt: NOW + 3_600_000 - 1000 }));
+        renderer.mockResolvedValueOnce(answered({ screenshot: "png", sessionId: "s-1", success: true, url: "https://example.com/person" }));
+        const next = (await act("click")) as ActionAnswer;
+
+        expect(renderer.mock.calls[0]?.[0]).toMatchObject({ body: { action: "screenshot" } });
+        expect(next.error).toContain("Your click action was not run");
     });
 
     it("looks again on the next action when the first look after a hand back failed", async () => {

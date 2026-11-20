@@ -26,8 +26,8 @@ import { patchRow } from "../lib/patch";
 import {
     browserAliveUntil,
     CONTROL_IDLE_MS,
-    controlNavigationBudget,
-    controlNavigationHold,
+    rendererCallBudget,
+    rendererCallHold,
     controlStateOf,
     LIVE_VIEW_CONNECT_DEADLINE_MS,
     liveViewRequest,
@@ -638,7 +638,7 @@ export const navigateInControl = authAction
         const startedAt = Date.now();
         // The hold was written before this call: one that starts late is cut off before the hold ends, never after it,
         // and one too late for any of it is not sent (no answer, like a call that failed: the browser is left as it is).
-        const budget = controlNavigationBudget(navigation.navigatingUntil, startedAt);
+        const budget = rendererCallBudget(navigation.navigatingUntil, startedAt);
         const { data } =
             budget === 0
                 ? { data: undefined }
@@ -687,7 +687,7 @@ export const navigateInControl = authAction
 /**
  * The person in control starts opening a page: only while they hold the lease `claim` names (not handed back), may write in the
  * thread, the owner has not turned browsing off or listed the address, and no page they asked for still loads. The
- * lease lasts at least as long as the renderer call (`controlNavigationHold`: the call may start a little later and is
+ * lease lasts at least as long as the renderer call (`rendererCallHold`: the call may start a little later and is
  * cut off before the hold ends), and a hand back meanwhile waits for it ({@link handBack}), so the agent never acts
  * while the page the person asked for loads. `navigatingUntil` names this navigation.
  */
@@ -735,7 +735,7 @@ export const beginControlNavigation = internalMutation
             return { error: blocked, kind: "blocked" as const };
         }
 
-        const navigatingUntil = controlNavigationHold(ctx.now);
+        const navigatingUntil = rendererCallHold(ctx.now);
 
         await patchRow(ctx.db, "browserSessions", browser.session, {
             control: { ...control, navigatingUntil, until: Math.max(control.until, navigatingUntil) },
