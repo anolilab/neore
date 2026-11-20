@@ -174,7 +174,11 @@ export const chatFixtures = (options: ChatFixtureOptions = {}): LunoraFixture[] 
         lunora(api.chat.functions.getThreadUIMessages, () => pageOf(messages.map(ownedBy)) as ReturnOf<typeof api.chat.functions.getThreadUIMessages>),
         lunora(api.chat.sharing.resolveThreadShard, null),
         lunora(api.chat.slides.functions.getGeneratingPresentation, null),
-        lunora(api.chat.functions.getCachedFollowupSuggestions, { suggestions: options.suggestions ?? [] }),
+        // The suggestions are for the latest reply: a cache entry for any other id is not shown.
+        lunora(api.chat.functions.getCachedFollowupSuggestions, {
+            lastMessageId: messages.findLast((message) => message.role === "assistant")?.id ?? "",
+            suggestions: options.suggestions ?? [],
+        }),
         lunora(api.chat.composite.getThreadPaneState, {
             childThreads: [],
             goal: null,

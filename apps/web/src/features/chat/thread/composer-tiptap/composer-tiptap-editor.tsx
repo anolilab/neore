@@ -45,7 +45,7 @@ import type { EmojiShortcodeMatch } from "./extensions/emoji-shortcode";
 import EmojiShortcode from "./extensions/emoji-shortcode";
 import type { FileMentionMatch } from "./extensions/file-mention";
 import FileMention from "./extensions/file-mention";
-import GhostCompletion from "./extensions/ghost-completion";
+import GhostCompletion, { getGhostCompletion } from "./extensions/ghost-completion";
 import PromptHistoryKeys from "./extensions/prompt-history-keys";
 import QuoteChip, { refreshQuoteChipLabels } from "./extensions/quote-chip";
 import type { SlashCommandMatch } from "./extensions/slash-command";
@@ -681,7 +681,24 @@ const ComposerTiptapEditor = ({
 
         const clearAnnouncement = setTimeout(setGhostAnnouncement, ANNOUNCEMENT_CLEAR_MS, "");
 
-        return () => clearTimeout(clearAnnouncement);
+        // Typing or Escape removes the prompt, and its line goes with it rather than when the timer runs out. The placement above
+        // is not seen: this listener is added after it.
+        const onTransaction = () => {
+            if (getGhostCompletion(editor.state)?.kind === "prompt") {
+                return;
+            }
+
+            editor.off("transaction", onTransaction);
+            clearTimeout(clearAnnouncement);
+            setGhostAnnouncement("");
+        };
+
+        editor.on("transaction", onTransaction);
+
+        return () => {
+            editor.off("transaction", onTransaction);
+            clearTimeout(clearAnnouncement);
+        };
     }, [editor, nextPromptScope, nextPromptSuggestion, promptAnnouncementText]);
 
     useEffect(() => {
