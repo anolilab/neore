@@ -466,7 +466,7 @@ app.post("/action", async (c) => {
                     };
                 });
 
-                result = { direction: scrollDirection, scrollPosition, success: true };
+                result = { direction: scrollDirection, scrollPosition, success: true, url: page.url() };
                 break;
             }
 
@@ -477,7 +477,7 @@ app.post("/action", async (c) => {
                 }
 
                 await page.fill(selector, text, { timeout: PAGE_TIMEOUT });
-                result = { success: true, typedSelector: selector, typedText: text };
+                result = { success: true, typedSelector: selector, typedText: text, url: page.url() };
                 break;
             }
 
