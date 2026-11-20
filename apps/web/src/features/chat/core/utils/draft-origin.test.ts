@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import type { PendingAttachment } from "../stores/chat-ui-store";
 import { useChatUIStore } from "../stores/chat-ui-store";
-import { composerDraftFrom, draftFromField, markComposerDraft, noteSavedPrompt, prefillDraftFrom } from "./draft-origin";
+import { composerDraftFrom, draftFromField, isOwnPromptContent, markComposerDraft, noteSavedPrompt, prefillDraftFrom } from "./draft-origin";
 
 const ui = () => useChatUIStore.getState();
 
@@ -106,6 +106,33 @@ describe("the composer draft's not-typed mark", () => {
         ui().clearComposer();
         ui().setComposerText("read before the session loaded");
         noteSavedPrompt({ userId: "user-c" }, undefined, { replaced: true });
+
+        expect(composerDraftFrom()).toBe("sharedPrompt");
+    });
+});
+
+describe(isOwnPromptContent, () => {
+    it("counts a prompt as the viewer's only when they wrote its current content themselves", () => {
+        expect(isOwnPromptContent({ contentBy: "user-a", contentByImpersonator: false, userId: "user-a" }, "user-a")).toBe(true);
+        // The viewer's own edit of a teammate's organization prompt.
+        expect(isOwnPromptContent({ contentBy: "user-a", contentByImpersonator: false, organizationId: "org", userId: "user-b" }, "user-a")).toBe(true);
+    });
+
+    it("refuses the viewer's prompt a teammate rewrote, and one an admin wrote while acting as the viewer", () => {
+        expect(isOwnPromptContent({ contentBy: "user-b", contentByImpersonator: false, organizationId: "org", userId: "user-a" }, "user-a")).toBe(false);
+        expect(isOwnPromptContent({ contentBy: "user-a", contentByImpersonator: true, userId: "user-a" }, "user-a")).toBe(false);
+        expect(isOwnPromptContent({ contentBy: "user-a", userId: "user-a" }, undefined)).toBe(false);
+    });
+
+    it("reads a row from before the writer was recorded as the viewer's only for their own personal prompt", () => {
+        expect(isOwnPromptContent({ userId: "user-a" }, "user-a")).toBe(true);
+        expect(isOwnPromptContent({ organizationId: "org", userId: "user-a" }, "user-a")).toBe(false);
+        expect(isOwnPromptContent({ userId: "user-b" }, "user-a")).toBe(false);
+    });
+
+    it("marks the draft when the viewer's own prompt holds a teammate's edit, even replacing the whole draft", () => {
+        ui().setComposerText("my prompt, rewritten by a teammate");
+        noteSavedPrompt({ contentBy: "user-b", contentByImpersonator: false, organizationId: "org", userId: "user-a" }, "user-a", { replaced: true });
 
         expect(composerDraftFrom()).toBe("sharedPrompt");
     });

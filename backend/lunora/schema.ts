@@ -2225,6 +2225,9 @@ export const schema = defineSchema({
     promptHistory: defineTable({
         changeType: v.string(),
         content: v.string(),
+        // Who wrote this version's content, as on `prompts` (`prompts/content-author.ts`); a restore carries it back.
+        contentBy: v.optional(v.string()),
+        contentByImpersonator: v.optional(v.boolean()),
         createdAt: v.number(),
         description: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
@@ -2253,6 +2256,11 @@ export const schema = defineSchema({
 
     prompts: defineTable({
         content: v.string(),
+        // Who last wrote `content`, from the session, never from input (`prompts/content-author.ts`): an org member can
+        // edit a teammate's prompt and an impersonating admin writes under the user's id, so `userId` does not say whose
+        // words it holds. Unset on rows from before it.
+        contentBy: v.optional(v.string()),
+        contentByImpersonator: v.optional(v.boolean()),
         currentVersion: v.optional(v.number()),
         description: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),

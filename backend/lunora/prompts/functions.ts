@@ -21,6 +21,7 @@ import { compareStrings } from "../lib/collections";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { checkRateLimit, getRateLimitKey } from "../lib/rate-limiter";
 import { FREE_PROMPT_LIMIT, VARIABLE_REGEX } from "./constants";
+import { contentAuthorOfSession, copiedContentAuthor } from "./content-author";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 
@@ -267,8 +268,10 @@ export const createPrompt = authMutation
 
         await assertPromptQuota(ctx);
 
+        const author = contentAuthorOfSession(ctx.user);
         const promptId = await ctx.db.insert("prompts", {
             content,
+            ...author,
             currentVersion: 1,
             description,
             enabledFeatures,
@@ -292,6 +295,7 @@ export const createPrompt = authMutation
         await ctx.db.insert("promptHistory", {
             changeType: "created",
             content,
+            ...author,
             createdAt: now,
             description,
             enabledFeatures,
@@ -369,12 +373,17 @@ export const updatePrompt = authMutation
             const isEnabledFeaturesChanged = enabledFeatures !== undefined && JSON.stringify(enabledFeatures) !== JSON.stringify(existing.enabledFeatures);
             const shouldSaveHistory = isContentChanged || isVariablesChanged || isModelChanged || isReasoningEffortChanged || isEnabledFeaturesChanged;
             const newVersion = (existing.currentVersion || 1) + (shouldSaveHistory ? 1 : 0);
+            // New words are the editor's, whoever owns the prompt; unchanged ones keep their writer. A variable's
+            // default is words too: it is put into the composer with the content.
+            const isWordsChanged = isContentChanged || isVariablesChanged;
+            const author = isWordsChanged ? contentAuthorOfSession(ctx.user) : copiedContentAuthor(existing);
 
             // Save history entry if content, variables, or settings changed
             if (shouldSaveHistory) {
                 await ctx.db.insert("promptHistory", {
                     changeType: changeType || "manual",
                     content: content === undefined ? existing.content : content,
+                    ...author,
                     createdAt: now,
                     description: description === undefined ? existing.description : description,
                     enabledFeatures: enabledFeatures === undefined ? existing.enabledFeatures : enabledFeatures,
@@ -391,6 +400,7 @@ export const updatePrompt = authMutation
 
             await ctx.db.patch("prompts", promptId, {
                 ...(content !== undefined && { content }),
+                ...(isWordsChanged && author),
                 ...(shouldSaveHistory && { currentVersion: newVersion }),
                 ...(description !== undefined && { description }),
                 ...(enabledFeatures !== undefined && { enabledFeatures }),
@@ -865,6 +875,7 @@ export const restorePromptVersion = authMutation
         await ctx.db.insert("promptHistory", {
             changeType: "restored",
             content: historyEntry.content,
+            ...copiedContentAuthor(historyEntry),
             createdAt: now,
             description: historyEntry.description,
             note: `Restored from version ${version}`,
@@ -876,9 +887,12 @@ export const restorePromptVersion = authMutation
         });
 
         // Update the prompt with the restored content. A field the restored
-        // version did not have is removed, not kept from the current one.
+        // version did not have is removed, not kept from the current one: so is its writer, a version from before
+        // `contentBy` reads as an old row (`content-author.ts`).
         await patchRow(ctx.db, "prompts", prompt, {
             content: historyEntry.content,
+            contentBy: historyEntry.contentBy,
+            contentByImpersonator: historyEntry.contentByImpersonator,
             currentVersion: newVersion,
             description: historyEntry.description,
             tags: historyEntry.tags,
@@ -921,8 +935,11 @@ export const duplicatePrompt = authMutation
         // A copy is a new prompt: same quota as `createPrompt`.
         await assertPromptQuota(ctx);
 
+        // The copy is the duplicating user's, the words still their writer's.
+        const author = copiedContentAuthor(existing);
         const newPromptId = await ctx.db.insert("prompts", {
             content: existing.content,
+            ...author,
             currentVersion: 1,
             description: existing.description,
             isFavorite: false,
@@ -938,6 +955,7 @@ export const duplicatePrompt = authMutation
         await ctx.db.insert("promptHistory", {
             changeType: "created",
             content: existing.content,
+            ...author,
             createdAt: now,
             description: existing.description,
             note: `Duplicated from "${existing.name}"`,

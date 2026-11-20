@@ -56,14 +56,15 @@
   Text the owner did not type is marked where it is saved (`lib/not-typed-text.ts`, `neore.notTyped`) and refused by
   name: a prompt, edit, steer or local turn an admin sent while impersonating, and a composer draft from a `?prompt=` or
   `?initialMessage=` link, anything the desktop shell hands over (a `neore://new?text=` link, a share, the Quick
-  Composer) or someone else's saved prompt. The web client marks the draft itself, never matches text: the mark stays
+  Composer) or a saved prompt whose content the viewer did not write (`isOwnPromptContent`, from `contentBy` /
+  `contentByImpersonator`, which every content write sets from the session, `prompts/content-author.ts`; never `userId`). The web client marks the draft itself, never matches text: the mark stays
   through edits, pane switches, a reload, the queue and a failed send, and goes when the draft is sent or emptied
   (`features/chat/core/utils/draft-origin.ts`); each send names it as `draftFrom`. An edit keeps the original's mark;
   a steer's lives in `persistentStreams.notTypedSteers` until delivery. A stateless run saves its prompt again: pass it
   through `statelessPrompt` with the saved row's marks, never the bare text. Prompt history and Restore to input send an
   admin's prompt again as `draftFrom: "impersonated"`. A plain-text paste stays unseen. Still unmarked, to mark (a draft
   kind the verdict names) before the fill ships: forwarded messages, Generate image/video (the reply's text sent as a
-  prompt), follow-up and welcome-screen suggestions, the prompt improver's Apply, the media gallery's stored prompt; and bot instructions and personalization an impersonating admin wrote (a
+  prompt), follow-up and welcome-screen suggestions, the prompt improver's Apply, the media gallery's stored prompt, an organization's variable defaults filled into a prompt (`getResolvedVariables`); and bot instructions and personalization an impersonating admin wrote (a
   `systemContext` kind that refuses). The allowlist refuses a step holding a page's result or an approval's
   request and response parts: the fill navigates and types inside its one call, and its own approval parts are admitted
   only for that call's id, added here on purpose.

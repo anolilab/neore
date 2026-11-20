@@ -22111,6 +22111,18 @@
           "optional": false,
           "unique": false
         },
+        "contentBy": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "contentByImpersonator": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "createdAt": {
           "kind": "number",
           "nullable": false,
@@ -22249,6 +22261,18 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "contentBy": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "contentByImpersonator": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "currentVersion": {
