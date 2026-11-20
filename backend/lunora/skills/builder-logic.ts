@@ -36,8 +36,6 @@ export { MAX_GOAL_LENGTH } from "./generate-prompt";
 // Whitelists
 // ============================================================================
 
-export { isSelectableTextModel, type ModelCandidate } from "@neore/ai/models";
-
 export interface BuilderModelOption {
     id: string;
     name: string;

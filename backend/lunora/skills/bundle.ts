@@ -40,7 +40,7 @@ import type { BundleItem, SkillSource } from "./bundle-format";
 import { BUNDLE_LIMITS, buildBundleMarkdown, groupItemOf, parseBundleMarkdown, skillItemOf, triggerItemOf } from "./bundle-format";
 import type { PlanEntry, PlanEnv } from "./bundle-plan";
 import { assertSelectionImportable, BundleImportError, mayRetryImport, planBundle, runBundleImport, skillLimitFor } from "./bundle-plan";
-import { isSelectableTextModel } from "./builder-logic";
+import { isSelectableTextModel } from "@neore/ai/models";
 import { getToolRegistry } from "./jit-tool-loader";
 import { deleteTriggerRows } from "../triggers/functions";
 import { deleteSkillRows } from "./functions";
