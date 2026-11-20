@@ -1487,6 +1487,8 @@ const ComposerInput = ({
             usePromptQueueStore.getState().setPaused(threadId, true);
         }
 
+        // A manual stop pauses everything that would send by itself, a send waiting on uploads included; the draft stays.
+        setUploadWait(null);
         cancelStream();
     }, [cancelStream, threadId]);
 

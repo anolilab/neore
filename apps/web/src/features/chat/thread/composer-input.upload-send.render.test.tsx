@@ -133,7 +133,17 @@ vi.mock("./composer-tiptap/use-composer-autocomplete", () => {
 });
 
 // The input row stands in with its contract: a send control, and whether a send is waiting on uploads.
-const InputArea = ({ isSendWaiting, onSubmit, ref }: { isSendWaiting?: boolean; onSubmit: () => void; ref?: Ref<ComposerInputAreaRef> }) => {
+const InputArea = ({
+    isSendWaiting,
+    onCancel,
+    onSubmit,
+    ref,
+}: {
+    isSendWaiting?: boolean;
+    onCancel?: () => void;
+    onSubmit: () => void;
+    ref?: Ref<ComposerInputAreaRef>;
+}) => {
     useImperativeHandle(ref, () => {
         return { blur: () => undefined, focus: () => undefined, getEditor: () => null };
     });
@@ -143,6 +153,9 @@ const InputArea = ({ isSendWaiting, onSubmit, ref }: { isSendWaiting?: boolean; 
             <output aria-label="Send state">{isSendWaiting ? "waiting" : "ready"}</output>
             <button onClick={onSubmit} type="button">
                 Send
+            </button>
+            <button onClick={onCancel} type="button">
+                Stop
             </button>
         </div>
     );
@@ -279,6 +292,26 @@ describe("ComposerInput send during an upload", () => {
         });
         expect(harness.sendMessage).not.toHaveBeenCalled();
         expect(sendState()).toBe("ready");
+    });
+
+    it("sends nothing once Stop is pressed while the send waits for the uploads", async () => {
+        harness.isStreaming = true;
+
+        const id = addUpload("uploading");
+
+        renderComposer();
+        pressSend();
+        fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+
+        expect(sendState()).toBe("ready");
+
+        harness.isStreaming = false;
+        useChatUIStore.getState().updateAttachment(id, { fileId: "file-1", status: "complete" });
+
+        await waitFor(() => {
+            expect(useChatUIStore.getState().composerAttachments[0]?.status).toBe("complete");
+        });
+        expect(harness.sendMessage).not.toHaveBeenCalled();
     });
 
     it("sends only once, however often send is pressed while waiting", async () => {
