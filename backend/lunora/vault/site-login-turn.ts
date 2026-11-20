@@ -30,7 +30,7 @@ import { loadEligibleThread } from "../devices/internal";
 import { computeTaint } from "../devices/lib/taint";
 
 /** A model message as the AI SDK holds it: a saved row's `message`, or one of `ToolExecutionOptions.messages`. */
-export type SiteLoginMessage = { content?: unknown; role?: unknown };
+export type SiteLoginMessage = { content?: unknown; providerOptions?: unknown; role?: unknown };
 
 export type SiteLoginTurn = {
     headless: boolean;
@@ -146,6 +146,12 @@ const toolMessageRefusal = (message: SiteLoginMessage): string | null =>
 export const messageRefusal = (message: SiteLoginMessage | undefined): string | null => {
     if (!message || (typeof message.content !== "string" && !Array.isArray(message.content))) {
         return "no-content";
+    }
+
+    // A message the app put in front of the model from elsewhere (a search hit, `agent/client/search.ts`) is marked on
+    // the message itself: it reads like a row of this path, so the mark is all that tells it apart.
+    if (hasNeoreMark(message.providerOptions)) {
+        return "retrieved";
     }
 
     switch (message.role) {

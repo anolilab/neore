@@ -265,9 +265,9 @@ const siteLoginTurnFields = {
     /**
      * The messages the model saw for the step, as they are (AI SDK `ToolExecutionOptions.messages`): this run's own steps
      * are not on the saved path above the prompt yet. Each is classified by the same allowlist as a saved row; none at all
-     * refuses. Too many to send is a refusal too.
+     * refuses. Too many to send is a refusal too. A message's own `providerOptions` come along: a search hit's mark is there.
      */
-    stepMessages: v.array(v.object({ content: v.optional(v.any()), role: v.string().max(16) })).max(1000),
+    stepMessages: v.array(v.object({ content: v.optional(v.any()), providerOptions: v.optional(v.any()), role: v.string().max(16) })).max(1000),
     /**
      * Every kind of text in the run's system prompt, one per piece as it is assembled: `instructions` (the app's own,
      * always), `personalization`, `teammate`, and for anything else its own kind (`knowledge`, `memory`, `project`,
@@ -289,6 +289,11 @@ export const usableSiteLogins = async (
     ctx: Pick<QueryCtx, "db">,
     args: { threadId: Id<"threads">; turn: SiteLoginTurn; userId: string },
 ): Promise<Doc<"savedSiteLogins">[]> => {
+    // As list, save and delete: a row stranded on `__root__` (or on a collaborator's shard) is no login of this user's.
+    if (!onOwnShard(args.userId)) {
+        return [];
+    }
+
     const verdict = await siteLoginTurnVerdict(ctx, args);
 
     if (!verdict.allowed) {

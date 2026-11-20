@@ -18,14 +18,16 @@
   (`isLeadAgentName`: lead rows and the prompt carry the model id; every other writer names itself, and a test pins
   that none of those names is a model id), results of `SAFE_RESULT_TOOLS`, built-in tools only (`toolSources`), and a
   system prompt of only `SAFE_SYSTEM_CONTEXT` kinds. The step's own messages are classified by the same allowlist as
-  the saved path (`messageRefusal`). The turn is the owner's own at the app (`isOwnInteractiveTurn`); the thread passes
+  the saved path (`messageRefusal`); a message-level `neore` mark refuses, so text retrieved into the messages from
+  elsewhere is marked where it is added (a search hit: `agent/client/search.ts#markSearchHit`). The turn is the
+  owner's own at the app (`isOwnInteractiveTurn`); the thread passes
   `loadEligibleThread`, is tagged `chat` and nothing else, and is no coding agent's, handoff, import, branch or other
   derived thread (`threadRelationships`) and has no context summary. Anything else refuses, including a row, part,
   tool, tag or context kind nobody classified: add one to the safe lists only on purpose, and when unsure leave it out.
   `agent/thread-summary-taint.ts#threadPathTaint` is not used here; do not widen it for this. Then the owner's own chats
   get every login; a teammate's thread only the logins naming that teammate, and none once it is deleted.
-- Logins live on the owner's own shard: save/delete refuse and list returns nothing on `__root__` or when `servesUser`
-  is false (`servesUser` alone admits `__root__`, which any caller can name; a collaborator reaches every procedure on a
+- Logins live on the owner's own shard: save/delete refuse, and list and the fill lookup (`usableSiteLogins`) return
+  nothing, on `__root__` or when `servesUser` is false (`servesUser` alone admits `__root__`, which any caller can name; a collaborator reaches every procedure on a
   shared thread's shard). Dev `SHARD_ROUTING=off` puts everyone on root, so root is allowed there. A save keeps only
   the caller's own existing teammate ids (a deleted one is dropped) and checks the 20-bot limit on what it keeps, so the
   web form always sends a login's ids unfiltered: its cached bot list cannot tell a deleted bot from a new one.
