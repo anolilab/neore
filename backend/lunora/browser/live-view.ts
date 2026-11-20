@@ -39,9 +39,20 @@ const browserIdOf = async (sessionId: Id<"browserSessions">, providerSessionId: 
 /**
  * The ONE decision both procedures make, at the moment of the call: the caller reads the thread right now (owner or
  * live grantee, not locked for them, not trashed), and its browser is still running.
+ *
+ * `primary`: the grant is a `.global()` row, and a read replica can still hold one an admin just removed. Minting a
+ * view credential reads it from the primary, so a revoked reader gets no new URL. The status query stays on the
+ * replica like every other read of the thread's content: it carries no credential, and the reader's messages read
+ * at the same consistency. The thread row (lock, trash) is on the owner's shard, which has no replica.
  */
-const readerBrowser = async (ctx: QueryCtx, threadId: Id<"threads">, userId: string, now: number): Promise<ReaderBrowser> => {
-    const access = await resolveThreadReadAccess(ctx, threadId, userId);
+const readerBrowser = async (
+    ctx: QueryCtx,
+    threadId: Id<"threads">,
+    userId: string,
+    now: number,
+    options: { primary?: boolean } = {},
+): Promise<ReaderBrowser> => {
+    const access = await resolveThreadReadAccess(ctx, threadId, userId, undefined, options);
 
     if (access?.kind !== "full") {
         return { kind: "denied" };
@@ -95,7 +106,7 @@ export const getThreadBrowser = authQuery
         };
     });
 
-/** {@link readerBrowser} for the action, which reaches the database only through `runQuery`. */
+/** {@link readerBrowser} for the action, which reaches the database only through `runQuery`; the grant from the primary. */
 export const getReaderBrowser = internalQuery
     .input({ threadId: v.id("threads"), userId: v.string() })
     .output(
@@ -106,7 +117,7 @@ export const getReaderBrowser = internalQuery
         ),
     )
     .query(async ({ args: { threadId, userId }, ctx }) => {
-        const browser = await readerBrowser(ctx, threadId, userId, Date.now());
+        const browser = await readerBrowser(ctx, threadId, userId, Date.now(), { primary: true });
 
         return browser.kind === "watchable" ? { kind: browser.kind, providerSessionId: browser.providerSessionId } : browser;
     });

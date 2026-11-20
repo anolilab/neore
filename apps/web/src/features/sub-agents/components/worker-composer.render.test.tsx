@@ -1,5 +1,6 @@
 /**
- * The worker composer is the composer of a worker thread: F6 must reach it as it reaches the cloud composer's editor.
+ * The worker composer is the composer of a worker thread: F6 must reach it as it reaches the cloud composer's editor,
+ * and it shows the worker's live cloud browser as the chat composer does.
  */
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -47,6 +48,13 @@ vi.mock("@/lib/toast", () => {
     return { showError: () => {} };
 });
 
+// The card itself is covered by `browser-live-view.render.test.tsx`: here, only which thread it is mounted for.
+vi.mock("@/features/chat/browser-live-view/browser-live-view", () => {
+    return {
+        default: ({ threadId }: { threadId: string | undefined }) => <section aria-label="Agent browser" data-thread-id={threadId} />,
+    };
+});
+
 const { default: WorkerComposer } = await import("./worker-composer");
 
 describe("the worker composer", () => {
@@ -68,5 +76,11 @@ describe("the worker composer", () => {
         expect(focusNextArea(1)).toBe(true);
         // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
         expect(document.activeElement).toBe(box);
+    });
+
+    it("shows the worker's live cloud browser, for the worker's own thread", () => {
+        render(<WorkerComposer archived={false} busy={false} followUp="queue" workerId="w1" />);
+
+        expect(screen.getByRole("region", { name: "Agent browser" }).dataset.threadId).toBe("w1");
     });
 });

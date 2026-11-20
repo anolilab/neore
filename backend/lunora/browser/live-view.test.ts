@@ -55,6 +55,34 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
     };
 });
 
+// A read replica that still holds a grant the primary no longer has: every grant read that does not ask for the
+// primary gets `replica.grant` while it is set, the way a lagging replica answers after an admin removed a reader.
+const { replica } = vi.hoisted(() => {
+    return { replica: {} as { grant?: Record<string, unknown> } };
+});
+
+vi.mock("../agent/thread-read-access", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../agent/thread-read-access")>();
+    const lagging = (context: any): any => {
+        const findFirst = async (query: { consistency?: string }) =>
+            query.consistency !== "primary" && replica.grant !== undefined ? replica.grant : await context.db.threadAccess.findFirst(query);
+        const db = new Proxy(context.db, {
+            get: (target, key) =>
+                key === "threadAccess"
+                    ? new Proxy(target.threadAccess, { get: (table, name) => (name === "findFirst" ? findFirst : table[name]) })
+                    : target[key],
+        });
+
+        return new Proxy(context, { get: (target, key) => (key === "db" ? db : target[key]) });
+    };
+
+    return {
+        ...original,
+        resolveThreadReadAccess: async (context: any, ...rest: Parameters<typeof original.resolveThreadReadAccess> extends [unknown, ...infer R] ? R : never) =>
+            await original.resolveThreadReadAccess(lagging(context), ...rest),
+    };
+});
+
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
 });
@@ -109,6 +137,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+    delete replica.grant;
     harness.close();
     fetchMock.mockReset();
     vi.unstubAllGlobals();
@@ -182,6 +211,19 @@ describe("a running browser", () => {
         vi.setSystemTime(expiresAt + 1);
 
         await expect(statusFor(READER)).resolves.toBeNull();
+        await expect(open(READER)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("mints no view for a reader an admin removed, while a replica still holds their grant", async () => {
+        await addSession();
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+            replica.grant = grant;
+            await ctx.db.delete("threadAccess", grant._id);
+        });
+
         await expect(open(READER)).rejects.toMatchObject({ code: "NOT_FOUND" });
         expect(fetchMock).not.toHaveBeenCalled();
     });
