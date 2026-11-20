@@ -499,13 +499,13 @@ const bareLinks = (text: string): Construct[] =>
         },
     );
 
-/** The bare links not inside a link's label: GFM does not link an address that is already a link's text. */
-const bareLinksOutsideLabels = (text: string, constructs: ReadonlyArray<Construct>): Construct[] => {
-    const labels = constructs.flatMap((construct) => (construct.inner === undefined ? [] : [construct.inner]));
-
-    // An address that starts inside a label is part of the link's text; the pattern may run on past the label's `]`.
-    return bareLinks(text).filter((link) => labels.every(([labelStart, labelEnd]) => link.range[0] < labelStart || link.range[0] >= labelEnd));
-};
+/**
+ * The bare links that start outside every parsed construct. An address that starts inside a link (its label or its
+ * destination), an image, a definition, HTML or code is part of that construct, and GFM does not link it again; the
+ * pattern may run on past the construct's end, so only where it starts counts.
+ */
+const bareLinksOutsideConstructs = (text: string, constructs: ReadonlyArray<Construct>): Construct[] =>
+    bareLinks(text).filter((link) => constructs.every(({ range }) => link.range[0] < range[0] || link.range[0] >= range[1]));
 
 /** The number of backslashes right before `index`. */
 const trailingBackslashCount = (text: string, index: number): number => {
@@ -601,7 +601,7 @@ export const markupAround = (
         blocked:
             from < markers ||
             breaksTable(text, draftFrom, draftTo) ||
-            [...constructs, ...characterReferences(text), ...bareLinksOutsideLabels(text, constructs)].some((construct) =>
+            [...constructs, ...characterReferences(text), ...bareLinksOutsideConstructs(text, constructs)].some((construct) =>
                 breaks(construct, draftFrom, draftTo),
             ),
         paragraph,
