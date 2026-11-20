@@ -239,6 +239,8 @@ interface ComposerInputProps {
      */
     onSubmitOverride?: (text: string, attachments: PendingAttachment[], draftFrom?: DraftOrigin) => Promise<void>;
     placeholder?: string;
+    /** Whether the suggested next prompt may show here: text chats only. */
+    suggestPrompt?: boolean;
 }
 
 export interface ComposerInputRef {
@@ -479,6 +481,7 @@ const ComposerInput = ({
     autoFocus = true,
     className,
     compact = false,
+    suggestPrompt = true,
     disabled = false,
     maxRows = 5,
     onOpenDraw,
@@ -1945,7 +1948,8 @@ const ComposerInput = ({
                 isStreaming={isSSEStreaming || isComparisonLoading}
                 isUploading={hasUploadingAttachments}
                 maxRows={maxRows}
-                nextPromptSuggestion={compact ? null : nextPromptSuggestion}
+                nextPromptScope={threadId}
+                nextPromptSuggestion={compact || !suggestPrompt ? null : nextPromptSuggestion}
                 onAddAttachment={compact ? undefined : handleAddAttachment}
                 onAttachDraftAsFile={draftFitsFile ? handleAttachDraftAsFile : undefined}
                 onCancel={handleCancel}
