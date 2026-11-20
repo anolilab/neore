@@ -287,6 +287,39 @@ describe("SiteLogins", () => {
         expect(harness.saveSiteLogin.mock.calls[1]?.[0]).toHaveProperty("password", undefined);
     });
 
+    it("keeps a draft moved to another site during a save as a new login of its own", async () => {
+        const user = userEvent.setup();
+        let finishSave: (value: typeof SAVED) => void = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const heldSave = new Promise<typeof SAVED>((resolve) => {
+            finishSave = resolve;
+        });
+
+        harness.saveSiteLogin.mockReturnValueOnce(heldSave).mockResolvedValue({ id: "login-2", updatedAt: 1 });
+        mount();
+
+        await user.type(screen.getByLabelText("Site"), SITE);
+        await user.type(screen.getByLabelText("Username or email"), "ada@example.com");
+        await user.type(passwordField(), PASSWORD);
+        await user.click(screen.getByRole("button", { name: "Save login" }));
+        await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
+
+        // Another origin to the server: a login of its own, not the one being saved.
+        await user.type(screen.getByLabelText("Site"), ".org");
+        finishSave(SAVED);
+
+        await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Login saved"));
+        expect(screen.getByRole("heading", { name: "New login" })).toBeTruthy();
+        expect(valueOf("Site")).toBe(`${SITE}.org`);
+        // The password just saved for the first site is not carried over to this one.
+        expect(passwordField().value).toBe("");
+
+        await user.type(passwordField(), "other");
+        await user.click(screen.getByRole("button", { name: "Save login" }));
+        await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledTimes(2));
+        expect(harness.saveSiteLogin.mock.calls[1]?.[0]).toMatchObject({ loginId: undefined, password: "other", site: `${SITE}.org` });
+    });
+
     it("keeps a password typed while a save was in flight, and only that one", async () => {
         const user = userEvent.setup();
         let finishSave: (value: typeof SAVED) => void = () => {};

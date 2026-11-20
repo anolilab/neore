@@ -97,6 +97,11 @@ const sameSite = (a: string, b: string): boolean => {
  * stay; when the save created the login, they become an edit of it, so saving them again does not create a second one.
  * Either way they now edit the version just saved. The password just saved never stays: kept, it would be sent again
  * with the later edit. One typed since the submit stays.
+ *
+ * An edit is still the submitted one while it edits the same login. A new login has no id yet, so it is the submitted
+ * one while its site names the same origin, as the server keys a login by it: a draft moved to another site, or one
+ * that does not parse yet, stays a new login, without the password just saved for the other site. An edit of another
+ * login opened meanwhile starts with no password, so one in it was typed there and stays.
  */
 const afterSave =
     (submitted: LoginDraft, saved: { id: Id<"savedSiteLogins">; updatedAt: number }) =>
@@ -105,14 +110,14 @@ const afterSave =
             return emptyDraft();
         }
 
-        const becameEdit = current.id === undefined && submitted.id === undefined && sameSite(current.site, submitted.site);
+        const sameDraft = submitted.id === undefined ? current.id === undefined && sameSite(current.site, submitted.site) : current.id === submitted.id;
+        const password = current.password === submitted.password ? "" : current.password;
 
-        if (!becameEdit && current.id !== submitted.id) {
-            return current;
+        if (!sameDraft) {
+            return current.id !== undefined || password === current.password ? current : { ...current, password };
         }
 
         const opened = { label: submitted.label.trim(), teammateIds: submitted.teammateIds, updatedAt: saved.updatedAt, username: submitted.username.trim() };
-        const password = current.password === submitted.password ? "" : current.password;
 
         return { ...current, id: saved.id, opened, password };
     };
