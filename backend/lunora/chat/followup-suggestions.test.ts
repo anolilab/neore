@@ -75,6 +75,17 @@ describe("the setting", () => {
 });
 
 describe("threads that never get a suggestion", () => {
+    it("a branched thread gets no model call: its raw rows share an order, so the reply shown cannot be keyed", async () => {
+        const branched = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("threads", { activeLeafMessageId: "leaf-1", createdAt: 1, status: "active", title: "B", updatedAt: 1, userId: OWNER }),
+        );
+
+        await runJob(branched);
+
+        expect(getAgent).not.toHaveBeenCalled();
+    });
+
     it("a locked thread gets no model call", async () => {
         const locked = await harness.run(
             async (ctx: any) => await ctx.db.insert("threads", { createdAt: 1, lockedAt: 1000, status: "active", title: "L", updatedAt: 1, userId: OWNER }),
