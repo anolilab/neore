@@ -78,6 +78,7 @@ import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
 import { breaksBefore, inOpenFence, isLongPaste, onOwnLines, planPaste, planText } from "./composer-paste/paste-plan";
 import { takesPaste } from "./composer-paste/paste-target";
+import { useComposerPrefill } from "./composer-prefill";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { composerSubmitIntent } from "./composer-submit-intent";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
@@ -1620,6 +1621,18 @@ const ComposerInput = ({
             }),
         [getComposerText, promptHistory, restoreFile, setText],
     );
+
+    // Text another part of the thread's page put here (a pull request's Catch up): added after what is typed, never sent.
+    const applyPrefill = useCallback(
+        (prefilled: string) => {
+            promptHistory.reset();
+            setText(textAfterRestore(getComposerText(), { append: true, files: [], text: prefilled }));
+            inputAreaRef.current?.focus();
+        },
+        [getComposerText, promptHistory, setText],
+    );
+
+    useComposerPrefill(isThreadComposer ? threadId : undefined, applyPrefill);
 
     // Handle "Upload new file" from @ popup — open file dialog
     const handleSelectFileUpload = useCallback(() => {
