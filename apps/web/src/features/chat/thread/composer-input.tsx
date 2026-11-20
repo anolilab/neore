@@ -27,6 +27,7 @@ import { AlertTriangleIcon, EditIcon, InfoIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent, FC } from "react";
 import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { isCompactCommand } from "@/features/chat/compaction/compaction-logic";
 import useCompactThread from "@/features/chat/compaction/use-compact-thread";
@@ -1149,6 +1150,9 @@ const ComposerInput = ({
     // Optimistic state (user message + Thinking...) is shown immediately inside
     // sendMessage before the first await. The network request runs in the background.
     // Content safety (banned words) is validated server-side in the /chat/stream endpoint.
+    const { data: sessionData } = useAuthSession();
+    const accountId = sessionData?.user?.id;
+
     const handleSubmit = useCallback(() => {
         // Read the draft from the store, not the render: a key pressed right after typing runs the handler of
         // the previous render, which still sees the old (possibly empty) draft.
@@ -1183,7 +1187,11 @@ const ComposerInput = ({
             // Not sent yet: it waits for these uploads and goes out once they finish, if the draft stays as it is (see the
             // effect after the auto-submit).
             setUploadWait(
-                startUploadWait({ attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, text: draftText }, threadId),
+                startUploadWait(
+                    { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, text: draftText },
+                    threadId,
+                    accountId,
+                ),
             );
 
             return;
@@ -1311,6 +1319,7 @@ const ComposerInput = ({
         clearThreadContext,
         setText,
         notifyFailedUpload,
+        accountId,
     ]);
 
     // "Send as a new chat" from outside the chat UI (the native shell's Quick
@@ -1375,7 +1384,14 @@ const ComposerInput = ({
             return;
         }
 
-        const outcome = settleUploadWait(uploadWait, { attachments, references: attachedReferences, text }, threadId);
+        // Settle against the store, as `handleSubmit` reads it, so the draft judged here is the one that goes out.
+        const live = useChatUIStore.getState();
+        const outcome = settleUploadWait(
+            uploadWait,
+            { attachments: live.composerAttachments, references: live.attachedReferences, text: live.composerText },
+            threadId,
+            accountId,
+        );
 
         if (outcome.kind === "waiting") {
             return;
@@ -1400,11 +1416,11 @@ const ComposerInput = ({
                 // A locked composer, a send already in flight, or a reply streaming with no queue to wait in: the message
                 // cannot go now. Say so, and keep the draft.
                 const intent = composerSubmitIntent({
-                    hasAttachments: attachments.length > 0,
+                    hasAttachments: live.composerAttachments.length > 0,
                     isComparisonValid,
                     isStreaming: isStreaming || isSendStarting(threadId),
                     isThreadComposer,
-                    text,
+                    text: live.composerText,
                     threadId,
                 });
 
@@ -1423,6 +1439,7 @@ const ComposerInput = ({
             }
         }
     }, [
+        accountId,
         attachedReferences,
         attachments,
         disabled,

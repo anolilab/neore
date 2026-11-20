@@ -14,8 +14,9 @@ export interface Draft {
     text: string;
 }
 
-/** An attachment as the send pressed on it: its id, and the uploaded file it had then, if it had finished. */
+/** An attachment as the send pressed on it: its id, the uploaded file it had then, and whether it had finished. */
 interface PressedAttachment {
+    complete: boolean;
     fileId: string | undefined;
     id: string;
 }
@@ -25,6 +26,7 @@ interface PressedAttachment {
  * the rest of the fields are what the draft must still be, and `attachmentIds` are the uploads it waits for.
  */
 export interface UploadWait {
+    accountId: string | undefined;
     attachmentIds: ReadonlyArray<string>;
     pressedAttachments: ReadonlyArray<PressedAttachment>;
     referenceIds: ReadonlyArray<string>;
@@ -35,12 +37,13 @@ export interface UploadWait {
 export type UploadWaitOutcome = { kind: "cancelled" } | { kind: "edited" } | { kind: "failed"; name: string } | { kind: "send" } | { kind: "waiting" };
 
 const pressedAttachment = (attachment: WaitedAttachment): PressedAttachment => {
-    return { fileId: attachment.fileId, id: attachment.id };
+    return { complete: attachment.status === "complete", fileId: attachment.fileId, id: attachment.id };
 };
 
-/** The wait a send pressed on `draft` starts with. */
-export const startUploadWait = (draft: Draft, threadId: string | undefined): UploadWait => {
+/** The wait a send pressed on `draft` starts with, for the chat and account the send was pressed in. */
+export const startUploadWait = (draft: Draft, threadId: string | undefined, accountId?: string): UploadWait => {
     return {
+        accountId,
         attachmentIds: draft.attachments.filter((attachment) => attachment.status !== "complete").map((attachment) => attachment.id),
         pressedAttachments: draft.attachments.map((attachment) => pressedAttachment(attachment)),
         referenceIds: draft.references.map((reference) => reference.id),
@@ -51,14 +54,18 @@ export const startUploadWait = (draft: Draft, threadId: string | undefined): Upl
 
 /**
  * The same attachments as pressed. An attachment that was still uploading has no file yet, so its file is not compared;
- * one that had finished must still hold the same file, so an edit that replaces it ends the wait.
+ * one that had finished must still hold the same file and stay finished, so an edit that replaces it ends the wait.
  */
 const sameAttachments = (attachments: ReadonlyArray<WaitedAttachment>, pressed: ReadonlyArray<PressedAttachment>): boolean =>
     attachments.length === pressed.length &&
     attachments.every((attachment, index) => {
         const before = pressed[index];
 
-        return attachment.id === before?.id && (before.fileId === undefined || attachment.fileId === before.fileId);
+        return (
+            attachment.id === before?.id &&
+            (before.fileId === undefined || attachment.fileId === before.fileId) &&
+            (!before.complete || attachment.status === "complete")
+        );
     });
 
 const sameReferences = (references: ReadonlyArray<WaitedReference>, ids: ReadonlyArray<string>): boolean =>
@@ -67,11 +74,11 @@ const sameReferences = (references: ReadonlyArray<WaitedReference>, ids: Readonl
 /**
  * What a waiting send does now that the draft or its uploads changed. It goes out only once every waited upload has
  * completed, and only as the draft that was pressed on. Any edit to the text, the attachments or the reference images
- * ends the wait: the user sends the new draft by pressing send again. A failed upload stops it. A chat change cancels
- * it quietly.
+ * ends the wait: the user sends the new draft by pressing send again. A failed upload stops it. A chat or account change
+ * cancels it quietly, so the draft of the account that pressed send is never sent by another.
  */
-export const settleUploadWait = (wait: UploadWait, draft: Draft, threadId: string | undefined): UploadWaitOutcome => {
-    if (wait.threadId !== threadId) {
+export const settleUploadWait = (wait: UploadWait, draft: Draft, threadId: string | undefined, accountId?: string): UploadWaitOutcome => {
+    if (wait.threadId !== threadId || wait.accountId !== accountId) {
         return { kind: "cancelled" };
     }
 

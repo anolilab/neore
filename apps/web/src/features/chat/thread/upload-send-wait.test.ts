@@ -27,10 +27,11 @@ describe("startUploadWait", () => {
         const draft = { attachments: [file("a", "complete", "f1"), file("b", "uploading")], references: [reference("r1")], text: "see files" };
 
         expect(startUploadWait(draft, "thread-1")).toStrictEqual({
+            accountId: undefined,
             attachmentIds: ["b"],
             pressedAttachments: [
-                { fileId: "f1", id: "a" },
-                { fileId: undefined, id: "b" },
+                { complete: true, fileId: "f1", id: "a" },
+                { complete: false, fileId: undefined, id: "b" },
             ],
             referenceIds: ["r1"],
             text: "see files",
@@ -82,6 +83,22 @@ describe("settleUploadWait", () => {
         );
 
         expect(replaced).toStrictEqual({ kind: "edited" });
+    });
+
+    it("ends as edited when a finished file starts uploading again under the same file id", () => {
+        const done = startUploadWait({ attachments: [file("a", "complete", "f1"), file("b", "uploading")], references: [], text: "see files" }, "thread-1");
+
+        expect(
+            settleUploadWait(done, { attachments: [file("a", "uploading", "f1"), file("b", "uploading")], references: [], text: "see files" }, "thread-1"),
+        ).toStrictEqual({ kind: "edited" });
+    });
+
+    it("cancels quietly when the account changed, even in the same chat", () => {
+        const wait = startUploadWait({ attachments: files(["a", "uploading"]), references: [], text: "see files" }, "thread-1", "user-1");
+        const done = { attachments: files(["a", "complete"]), references: [], text: "see files" };
+
+        expect(settleUploadWait(wait, done, "thread-1", "user-2")).toStrictEqual({ kind: "cancelled" });
+        expect(settleUploadWait(wait, done, "thread-1", "user-1")).toStrictEqual({ kind: "send" });
     });
 
     it("cancels quietly when the chat changed while the send waited", () => {
