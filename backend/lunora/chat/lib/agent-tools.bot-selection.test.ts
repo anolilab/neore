@@ -31,6 +31,8 @@ const DOCS = mcpServerKey(DOCS_URL) ?? "";
 const connected = vi.hoisted(() => [] as string[][]);
 /** Of the user's connectors (gmail, slack), the ones each run set up: `null` when it set up every one. */
 const connectorsSetUp = vi.hoisted(() => [] as (string[] | null)[]);
+/** Per run, the names of the saved servers `withMcpServerGrants` may obtain a token for. */
+const signInsUsed = vi.hoisted(() => [] as string[][]);
 
 vi.mock("./mcp-tools", () => {
     return {
@@ -66,7 +68,16 @@ vi.mock("../../connectors/lib/grant-runtime", () => {
 
             return [];
         },
-        withMcpServerGrants: async (_ctx: unknown, _userId: string, servers: unknown[]) => servers,
+        withMcpServerGrants: async (
+            _ctx: unknown,
+            _userId: string,
+            servers: { name: string }[],
+            options: { keep?: (server: { name: string }) => boolean } = {},
+        ) => {
+            signInsUsed.push(servers.filter((server) => options.keep?.(server) !== false).map((server) => server.name));
+
+            return servers;
+        },
     };
 });
 
@@ -147,6 +158,7 @@ const unattendedForBot = async (): Promise<string[]> => {
 beforeEach(() => {
     connected.length = 0;
     connectorsSetUp.length = 0;
+    signInsUsed.length = 0;
     extraServers = [];
     botOwner = "owner";
     ownerServerKeys = [];
@@ -220,6 +232,18 @@ describe("buildAgentTools with a bot's tool selection", () => {
         await chatInBotThread();
 
         expect(connected).toStrictEqual([[], ["mail"]]);
+    });
+
+    it("obtains no sign-in token for a saved server the selection could keep nothing of", async () => {
+        await chatInBotThread();
+
+        selection = { exclude: [`${DOCS}:*`] };
+        await chatInBotThread();
+
+        selection = { allow: ["webSearch"], exclude: [] };
+        await chatInBotThread();
+
+        expect(signInsUsed).toStrictEqual([["Docs (renamed)", "mail"], ["mail"], []]);
     });
 
     it("connects to no user server once an excluded address went stale, nor to a server whose every allowed tool is excluded", async () => {

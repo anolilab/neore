@@ -149,6 +149,33 @@ export const SaveRefused: Story = {
     },
 };
 
+/** A save the input validator rejects: nothing was stored, so it reads as refused with the validator's reason, not as unknown. */
+export const SaveRejectedByValidator: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...botFixtures(),
+                    lunoraError(api.bots.functions.updateBot, "VALIDATION_ERROR", "patch.toolSelection.exclude must be an array", 400),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await lunoraAnswered(api.bots.functions.listBots);
+        const dialog = await openTools(canvas);
+
+        await waitFor(async () => await expect(within(dialog).getByRole("button", { name: "Remove docs:*" })).toBeVisible());
+        await userEvent.click(within(dialog).getByRole("radio", { name: "All tools" }));
+        await userEvent.click(within(dialog).getByRole("button", { name: "Save tools" }));
+
+        // The reason is this story's own; toasts from the stories before it can still be on screen.
+        await waitFor(async () => await expect(await screen.findByText("patch.toolSelection.exclude must be an array")).toBeVisible());
+        await expect(screen.getAllByText("Could not save the bot's tools. Its tools are unchanged.").some((title) => title.checkVisibility())).toBe(true);
+        await expect(screen.getByRole("dialog")).toBeVisible();
+    },
+};
+
 /** The patches the save below sent. */
 const savedPatches: unknown[] = [];
 

@@ -48,8 +48,21 @@ const emptyDraft = (): BotDraft => {
     };
 };
 
-/** Codes with which the server refused a save outright: nothing was stored, unlike a lost or failed answer. */
-const REFUSED_SAVE_CODES = new Set(["BAD_REQUEST", "FORBIDDEN", "INVALID_ARGUMENT", "NOT_FOUND", "TOO_MANY_REQUESTS"]);
+/**
+ * Codes with which the server refused a save outright: nothing was stored, unlike a lost or failed answer. Ours and the ones
+ * Lunora answers before a handler writes (an input its validator rejects, a body too large, no session).
+ */
+const REFUSED_SAVE_CODES = new Set([
+    "BAD_REQUEST",
+    "FORBIDDEN",
+    "INVALID_ARGUMENT",
+    "NOT_FOUND",
+    "PAYLOAD_TOO_LARGE",
+    "TOO_MANY_REQUESTS",
+    "UNAUTHORIZED",
+    "UNPROCESSABLE",
+    "VALIDATION_ERROR",
+]);
 
 /** How a tools save ended: stored, refused (with the server's reason), refused as made from an older pick, or not known. */
 type ToolsSaveOutcome = { kind: "conflict" } | { kind: "refused"; reason: string } | { kind: "saved"; stored: BotToolSelection | null } | { kind: "unknown" };

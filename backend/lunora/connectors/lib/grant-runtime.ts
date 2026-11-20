@@ -275,12 +275,15 @@ interface McpServerGrant {
  * With `pruneOrphans` — pass it ONLY with the user's complete server list — a
  * grant whose server is gone (removed, or its URL changed) is revoked and
  * deleted, so removing a server in settings ends the third-party access too.
+ *
+ * With `keep`, a server it does not keep is returned as saved: no token is obtained or refreshed for it, and a failed refresh
+ * is not recorded against its grant. Orphans are still judged by the whole list.
  */
 export const withMcpServerGrants = async (
     ctx: Pick<ActionCtx, "runMutation" | "runQuery">,
     userId: string,
     servers: MCPServerConfig[],
-    options: { fetchImpl?: OAuthFetch; pruneOrphans?: boolean } = {},
+    options: { fetchImpl?: OAuthFetch; keep?: (server: MCPServerConfig) => boolean; pruneOrphans?: boolean } = {},
 ): Promise<MCPServerConfig[]> => {
     const fetchImpl = options.fetchImpl ?? defaultOAuthFetch;
     const grants = (await ctx.runQuery(internal.connectors.store.listMcpServerGrants, { userId })) as McpServerGrant[];
@@ -308,7 +311,7 @@ export const withMcpServerGrants = async (
         servers.map(async (server) => {
             const grant = byName.get(server.name);
 
-            if (!grant || grant.serverUrl !== server.url || grant.status === "disconnected") {
+            if (!grant || grant.serverUrl !== server.url || grant.status === "disconnected" || options.keep?.(server) === false) {
                 return server;
             }
 

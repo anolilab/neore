@@ -310,13 +310,23 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         admittedRun,
     );
 
-    // Bearer tokens for servers the user signed in to. The FULL list, so a grant
-    // whose server was removed is recognised as orphaned and revoked.
-    const servers = await withMcpServerGrants(ctx, userId, allMcpServers as MCPServerConfig[], { pruneOrphans: true }).catch((error: unknown) => {
-        toolsLogger.warn("[TOOLS] MCP server sign-ins unavailable:", error);
+    const savedUrls = (allMcpServers as MCPServerConfig[]).map((server) => server.url);
+    // `savedUrls` are the RUNNING user's; in a collaborator's run the owner's saved keys tell what an exclusion still names.
+    const selectionOwner = { runs: runToolSelection?.ownerId === userId, serverKeys: runToolSelection?.ownerServerKeys ?? [] };
+    // A server none of whose tools the bot could keep is not connected to: nothing is listed only to be dropped below. Judged by
+    // the key its tools are matched by below, so a server that keeps none of them (`""`) is not connected to either.
+    const botMayKeep = (server: MCPServerConfig): boolean =>
+        !botToolSelection || selectionMayKeepServer(botToolSelection, selectionServerKey(botToolSelection, server, savedUrls, selectionOwner));
 
-        return allMcpServers as MCPServerConfig[];
-    });
+    // Bearer tokens for servers the user signed in to. The FULL list, so a grant whose server was removed is recognised as
+    // orphaned and revoked; a server the bot keeps nothing of gets no token, so its grant is never refreshed or marked.
+    const servers = await withMcpServerGrants(ctx, userId, allMcpServers as MCPServerConfig[], { keep: botMayKeep, pruneOrphans: true }).catch(
+        (error: unknown) => {
+            toolsLogger.warn("[TOOLS] MCP server sign-ins unavailable:", error);
+
+            return allMcpServers as MCPServerConfig[];
+        },
+    );
     let selectedServers = servers.filter((s) => s.enabled);
 
     if (snapshot) {
@@ -329,18 +339,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     // resumed run derives the same runtime names). The composer's server pick
     // does not narrow them — their per-tool permissions do — but a snapshot does.
     selectedServers = [...selectedServers, ...(snapshot ? connectorServers.filter((s) => snapshot.mcpServerNames.includes(s.name)) : connectorServers)];
-
-    const savedUrls = (allMcpServers as MCPServerConfig[]).map((server) => server.url);
-    // `savedUrls` are the RUNNING user's; in a collaborator's run the owner's saved keys tell what an exclusion still names.
-    const selectionOwner = { runs: runToolSelection?.ownerId === userId, serverKeys: runToolSelection?.ownerServerKeys ?? [] };
-
-    // A server none of whose tools the bot could keep is not connected to: nothing is listed only to be dropped below. Judged by
-    // the key its tools are matched by below, so a server that keeps none of them (`""`) is not connected to either.
-    if (botToolSelection) {
-        selectedServers = selectedServers.filter((server) =>
-            selectionMayKeepServer(botToolSelection, selectionServerKey(botToolSelection, server, savedUrls, selectionOwner)),
-        );
-    }
+    selectedServers = selectedServers.filter((server) => botMayKeep(server));
 
     const noDevices: DeviceToolsResult = { descriptors: new Map(), tools: {} };
     const [mcpResult, deviceResult] = await Promise.all([
