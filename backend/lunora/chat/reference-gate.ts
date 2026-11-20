@@ -6,6 +6,7 @@
  * row's chat is one the caller may read here. The caller's files, documents and passcode rows live on the caller's shard, so
  * only that shard sees a lock of the caller's chat: the check cannot run on the thread's shard alone.
  */
+import { REFERENCE_MEDIA_CAPS } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
@@ -85,6 +86,11 @@ export const gateReferencesOnCallerShard = internalQuery
     })
     .output(v.object({ refused: v.boolean() }))
     .query(async ({ args, ctx }) => {
+        // Refused before any read: the list is caller-controlled and the reads below run once per entry.
+        if (args.referenceIds.length > REFERENCE_MEDIA_CAPS.images || args.referenceImages.length > REFERENCE_MEDIA_CAPS.images) {
+            return { refused: true };
+        }
+
         for (const [index, referenceId] of args.referenceIds.entries()) {
             const referenceUrl = args.referenceImages[index] ?? "";
 

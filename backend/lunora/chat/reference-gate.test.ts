@@ -2,6 +2,7 @@
  * The reference images of `/chat/media` are checked on the caller's shard (`chat/reference-gate.ts`): a reference is the caller's
  * own row, under that row's own URL, in a chat the caller may read with the proof the request carries for that chat.
  */
+import { REFERENCE_MEDIA_CAPS } from "@neore/ai/models";
 import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -144,6 +145,14 @@ describe("a media request's references are checked on the caller's shard", () =>
                 ownerOpenId,
             ),
         ).resolves.toBe(true);
+    });
+
+    it("refuses a list longer than the media cap, before any row is read", async () => {
+        const repeated = Array.from({ length: REFERENCE_MEDIA_CAPS.images + 1 }, () => {
+            return { id: `file:${openFileId}`, url: OPEN_URL };
+        });
+
+        await expect(refusedFor(OWNER, repeated, ownerOpenId)).resolves.toBe(true);
     });
 
     it("refuses a malformed id", async () => {
