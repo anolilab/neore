@@ -28,6 +28,23 @@ const LINK_TYPES: ReadonlySet<string> = new Set(["definition", "html", "image", 
 /** Nodes whose content Markdown shows as typed. */
 const CODE_TYPES: ReadonlySet<string> = new Set(["code", "inlineCode"]);
 
+/** Blocks whose marker sits at the start of a line: a wrap that starts there would move the marker into the text. */
+const MARKED_BLOCK_TYPES: ReadonlySet<string> = new Set(["blockquote", "heading", "listItem"]);
+
+/** A blockquote marker `>` and the space after it. */
+const QUOTE_MARKER = /^[ \t]{0,3}>[ \t]?/;
+
+/** A list bullet or number, or heading `#`s, and the spaces after them. */
+const LIST_OR_HEADING_MARKER = /^[ \t]{0,3}(?:[-+*]|\d{1,9}[.)]|#{1,6})(?=[ \t]|$)[ \t]*/;
+
+/** The length of the block markers at the start of `line`, nested ones included (`> - item`). */
+const markerLength = (line: string, offset = 0): number => {
+    const rest = line.slice(offset);
+    const match = QUOTE_MARKER.exec(rest) ?? LIST_OR_HEADING_MARKER.exec(rest);
+
+    return match === null ? offset : markerLength(line, offset + match[0].length);
+};
+
 const runLength = (text: string, start: number): number => {
     let end = start;
 
@@ -149,8 +166,12 @@ const labelOf = (node: MarkdownNode, range: [number, number], text: string): [nu
     return start === undefined || end === undefined ? undefined : [start, end];
 };
 
-const collect = (node: MarkdownNode, text: string, constructs: Construct[]): void => {
+const collect = (node: MarkdownNode, text: string, constructs: Construct[], blocks: [number, number][]): void => {
     const range = rangeOf(node);
+
+    if (range !== undefined && MARKED_BLOCK_TYPES.has(node.type)) {
+        blocks.push(range);
+    }
 
     if (range !== undefined && (LINK_TYPES.has(node.type) || CODE_TYPES.has(node.type))) {
         constructs.push({ code: CODE_TYPES.has(node.type), holdable: node.type !== "definition", inner: labelOf(node, range, text), range });
@@ -159,7 +180,7 @@ const collect = (node: MarkdownNode, text: string, constructs: Construct[]): voi
     const children = node.children ?? [];
 
     for (const child of children) {
-        collect(child, text, constructs);
+        collect(child, text, constructs, blocks);
     }
 };
 
@@ -218,7 +239,7 @@ const breaks = (construct: Construct, from: number, to: number): boolean => {
 
 /**
  * The Markdown around a selection `from`..`to` in the textblock `parent` (parent offsets). The draft is parsed with
- * remark, so links, images, references, definitions, autolinks, inline HTML and code are found with CommonMark's own
+ * remark, so links, images, references, definitions, autolinks, inline HTML, code and block markers are found with CommonMark's own
  * rules. Returns `null` for a draft longer than `MAX_WRAP_DRAFT`. `blocked` is whether a wrap would break one of them; `paragraph` is the
  * textblock's text with a line break for each inline node that is not text, for the flanking checks. `takenFences` are
  * the lengths of unmatched backtick runs before the selection: a code fence of such a length would pair with that run.
@@ -238,11 +259,18 @@ export const markupAround = (
     const constructs: Construct[] = [];
     const { unmatched } = scanBackticks(text);
 
-    collect(parser.parse(text) as MarkdownNode, text, constructs);
+    const blocks: [number, number][] = [];
+
+    collect(parser.parse(text) as MarkdownNode, text, constructs, blocks);
+
+    const paragraph = text.slice(start, start + parent.content.size);
+    const lineEnd = start + parent.content.size;
+    // A blockquote, list item or heading on this line keeps its marker only while the wrap starts after it.
+    const markers = blocks.some(([blockStart, blockEnd]) => blockStart <= lineEnd && blockEnd >= start) ? markerLength(paragraph) : 0;
 
     return {
-        blocked: constructs.some((construct) => breaks(construct, start + from, start + to)),
-        paragraph: text.slice(start, start + parent.content.size),
+        blocked: from < markers || constructs.some((construct) => breaks(construct, start + from, start + to)),
+        paragraph,
         takenFences: new Set(unmatched.filter((run) => run.start < start + from).map((run) => run.length)),
     };
 };

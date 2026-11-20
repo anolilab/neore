@@ -649,6 +649,33 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor)).toBe(String.raw`a\***foo** b`);
     });
 
+    it("leaves a blockquote line alone when the selection holds its > marker", () => {
+        const editor = editorWith("<p>&gt; foo</p>");
+
+        select(editor, 1, 6);
+
+        expect(wrapSelectionOnTextInput(editor.view, 1, 6, "*")).toBe(true);
+        expect(text(editor)).toBe("> foo");
+    });
+
+    it("leaves a list item alone when the selection holds its bullet", () => {
+        const editor = editorWith("<p>- item</p>");
+
+        select(editor, 1, 7);
+
+        expect(wrapSelectionOnTextInput(editor.view, 1, 7, "*")).toBe(true);
+        expect(text(editor)).toBe("- item");
+    });
+
+    it("wraps the text after a blockquote marker", () => {
+        const editor = editorWith("<p>&gt; foo</p>");
+
+        select(editor, 3, 6);
+        wrapSelectionOnTextInput(editor.view, 3, 6, "*");
+
+        expect(text(editor)).toBe("> **foo**");
+    });
+
     it("wraps literal ](url) text that has no link label before it", () => {
         const editor = editorWith("<p>literal ](url) text</p>");
 
