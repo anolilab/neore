@@ -445,11 +445,20 @@ export const ServersLoadFails: Story = {
         await expect(within(dialog).getByRole("button", { name: `Remove ${DOCS}:delete` })).toBeVisible();
         await expect(within(dialog).queryByText(/Removed server/u)).toBeNull();
 
+        // A server's name cannot be resolved meanwhile; once the retry read the servers, the reason goes and the name can be added.
+        const excluded = within(dialog).getByRole("combobox", { name: "Excluded tools" });
+
+        await userEvent.type(excluded, "docs:search{Enter}");
+        await expect(within(dialog).getByText(/could not be loaded. Retry above to add one by name/u)).toBeVisible();
+
         preferencesRead.fails = false;
         await userEvent.click(within(dialog).getByRole("button", { name: "Retry" }));
 
         await waitFor(async () => await expect(within(dialog).getByRole("button", { name: "Remove docs:delete" })).toBeVisible());
         await expect(within(dialog).queryByText("Your servers, connectors and computers could not be loaded.")).toBeNull();
+        await expect(within(dialog).queryByText(/No server, connector or computer matches/u)).toBeNull();
+        await userEvent.type(excluded, "{Enter}");
+        await expect(within(dialog).getByRole("button", { name: "Remove docs:search" })).toBeVisible();
     },
 };
 

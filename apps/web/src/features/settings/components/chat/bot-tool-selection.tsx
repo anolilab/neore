@@ -131,6 +131,17 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
     const [unknownBuiltIn, setUnknownBuiltIn] = useState<string | null>(null);
     const [overCap, setOverCap] = useState(false);
     const full = values.length >= BOT_TOOL_SELECTOR_MAX_COUNT;
+    // A name refused while the lists were not read was refused for that reason only: once they load (or fail), the reason is
+    // dropped and the text waits in the field, still pending, to be added again.
+    const readiness = `${catalog.serversState}:${catalog.builtInNames === undefined ? String(catalog.builtInNamesFailed === true) : "ready"}`;
+    const [readinessSeen, setReadinessSeen] = useState(readiness);
+
+    if (readinessSeen !== readiness) {
+        setReadinessSeen(readiness);
+        setUnknownServer(null);
+        setUnknownBuiltIn(null);
+    }
+
     const staleId = useId();
     // A stored built-in that is no longer one: the server refuses the save until it is removed.
     const stale =
@@ -289,7 +300,7 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
                 {unknownBuiltIn !== null && unknownBuiltInMessage()}
                 {overCap && t`This list is full: remove a tool before adding another.`}
             </p>
-            <p aria-live="polite" className="text-destructive text-xs empty:hidden" id={staleId}>
+            <p aria-live="polite" className="text-destructive text-xs" id={staleId}>
                 {stale && t`A listed built-in tool no longer exists. Remove it before saving.`}
             </p>
             {removedServerWarning !== undefined &&
