@@ -3,8 +3,8 @@
  * together. Vitest's own `--shard` gives each shard an equal count of files, and the backend's files take from
  * 20 milliseconds to almost 20 seconds.
  *
- * Each project with a `test:coverage` target spreads `timeSharding(import.meta.url)` into its `test` config. It does nothing
- * until one of two variables is set:
+ * Each project with a `test:coverage` target and more test files than shards spreads `timeSharding(import.meta.url)`
+ * into its `test` config; Vitest refuses more shards than files. It does nothing until one of two variables is set:
  *
  * - `VITEST_SHARD=2/3` runs that shard. Files are dealt out longest first, each to the shard with the least
  *   time so far.

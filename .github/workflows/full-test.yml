@@ -82,7 +82,8 @@ jobs:
               shell: "bash"
               env:
                   VITEST_RECORD_TIMINGS: "1"
-              run: "pnpm exec vis run test:coverage"
+              # Past the task cache: a cached pass would record nothing, and the save below would store old timings anew.
+              run: 'pnpm exec vis run test:coverage --skip-cache ":test:coverage"'
 
             # Saved from main, whose caches every pull request can restore. A run whose tests failed saves nothing.
             - name: "Save the test timings"
