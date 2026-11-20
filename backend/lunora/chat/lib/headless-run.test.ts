@@ -125,6 +125,7 @@ vi.mock("./agent-tools", async () => {
                 mcpServerNames: ["notes"],
                 // A tool the allowlist drops keeps no fingerprint in the snapshot.
                 mcpToolFingerprints: { mcp_notes_other: "fp-other", mcp_notes_search: "fp-search" },
+                mcpToolOrigins: { mcp_notes_other: "origin-other", mcp_notes_search: "origin-search" },
                 permissionKeys: { browser: "builtin:browser", mcp_notes_search: "mcp:notes:search", webSearch: "builtin:webSearch" },
                 // The notes search is set to `ask`, a tool kept for a run that may pause.
                 requiresApproval: ["mcp_notes_search"],
@@ -613,6 +614,27 @@ describe("runHeadlessAgent tool allowlist", () => {
         expect(seen.buildOptions[0]).toMatchObject({ headless: true, unattendedMode: "supervised" });
     });
 
+    it("narrows its tools by the selection of the bot it names, or of the thread it continues or the lead it runs under", async () => {
+        await run({});
+        await runHeadlessAgent(fakeCtx() as never, {
+            botId: "bot-1",
+            memory: false,
+            model: "test-model",
+            modeThreadId: "lead-1",
+            organizationId: null,
+            origin: "lead",
+            personalization: "none",
+            thread: { title: "Chat" },
+            tools: "headless",
+            userId: "owner",
+        });
+
+        expect(seen.buildOptions.map((options) => (options as { botLookup?: unknown }).botLookup)).toStrictEqual([
+            { botId: undefined, threadId: "thread-1" },
+            { botId: "bot-1", threadId: "lead-1" },
+        ]);
+    });
+
     it("builds a new thread's tools under the mode of the bot its lead thread leads to, and stamps nothing", async () => {
         const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
 
@@ -913,6 +935,7 @@ describe("runHeadlessAgent pauseForApproval", () => {
         expect(recorded!.config).toMatchObject({
             mcpServerNames: ["notes"],
             mcpToolFingerprints: { mcp_notes_search: "fp-search" },
+            mcpToolOrigins: { mcp_notes_search: "origin-search" },
             subAgentRunId: RUN_ID,
             toolNames: ["mcp_notes_search", "webSearch"],
             toolPermissionKeys: { mcp_notes_search: "mcp:notes:search", webSearch: "builtin:webSearch" },
@@ -935,6 +958,18 @@ describe("runHeadlessAgent pauseForApproval", () => {
         const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
 
         expect(recorded!.config).toMatchObject({ chainSource: "task:t1", dispatchOrigin: "trigger" });
+    });
+
+    it("saves where it found its bot, so a continuation on a thread that names none is still narrowed by it", async () => {
+        seen.saved = [approvalRequest];
+
+        const ctx = fakeCtx();
+
+        await run(ctx, { botId: "bot-1", pauseForApproval: { subAgentRunId: RUN_ID } });
+
+        const [recorded] = calls(ctx, "chat_tool_permissions:recordPendingToolApprovals") as { config: Record<string, unknown> }[];
+
+        expect(recorded!.config.botLookup).toStrictEqual({ botId: "bot-1", threadId: "child-1" });
     });
 
     it("saves the run's organization, whose cap the continuation reads when the thread has none", async () => {

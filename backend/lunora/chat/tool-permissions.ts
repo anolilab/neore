@@ -33,6 +33,8 @@ import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { resolveThreadReadAccess } from "../agent/thread-read-access";
+import type { RunToolSelection } from "../bots/run-tool-selection";
+import { readRunToolSelection } from "../bots/run-tool-selection";
 import type { ThreadPermissionMode } from "./lib/thread-permission-mode";
 import { internalMutation, internalQuery } from "../_generated/server";
 import type { AuthMutationCtx } from "../lib/crpc";
@@ -334,18 +336,19 @@ export const threadModeForApp = async (
     connectorAccess: { connectorSlug: string; level: "none" | "read_only" | "read_write" }[];
     mode: ThreadPermissionMode | null;
     organizationId: string | null;
+    toolSelection: RunToolSelection | null;
 }> => {
     const access = await resolveThreadReadAccess(ctx, threadId as Id<"threads">, userId);
 
     if (access?.kind !== "full" && access?.kind !== "locked") {
-        return { allowed: false, connectorAccess: [], mode: null, organizationId: null };
+        return { allowed: false, connectorAccess: [], mode: null, organizationId: null, toolSelection: null };
     }
 
     // A thread with no owner on record is not reachable through an app call: the same refusal as a thread that is not there.
     const owner = access.thread.userId;
 
     if (owner === undefined) {
-        return { allowed: false, connectorAccess: [], mode: null, organizationId: null };
+        return { allowed: false, connectorAccess: [], mode: null, organizationId: null, toolSelection: null };
     }
 
     const connectorAccess = await threadConnectorAccess(ctx, { threadId: access.thread._id, userId: owner });
@@ -357,6 +360,8 @@ export const threadModeForApp = async (
         connectorAccess,
         mode: await modeOfThread(ctx, access.thread, userId),
         organizationId: access.thread.organizationId ?? access.thread.capOrganizationId ?? null,
+        // The selection of the bot the chat runs as, read here on the thread's shard, where its bot lives too.
+        toolSelection: await readRunToolSelection(ctx, { threadId: access.thread._id }),
     };
 };
 
@@ -374,6 +379,14 @@ export const getThreadPermissionModeForApp = internalQuery
             connectorAccess: v.array(v.object({ connectorSlug: v.string(), level: vAccessLevel })),
             mode: v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"), v.null()),
             organizationId: v.union(v.string(), v.null()),
+            toolSelection: v.union(
+                v.object({
+                    ownerId: v.string(),
+                    ownerServerKeys: v.array(v.string()),
+                    selection: v.object({ allow: v.optional(v.array(v.string())), exclude: v.array(v.string()) }),
+                }),
+                v.null(),
+            ),
         }),
     )
     .query(async ({ args: { threadId, userId }, ctx }) => await threadModeForApp(ctx, threadId, userId));
