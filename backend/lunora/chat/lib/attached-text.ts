@@ -100,6 +100,17 @@ const QUOTED_LINE_RE = /^ {0,3}>/u;
 
 const BLANK_LINE_RE = /^\s*$/u;
 
+/** Any line that opens like a quote, read loosely so a check that fails closed misses none: any leading space (a tab, a
+ * no-break space), an escaped `\>` (how a pasted `&gt;` line comes through the composer) or a full-width `＞`. */
+const LOOSE_QUOTED_LINE_RE = /^\s*\\?[>＞]/u;
+
+/**
+ * Whether the text holds a blockquote: a forward (`features/chat/forward`), the composer's quote of a reply and a rich
+ * paste of a quote all reach the user row as `>` lines with no mark, so a quote is never read as the person's own words.
+ * A plain-text paste carries no marker and is not seen here.
+ */
+export const carriesQuotedLines = (text: string): boolean => text.split("\n").some((line) => LOOSE_QUOTED_LINE_RE.test(line));
+
 /**
  * Which lines are part of a blockquote: those with the marker, and the lines that run on from them without one (a quoted
  * paragraph's lazy continuation in Markdown) until a blank line ends it.
