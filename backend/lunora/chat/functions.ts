@@ -4580,14 +4580,27 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return role === "user" || role === "assistant";
             });
 
-            // Messages are returned in descending order (newest first), so the first element is the latest
-            const lastMessageId = filteredMessageDocuments.length > 0 ? (filteredMessageDocuments[0]?._id ?? null) : null;
+            // Messages are returned in descending order (newest first), so the first element is the latest.
+            const newest = filteredMessageDocuments[0];
 
-            if (!lastMessageId) {
+            if (!newest) {
                 chatLogger.warn(`[generateFollowupSuggestionsForThread] No messages found for thread: ${threadId}`);
 
                 return;
             }
+
+            // Only the reply that is still the newest message gets suggestions. A newer user message has its own run, which schedules its own.
+            if (newest.message?.role !== "assistant") {
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] Newest message is not a reply, skipping: ${threadId}`);
+
+                return;
+            }
+
+            // The composer keys a reply by the first row of its turn (ui-messages groups a turn by `order`), so cache under that id.
+            const turnRows = (messagesResult.page || []).filter(
+                (messageDocument) => messageDocument.order === newest.order && messageDocument.message?.role !== "user",
+            );
+            const lastMessageId = turnRows.toSorted((first, second) => first.stepOrder - second.stepOrder)[0]?._id ?? newest._id;
 
             chatLogger.debug(`[generateFollowupSuggestionsForThread] Last message found`, {
                 lastMessageId,
@@ -4611,15 +4624,18 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
-            // A utility call: one unit of the daily Text quota, on whoever the background model bills (keyed per reply, so a retry is not charged again).
-            const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
-                kind: "Text",
-                requestId: `followup:${threadId}:${lastMessageId}`,
-                userId: background.billedUserId ?? userId,
-            });
+            // Only a paid fallback is metered, to the user whose plan unlocked it. The platform's default stays unmetered (see resolveBackgroundModel).
+            // Keyed per reply, so a retry is not charged again.
+            if (background.billedUserId) {
+                const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
+                    kind: "Text",
+                    requestId: `followup:${threadId}:${lastMessageId}`,
+                    userId: background.billedUserId,
+                });
 
-            if (!charged) {
-                return;
+                if (!charged) {
+                    return;
+                }
             }
 
             chatLogger.debug(`[generateFollowupSuggestionsForThread] Generating new suggestions`, {
