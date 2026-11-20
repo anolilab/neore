@@ -2307,6 +2307,9 @@ importers:
       remark-directive:
         specifier: catalog:markdown
         version: 4.0.0(supports-color@10.2.2)
+      remark-parse:
+        specifier: catalog:markdown
+        version: 11.0.0(supports-color@10.2.2)
       rooks:
         specifier: catalog:utils
         version: 9.9.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)

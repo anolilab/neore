@@ -1,8 +1,9 @@
 import { Extension } from "@tiptap/core";
-import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
 import { Plugin, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
+
+import { markupAround, scanBackticks } from "./wrap-markup";
 
 type Marker = "`" | "*" | "_";
 
@@ -24,262 +25,6 @@ const lastCharacter = (text: string): string => [...text.slice(-2)].at(-1) ?? ""
 const firstCharacter = (text: string): string => [...text.slice(0, 2)][0] ?? "";
 
 const isSpace = (character: string): boolean => character === "" || WHITESPACE.test(character);
-
-const runLength = (text: string, start: number): number => {
-    let end = start;
-
-    while (end < text.length && text[end] === "`") {
-        end += 1;
-    }
-
-    return end - start;
-};
-
-/**
- * A lookup of the next backtick run of an exact length at or after a position. The runs are found in one pass and each
- * length keeps a cursor that only moves forward, because the scan in `codeSpans` asks with rising positions: the whole
- * paragraph is read a bounded number of times, however many runs it has.
- */
-const nextRunFinder = (text: string): ((start: number, length: number) => number) => {
-    const runsByLength = new Map<number, number[]>();
-
-    for (const run of text.matchAll(/`+/g)) {
-        const starts = runsByLength.get(run[0].length) ?? [];
-
-        starts.push(run.index);
-        runsByLength.set(run[0].length, starts);
-    }
-
-    const cursors = new Map<number, number>();
-
-    return (start, length) => {
-        const starts = runsByLength.get(length) ?? [];
-        let cursor = cursors.get(length) ?? 0;
-
-        while (cursor < starts.length && (starts[cursor] ?? 0) < start) {
-            cursor += 1;
-        }
-
-        cursors.set(length, cursor);
-
-        return starts[cursor] ?? -1;
-    };
-};
-
-/** A backtick run that no later run of the same length closes, so Markdown shows it as a literal backtick. */
-interface UnmatchedRun {
-    length: number;
-    start: number;
-}
-
-/**
- * The inline code spans of `text`, as `[start, end)` indices, and the runs that open none. Markdown shows everything
- * inside a span literally. A backtick escaped by a backslash outside code does not open a span.
- */
-const scanBackticks = (text: string): { spans: [number, number][]; unmatched: UnmatchedRun[] } => {
-    const findRun = nextRunFinder(text);
-    const spans: [number, number][] = [];
-    const unmatched: UnmatchedRun[] = [];
-    let index = 0;
-
-    while (index < text.length) {
-        if (text[index] === "\\") {
-            index += 2;
-        } else if (text[index] === "`") {
-            const length = runLength(text, index);
-            const closing = findRun(index + length, length);
-
-            if (closing === -1) {
-                unmatched.push({ length, start: index });
-                index += length;
-            } else {
-                spans.push([index, closing + length]);
-                index = closing + length;
-            }
-        } else {
-            index += 1;
-        }
-    }
-
-    return { spans, unmatched };
-};
-
-/**
- * A lookup of the `)` that closes a link destination starting at a position, or -1. A backslash escapes the next
- * character, and parentheses inside the destination nest, as CommonMark allows. An angle-bracket destination `<...>`
- * ends at its `>`, so a parenthesis inside it is text.
- *
- * Every answer is computed in one pass from the end of the text, so a paragraph with many unclosed `](` costs one pass,
- * not a scan to its end for each of them. `closeFrom[index]` is what a scan from `index` returns: a `(` there is closed
- * by the scan from the next position, and the scan goes on after that closer.
- */
-const destinationFinder = (text: string): ((start: number) => number) => {
-    const closeFrom = new Int32Array(text.length + 2).fill(-1);
-    const angleFrom = new Int32Array(text.length + 2).fill(-1);
-    const at = (table: Int32Array, index: number): number => table[index] ?? -1;
-
-    for (let index = text.length - 1; index >= 0; index -= 1) {
-        switch (text[index]) {
-            case "(": {
-                const inner = at(closeFrom, index + 1);
-
-                closeFrom[index] = inner === -1 ? -1 : at(closeFrom, inner + 1);
-                angleFrom[index] = at(angleFrom, index + 1);
-
-                break;
-            }
-
-            case ")": {
-                closeFrom[index] = index;
-                angleFrom[index] = at(angleFrom, index + 1);
-
-                break;
-            }
-
-            case ">": {
-                closeFrom[index] = at(closeFrom, index + 1);
-                angleFrom[index] = index;
-
-                break;
-            }
-
-            case "\\": {
-                closeFrom[index] = at(closeFrom, index + 2);
-                angleFrom[index] = at(angleFrom, index + 2);
-
-                break;
-            }
-
-            default: {
-                closeFrom[index] = at(closeFrom, index + 1);
-                angleFrom[index] = at(angleFrom, index + 1);
-            }
-        }
-    }
-
-    return (start) => {
-        if (text[start] !== "<") {
-            return at(closeFrom, start);
-        }
-
-        const angle = at(angleFrom, start + 1);
-
-        return angle === -1 ? -1 : at(closeFrom, angle + 1);
-    };
-};
-
-/** A link in a paragraph: the whole construct as `[start, end)` indices, and for `[label](...)` its label text. */
-interface LinkRange {
-    label?: [number, number];
-    whole: [number, number];
-}
-
-/** An autolink `<scheme:...>` or `<name@host>`. */
-const AUTOLINK = /<(?:[a-z][\w+.-]{1,31}:[^\s<>]*|[^\s<>@]+@[^\s<>@]+)>/gi;
-
-/** The autolinks in `text` that are not inside a code span. */
-const autolinks = (text: string, spans: ReadonlyArray<[number, number]>): LinkRange[] =>
-    [...text.matchAll(AUTOLINK)]
-        .filter((match) => spans.every(([start, end]) => match.index < start || match.index >= end))
-        .map((match) => {
-            return { whole: [match.index, match.index + match[0].length] };
-        });
-
-/**
- * The links in `text`: each `[label](destination)` and each autolink. A `]` opens a destination only after an
- * unescaped `[`, and code spans are skipped, because link syntax there is literal text.
- */
-const linkRanges = (text: string, spans: ReadonlyArray<[number, number]>): LinkRange[] => {
-    const codeEnds = new Map(spans);
-    const destinationEnd = destinationFinder(text);
-    const links: LinkRange[] = [];
-    const labels: number[] = [];
-    let index = 0;
-
-    while (index < text.length) {
-        const current = text[index];
-        let next = codeEnds.get(index) ?? index + 1;
-
-        if (codeEnds.has(index)) {
-            // The code span is skipped whole.
-        } else if (current === "\\") {
-            next = index + 2;
-        } else if (current === "[") {
-            labels.push(index);
-        } else if (current === "]" && labels.length > 0) {
-            const labelStart = labels.pop() ?? 0;
-            const end = text[index + 1] === "(" ? destinationEnd(index + 2) : -1;
-
-            if (end !== -1) {
-                links.push({ label: [labelStart + 1, index], whole: [labelStart, end + 1] });
-                next = end + 1;
-            }
-        }
-
-        index = next;
-    }
-
-    return [...links, ...autolinks(text, spans)];
-};
-
-/**
- * Whether a wrap of `from`..`to` would break a link: it overlaps the link without holding all of it, and is not inside
- * the link's label text. Delimiters inside a destination change the URL, and a wrap across the brackets or an autolink's
- * angle brackets ends the link syntax.
- */
-const breaksLink = (link: LinkRange, from: number, to: number): boolean => {
-    const [start, end] = link.whole;
-    const overlaps = from < end && to > start;
-    const holdsAll = from <= start && to >= end;
-    const insideLabel = link.label !== undefined && from >= link.label[0] && to <= link.label[1];
-
-    return overlaps && !holdsAll && !insideLabel;
-};
-
-/**
- * What the Markdown already in a paragraph means for a wrap of `from`..`to` (parent offsets). The wrap is `blocked` when
- * an end of the selection is strictly inside a code span, where a delimiter would show literally, or when it would break a
- * link (`breaksLink`). `takenFences` are the lengths of unmatched backtick runs before
- * the selection: a code fence of such a length would pair with that earlier run instead of its own closer.
- *
- * A line break or other inline node counts as a line ending, so a backslash before it escapes nothing after it.
- */
-const markupAround = (parent: ProseMirrorNode, from: number, to: number): { blocked: boolean; takenFences: ReadonlySet<number> } => {
-    const offsets: number[] = [];
-    let text = "";
-
-    parent.forEach((child, offset) => {
-        const part = child.isText ? (child.text ?? "") : "\n";
-
-        for (let index = 0; index < part.length; index += 1) {
-            offsets.push(offset + index);
-        }
-
-        text += part;
-    });
-
-    // Every index of `text` has an offset, so both lookups exist; `?? 0` only narrows the type.
-    const toOffsets = ([start, end]: [number, number]): [number, number] => [offsets[start] ?? 0, (offsets[end - 1] ?? 0) + 1];
-    const { spans, unmatched } = scanBackticks(text);
-    const inCode = spans.map((span) => toOffsets(span)).some(([start, end]) => (from > start && from < end) || (to > start && to < end));
-    // Point offsets: `offsets[index]` is where the character at `index` sits, and `end` maps just past its last character.
-    const at = (index: number): number => offsets[index] ?? 0;
-    const inLink = linkRanges(text, spans).some((link) =>
-        breaksLink(
-            {
-                label: link.label && [at(link.label[0]), at(link.label[1])],
-                whole: [at(link.whole[0]), at(link.whole[1] - 1) + 1],
-            },
-            from,
-            to,
-        ),
-    );
-
-    return {
-        blocked: inCode || inLink,
-        takenFences: new Set(unmatched.filter((run) => (offsets[run.start] ?? 0) < from).map((run) => run.length)),
-    };
-};
 
 const trailingBackslashes = (text: string): number => {
     let count = 0;
@@ -440,22 +185,22 @@ const planWrap = (state: EditorState, from: number, to: number, typed: string): 
 
     const lead = selected.indexOf(body);
     const trail = selected.slice(lead + body.length);
-    const { parent } = $from;
-    const beforeOpen = `${parent.textBetween(0, $from.parentOffset)}${selected.slice(0, lead)}`;
-    const afterClose = `${trail}${parent.textBetween($to.parentOffset, parent.content.size)}`;
+    const markup = markupAround(state.doc, $from.parent, $from.parentOffset, $to.parentOffset);
+
+    if (markup === null) {
+        return null;
+    }
+
+    const beforeOpen = `${markup.paragraph.slice(0, $from.parentOffset)}${selected.slice(0, lead)}`;
+    const afterClose = `${trail}${markup.paragraph.slice($to.parentOffset)}`;
     const openBefore = lastCharacter(beforeOpen);
     const closeAfter = firstCharacter(afterClose);
     // Only a letter, digit or mark that touches the wrapped text itself makes it a word; the spaces around it do not.
     const insideWord = (lead === 0 && WORD_CHARACTER.test(openBefore)) || (trail.length === 0 && WORD_CHARACTER.test(closeAfter));
 
-    // An odd run of backslashes before the opener would escape it, and a backtick beside a code fence would join it.
-    if (collidesWithMarkup(beforeOpen, typed, openBefore, closeAfter)) {
-        return REFUSED;
-    }
-
-    const markup = markupAround(parent, $from.parentOffset, $to.parentOffset);
-
-    if (markup.blocked) {
+    // An odd run of backslashes before the opener would escape it, a backtick beside a code fence would join it, and a
+    // wrap inside code, a link or other Markdown syntax would show literally or break it.
+    if (markup.blocked || collidesWithMarkup(beforeOpen, typed, openBefore, closeAfter)) {
         return REFUSED;
     }
 

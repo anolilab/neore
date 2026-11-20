@@ -278,8 +278,8 @@ describe("wrapSelection edge cases", () => {
         expect(selectedText(editor)).toBe(String.raw`a\_b`);
     });
 
-    it("wraps a selection with very many backtick runs in code without a stack overflow", () => {
-        const runs = "`a".repeat(150_000);
+    it("wraps a selection with very many backtick runs in code", () => {
+        const runs = "`a".repeat(4900);
         const editor = editorWith(`<p>x ${runs} y</p>`);
         const end = 3 + runs.length;
 
@@ -431,7 +431,7 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
     });
 
     it("wraps quickly beside many unmatched backtick runs of different lengths", () => {
-        const runs = Array.from({ length: 600 }, (_, index) => `${"`".repeat(index + 1)}x`).join("");
+        const runs = Array.from({ length: 130 }, (_, index) => `${"`".repeat(index + 1)}x`).join("");
         const editor = editorWith(`<p>hello ${runs}</p>`);
 
         select(editor, 1, 6);
@@ -513,12 +513,87 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
     });
 
     it("wraps quickly beside many unclosed link destinations", () => {
-        const editor = editorWith(`<p>hello ${"[x](".repeat(10_000)}</p>`);
+        const editor = editorWith(`<p>hello ${"[x](".repeat(2400)}</p>`);
 
         select(editor, 1, 6);
 
         expect(wrapSelectionOnTextInput(editor.view, 1, 6, "*")).toBe(true);
         expect(text(editor).startsWith("**hello** [x](")).toBe(true);
+    });
+
+    it("leaves typing alone in a draft longer than the size cap", () => {
+        const editor = editorWith(`<p>hello ${"a".repeat(10_000)}</p>`);
+
+        select(editor, 1, 6);
+
+        expect(wrapSelectionOnTextInput(editor.view, 1, 6, "*")).toBe(false);
+    });
+
+    it("wraps text inside an escaped autolink, which is literal text", () => {
+        const editor = editorWith("<p>go &#92;&lt;https://example.com&gt; now</p>");
+
+        select(editor, 6, 11);
+
+        expect(selectedText(editor)).toBe("https");
+        expect(wrapSelectionOnTextInput(editor.view, 6, 11, "*")).toBe(true);
+        expect(text(editor)).toBe(String.raw`go \<**https**://example.com> now`);
+    });
+
+    it("leaves an image's ! alone, which would turn the image into a link", () => {
+        const editor = editorWith("<p>see ![a](b.png) now</p>");
+
+        select(editor, 5, 6);
+
+        expect(wrapSelectionOnTextInput(editor.view, 5, 6, "*")).toBe(true);
+        expect(text(editor)).toBe("see ![a](b.png) now");
+    });
+
+    it("leaves a reference link's second label alone, which would split the link", () => {
+        const editor = editorWith("<p>[docs][ref] x</p><p></p><p>[ref]: https://e.com</p>");
+        const before = text(editor);
+
+        select(editor, 7, 12);
+
+        expect(selectedText(editor)).toBe("[ref]");
+        expect(wrapSelectionOnTextInput(editor.view, 7, 12, "*")).toBe(true);
+        expect(text(editor)).toBe(before);
+    });
+
+    it("protects a link title that holds a parenthesis", () => {
+        const editor = editorWith('<p>[x](url "a)" ) y</p>');
+
+        select(editor, 12, 13);
+
+        expect(wrapSelectionOnTextInput(editor.view, 12, 13, "*")).toBe(true);
+        expect(text(editor)).toBe('[x](url "a)" ) y');
+    });
+
+    it("wraps quickly beside many autolinks and code spans", () => {
+        const editor = editorWith(`<p>hello ${"&lt;a@b.c&gt; `c` ".repeat(800)}</p>`);
+
+        select(editor, 1, 6);
+
+        expect(wrapSelectionOnTextInput(editor.view, 1, 6, "*")).toBe(true);
+        expect(text(editor).startsWith("**hello** <a@b.c>")).toBe(true);
+    });
+
+    it("reads a line break before the selection as a line end, not as the text before it", () => {
+        const editor = editorWith("<p>a*<br>foo</p>");
+
+        select(editor, 4, 7);
+
+        expect(selectedText(editor)).toBe("foo");
+        expect(wrapSelectionOnTextInput(editor.view, 4, 7, "*")).toBe(true);
+        expect(text(editor)).toContain("**foo**");
+    });
+
+    it("wraps link-like prose whose destination has a space, which is no link", () => {
+        const editor = editorWith("<p>[a](b c) d</p>");
+
+        select(editor, 7, 8);
+        wrapSelectionOnTextInput(editor.view, 7, 8, "*");
+
+        expect(text(editor)).toBe("[a](b **c**) d");
     });
 
     it("wraps literal ](url) text that has no link label before it", () => {

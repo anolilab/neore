@@ -158,6 +158,7 @@
         "react-hotkeys-hook": "catalog:utils",
         "react-qr-code": "catalog:utils",
         "remark-directive": "catalog:markdown",
+        "remark-parse": "catalog:markdown",
         "rooks": "catalog:utils",
         "shadcn": "catalog:ui",
         "slate": "catalog:editor",
