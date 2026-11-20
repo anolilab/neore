@@ -225,6 +225,13 @@ const isSeparatorRow = (line: string): boolean =>
         .split("|")
         .every((cell) => SEPARATOR_CELL.test(cell));
 
+/** The number of cells in a table row. */
+const cellCount = (line: string): number => line.trim().replaceAll(OUTER_PIPES, "").split("|").length;
+
+/** Whether `header` over `separator` starts a GFM table: a separator row under a line with as many cells. */
+const headsTable = (header: string, separator: string): boolean =>
+    header.trim() !== "" && isSeparatorRow(separator) && cellCount(header) === cellCount(separator);
+
 /** The line of `text` that starts at `start`, without its line break; empty when `start` is -1. */
 const lineFrom = (text: string, start: number): string => {
     if (start === -1) {
@@ -254,7 +261,7 @@ const hasCellPipe = (text: string, from: number, to: number): boolean => {
 /**
  * Whether a wrap of `from`..`to` (draft indices) would break a GFM table, as the message renderer shows one: a wrap on
  * its separator row, or one across a cell's `|`. GFM is not parsed here, so the table is found from the lines around the
- * selection: a row with a `|`, a separator row under it, and the rows after it up to a blank line.
+ * selection: a header row, a separator row under it with as many cells, and the rows after it up to a blank line.
  */
 const breaksTable = (text: string, from: number, to: number): boolean => {
     const lineStart = text.lastIndexOf("\n", from - 1) + 1;
@@ -265,25 +272,19 @@ const breaksTable = (text: string, from: number, to: number): boolean => {
         return false;
     }
 
-    // Walk up the rows of this block to find the separator row it hangs from, or the one right below a header row.
-    let separator = false;
+    // Walk up the rows of this block to find a separator row under a header row: the table this line belongs to.
+    let inTable = headsTable(line, lineFrom(text, lineEndIndex === -1 ? -1 : lineEndIndex + 1));
     let cursor = lineStart;
     let current = line;
 
-    while (!separator && current.trim() !== "") {
-        separator = isSeparatorRow(current);
-
-        if (cursor === 0) {
-            break;
-        }
-
+    while (!inTable && cursor > 0 && current.trim() !== "") {
         const previousStart = text.lastIndexOf("\n", cursor - 2) + 1;
+        const previous = text.slice(previousStart, cursor - 1);
 
-        current = text.slice(previousStart, cursor - 1);
+        inTable = headsTable(previous, current);
+        current = previous;
         cursor = previousStart;
     }
-
-    const inTable = separator || isSeparatorRow(lineFrom(text, lineEndIndex === -1 ? -1 : lineEndIndex + 1));
 
     return inTable && (isSeparatorRow(line) || hasCellPipe(text, from, to));
 };

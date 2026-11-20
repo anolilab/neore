@@ -898,6 +898,15 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor)).toBe("x &**bogus**; y");
     });
 
+    it("wraps the dashes of a lone |---| line, which is no table without a header row", () => {
+        const editor = editorWith("<p>|---|</p>");
+
+        select(editor, 2, 5);
+        wrapSelectionOnTextInput(editor.view, 2, 5, "`");
+
+        expect(text(editor)).toBe("|`---`|");
+    });
+
     it("wraps literal ](url) text that has no link label before it", () => {
         const editor = editorWith("<p>literal ](url) text</p>");
 
