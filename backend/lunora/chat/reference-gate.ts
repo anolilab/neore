@@ -12,7 +12,9 @@ import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
-import { internalQuery } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
+import { FILE_ATTACH_THREAD_SCOPE, FILE_ATTACH_TTL_MS } from "../agent/file-attach-claim";
+import { claimFence } from "../lib/claim-once";
 import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { lockedAfterCreation, threadGateOutcome } from "./lib/thread-gate";
@@ -105,11 +107,26 @@ export const threadReadableOnShard = internalQuery
     });
 
 /**
- * The job-time recheck of one referenced chat, on its owner's shard, for a reference checked at `requestedAt`. The job carries no
- * unlock proof. A chat locked when the request was checked was read with that request's proof, so it is still held only while the
- * caller owns it and the lock predates the check. A chat locked since the check is not held, and an unlocked one is held only
- * while the caller may still read it.
+ * Whether a referenced chat is still held by the caller for a reference checked at `requestedAt`. The job carries no unlock proof.
+ * A chat locked when the request was checked was read with that request's proof, so it is still held only while the caller owns it
+ * and the lock predates the check. A chat locked since the check is not held, and an unlocked one is held only while the caller may
+ * still read it.
  */
+const chatHeld = async (ctx: Pick<QueryCtx, "db">, { requestedAt, threadId, userId }: { requestedAt: number; threadId: string; userId: string }) => {
+    const thread = await ctx.db.get("threads", threadId as Id<"threads">);
+
+    if (!thread) {
+        return false;
+    }
+
+    if (isThreadLocked(thread)) {
+        return thread.userId === userId && !lockedAfterCreation(thread, requestedAt);
+    }
+
+    return (await threadGateOutcome(ctx, { level: "read", threadId: threadId as Id<"threads">, userId })) === "ok";
+};
+
+/** {@link chatHeld} as a read, for a caller that only asks. */
 export const chatHeldOnShard = internalQuery
     .input({
         requestedAt: v.number(),
@@ -118,17 +135,39 @@ export const chatHeldOnShard = internalQuery
     })
     .output(v.object({ held: v.boolean() }))
     .query(async ({ args, ctx }) => {
-        const thread = await ctx.db.get("threads", args.threadId as Id<"threads">);
+        return { held: await chatHeld(ctx, args) };
+    });
 
-        if (!thread) {
+/**
+ * {@link chatHeld} as the job's recheck. For an unlocked chat the caller may read, it also holds the chat against a lock until the
+ * job is done: an attach claim on the chat's owner shard (`agent/file-attach-thread.ts`), which `enableThreadLock` refuses while it is
+ * held. The claim is taken in the same transaction as the check, so no lock can commit between the two. A locked chat needs no hold,
+ * since it is already closed to new attaches. The claim is released by `endThreadAttach` (`chat/reference-recheck.ts`).
+ */
+export const holdReferenceChatOnShard = internalMutation
+    .input({
+        requestedAt: v.number(),
+        requestId: v.string().max(MAX_LENGTH.id),
+        threadId: v.string().max(MAX_LENGTH.id),
+        userId: v.string(),
+    })
+    .output(v.object({ claimedAt: v.optional(v.number()), held: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        if (!(await chatHeld(ctx, args))) {
             return { held: false };
         }
 
-        if (isThreadLocked(thread)) {
-            return { held: thread.userId === args.userId && !lockedAfterCreation(thread, args.requestedAt) };
+        const thread = await ctx.db.get("threads", args.threadId as Id<"threads">);
+
+        if (thread && isThreadLocked(thread)) {
+            return { held: true };
         }
 
-        const outcome = await threadGateOutcome(ctx, { level: "read", threadId: args.threadId as Id<"threads">, userId: args.userId });
+        const claimedAt = await claimFence(ctx, FILE_ATTACH_THREAD_SCOPE, `${args.threadId}:${args.requestId}`, {
+            ttlMs: FILE_ATTACH_TTL_MS,
+            userId: args.userId,
+        });
 
-        return { held: outcome === "ok" };
+        // A request id is unique per attempt, so a held key is not expected. Refusing the chat fails the job closed.
+        return claimedAt === null ? { held: false } : { claimedAt, held: true };
     });

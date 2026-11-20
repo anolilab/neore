@@ -110,7 +110,7 @@ import {
 import { getAgentForUser } from "./lib/thread-helpers";
 import { assertStartClaimHeld, recordStartSaved, vStartClaim } from "./start-claim";
 import { savePromptInTransaction } from "./lib/save-prompt";
-import { referencesStillHeld } from "./reference-recheck";
+import { type ReferenceClaim, referencesStillHeld, releaseReferenceClaims } from "./reference-recheck";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
 import { deleteThreadShardRoutes } from "../lib/shard-routes";
@@ -5157,14 +5157,26 @@ export const generateImage = internalAction
                 threadId,
             });
 
+            // The attach claims the recheck takes on the chats' owner shards; released once the provider has the references (`finally`).
+            const referenceClaims: ReferenceClaim[] = [];
+            const referenceRequestId = crypto.randomUUID();
+
             try {
                 // Checked again here, after the queue delivered the job: a lock or grant change since the request must not reach the
-                // provider. A job with references but no ids or check time is refused too (the route always sends both).
-                if (referenceImages !== undefined && referenceImages.length > 0) {
+                // provider. Only a job that carries reference ids is checked: `/chat/media` sends them with its references and refuses
+                // references without them, while the image tool and the workflows pass their own URLs, which are not picker rows.
+                if (referenceIds !== undefined) {
                     const held =
-                        referenceIds !== undefined &&
+                        referenceImages !== undefined &&
                         referenceCheckedAt !== undefined &&
-                        (await referencesStillHeld(context, { referenceIds, referenceImages, requestedAt: referenceCheckedAt, userId }));
+                        (await referencesStillHeld(context, {
+                            claims: referenceClaims,
+                            referenceIds,
+                            referenceImages,
+                            requestedAt: referenceCheckedAt,
+                            requestId: referenceRequestId,
+                            userId,
+                        }));
 
                     if (!held) {
                         throw new LunoraError("NOT_FOUND", "File not found");
@@ -5360,6 +5372,8 @@ export const generateImage = internalAction
 
                 chatLogger.error("[cvx][image_generation] Error generating image:", error);
                 throw new LunoraError("BAD_REQUEST", `Failed to generate image: ${error instanceof Error ? error.message : "Unknown error"}`);
+            } finally {
+                await releaseReferenceClaims(referenceClaims, referenceRequestId);
             }
         },
     );

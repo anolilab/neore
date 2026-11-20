@@ -7,9 +7,11 @@ import { REFERENCE_MEDIA_CAPS } from "@neore/ai/models";
 import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { endThreadAttach } from "../agent/file-attach-thread";
+import { fileAttachInThread } from "../agent/file-attach-claim";
 import { mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
 import schema from "../schema";
-import { chatHeldOnShard, gateReferenceRowsOnCallerShard, threadReadableOnShard } from "./reference-gate";
+import { chatHeldOnShard, gateReferenceRowsOnCallerShard, holdReferenceChatOnShard, threadReadableOnShard } from "./reference-gate";
 
 const SECRET = "test-storage-signing-secret";
 const OWNER = "reference-owner";
@@ -244,5 +246,41 @@ describe("a queued media job rechecks each referenced chat on its owner's shard"
 
     it("does not hold an unlocked chat a collaborator has no grant to", async () => {
         await expect(heldFor(ownerOpenId, COLLAB, 1)).resolves.toBe(false);
+    });
+});
+
+describe("a queued media job holds the chats it reads against a lock until the provider has its references", () => {
+    type Hold = { claimedAt?: number; held: boolean };
+
+    const holdFor = async (threadId: string, userId: string, requestId: string, requestedAt: number): Promise<Hold> =>
+        (await run(async (ctx) => await ctx.runMutation(holdReferenceChatOnShard as never, { requestedAt, requestId, threadId, userId }))) as Hold;
+
+    const attachInFlight = async (threadId: string): Promise<boolean> => await run(async (ctx) => await fileAttachInThread(ctx, threadId));
+
+    it("takes an attach claim on an unlocked chat, which blocks a lock until it is released", async () => {
+        const { claimedAt, held } = await holdFor(ownerOpenId, OWNER, "job-open", 1);
+
+        expect(held).toBe(true);
+        expect(claimedAt).toBeDefined();
+        await expect(attachInFlight(ownerOpenId)).resolves.toBe(true);
+
+        await run(async (ctx) => await ctx.runMutation(endThreadAttach as never, { claimedAt, requestId: "job-open", threadId: ownerOpenId }));
+        await expect(attachInFlight(ownerOpenId)).resolves.toBe(false);
+    });
+
+    it("takes no claim on a chat locked before the check, which is already closed to attaches", async () => {
+        const { claimedAt, held } = await holdFor(ownerLockedId, OWNER, "job-locked", 3);
+
+        expect(held).toBe(true);
+        expect(claimedAt).toBeUndefined();
+        await expect(attachInFlight(ownerLockedId)).resolves.toBe(false);
+    });
+
+    it("takes no claim on a chat the caller may not read, and holds nothing", async () => {
+        const { claimedAt, held } = await holdFor(ownerOpenId, COLLAB, "job-denied", 1);
+
+        expect(held).toBe(false);
+        expect(claimedAt).toBeUndefined();
+        await expect(attachInFlight(ownerOpenId)).resolves.toBe(false);
     });
 });
