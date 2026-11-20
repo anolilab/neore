@@ -4,6 +4,7 @@ import { rowsAfterContextReset } from "../agent/context-reset";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { withoutSwitchIds } from "../agent/agent-switch-logic";
 import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
+import { replyAnchorRow } from "../agent/followup-suggestions";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -4606,13 +4607,14 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
-            // The composer keys a reply by the first row of its turn (ui-messages groups a turn by `order`), so cache under that id.
+            // The composer keys a reply by the first row of its last group (ui-messages closes a group at a user or system row), so cache under that id.
             // A long tool turn can run past one page, so the turn's pages are read until the rows of an older turn appear.
-            let firstRow = newest;
+            const turnRows: (typeof newest)[] = [];
             let turnPage = messagesResult;
 
             for (let pages = 0; pages < MAX_TURN_PAGES; pages += 1) {
                 let reachedOlderTurn = false;
+
                 const pageRows = turnPage.page || [];
 
                 for (const messageDocument of pageRows) {
@@ -4622,9 +4624,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                         break;
                     }
 
-                    if (messageDocument.order === newest.order && messageDocument.message?.role !== "user" && messageDocument.stepOrder < firstRow.stepOrder) {
-                        firstRow = messageDocument;
-                    }
+                    turnRows.push(messageDocument);
                 }
 
                 if (reachedOlderTurn || turnPage.isDone || !turnPage.continueCursor) {
@@ -4637,6 +4637,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                 });
             }
 
+            const firstRow = replyAnchorRow(turnRows, newest);
             const lastMessageId = firstRow._id;
 
             chatLogger.debug(`[generateFollowupSuggestionsForThread] Last message found`, {
