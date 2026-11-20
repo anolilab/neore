@@ -100,9 +100,7 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
         useChatActions: () => {
             return { cancelStream: vi.fn(), jwtToken: "", sendMessage: harness.sendMessage };
         },
-        useChatIsRunning: () => {
-            return harness.isStreaming;
-        },
+        useChatIsRunning: () => harness.isStreaming,
         useChatIsStreaming: () => {
             return { isStreaming: harness.isStreaming, sseStreamState: harness.sseStreamState };
         },
