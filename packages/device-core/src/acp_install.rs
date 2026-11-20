@@ -304,6 +304,7 @@ impl DeviceState {
             install: Some(AcpInstall {
                 index_integrity: None,
                 publisher: request.publisher.clone(),
+                registry_env: request.env.keys().cloned().collect(),
                 sha256: actual,
                 source: request.source.clone(),
                 tree_sha256: None,
@@ -324,8 +325,8 @@ impl DeviceState {
         Ok(self.acp_view())
     }
 
-    /// Moves the verified `unpacked` folder to `final_dir` (`<data dir>/acp-agents/<key>/<version>`) and records
-    /// `agent` with its pin. A failure leaves the agent, and any earlier install of the same version, as it was.
+    /// Moves the verified `unpacked` folder to `final_dir` (`<data dir>/acp-agents/<key>/<name>`, the name from
+    /// [`install_dir_name`]) and records `agent` with its pin. A failure leaves the agent, and any earlier install of the same version, as it was.
     /// Installing over an installed key drops its folder approvals unless it is the same program.
     pub(crate) fn commit_install(
         &self,
@@ -333,11 +334,15 @@ impl DeviceState {
         unpacked: &Path,
         final_dir: &Path,
     ) -> Result<(), String> {
-        let version = agent
-            .install
-            .as_ref()
-            .map(|pin| pin.version.clone())
-            .ok_or("an install needs a pin")?;
+        if agent.install.is_none() {
+            return Err("an install needs a pin".into());
+        }
+
+        let name = final_dir
+            .file_name()
+            .ok_or("an install folder needs a name")?
+            .to_string_lossy()
+            .into_owned();
 
         let _committing = lock_installs();
 
@@ -347,7 +352,7 @@ impl DeviceState {
         // An explicit reinstall of the same version keeps the old folder until the new one is recorded, so a
         // failure leaves the agent as it was. The name starts with a dot: a version starts with a digit.
         let key_dir = self.install_root().join(&agent.key);
-        let aside = key_dir.join(format!(".{version}.old"));
+        let aside = key_dir.join(format!(".{name}.old"));
         let replaced = final_dir.exists();
 
         // The agent's folder must be a real folder under app data: through a symlink the cleanup below would
@@ -392,8 +397,17 @@ impl DeviceState {
                         return Err(already_registered(&agent.key));
                     }
 
-                    // The user's own variables stay; the registry's are laid over them.
+                    // The user's own variables stay; the registry's are laid over them, and those the registry set at
+                    // the last install but no longer sets go.
                     let mut env = settings.acp_agents[i].env.clone();
+
+                    if let Some(old) = &settings.acp_agents[i].install {
+                        for name in &old.registry_env {
+                            if !agent.env.0.contains_key(name) {
+                                env.0.remove(name);
+                            }
+                        }
+                    }
 
                     env.0.extend(std::mem::take(&mut agent.env.0));
                     agent.env = env;
@@ -451,16 +465,46 @@ impl DeviceState {
         let _committing = lock_installs();
         let settings = self.settings();
 
-        if let Some(pin) = settings
+        if let Some((agent, pin)) = settings
             .acp_agents
             .iter()
             .find(|agent| agent.key == key)
-            .and_then(|agent| agent.install.as_ref())
+            .and_then(|agent| agent.install.as_ref().map(|pin| (agent, pin)))
         {
             if safe_relative(Path::new(key)).is_ok_and(|clean| clean.components().count() == 1) {
-                self.prune_other_versions(&self.install_root().join(key), &pin.version);
+                self.prune_other_versions(
+                    &self.install_root().join(key),
+                    &self.installed_dir_name(agent, pin),
+                );
             }
         }
+    }
+
+    /// The folder under `acp-agents/<key>/` that `agent`'s pinned program is in: the first argument of an npm agent (it
+    /// runs `node <program>`), the command of a binary one. The program cannot be edited without dropping the pin, so this
+    /// is the folder that was installed, also one named before [`install_dir_name`] took its current form. An agent whose
+    /// program is not under its key's folder has the pin's own name.
+    pub(crate) fn installed_dir_name(&self, agent: &AcpAgent, pin: &AcpInstall) -> String {
+        let key_dir = self.install_root().join(&agent.key);
+        let program = if pin.tree_sha256.is_some() {
+            agent.args.first()
+        } else {
+            Some(&agent.command)
+        };
+
+        program
+            .and_then(|program| {
+                match Path::new(program)
+                    .strip_prefix(&key_dir)
+                    .ok()?
+                    .components()
+                    .next()?
+                {
+                    Component::Normal(name) => Some(name.to_string_lossy().into_owned()),
+                    _ => None,
+                }
+            })
+            .unwrap_or_else(|| install_dir_name(pin))
     }
 
     /// An agent registered by hand under this key is not replaced by an install.
@@ -511,7 +555,8 @@ impl DeviceState {
 
         match moved {
             Ok(()) => {
-                std::thread::spawn(move || {
+                // A thread that cannot be started leaves the entry in the trash for the next sweep.
+                let _ = std::thread::Builder::new().spawn(move || {
                     #[cfg(test)]
                     tests_hook::before_delete(&target);
 
@@ -642,6 +687,21 @@ pub(crate) mod tests_hook {
         if let Some(hook) = hook {
             hook();
         }
+    }
+}
+
+/// The folder an install lives in under `acp-agents/<key>/`. A binary install is its version; an npm install is
+/// `npm-<version>-<first 16 hex digits of its tree hash>`, so other bytes under the same version never replace a folder
+/// a spawn plan already verified, and no binary version (which starts with a digit) can name the same folder. A recorded hash that is not hex (an edited settings file) names no folder.
+pub(crate) fn install_dir_name(pin: &AcpInstall) -> String {
+    match pin.tree_sha256.as_deref() {
+        Some(tree) => match tree.get(..16) {
+            Some(prefix) if prefix.bytes().all(|b| b.is_ascii_hexdigit()) => {
+                format!("npm-{}-{prefix}", pin.version)
+            }
+            _ => format!(".{}-invalid", pin.version),
+        },
+        None => pin.version.clone(),
     }
 }
 

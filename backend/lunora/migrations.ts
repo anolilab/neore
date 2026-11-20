@@ -199,3 +199,14 @@ export const addAgentCommandsToChunks = defineMigration({
     table: "persistentChunks",
     up: () => undefined,
 });
+
+/**
+ * A delivered steer gained `textLength`, so a recovered reply can split a combined row into its steers. A row written
+ * before it has none: recovery falls back to the row's own time for those steers (`chat/lib/recover-finished-reply.ts`).
+ * Nothing is rewritten, so the old rows keep their meaning and the new key is optional.
+ */
+export const addSteerTextLength = defineMigration({
+    id: "add-steer-text-length",
+    table: "persistentStreams",
+    up: () => undefined,
+});

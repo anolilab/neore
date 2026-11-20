@@ -5,6 +5,8 @@
  * of the native boundary and give a clear error for it.
  */
 
+import path from "node:path";
+
 import type { HostSpec } from "./types";
 
 /** Matches the backend's per-call input cap with room for the envelope. */
@@ -99,6 +101,64 @@ export const readServerPath = (value: unknown): string => {
     }
 
     return text(value, "path", 4096);
+};
+
+/** The longest folder path: a server root may be at most 1000 bytes (the core), so one limit serves both sides. */
+const MAX_MACHINE_PATH_BYTES = 1000;
+/** Whitespace and wildcards, and a leading `!` (negation); `!` elsewhere is a literal character, as in `build!legacy`. */
+const ALIAS_FORBIDDEN = /[\s*?]/u;
+
+/** Control, format (bidi overrides, zero-width) and line or paragraph separator characters: a native prompt would show another folder. */
+const UNSAFE_PATH_CHARACTER = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+const NETWORK_OR_DEVICE_PATH = /^[\\/]{2}/u;
+
+/**
+ * A folder the add-project picker names: absolute, no control or format characters, at most 1000 bytes. `local` is this computer's rule for
+ * "absolute" (drive letters on Windows); a server's paths are POSIX. An empty path is allowed only when `allowEmpty`.
+ */
+export const readMachinePath = (value: unknown, local: boolean, allowEmpty = false): string => {
+    if (value === "" && allowEmpty) {
+        return "";
+    }
+
+    const folder = text(value, "path", MAX_MACHINE_PATH_BYTES);
+
+    if (UNSAFE_PATH_CHARACTER.test(folder) || Buffer.byteLength(folder) > MAX_MACHINE_PATH_BYTES) {
+        throw new Error("device: path is invalid");
+    }
+
+    // On Windows `isAbsolute` also accepts UNC and device paths (`\\host\share`, `\\?\`), which name network or device targets,
+    // and any mix of the two separators at the start (`\\`, `//`, `\/`, `/\`) starts one. On POSIX those are ordinary path characters.
+    const networkOrDevice = local && path.sep === "\\" && NETWORK_OR_DEVICE_PATH.test(folder);
+
+    if (networkOrDevice || !(local ? path.isAbsolute(folder) : folder.startsWith("/"))) {
+        throw new Error("device: path must be absolute");
+    }
+
+    return folder;
+};
+
+/** The id of a machine; the main process then checks that it knows it. */
+export const readMachineId = (value: unknown): string => text(value, "machineId", 64);
+
+/** A `Host` alias of ~/.ssh/config; the main process then checks that the reader returned it. */
+export const readSshAlias = (value: unknown): string => {
+    const alias = text(value, "sshAlias", 253);
+
+    if (alias.startsWith("!") || ALIAS_FORBIDDEN.test(alias) || CONTROL_CHARACTER.test(alias)) {
+        throw new Error("device: sshAlias is invalid");
+    }
+
+    return alias;
+};
+
+/** The request object of a machine call: a record with a machine id, a path and, for a browse, a cursor. */
+export const readMachineRequest = (value: unknown): Record<string, unknown> => {
+    if (!isRecord(value)) {
+        throw new Error("device: request is invalid");
+    }
+
+    return value;
 };
 
 /** The last name of the page before. */

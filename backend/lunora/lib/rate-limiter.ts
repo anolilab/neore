@@ -276,6 +276,8 @@ export const RATE_LIMIT_CONFIGS = {
     // "Send feedback" (`feedback/functions.ts`): enough for a burst of reports, not for a flood.
     "feedback/submit:free": Ratelimit.fixedWindow(10, HOUR),
     "feedback/submit:premium": Ratelimit.fixedWindow(30, HOUR),
+    "follows/update:free": Ratelimit.fixedWindow(30, MINUTE),
+    "follows/update:premium": Ratelimit.fixedWindow(100, MINUTE),
     // General rate limits
     free: Ratelimit.tokenBucket(40, 10 * SECOND, 40),
     // GDPR limits
@@ -331,6 +333,10 @@ export const RATE_LIMIT_CONFIGS = {
     // outbound registry call, so free text cannot be an unbounded fan-out.
     "mcp/registry:free": Ratelimit.tokenBucket(30, MINUTE, 40),
     "mcp/registry:premium": Ratelimit.tokenBucket(60, MINUTE, 90),
+    // Bringing in another assistant's memory: a preview labels the paste with a model,
+    // a save may run belief revision per fact. Shared by both steps.
+    "memory/import:free": Ratelimit.fixedWindow(10, HOUR),
+    "memory/import:premium": Ratelimit.fixedWindow(30, HOUR),
     // Memory management (edit / pin / retype / delete / dismiss a digest)
     "memory/update:free": Ratelimit.fixedWindow(60, MINUTE),
     "memory/update:premium": Ratelimit.fixedWindow(180, MINUTE),

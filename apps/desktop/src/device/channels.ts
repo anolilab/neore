@@ -8,16 +8,21 @@
  */
 
 export const DEVICE_CHANNEL = {
+    browseMachineFolders: "neore:device:browse-machine-folders",
     changed: "neore:device:changed",
+    connectAddProjectMachine: "neore:device:connect-add-project-machine",
+    createMachineFolder: "neore:device:create-machine-folder",
     execute: "neore:device:execute",
     hostConnect: "neore:device:host-connect",
     hostDisconnect: "neore:device:host-disconnect",
     hostPair: "neore:device:host-pair",
     hostProbe: "neore:device:host-probe",
+    listAddProjectMachines: "neore:device:list-add-project-machines",
     manifest: "neore:device:manifest",
     openSettings: "neore:device:open-settings",
     pair: "neore:device:pair",
     progress: "neore:device:progress",
+    shareMachineFolder: "neore:device:share-machine-folder",
     status: "neore:device:status",
 } as const;
 

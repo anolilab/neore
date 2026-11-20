@@ -42,6 +42,15 @@ const lingui = vi.hoisted(() => {
     return { i18n: { _: (value: string) => value }, t };
 });
 
+// The options menu reads the follow state; these tests are about the row, not the follow items.
+vi.mock("../follows/use-thread-follow", () => {
+    return {
+        useThreadFollow: () => {
+            return { error: null, isPending: false, setState: () => {}, state: undefined };
+        },
+    };
+});
+
 vi.mock("@lingui/core/macro", () => {
     return { msg: (strings: TemplateStringsArray) => strings[0], plural: () => "" };
 });

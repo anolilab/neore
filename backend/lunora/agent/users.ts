@@ -11,6 +11,7 @@ import { internalAction, internalMutation, internalQuery, type MutationCtx as Mu
  */
 import { nullable, paginationOptionsValidator } from "../lib/validators";
 import { stream } from "../lib/streams";
+import { deleteFollowRowsOfThread } from "../chat/follows/functions";
 import { deleteMessage } from "./messages";
 import { deleteStreamsPageForThreadId } from "./streams";
 import { vPaginationResult } from "./validators";
@@ -224,7 +225,8 @@ async function deletePageForUserId(context: MutationContext, args: DeleteAllArgs
         threadId: threadInProgress!,
     });
 
-    if (streamResult.isDone) {
+    // The thread's follow rows go first, one batch per call; the thread goes once none are left.
+    if (streamResult.isDone && (await deleteFollowRowsOfThread(context, threadInProgress!))) {
         await context.db.delete("threads", threadInProgress);
         threadInProgress = null;
         messagesCursor = null;

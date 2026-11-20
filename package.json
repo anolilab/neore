@@ -31,7 +31,7 @@
         "clean": "vis run clean && rimraf ./node_modules && pnpm run cleanup:empty-packages",
         "cleanup:empty-packages": "node scripts/cleanup-empty-packages.js",
         "codegen:backend": "vis run codegen --projects=@neore/backend",
-        "deploy": "alchemy deploy",
+        "deploy": "pnpm run codegen:backend && alchemy deploy",
         "deploy:destroy": "DESTROY=true alchemy destroy",
         "dev": "vis run dev --projects=@neore/web,@neore/backend,llm-gateway",
         "dev:app": "vis run dev --projects=@neore/web",

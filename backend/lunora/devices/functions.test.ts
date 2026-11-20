@@ -39,6 +39,7 @@ const { createAcpCall } = await import("./lib/acp-call");
 const { ACP_CLAIM_WINDOW_MS, DEVICE_CLAIM_WINDOW_MS } = await import("./lib/constants");
 const { claimWindowMs, isAcpTool, OPEN_CALL_PAGE } = await import("./lib/state");
 const { isDeviceInScope } = await import("./lib/scope");
+const { MACHINE_CLEAR_BATCH } = await import("../projects/machine-location");
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -1085,6 +1086,73 @@ describe("releaseDeviceCall", () => {
 });
 
 describe("revokeDevice", () => {
+    const remainingOn = async (deviceId: string) => {
+        const count = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.projects.findMany({ limit: 1000, where: { machineId: deviceId, userId: ownerId } });
+
+            return page.length;
+        });
+
+        return count as number;
+    };
+    // The harness does not dispatch scheduled jobs, so a test runs the clearing body with the job's own args.
+    const clearScheduled = async (args: unknown) => await harness.run(async (ctx: any) => await ctx.runMutation(internals.clearDeviceProjects, args as never));
+    // Only the clear job is picked: the revoke may schedule other work.
+    const pendingClears = () => harness.scheduler.list().filter((job) => job.functionPath?.includes("clearDeviceProjects") === true);
+
+    it("clears the machine and folder of the owner's projects on the device, in a scheduled run, and leaves other users' projects alone", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const mine = await insertProject(ownerId, { machineId: deviceId, path: "/home/me/app" });
+        const theirs = await insertProject(STRANGER, { machineId: deviceId, path: "/home/them/app" });
+        const read = async (id: string) =>
+            (await harness.run(async (ctx: any) => await ctx.db.projects.findFirst({ where: { _id: id } }))) as Record<string, unknown>;
+
+        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId } as never);
+
+        // The revoke leaves the projects alone; only the scheduled run clears them.
+        expect(await read(mine)).toMatchObject({ machineId: deviceId, path: "/home/me/app" });
+        expect(pendingClears()).toHaveLength(1);
+
+        await clearScheduled(pendingClears()[0]?.args);
+
+        const cleared = await read(mine);
+
+        expect(cleared).toMatchObject({ title: "Project", userId: ownerId });
+        expect(cleared.machineId).toBeUndefined();
+        expect(cleared.path).toBeUndefined();
+        expect(await read(theirs)).toMatchObject({ machineId: deviceId, path: "/home/them/app" });
+        expect(pendingClears()).toHaveLength(1);
+    });
+
+    it("clears one batch per scheduled run, keeps scheduling while a run clears a full batch, and schedules nothing after a partial one", async () => {
+        const { deviceId } = await pairedDevice(ownerId);
+        const total = MACHINE_CLEAR_BATCH * 2 + 1;
+
+        for (let index = 0; index < total; index += 1) {
+            await insertProject(ownerId, { machineId: deviceId, path: `/home/me/app-${index}` });
+        }
+
+        await as(ownerId).mutation(functions.revokeDevice as never, { deviceId } as never);
+
+        expect(await remainingOn(deviceId)).toBe(total);
+        expect(pendingClears()).toHaveLength(1);
+
+        await clearScheduled(pendingClears()[0]?.args);
+
+        expect(await remainingOn(deviceId)).toBe(total - MACHINE_CLEAR_BATCH);
+        expect(pendingClears()).toHaveLength(2);
+
+        await clearScheduled(pendingClears()[1]?.args);
+
+        expect(await remainingOn(deviceId)).toBe(1);
+        expect(pendingClears()).toHaveLength(3);
+
+        await clearScheduled(pendingClears()[2]?.args);
+
+        expect(await remainingOn(deviceId)).toBe(0);
+        expect(pendingClears()).toHaveLength(3);
+    });
+
     it("deletes the device and expires its open calls; the audit rows stay", async () => {
         const { deviceId } = await pairedDevice(ownerId);
         const threadId = await insertThread(ownerId);

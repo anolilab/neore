@@ -87,7 +87,19 @@ export const shouldAnimateEntrance = ({
     total: number;
 }): boolean => role === "user" && index === total - 1 && !initialIds.has(messageId);
 
-const MESSAGE_HASH = /^#message-(.+)$/;
+// `@<order>.<stepOrder>` after the id says where the message sits, so a jump can page back to it however old it is.
+const MESSAGE_HASH = /^#message-([^@]+)(?:@(\d+)\.(\d+))?$/;
+
+/** The `message-<id>` hash a link jumps with; with the message's position the jump reaches it however far back it is. */
+export const messageHash = (messageId: string, order?: number, stepOrder?: number): string =>
+    order === undefined ? `message-${messageId}` : `message-${messageId}@${order}.${stepOrder ?? 0}`;
+
+/** The position a `#message-<id>@<order>.<stepOrder>` deep link carries, if any. */
+export const parseMessageHashPosition = (hash: string): MessagePosition | undefined => {
+    const match = MESSAGE_HASH.exec(hash);
+
+    return match?.[2] === undefined || match[3] === undefined ? undefined : { order: Number(match[2]), stepOrder: Number(match[3]) };
+};
 
 /** Reads `#message-<id>` deep links. */
 export const parseMessageHash = (hash: string): string | undefined => {

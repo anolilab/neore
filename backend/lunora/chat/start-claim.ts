@@ -24,7 +24,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
-import { internalMutation } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { claimFence, claimRow, recordClaimResult } from "../lib/claim-once";
 import { sha256Hex } from "../lib/crypto";
 import { patchRow } from "../lib/patch";
@@ -186,6 +186,19 @@ const streamUnclaimed = async (ctx: Pick<MutationCtx, "db">, streamId: string): 
  * send recorded, `in_progress` while the first send is within its lease and has not finished (saved, and for a text turn
  * `streams`, given its stream), or `resume` for a text turn whose sender died between its save and its stream.
  */
+/**
+ * Whether a send under this client id has already saved its prompt (a resend). Read-only: `/chat/start` asks it before it checks a
+ * resend's files, which the first send already checked; the send's own claim (`claimChatStart`) still decides the answer.
+ */
+export const peekChatStart = internalQuery
+    .input({ clientMessageId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.object({ saved: v.boolean() }))
+    .query(async ({ args, ctx }) => {
+        const existing = await claimRow(ctx, CHAT_START_SCOPE, startKey(args.userId, args.clientMessageId));
+
+        return { saved: isSaved(recordOf(existing?.result)) };
+    });
+
 export const claimChatStart = internalMutation
     .input({
         clientMessageId: v.string().max(MAX_LENGTH.id),

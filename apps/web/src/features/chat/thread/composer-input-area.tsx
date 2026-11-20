@@ -453,7 +453,7 @@ const ComposerInputArea = ({
                 {hiddenNotice}
             </div>
             {/* A send that starts waiting for uploads is announced here; the send button keeps its name */}
-            <div aria-live="polite" className="sr-only" role="status">
+            <div aria-live="polite" className="sr-only">
                 {isSendWaiting ? t`Sending once uploads finish…` : null}
             </div>
             <ComposerLengthNotice chars={value.length} id={lengthNoticeId} onAttachAsFile={onAttachDraftAsFile} tooLongForFile={tooLongForFile} />

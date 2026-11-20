@@ -87,3 +87,7 @@ coverage/
 # Written by `lunora codegen`; every consumer runs codegen first (vis `codegen` target).
 backend/lunora/_generated/architecture.json
 backend/lunora/_generated/architecture.ts
+
+# Lunora codegen output (`backend/lunora/_generated/`). Written by `pnpm --filter @neore/backend run codegen`; CI runs it
+# before anything that imports it, so the output is never committed.
+backend/lunora/_generated/

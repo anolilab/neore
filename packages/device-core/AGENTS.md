@@ -30,6 +30,9 @@ The rules for working in `packages/device-core/`. The detail and reasoning are i
 - Hosts start `--stdio --launch <id>` with `<run>/<id>.pid`; reap only launches this computer started, and only after confirming program `neore-host` with `--launch <id>` (pidfd on Linux). SIGTERM kills every command's process group (`shell::kill_running`).
 - Run folder `~/.neore/host/run` (tests: `NEORE_HOST_RUN_DIR`). `ssh::MULTIPLEXING` is fixed `false` on Windows (no passphrase helper there either).
 - **Files on a server** (`list`/`tar`/`cancel`): LOCAL window only, never the agent; no signed call, no prompt.
+  Exception (protocol 4): `browse` (directory names only, not confined to shares) and `mkdir` are reached through the
+  desktop bridge from the add-project picker. The desktop asks the person before it shares a folder or creates one on a
+  server, and the host still refuses files and never reads contents for `browse`. Never add file reads to this path.
 - `tar` (`archive.rs`) walks with `openat` + `O_NOFOLLOW` and LEAVES OUT symlinks, hard-linked files, FIFOs and devices; the desktop never unpacks what it saves. The save path comes from a native dialog, never the window.
 - The connection reader never waits for disk: chunks (`CHUNK_TAG` raw frames) queue by bytes; > 64 MiB behind or an idle minute ends the download. Unix hosts only.
 - **Coding agents on a server**: `neore-host` only owns the process; the host kills the agent's process group on cancel, stdin end and SIGTERM. The core picks the secret by the payload's DEVICE.

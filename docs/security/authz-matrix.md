@@ -261,10 +261,10 @@ for a schema table that is neither policed nor listed:
 | `billing_checkout.getMyPlan` | query | authQuery | user | caller-scoped (ctx.user) — own row only | ok — new |
 | `billing_checkout.getTeamPlansIPay` | query | authQuery | organization, member (count) | caller-scoped: organizations whose `creemPurchaserId` is the caller (indexed); returns name + member count only, for the delete-account warning | ok — new |
 | `billing_checkout.openCustomerPortal` | action | authAction + RL | user, organization (customer id) | `user`: caller's own row; `organization`: active org owner AND the recorded purchaser (`creemPurchaserId`) — the org's Creem customer is the purchaser's own | ok — new; portal for the caller's own Pro or their org's Team only |
-| `bots_functions.createBot` | mutation | authMutation + RL | bots | caller-scoped (ctx.user); model checked against the catalog | ok |
+| `bots_functions.createBot` | mutation | authMutation + RL | bots | caller-scoped (ctx.user); model checked against the catalog; a permission mode is refused while impersonating | ok |
 | `bots_functions.deleteBot` | mutation | authMutation + RL | bots | row.userId == caller | ok |
 | `bots_functions.listBots` | query | authQuery | bots | caller-scoped (ctx.user) | ok |
-| `bots_functions.updateBot` | mutation | authMutation + RL | bots | row.userId == caller; model checked against the catalog | ok |
+| `bots_functions.updateBot` | mutation | authMutation + RL | bots | row.userId == caller; model checked against the catalog; a permission mode is refused while impersonating | ok |
 | `changelog_functions.getChangelogs` | action | publicAction | — | none (public) | accepted — public by design; cached with a module cooldown |
 | `chat_agent_switch.switchThreadAgent` | action | authAction + RL | threads, messages, idempotencyClaims | thread WRITE grant (`requireThreadPermission`, the right a collaborator has to pick a send's model), checked in `planAgentSwitch` and again in `commitAgentSwitch`, the only two internal functions it calls (both take the caller's `userId` from `ctx.user`, never from args); an enabled, paid-plan-checked chat model only; refused while a reply streams, and on bot, group and media threads; a switch to or from a coding agent on a paired computer (`acp_switch.commitHostSwitch`, the one other internal function it calls, taking the caller's `userId` from `ctx.user`) is the OWNER's alone (a write grant is not enough), needs the (agent, folder) pair in the target computer's own `acpOffers` (written only from its signed manifest, so a switch creates no consent) and that computer online and the caller's, never summarises or charges, and makes a new `continuation`-linked thread when the runner changes (cloud to host, host to cloud) while the source stays untouched, or opens the next session in the same thread (host to host); the handoff is built from the thread's own rows and a summary through the gateway before anything is written, after the plan has read the daily allowance and `beginSwitchSummary` has taken a per-thread claim and counted the call against its own rate limit; one mutation takes the claim-once on the caller's `clientId`, charges the round (`chargeRound`) and writes the divider through `agent/table-writes.ts`, refusing a path that moved since the plan | ok |
 | `chat_agent_switch.previewAgentSwitch` | query | authQuery | threads, messages | same write-grant and refusal checks as the switch; read only, returns token estimates for the confirm step | ok |
@@ -289,13 +289,15 @@ for a schema table that is neither policed nor listed:
 | `chat_custom_providers.listCustomProviders` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_custom_providers.probeCustomProvider` | action | authAction + RL | — | caller-scoped (ctx.user) | ok |
 | `chat_custom_providers.saveCustomProvider` | mutation | authMutation + RL | aiUserPreferences | caller-scoped (ctx.user) | ok |
+| `chat_follows_functions.getThreadFollow` | query | authQuery | threadFollows, threads | thread access (owner/grant, read; `requireThreadPermission`) | ok |
+| `chat_follows_functions.setThreadFollow` | mutation | authMutation + RL | threadFollows, threads | thread access (owner/grant, read); row is the caller's own | ok |
 | `chat_functions.abortStreamByMessageId` | mutation | authMutation | threads | thread access (owner/grant) | ok |
 | `chat_functions.abortThreadStream` | mutation | authMutation + RL | threads | thread access (owner/grant, write) | ok |
 | `chat_functions.branchThread` | action | authAction + RL | threads | row.userId == caller | ok |
 | `chat_functions.continueThread` | action | authAction + RL | threads | thread access (owner/grant) | accepted — rate-limited; advisor: no maxOutputTokens bound |
 | `chat_functions.convertTemporaryToPermanent` | mutation | authMutation + RL | threads | row.userId == caller | ok |
 | `chat_functions.createExtensionPairing` | mutation | authMutation + RL | — | caller-scoped (ctx.user) | ok |
-| `chat_functions.createThread` | mutation | authMutation + RL | projects, teamMember | org membership/role; row.userId == caller; botId must be a bot the caller owns | **fixed** (low) — organizationId must be the active org |
+| `chat_functions.createThread` | mutation | authMutation + RL | projects, teamMember | org membership/role; row.userId == caller; botId must be a bot the caller owns; the new chat takes the bot's permission mode, except `full` while impersonating | **fixed** (low) — organizationId must be the active org |
 | `chat_functions.createThreadRelationshipPublic` | mutation | authMutation + RL | threads | row.userId == caller (both ends) | **fixed** (critical) — both threads must be the caller's; a link to a stranger's thread was a read grant on it |
 | `chat_functions.deleteThread` | mutation | authMutation + RL | threads | refused while impersonating; row.userId == caller; the public API route (`DELETE /api/v1/threads/{id}`) refuses a host-run thread with 409 before calling it | ok |
 | `chat_functions.deleteThreads` | mutation | authMutation + RL | — | refused while impersonating (the whole call); row.userId == caller | ok |
@@ -395,7 +397,7 @@ for a schema table that is neither policed nor listed:
 | `chat_thread_state.markThreadViewed` | mutation | authMutation + RL | threads | owner helper (`requireOwnedThreadIgnoringLock`) | ok |
 | `chat_thread_state.snoozeThread` | mutation | authMutation + RL | threads | owner helper (`requireOwnedThreadIgnoringLock`) | ok |
 | `chat_thread_state.unsnoozeThread` | mutation | authMutation + RL | threads | owner helper (`requireOwnedThreadIgnoringLock`) | ok |
-| `chat_thread_state.setThreadPermissionMode` | mutation | authMutation + RL | threads | owner helper (`requireOwnedThreadIgnoringLock`); refuses a host thread | ok |
+| `chat_thread_state.setThreadPermissionMode` | mutation | authMutation + RL | threads | owner helper (`requireOwnedThreadIgnoringLock`); refuses a host thread; refused while impersonating | ok |
 | `chat_thread_state.getEffectivePermissionMode` | query | authQuery | threads | owner helper (`requireOwnedThreadIgnoringLock`); the mode its own runs use, or its comparison parent's | ok |
 | `chat_tool_permissions.getToolPermissionSettings` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_tool_permissions.listMcpToolPermissions` | action | authAction + RL | aiUserPreferences | caller-scoped (ctx.user) | **fixed** (medium) — SSRF guard on saved server URLs |
@@ -492,11 +494,14 @@ for a schema table that is neither policed nor listed:
 | `media_functions.listUserImages` | query | authQuery | files, threads | row.userId == caller | ok |
 | `memory_functions.clearAllUserMemories` | mutation | authMutation + RL | embeddings_768 | caller-scoped (ctx.user) | ok |
 | `memory_functions.deleteMemory` | mutation | authMutation + RL | embeddings_768 | owner helper | ok |
+| `memory_functions.getMemorySource` | query | authQuery | memories, threads, messages | row.userId == caller; link via `resolveThreadReadAccess` (full, not deleted; no unlock proof, so a locked chat gives no link and hides the quote from its owner, `quoteHidden`; a collaborator's memory quotes only their own words and keeps them, as after an unshare); message id only while it is in that thread | ok |
 | `memory_functions.getMemoryStats` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `memory_functions.getMessageMemoryUsage` | query | authQuery | memories, threads | row.userId == caller | ok |
 | `memory_functions.listUserMemories` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `memory_functions.setMemoryPinned` | mutation | authMutation + RL | — | owner helper | ok |
 | `memory_functions.updateMemory` | mutation | authMutation + RL | — | owner helper | ok |
+| `memory_import.previewMemoryImport` | action | authAction + RL | userSettings (`isMemoryEnabled`) | caller-scoped (ctx.user); refused while memory is off; the paste goes to a utility model the caller's filter rules allow, wrapped as data; stores nothing | ok — new |
+| `memory_import.saveImportedMemories` | action | authAction + RL | memories, embeddings_1024 | caller-scoped (ctx.user): `userId`, `source` and the app are stamped server-side; refused while memory is off; the client's facts are re-checked against the preview's caps and secret filter before dedup | ok — new |
 | `memory_reflection.dismissMemoryDigest` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `memory_reflection.getLatestMemoryDigest` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `messenger_functions.createConnection` | mutation | authMutation + RL | messengerConnections | caller-scoped (ctx.user) | **fixed** (low) — a new connection answers nobody until `/pair <code>` (code returned once, hashed at rest) |
@@ -550,11 +555,11 @@ for a schema table that is neither policed nor listed:
 | `pages_sharing.revokePageInvite` | mutation | authMutation + RL | pageInvites | page access | ok |
 | `pages_sharing.setPagePublic` | mutation | authMutation + RL | pages | page access | ok |
 | `pages_sharing.updatePageGrant` | mutation | authMutation + RL | pages | page access | ok |
-| `projects_functions.createProject` | mutation | authMutation + RL | — | org membership/role | **fixed** (medium) — organizationId must be the active org |
+| `projects_functions.createProject` | mutation | authMutation + RL | devices | org membership/role; optional `machineId` must be a device with `device.userId == caller` and no `revokedAt` (otherwise NOT_FOUND), with an absolute `path` | **fixed** (medium) — organizationId must be the active org; the machine and folder are recorded only for the caller's own live device |
 | `projects_functions.deleteProject` | mutation | authMutation + RL | projects | row.userId == caller | **fixed** (low) — move target must be the caller's project |
-| `projects_functions.getProject` | query | authQuery | projects | org membership/role; row.userId == caller | ok |
-| `projects_functions.listPinnedProjects` | query | authQuery | — | caller-scoped (ctx.user) | **fixed** (high) — via `agent_projects.listPinnedProjects` |
-| `projects_functions.listProjects` | query | authQuery | — | caller-scoped (ctx.user) | **fixed** (high) — via `agent_projects.listProjects` |
+| `projects_functions.getProject` | query | authQuery | projects | org membership/role; row.userId == caller | ok — the machine and folder (`machineId`, `path`) are returned to the project's owner only |
+| `projects_functions.listPinnedProjects` | query | authQuery | — | caller-scoped (ctx.user) | **fixed** (high) — via `agent_projects.listPinnedProjects`; the machine and folder are owner-only |
+| `projects_functions.listProjects` | query | authQuery | — | caller-scoped (ctx.user) | **fixed** (high) — via `agent_projects.listProjects`; the machine and folder are owner-only |
 | `projects_functions.listThreadsByProject` | query | authQuery | projects | row.userId == caller | ok |
 | `projects_functions.moveThreadToProject` | mutation | authMutation + RL | projects, threads | row.userId == caller | ok |
 | `projects_functions.pinProject` | mutation | authMutation + RL | projects | row.userId == caller | ok |
@@ -727,7 +732,7 @@ for a schema table that is neither policed nor listed:
 | `workflow_functions.getWorkflow` | query | authQuery | projects | row.userId == caller | ok |
 | `workflow_functions.listExecutions` | query | authQuery | projects | row.userId == caller | ok |
 | `workflow_functions.listNodeExecutions` | query | authQuery | workflowExecutions | row.userId == caller | ok |
-| `workflow_functions.listWorkflows` | query | authQuery | — | caller-scoped (ctx.user) | **fixed** (high) — via `agent_projects.listProjects` |
+| `workflow_functions.listWorkflows` | query | authQuery | — | caller-scoped (ctx.user) | **fixed** (high) — via `agent_projects.listProjects`; the machine and folder are owner-only |
 | `workflow_functions.updateExecutionStatus` | mutation | authMutation + RL | workflowExecutions | row.userId == caller | ok |
 | `workflow_functions.updateNodeExecution` | mutation | authMutation + RL | — | row.userId == caller | ok |
 | `workflow_functions.updateWorkflowContent` | mutation | authMutation + RL | projects | row.userId == caller | ok |

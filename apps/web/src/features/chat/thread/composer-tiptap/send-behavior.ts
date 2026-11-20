@@ -1,8 +1,8 @@
 /**
  * What an Enter chord does in the composer, from the user's `sendBehavior` preference.
- * Cmd/Ctrl+Enter sends in every mode.
+ * Cmd/Ctrl+Enter sends in every mode. `modEnter` makes it the only send chord: plain Enter then adds a line.
  */
-export type SendBehavior = "button" | "enter" | "shiftEnter";
+export type SendBehavior = "button" | "enter" | "modEnter" | "shiftEnter";
 
 export type EnterChord = "mod" | "plain" | "shift";
 
@@ -24,6 +24,10 @@ export const resolveEnterAction = (behavior: SendBehavior, chord: EnterChord): E
 export const sendShortcutLabel = (behavior: SendBehavior): string | undefined => {
     if (behavior === "enter") {
         return "Enter";
+    }
+
+    if (behavior === "modEnter") {
+        return "Ctrl/Cmd+Enter";
     }
 
     return behavior === "shiftEnter" ? "Shift+Enter" : undefined;
