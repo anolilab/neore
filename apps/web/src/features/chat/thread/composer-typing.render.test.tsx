@@ -86,6 +86,13 @@ vi.mock("@/lib/env", () => {
     return { default: { VITE_LUNORA_URL: "http://localhost:8788" } };
 });
 
+vi.mock("@/features/auth/hooks/use-auth-session", () => {
+    return {
+        useAuthSession: () => {
+            return { data: { user: { id: "user-1" } } };
+        },
+    };
+});
 vi.mock("@/features/auth/hooks/use-invite-only", () => {
     return {
         default: () => {
