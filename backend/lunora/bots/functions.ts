@@ -11,6 +11,7 @@ import { patchRow, withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { SUB_AGENT_MAX_DEPTH } from "../sub-agents/logic";
 import { isTaskModelAllowed } from "../tasks/logic";
+import { markBotOwnerDeleted } from "./owner";
 
 const vPermissionMode = v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"));
 
@@ -98,6 +99,9 @@ export const createBot = authMutation
             userId,
         });
 
+        // The owner outlives a deleted bot, so a memory it taught still names whoever made the bot (`botOwners`).
+        await context.db.insert("botOwners", { botId, createdAt: now, ownerId: userId });
+
         context.log.event("bots.create_bot", {
             botId,
             computerEnabled: args.computerEnabled,
@@ -184,6 +188,9 @@ export const deleteBot = authMutation
         // Threads, routines and memories that name this bot keep the id. Readers
         // treat a missing bot as the plain assistant, so nothing is rewritten here.
         await context.db.delete("bots", bot._id);
+
+        // Its tombstone tells the memory list the bot is gone.
+        await markBotOwnerDeleted(context, bot._id, context.now);
 
         context.log.event("bots.delete_bot", {});
 

@@ -82,6 +82,9 @@ const MemorySettings: FC = () => {
     const { data: memories, refetch: refetchMemories } = useQuery({
         ...crpc.memory.functions.listUserMemories.queryOptions({}),
         enabled: memoryEnabled,
+        // A shared bot's label comes from the global `botOwners` table, whose writes on the bot owner's shard never
+        // reach this live query: read it again whenever the person comes back to the page.
+        refetchOnWindowFocus: "always",
     });
 
     // Fetch memory stats (skip when memory is disabled)

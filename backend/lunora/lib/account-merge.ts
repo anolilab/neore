@@ -57,6 +57,7 @@ export const shardLocalTables = (source: unknown = schema): string[] =>
  * {@link GLOBAL_USER_TABLES_NOT_REASSIGNED} (`account-merge.test.ts` pins it).
  */
 export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>> = {
+    botOwners: ["ownerId"],
     chatFileAccess: ["userId"],
     feedback: ["userId"],
     // Without this a guest's collection stays the guest's: the files that moved
@@ -228,17 +229,27 @@ export const reassignGlobalRows = internalMutation
     .mutation(async ({ args, ctx }) => {
         const facades = ctx.db as unknown as Record<
             string,
-            { findMany: (options: { where: Record<string, string> }) => Promise<{ page: Record<string, unknown>[] }> }
+            {
+                findMany: (options: { consistency: "primary"; where: Record<string, string> }) => Promise<{ page: Record<string, unknown>[] }>;
+            }
         >;
         let reassigned = 0;
 
         for (const [table, columns] of Object.entries(GLOBAL_USER_COLUMNS)) {
             for (const column of columns) {
-                const { page } = await facades[table]!.findMany({ where: { [column]: args.from } });
+                // One read returns at most a page (4096 rows): read again until none is left. Each patch moves its row out of
+                // the filter, and a primary read sees that at once, so the loop ends.
+                for (;;) {
+                    const { page } = await facades[table]!.findMany({ consistency: "primary", where: { [column]: args.from } });
 
-                for (const row of page) {
-                    await ctx.db.patch(table as never, row._id as never, { [column]: args.to } as never);
-                    reassigned += 1;
+                    if (page.length === 0) {
+                        break;
+                    }
+
+                    for (const row of page) {
+                        await ctx.db.patch(table as never, row._id as never, { [column]: args.to } as never);
+                        reassigned += 1;
+                    }
                 }
             }
         }

@@ -135,10 +135,13 @@ export interface ReflectionPlan {
 
 /**
  * A write the apply mutation performs. `supersede` with `byMemoryId === memoryId` retires a row; with `expiredOn`,
- * only while the row is still past its end date on that day, so an end date moved after planning keeps it.
+ * only while the row is still past its end date on that day, so an end date moved after planning keeps it. `merge`
+ * marks one that folds a near-duplicate into its survivor (`mergeToOps`), not a belief replacing another.
  */
 export type ReflectionOp =
     | {
+          /** A merge's absorbed row as the plan read it: a row revised since is neither retired nor quoted on the survivor. */
+          absorbedText?: string;
           byMemoryId: string;
           checkDates?: {
               by: { eventEnd?: string; eventStart?: string; validUntil?: string };
@@ -147,6 +150,7 @@ export type ReflectionOp =
           expiredOn?: string;
           kind: "supersede";
           memoryId: string;
+          merge?: true;
       }
     | {
           checkDates?: { memory: { eventEnd?: string; eventStart?: string; validUntil?: string } };
@@ -155,8 +159,20 @@ export type ReflectionOp =
           lastConfirmedAt?: number;
           memory?: string;
           memoryId: string;
+          /** A merge survivor's text as the plan read it: a survivor edited since takes no merge. */
+          readText?: string;
       }
-    | { confidence: number; importance: number; kind: "promote"; memory: string; sourceIds: string[]; threadId?: string; type: MemoryType };
+    | {
+          confidence: number;
+          importance: number;
+          kind: "promote";
+          memory: string;
+          sourceIds: string[];
+          /** The text each source read when the synthesis decided on it: a source revised since is left out of the promotion. */
+          sourceTexts?: { id: string; memory: string }[];
+          threadId?: string;
+          type: MemoryType;
+      };
 
 // ============================================================================
 // Similarity
@@ -554,7 +570,11 @@ export const revisionToOps = (
 };
 
 /** A supersession planned on the dates both rows held then: applying it checks they still hold them. */
-const supersedeChecked = (memoryId: string, byMemoryId: string, memories: ReadonlyMap<string, ReflectionMemory>): ReflectionOp => {
+const supersedeChecked = (
+    memoryId: string,
+    byMemoryId: string,
+    memories: ReadonlyMap<string, ReflectionMemory>,
+): Extract<ReflectionOp, { kind: "supersede" }> => {
     const row = memories.get(memoryId);
     const by = memories.get(byMemoryId);
 
@@ -585,8 +605,13 @@ export const mergeToOps = (merge: MergeCandidate, memories: ReadonlyMap<string, 
             memoryId: merge.survivorId,
             ...(text && { memory: text }),
             ...(survivor && { checkDates: { memory: factDatesOf(survivor) } }),
+            ...(survivor && { readText: survivor.text }),
         },
-        ...merge.absorbedIds.map((memoryId) => supersedeChecked(memoryId, merge.survivorId, memories)),
+        ...merge.absorbedIds.map((memoryId): ReflectionOp => {
+            const absorbedText = memories.get(memoryId)?.text;
+
+            return { ...supersedeChecked(memoryId, merge.survivorId, memories), merge: true, ...(absorbedText !== undefined && { absorbedText }) };
+        }),
     ];
 };
 
@@ -594,6 +619,13 @@ export const mergeToOps = (merge: MergeCandidate, memories: ReadonlyMap<string, 
  * How many merges the written ops still carry out: one whose wording was dropped as only a secret supersedes nothing
  * (`redactReflectionOps`), so the digest does not count it.
  */
+/** The ops the write carried out: a supersede it skipped (a row changed since the plan) merged or resolved nothing. */
+export const committedReflectionOps = (ops: ReadonlyArray<ReflectionOp>, supersededIds: ReadonlyArray<string>): ReflectionOp[] => {
+    const superseded = new Set(supersededIds);
+
+    return ops.filter((op) => op.kind !== "supersede" || superseded.has(op.memoryId));
+};
+
 export const countAppliedMerges = (merges: ReadonlyArray<MergeCandidate>, ops: ReadonlyArray<ReflectionOp>): number => {
     const absorbed = new Set(ops.flatMap((op) => (op.kind === "supersede" ? [`${op.byMemoryId}\u{0}${op.memoryId}`] : [])));
 
@@ -636,6 +668,9 @@ export const promotionToOp = (
         kind: "promote",
         memory: text,
         sourceIds: sources.map((m) => m.id),
+        sourceTexts: sources.map((m) => {
+            return { id: m.id, memory: m.text };
+        }),
         type: decision.type,
         ...(latest?.threadId && { threadId: latest.threadId }),
     };

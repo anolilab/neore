@@ -331,6 +331,37 @@ describe("extraction vector dedup", () => {
         ]);
     });
 
+    it("gives a legacy memory with no quote the quote of a restatement", async () => {
+        expect.assertions(1);
+
+        const rowId = await harness.run(async (ctx: any) => {
+            const vector = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: VECTOR });
+
+            searchVectors.mockResolvedValue([{ _id: vector, _score: 0.97 }]);
+
+            return await ctx.db.insert("memories", { embeddingId: vector, memory: FACT, type: "activity", userId: USER });
+        });
+
+        generateText.mockResolvedValueOnce({
+            output: { facts: [{ confidence: 90, importance: 80, memory: FACT, quote: "blue vase in Lisbon", type: "activity" }] },
+        });
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "A lovely vase.",
+                    quotablePrompt: "I bought a blue vase in Lisbon, please remember that about me",
+                    threadId,
+                    userId: USER,
+                    userMessage: "I bought a blue vase in Lisbon, please remember that about me",
+                }),
+        );
+
+        const row = await harness.run(async (ctx: any) => await ctx.db.get("memories", rowId));
+
+        expect(row?.evidence?.quote).toBe("blue vase in Lisbon");
+    });
+
     it("stores a revision's wording redacted, and keeps it when a later revision of the row is only a secret", async () => {
         expect.assertions(3);
 
