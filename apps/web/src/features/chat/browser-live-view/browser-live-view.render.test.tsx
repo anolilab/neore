@@ -83,6 +83,8 @@ const setVisibility = (state: DocumentVisibilityState): void => {
 };
 
 afterEach(() => {
+    // Spies on the clock first (a test's `setTimeout` wraps the fake one), then the real clock back.
+    vi.restoreAllMocks();
     vi.useRealTimers();
     setVisibility("visible");
     backend.browser = null;
@@ -172,6 +174,44 @@ describe("BrowserLiveView", () => {
         expect(screen.queryByRole("region", { name: "Browser" })).toBeNull();
         expect(screen.queryByText("https://example.com/login")).toBeNull();
         expect(backend.statusReads).toBeGreaterThan(readsBefore);
+    });
+
+    it("waits for a grant that ends weeks from now without waking up again and again, and leaves when it ends", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const DAY = 24 * 60 * 60 * 1000;
+
+        const fakeSetTimeout = globalThis.setTimeout;
+        // A browser fires a timer longer than 2^31 − 1 ms at once; the fake clock does not, so the test does what a browser does.
+        const timers = vi
+            .spyOn(globalThis, "setTimeout")
+            .mockImplementation(((handler: () => void, delay?: number) =>
+                fakeSetTimeout(handler, (delay ?? 0) > 2_147_483_647 ? 1 : delay)) as typeof setTimeout);
+
+        backend.browser = { accessUntil: Date.now() + 30 * DAY, browserId: "b-1", idleUntil: Date.now() + 60 * DAY };
+        mountCard();
+        await screen.findByRole("region", { name: "Browser" });
+        timers.mockClear();
+
+        // A second in steps, each committed on its own (one `act` would batch the renders of a looping card into one).
+        for (let step = 0; step < 20; step += 1) {
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(50);
+            });
+        }
+
+        // A card that set a new timer on every render would have set one for each step.
+        expect(timers.mock.calls.length).toBeLessThan(5);
+        expect(screen.getByRole("region", { name: "Browser" })).toBeTruthy();
+
+        backend.browser = null;
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(29 * DAY);
+        });
+        expect(screen.getByRole("region", { name: "Browser" })).toBeTruthy();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(DAY);
+        });
+        expect(screen.queryByRole("region", { name: "Browser" })).toBeNull();
     });
 
     it("drops a view that arrives after the person hid it again", async () => {

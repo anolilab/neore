@@ -48,6 +48,9 @@ const failureReasonOf = (error: unknown): FailureReason => {
 
 const CLOSED: View = { kind: "closed" };
 
+/** The longest delay a browser timer keeps (2^31 − 1 ms, about 24.8 days); a longer one fires at once. */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
 /** True once `until` has passed; re-renders at that moment, so the card leaves without a new server answer. */
 const usePassed = (until: number | undefined): boolean => {
     const [now, setNow] = useState(() => Date.now());
@@ -57,8 +60,10 @@ const usePassed = (until: number | undefined): boolean => {
             return undefined;
         }
 
-        // From the real time, not the last render's: a later `until` would otherwise fire late by the time between.
-        const timer = setTimeout(() => setNow(Date.now()), Math.max(0, until - Date.now()) + 50);
+        // From the real time, not the last render's: a later `until` would otherwise fire late by the time between. A
+        // far-off `until` waits in steps of the longest delay a timer keeps; each step re-arms for what is left.
+        const delay = Math.min(Math.max(0, until - Date.now()) + 50, MAX_TIMER_DELAY_MS);
+        const timer = setTimeout(() => setNow(Date.now()), delay);
 
         return () => clearTimeout(timer);
     }, [until, now]);
