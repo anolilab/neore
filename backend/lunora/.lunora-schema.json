@@ -23704,6 +23704,81 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "savedSiteLogins": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "encryptedPassword": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "label": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "refined": true
+        },
+        "origin": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "refined": true
+        },
+        "teammateIds": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "id",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "ref": "bots"
+          }
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "username": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "refined": true
+        }
+      },
+      "indexes": {
+        "by_userId_origin": {
+          "fields": [
+            "userId",
+            "origin"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "session": {
       "commitOrdered": false,
       "fields": {
