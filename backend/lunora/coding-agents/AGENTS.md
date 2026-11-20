@@ -19,6 +19,16 @@
   `-p` executes the repo's `.claude/settings.json` hooks and `.mcp.json`
   servers. CLI flags are cited in `buildAgentCommand`; re-check them when
   bumping `npmVersion`. E2B itself is unit-tested against a fake only.
+- **Repository setup runs with no secret in the sandbox.** `.neore/setup`
+  (`repoSetupLines` in `commands.ts`) is repository content that executes, so
+  it runs after the clone deleted `GIT_AUTH_PATH`, as `SETUP_USER` (no sudo;
+  `env -i`; it owns the working tree, never `.git`), and its leftovers are
+  killed before the key exists. The script's own env holds no key
+  (`agentEnv`): `pollRun` writes it into the 0700 `RUN_DIR` only when the
+  script asks (`KEY_WANTED_PATH`), and the script exports it to the agent
+  command alone. Never pass the key in `startDetached` envs again. Setup
+  failing or timing out does not fail the run; the diff is taken against the
+  tree setup left (third line of `BASE_INFO_PATH`).
 - **Project repositories** — a project lists the repositories its runs pick
   from, one `projectRepositories` row each, added and edited only by the
   per-row procedures in `projects/functions.ts`; a project delete and the

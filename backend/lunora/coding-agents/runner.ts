@@ -11,7 +11,8 @@
  * 1. {@link startRun} — creates the sandbox, writes the script, the prompt and
  *    the GitHub credential, and launches the script in the background;
  * 2. {@link pollRun} — reads the log from a byte offset, formats and redacts
- *    it, and reports whether the script finished;
+ *    it, hands over the provider key once the script asks for it (after the
+ *    repository's own setup script ended), and reports whether it finished;
  * 3. {@link finalizeRun} — collects the diff and summary and kills the sandbox.
  *
  * Each step takes seconds. Kept free of Lunora and E2B so the lifecycle is
@@ -23,6 +24,7 @@
 import { formatClaudeStreamLine } from "./agent-output";
 import type { CodingAgentId, CommitAuthor, ParsedRepo, RunStatus } from "./commands";
 import {
+    AGENT_KEY_PATH,
     agentEnv,
     BASE_INFO_PATH,
     buildAgentPrompt,
@@ -35,6 +37,7 @@ import {
     credentialFor,
     DIFF_MAX_BYTES,
     GIT_AUTH_PATH,
+    KEY_WANTED_MARK,
     parsePullRequestStatus,
     parseRunStatus,
     PATCH_PATH,
@@ -47,6 +50,7 @@ import {
     REPO_DIR,
     RUN_LOG_PATH,
     RUN_SCRIPT_PATH,
+    SETUP_STEP_LABELS,
     TIMEOUT_EXIT_CODE,
 } from "./commands";
 import { expandSecrets, redactSecrets } from "./redact";
@@ -117,6 +121,21 @@ const describeFailure = (step: string, outcome: CommandOutcome): string => {
     return `${step} failed (exit ${String(outcome.exitCode)})${detail ? `: ${detail}` : ""}`;
 };
 
+const OBJECT_ID = /^[0-9a-f]{40}$/u;
+
+/** The tree the repository's setup script left, when it ran (its changes are not the agent's), else the clone's commit. */
+const diffBaseOf = (baseSha: string, setupTree: string | undefined): string => {
+    const tree = setupTree?.trim();
+
+    return tree !== undefined && OBJECT_ID.test(tree) ? tree : baseSha;
+};
+
+const setupFailure = (step: string): string => {
+    const label = SETUP_STEP_LABELS[step];
+
+    return `${label ? `Setup failed while ${label}` : `Setup failed at step "${step}"`}. See the log for details.`;
+};
+
 const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 export interface StartResult {
@@ -165,11 +184,11 @@ export const startRun = async (
             await sandbox.writeFile(GIT_AUTH_PATH, credential);
         }
 
-        // The provider key is the one secret the script's environment carries:
-        // the agent needs it, and it is the user's own key for the agent they chose.
+        // No secret in the script's environment: the repository's setup script runs
+        // before the agent, and the provider key is handed over by `pollRun` after it.
         await sandbox.startDetached(`bash ${RUN_SCRIPT_PATH} > ${RUN_LOG_PATH} 2>&1 < /dev/null`, {
             cwd: "/home/user",
-            envs: agentEnv(spec.agent, spec.providerKey),
+            envs: agentEnv(spec.agent),
         });
 
         return { sandboxId: sandbox.id, status: "started" };
@@ -216,20 +235,36 @@ const formatClaudeChunk = (chunk: string): { summary?: string; text: string } =>
     return { ...(summary !== undefined && { summary }), text: lines.length > 0 ? `${lines.join("\n")}\n` : "" };
 };
 
+/** The first line of `text`, and what follows it. */
+const splitLine = (text: string): [string, string] => {
+    const newline = text.indexOf("\n");
+
+    return newline === -1 ? [text, ""] : [text.slice(0, newline), text.slice(newline + 1)];
+};
+
 /**
  * Read what the script logged since `offset`. Only whole lines are consumed —
  * the rest is re-read next poll — so neither a secret nor a JSON event is ever
  * split across two polls. The exceptions: a line longer than a whole read, and
  * the tail once the script has ended.
+ *
+ * When the script waits for the provider key (repository setup has ended), the
+ * key is written to its private directory. Without a key the script gives up on
+ * its own (`setup-failed:agent-key`).
  */
 export const pollRun = async (
-    sandbox: Pick<SandboxHandle, "run">,
-    input: { agent: CodingAgentId; offset: number; secrets: ReadonlyArray<string> },
+    sandbox: Pick<SandboxHandle, "run" | "writeFile">,
+    input: { agent: CodingAgentId; offset: number; providerKey?: string; secrets: ReadonlyArray<string> },
 ): Promise<PollResult> => {
     const result = await sandbox.run(buildPollCommand(input.offset), { cwd: "/home/user", timeoutMs: COMMAND_TIMEOUT_MS });
-    const newline = result.stdout.indexOf("\n");
-    const status = parseRunStatus(newline === -1 ? result.stdout : result.stdout.slice(0, newline));
-    const chunk = newline === -1 ? "" : result.stdout.slice(newline + 1);
+    const [statusLine, afterStatus] = splitLine(result.stdout);
+    const [keyLine, chunk] = splitLine(afterStatus);
+    const status = parseRunStatus(statusLine);
+
+    if (!status && keyLine.trim() === KEY_WANTED_MARK && input.providerKey) {
+        await sandbox.writeFile(AGENT_KEY_PATH, input.providerKey);
+    }
+
     const lastNewline = chunk.lastIndexOf("\n");
     let consumed = chunk;
 
@@ -258,7 +293,7 @@ export const finalizeRun = async (
 
     try {
         const baseInfo = await sandbox.readFile(BASE_INFO_PATH).catch(() => "");
-        const [baseSha, baseBranch] = baseInfo.trim().split("\n", 2);
+        const [baseSha, baseBranch, setupTree] = baseInfo.trim().split("\n", 3);
 
         if (baseSha?.trim()) {
             outcome.baseSha = baseSha.trim();
@@ -271,7 +306,7 @@ export const finalizeRun = async (
         const { status } = input;
 
         if (status.kind === "setup-failed") {
-            outcome.error = `Setup failed at step "${status.step}". See the log for details.`;
+            outcome.error = setupFailure(status.step);
 
             return outcome;
         }
@@ -297,7 +332,8 @@ export const finalizeRun = async (
         }
 
         if (outcome.baseSha) {
-            const diff = await sandbox.run(buildDiffCommand(outcome.baseSha), { cwd: REPO_DIR, timeoutMs: COMMAND_TIMEOUT_MS });
+            const diffBase = diffBaseOf(outcome.baseSha, setupTree);
+            const diff = await sandbox.run(buildDiffCommand(diffBase), { cwd: REPO_DIR, timeoutMs: COMMAND_TIMEOUT_MS });
 
             if (diff.exitCode !== 0) {
                 outcome.error = redact(describeFailure("git diff", diff));
@@ -305,7 +341,7 @@ export const finalizeRun = async (
                 return outcome;
             }
 
-            const stat = await sandbox.run(buildDiffStatCommand(outcome.baseSha), { cwd: REPO_DIR, timeoutMs: COMMAND_TIMEOUT_MS });
+            const stat = await sandbox.run(buildDiffStatCommand(diffBase), { cwd: REPO_DIR, timeoutMs: COMMAND_TIMEOUT_MS });
 
             outcome.diffTruncated = diff.stdout.length > DIFF_MAX_BYTES;
             outcome.diff = redact(diff.stdout.slice(0, DIFF_MAX_BYTES));

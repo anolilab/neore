@@ -5,10 +5,12 @@ import type { HostDriver } from "../source-control/driver";
 import type { HostRequest } from "../source-control/origin-fetch";
 import { HostApiError } from "../source-control/origin-fetch";
 import {
+    AGENT_KEY_PATH,
     BASE_INFO_PATH,
     CODEX_LAST_MESSAGE_PATH,
     GIT_AUTH_PATH,
     githubBasicCredential,
+    KEY_WANTED_MARK,
     parseRepoUrl,
     PATCH_PATH,
     PR_SCRIPT_PATH,
@@ -135,8 +137,8 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-/** A poll answer: status line, then the log bytes. */
-const pollOutput = (status: string, log: string): CommandOutcome => ok(`${status}\n${log}`);
+/** A poll answer: status line, key-wanted line, then the log bytes. */
+const pollOutput = (status: string, log: string, keyWanted = false): CommandOutcome => ok(`${status}\n${keyWanted ? KEY_WANTED_MARK : ""}\n${log}`);
 
 describe("startRun (the async hand-off)", () => {
     it("launches the run script detached and returns without waiting for the agent", async () => {
@@ -153,12 +155,14 @@ describe("startRun (the async hand-off)", () => {
         expect(sandbox.killed).toBe(0);
     });
 
-    it("gives the script only the provider key; the GitHub credential goes to a file the clone deletes", async () => {
+    it("gives the script no secret; the GitHub credential goes to a file the clone deletes, the key waits for the poller", async () => {
         const sandbox = fakeSandbox();
 
         await startRun(spec(), { onSandbox: notCancelled, sandboxes: providerFor(sandbox) });
 
-        expect(sandbox.detached[0]?.envs?.["ANTHROPIC_API_KEY"]).toBe(PROVIDER_KEY);
+        expect(sandbox.detached[0]?.envs).not.toHaveProperty("ANTHROPIC_API_KEY");
+        expect(JSON.stringify(sandbox.detached)).not.toContain(PROVIDER_KEY);
+        expect([...sandbox.files.values()].join("\n")).not.toContain(PROVIDER_KEY);
         expect(JSON.stringify(sandbox.detached)).not.toContain(GITHUB_TOKEN);
         expect(JSON.stringify(sandbox.detached)).not.toContain(githubBasicCredential(GITHUB_TOKEN));
         expect(sandbox.files.get(GIT_AUTH_PATH)).toBe(githubBasicCredential(GITHUB_TOKEN));
@@ -239,6 +243,26 @@ describe("pollRun", () => {
         expect(result.summary).toBe("Done. ([REDACTED])");
     });
 
+    it("writes the key only once the script asks for it, after repository setup", async () => {
+        const waiting = fakeSandbox(() => pollOutput("", "setup done\n", true));
+
+        await pollRun(waiting, { agent: "codex", offset: 0, providerKey: PROVIDER_KEY, secrets });
+
+        expect(waiting.files.get(AGENT_KEY_PATH)).toBe(PROVIDER_KEY);
+
+        const settingUp = fakeSandbox(() => pollOutput("", "npm install\n"));
+
+        await pollRun(settingUp, { agent: "codex", offset: 0, providerKey: PROVIDER_KEY, secrets });
+
+        expect(settingUp.files.has(AGENT_KEY_PATH)).toBe(false);
+
+        const ended = fakeSandbox(() => pollOutput("setup-failed:agent-key", "", true));
+
+        await pollRun(ended, { agent: "codex", offset: 0, providerKey: PROVIDER_KEY, secrets });
+
+        expect(ended.files.has(AGENT_KEY_PATH)).toBe(false);
+    });
+
     it("reports the status and takes the unterminated tail once the script ended", async () => {
         const result = await pollRun(
             fakeSandbox(() => pollOutput("agent:0", "last words")),
@@ -263,6 +287,18 @@ describe("finalizeRun", () => {
         expect(sandbox.killed).toBe(1);
     });
 
+    it("diffs against the tree the repository's setup left, when it ran", async () => {
+        const setupTree = "fedcba9876543210fedcba9876543210fedcba98";
+        const sandbox = fakeSandbox();
+
+        sandbox.files.set(BASE_INFO_PATH, `${BASE_SHA}\nmain\n${setupTree}\n`);
+
+        const outcome = await finalizeRun(sandbox, { ...base, agent: "claude_code", status: { exitCode: 0, kind: "agent" } });
+
+        expect(outcome.baseSha).toBe(BASE_SHA);
+        expect(sandbox.calls.map((call) => call.command).filter((command) => command.includes(setupTree))).toHaveLength(2);
+    });
+
     it("reads codex's summary from its last-message file", async () => {
         const outcome = await finalizeRun(fakeSandbox(), { ...base, agent: "codex", status: { exitCode: 0, kind: "agent" } });
 
@@ -270,7 +306,9 @@ describe("finalizeRun", () => {
     });
 
     it.each([
-        ["a setup failure", { kind: "setup-failed", step: "clone" } as const, 'Setup failed at step "clone"'],
+        ["a setup failure", { kind: "setup-failed", step: "clone" } as const, "Setup failed while cloning the repository"],
+        ["a repository setup failure", { kind: "setup-failed", step: "repo-setup" } as const, "after its setup script (.neore/setup)"],
+        ["an unknown setup step", { kind: "setup-failed", step: "other" } as const, 'Setup failed at step "other"'],
         ["a timeout", { exitCode: 124, kind: "agent" } as const, "Timed out after 20 minutes"],
         ["a non-zero exit", { exitCode: 2, kind: "agent" } as const, "exited with code 2"],
     ])("fails on %s and still kills the sandbox", async (_label, status, error) => {

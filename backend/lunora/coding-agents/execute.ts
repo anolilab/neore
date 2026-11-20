@@ -192,7 +192,7 @@ export const pollCodingAgentRun = internalAction
             return null;
         }
 
-        // Exact-match redaction needs the key; the GitHub token never reaches
+        // Exact-match redaction and the key hand-off need the key; the GitHub token never reaches
         // the log (it lives only in the clone's `git` process), and the token
         // patterns in `redactSecrets` back that up.
         const providerKey = await loadProviderKey(ctx, run.userId, run.agent);
@@ -200,7 +200,8 @@ export const pollCodingAgentRun = internalAction
         let polled: Awaited<ReturnType<typeof pollRun>>;
 
         try {
-            polled = await pollRun(sandbox, { agent: run.agent, offset: run.logOffset, secrets });
+            // The key goes to the sandbox only when the script asks for it, after the repository's setup script.
+            polled = await pollRun(sandbox, { agent: run.agent, offset: run.logOffset, ...(providerKey !== undefined && { providerKey }), secrets });
         } catch {
             // A transient read failure: try again next time; the deadline bounds it.
             await next();
