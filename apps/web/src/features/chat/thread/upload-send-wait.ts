@@ -1,6 +1,6 @@
 import type { PendingAttachment } from "../core/stores/chat-ui-store";
 
-type WaitedAttachment = Pick<PendingAttachment, "fileId" | "id" | "name" | "status">;
+type WaitedAttachment = Partial<Pick<PendingAttachment, "file">> & Pick<PendingAttachment, "fileId" | "id" | "name" | "status">;
 
 /** A reference image attached to the next message: only its id matters here. */
 interface WaitedReference {
@@ -19,6 +19,8 @@ export interface Draft {
 /** An attachment as the send pressed on it: its id, the uploaded file it had then, and whether it had finished. */
 interface PressedAttachment {
     complete: boolean;
+    /** The file it held: an edit while it uploads replaces it, though the id stays; a retry keeps it. */
+    file: File | undefined;
     fileId: string | undefined;
     id: string;
 }
@@ -49,7 +51,7 @@ const pressedAttachment = (attachment: WaitedAttachment): PressedAttachment => {
     const complete = attachment.status === "complete";
 
     // A file still uploading may hold the id of the upload it replaces (an edit or a retry); only a finished one's is kept.
-    return { complete, fileId: complete ? attachment.fileId : undefined, id: attachment.id };
+    return { complete, file: attachment.file, fileId: complete ? attachment.fileId : undefined, id: attachment.id };
 };
 
 /** The wait a send pressed on `draft` starts with, for the chat and account the send was pressed in. */
@@ -76,6 +78,7 @@ const sameAttachments = (attachments: ReadonlyArray<WaitedAttachment>, pressed: 
 
         return (
             attachment.id === before?.id &&
+            (before.file === undefined || attachment.file === before.file) &&
             (before.fileId === undefined || attachment.fileId === before.fileId) &&
             (!before.complete || attachment.status === "complete")
         );
