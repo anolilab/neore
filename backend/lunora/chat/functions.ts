@@ -4703,7 +4703,9 @@ export const generateFollowupSuggestionsForThread = internalAction
                     paginationOpts: { cursor: null, numItems: 10 },
                     threadId,
                 });
-                const latest = rowsAfterContextReset(page.page || [], contextReset).find((messageDocument) => {
+                // Filtered by the reset read just now, which equals the one read at the start (the check above returns otherwise).
+                // System rows are skipped on purpose: an agent-switch divider does not hide the reply the composer shows.
+                const latest = rowsAfterContextReset(page.page || [], currentReset).find((messageDocument) => {
                     const role = messageDocument.message?.role;
 
                     return role === "user" || role === "assistant";
