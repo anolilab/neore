@@ -103,7 +103,15 @@ const save = async (args: Record<string, unknown>, userId = OWNER) =>
 
 const rows = async () => (await harness.run(async (ctx: any) => await ctx.db.query("savedSiteLogins").collect())) as Record<string, unknown>[];
 
-type Turn = { headless: boolean; impersonated: boolean; origin: string; promptMessageId?: string; startedBy: string; taintedBy: string[] };
+type Turn = {
+    headless: boolean;
+    impersonated: boolean;
+    origin: string;
+    promptMessageId?: string;
+    startedBy: string;
+    taintedBy: string[];
+    untrustedContext: boolean;
+};
 
 // The owner's own prompt in each thread, written before the run asks for a login.
 const prompts = new Map<string, string>();
@@ -146,6 +154,7 @@ const turnFor = async (threadId: string, userId: string, overrides: Partial<Turn
         promptMessageId: await promptFor(threadId),
         startedBy: userId,
         taintedBy: [],
+        untrustedContext: false,
         ...overrides,
     };
 };
@@ -496,13 +505,17 @@ describe("which chats may use a login", () => {
         expect(await usable(plainThread)).toStrictEqual([{ site: SITE }]);
     });
 
-    it("a turn that has already read something untrusted gets none: a tool result in the step or earlier on the path, a summary that folded one", async () => {
+    it("a turn that has already read something untrusted gets none: a tool result in the step or on the path, injected context, a summary that folded one", async () => {
         await save({ password: PASSWORD });
 
         for (const source of ["web", "knowledge", "mcp", "device", "files"]) {
             expect(await usable(plainThread, OWNER, { taintedBy: [source] })).toStrictEqual([]);
             expect(await forFill(plainThread, SITE, OWNER, { taintedBy: [source] })).toBeNull();
         }
+
+        // Knowledge excerpts, memories, project context or skill text in the system prompt.
+        expect(await usable(plainThread, OWNER, { untrustedContext: true })).toStrictEqual([]);
+        expect(await forFill(plainThread, SITE, OWNER, { untrustedContext: true })).toBeNull();
 
         // An earlier turn read a page: the tool result is still on the prompt's path, whatever the caller reports.
         const earlier = await insertThread({});
@@ -523,6 +536,27 @@ describe("which chats may use a login", () => {
         );
 
         expect(await usable(earlier)).toStrictEqual([]);
+
+        // An earlier turn's captured page: a plain text part with no `fileIds`, still on the prompt's path.
+        const earlierPage = await insertThread({});
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("messages", {
+                    message: {
+                        content: [{ providerOptions: { neore: { pageContext: { kind: "page" } } }, text: "From the page", type: "text" }],
+                        role: "user",
+                    },
+                    order: -1,
+                    status: "success",
+                    stepOrder: 0,
+                    threadId: earlierPage,
+                    tool: false,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(await usable(earlierPage)).toStrictEqual([]);
 
         const prompt = await promptFor(plainThread);
 

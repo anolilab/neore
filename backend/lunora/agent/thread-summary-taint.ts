@@ -12,6 +12,7 @@
  */
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import { messagesCarryAttachedText } from "../chat/lib/attached-text";
 import { computeTaint, type DeviceTaintSource, mergeTaint } from "../devices/lib/taint";
 import { agentSwitchOf } from "./agent-switch-logic";
 import { walkPath } from "./branch-rows";
@@ -54,14 +55,19 @@ const PATH_TAINT_PAGE = 100;
 
 /**
  * A file attached to a row is untrusted whatever the row's own parts look like: a document's text reaches the model as
- * text, and the file is named only by `fileIds`. Only the assistant's own rows (generated media) are left out.
+ * text, and the file is named only by `fileIds`. Only the assistant's own rows (generated media) are left out. A
+ * document's extracted text or a captured page is a plain user text part `computeTaint` cannot see
+ * (`messagesCarryAttachedText`), so it counts too.
  */
 const attachmentTaint = (rows: ReadonlyArray<Pick<Doc<"messages">, "fileIds" | "message">>): DeviceTaintSource[] =>
-    rows.some((row) => (row.fileIds?.length ?? 0) > 0 && (row.message as { role?: unknown } | undefined)?.role !== "assistant") ? ["files"] : [];
+    rows.some((row) => (row.fileIds?.length ?? 0) > 0 && (row.message as { role?: unknown } | undefined)?.role !== "assistant") ||
+    messagesCarryAttachedText(rows.map((row) => row.message as { content?: unknown; role?: unknown }))
+        ? ["files"]
+        : [];
 
 /**
  * What an agent that takes over from a thread has read when it is handed that thread's turns: the tool results and
- * attachments on its active path up to `leaf` (the handoff keeps only the text, but that text was written from them),
+ * attachments (attached document or page text included) on its active path up to `leaf` (the handoff keeps only the text, but that text was written from them),
  * the summaries that folded older rows, and a takeover the thread itself was. A path longer than the read counts as
  * having read a page: the rows nobody looked at cannot be vouched for.
  */

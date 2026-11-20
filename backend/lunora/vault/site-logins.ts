@@ -266,11 +266,17 @@ const siteLoginTurnFields = {
     /** `ToolCtx.startedBy`: who started the turn. A continuation runs as the owner whoever that was. */
     startedBy: v.string().max(64),
     /**
-     * What the run had read before it asked: `computeTaint` and `messagesCarryAttachedText` over the messages the model saw for that step (AI SDK
-     * `ToolExecutionOptions.messages`, as a device call computes it), so a page, a file or a tool result read earlier in
-     * the turn or the thread counts. Any entry refuses every login.
+     * What the run had read before it asked: `computeTaint` over the messages the model saw for that step (AI SDK
+     * `ToolExecutionOptions.messages`, as a device call computes it), plus `files` when `messagesCarryAttachedText`, so a
+     * page, a file or a tool result read earlier in the turn or the thread counts. Any entry refuses every login.
      */
     taintedBy: v.array(vDeviceTaintSource),
+    /**
+     * Whether the system prompt carries text the owner did not write in this chat: knowledge excerpts, memories, project
+     * context, the thread's stored instructions or skill text, as the low-risk check reads it (`untrustedContext` in
+     * `chat/execute.ts`, `injectsUntrustedContext`). None of it is in the step's messages or on the path, so it is told here.
+     */
+    untrustedContext: v.boolean(),
 };
 
 export type SiteLoginTurn = {
@@ -280,6 +286,7 @@ export type SiteLoginTurn = {
     promptMessageId: Id<"messages">;
     startedBy: string;
     taintedBy: ReadonlyArray<string>;
+    untrustedContext: boolean;
 };
 
 /**
@@ -335,11 +342,11 @@ const ownPromptRow = async (
 
 /**
  * Whether the run has read anything untrusted before it asked: what it reports from the step's messages
- * (`turn.taintedBy`: this turn's tool results), and, read here whatever the caller says, the prompt's path up to it, the
+ * (`turn.taintedBy`: this turn's tool results) and its system prompt (`turn.untrustedContext`), and, read here whatever the caller says, the prompt's path up to it, the
  * thread's context summaries and a coding agent's handoff (`threadPathTaint`).
  */
 const turnIsTainted = async (ctx: Pick<QueryCtx, "db">, turn: SiteLoginTurn, threadId: Id<"threads">, prompt: Doc<"messages">): Promise<boolean> => {
-    if (turn.taintedBy.length > 0) {
+    if (turn.untrustedContext || turn.taintedBy.length > 0) {
         return true;
     }
 
