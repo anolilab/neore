@@ -55,7 +55,8 @@ export const dailyLimitTierOf = (user: LimitedUser): DailyLimitTier => {
 
 export const dailyLimitKeyOf = (kind: DailyLimitKind, tier: DailyLimitTier): RateLimitKey | undefined => DAILY_LIMIT_KEYS[kind][tier];
 
-export type DailyLimitResult = { ok: true } | { ok: false; retryAfter?: number };
+/** `windowStart` is the fixed window the units were taken from; a refund gives them back only while that window is current. */
+export type DailyLimitResult = { ok: true; windowStart?: number } | { ok: false; retryAfter?: number };
 
 /**
  * Charge `count` units of `kind` to `user`'s daily quota. With a `chargeKey` (a keyed send's, `startChargeKey`) the units
@@ -83,7 +84,11 @@ export const chargeDailyLimit = async (
             ? await context.runMutation(internal.lib.rate_limiter_mutations.applyRateLimit, { count, identifier: user._id, key })
             : await context.runMutation(internal.chat.daily_charge.chargeDailyLimitOnce, { chargeKey, count, identifier: user._id, key });
 
-    return result.ok ? { ok: true } : { ok: false, retryAfter: result.retryAfter };
+    if (!result.ok) {
+        return { ok: false, retryAfter: result.retryAfter };
+    }
+
+    return { ok: true, ...(result.windowStart !== undefined && { windowStart: result.windowStart }) };
 };
 
 /**
@@ -95,7 +100,7 @@ export const refundDailyLimit = async (
     context: Pick<HttpActionCtx, "runMutation">,
     user: LimitedUser & Pick<BetterAuthUser, "_id">,
     kind: DailyLimitKind,
-    { chargeKey }: { chargeKey?: string } = {},
+    { chargeKey, windowStart }: { chargeKey?: string; windowStart?: number } = {},
 ): Promise<void> => {
     if (isPlatformAdmin(user)) {
         return;
@@ -114,6 +119,7 @@ export const refundDailyLimit = async (
             count: 1,
             identifier: user._id,
             key,
+            ...(windowStart !== undefined && { windowStart }),
         });
     } catch (error) {
         chatLogger.error("Could not refund a daily quota unit:", error);

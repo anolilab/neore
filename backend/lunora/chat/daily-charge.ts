@@ -97,35 +97,48 @@ export const chargeDailyUnit = internalMutation
  */
 export const chargeDailyLimitOnce = internalMutation
     .input({ chargeKey: v.string().max(MAX_LENGTH.long), count: v.optional(v.number()), identifier: v.string(), key: v.string() })
-    .output(v.object({ ok: v.boolean(), retryAfter: v.optional(v.number()) }))
+    .output(v.object({ ok: v.boolean(), retryAfter: v.optional(v.number()), windowStart: v.optional(v.number()) }))
     .mutation(async ({ args: { chargeKey, count, identifier, key }, ctx }) => {
         if (!(await claimOnce(ctx, DAILY_CHARGE_SCOPE, chargeKey, DAILY_CHARGE_CLAIM_TTL_MS, identifier))) {
             return { ok: true };
         }
 
-        const { ok, retryAfter } = await applyLimit(ctx, { count, identifier, key });
+        const { ok, retryAfter, windowStart } = await applyLimit(ctx, { count, identifier, key });
 
         if (!ok) {
             await releaseClaim(ctx, DAILY_CHARGE_SCOPE, chargeKey);
         }
 
-        return { ok, ...(retryAfter !== undefined && { retryAfter }) };
+        return {
+            ok,
+            ...(retryAfter !== undefined && { retryAfter }),
+            ...(windowStart !== undefined && { windowStart }),
+        };
     });
 
 /**
  * Undoes a charge for a send that was then refused, after the units were taken: the window gets its units back
- * (`refundLimitUnits`). A keyed charge's claim goes too, so the send's retry is charged normally rather than found already
- * charged, which would leave the send that succeeds uncharged.
+ * (`refundLimitUnits`), if the charge's window (`windowStart`) is still current. A keyed charge's claim goes too, so the
+ * send's retry is charged normally rather than found already charged, which would leave the send that succeeds uncharged.
+ * Without a `windowStart` (a keyed retry that found its claim already held, so this attempt took no units) nothing is given back.
  */
 export const refundDailyCharge = internalMutation
-    .input({ chargeKey: v.optional(v.string().max(MAX_LENGTH.long)), count: v.number(), identifier: v.string(), key: v.string() })
+    .input({
+        chargeKey: v.optional(v.string().max(MAX_LENGTH.long)),
+        count: v.number(),
+        identifier: v.string(),
+        key: v.string(),
+        windowStart: v.optional(v.number()),
+    })
     .output(v.null())
-    .mutation(async ({ args: { chargeKey, count, identifier, key }, ctx }) => {
+    .mutation(async ({ args: { chargeKey, count, identifier, key, windowStart }, ctx }) => {
         if (chargeKey !== undefined) {
             await releaseClaim(ctx, DAILY_CHARGE_SCOPE, chargeKey);
         }
 
-        await refundLimitUnits(ctx, { count, identifier, key });
+        if (windowStart !== undefined) {
+            await refundLimitUnits(ctx, { count, identifier, key, windowStart });
+        }
 
         return null;
     });

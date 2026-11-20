@@ -1511,8 +1511,13 @@ const runChatStartOnShard = async (
             );
         }
 
+        const { windowStart } = dailyLimit;
+
         charge.refund = async () => {
-            await refundDailyLimit(context, user, "Text", { ...(chargeKey !== undefined && { chargeKey }) });
+            await refundDailyLimit(context, user, "Text", {
+                ...(chargeKey !== undefined && { chargeKey }),
+                ...(windowStart !== undefined && { windowStart }),
+            });
         };
     }
 
@@ -2088,8 +2093,10 @@ const editMessageAttached = async (
         }
 
         // Given back if the window closes before the save (the catch below).
+        const { windowStart } = editLimit;
+
         holder.refundCharge = async () => {
-            await refundDailyLimit(context, user, "Text");
+            await refundDailyLimit(context, user, "Text", { ...(windowStart !== undefined && { windowStart }) });
         };
 
         // The edit's attachments are saved with it: refused rather than saved once the file's claim can no longer hold a lock back.

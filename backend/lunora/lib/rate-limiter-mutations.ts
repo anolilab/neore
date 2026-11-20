@@ -10,14 +10,18 @@ import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { createRatelimit, RATE_LIMIT_CONFIGS } from "./rate-limiter";
 
+/** The row the limiter reads for one identifier (`neore:<key>:<identifier>`, `lunorash/ratelimit`), encoded as the store encodes it. */
+const limitStorageKey = (key: string, identifier: string): string => `${encodeURIComponent(key)}:${encodeURIComponent(`neore:${key}:${identifier}`)}`;
+
 /**
- * Gives back `count` units that {@link applyLimit} took from a fixed window, for a send that was then refused. The window's
- * remaining count goes up by `count`, capped at its rate. A window that rolled over since the charge is already full, so the
- * refund adds nothing there. Written to the same row the limiter reads (`neore:<key>:<identifier>`, `lunorash/ratelimit`).
+ * Gives back `count` units that {@link applyLimit} took from the fixed window starting at `windowStart`, for a send that was
+ * then refused. The units go back only while that window is still the current one: once it has rolled over, the charge no
+ * longer counts against anything, and the new window's own charges must not be credited. Otherwise the remaining count goes
+ * up by `count`, capped at the rate.
  */
 export const refundLimitUnits = async (
     ctx: Pick<MutationCtx, "db">,
-    { count, identifier, key }: { count: number; identifier: string; key: string },
+    { count, identifier, key, windowStart }: { count: number; identifier: string; key: string; windowStart: number },
 ): Promise<void> => {
     const config = (RATE_LIMIT_CONFIGS as Record<string, (typeof RATE_LIMIT_CONFIGS)[keyof typeof RATE_LIMIT_CONFIGS] | undefined>)[key];
 
@@ -26,8 +30,12 @@ export const refundLimitUnits = async (
     }
 
     const store = createDbStore({ db: ctx.db as never });
-    const storageKey = `${encodeURIComponent(key)}:${encodeURIComponent(`neore:${key}:${identifier}`)}`;
+    const storageKey = limitStorageKey(key, identifier);
     const current = availableAt(config, await store.get(storageKey), Date.now());
+
+    if (current.ts !== windowStart) {
+        return;
+    }
 
     await store.set(storageKey, { ts: current.ts, value: Math.min(config.capacity ?? config.rate, current.value + count) });
 };
@@ -36,7 +44,7 @@ export const refundLimitUnits = async (
 export const applyLimit = async (
     ctx: Pick<MutationCtx, "db" | "now">,
     { count, identifier, key, reserve }: { count?: number; identifier: string; key: string; reserve?: boolean },
-): Promise<{ ok: boolean; retryAfter: number | undefined }> => {
+): Promise<{ ok: boolean; retryAfter: number | undefined; windowStart?: number }> => {
     // Widened at the lookup, not in the table — `key` arrives from the wire as
     // an already-tiered `<base>:<tier>` string.
     if (!Object.hasOwn(RATE_LIMIT_CONFIGS, key)) {
@@ -48,10 +56,15 @@ export const applyLimit = async (
     const units = reserve === true ? Math.min(count ?? 1, config.capacity ?? config.rate) : (count ?? 1);
     const result = await limiter.limit(identifier, { count: units, reserve });
 
-    return {
-        ok: result.ok,
-        retryAfter: result.ok ? undefined : Math.max(0, result.reset - ctx.now),
-    };
+    if (!result.ok) {
+        return { ok: false, retryAfter: Math.max(0, result.reset - ctx.now) };
+    }
+
+    // The window the units were taken from: a fixed window's row carries its start after a consume.
+    const store = createDbStore({ db: ctx.db as never });
+    const row = await store.get(limitStorageKey(key, identifier));
+
+    return { ok: true, retryAfter: undefined, windowStart: row?.ts };
 };
 
 export const applyRateLimit = internalMutation
