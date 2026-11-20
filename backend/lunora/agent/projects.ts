@@ -24,7 +24,7 @@ import { admitOrganization } from "../lib/rls/scope";
 import { countedWorkflowFileIds } from "../workflow/images";
 import { changeRefcount } from "./files";
 import { listThreadItem } from "./threads";
-import { eraseProjectRepositories, eraseProjectRuleFiles } from "../projects/gdpr";
+import { eraseProjectRepositories, eraseProjectRuleFiles, markProjectRuleFilesErasing } from "../projects/gdpr";
 import { mayEditProject } from "../projects/edit-access";
 import { forViewer } from "../projects/machine-location";
 
@@ -317,9 +317,11 @@ export const deleteProject = internalMutation
         // Its repositories go last before the row, so a check or thread move that fails above leaves them in place. The
         // delete's marker stays until the caller is done (`projects/functions.ts#deleteProject`).
         await eraseProjectRepositories(ctx, args.projectId, { keepMarker: true });
-        await ctx.db.delete("projects", args.projectId);
         // Its rule files only once the row is gone: a `.global()` write does not roll back, so a delete that failed in
-        // between would leave a live project without its instructions. Nothing reads them without the project.
+        // between would leave a live project without its instructions. Marked first, so a sweep finishes an erase that
+        // fails after the row went (`sweepUnfinishedRuleFileErasures`). Nothing reads them without the project.
+        await markProjectRuleFilesErasing(ctx, args.projectId);
+        await ctx.db.delete("projects", args.projectId);
         await eraseProjectRuleFiles(ctx, args.projectId);
         await recountWorkflowImages(ctx, project.userId, project.workflowContent, undefined);
 

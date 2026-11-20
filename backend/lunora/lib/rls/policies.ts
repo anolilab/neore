@@ -457,7 +457,7 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     projectRepositories:
         "access is decided by the row's project, never its own `userId`/`organizationId` copies: `readableProject`/`editableProject` in `projects/functions.ts` (read: the owner or a current member of the project's organization; change: the owner, or any current member when the project has no owner)",
     projectRuleFiles:
-        "one row per project with no owner column; every access follows the project's check (`readableProject`, `projectWithEditableSettings` in `projects/functions.ts`)",
+        "one row per project; its `userId` copies the project's owner for erasure only, and every access follows the project's check (`readableProject`, `projectWithEditableSettings` in `projects/functions.ts`)",
     promptHistory: "`userId` is the EDITOR of an org-shared prompt; read under the prompt's rule",
     rateLimit: "better-auth rate limiter",
     rateLimits: "rate-limit counters written by every procedure's rate-limit middleware",

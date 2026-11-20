@@ -139,13 +139,21 @@ describe("residual account-deletion steps", () => {
                 };
 
                 await ctx.db.insert("projectRepositories", { createdAt: NOW, projectId: refs.project, url: `https://github.com/${userId}/r.git`, userId });
-                await ctx.db.insert("projectRuleFiles", { files: [], projectId: refs.project, updatedAt: NOW });
+                await ctx.db.insert("projectRuleFiles", { files: [], projectId: refs.project, updatedAt: NOW, userId });
 
                 // Left by a project delete that failed part way: the project is gone, the row names its owner.
                 const gone = await ctx.db.insert("projects", { name: "gone", userId });
 
                 await ctx.db.delete("projects", gone);
                 await ctx.db.insert("projectRepositories", { createdAt: NOW, projectId: gone, url: `https://github.com/${userId}/left.git`, userId });
+
+                // Rule files a failed delete left too, more than one erase page of them, found by their owner.
+                for (let index = 0; index < (userId === A ? 10 : 1); index += 1) {
+                    const left = await ctx.db.insert("projects", { name: "left", userId });
+
+                    await ctx.db.delete("projects", left);
+                    await ctx.db.insert("projectRuleFiles", { files: [], projectId: left, updatedAt: NOW, userId });
+                }
 
                 for (const [table, make] of Object.entries(ROWS)) {
                     const count = userId === A ? MANY : 1;
@@ -196,10 +204,10 @@ describe("residual account-deletion steps", () => {
             `https://github.com/${B}/r.git`,
         ]);
 
-        // A's projects' rule files go with them; B's stay.
+        // A's projects' rule files go with them, those of A's deleted projects too; B's stay.
         const ruleFiles = await rowsOf("projectRuleFiles");
 
-        expect(ruleFiles).toHaveLength(1);
+        expect(ruleFiles.map((row) => row.userId)).toStrictEqual([B, B]);
 
         // The ledger keeps its amounts under the marker.
         const ledger = await rowsOf("gatewayUsageDeductions");

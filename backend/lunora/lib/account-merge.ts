@@ -69,6 +69,7 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     pageInvites: ["userId", "ownerId", "acceptedBy"],
     passkey: ["userId"],
     projectRepositories: ["userId"],
+    projectRuleFiles: ["userId"],
     projects: ["userId"],
     promptHistory: ["userId"],
     prompts: ["userId"],
@@ -233,6 +234,12 @@ export const deleteShardRows = internalMutation
  */
 const REASSIGN_BATCH = 200;
 
+/**
+ * Fewer rows per call for a table whose rows are large: each read row is charged whole against the call's read limit,
+ * and a rule-file row may hold up to `MAX_RULE_FILES_BYTES`.
+ */
+const REASSIGN_BATCH_BY_TABLE: Readonly<Record<string, number>> = { projectRuleFiles: 8 };
+
 export const reassignGlobalRows = internalMutation
     .input({ from: v.string(), to: v.string() })
     .output(v.object({ done: v.boolean(), reassigned: v.number() }))
@@ -247,7 +254,7 @@ export const reassignGlobalRows = internalMutation
 
         for (const [table, columns] of Object.entries(GLOBAL_USER_COLUMNS)) {
             for (const column of columns) {
-                const room = REASSIGN_BATCH - reassigned;
+                const room = Math.min(REASSIGN_BATCH - reassigned, REASSIGN_BATCH_BY_TABLE[table] ?? REASSIGN_BATCH);
 
                 if (room <= 0) {
                     // Primary reads: a patch moves its row out of the filter, so the next call starts where this one stopped.

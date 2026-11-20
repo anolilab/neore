@@ -21550,6 +21550,18 @@
     "projectRuleFiles": {
       "commitOrdered": false,
       "fields": {
+        "carriedContext": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "deletingAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "files": {
           "kind": "array",
           "nullable": false,
@@ -21628,14 +21640,38 @@
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "version": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
+        "by_deleting_at": {
+          "fields": [
+            "deletingAt"
+          ],
+          "unique": false
+        },
         "by_project": {
           "fields": [
             "projectId"
           ],
           "unique": true
+        },
+        "by_user": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
         }
       },
       "memory": false,

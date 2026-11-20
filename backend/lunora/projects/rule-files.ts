@@ -46,12 +46,14 @@ const LEGACY_CONTEXT_FILES = new WeakSet<RuleFile>();
 
 /**
  * The project's rule files in order: a legacy `context` first, as an `always` file, then the saved list. A project
- * whose rule files were saved has no `context` left, unless a client that still writes it set it again since.
+ * whose rule files were saved has no `context` left, unless a client that still writes it set it again since, or the
+ * save that carried it into the list failed to clear it: `carriedContext` is that save's {@link contextFingerprint}, and
+ * a `context` matching it is in the list already, so it is not read twice.
  */
-export const projectRuleFiles = (project: { context?: string | null; ruleFiles?: RuleFile[] | null }): RuleFile[] => {
+export const projectRuleFiles = (project: { carriedContext?: string | null; context?: string | null; ruleFiles?: RuleFile[] | null }): RuleFile[] => {
     const files = project.ruleFiles ?? [];
 
-    if (!project.context) {
+    if (!project.context || isCarriedContext(project.context, project.carriedContext)) {
         return files;
     }
 
@@ -260,12 +262,8 @@ export const selectRuleFiles = (files: RuleFile[], paths: string[]): { files: Ru
     return { files: selected, matchingCut: budget.steps <= 0, omitted: applicable.length - selected.length, truncated };
 };
 
-/**
- * A short fingerprint of a list of rule files, in order: what the editor read, so a save from an older view is refused
- * (`setProjectRuleFiles`). FNV-1a over the JSON, with its length; not a security measure.
- */
-export const ruleFilesRevision = (files: RuleFile[]): string => {
-    const text = JSON.stringify(files.map((file) => [file.id, file.title, file.mode, file.globs ?? [], file.content]));
+/** FNV-1a over `text`, with its length; not a security measure. */
+const fingerprint = (text: string): string => {
     let hash = 0x81_1c_9d_c5;
 
     for (let index = 0; index < text.length; index += 1) {
@@ -274,6 +272,23 @@ export const ruleFilesRevision = (files: RuleFile[]): string => {
 
     return `${text.length.toString(36)}-${hash.toString(36)}`;
 };
+
+/**
+ * A short fingerprint of a list of rule files, in order: what the editor read, so a save from an older view is refused
+ * (`setProjectRuleFiles`): {@link fingerprint} over the JSON.
+ */
+export const ruleFilesRevision = (files: RuleFile[]): string =>
+    fingerprint(JSON.stringify(files.map((file) => [file.id, file.title, file.mode, file.globs ?? [], file.content])));
+
+/**
+ * The fingerprint a save that carries a legacy `context` into the list stores beside it (`carriedContext`), so a
+ * `context` it could not clear afterwards reads as carried ({@link projectRuleFiles}), never as a second copy.
+ */
+export const contextFingerprint = (context: string): string => fingerprint(context);
+
+/** Whether `context` is the one a save carried into the list, by its {@link contextFingerprint}. */
+export const isCarriedContext = (context: string, carriedContext: string | null | undefined): boolean =>
+    Boolean(carriedContext) && carriedContext === contextFingerprint(context);
 
 /** The text of the selected files for the prompt, joined; framed by the caller as `PROJECT CONTEXT:`, as `context` was. */
 export const renderRuleFiles = (files: RuleFile[]): string | null => {

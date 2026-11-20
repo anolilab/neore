@@ -1,7 +1,7 @@
 /**
  * The projects module's own rows for erasure and export: a project's repositories (`projectRepositories`) and its rule
- * files (`projectRuleFiles`). Both go with their project when it is deleted; repositories also by their owner's `userId`
- * when the owner's account is, which also reaches a row a failed project delete left behind. The rows of an
+ * files (`projectRuleFiles`). Both go with their project when it is deleted, and by their owner's `userId` when the
+ * owner's account is, which also reaches a row a failed project delete left behind. The repository rows of an
  * organization project nobody owns carry no `userId`: they go when the organization is deleted
  * (`eraseOrganizationRepositories`, queued from `auth.ts`, with a daily sweep behind it).
  */
@@ -16,8 +16,8 @@ import { logger } from "../lib/logger";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
 import { PROJECTS_PER_DETAILS_READ } from "./export-pages";
-import { DELETION_MARKER_URL, isRepoRow } from "./repositories";
-import { projectRuleFiles } from "./rule-files";
+import { DELETION_MARKER_TTL_MS, DELETION_MARKER_URL, isRepoRow } from "./repositories";
+import { ruleFilesOf } from "./rule-file-rows";
 import { findProjectRowsMeasured, projectRowsReadBytes } from "./project-row";
 
 /** A project's repositories, one batch; with `keepMarker`, a delete's marker stays until the delete is done. */
@@ -41,6 +41,7 @@ export const eraseProjectRepositoriesForUser = async (ctx: MutationCtx, userId: 
 };
 
 const repoLogger = logger.scope("project-repositories");
+const ruleFileLogger = logger.scope("project-rule-files");
 
 /** Whether a row belongs to an organization project nobody owns: the organization's data, not a person's. */
 const isOrganizationOwned = (row: { organizationId?: string; userId?: string }): boolean => row.userId === undefined && !!row.organizationId;
@@ -348,10 +349,10 @@ export const collectProjectRuleFilesForExport = internalQuery
             owned.length > 0
                 ? await ctx.db.projectRuleFiles.findMany({ consistency: "primary", where: { projectId: { in: owned.map((row) => row._id) } } })
                 : { page: [] };
-        const saved = new Map(rows.map((row) => [row.projectId as string, row.files] as const));
+        const saved = new Map(rows.map((row) => [row.projectId as string, row] as const));
         const projects = owned
             .map((row) => {
-                return { projectId: row._id, ruleFiles: projectRuleFiles({ context: row.context, ruleFiles: saved.get(row._id) }) };
+                return { projectId: row._id, ruleFiles: ruleFilesOf(row, saved.get(row._id)) };
             })
             .filter((project) => project.ruleFiles.length > 0);
 
@@ -359,9 +360,9 @@ export const collectProjectRuleFilesForExport = internalQuery
     });
 
 /**
- * The rule files of `projectId`, with the project: `agent.projects.deleteProject`, and for account deletion both
- * `deleteUserWorkflowData` and `agent/gdpr.ts#eraseProjectsForUser`, which deletes the rows, so a save that landed
- * between the two steps leaves nothing behind.
+ * The rule files of `projectId`, once the project row is gone: `agent.projects.deleteProject`, and for account
+ * deletion `agent/gdpr.ts#eraseProjectsForUser`, so a save that landed before it leaves nothing, and one after it finds
+ * no project and erases its own (`setProjectRuleFiles`). Also that save's own take-back.
  */
 export const eraseProjectRuleFiles = async (ctx: MutationCtx, projectId: Id<"projects">): Promise<void> => {
     const row = await ctx.db.projectRuleFiles.findFirst({ consistency: "primary", where: { projectId } });
@@ -370,3 +371,81 @@ export const eraseProjectRuleFiles = async (ctx: MutationCtx, projectId: Id<"pro
         await ctx.db.delete("projectRuleFiles", row._id);
     }
 };
+
+/**
+ * Marks the rule files of a project whose delete is about to remove the project row (`agent.projects.deleteProject`):
+ * they go only after the row, so a delete failing in between leaves a live project with its rules, and one failing
+ * after leaves a marked row that {@link sweepUnfinishedRuleFileErasures} finishes.
+ */
+export const markProjectRuleFilesErasing = async (ctx: MutationCtx, projectId: Id<"projects">): Promise<void> => {
+    const row = await ctx.db.projectRuleFiles.findFirst({ consistency: "primary", where: { projectId } });
+
+    if (row) {
+        await ctx.db.patch("projectRuleFiles", row._id, { deletingAt: ctx.now });
+    }
+};
+
+/**
+ * Rule-file rows one erasure or sweep reads at most: each is charged whole, up to `MAX_RULE_FILES_BYTES`, so a page
+ * stays far under a transaction's read limit.
+ */
+const RULE_FILE_ROWS_PER_PAGE = 8;
+
+/**
+ * The rule-file rows of the user's projects by their copy of the owner (`userId`), one page: a row whose project is
+ * already gone too, one a failed project delete left.
+ */
+export const eraseProjectRuleFilesForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
+    const { page: rows } = await ctx.db.projectRuleFiles.findMany({ consistency: "primary", limit: RULE_FILE_ROWS_PER_PAGE, where: { userId } });
+
+    await Promise.all(rows.map((row) => ctx.db.delete("projectRuleFiles", row._id)));
+
+    return { hasMore: rows.length >= RULE_FILE_ROWS_PER_PAGE };
+};
+
+/**
+ * Daily backstop for a project delete that failed after the project row went (`markProjectRuleFilesErasing`): a row
+ * marked longer than a delete can take is erased once its project is gone, and unmarked while it is there (a delete
+ * that failed before). A project that cannot be read keeps its row. One page per run; the next is scheduled.
+ */
+export const sweepUnfinishedRuleFileErasures = internalMutation
+    .input({ cursor: v.optional(v.string().max(MAX_LENGTH.cursor)) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const page = await ctx.db.projectRuleFiles.findMany({
+            consistency: "primary",
+            cursor: args.cursor ?? null,
+            limit: RULE_FILE_ROWS_PER_PAGE,
+            where: { deletingAt: { gt: 0, lt: ctx.now - DELETION_MARKER_TTL_MS } },
+        });
+        let erased = 0;
+
+        for (const row of page.page) {
+            let project: Doc<"projects"> | null;
+
+            try {
+                project = await ctx.db.projects.findFirst({ consistency: "primary", where: { _id: row.projectId } });
+            } catch (error) {
+                ruleFileLogger.error("Reading a project during the rule-file sweep failed; its rule files are kept", { error, projectId: row.projectId });
+
+                continue;
+            }
+
+            if (project) {
+                await ctx.db.patchIf("projectRuleFiles", row._id, { patch: { deletingAt: 0 }, where: { deletingAt: row.deletingAt ?? null } });
+            } else {
+                await ctx.db.delete("projectRuleFiles", row._id);
+                erased += 1;
+            }
+        }
+
+        if (erased > 0) {
+            ruleFileLogger.info("Erased the rule files of deleted projects", { erased });
+        }
+
+        if (!page.isDone && page.continueCursor) {
+            await ctx.scheduler.runAfter(0, internal.projects.gdpr.sweepUnfinishedRuleFileErasures, { cursor: page.continueCursor });
+        }
+
+        return null;
+    });

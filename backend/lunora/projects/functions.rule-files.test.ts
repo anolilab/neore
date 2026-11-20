@@ -30,8 +30,16 @@ import {
     setProjectRuleFiles,
     updateProject,
 } from "./functions";
-import { collectProjectRuleFilesForExport, eraseProjectRuleFiles } from "./gdpr";
-import { readProjectRuleFiles } from "./rule-file-rows";
+import { markRuleFilesSaved } from "../agent/table-writes";
+import {
+    collectProjectRuleFilesForExport,
+    eraseProjectRuleFiles,
+    eraseProjectRuleFilesForUser,
+    markProjectRuleFilesErasing,
+    sweepUnfinishedRuleFileErasures,
+} from "./gdpr";
+import { DELETION_MARKER_TTL_MS, DELETION_MARKER_URL } from "./repositories";
+import { readProjectRuleFiles, ruleFileRow, writeProjectRuleFiles } from "./rule-file-rows";
 import { MAX_RULE_TEXT_PER_RUN } from "./rule-files";
 
 const OWNER = "user-owner";
@@ -64,7 +72,14 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
 vi.mock("./rule-file-rows", async (importOriginal) => {
     const original = await importOriginal<typeof import("./rule-file-rows")>();
 
-    return { ...original, readProjectRuleFiles: vi.fn(original.readProjectRuleFiles) };
+    return { ...original, readProjectRuleFiles: vi.fn(original.readProjectRuleFiles), writeProjectRuleFiles: vi.fn(original.writeProjectRuleFiles) };
+});
+
+// Fails once where a test says, to leave a save half done.
+vi.mock("../agent/table-writes", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../agent/table-writes")>();
+
+    return { ...original, markRuleFilesSaved: vi.fn(original.markRuleFilesSaved) };
 });
 
 // Watched for when a project's delete erases its rule files.
@@ -108,7 +123,7 @@ const project = async ({ ruleFiles, ...fields }: Record<string, unknown> & { rul
     const projectId = await insert("projects", fields);
 
     if (ruleFiles) {
-        await insert("projectRuleFiles", { files: ruleFiles, projectId, updatedAt: 0 });
+        await insert("projectRuleFiles", { files: ruleFiles, projectId, updatedAt: 0, ...(typeof fields.userId === "string" && { userId: fields.userId }) });
     }
 
     return projectId;
@@ -121,6 +136,10 @@ const savedFiles = async (projectId: string) =>
 
         return saved?.files;
     })) as unknown[] | undefined;
+
+/** The rule-file row of `projectId`, `null` without one. */
+const ruleRow = async (projectId: string) =>
+    (await harness.run(async (ctx: any) => await ctx.db.projectRuleFiles.findFirst({ where: { projectId } }))) as Record<string, unknown> | null;
 
 const chatFile = async (filename: string) =>
     await insert("chatFiles", { filename, hash: filename, lastTouchedAt: 0, mediaType: "text/plain", refcount: 1, storageId: filename });
@@ -393,6 +412,10 @@ describe("changing a project's rule files", () => {
 
         vi.mocked(eraseProjectRuleFiles).mockImplementationOnce(async (ctx, projectId) => {
             projectAtErase.push(await ctx.db.projects.findFirst({ where: { _id: projectId } }));
+            // Marked before the project row went, so a sweep finishes an erase that fails here.
+            const marked = await ctx.db.projectRuleFiles.findFirst({ where: { projectId } });
+
+            expect(marked?.deletingAt).toBeGreaterThan(0);
             const { eraseProjectRuleFiles: erase } = await vi.importActual<typeof import("./gdpr")>("./gdpr");
 
             await erase(ctx, projectId);
@@ -408,11 +431,19 @@ describe("changing a project's rule files", () => {
 
         await expect(savedFiles(kept)).resolves.toBeUndefined();
 
-        // The account's last project step takes the rule files with each project, a row saved after the earlier step too.
+        // The account's last project step takes the rule files with each project, a row saved after the earlier step too,
+        // once the project row is gone, as a delete does.
         const last = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "last", userId: OWNER });
 
+        vi.mocked(eraseProjectRuleFiles).mockImplementationOnce(async (ctx, projectId) => {
+            projectAtErase.push(await ctx.db.projects.findFirst({ where: { _id: projectId } }));
+            const { eraseProjectRuleFiles: erase } = await vi.importActual<typeof import("./gdpr")>("./gdpr");
+
+            await erase(ctx, projectId);
+        });
         await harness.run(async (ctx: any) => await eraseProjectsForUser(ctx, OWNER));
 
+        expect(projectAtErase).toStrictEqual([null, null]);
         await expect(savedFiles(last)).resolves.toBeUndefined();
     });
 
@@ -446,16 +477,136 @@ describe("changing a project's rule files", () => {
         expect((await list(OWNER, projectId))!.files).toMatchObject([{ id: "sql" }]);
     });
 
-    it("refuses the second of two first saves that both found no row as stale, not with the database's error", async () => {
-        const { writeProjectRuleFiles } = await vi.importActual<typeof import("./rule-file-rows")>("./rule-file-rows");
-        const db = {
-            insert: vi.fn(async () => {
-                throw Object.assign(new Error("UNIQUE constraint failed: projectRuleFiles.projectId"), { kind: "unique" });
-            }),
-            projectRuleFiles: { findFirst: vi.fn(async () => null) },
-        };
+    it("writes only over the row a save compared against: the second of two saves that read it is refused", async () => {
+        const projectId = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "p", userId: OWNER });
+        const owner = { _id: projectId, userId: OWNER };
+        const write = async (read: unknown, files: unknown[]) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await writeProjectRuleFiles({ db: ctx.db, now: 1 } as never, owner as never, read as never, { carriedContext: "", files: files as never }),
+            );
+        const read = await harness.run(async (ctx: any) => await ruleFileRow(ctx, projectId as never, { primary: true }));
 
-        await expect(writeProjectRuleFiles({ db, now: 1 } as never, "p" as never, [])).rejects.toMatchObject({ code: "CONFLICT" });
+        await write(read, []);
+        await expect(write(read, [sqlRules])).rejects.toMatchObject({ code: "CONFLICT" });
+        await expect(savedFiles(projectId)).resolves.toStrictEqual([]);
+        // A first save that found no row, over a row written since: refused by the unique index, as stale.
+        await expect(write(null, [sqlRules])).rejects.toMatchObject({ code: "CONFLICT" });
+        await expect(savedFiles(projectId)).resolves.toStrictEqual([]);
+    });
+
+    it("takes no save while the project's delete is under way, and takes back one its delete overtook", async () => {
+        const deleting = await insert("projects", { createdAt: 0, title: "deleting", userId: OWNER });
+        const { revision } = (await list(OWNER, deleting))!;
+
+        await insert("projectRepositories", { createdAt: 0, deletingAt: Date.now(), projectId: deleting, url: DELETION_MARKER_URL, userId: OWNER });
+
+        await expect(save(OWNER, deleting, [sqlRules], revision)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await expect(savedFiles(deleting)).resolves.toBeUndefined();
+
+        // Deleted between the save's check and its write: the delete's erase may have run first, so the save erases its own.
+        const overtaken = await insert("projects", { createdAt: 0, title: "overtaken", userId: OWNER });
+        const actual = await vi.importActual<typeof import("./rule-file-rows")>("./rule-file-rows");
+
+        vi.mocked(writeProjectRuleFiles).mockImplementationOnce(async (ctx, ...rest) => {
+            await actual.writeProjectRuleFiles(ctx, ...rest);
+            await ctx.db.delete("projects", overtaken as never);
+        });
+
+        vi.mocked(eraseProjectRuleFiles).mockClear();
+
+        await expect(save(OWNER, overtaken, [sqlRules])).rejects.toMatchObject({ code: "NOT_FOUND" });
+        // Erased by the save itself: a `.global()` write is not rolled back with the refusal, as the harness rolls it back.
+        expect(eraseProjectRuleFiles).toHaveBeenCalledWith(expect.anything(), overtaken);
+        await expect(savedFiles(overtaken)).resolves.toBeUndefined();
+    });
+
+    it("never reads a context twice when the save that carried it failed to clear it, and a retry clears it", async () => {
+        const projectId = await insert("projects", { context: "Old notes", createdAt: 0, title: "p", userId: OWNER });
+        const { files } = (await list(OWNER, projectId))!;
+
+        // The clear lost (a `.global()` write that failed after the list's committed, which the harness would roll back).
+        vi.mocked(markRuleFilesSaved).mockResolvedValueOnce();
+
+        await save(OWNER, projectId, [sqlRules, ...files]);
+        // The list holds the context; the project still has it, read once, as the list's own file.
+        await expect(row(projectId)).resolves.toMatchObject({ context: "Old notes" });
+        expect((await list(OWNER, projectId))!.files.map((file) => file.id)).toStrictEqual(["sql", "context"]);
+        expect(await contextFor(projectId)).toBe("Old notes");
+
+        await save(OWNER, projectId, (await list(OWNER, projectId))!.files);
+
+        await expect(row(projectId)).resolves.not.toHaveProperty("context");
+        expect(await contextFor(projectId)).toBe("Old notes");
+    });
+
+    it("keeps a context written after the save's check instead of clearing it unsaved", async () => {
+        const projectId = await insert("projects", { context: "Old notes", createdAt: 0, title: "p", userId: OWNER });
+        const { files } = (await list(OWNER, projectId))!;
+        const actual = await vi.importActual<typeof import("./rule-file-rows")>("./rule-file-rows");
+
+        vi.mocked(writeProjectRuleFiles).mockImplementationOnce(async (ctx, ...rest) => {
+            await actual.writeProjectRuleFiles(ctx, ...rest);
+            await ctx.db.patch("projects", projectId as never, { context: "Newer notes" });
+        });
+
+        await save(OWNER, projectId, [sqlRules, ...files]);
+
+        await expect(row(projectId)).resolves.toMatchObject({ context: "Newer notes" });
+        expect((await list(OWNER, projectId))!.files.map((file) => file.id)).toStrictEqual(["context-2", "sql", "context"]);
+    });
+
+    it("erases rule files a failed delete left: the sweep once the project is gone, and the owner's account", async () => {
+        const sweep = async () => await harness.run(async (ctx: any) => await ctx.runMutation(sweepUnfinishedRuleFileErasures as never, {}));
+        const markedLongAgo = async (projectId: string) =>
+            await harness.run(async (ctx: any) => {
+                const saved = await ctx.db.projectRuleFiles.findFirst({ where: { projectId } });
+
+                await ctx.db.patch("projectRuleFiles", saved._id, { deletingAt: Date.now() - DELETION_MARKER_TTL_MS - 1 });
+            });
+        // A delete that marked the row and removed the project, then failed before its erase.
+        const left = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "left", userId: OWNER });
+
+        await harness.run(async (ctx: any) => {
+            await markProjectRuleFilesErasing(ctx, left as never);
+            await ctx.db.delete("projects", left);
+        });
+        // A delete that failed before the project row went: the project keeps its rules.
+        const live = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "live", userId: OWNER });
+
+        await sweep();
+        // Not while a delete could still be running.
+        await expect(savedFiles(left)).resolves.toStrictEqual([sqlRules]);
+
+        await markedLongAgo(left);
+        await markedLongAgo(live);
+        await sweep();
+
+        await expect(savedFiles(left)).resolves.toBeUndefined();
+        await expect(savedFiles(live)).resolves.toStrictEqual([sqlRules]);
+        await expect(ruleRow(live)).resolves.toMatchObject({ deletingAt: 0 });
+
+        // Account deletion finds a row by its owner, its project gone; another user's stays.
+        const orphan = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "orphan", userId: OWNER });
+        const theirs = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "theirs", userId: STRANGER });
+
+        await harness.run(async (ctx: any) => await ctx.db.delete("projects", orphan));
+        await harness.run(async (ctx: any) => await eraseProjectRuleFilesForUser(ctx, OWNER));
+
+        await expect(savedFiles(orphan)).resolves.toBeUndefined();
+        await expect(savedFiles(live)).resolves.toBeUndefined();
+        await expect(savedFiles(theirs)).resolves.toStrictEqual([sqlRules]);
+    });
+
+    it("stamps a saved row with the project's owner", async () => {
+        const projectId = await insert("projects", { createdAt: 0, title: "p", userId: OWNER });
+
+        await save(OWNER, projectId, [sqlRules]);
+
+        await expect(ruleRow(projectId)).resolves.toMatchObject({
+            userId: OWNER,
+            version: 1,
+        });
     });
 
     it("refuses a pattern file without a pattern", async () => {

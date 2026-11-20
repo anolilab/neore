@@ -265,10 +265,16 @@ export const deleteVectorRow = async (db: Database, vectorId: Id<VectorTableName
 
 /**
  * Marks a project changed by a save of its rule files (`projects.functions.setProjectRuleFiles`), and with
- * `clearContext` removes its legacy `context`, whose text moved into the list. The row is read again right before the
- * write: removing a column rewrites the whole row, which must not carry back an older copy of another column.
+ * `clearContext`, the legacy `context` text the save moved into the list, removes it while it is still that text: one
+ * written since never reached the list, so it stays. The row is read again right before the write: removing a column
+ * rewrites the whole row, which must not carry back an older copy of another column.
  */
-export const markRuleFilesSaved = async (db: Database, projectId: Id<"projects">, now: number, { clearContext = false } = {}): Promise<void> => {
+export const markRuleFilesSaved = async (
+    db: Database,
+    projectId: Id<"projects">,
+    now: number,
+    { clearContext }: { clearContext?: string } = {},
+): Promise<void> => {
     if (!clearContext) {
         await db.patch("projects", projectId, { updatedAt: now });
 
@@ -278,6 +284,6 @@ export const markRuleFilesSaved = async (db: Database, projectId: Id<"projects">
     const project = await db.projects.findFirst({ consistency: "primary", where: { _id: projectId } });
 
     if (project) {
-        await patchRow(db, "projects", project, { context: undefined, updatedAt: now });
+        await patchRow(db, "projects", project, { ...(project.context === clearContext && { context: undefined }), updatedAt: now });
     }
 };

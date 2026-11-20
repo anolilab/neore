@@ -8,7 +8,7 @@ import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, deleteParentsWithChildren, full } from "../gdpr/batch";
 import { gdprLogger } from "../lib/logger";
-import { eraseProjectRuleFiles } from "../projects/gdpr";
+import { eraseProjectRuleFiles, markProjectRuleFilesErasing } from "../projects/gdpr";
 import { deleteVectorRow } from "./table-writes";
 import type { VectorTableName } from "./vector/tables";
 
@@ -156,11 +156,13 @@ export const eraseThreadSummariesForUser = async (ctx: MutationCtx, userId: stri
 export const eraseProjectsForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
     const { page: projects } = await ctx.db.projects.findMany({ where: { userId } });
 
-    // Each with its rule files: a save between `deleteUserWorkflowData` and this step wrote a row for it again.
+    // Each with its rule files, a row a save wrote since `deleteUserWorkflowData` too: marked, then erased once the
+    // project row is gone, as a project delete does, so a save after the erase finds no project and takes its own back.
     await Promise.all(
         projects.map(async (p) => {
-            await eraseProjectRuleFiles(ctx, p._id);
+            await markProjectRuleFilesErasing(ctx, p._id);
             await ctx.db.delete("projects", p._id);
+            await eraseProjectRuleFiles(ctx, p._id);
         }),
     );
 };

@@ -7,18 +7,23 @@
   list, OFF the `projects` row: a metered `.global()` read is charged the whole row whatever it `select`s, so on the
   project row every list, pin, read and export would pay for up to 1 MB. Only the editor (`listProjectRuleFiles`), a
   run's setup (`getProjectContextForRun`, `tasks/internal.ts#runProjectFor`), a save and the export read it, always
-  after the project's own check (`readProjectRuleFiles`); the table has no owner column, so organization moves,
-  sharing and account merges follow the project. A new reader of the table is a decision: the source check in
+  after the project's own check (`readProjectRuleFiles`), so organization moves and sharing follow the project. The
+  row's `userId` copies the project's owner for erasure only (and is merged with accounts). A new reader of the table is a decision: the source check in
   `functions.rule-files.test.ts` lists who touches it. A fork does not copy them.
-- Deleting a project deletes its row (`agent.projects.deleteProject` → `eraseProjectRuleFiles`) AFTER the project row:
-  a `.global()` write does not roll back, so the other order could leave a live project without its rules. Account
-  deletion erases it per project in `deleteUserWorkflowData`, before the project rows go.
+- Deleting a project marks its row (`deletingAt`), deletes the project row, then erases its row
+  (`agent.projects.deleteProject`): a `.global()` write does not roll back, so erasing first could leave a live project
+  without its rules. A row a failed delete left marked is finished by the daily `sweepUnfinishedRuleFileErasures` once
+  its project is gone (unmarked while it lives). Account deletion erases by owner (`eraseProjectRuleFilesForUser`, in
+  `deleteUserWorkflowData`), orphans included, and per project again in `eraseProjectsForUser`.
+- A save refuses while the project's delete is under way (`deleteUnderway`, as the repository mutations do), and
+  erases its own row when the project is gone after its write.
 - Changing them follows `updateProject` exactly: the owner only (`mayEditProject` in `edit-access.ts`, through
   `projectWithEditableSettings`), decided in the transaction that writes. Never widen one alone. `updateProject`
   re-checks the owner in its writing mutation (`settingsEditorId`).
 - The legacy `context` text reads as the first `always` file (`projectRuleFiles`) everywhere: runs, the editor and
   the export. `defineMigration` does not reach `.global()` rows, so nothing rewrites it in bulk: the first
-  `setProjectRuleFiles` saves it into the list and clears `context` in the same transaction; an unchanged one longer
+  `setProjectRuleFiles` saves it into the list, marked carried (`carriedContext`, its fingerprint), then clears
+  `context` while it is still that text; a `context` matching the mark is never read a second time if the clear fails; an unchanged one longer
   than a rule file may be stays in `context` (`keepContext`); a file sent under its id that differs from it is saved and
   the `context` cleared, never dropped. A project with only a `context` gives a run exactly that text; keep that true
   when changing the rendering.
@@ -38,8 +43,9 @@
 - Size: `normalizeRuleFiles` caps the list at `MAX_RULE_FILES_BYTES` of stored JSON, which keeps the rule-file row
   under D1's 2 MB; the project row is not grown by a save.
 - A save names the revision of the list it started from (`ruleFilesRevision`, over the list a legacy `context` first);
-  `setProjectRuleFiles` reads the rule-file row on the primary and compares it in the transaction that writes, refusing
-  a stale one (CONFLICT).
+  `setProjectRuleFiles` reads the rule-file row on the primary and refuses a stale one (CONFLICT). The write is guarded
+  on that row (`writeProjectRuleFiles`: `patchIf` on its `version`, an insert on the unique index), so of two saves
+  that checked the same revision the second is refused too.
 - A metered `.global()` read is charged the whole row whatever it `select`s (Lunora drops the `select`, charges, then
   projects), so a read that budgets its cost measures whole rows: `findProjectRowsMeasured` / `projectRowsReadBytes`.
   The export returns rule files only from their own pass (`attachProjectRuleFiles`, which counts both the project and

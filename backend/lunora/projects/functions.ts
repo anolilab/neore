@@ -17,7 +17,7 @@ import { enqueueJob } from "../lib/job-queue";
 import { admitOrganization, systemDb } from "../lib/rls/scope";
 import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
-import { eraseProjectRepositories } from "./gdpr";
+import { eraseProjectRepositories, eraseProjectRuleFiles } from "./gdpr";
 import {
     DELETION_MARKER_TTL_MS,
     DEFAULT_COUNTER_URL,
@@ -32,8 +32,10 @@ import {
 import { mayEditProject } from "./edit-access";
 import { forViewer, resolveProjectLocation } from "./machine-location";
 import { projectRowsReadBytes } from "./project-row";
-import { readProjectRuleFiles, writeProjectRuleFiles } from "./rule-file-rows";
+import { readProjectRuleFiles, ruleFileRow, ruleFilesOf, writeProjectRuleFiles } from "./rule-file-rows";
 import {
+    contextFingerprint,
+    isCarriedContext,
     MAX_RULE_FILE_LENGTH,
     MAX_RULE_FILES,
     MAX_RULE_GLOB_LENGTH,
@@ -369,8 +371,8 @@ export const listProjectRuleFiles = authQuery
  * `keepContext`: an unchanged `context` longer than a rule file may be stays where it is, still read first, and the list
  * holds the other files. Who may: the rule of `updateProject` ({@link projectWithEditableSettings}, its owner only),
  * decided on the primary. `revision` is the one `listProjectRuleFiles` gave with the list the editor started from; a list
- * changed since is refused (CONFLICT). The check, the rule-file row and the `context` are read and written in this one
- * transaction.
+ * changed since is refused (CONFLICT), and so is the second of two saves that checked the same one
+ * (`writeProjectRuleFiles`). A project being deleted takes no save, and a save its delete overtook is taken back.
  */
 export const setProjectRuleFiles = authMutation
     .use(rateLimit("projects/update"))
@@ -414,24 +416,42 @@ export const setProjectRuleFiles = authMutation
             throw new LunoraError("NOT_FOUND", "Project not found");
         }
 
-        const current = await readProjectRuleFiles(context, project, { primary: true });
+        // A delete under way (its marker, `underDeleteMarker`) takes the rule files with it: no new text for it to miss.
+        if (await deleteUnderway(context, projectId)) {
+            throw new LunoraError("NOT_FOUND", "Project not found");
+        }
+
+        const row = await ruleFileRow(context, projectId, { primary: true });
+        const current = ruleFilesOf(project, row);
 
         if (revision !== ruleFilesRevision(current)) {
             throw new LunoraError("CONFLICT", "The rule files were changed meanwhile. Reload them and save again.");
         }
 
-        // A kept context reads as the list's first file under its own id: a file sent under that id is that file again,
-        // left out of the list, unless it was changed. A changed one is saved as an ordinary file, held to its limits, and
-        // the `context` is cleared, so a change is never reported saved while the old text stays.
-        const legacy = keepContext && project.context ? current[0] : undefined;
+        // A `context` still on the project that the list does not carry yet reads as the list's first file under its own
+        // id. Kept, a file sent under that id is that file again, left out of the list, unless it was changed. A changed
+        // one is saved as an ordinary file, held to its limits, and the `context` cleared, so a change is never reported
+        // saved while the old text stays.
+        const pendingContext = project.context && !isCarriedContext(project.context, row?.carriedContext) ? project.context : undefined;
+        const legacy = keepContext && pendingContext ? current[0] : undefined;
         const sent = legacy && ruleFiles.find((file) => file.id === legacy.id);
         const kept = legacy && (!sent || ruleFilesRevision([sent]) === ruleFilesRevision([legacy])) ? legacy.id : undefined;
         const normalized = normalizeRuleFiles(kept ? ruleFiles.filter((file) => file.id !== kept) : ruleFiles);
+        // The `context` text this save carries into the list, marked carried in the same write, so one the clear below
+        // fails to remove is not read a second time.
+        const carried = kept ? undefined : project.context;
 
-        await writeProjectRuleFiles(context, projectId, normalized);
+        await writeProjectRuleFiles(context, project, row, { carriedContext: carried ? contextFingerprint(carried) : "", files: normalized });
+
+        // Deleted since the check above: its delete may have erased the rule files before this write, so this one goes.
+        if (!(await context.db.projects.findFirst({ consistency: "primary", where: { _id: projectId } }))) {
+            await eraseProjectRuleFiles(context, projectId);
+
+            throw new LunoraError("NOT_FOUND", "Project not found");
+        }
 
         // The list carries the context from now on.
-        await markRuleFilesSaved(context.db, projectId, context.now, { clearContext: !kept && Boolean(project.context) });
+        await markRuleFilesSaved(context.db, projectId, context.now, { clearContext: carried });
 
         context.log.event("projects.set_rule_files", {
             globFiles: normalized.filter((file) => file.mode === "glob").length,
