@@ -118,9 +118,10 @@ export const chargeDailyLimitOnce = internalMutation
 
 /**
  * Undoes a charge for a send that was then refused, after the units were taken: the window gets its units back
- * (`refundLimitUnits`), if the charge's window (`windowStart`) is still current. A keyed charge's claim goes too, so the
- * send's retry is charged normally rather than found already charged, which would leave the send that succeeds uncharged.
- * Without a `windowStart` (a keyed retry that found its claim already held, so this attempt took no units) nothing is given back.
+ * (`refundLimitUnits`), if the charge's window (`windowStart`) is still current. A keyed charge's claim is released with it, so
+ * the send's retry is charged normally rather than found already charged. Without a `windowStart` (a keyed retry that found its
+ * claim already held, so this attempt took no units) nothing is given back and the claim stays: the first attempt's unit then
+ * pays for the send that succeeds, instead of that send being charged a second time.
  */
 export const refundDailyCharge = internalMutation
     .input({
@@ -132,13 +133,15 @@ export const refundDailyCharge = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { chargeKey, count, identifier, key, windowStart }, ctx }) => {
+        if (windowStart === undefined) {
+            return null;
+        }
+
         if (chargeKey !== undefined) {
             await releaseClaim(ctx, DAILY_CHARGE_SCOPE, chargeKey);
         }
 
-        if (windowStart !== undefined) {
-            await refundLimitUnits(ctx, { count, identifier, key, windowStart });
-        }
+        await refundLimitUnits(ctx, { count, identifier, key, windowStart });
 
         return null;
     });

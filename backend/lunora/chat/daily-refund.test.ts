@@ -37,6 +37,9 @@ const chargeUnkeyed = async (): Promise<number> => {
 };
 
 beforeEach(() => {
+    // Pinned for every test: a charge near midnight must not roll into the next window before its refund or count.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(DAY_ONE);
     harness = lunoraTest(schema as never);
 });
 
@@ -85,10 +88,22 @@ describe("refunding a refused send's quota unit", () => {
         expect(await remaining()).toBe(FREE_TEXT_DAILY - 1);
     });
 
-    it("does not credit a unit to a window that started after the charge (the window rolled over)", async () => {
-        vi.useFakeTimers({ toFake: ["Date"] });
+    it("keeps a keyed claim held when the refund has no window, so the retry is not charged a second unit", async () => {
+        const charge = { chargeKey: "send-2", count: 1, identifier: USER, key: KEY };
 
-        vi.setSystemTime(DAY_ONE);
+        await run(async (ctx) => await ctx.runMutation(chargeDailyLimitOnce as never, charge));
+        expect(await remaining()).toBe(FREE_TEXT_DAILY - 1);
+
+        // A refund that took no unit (no window) must leave the claim alone.
+        await run(async (ctx) => await ctx.runMutation(refundDailyCharge as never, { ...charge }));
+        expect(await remaining()).toBe(FREE_TEXT_DAILY - 1);
+
+        // The retry finds the claim held: it is not charged again.
+        await run(async (ctx) => await ctx.runMutation(chargeDailyLimitOnce as never, charge));
+        expect(await remaining()).toBe(FREE_TEXT_DAILY - 1);
+    });
+
+    it("does not credit a unit to a window that started after the charge (the window rolled over)", async () => {
         const dayOneWindow = await chargeUnkeyed();
 
         vi.setSystemTime(DAY_TWO);
