@@ -121,7 +121,7 @@ export const executeBrowserAction = internalAction
                 }
 
                 // One write: a replaced browser's id, the page this action left it on, the activity stamp, this action's hold's end.
-                await ctx.runMutation(internal.browser.functions.logAction, {
+                const logged = await ctx.runMutation(internal.browser.functions.logAction, {
                     action,
                     currentUrl: result.url,
                     durationMs,
@@ -135,6 +135,12 @@ export const executeBrowserAction = internalAction
                     target: args.url ?? args.selector,
                     value: args.text,
                 });
+
+                // Another action at the same time left the thread on another browser: this result's page, content and
+                // screenshot are of a browser the next step will not use, so none of it reaches the model.
+                if (logged.replaced) {
+                    return browserReplacedResult(logged.currentUrl);
+                }
 
                 return result;
             } catch (error) {
@@ -163,6 +169,19 @@ export const executeBrowserAction = internalAction
             success: false,
         };
     });
+
+/** What the agent hears from an action whose browser another, concurrent action replaced: look again, on the kept browser. */
+const browserReplacedResult = (keptUrl: string | undefined): { error: string; success: false; url?: string } => {
+    return {
+        error: `Another browser action ran at the same time and the thread now uses its browser, not the one this action ran on, so this action's result was discarded. ${
+            keptUrl === undefined
+                ? "The browser's current page is unknown, and it may have none: navigate to the page you need before the next step."
+                : `The browser is on ${keptUrl}: take a screenshot or extract the page before the next step.`
+        } Repeat this action there if it is still needed.`,
+        success: false,
+        ...(keptUrl !== undefined && { url: keptUrl }),
+    };
+};
 
 const sanitizeBrowserError = (error: unknown): string => {
     const raw = error instanceof Error ? error.message : String(error);

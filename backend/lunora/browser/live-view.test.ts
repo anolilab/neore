@@ -255,6 +255,18 @@ describe("a running browser", () => {
         await expect(open(OWNER)).resolves.toEqual({ status: "ended" });
     });
 
+    it("returns no URL when an agent action replaced the browser while the provider minted it", async () => {
+        const sessionId = await addSession();
+
+        fetchMock.mockImplementation(async () => {
+            await harness.run(async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { providerSessionId: "s-2" }));
+
+            return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
+        });
+
+        await expect(open(OWNER)).resolves.toEqual({ status: "ended" });
+    });
+
     it("returns no URL when the chat was locked while the provider minted it", async () => {
         await addSession();
         fetchMock.mockImplementation(async () => {

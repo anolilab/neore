@@ -33,6 +33,8 @@ vi.mock("@neore/service-sdk/browser-renderer", async (importOriginal) => {
 });
 
 const OWNER = "user-owner";
+/** The note an action whose browser was replaced gets: look again, at the kept browser on page a. */
+const REPLACED_NOTE_FOR_A = /at the same time.*https:\/\/example\.com\/a.*screenshot or extract/su;
 /** The frozen clock every test reads, in the code and in the assertions alike. */
 const NOW = Date.UTC(2026, 10, 20, 12);
 
@@ -209,7 +211,9 @@ describe("two browser actions at once", () => {
         await newerRun;
         vi.setSystemTime(NOW + 2000);
         older.release(answered({ sessionId: "s-1", success: true, url: "https://example.com/old" }));
-        await olderRun;
+
+        // The older action's page is of the replaced browser: the agent is sent to look at the kept one instead.
+        expect(await olderRun).toMatchObject({ success: false, url: "https://example.com/new" });
 
         const after = await row();
 
@@ -313,8 +317,15 @@ describe("two first browser actions at once", () => {
         await second.reached;
         first.release(answered({ sessionId: "s-a", success: true, url: "https://example.com/a" }));
         await firstRun;
-        second.release(answered({ sessionId: "s-b", success: true, url: "https://example.com/b" }));
-        await secondRun;
+        second.release(answered({ content: "page b", sessionId: "s-b", success: true, title: "B", url: "https://example.com/b" }));
+        const secondResult = (await secondRun) as Record<string, unknown>;
+
+        expect(await firstRun).toMatchObject({ sessionId: "s-a", success: true, url: "https://example.com/a" });
+        // The second browser is not the one kept: the agent hears that and where the kept browser is, never page b.
+        expect(secondResult).toMatchObject({ success: false, url: "https://example.com/a" });
+        expect(secondResult.error).toMatch(REPLACED_NOTE_FOR_A);
+        expect(Object.keys(secondResult).toSorted((a, b) => a.localeCompare(b))).toEqual(["error", "success", "url"]);
+        expect(secondResult.error).not.toContain("example.com/b");
 
         const rows = (await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").collect())) as SessionRow[];
 

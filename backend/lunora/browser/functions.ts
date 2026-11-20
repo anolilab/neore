@@ -158,6 +158,11 @@ export const logAction = internalMutation
         target: v.optional(v.string()),
         value: v.optional(v.string()),
     })
+    /**
+     * `replaced`: the row moved on to another browser while this action ran, so its result is of a browser the thread
+     * no longer uses; `currentUrl` is then the kept browser's page, for the agent to look at again.
+     */
+    .output(v.object({ currentUrl: v.optional(v.string()), replaced: v.boolean() }))
     .mutation(
         async ({
             args: {
@@ -190,7 +195,7 @@ export const logAction = internalMutation
             const session = await ctx.db.get("browserSessions", sessionId);
 
             if (!session) {
-                return;
+                return { replaced: false };
             }
 
             const inUseHolds = holdsAfter(session.inUseHolds, ctx.now, heldUntil);
@@ -201,7 +206,7 @@ export const logAction = internalMutation
             if ((session.providerSessionId ?? null) !== startedWithProviderSessionId) {
                 await patchRow(ctx.db, "browserSessions", session, { inUseHolds });
 
-                return;
+                return { ...(session.currentUrl !== undefined && { currentUrl: session.currentUrl }), replaced: true };
             }
 
             // A browser the renderer replaced (the old one expired, or was closed after a blocked redirect) starts with
@@ -226,6 +231,8 @@ export const logAction = internalMutation
                 lastActivityAt: Math.max(session.lastActivityAt, ctx.now),
                 ...page,
             });
+
+            return { replaced: false };
         },
     );
 

@@ -192,6 +192,13 @@ export const openLiveView = authAction
             return { status: "ended" as const };
         }
 
+        // An agent action replaced the browser while the provider minted: the URL shows one the agent no longer drives.
+        if (after.providerSessionId !== browser.providerSessionId) {
+            ctx.log.event("browser.live_view_opened", { ok: false, reason: "replaced_after_mint" });
+
+            return { status: "ended" as const };
+        }
+
         ctx.log.event("browser.live_view_opened", { ok: true, status: response.status });
 
         return { connectBy: Date.now() + LIVE_VIEW_CONNECT_DEADLINE_MS, status: "ok" as const, url };
