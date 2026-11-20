@@ -264,8 +264,7 @@ pub fn pair(
     out: &mut dyn Write,
 ) -> Result<Paired, PairError> {
     let backend = validate_backend(backend).map_err(PairError::Refused)?;
-    // Announced with the code, so the owner sees where the secret will live before approving. The probe refuses a
-    // machine with no usable keychain that cannot keep a file private, and a folder `save` would refuse.
+    // Announced with the code, so the owner sees where the secret will live before approving.
     let storage = vault.probe().map_err(PairError::NoStorage)?;
 
     let code = request_code(http, timer, &backend, identity, storage, out)?;
