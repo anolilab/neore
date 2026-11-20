@@ -1,7 +1,8 @@
 /**
  * `<SiteLogins>`: a typed password never outlasts its account, a save or a failed delete never discards edits it did
  * not send, an edit never drops a login's bots while the bot list is missing, the form stops at the server's limit, and
- * another account's cached logins and bots never show and are refetched.
+ * another account's cached logins and bots never show and are refetched. A list that failed to load says so and offers a
+ * retry; it never passes for an empty one.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -19,6 +20,7 @@ const harness = vi.hoisted(() => {
         botsState: "loaded" as "failed" | "loaded" | "pending",
         deleteSiteLogin: vi.fn(),
         logins: [] as { hasPassword: true; id: string; site: string; teammateIds: string[]; updatedAt: number; username: string }[],
+        loginsFailed: false,
         loginsPending: false,
         saveSiteLogin: vi.fn(),
         userId: "user-a" as string | undefined,
@@ -83,7 +85,17 @@ vi.mock("@/lib/lunora/crpc", () => {
                     queryOptions: () => {
                         // One key for every account, as in the app: a switch finds the last account's list cached.
                         return {
-                            queryFn: async () => (harness.loginsPending ? await new Promise(() => {}) : { logins: harness.logins, userId: harness.userId }),
+                            queryFn: async () => {
+                                if (harness.loginsPending) {
+                                    return await new Promise(() => {});
+                                }
+
+                                if (harness.loginsFailed) {
+                                    throw new Error("logins unavailable");
+                                }
+
+                                return { logins: harness.logins, userId: harness.userId };
+                            },
                             queryKey: ["site-logins"],
                         };
                     },
@@ -136,6 +148,7 @@ afterEach(() => {
     harness.bots = [];
     harness.botsState = "loaded";
     harness.logins = [];
+    harness.loginsFailed = false;
     harness.loginsPending = false;
     harness.userId = "user-a";
     vi.clearAllMocks();
@@ -299,6 +312,74 @@ describe("SiteLogins", () => {
         view.rerender();
 
         await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+        await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+        await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
+        expect(harness.saveSiteLogin.mock.calls[0]?.[0]).toMatchObject({ teammateIds: ["bot-0"] });
+    });
+
+    it("shows a failed login list as an error with a retry, never as an empty list to add to", async () => {
+        const user = userEvent.setup();
+
+        harness.loginsFailed = true;
+        harness.logins = [savedLogin()];
+        mount();
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toContain("Your saved logins could not be loaded.");
+        expect(screen.queryByRole("button", { name: "Save login" })).toBeNull();
+        expect(screen.queryByLabelText("Password")).toBeNull();
+
+        harness.loginsFailed = false;
+        await user.click(screen.getByRole("button", { name: "Try again" }));
+
+        expect(await screen.findByRole("button", { name: `Edit login for ${SITE}` })).toBeDefined();
+        expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("says why an edit waits on a failed bot list, and saves it with its bots once the retry loads them", async () => {
+        const user = userEvent.setup();
+
+        harness.botsState = "failed";
+        harness.logins = [savedLogin(["bot-0"])];
+        harness.saveSiteLogin.mockResolvedValue("login-1");
+        mount();
+
+        await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toContain("Your bots could not be loaded.");
+        expect(isDisabled(screen.getByRole("button", { name: "Save changes" }))).toBe(true);
+
+        harness.botsState = "loaded";
+        harness.bots = botsOf("user-a", 1);
+        await user.click(screen.getByRole("button", { name: "Try again" }));
+
+        expect(await screen.findByText("Bot 0")).toBeDefined();
+        expect(screen.queryByRole("alert")).toBeNull();
+        await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+        await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
+        expect(harness.saveSiteLogin.mock.calls[0]?.[0]).toMatchObject({ teammateIds: ["bot-0"] });
+    });
+
+    it("keeps an edit savable when a refetch fails but the user's own bots are still cached", async () => {
+        const user = userEvent.setup();
+
+        harness.bots = botsOf("user-a", 1);
+        harness.logins = [savedLogin(["bot-0"])];
+        harness.saveSiteLogin.mockResolvedValue("login-1");
+        const view = mount();
+
+        await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+        await screen.findByText("Bot 0");
+
+        harness.botsState = "failed";
+        await view.queryClient.refetchQueries({ queryKey: ["bots"] });
+
+        await waitFor(() => expect(view.queryClient.getQueryState(["bots"])?.status).toBe("error"));
+        expect(screen.queryByRole("alert")).toBeNull();
         await user.click(screen.getByRole("button", { name: "Save changes" }));
 
         await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());

@@ -83,15 +83,24 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
     const teammatesId = useId();
 
     const loginsQuery = crpc.vault.site_logins.listSiteLogins.queryOptions({});
-    const { data: loginList } = useQuery(loginsQuery);
-    const { data: botList = [], isSuccess: botListLoaded } = useQuery(crpc.bots.functions.listBots.queryOptions({}));
+    const { data: loginList, isError: loginListFailed, isFetching: loginsFetching, refetch: refetchLogins } = useQuery(loginsQuery);
+    const {
+        data: botListData,
+        isError: botListFailed,
+        isFetching: botsFetching,
+        refetch: refetchBots,
+    } = useQuery(crpc.bots.functions.listBots.queryOptions({}));
+    const botList = botListData ?? [];
     // The query keys carry no user: right after an account switch they can still hold the last account's lists, even
     // fresh ones. Show only what is this user's, and refetch below.
     const logins = loginList?.userId === userId ? loginList.logins : [];
     const bots = botList.filter((bot) => bot.userId === userId);
-    const botsLoaded = botListLoaded && bots.length === botList.length;
+    // A failed refetch keeps the cached list, and that still counts: what matters is whose it is.
+    const botsLoaded = botListData !== undefined && bots.length === botList.length;
     const holdsAnotherAccountsLogins = loginList !== undefined && loginList.userId !== userId;
-    const holdsAnotherAccountsBots = botListLoaded && !botsLoaded;
+    // A list that failed is not an empty one: say so, and offer no form that could act on it.
+    const loginsFailed = loginListFailed && loginList?.userId !== userId;
+    const holdsAnotherAccountsBots = botListData !== undefined && !botsLoaded;
 
     useEffect(() => {
         if (holdsAnotherAccountsLogins) {
@@ -187,6 +196,22 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                 </p>
             </div>
 
+            {loginsFailed && (
+                <div className="flex flex-wrap items-center gap-3" role="alert">
+                    <p className="text-destructive text-sm">{t`Your saved logins could not be loaded.`}</p>
+                    <Button
+                        disabled={loginsFetching}
+                        onClick={() => {
+                            void refetchLogins();
+                        }}
+                        size="sm"
+                        variant="outline"
+                    >
+                        {t`Try again`}
+                    </Button>
+                </div>
+            )}
+
             {logins.length > 0 && (
                 <ul className="divide-border divide-y rounded-md border">
                     {logins.map((login) => {
@@ -233,79 +258,101 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                 </ul>
             )}
 
-            <form className="grid max-w-xl gap-4" onSubmit={handleSave}>
-                <h3 className="text-base font-medium">{isEditing ? t`Edit login` : t`New login`}</h3>
-                <div className="space-y-2">
-                    <Label htmlFor={siteId}>{t`Site`}</Label>
-                    <Input
-                        disabled={isEditing}
-                        id={siteId}
-                        inputMode="url"
-                        onChange={(event) => setDraft({ ...draft, site: event.target.value })}
-                        placeholder="https://example.com"
-                        value={draft.site}
-                    />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor={usernameId}>{t`Username or email`}</Label>
-                    <Input
-                        autoComplete="off"
-                        id={usernameId}
-                        maxLength={320}
-                        onChange={(event) => setDraft({ ...draft, username: event.target.value })}
-                        value={draft.username}
-                    />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor={passwordId}>{t`Password`}</Label>
-                    <Input
-                        autoComplete="new-password"
-                        id={passwordId}
-                        maxLength={1024}
-                        onChange={(event) => setDraft({ ...draft, password: event.target.value })}
-                        placeholder={isEditing ? t`Leave empty to keep the saved password` : undefined}
-                        type="password"
-                        value={draft.password}
-                    />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor={labelId}>{t`Label (optional)`}</Label>
-                    <Input id={labelId} maxLength={80} onChange={(event) => setDraft({ ...draft, label: event.target.value })} value={draft.label} />
-                </div>
-                {bots.length > 0 && (
-                    <fieldset aria-describedby={teammatesId} className="space-y-2">
-                        <legend className="text-sm font-medium">{t`Bots that may use it`}</legend>
-                        <p className="text-muted-foreground text-xs" id={teammatesId}>
-                            {t`Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can.`}
-                        </p>
-                        {atTeammateLimit && <p className="text-muted-foreground text-xs" role="status">{t`A login can name at most ${MAX_TEAMMATES} bots.`}</p>}
-                        {bots.map((bot) => {
-                            const checked = draft.teammateIds.includes(bot._id as Id<"bots">);
-
-                            return (
-                                <Label className="flex items-center gap-2 font-normal" key={bot._id}>
-                                    <Checkbox
-                                        checked={checked}
-                                        disabled={!checked && atTeammateLimit}
-                                        onCheckedChange={(next) => toggleTeammate(bot._id as Id<"bots">, next)}
-                                    />
-                                    {bot.name}
-                                </Label>
-                            );
-                        })}
-                    </fieldset>
-                )}
-                <div className="flex gap-2">
-                    <Button disabled={!canSave || saveMutation.isPending} type="submit">
-                        {isEditing ? t`Save changes` : t`Save login`}
-                    </Button>
-                    {isEditing && (
-                        <Button onClick={() => setDraft(emptyDraft())} type="button" variant="outline">
-                            {t`Cancel`}
-                        </Button>
+            {!loginsFailed && (
+                <form className="grid max-w-xl gap-4" onSubmit={handleSave}>
+                    <h3 className="text-base font-medium">{isEditing ? t`Edit login` : t`New login`}</h3>
+                    <div className="space-y-2">
+                        <Label htmlFor={siteId}>{t`Site`}</Label>
+                        <Input
+                            disabled={isEditing}
+                            id={siteId}
+                            inputMode="url"
+                            onChange={(event) => setDraft({ ...draft, site: event.target.value })}
+                            placeholder="https://example.com"
+                            value={draft.site}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor={usernameId}>{t`Username or email`}</Label>
+                        <Input
+                            autoComplete="off"
+                            id={usernameId}
+                            maxLength={320}
+                            onChange={(event) => setDraft({ ...draft, username: event.target.value })}
+                            value={draft.username}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor={passwordId}>{t`Password`}</Label>
+                        <Input
+                            autoComplete="new-password"
+                            id={passwordId}
+                            maxLength={1024}
+                            onChange={(event) => setDraft({ ...draft, password: event.target.value })}
+                            placeholder={isEditing ? t`Leave empty to keep the saved password` : undefined}
+                            type="password"
+                            value={draft.password}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor={labelId}>{t`Label (optional)`}</Label>
+                        <Input id={labelId} maxLength={80} onChange={(event) => setDraft({ ...draft, label: event.target.value })} value={draft.label} />
+                    </div>
+                    {botListFailed && !botsLoaded && (
+                        <div className="flex flex-wrap items-center gap-3" role="alert">
+                            <p className="text-destructive text-sm">
+                                {t`Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept.`}
+                            </p>
+                            <Button
+                                disabled={botsFetching}
+                                onClick={() => {
+                                    void refetchBots();
+                                }}
+                                size="sm"
+                                type="button"
+                                variant="outline"
+                            >
+                                {t`Try again`}
+                            </Button>
+                        </div>
                     )}
-                </div>
-            </form>
+                    {bots.length > 0 && (
+                        <fieldset aria-describedby={teammatesId} className="space-y-2">
+                            <legend className="text-sm font-medium">{t`Bots that may use it`}</legend>
+                            <p className="text-muted-foreground text-xs" id={teammatesId}>
+                                {t`Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can.`}
+                            </p>
+                            {atTeammateLimit && (
+                                <p className="text-muted-foreground text-xs" role="status">{t`A login can name at most ${MAX_TEAMMATES} bots.`}</p>
+                            )}
+                            {bots.map((bot) => {
+                                const checked = draft.teammateIds.includes(bot._id as Id<"bots">);
+
+                                return (
+                                    <Label className="flex items-center gap-2 font-normal" key={bot._id}>
+                                        <Checkbox
+                                            checked={checked}
+                                            disabled={!checked && atTeammateLimit}
+                                            onCheckedChange={(next) => toggleTeammate(bot._id as Id<"bots">, next)}
+                                        />
+                                        {bot.name}
+                                    </Label>
+                                );
+                            })}
+                        </fieldset>
+                    )}
+                    <div className="flex gap-2">
+                        <Button disabled={!canSave || saveMutation.isPending} type="submit">
+                            {isEditing ? t`Save changes` : t`Save login`}
+                        </Button>
+                        {isEditing && (
+                            <Button onClick={() => setDraft(emptyDraft())} type="button" variant="outline">
+                                {t`Cancel`}
+                            </Button>
+                        )}
+                    </div>
+                </form>
+            )}
 
             <ConfirmDialog
                 confirmLabel={t`Delete`}
