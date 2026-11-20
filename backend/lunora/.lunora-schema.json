@@ -22123,6 +22123,12 @@
           "optional": true,
           "unique": false
         },
+        "contentByOthers": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "createdAt": {
           "kind": "number",
           "nullable": false,
@@ -22270,6 +22276,12 @@
           "unique": false
         },
         "contentByImpersonator": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "contentByOthers": {
           "kind": "boolean",
           "nullable": false,
           "optional": true,

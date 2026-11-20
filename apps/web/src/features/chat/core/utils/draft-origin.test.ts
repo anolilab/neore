@@ -112,15 +112,16 @@ describe("the composer draft's not-typed mark", () => {
 });
 
 describe(isOwnPromptContent, () => {
-    it("counts a prompt as the viewer's only when they wrote its current content themselves", () => {
+    it("counts a prompt as the viewer's only when they wrote all of its current words themselves", () => {
         expect(isOwnPromptContent({ contentBy: "user-a", contentByImpersonator: false, userId: "user-a" }, "user-a")).toBe(true);
-        // The viewer's own edit of a teammate's organization prompt.
+        // A teammate's organization prompt whose words are all the viewer's (the backend records no other writer).
         expect(isOwnPromptContent({ contentBy: "user-a", contentByImpersonator: false, organizationId: "org", userId: "user-b" }, "user-a")).toBe(true);
     });
 
-    it("refuses the viewer's prompt a teammate rewrote, and one an admin wrote while acting as the viewer", () => {
+    it("refuses the viewer's prompt a teammate rewrote or wrote part of, and one an admin wrote any of while acting as the viewer", () => {
         expect(isOwnPromptContent({ contentBy: "user-b", contentByImpersonator: false, organizationId: "org", userId: "user-a" }, "user-a")).toBe(false);
         expect(isOwnPromptContent({ contentBy: "user-a", contentByImpersonator: true, userId: "user-a" }, "user-a")).toBe(false);
+        expect(isOwnPromptContent({ contentBy: "user-a", contentByImpersonator: false, contentByOthers: true, userId: "user-a" }, "user-a")).toBe(false);
         expect(isOwnPromptContent({ contentBy: "user-a", userId: "user-a" }, undefined)).toBe(false);
     });
 

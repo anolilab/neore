@@ -21,7 +21,7 @@ import { compareStrings } from "../lib/collections";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { checkRateLimit, getRateLimitKey } from "../lib/rate-limiter";
 import { FREE_PROMPT_LIMIT, VARIABLE_REGEX } from "./constants";
-import { contentAuthorOfSession, copiedContentAuthor } from "./content-author";
+import { contentAuthorAfterEdit, contentAuthorOfSession, copiedContentAuthor, variableDefaults } from "./content-author";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 
@@ -373,10 +373,12 @@ export const updatePrompt = authMutation
             const isEnabledFeaturesChanged = enabledFeatures !== undefined && JSON.stringify(enabledFeatures) !== JSON.stringify(existing.enabledFeatures);
             const shouldSaveHistory = isContentChanged || isVariablesChanged || isModelChanged || isReasoningEffortChanged || isEnabledFeaturesChanged;
             const newVersion = (existing.currentVersion || 1) + (shouldSaveHistory ? 1 : 0);
-            // New words are the editor's, whoever owns the prompt; unchanged ones keep their writer. A variable's
-            // default is words too: it is put into the composer with the content.
-            const isWordsChanged = isContentChanged || isVariablesChanged;
-            const author = isWordsChanged ? contentAuthorOfSession(ctx.user) : copiedContentAuthor(existing);
+            // New words add the editor to their writers, whoever owns the prompt (`content-author.ts`). A variable's
+            // default is words too, put into the composer with the content; its name, description or requirement is not.
+            const isDefaultsChanged =
+                variables !== undefined && JSON.stringify(variableDefaults(variables)) !== JSON.stringify(variableDefaults(existing.variables));
+            const isWordsChanged = isContentChanged || isDefaultsChanged;
+            const author = isWordsChanged ? contentAuthorAfterEdit(existing, ctx.user) : copiedContentAuthor(existing);
 
             // Save history entry if content, variables, or settings changed
             if (shouldSaveHistory) {
@@ -887,12 +889,13 @@ export const restorePromptVersion = authMutation
         });
 
         // Update the prompt with the restored content. A field the restored
-        // version did not have is removed, not kept from the current one: so is its writer, a version from before
-        // `contentBy` reads as an old row (`content-author.ts`).
+        // version did not have is removed, not kept from the current one: so is its writers' record, a version from
+        // before `contentBy` reads as an old row (`content-author.ts`).
         await patchRow(ctx.db, "prompts", prompt, {
             content: historyEntry.content,
             contentBy: historyEntry.contentBy,
             contentByImpersonator: historyEntry.contentByImpersonator,
+            contentByOthers: historyEntry.contentByOthers,
             currentVersion: newVersion,
             description: historyEntry.description,
             tags: historyEntry.tags,

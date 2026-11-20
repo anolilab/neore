@@ -23,15 +23,22 @@ export const markComposerDraft = (origin: DraftOrigin): void => {
 export const composerDraftFrom = (): DraftOrigin | undefined => useChatUIStore.getState().composerDraftFrom;
 
 /** What the composer needs of a saved prompt to tell whose words it holds (`backend/lunora/prompts/content-author.ts`). */
-export type SavedPromptAuthorship = { contentBy?: string; contentByImpersonator?: boolean; organizationId?: string; userId: string };
+export type SavedPromptAuthorship = {
+    contentBy?: string;
+    contentByImpersonator?: boolean;
+    contentByOthers?: boolean;
+    organizationId?: string;
+    userId: string;
+};
 
 /**
- * Whether the viewer wrote the prompt's current content, themselves and not an admin acting as them. The owner's id says
- * nothing about that: a teammate may have edited it. A row from before the writer was recorded is the viewer's only if it
- * is their own personal prompt; an organization's could hold anyone's words.
+ * Whether the viewer wrote all of the prompt's current words, themselves and not an admin acting as them. The owner's id
+ * says nothing about that: a teammate may have edited it, and one other writer of any part makes it someone else's. A row
+ * from before the writers were recorded is the viewer's only if it is their own personal prompt; an organization's could
+ * hold anyone's words.
  */
 export const isOwnPromptContent = (prompt: SavedPromptAuthorship, viewerId: string | undefined): boolean => {
-    if (viewerId === undefined || prompt.contentByImpersonator === true) {
+    if (viewerId === undefined || prompt.contentByImpersonator === true || prompt.contentByOthers === true) {
         return false;
     }
 

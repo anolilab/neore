@@ -594,7 +594,7 @@ for a schema table that is neither policed nor listed:
 | `prompts_functions.setThreadVariables` | mutation | authMutation + RL | threadVariables, threads | owner helper; row.userId == caller | **fixed** (medium) — thread must be the caller's before a row is created |
 | `prompts_functions.setUserVariableDefaults` | mutation | authMutation + RL | userVariableDefaults | caller-scoped (ctx.user) | ok |
 | `prompts_functions.togglePromptFavorite` | mutation | authMutation + RL | prompts | row.userId == caller | ok |
-| `prompts_functions.updatePrompt` | mutation | authMutation + RL | promptHistory, prompts | row.userId == caller | ok — a change of content or of a variable default records the editor as its writer (`contentBy`, `contentByImpersonator`), not the owner |
+| `prompts_functions.updatePrompt` | mutation | authMutation + RL | promptHistory, prompts | row.userId == caller | ok — a change of content or of a variable default adds the editor to its writers (`contentBy`; `contentByOthers` once anyone else wrote part of it, `contentByImpersonator` once anyone did while impersonated; neither clears), not the owner; a variable's name, description or requirement writes no words |
 | `prompts_functions.updateThreadVariable` | mutation | authMutation + RL | threadVariables, threads | owner helper; row.userId == caller | **fixed** (medium) — thread must be the caller's before a row is created |
 | `saas_notification_functions.listNotifications` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `saas_notification_functions.markNotificationsRead` | mutation | authMutation | — | caller-scoped (ctx.user) | ok |
@@ -772,12 +772,12 @@ for a schema table that is neither policed nor listed:
   composer draft itself carries the mark (`composerDraftFrom`, `features/chat/core/utils/draft-origin.ts`) from when it is
   filled until it is sent or emptied, through edits, a pane switch, a reload, the queue and a failed send, and each send
   names it as `draftFrom`. Its sources: a `?prompt=` link or a chat's `?initialMessage=` (`promptLink`), an
-  saved prompt whose current content the viewer did not write themselves (`sharedPrompt`: every write of a prompt's content records `contentBy` and `contentByImpersonator` from the session, a copy or restore carries the copied text's writer, and a row without them is the viewer's only as their own personal prompt; `prompts/content-author.ts`), a desktop `neore://new?text=` link, share or Quick Composer (`shellLink`),
+  saved prompt whose current words (content and variable defaults) the viewer did not all write themselves (`sharedPrompt`: every write of them records `contentBy` from the session and sets `contentByOthers` / `contentByImpersonator` once anyone else, or anyone impersonated, wrote part of them, which only a restore clears; a copy or restore carries the copied words' record, and a row without them is the viewer's only as their own personal prompt; `prompts/content-author.ts`; the `?promptId=` loader decides only once the session has loaded), a desktop `neore://new?text=` link, share or Quick Composer (`shellLink`),
   and an admin's prompt sent again (`impersonated`); prompt history recall and Restore to input keep every mark. Any
   prompt, edit, steer or local turn an admin sent while impersonating (or, on `/chat/edit`, under a sign-in that cannot
   be confirmed) is marked by the server. The client's `draftFrom` only ever restricts. Still unmarked, and to be marked
   before the fill tool ships: forwarded messages, Generate image/video (a reply's text sent as a prompt), follow-up and
-  welcome-screen suggestions, the prompt improver's Apply, the media gallery's stored prompt and an organization's variable defaults filled into a prompt (`getResolvedVariables`).
+  welcome-screen suggestions, the prompt improver's Apply, the media gallery's stored prompt and an organization's variable defaults filled into a prompt (`getResolvedVariables`) and the organization's name a loaded prompt fills in (`getAutoPopulatedVariables`).
 
 ## Removed from the client surface in this audit
 

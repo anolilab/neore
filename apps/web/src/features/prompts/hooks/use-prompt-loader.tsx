@@ -35,7 +35,7 @@ const usePromptLoader = (promptId: string | undefined) => {
     const setPendingSettings = useModelStore((state) => state.setPendingSettings);
 
     // Get current user context for auto-populated variables
-    const { data: sessionData } = useAuthSession();
+    const { data: sessionData, isPending: isSessionPending } = useAuthSession();
     const { data: activeOrganization } = useAuthActiveOrganization();
 
     // Load prompt if promptId is provided
@@ -50,7 +50,9 @@ const usePromptLoader = (promptId: string | undefined) => {
             return;
         }
 
-        if (!prompt || !modelsSettled || handledPromptId.current === promptId) {
+        // The session too: whose words the prompt holds is told from the viewer's id (`noteSavedPrompt`), and a prompt
+        // handled before it loads would stay marked as someone else's for this visit.
+        if (!prompt || !modelsSettled || isSessionPending || handledPromptId.current === promptId) {
             return;
         }
 
@@ -105,7 +107,7 @@ const usePromptLoader = (promptId: string | undefined) => {
         noteSavedPrompt(prompt, sessionData?.user?.id, { replaced: true });
         toast.success(t`Prompt loaded`);
         handledPromptId.current = promptId;
-    }, [promptId, prompt, models, modelsSettled, setComposerText, setSelectedModel, setPendingSettings, sessionData, activeOrganization, t]);
+    }, [promptId, prompt, models, modelsSettled, isSessionPending, setComposerText, setSelectedModel, setPendingSettings, sessionData, activeOrganization, t]);
 };
 
 export default usePromptLoader;
