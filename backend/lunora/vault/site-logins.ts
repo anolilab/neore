@@ -99,10 +99,14 @@ export const listSiteLogins = authQuery.output(v.object({ logins: v.array(vSiteL
     const { userId } = ctx.user;
 
     if (!onOwnShard(userId)) {
+        ctx.log.event("vault.list_site_logins", { count: 0, ownShard: false });
+
         return { logins: [], userId };
     }
 
     const rows = await ownLogins(ctx, userId);
+
+    ctx.log.event("vault.list_site_logins", { count: rows.length, ownShard: true });
 
     return {
         logins: rows.map((row) => {
