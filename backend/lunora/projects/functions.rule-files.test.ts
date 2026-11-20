@@ -21,6 +21,7 @@ import {
     setProjectRuleFiles,
     updateProject,
 } from "./functions";
+import { MAX_RULE_TEXT_PER_RUN } from "./rule-files";
 
 const OWNER = "user-owner";
 const MEMBER = "user-member";
@@ -122,6 +123,31 @@ describe("a project's rule files in a run", () => {
             context: "Be brief.",
             projectId,
         });
+    });
+
+    it("holds a chat run and a task run to the same rule-text cap, separators and marker included", async () => {
+        const ruleFiles = Array.from({ length: 5 }, (_, index) => {
+            return { content: String(index).repeat(60_000), id: `f${index}`, mode: "always", title: `F${index}` };
+        });
+        const projectId = await insert("projects", { createdAt: 0, ruleFiles, title: "p", userId: OWNER });
+        const taskId = await insert("tasks", {
+            attemptCount: 0,
+            createdAt: 0,
+            dependsOn: [],
+            instructions: "Do it.",
+            maxRepairRounds: 0,
+            projectId,
+            recurring: false,
+            title: "t",
+            updatedAt: 0,
+            userId: OWNER,
+        });
+        const chat = (await contextFor(projectId)) as string;
+        const task = (await harness.run(async (ctx: any) => await ctx.runQuery(runProjectFor as never, { taskId }))) as { context: string };
+
+        expect(chat).toContain("truncated");
+        expect(chat.length).toBeLessThanOrEqual(MAX_RULE_TEXT_PER_RUN);
+        expect(task.context).toBe(chat);
     });
 
     it("gives a project that only has its legacy context exactly that text", async () => {

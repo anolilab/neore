@@ -63,8 +63,8 @@ import {
 } from "./logic";
 import { vTaskRunNoticeReason, vTaskRunOrigin, vVerdict } from "./validators";
 import { vCodingAgentAssignment } from "../coding-agents/validators";
-import { writableProject } from "../projects/functions";
-import { projectRuleFiles, renderRuleFiles, selectRuleFiles } from "../projects/rule-files";
+import { projectRunContext, writableProject } from "../projects/functions";
+import { projectRuleFiles } from "../projects/rule-files";
 
 export type TaskRunOrigin = "dependency" | "manual" | "repair" | "retry" | "schedule";
 
@@ -608,7 +608,7 @@ export const runProjectFor = internalQuery
         }
 
         // A task's run attaches no files: its project's `always` rule files, a legacy `context` first, as a chat gets them.
-        const context = renderRuleFiles(selectRuleFiles(projectRuleFiles(project), []).files);
+        const context = projectRunContext(ctx, project._id, projectRuleFiles(project), []);
 
         return { projectId: project._id, ...(context && { context }) };
     });

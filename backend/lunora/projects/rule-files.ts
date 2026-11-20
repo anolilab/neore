@@ -212,11 +212,16 @@ export const matchesGlob = (glob: string, path: string, shared?: MatchBudget): b
     );
 };
 
+/** What joins two files' text for a run ({@link renderRuleFiles}); counted in the run's budget. */
+const RULE_FILE_SEPARATOR = "\n\n";
+
 /**
  * The files a run takes, in the project's order: every `always` file, and each `glob` file one of whose patterns matches
- * one of `paths`. Their text together stays within {@link MAX_RULE_TEXT_PER_RUN}: the file that reaches it is cut there
- * (marked) and the ones after it are left out, counted in `omitted`. A legacy `context` is taken whole, as before rule
- * files, and not counted: one kept beside the files (`keepContext`) would otherwise leave them nothing. `matchingCut` says the matching budget ran out, so some pattern was not tried.
+ * one of `paths`. Rendered ({@link renderRuleFiles}), their text stays within {@link MAX_RULE_TEXT_PER_RUN}, the
+ * separators and the cut file's marker included: the file that reaches it is cut there (marked) and the ones after it
+ * are left out, counted in `omitted`. A legacy `context` is taken whole, as before rule files, and not counted: one
+ * kept beside the files (`keepContext`) would otherwise leave them nothing. `matchingCut` says the matching budget ran
+ * out, so some pattern was not tried.
  */
 export const selectRuleFiles = (files: RuleFile[], paths: string[]): { files: RuleFile[]; matchingCut: boolean; omitted: number; truncated: boolean } => {
     const budget: MatchBudget = { steps: GLOB_MATCH_STEPS_PER_RUN };
@@ -226,26 +231,36 @@ export const selectRuleFiles = (files: RuleFile[], paths: string[]): { files: Ru
     const selected: RuleFile[] = [];
     let left = MAX_RULE_TEXT_PER_RUN;
     let truncated = false;
+    // Whether text is already rendered, so the next file's text comes after a separator.
+    let started = false;
 
     for (const file of applicable) {
-        if (LEGACY_CONTEXT_FILES.has(file)) {
+        const blank = file.content.trim().length === 0;
+
+        // A blank file renders nothing (`renderRuleFiles`), so it costs nothing.
+        if (LEGACY_CONTEXT_FILES.has(file) || blank) {
             selected.push(file);
+            started ||= !blank;
             continue;
         }
 
-        if (left <= 0) {
-            break;
+        const separator = started ? RULE_FILE_SEPARATOR.length : 0;
+
+        if (separator + file.content.length <= left) {
+            selected.push(file);
+            left -= separator + file.content.length;
+            started = true;
+            continue;
         }
 
-        if (file.content.length > left) {
-            selected.push({ ...file, content: `${file.content.slice(0, left)}${TRUNCATED_NOTE}` });
+        const room = left - separator - TRUNCATED_NOTE.length;
+
+        if (room > 0) {
+            selected.push({ ...file, content: `${file.content.slice(0, room)}${TRUNCATED_NOTE}` });
             truncated = true;
-            left = 0;
-            continue;
         }
 
-        selected.push(file);
-        left -= file.content.length;
+        break;
     }
 
     return { files: selected, matchingCut: budget.steps <= 0, omitted: applicable.length - selected.length, truncated };
@@ -270,7 +285,7 @@ export const ruleFilesRevision = (files: RuleFile[]): string => {
 export const renderRuleFiles = (files: RuleFile[]): string | null => {
     const parts = files.map((file) => file.content).filter((content) => content.trim().length > 0);
 
-    return parts.length > 0 ? parts.join("\n\n") : null;
+    return parts.length > 0 ? parts.join(RULE_FILE_SEPARATOR) : null;
 };
 
 const utf8Bytes = (value: string): number => new TextEncoder().encode(value).byteLength;

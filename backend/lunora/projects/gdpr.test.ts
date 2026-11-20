@@ -221,15 +221,21 @@ describe("owned projects in the GDPR export", () => {
         }
     });
 
-    it("does not read a project's heavy columns, so a large row costs no more than a small one", async () => {
+    it("counts a project's whole row, its heavy columns too, as the read is charged, and past the budget marks the rest", async () => {
         await harness.run((async (ctx: any) => {
-            await ctx.db.insert("projects", { context: "x".repeat(100_000), createdAt: 1, title: "big", userId: A });
+            // Every row large, so whichever page a row lands on (rows inserted together can share a _creationTime), it passes the budget.
+            for (let index = 0; index < 3; index += 1) {
+                await ctx.db.insert("projects", { context: "x".repeat(100_000), createdAt: index, title: `p${index}`, userId: A });
+            }
         }) as never);
 
         const { projects, readBytes } = await ownedFor(A, 4096);
 
-        expect(readBytes).toBeLessThan(4096);
-        expect(projects).toEqual([expect.not.objectContaining({ detailsOmitted: true })]);
+        expect(readBytes).toBeGreaterThan(300_000);
+        expect(projects).toHaveLength(3);
+        // Every project is still exported, each marked.
+        expect(projects).toEqual(Array.from({ length: 3 }, () => expect.objectContaining({ detailsOmitted: true })));
+        expect(projects.map((project) => (project as { context?: unknown }).context)).toEqual([undefined, undefined, undefined]);
     });
 });
 
@@ -280,6 +286,30 @@ describe("project rule files in the GDPR export", () => {
         expect(projects).toHaveLength(3);
         expect(projects[0]).toHaveProperty("ruleFiles");
         expect(projects[1]).toHaveProperty("ruleFiles");
+        expect(projects[2]).toEqual({ projectId: ids[2], ruleFilesOmitted: true });
+    });
+
+    it("counts a project's whole row, its workflow too, so large rows stop the pass and mark the rest omitted", async () => {
+        const workflowContent = { edges: [], nodes: [{ data: { text: "w".repeat(50_000) }, id: "n", position: { x: 0, y: 0 }, type: "note" }] };
+        const ids = (await harness.run((async (ctx: any) => {
+            const inserted = [];
+
+            for (let index = 0; index < 3; index += 1) {
+                inserted.push(await ctx.db.insert("projects", { context: "Be brief.", createdAt: index, title: `p${index}`, userId: A, workflowContent }));
+            }
+
+            return inserted;
+        }) as never)) as string[];
+
+        const { projects, readBytes } = await withRules(
+            ids.map((projectId: string) => {
+                return { projectId };
+            }),
+            60_000,
+        );
+
+        expect(readBytes).toBeGreaterThan(100_000);
+        expect(projects[0]).toHaveProperty("ruleFiles");
         expect(projects[2]).toEqual({ projectId: ids[2], ruleFilesOmitted: true });
     });
 });

@@ -104,13 +104,39 @@ describe("selectRuleFiles", () => {
     });
 
     it("cuts the file that reaches the run's budget and leaves the rest out", () => {
-        const big = "x".repeat(MAX_RULE_TEXT_PER_RUN - 10);
-        const result = selectRuleFiles([always("a", big), always("b", "y".repeat(50)), always("c", "z")], []);
+        const big = "x".repeat(MAX_RULE_TEXT_PER_RUN - 100);
+        const result = selectRuleFiles([always("a", big), always("b", "y".repeat(500)), always("c", "z")], []);
 
         expect(result.files.map((file) => file.id)).toEqual(["a", "b"]);
-        expect(result.files[1]!.content.startsWith("y".repeat(10))).toBe(true);
+        expect(result.files[1]!.content.startsWith("y".repeat(50))).toBe(true);
         expect(result.files[1]!.content).toContain("truncated");
         expect(result).toMatchObject({ omitted: 1, truncated: true });
+        expect(renderRuleFiles(result.files)).toHaveLength(MAX_RULE_TEXT_PER_RUN);
+    });
+
+    it("counts the separators and the cut file's marker in the run's budget", () => {
+        const files = Array.from({ length: 20 }, (_, index) => always(`f${index}`, String(index % 10).repeat(MAX_RULE_TEXT_PER_RUN / 16 - 1)));
+        const result = selectRuleFiles(files, []);
+
+        expect(result.truncated).toBe(true);
+        expect(renderRuleFiles(result.files)!.length).toBeLessThanOrEqual(MAX_RULE_TEXT_PER_RUN);
+    });
+
+    it("leaves out a file with no room past its separator and marker, rather than run over", () => {
+        const result = selectRuleFiles([always("a", "x".repeat(MAX_RULE_TEXT_PER_RUN - 5)), always("b", "y".repeat(100))], []);
+
+        expect(result.files.map((file) => file.id)).toEqual(["a"]);
+        expect(result).toMatchObject({ omitted: 1, truncated: false });
+        expect(renderRuleFiles(result.files)!.length).toBeLessThanOrEqual(MAX_RULE_TEXT_PER_RUN);
+    });
+
+    it("keeps the files beside a legacy context within the budget, past the context's own text", () => {
+        const context = "c".repeat(1000);
+        const files = [always("a", "x".repeat(MAX_RULE_TEXT_PER_RUN / 2)), always("b", "y".repeat(MAX_RULE_TEXT_PER_RUN))];
+        const rendered = renderRuleFiles(selectRuleFiles(projectRuleFiles({ context, ruleFiles: files }), []).files)!;
+
+        expect(rendered.startsWith(context)).toBe(true);
+        expect(rendered.length).toBeLessThanOrEqual(context.length + MAX_RULE_TEXT_PER_RUN);
     });
 });
 

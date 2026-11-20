@@ -16,8 +16,8 @@ import { ROOT_SHARD_KEY } from "../lib/shard-context";
 import { MAX_LENGTH } from "../lib/validators";
 import { PROJECTS_PER_DETAILS_READ } from "./export-pages";
 import { DELETION_MARKER_URL, isRepoRow } from "./repositories";
-import { projectRuleFiles, type RuleFile } from "./rule-files";
-import { findProjectRow, findProjectRows, type ProjectRow } from "./project-row";
+import { projectRuleFiles } from "./rule-files";
+import { findProjectRow, findProjectRowsMeasured, type ProjectRow } from "./project-row";
 
 /** A project's repositories, one batch; with `keepMarker`, a delete's marker stays until the delete is done. */
 export const eraseProjectRepositories = async (ctx: MutationCtx, projectId: Id<"projects">, { keepMarker = false } = {}): Promise<BatchResult> => {
@@ -241,7 +241,7 @@ export const collectProjectRepositoriesForExport = internalQuery
 /**
  * Projects' details for the export, next to their repositories, in one read: each one's title and whether it is shared
  * (`isPublic`), never the share token (`pages/gdpr.ts` drops a page's the same way). `readBytes` is what reading the
- * rows cost, `context` and workflow included (their rule files are read in their own pass), so the export can count it against its read budget. A project
+ * whole rows cost, `context`, workflow and rule files included ({@link findProjectRowsMeasured}), so the export can count it against its read budget. A project
  * that is gone or not the user's is left out.
  */
 export const collectProjectDetailsForExport = internalQuery
@@ -253,8 +253,7 @@ export const collectProjectDetailsForExport = internalQuery
         }),
     )
     .query(async ({ args: { projectIds, userId }, ctx }) => {
-        const { page } = await findProjectRows(ctx.db.projects, { consistency: "primary", where: { _id: { in: projectIds } } });
-        const readBytes = page.reduce((total, row) => total + new TextEncoder().encode(JSON.stringify(row)).byteLength, 0);
+        const { page, readBytes } = await findProjectRowsMeasured(ctx.db.projects, { consistency: "primary", where: { _id: { in: projectIds } } });
         const projects = page
             .filter((row) => row.userId === userId)
             .map((row) => {
@@ -266,8 +265,9 @@ export const collectProjectDetailsForExport = internalQuery
     });
 
 /**
- * One page of the user's projects for the export, the ones without a repository too (`collectAllOwnedProjects`). A project
- * row's heavy columns (`context`, the workflow) are not read: only the exported ones are selected, and a page holds {@link PROJECTS_PER_DETAILS_READ} rows.
+ * One page of the user's projects for the export, the ones without a repository too (`collectAllOwnedProjects`), with what
+ * reading it cost: the whole rows, heavy columns included ({@link findProjectRowsMeasured}), though only the exported
+ * ones are returned. A page holds {@link PROJECTS_PER_DETAILS_READ} rows.
  * Each project carries the machine and folder a computer's project records, which only its owner may see.
  */
 export const collectOwnedProjectsForExport = internalQuery
@@ -288,18 +288,15 @@ export const collectOwnedProjectsForExport = internalQuery
         }),
     )
     .query(async ({ args: { cursor, userId }, ctx }) => {
-        const result = await ctx.db.projects.findMany({
+        const result = await findProjectRowsMeasured(ctx.db.projects, {
             consistency: "primary",
             cursor: cursor ?? null,
             limit: PROJECTS_PER_DETAILS_READ,
             orderBy: [{ _creationTime: "asc" }],
-            select: ["isPublic", "machineId", "path", "title"] as const,
             where: { userId },
         });
-        // The typed `select` result is a union of one-column picks, which none of the reads below fit.
-        const rows = result.page as unknown as { _id: string; isPublic?: boolean; machineId?: string; path?: string; title: string }[];
-        const readBytes = rows.reduce((total, row) => total + new TextEncoder().encode(JSON.stringify(row)).byteLength, 0);
-        const projects = rows.map((row) => {
+        const { readBytes } = result;
+        const projects = result.page.map((row) => {
             return {
                 ...(row.machineId !== undefined && { machineId: row.machineId }),
                 ...(row.path !== undefined && { path: row.path }),
@@ -314,8 +311,9 @@ export const collectOwnedProjectsForExport = internalQuery
 
 /**
  * The rule files of up to {@link PROJECTS_PER_DETAILS_READ} of the user's projects for the export, a legacy `context`
- * first (`projectRuleFiles`), and what reading them cost. A separate read from the projects' page, which never reads
- * these heavy columns, so the export can leave them out past its budget (`attachProjectRuleFiles`) and keep the rest.
+ * first (`projectRuleFiles`), and what reading them cost: the whole rows ({@link findProjectRowsMeasured}). A separate
+ * read from the projects' page, which never returns these heavy columns, so the export can leave them out past its
+ * budget (`attachProjectRuleFiles`) and keep the rest.
  */
 export const collectProjectRuleFilesForExport = internalQuery
     .input({ projectIds: v.array(v.id("projects")).max(PROJECTS_PER_DETAILS_READ), userId: v.string().max(MAX_LENGTH.id) })
@@ -339,15 +337,8 @@ export const collectProjectRuleFilesForExport = internalQuery
         }),
     )
     .query(async ({ args: { projectIds, userId }, ctx }) => {
-        const { page } = await ctx.db.projects.findMany({
-            consistency: "primary",
-            select: ["context", "ruleFiles", "userId"] as const,
-            where: { _id: { in: projectIds } },
-        });
-        // The typed `select` result is a union of one-column picks, which the reads below do not fit.
-        const rows = page as unknown as { _id: string; context?: string; ruleFiles?: RuleFile[]; userId?: string }[];
-        const readBytes = rows.reduce((total, row) => total + new TextEncoder().encode(JSON.stringify(row)).byteLength, 0);
-        const projects = rows
+        const { page, readBytes } = await findProjectRowsMeasured(ctx.db.projects, { consistency: "primary", where: { _id: { in: projectIds } } });
+        const projects = page
             .filter((row) => row.userId === userId)
             .map((row) => {
                 return { projectId: row._id, ruleFiles: projectRuleFiles(row) };

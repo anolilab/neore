@@ -30,7 +30,7 @@ import {
 } from "./repositories";
 import { mayEditProject } from "./edit-access";
 import { forViewer, resolveProjectLocation } from "./machine-location";
-import { findProjectRow, PROJECT_ROW_COLUMNS, type ProjectRow } from "./project-row";
+import { findProjectRow, findProjectRowsMeasured, PROJECT_ROW_COLUMNS, type ProjectRow } from "./project-row";
 import {
     MAX_RULE_FILE_LENGTH,
     MAX_RULE_FILES,
@@ -146,8 +146,8 @@ export const readableProjectGrants = async (
 };
 
 /**
- * The grants of {@link readableProjectGrants}, with the bytes its project documents cost to read: their JSON size, a fair measure
- * of what the read budget counts. A caller that budgets its reads uses this, so each document is counted when it is read.
+ * The grants of {@link readableProjectGrants}, with the bytes its project documents cost to read: the whole rows' JSON size,
+ * what the read budget counts. A caller that budgets its reads uses this, so each document is counted when it is read.
  */
 export const readableProjectGrantsMeasured = async (
     context: QueryCtx | MutationCtx,
@@ -166,22 +166,28 @@ export const readableProjectGrantsMeasured = async (
     let readBytes = 0;
 
     for (const ids of inBatches(projectIds)) {
-        const { page: picked } = await systemDb(context).projects.findMany({
-            ...consistency,
-            // Only what the grant is decided on and names: a whole row carries the context, the workflow and the rule files.
-            select: ["organizationId", "title", "userId"] as const,
-            where: { _id: { in: ids } },
-        });
-        // The typed `select` result is a union of one-column picks.
-        const page = picked as unknown as typeof rows;
+        if (options.measure === false) {
+            const { page: picked } = await systemDb(context).projects.findMany({
+                ...consistency,
+                // Only what the grant is decided on and names: a whole row carries the context, the workflow and the rule files.
+                select: ["organizationId", "title", "userId"] as const,
+                where: { _id: { in: ids } },
+            });
 
-        if (options.measure !== false) {
-            for (const row of page) {
-                readBytes += new TextEncoder().encode(JSON.stringify(row)).byteLength;
-            }
+            // The typed `select` result is a union of one-column picks.
+            rows.push(...(picked as unknown as typeof rows));
+            continue;
         }
 
-        rows.push(...page);
+        // Measured, the rows are read whole: a `select` would not lower what the read is charged (`findProjectRowsMeasured`).
+        const measured = await findProjectRowsMeasured(systemDb(context).projects, { ...consistency, where: { _id: { in: ids } } });
+
+        readBytes += measured.readBytes;
+        rows.push(
+            ...measured.page.map((row) => {
+                return { _id: row._id, organizationId: row.organizationId, title: row.title, userId: row.userId };
+            }),
+        );
     }
 
     const organizations = [...new Set(rows.filter((row) => row.userId !== userId && row.organizationId).map((row) => row.organizationId!))];
@@ -273,6 +279,26 @@ const storedRuleFiles = async (context: MutationCtx, projectId: Id<"projects">):
     return row?.ruleFiles ?? undefined;
 };
 
+/**
+ * The text a run takes from a project's rule files (`projectRuleFiles`), given the names of the files its message
+ * attaches (`paths`; none for a task): what every run path uses, chat, edit, group and task runs alike, so the per-run
+ * cap (`selectRuleFiles`) and the logging apply to each the same way. Only counts are logged, never text.
+ */
+export const projectRunContext = (context: QueryCtx, projectId: Id<"projects">, files: RuleFile[], paths: string[]): string | null => {
+    const selected = selectRuleFiles(files, paths);
+
+    if (selected.omitted > 0 || selected.truncated || selected.matchingCut) {
+        context.log.event("projects.rule_files_over_budget", {
+            matchingCut: selected.matchingCut,
+            omitted: selected.omitted,
+            projectId,
+            truncated: selected.truncated,
+        });
+    }
+
+    return renderRuleFiles(selected.files);
+};
+
 /** File names read for one run's pattern match, at most: a message attaches no more (`MAX_ATTACHED_FILES`). */
 const MAX_RUN_FILE_IDS = MAX_ATTACHED_FILES;
 
@@ -295,25 +321,14 @@ export const getProjectContextForRun = internalQuery
         const files = projectRuleFiles(project);
         let paths: string[] = [];
 
-        // The names are read only when a file could match one: the rows also hold the files' extracted text, which is not selected.
+        // The names are read only when a file could match one: the rows also hold the files' extracted text, never returned here.
         if (fileIds && fileIds.length > 0 && files.some((file) => file.mode === "glob")) {
             const { page } = await context.db.chatFiles.findMany({ select: ["filename"] as const, where: { _id: { in: fileIds } } });
 
             paths = (page as unknown as { filename?: string }[]).flatMap((row) => (row.filename ? [row.filename] : []));
         }
 
-        const selected = selectRuleFiles(files, paths);
-
-        if (selected.omitted > 0 || selected.truncated || selected.matchingCut) {
-            context.log.event("projects.rule_files_over_budget", {
-                matchingCut: selected.matchingCut,
-                omitted: selected.omitted,
-                projectId,
-                truncated: selected.truncated,
-            });
-        }
-
-        return renderRuleFiles(selected.files);
+        return projectRunContext(context, projectId, files, paths);
     });
 
 /**

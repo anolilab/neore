@@ -45,15 +45,15 @@ describe(readableProjectTitles, () => {
         encode.mockRestore();
     });
 
-    it("counts the bytes of the columns the budgeted read reads, and reads no others", async () => {
+    it("counts the whole row the budgeted read is charged, columns it does not name included", async () => {
         const id = await harness.run(
             async (ctx: any) => await ctx.db.insert("projects", { createdAt: 1, description: "x".repeat(5000), title: "y".repeat(5000), userId: A }),
         );
 
         const measured = await harness.run(async (ctx: any) => await readableProjectGrantsMeasured(ctx, [id], A));
 
-        expect(measured.readBytes).toBeGreaterThan(5000);
-        // The description is not one of them: a whole row would also carry the context, the workflow and the rule files.
-        expect(measured.readBytes).toBeLessThan(10_000);
+        // The description too: a metered read is charged the whole row, whatever it names.
+        expect(measured.readBytes).toBeGreaterThan(10_000);
+        expect(measured.grants.get(id)).toStrictEqual({ organizationId: undefined, title: "y".repeat(5000) });
     });
 });

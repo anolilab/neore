@@ -102,9 +102,9 @@ interface OwnedProjectsPage {
 }
 
 /**
- * Every project the user owns, one page per query, reported only after the last page. A project is never left out and
- * the export never fails for its size: the query reads only the columns it exports, and a page that takes the reads
- * past `maxBytes` has its projects' sharing flag dropped and marked `{ detailsOmitted: true }`, the same way the
+ * Every project the user owns, one page per query, reported only after the last page. A project is never left out:
+ * every page is read, each costing its whole rows (`findProjectRowsMeasured`), and a page that takes the reads past
+ * `maxBytes` has its projects' sharing flag dropped and marked `{ detailsOmitted: true }`, the same way the
  * repositories' project details are. The id, title, machine and folder stay on every row.
  */
 export const collectAllOwnedProjects = async (
