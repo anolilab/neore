@@ -4559,6 +4559,12 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
+            // A branched thread (a regenerate or an edit) lists only its active path, and this job reads raw rows, where replies share
+            // an `order`. It could key a reply the composer does not show, and charge for it. Until it reads the path, it gets none.
+            if (threadData.activeLeafMessageId) {
+                return;
+            }
+
             // The owner's setting decides whether the owner's thread gets a suggestion; the run's own guest status decides whether this run pays.
             const ownerGate = await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId: threadData.userId });
             const actorGate = await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId });
