@@ -246,6 +246,7 @@ describe("an npm agent", () => {
             fetch: fetchSpy as unknown as typeof fetch,
             locateTools: () => options.tools === null ? undefined : options.tools ?? TOOLS,
             registry,
+            resolveTools: async (found) => found,
             toolIdentity: (file) => `identity of ${file}`,
         });
 

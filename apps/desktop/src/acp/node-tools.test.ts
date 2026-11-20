@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { findNodeTools } from "./node-tools";
+import { findNodeTools, resolveNodeTools } from "./node-tools";
 
 const present = (...files: string[]) => (file: string) => files.includes(file);
 /** Absolute on any host: the drive or `/` the tests run from. */
@@ -84,5 +84,47 @@ describe.skipIf(process.platform === "win32")("findNodeTools with the real file 
 
         expect(found).toEqual({ node: path.join(ready, "node"), npm: path.join(ready, "npm") });
         expect(findNodeTools([lookalike, unready].join(path.delimiter))?.node ?? "").not.toContain(unready);
+    });
+});
+
+describe(resolveNodeTools, () => {
+    const bin = absolute("home", "me", ".volta", "tools", "image", "node", "22.1.0", "bin");
+    const real = { node: path.join(bin, "node"), npm: path.join(bin, "npm") };
+    const shim = { node: absolute("home", "me", ".volta", "bin", "node"), npm: absolute("home", "me", ".volta", "bin", "npm") };
+    const files = new Set([real.node, real.npm]);
+    const answers = (npmVersion: string) => async (program: string, args: string[]): Promise<string> => {
+        if (program === shim.node && args.join(" ") === "-p process.execPath") {
+            return `${real.node}\n`;
+        }
+
+        if (program === real.node && args[1] === "--version") {
+            return `${npmVersion}\n`;
+        }
+
+        throw new Error(`unexpected run: ${program} ${args.join(" ")}`);
+    };
+
+    it("uses the binary a shim runs and the npm next to it", async () => {
+        await expect(resolveNodeTools(shim, answers("11.10.0"), (file) => files.has(file))).resolves.toStrictEqual(real);
+    });
+
+    it("refuses an npm older than 11.10", async () => {
+        await expect(resolveNodeTools(shim, answers("11.9.3"), (file) => files.has(file))).rejects.toThrow("older than 11.10");
+        await expect(resolveNodeTools(shim, answers("10.9.2"), (file) => files.has(file))).rejects.toThrow("older than 11.10");
+    });
+
+    it("refuses a node that names no binary, and one with no npm beside it", async () => {
+        const relative = async (): Promise<string> => "node\n";
+
+        await expect(resolveNodeTools(shim, relative, () => true)).rejects.toThrow("did not name the Node.js binary");
+        await expect(resolveNodeTools(shim, answers("11.10.0"), (file) => file === real.node)).rejects.toThrow("npm was not found next to Node.js");
+    });
+
+    it("says so when the node it found does not run", async () => {
+        const broken = async (): Promise<string> => {
+            throw new Error("spawn EACCES");
+        };
+
+        await expect(resolveNodeTools(shim, broken, () => true)).rejects.toThrow("did not run");
     });
 });

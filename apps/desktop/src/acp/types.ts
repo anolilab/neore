@@ -47,6 +47,8 @@ export interface AcpInstall {
     /** The package index's hash an npm install was verified against; absent on a binary install. */
     indexIntegrity?: string;
     publisher: string;
+    /** The names of the variables the registry set at this install; a reinstall drops those it no longer sets. */
+    registryEnv?: string[];
     sha256: string;
     source: string;
     /** Hash of the installed files, checked before every start; npm installs only. */

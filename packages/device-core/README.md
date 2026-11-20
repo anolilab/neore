@@ -219,13 +219,17 @@ The installed folder is `acp-agents/<key>/npm-<version>-<16 hex of the tree hash
 other bytes lands beside the old folder, so a plan already verified never runs files it did not hash. The old folder
 goes when the desktop calls `acpInstallPrune`, after it closed the sessions started from it.
 
+The pin records the names of the variables the registry set (`registry_env`). A reinstall keeps the person's own
+variables, lays the registry's new ones over them and drops those the registry set before and no longer sets.
+
 An install, a removal and a prune of old versions run one at a time (`lock_installs`). Deleting an install or a
 staging folder renames it into `acp-agents/.trash` under that lock and deletes it on a thread; trash names carry a
 per-run id, and the sweep at the next install stage removes the entries of other runs only. When the rename fails,
 the entry is deleted where it is, on the calling thread.
 
 `acp_install_npm` (called by the desktop's `acp/install.ts`) installs a downloaded tarball: its SHA-512 must equal the
-package index's integrity before and after npm runs, npm runs with `--ignore-scripts` and a scrubbed environment by
-the absolute `node` and `npm` the desktop found (refused if either resolves elsewhere than when the person
-confirmed), the installed package must be the pinned name and version, and its program (a JavaScript file, picked
+package index's integrity before and after npm runs, npm runs with `--ignore-scripts`, `--allow-git=none` and a
+scrubbed environment by the absolute `node` and `npm` the desktop gave (refused if either is not the file it was when
+the person confirmed). The desktop resolves a version manager's shim to the Node.js binary it runs and the npm next to
+it, and refuses npm older than 11.10 (`acp/node-tools.ts#resolveNodeTools`); the installed package must be the pinned name and version, and its program (a JavaScript file, picked
 like `npx` would) must be inside it. The agent is recorded to run `node <program>`.

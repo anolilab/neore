@@ -304,6 +304,7 @@ impl DeviceState {
             install: Some(AcpInstall {
                 index_integrity: None,
                 publisher: request.publisher.clone(),
+                registry_env: request.env.keys().cloned().collect(),
                 sha256: actual,
                 source: request.source.clone(),
                 tree_sha256: None,
@@ -396,8 +397,17 @@ impl DeviceState {
                         return Err(already_registered(&agent.key));
                     }
 
-                    // The user's own variables stay; the registry's are laid over them.
+                    // The user's own variables stay; the registry's are laid over them, and those the registry set at
+                    // the last install but no longer sets go.
                     let mut env = settings.acp_agents[i].env.clone();
+
+                    if let Some(old) = &settings.acp_agents[i].install {
+                        for name in &old.registry_env {
+                            if !agent.env.0.contains_key(name) {
+                                env.0.remove(name);
+                            }
+                        }
+                    }
 
                     env.0.extend(std::mem::take(&mut agent.env.0));
                     agent.env = env;

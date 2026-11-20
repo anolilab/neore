@@ -80,6 +80,7 @@ fn seed_install(state: &DeviceState, dir: &Path, node: &Path) -> AcpAgent {
         install: Some(AcpInstall {
             index_integrity: Some("sha512-index".into()),
             publisher: "Example Inc.".into(),
+            registry_env: Vec::new(),
             sha256: "0".repeat(64),
             source: "https://registry.npmjs.org/fixture-agent/-/fixture-agent-1.0.0.tgz".into(),
             tree_sha256: Some(tree),
@@ -593,6 +594,7 @@ fn removing_a_node_variable_drops_the_pin_too() {
                 settings.acp_agents[0].install = Some(AcpInstall {
                     index_integrity: Some("sha512-index".into()),
                     publisher: "Example Inc.".into(),
+                    registry_env: Vec::new(),
                     sha256: "0".repeat(64),
                     source: "https://registry.npmjs.org/x".into(),
                     tree_sha256: Some(tree_hash(&installed(&dir)).unwrap()),
@@ -1191,11 +1193,6 @@ fn npm_env_child() {
         "http_proxy",
         "no_proxy",
         "NODE_EXTRA_CA_CERTS",
-        // The version managers' homes, so a shim finds the person's installs.
-        "VOLTA_HOME",
-        "MISE_DATA_DIR",
-        "MISE_CONFIG_DIR",
-        "ASDF_DATA_DIR",
         // Set by the shell that runs the script, not passed in.
         "PWD",
         "OLDPWD",
@@ -1221,17 +1218,6 @@ fn npm_env_child() {
         );
     }
 
-    // One the parent set is passed as it is; one it did not is the manager's default under the real home.
-    for line in [
-        "VOLTA_HOME=/opt/volta-home",
-        "MISE_DATA_DIR=/home/test-person/.local/share/mise",
-    ] {
-        assert!(
-            seen.lines().any(|seen| seen == line),
-            "{line} did not reach npm"
-        );
-    }
-
     println!("npm-env-checked");
 }
 
@@ -1251,13 +1237,7 @@ fn only_the_variables_npm_needs_reach_it() {
         command.env(name, value);
     }
 
-    for (name, _) in MANAGER_HOMES {
-        command.env_remove(name);
-    }
-
     let output = command
-        .env("HOME", "/home/test-person")
-        .env("VOLTA_HOME", "/opt/volta-home")
         .env("NODE_OPTIONS", "--require /tmp/evil.js")
         .env("npm_config_foo", "bar")
         .env("NEORE_TEST_SECRET", "hunter2")
@@ -2518,4 +2498,64 @@ fn a_reinstall_with_other_bytes_leaves_the_files_a_plan_verified_in_place() {
 
     assert!(gone, "the prune takes the old folder");
     assert!(current.exists(), "and keeps the pinned one");
+}
+
+#[test]
+fn npm_is_told_to_fetch_nothing_from_git() {
+    let (state, dir) = state("allow-git");
+    let (node, npm, log) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+
+    state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+
+    assert!(fs::read_to_string(&log)
+        .unwrap()
+        .split_whitespace()
+        .any(|arg| arg == "--allow-git=none"));
+}
+
+#[test]
+fn a_reinstall_drops_the_variables_the_registry_no_longer_sets_and_keeps_the_persons_own() {
+    let (state, dir) = state("registry-env");
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let install = |env: &[(&str, &str)]| {
+        let mut request = request(&state, &node, &npm, &bytes, integrity(&bytes));
+
+        request.env = env
+            .iter()
+            .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+            .collect();
+        state.acp_install_npm(request).unwrap();
+    };
+    let env = || -> Vec<(String, String)> {
+        state.settings().acp_agents[0]
+            .env
+            .0
+            .iter()
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect()
+    };
+
+    install(&[("FIXTURE_MODE", "legacy"), ("FIXTURE_LEVEL", "1")]);
+    state
+        .acp_update(
+            serde_json::from_value(json!({
+                "op": "setEnv", "agentKey": "fixture", "name": "MY_TOKEN", "value": "mine",
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+    install(&[("FIXTURE_LEVEL", "2")]);
+
+    assert_eq!(
+        env(),
+        vec![
+            ("FIXTURE_LEVEL".to_owned(), "2".to_owned()),
+            ("MY_TOKEN".to_owned(), "mine".to_owned()),
+        ]
+    );
 }

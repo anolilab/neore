@@ -14,7 +14,7 @@ import { pipeline } from "node:stream/promises";
 import { loadToolIdentity } from "../device/addon";
 import type { DeviceCore } from "../device/types";
 import type { NodeTools } from "./node-tools";
-import { findNodeTools } from "./node-tools";
+import { findNodeTools, resolveNodeTools } from "./node-tools";
 import type { NpmIndexEntry } from "./npm-index";
 import { lookupNpmIntegrity, NPM_HOST } from "./npm-index";
 import type { AgentRegistry, ResolvedInstall, ResolvedNpmInstall } from "./registry";
@@ -91,6 +91,8 @@ export interface InstallerOptions {
     fetch?: typeof fetch;
     /** Where node and npm are; the default searches `PATH` and the usual package-manager folders. */
     locateTools?: () => NodeTools | undefined;
+    /** The Node.js binary behind what was found, and its npm (`resolveNodeTools`). */
+    resolveTools?: (found: NodeTools) => Promise<NodeTools>;
     registry: AgentRegistry;
     /** The core's `toolIdentity`; the default loads it from the addon. */
     toolIdentity?: (file: string) => string | null;
@@ -173,11 +175,14 @@ export class AgentInstaller {
      * that cannot happen (no node, no hash) never asks. Nothing is downloaded until the answer is yes.
      */
     private async installNpm(resolved: ResolvedNpmInstall): Promise<AcpView | null> {
-        const found = (this.options.locateTools ?? (() => findNodeTools()))();
+        const located = (this.options.locateTools ?? (() => findNodeTools()))();
 
-        if (found === undefined) {
+        if (located === undefined) {
             throw new Error("Node.js and npm were not found. Install Node.js (which includes npm), then try again.");
         }
+
+        // The binary a version manager's shim runs, not the shim: the install and the agent use it with no manager config.
+        const found = await (this.options.resolveTools ?? (async (tools) => await resolveNodeTools(tools)))(located);
 
         // Taken as the dialog opens: the core refuses a node or npm that is no longer the file the person confirmed.
         const identify = this.options.toolIdentity ?? loadToolIdentity();

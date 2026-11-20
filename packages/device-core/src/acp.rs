@@ -79,6 +79,10 @@ pub struct AcpInstall {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_integrity: Option<String>,
     pub publisher: String,
+    /// The names of the variables the registry set at this install. A reinstall drops those the registry no longer
+    /// sets and keeps the agent's other variables (the person's own).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub registry_env: Vec<String>,
     /// SHA-256 of the archive that was verified, lowercase hex.
     pub sha256: String,
     /// The archive's URL, as the registry gave it.
