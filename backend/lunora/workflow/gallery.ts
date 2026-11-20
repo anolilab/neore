@@ -13,6 +13,7 @@ import { authMutation, publicAction, publicQuery, rateLimit } from "../lib/crpc"
 import { rateLimitGuard, shareLinkBucket } from "../lib/rate-limiter";
 import { throwForbidden, throwNotFound } from "../lib/error-helpers";
 import { MAX_LENGTH } from "../lib/validators";
+import { findProjectRow, findProjectRows } from "../projects/project-row";
 
 // Generate a unique share token
 const generateToken = (): string => crypto.randomUUID();
@@ -42,11 +43,11 @@ export const browseGallery = publicQuery
         // `_creationTime`, `by_public` on `galleryPublishedAt`), which the stable
         // sorts below keep for equal keys. Only workflow projects are listed.
         const { page: workflows } = category
-            ? await context.db.projects.findMany({
+            ? await findProjectRows(context.db.projects, {
                   orderBy: [{ _creationTime: "asc" }],
                   where: { galleryCategory: category, isPublic: true, projectType: "workflow" },
               })
-            : await context.db.projects.findMany({
+            : await findProjectRows(context.db.projects, {
                   orderBy: [{ galleryPublishedAt: "asc" }, { _creationTime: "asc" }],
                   where: { isPublic: true, projectType: "workflow" },
               });
@@ -146,7 +147,7 @@ export const getPublicWorkflowOwner = internalQuery
     .input({ publicAccessToken: v.string() })
     .output(v.union(v.string(), v.null()))
     .query(async ({ args: { publicAccessToken }, ctx }) => {
-        const project = await ctx.db.projects.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { publicAccessToken } });
+        const project = await findProjectRow(ctx.db.projects, { orderBy: [{ _creationTime: "asc" }], where: { publicAccessToken } });
 
         return project?.isPublic && project.projectType === "workflow" ? (project.userId ?? null) : null;
     });
@@ -157,7 +158,7 @@ export const readPublicWorkflow = internalQuery
         publicAccessToken: v.string(),
     })
     .query(async ({ args: { publicAccessToken }, ctx: context }) => {
-        const project = await context.db.projects.findFirst({ orderBy: [{ _creationTime: "asc" }], where: { publicAccessToken } });
+        const project = await findProjectRow(context.db.projects, { orderBy: [{ _creationTime: "asc" }], where: { publicAccessToken } });
 
         if (!project || !project.isPublic || project.projectType !== "workflow") {
             return null;
@@ -210,7 +211,7 @@ export const getFeaturedWorkflows = publicQuery
         ),
     )
     .query(async ({ ctx: context }) => {
-        const { page: results } = await context.db.projects.findMany({
+        const { page: results } = await findProjectRows(context.db.projects, {
             limit: 10,
             orderBy: [{ _creationTime: "asc" }],
             where: { galleryFeatured: true, isPublic: true, projectType: "workflow" },
@@ -249,7 +250,7 @@ export const publishWorkflow = authMutation
     .mutation(async ({ args: { category, projectId, tags }, ctx: context }) => {
         const { userId } = context.user;
 
-        const project = await context.db.projects.findFirst({ where: { _id: projectId as Id<"projects"> } });
+        const project = await findProjectRow(context.db.projects, { where: { _id: projectId as Id<"projects"> } });
 
         if (!project) {
             throwNotFound("Workflow");
@@ -306,7 +307,7 @@ export const unpublishWorkflow = authMutation
     .mutation(async ({ args: { projectId }, ctx: context }) => {
         const { userId } = context.user;
 
-        const project = await context.db.projects.findFirst({ where: { _id: projectId as Id<"projects"> } });
+        const project = await findProjectRow(context.db.projects, { where: { _id: projectId as Id<"projects"> } });
 
         if (!project) {
             throwNotFound("Workflow");
@@ -349,7 +350,7 @@ export const updateGalleryMeta = authMutation
     .mutation(async ({ args: { category, description, projectId, tags }, ctx: context }) => {
         const { userId } = context.user;
 
-        const project = await context.db.projects.findFirst({ where: { _id: projectId as Id<"projects"> } });
+        const project = await findProjectRow(context.db.projects, { where: { _id: projectId as Id<"projects"> } });
 
         if (!project) {
             throwNotFound("Workflow");

@@ -7,9 +7,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 
-import { getProject as getOwnProject, updateProject as writeProject } from "../agent/projects";
+import { getProject as getOwnProject, unpinProject, updateProject as writeProject } from "../agent/projects";
 import schema from "../schema";
 import { runProjectFor } from "../tasks/internal";
+import { getWorkflow } from "../workflow/functions";
 import {
     getProject,
     getProjectContextForRun,
@@ -281,6 +282,26 @@ describe("changing a project's rule files", () => {
         await expect(read(false)).resolves.not.toHaveProperty("ruleFiles");
         await expect(read(true)).resolves.toMatchObject({ ruleFiles: [sqlRules] });
         await expect(list(owner, projectId)).resolves.toMatchObject({ files: [{ id: "context" }, { id: "sql" }] });
+    });
+
+    it("leaves rule files out of the workflow editor's read, and a whole-row write keeps them", async () => {
+        const projectId = await insert("projects", {
+            createdAt: 0,
+            pinnedAt: 1,
+            projectType: "workflow",
+            ruleFiles: [sqlRules],
+            title: "w",
+            userId: OWNER,
+            workflowContent: { edges: [], nodes: [] },
+        });
+
+        await expect(as(OWNER).query(getWorkflow as never, { projectId } as never)).resolves.toMatchObject({ _id: projectId, title: "w" });
+        await expect(as(OWNER).query(getWorkflow as never, { projectId } as never)).resolves.not.toHaveProperty("ruleFiles");
+
+        // Removing `pinnedAt` replaces the row (`patchRow`): it is read whole, so the rule files stay.
+        await harness.run(async (ctx: any) => await ctx.runMutation(unpinProject as never, { projectId }));
+
+        await expect(harness.run(async (ctx: any) => await ctx.db.get("projects", projectId))).resolves.toMatchObject({ ruleFiles: [sqlRules] });
     });
 
     it("refuses a save from a view older than another save, and keeps that save", async () => {

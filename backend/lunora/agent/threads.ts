@@ -35,6 +35,7 @@ import { readPasscodeRow } from "./thread-passcode";
 import { clearAwaitingInput, patchThread } from "./table-writes";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
 import { deleteThreadSummaries } from "./thread-summaries";
+import { findProjectRow } from "../projects/project-row";
 
 export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
     const result = omit(thread, ["parentThreadIds"]);
@@ -1517,7 +1518,7 @@ export const moveThreadToProject = internalMutation
 
         assert(thread, `Thread ${args.threadId} not found`);
 
-        const project = await ctx.db.projects.findFirst({ where: { _id: args.projectId } });
+        const project = await findProjectRow(ctx.db.projects, { where: { _id: args.projectId } });
 
         assert(project, `Project ${args.projectId} not found`);
         await ctx.db.patch("threads", args.threadId, {

@@ -4,9 +4,11 @@
 
 - **Rule files** (`projects.ruleFiles`, `rule-files.ts`) — the owner's instructions for a project's runs, at most
   `MAX_RULE_FILES`, each `always` or `glob`. They live ON the project row, so reading, deletion and organization moves
-  follow the project with no table of their own. Project lists and single-project reads never read them: they select
-  `PROJECT_ROW_COLUMNS` (`project-row.ts`, typed `ProjectRow`); only the editor and a run's setup (a task's too)
-  pass `{ ruleFiles: true }` to `readableProject` / `writableProject`. A new project column goes in that list (the type check demands it).
+  follow the project with no table of their own. Every other `projects` read leaves them out: `findProjectRow` /
+  `findProjectRows` (`project-row.ts`, `PROJECT_ROW_COLUMNS`, typed `ProjectRow`) or its own `select`; only the editor
+  and a run's setup (a task's too) pass `{ ruleFiles: true }` to `readableProject` / `writableProject`. A writer that
+  `patchRow`s a removal reads the whole row (it is replaced). `project-reads.guard.test.ts` counts both kinds. A new
+  project column goes in that list (the type check demands it).
 - Changing them follows `updateProject` exactly: the owner only (`mayEditProject` in `edit-access.ts`, through
   `projectWithEditableSettings`), re-checked in the writing transaction (`settingsEditorId`). Never widen one alone.
 - The legacy `context` text reads as the first `always` file (`projectRuleFiles`) everywhere: runs, the editor and

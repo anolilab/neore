@@ -17,6 +17,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { PROJECTS_PER_DETAILS_READ } from "./export-pages";
 import { DELETION_MARKER_URL, isRepoRow } from "./repositories";
 import { projectRuleFiles, type RuleFile } from "./rule-files";
+import { findProjectRow, findProjectRows, type ProjectRow } from "./project-row";
 
 /** A project's repositories, one batch; with `keepMarker`, a delete's marker stays until the delete is done. */
 export const eraseProjectRepositories = async (ctx: MutationCtx, projectId: Id<"projects">, { keepMarker = false } = {}): Promise<BatchResult> => {
@@ -48,16 +49,12 @@ const isOrganizationOwned = (row: { organizationId?: string; userId?: string }):
  * move commits the project before it re-stamps the rows, and a re-stamp that failed is never retried. Such a row is
  * re-stamped here instead. The project is read from the primary, once per project (`projects`). Returns whether it erased.
  */
-const eraseUnlessMoved = async (
-    ctx: MutationCtx,
-    row: Doc<"projectRepositories">,
-    projects: Map<string, Promise<Doc<"projects"> | null>>,
-): Promise<boolean> => {
+const eraseUnlessMoved = async (ctx: MutationCtx, row: Doc<"projectRepositories">, projects: Map<string, Promise<ProjectRow | null>>): Promise<boolean> => {
     if (!projects.has(row.projectId)) {
-        projects.set(row.projectId, ctx.db.projects.findFirst({ consistency: "primary", where: { _id: row.projectId } }));
+        projects.set(row.projectId, findProjectRow(ctx.db.projects, { consistency: "primary", where: { _id: row.projectId } }));
     }
 
-    let project: Doc<"projects"> | null | undefined;
+    let project: ProjectRow | null | undefined;
 
     try {
         project = await projects.get(row.projectId);
@@ -88,12 +85,12 @@ const eraseUnlessMoved = async (
  * lost to later moves, or whose retry could not be queued). The project is read from the primary, once per project.
  * Only while the row still holds the copy read here, so a move landing meanwhile wins. Returns whether it re-stamped.
  */
-const restampIfMoved = async (ctx: MutationCtx, row: Doc<"projectRepositories">, projects: Map<string, Promise<Doc<"projects"> | null>>): Promise<boolean> => {
+const restampIfMoved = async (ctx: MutationCtx, row: Doc<"projectRepositories">, projects: Map<string, Promise<ProjectRow | null>>): Promise<boolean> => {
     if (!projects.has(row.projectId)) {
-        projects.set(row.projectId, ctx.db.projects.findFirst({ consistency: "primary", where: { _id: row.projectId } }));
+        projects.set(row.projectId, findProjectRow(ctx.db.projects, { consistency: "primary", where: { _id: row.projectId } }));
     }
 
-    let project: Doc<"projects"> | null | undefined;
+    let project: ProjectRow | null | undefined;
 
     try {
         project = await projects.get(row.projectId);
@@ -128,7 +125,7 @@ export const eraseOrganizationRepositories = internalMutation
         // From the primary: a replica's stale copy could still show a row under this organization after its project moved.
         const page = await ctx.db.projectRepositories.findMany({ consistency: "primary", cursor: cursor ?? null, limit: BATCH, where: { organizationId } });
 
-        const projects = new Map<string, Promise<Doc<"projects"> | null>>();
+        const projects = new Map<string, Promise<ProjectRow | null>>();
 
         await Promise.all(page.page.filter((row) => isOrganizationOwned(row)).map(async (row) => await eraseUnlessMoved(ctx, row, projects)));
 
@@ -164,7 +161,7 @@ export const sweepOrphanedOrganizationRepositories = internalMutation
         // From the primary, like the organization read below: no stale `organizationId` decides a delete.
         const page = await ctx.db.projectRepositories.findMany({ consistency: "primary", cursor: args.cursor ?? null, limit: ORPHAN_SWEEP_PAGE_SIZE });
         const gone = new Map<string, boolean>();
-        const projects = new Map<string, Promise<Doc<"projects"> | null>>();
+        const projects = new Map<string, Promise<ProjectRow | null>>();
         let deleted = 0;
         let restamped = 0;
 
@@ -244,7 +241,7 @@ export const collectProjectRepositoriesForExport = internalQuery
 /**
  * Projects' details for the export, next to their repositories, in one read: each one's title and whether it is shared
  * (`isPublic`), never the share token (`pages/gdpr.ts` drops a page's the same way). `readBytes` is what reading the
- * whole rows cost, `context` and workflow included, so the export can count it against its read budget. A project
+ * rows cost, `context` and workflow included (their rule files are read in their own pass), so the export can count it against its read budget. A project
  * that is gone or not the user's is left out.
  */
 export const collectProjectDetailsForExport = internalQuery
@@ -256,7 +253,7 @@ export const collectProjectDetailsForExport = internalQuery
         }),
     )
     .query(async ({ args: { projectIds, userId }, ctx }) => {
-        const { page } = await ctx.db.projects.findMany({ consistency: "primary", where: { _id: { in: projectIds } } });
+        const { page } = await findProjectRows(ctx.db.projects, { consistency: "primary", where: { _id: { in: projectIds } } });
         const readBytes = page.reduce((total, row) => total + new TextEncoder().encode(JSON.stringify(row)).byteLength, 0);
         const projects = page
             .filter((row) => row.userId === userId)

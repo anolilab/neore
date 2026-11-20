@@ -9,6 +9,7 @@ import { assert } from "../lib/error-helpers";
 import { paginatedDocsOf } from "../lib/output-validators";
 import { paginationOptionsValidator } from "../lib/validators";
 import { withoutUndefined } from "../lib/patch";
+import { findProjectRow } from "../projects/project-row";
 
 const MAX_PAGE_SIZE = 100;
 
@@ -41,7 +42,7 @@ export const listByProject = query
             return { continueCursor: "", isDone: true, page: [], pageStatus: null, splitCursor: null };
         }
 
-        const project = await ctx.db.projects.findFirst({ where: { _id: args.projectId } });
+        const project = await findProjectRow(ctx.db.projects, { where: { _id: args.projectId } });
 
         if (!project || project.userId !== identity.userId) {
             return { continueCursor: "", isDone: true, page: [], pageStatus: null, splitCursor: null };

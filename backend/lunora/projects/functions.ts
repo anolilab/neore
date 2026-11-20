@@ -30,7 +30,7 @@ import {
 } from "./repositories";
 import { mayEditProject } from "./edit-access";
 import { forViewer, resolveProjectLocation } from "./machine-location";
-import { PROJECT_ROW_COLUMNS, type ProjectRow } from "./project-row";
+import { findProjectRow, PROJECT_ROW_COLUMNS, type ProjectRow } from "./project-row";
 import {
     MAX_RULE_FILE_LENGTH,
     MAX_RULE_FILES,
@@ -234,11 +234,7 @@ export const projectWithEditableSettings = async (
     userId: string,
     { primary = false } = {},
 ): Promise<ProjectRow | null> => {
-    const project = (await context.db.projects.findFirst({
-        select: PROJECT_ROW_COLUMNS,
-        where: { _id: projectId },
-        ...(primary && { consistency: "primary" as const }),
-    })) as unknown as ProjectRow | null;
+    const project = await findProjectRow(context.db.projects, { where: { _id: projectId }, ...(primary && { consistency: "primary" as const }) });
 
     return project && mayEditProject(project, userId) ? project : null;
 };
@@ -592,7 +588,7 @@ const RESTAMP_PASSES = 3;
 const restampRepositories = async (context: MutationCtx, projectId: Id<"projects">, retry = 0): Promise<void> => {
     // One read more than there are passes: the last only checks that the last pass settled the rows.
     for (let pass = 0; pass <= RESTAMP_PASSES; pass += 1) {
-        const project = await systemDb(context).projects.findFirst({ consistency: "primary", where: { _id: projectId } });
+        const project = await findProjectRow(systemDb(context).projects, { consistency: "primary", where: { _id: projectId } });
 
         if (!project) {
             return;
@@ -866,7 +862,7 @@ export const addProjectRepo = authMutation
         const rows = await repoRows(context, projectId, { primary: true });
         const overCap = rows.length > MAX_PROJECT_REPOSITORIES;
         // Gone, or a delete under way (its marker, written before it erases anything): either way the row goes.
-        const current = await systemDb(context).projects.findFirst({ consistency: "primary", where: { _id: projectId } });
+        const current = await findProjectRow(systemDb(context).projects, { consistency: "primary", where: { _id: projectId } });
         const projectGone = !current || (await deleteUnderway(context, projectId));
         // Moved to another organization since it was authorized above: decide again on the project as it is now, so a
         // member of the organization it left cannot add to it.
@@ -1051,14 +1047,14 @@ export const setDefaultProjectRepo = authMutation
     .mutation(async ({ args, ctx: context }) => {
         const repo = await editableRepo(context, args.repoId as Id<"projectRepositories">, context.user.userId);
         // The owner and organization the counter copies, from the project as it is now, not the row's copy of them.
-        const project = await systemDb(context).projects.findFirst({ consistency: "primary", where: { _id: repo.projectId } });
+        const project = await findProjectRow(systemDb(context).projects, { consistency: "primary", where: { _id: repo.projectId } });
 
         if (!project || (await deleteUnderway(context, repo.projectId))) {
             throw new LunoraError("NOT_FOUND", "Repository not found");
         }
 
         const stamped = await stampDefault(context, repo, { organizationId: project.organizationId, userId: project.userId });
-        const current = await systemDb(context).projects.findFirst({ consistency: "primary", where: { _id: repo.projectId } });
+        const current = await findProjectRow(systemDb(context).projects, { consistency: "primary", where: { _id: repo.projectId } });
 
         if (!current || (await deleteUnderway(context, repo.projectId))) {
             const counter = await context.db.projectRepositories.findFirst({
@@ -1186,7 +1182,7 @@ export const deleteProject = authMutation
 
         // Threads may only be moved into another project of the caller's.
         if (moveThreadsToProjectId) {
-            const target = await context.db.projects.findFirst({ where: { _id: context.db.asId("projects", moveThreadsToProjectId) } });
+            const target = await findProjectRow(context.db.projects, { where: { _id: context.db.asId("projects", moveThreadsToProjectId) } });
 
             if (!target || target.userId !== userId) {
                 throw new LunoraError("NOT_FOUND", "Project not found");

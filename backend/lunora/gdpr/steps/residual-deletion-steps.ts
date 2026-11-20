@@ -79,6 +79,7 @@ import { recomputeSkillRatings } from "../../skills/rating-cascade";
 import { anonymiseGatewayUsage, deleteIdentityRows, deleteUserRecord, readIdentityRows } from "../../auth/gdpr";
 import { eraseUsageForUser } from "../../usage/gdpr";
 import { eraseGatewayNotificationsForUser } from "../../saas/gdpr";
+import { findProjectRows } from "../../projects/project-row";
 
 const vBatchResult = v.object({ hasMore: v.boolean() });
 
@@ -406,7 +407,7 @@ export const deleteUserWorkflowData = internalMutation
 
         hasMore ||= ownRepositories.hasMore;
 
-        const { page: projects } = await context.db.projects.findMany({ where: { userId } });
+        const { page: projects } = await findProjectRows(context.db.projects, { where: { userId } });
 
         for (const project of projects) {
             // Versions and presence attached to the project (`workflow/gdpr.ts`).

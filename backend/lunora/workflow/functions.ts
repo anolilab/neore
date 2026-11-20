@@ -11,6 +11,7 @@ import { paginatedDocsOf } from "../lib/output-validators";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { throwForbidden, throwNotFound } from "../lib/error-helpers";
 import { assertJsonWithinLimit, MAX_LENGTH, vJsonValue } from "../lib/validators";
+import { findProjectRow } from "../projects/project-row";
 
 // Get a workflow project
 export const getWorkflow = authQuery
@@ -20,7 +21,7 @@ export const getWorkflow = authQuery
     .query(async ({ args: { projectId }, ctx: context }) => {
         const { userId } = context.user;
 
-        const project = await context.db.projects.findFirst({ where: { _id: projectId as Id<"projects"> } });
+        const project = await findProjectRow(context.db.projects, { where: { _id: projectId as Id<"projects"> } });
 
         if (!project) {
             return null;
@@ -137,7 +138,7 @@ export const updateWorkflowContent = authMutation
         const { userId } = context.user;
 
         // Verify project exists and user has access
-        const project = await context.db.projects.findFirst({ where: { _id: projectId as Id<"projects"> } });
+        const project = await findProjectRow(context.db.projects, { where: { _id: projectId as Id<"projects"> } });
 
         if (!project) {
             throwNotFound("Workflow");
@@ -174,7 +175,7 @@ export const createExecution = authMutation
         const { userId } = context.user;
 
         // Verify project exists and user has access
-        const project = await context.db.projects.findFirst({ where: { _id: projectId as Id<"projects"> } });
+        const project = await findProjectRow(context.db.projects, { where: { _id: projectId as Id<"projects"> } });
 
         if (!project) {
             throwNotFound("Workflow");
@@ -243,7 +244,7 @@ export const listExecutions = authQuery
         const { userId } = context.user;
 
         // Verify project exists and user has access
-        const project = await context.db.projects.findFirst({ where: { _id: projectId as Id<"projects"> } });
+        const project = await findProjectRow(context.db.projects, { where: { _id: projectId as Id<"projects"> } });
 
         if (!project) {
             throwNotFound("Workflow");
