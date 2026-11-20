@@ -23,7 +23,10 @@ interface Construct {
 }
 
 /** Link-like nodes: a delimiter inside their destination, label brackets or syntax changes or ends the link. */
-const LINK_TYPES: ReadonlySet<string> = new Set(["definition", "html", "image", "imageReference", "link", "linkReference"]);
+const LINK_TYPES: ReadonlySet<string> = new Set(["definition", "html", "image", "imageReference", "link", "linkReference", "thematicBreak"]);
+
+/** Constructs a wrap may not hold whole: delimiters before them end their syntax (a definition, a code fence, a divider). */
+const UNHOLDABLE_TYPES: ReadonlySet<string> = new Set(["code", "definition", "thematicBreak"]);
 
 /** Nodes whose content Markdown shows as typed. */
 const CODE_TYPES: ReadonlySet<string> = new Set(["code", "inlineCode"]);
@@ -179,6 +182,77 @@ const labelOf = (node: MarkdownNode, range: [number, number], text: string): [nu
     return start === undefined || end === undefined ? undefined : [start, end];
 };
 
+/** The underline of a setext heading (`Title` over `===`): the line after its text, which a wrap would turn into text. */
+const setextUnderline = (node: MarkdownNode, range: [number, number], text: string): [number, number] | undefined => {
+    const textEnd = rangeOf(node.children?.at(-1) ?? node)?.[1] ?? range[1];
+    const lineBreak = text.indexOf("\n", textEnd);
+
+    return lineBreak === -1 || lineBreak >= range[1] ? undefined : [lineBreak + 1, range[1]];
+};
+
+/** The pipes at the two ends of a table row. */
+const OUTER_PIPES = /^\||\|$/g;
+
+/** A separator cell: dashes, with an optional colon at either end. */
+const SEPARATOR_CELL = /^ *:?-+:? *$/;
+
+/** Whether `line` is a GFM table separator row: cells of dashes, with optional colons, between pipes. */
+const isSeparatorRow = (line: string): boolean =>
+    line.includes("|") &&
+    line
+        .trim()
+        .replaceAll(OUTER_PIPES, "")
+        .split("|")
+        .every((cell) => SEPARATOR_CELL.test(cell));
+
+/** The line of `text` that starts at `start`, without its line break; empty when `start` is -1. */
+const lineFrom = (text: string, start: number): string => {
+    if (start === -1) {
+        return "";
+    }
+
+    const end = text.indexOf("\n", start);
+
+    return text.slice(start, end === -1 ? text.length : end);
+};
+
+/**
+ * Whether a wrap of `from`..`to` (draft indices) would break a GFM table, as the message renderer shows one: a wrap on
+ * its separator row, or one across a cell's `|`. GFM is not parsed here, so the table is found from the lines around the
+ * selection: a row with a `|`, a separator row under it, and the rows after it up to a blank line.
+ */
+const breaksTable = (text: string, from: number, to: number): boolean => {
+    const lineStart = text.lastIndexOf("\n", from - 1) + 1;
+    const lineEndIndex = text.indexOf("\n", from);
+    const line = lineFrom(text, lineStart);
+
+    if (!line.includes("|")) {
+        return false;
+    }
+
+    // Walk up the rows of this block to find the separator row it hangs from, or the one right below a header row.
+    let separator = false;
+    let cursor = lineStart;
+    let current = line;
+
+    while (!separator && current.trim() !== "") {
+        separator = isSeparatorRow(current);
+
+        if (cursor === 0) {
+            break;
+        }
+
+        const previousStart = text.lastIndexOf("\n", cursor - 2) + 1;
+
+        current = text.slice(previousStart, cursor - 1);
+        cursor = previousStart;
+    }
+
+    const inTable = separator || isSeparatorRow(lineFrom(text, lineEndIndex === -1 ? -1 : lineEndIndex + 1));
+
+    return inTable && (isSeparatorRow(line) || text.slice(from, to).includes("|"));
+};
+
 /**
  * The constructs and marked blocks of a syntax tree. An explicit stack walks it, because a deeply nested tree (thousands
  * of `>`) would overflow recursion.
@@ -201,10 +275,16 @@ const collect = (root: MarkdownNode, text: string): { blocks: [number, number][]
             // before it, so like a definition it may not be held whole.
             constructs.push({
                 code: node.type === "inlineCode",
-                holdable: node.type !== "definition" && node.type !== "code",
+                holdable: !UNHOLDABLE_TYPES.has(node.type),
                 inner: labelOf(node, range, text),
                 range,
             });
+        }
+
+        const underline = range === undefined || node.type !== "heading" ? undefined : setextUnderline(node, range, text);
+
+        if (underline !== undefined) {
+            constructs.push({ code: false, holdable: false, range: underline });
         }
 
         pending.push(...(node.children ?? []));
@@ -300,7 +380,7 @@ export const markupAround = (
     const markers = onBlock ? lineStart + markerLength(paragraph.slice(lineStart, lineEnd)) : 0;
 
     return {
-        blocked: from < markers || constructs.some((construct) => breaks(construct, start + from, start + to)),
+        blocked: from < markers || breaksTable(text, start + from, start + to) || constructs.some((construct) => breaks(construct, start + from, start + to)),
         paragraph,
         takenFences: new Set(unmatched.filter((run) => run.start < start + from).map((run) => run.length)),
     };

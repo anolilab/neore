@@ -717,6 +717,53 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor)).toBe("```foo");
     });
 
+    it("leaves a divider alone, which a wrap would turn into text", () => {
+        const editor = editorWith("<p>a</p><p></p><p>---</p>");
+
+        select(editor, 6, 9);
+
+        expect(selectedText(editor)).toBe("---");
+        expect(wrapSelectionOnTextInput(editor.view, 6, 9, "`")).toBe(true);
+        expect(text(editor)).toBe("a\n\n---");
+    });
+
+    it("leaves a setext heading's underline alone, and still wraps its text", () => {
+        const editor = editorWith("<p>Title</p><p>===</p>");
+
+        select(editor, 8, 11);
+
+        expect(selectedText(editor)).toBe("===");
+        expect(wrapSelectionOnTextInput(editor.view, 8, 11, "*")).toBe(true);
+        expect(text(editor)).toBe("Title\n===");
+
+        select(editor, 1, 6);
+        wrapSelectionOnTextInput(editor.view, 1, 6, "*");
+
+        expect(text(editor)).toBe("**Title**\n===");
+    });
+
+    it("leaves a table's separator row and cell pipes alone, and still wraps a cell's text", () => {
+        const editor = editorWith("<p>| a | b |</p><p>| --- | --- |</p><p>| c | d |</p>");
+        const before = text(editor);
+
+        select(editor, 14, 17);
+
+        expect(selectedText(editor)).toBe("---");
+        expect(wrapSelectionOnTextInput(editor.view, 14, 17, "*")).toBe(true);
+        expect(text(editor)).toBe(before);
+
+        select(editor, 29, 34);
+
+        expect(selectedText(editor)).toBe("c | d");
+        expect(wrapSelectionOnTextInput(editor.view, 29, 34, "*")).toBe(true);
+        expect(text(editor)).toBe(before);
+
+        select(editor, 29, 30);
+        wrapSelectionOnTextInput(editor.view, 29, 30, "*");
+
+        expect(text(editor)).toBe("| a | b |\n| --- | --- |\n| **c** | d |");
+    });
+
     it("wraps literal ](url) text that has no link label before it", () => {
         const editor = editorWith("<p>literal ](url) text</p>");
 
