@@ -172,7 +172,15 @@ pub fn main(command: &str, args: impl Iterator<Item = String>) -> ExitCode {
 
                     return ExitCode::FAILURE;
                 }
-                Ok(None) => {}
+                // What an unpair interrupted between the record and the history left behind belongs to the old pairing,
+                // so it goes before a new one starts: the new secret cannot sign the old calls anyway.
+                Ok(None) => {
+                    if let Err(error) = vault.forget().and_then(|()| forget_nonces(vault.dir())) {
+                        eprintln!("neore-host: {error}");
+
+                        return ExitCode::FAILURE;
+                    }
+                }
                 Err(error) => {
                     eprintln!("neore-host: {error}");
 
