@@ -144,7 +144,9 @@ impl Service {
                 json!({ "accepted": false, "reason": "the request is too long" })
             } else {
                 match std::str::from_utf8(&line) {
-                    Ok(text) if text.trim().is_empty() => continue,
+                    Ok(text) if text.trim().is_empty() => {
+                        json!({ "accepted": false, "reason": "the request is empty" })
+                    }
                     Ok(text) => self.answer(text.trim(), now()),
                     Err(_) => json!({ "accepted": false, "reason": "the request is malformed" }),
                 }

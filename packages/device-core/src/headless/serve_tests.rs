@@ -246,20 +246,22 @@ fn a_second_run_on_the_same_pairing_is_refused_until_the_first_ends() {
 }
 
 #[test]
-fn malformed_and_oversized_lines_are_refused_without_ending_the_run() {
+fn blank_malformed_and_oversized_lines_are_each_answered_without_ending_the_run() {
     let (mut service, _dir) = service("malformed");
     let oversized = "x".repeat(MAX_LINE_BYTES as usize + 10);
     let got = answers(
         &mut service,
         &[
             "not json".into(),
+            "  ".into(),
             oversized,
             line(SECRET, &call("device-1", "n9", 60_000)),
         ],
     );
 
-    assert_eq!(got.len(), 3);
+    assert_eq!(got.len(), 4);
     assert_eq!(got[0]["reason"], json!("the request is malformed"));
-    assert_eq!(got[1]["reason"], json!("the request is too long"));
-    assert_eq!(got[2]["accepted"], json!(true));
+    assert_eq!(got[1]["reason"], json!("the request is empty"));
+    assert_eq!(got[2]["reason"], json!("the request is too long"));
+    assert_eq!(got[3]["accepted"], json!(true));
 }
