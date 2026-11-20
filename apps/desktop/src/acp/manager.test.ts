@@ -721,6 +721,54 @@ describe("starts that wait for their plan", () => {
         expect(calls).toHaveLength(2);
     });
 
+    it("closes a session whose approval is revoked right after its plan was checked", async () => {
+        let revoking: Promise<void> | undefined;
+        const target = make(
+            {},
+            {
+                // Not async: the manager's `await` must sit on `made` itself, right behind the job queued below.
+                // eslint-disable-next-line @typescript-eslint/promise-function-async -- see above
+                plan: (_key, folder) => {
+                    const made = Promise.resolve(scratch.plan({}, folder));
+
+                    // Queued to run right after the manager's check of this plan, before anything else of the start.
+                    // eslint-disable-next-line promise/prefer-await-to-then -- the order of the queued jobs is what is tested
+                    void made.then(() => {
+                        queueMicrotask(() => {
+                            revoking ??= target.closeUnapproved({ agents: [], consents: [] });
+                        });
+                    });
+
+                    return made;
+                },
+            },
+        );
+        const started = messageOf(target.startSession("fake", "Fake", scratch.work));
+
+        await vi.waitFor(() => expect(revoking).toBeDefined());
+        await revoking;
+        await started;
+
+        // The check passed: the session was started, and the revocation behind it closed it.
+        expect(target.summaries()).toHaveLength(1);
+        expect(target.summaries().every((summary) => summary.status === "ended")).toBe(true);
+    });
+
+    it("starts no probe once the server's removal began while its plan was made", async () => {
+        const target = make(
+            {},
+            {
+                plan: (_key, folder) => {
+                    target.refuse();
+
+                    return scratch.plan({}, folder);
+                },
+            },
+        );
+
+        await expect(target.probe("fake")).rejects.toThrow("being removed");
+    });
+
     it("removes the scratch folder of a probe plan it drops, on a retry and at the retry limit", async () => {
         const made: string[] = [];
         const target = make(

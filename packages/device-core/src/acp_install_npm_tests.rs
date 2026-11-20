@@ -44,7 +44,7 @@ fn installed(dir: &Path) -> PathBuf {
         .map(|entry| entry.path())
         .find(|path| {
             path.file_name()
-                .is_some_and(|name| name.to_string_lossy().starts_with("1.0.0-"))
+                .is_some_and(|name| name.to_string_lossy().starts_with("npm-1.0.0-"))
         })
         .unwrap_or_else(|| key_dir.join("1.0.0"))
 }
@@ -56,7 +56,7 @@ fn script(dir: &Path) -> PathBuf {
         .join("cli.js")
 }
 
-/// What an npm install leaves behind: the files under `acp-agents/fixture/1.0.0-<tree hash prefix>` and an agent
+/// What an npm install leaves behind: the files under `acp-agents/fixture/npm-1.0.0-<tree hash prefix>` and an agent
 /// recorded to run `node <program>`, pinned with the hash of that folder. Returns the agent as recorded.
 fn seed_install(state: &DeviceState, dir: &Path, node: &Path) -> AcpAgent {
     let written = script(dir);
@@ -68,7 +68,7 @@ fn seed_install(state: &DeviceState, dir: &Path, node: &Path) -> AcpAgent {
 
     fs::rename(
         installed(dir),
-        dir.join(format!("acp-agents/fixture/1.0.0-{}", &tree[..16])),
+        dir.join(format!("acp-agents/fixture/npm-1.0.0-{}", &tree[..16])),
     )
     .unwrap();
 

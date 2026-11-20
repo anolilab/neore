@@ -515,7 +515,8 @@ impl DeviceState {
 
         match moved {
             Ok(()) => {
-                std::thread::spawn(move || {
+                // A thread that cannot be started leaves the entry in the trash for the next sweep.
+                let _ = std::thread::Builder::new().spawn(move || {
                     #[cfg(test)]
                     tests_hook::before_delete(&target);
 
@@ -649,14 +650,14 @@ pub(crate) mod tests_hook {
     }
 }
 
-/// The folder an install lives in under `acp-agents/<key>/`. A binary install is its version; an npm install is its
-/// version and the first 16 hex digits of its tree hash, so other bytes under the same version never replace a
-/// folder a spawn plan already verified. A recorded hash that is not hex (an edited settings file) names no folder.
+/// The folder an install lives in under `acp-agents/<key>/`. A binary install is its version; an npm install is
+/// `npm-<version>-<first 16 hex digits of its tree hash>`, so other bytes under the same version never replace a folder
+/// a spawn plan already verified, and no binary version (which starts with a digit) can name the same folder. A recorded hash that is not hex (an edited settings file) names no folder.
 pub(crate) fn install_dir_name(pin: &AcpInstall) -> String {
     match pin.tree_sha256.as_deref() {
         Some(tree) => match tree.get(..16) {
             Some(prefix) if prefix.bytes().all(|b| b.is_ascii_hexdigit()) => {
-                format!("{}-{prefix}", pin.version)
+                format!("npm-{}-{prefix}", pin.version)
             }
             _ => format!(".{}-invalid", pin.version),
         },

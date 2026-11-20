@@ -11,7 +11,7 @@
 //!    with a scrubbed environment, so no `PATH` lookup, user `.npmrc` or `NODE_OPTIONS` reaches them;
 //! 3. the installed package must be the name and version that was pinned, and its program is resolved INSIDE it;
 //! 4. every file, folder and link of the prefix is hashed ([`tree_hash`]) and the hash recorded in the pin next
-//!    to the index's integrity, the folder is renamed to `acp-agents/<key>/<version>-<tree hash prefix>` and the
+//!    to the index's integrity, the folder is renamed to `acp-agents/<key>/npm-<version>-<tree hash prefix>` and the
 //!    agent is recorded to run `node <program>`: the command is never `npx`, and nothing is resolved at launch.
 //!    The folder is named by its content, so a reinstall with other bytes never replaces files a plan already
 //!    verified: it lands in a folder of its own, and the old one goes only when the desktop prunes it.
@@ -1172,7 +1172,7 @@ impl DeviceState {
                 }));
 
                 return Err(format!(
-                    "{} {} has a node_modules folder next to its install that Neore did not put there ({}). Neore will not start it. Remove that folder, or reinstall the agent.",
+                    "{} {} has a node_modules folder next to its install that Neore did not put there ({}). Neore will not start it. Look at what is in that folder, then move or remove it.",
                     agent.label,
                     pin.version,
                     outside.display()

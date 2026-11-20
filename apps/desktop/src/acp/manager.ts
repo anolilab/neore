@@ -160,19 +160,13 @@ export class AcpManager {
     ): Promise<Result> {
         requireSupported();
 
-        const plan = await this.planCurrent(agentKey, folder);
-        let child: AgentProcess;
+        const { child, plan } = await this.planCurrent(agentKey, folder, (made) => {
+            // The plan is made off the main thread: the server's removal can have begun meanwhile. A sign-out holds the
+            // agent and runs through here itself, so it is not refused.
+            this.refuseRetired();
 
-        try {
-            child = this.spawn(plan, agentKey);
-        } catch (error) {
-            // The folder exists before anything starts; a start that fails must not leave it behind.
-            if (plan.scratch) {
-                await removeQuietly(plan.cwd);
-            }
-
-            throw error;
-        }
+            return { child: this.spawn(made, agentKey), plan: made };
+        });
 
         const connection = new JsonRpcConnection(child.stdout, child.stdin, {
             notification: (method, params) => handlers.notification?.(method, params),
@@ -266,75 +260,85 @@ export class AcpManager {
         // The slot is held while the plan is made, so starts that overlap cannot all pass the check in `refuseStart`.
         this.starting += 1;
 
-        let plan: SpawnPlan;
-
-        try {
-            plan = await this.planCurrent(agentKey, folder);
-        } finally {
-            this.starting -= 1;
-        }
-
-        // The plan is made off the main thread: a sign-out or the server's removal can have begun meanwhile.
-        this.refuseStart(agentKey);
-
-        const child = this.spawn(plan, agentKey);
-        const folderInfo = this.options.hostInfo?.(agentKey, plan.cwd);
-        const { hooks } = this.options;
+        let holding = true;
         // The runner needs the session to prompt and the session needs the runner to say when its turns start and end.
         let runner: HookRunner | undefined;
-        // The fields only a remote, a resumed or a host-run session has.
-        const remoteFields = remote === undefined ? {} : { sessionId: remote.sessionId, threadId: remote.threadId };
-        const resumeFields = remote === undefined ? {} : savedSessionFields(remote);
-        const { observer } = this.options;
-        const hostFields = folderInfo === undefined || observer === undefined ? {} : { hostInfo: { agentKey, agentLabel, ...folderInfo }, observer };
         let session: AgentSession;
 
         try {
-            session = new AgentSession({
-                agentKey,
-                agentLabel,
-                appVersion: this.options.appVersion,
-                cancelGraceMs: this.options.cancelGraceMs,
-                folder: plan.cwd,
-                folderIsRemote: this.options.folderIsRemote,
-                gate: this.options.gate ?? declineGate,
-                lifecycle:
-                    hooks === undefined
-                        ? undefined
-                        : { ended: () => runner?.stop(), turnEnded: () => runner?.turnEnded(), turnStarted: () => runner?.turnStarted() },
-                log: this.options.log,
-                onChange: () => this.sessionChanged(),
-                process: child,
-                startupTimeoutMs: this.options.startupTimeoutMs,
-                terminals: this.options.terminals,
-                ...remoteFields,
-                ...resumeFields,
-                ...hostFields,
+            // Spawned and registered in the continuation that checked the plan is current: a revocation queued behind
+            // the plan finds the session and closes it, instead of missing a process not registered yet.
+            session = await this.planCurrent(agentKey, folder, (plan) => {
+                // The session takes over the place the start held.
+                this.starting -= 1;
+                holding = false;
+                // The plan is made off the main thread: a sign-out or the server's removal can have begun meanwhile.
+                this.refuseSpawn(agentKey);
+
+                const child = this.spawn(plan, agentKey);
+                const folderInfo = this.options.hostInfo?.(agentKey, plan.cwd);
+                const { hooks } = this.options;
+                // The fields only a remote, a resumed or a host-run session has.
+                const remoteFields = remote === undefined ? {} : { sessionId: remote.sessionId, threadId: remote.threadId };
+                const resumeFields = remote === undefined ? {} : savedSessionFields(remote);
+                const { observer } = this.options;
+                const hostFields = folderInfo === undefined || observer === undefined ? {} : { hostInfo: { agentKey, agentLabel, ...folderInfo }, observer };
+                let created: AgentSession;
+
+                try {
+                    created = new AgentSession({
+                        agentKey,
+                        agentLabel,
+                        appVersion: this.options.appVersion,
+                        cancelGraceMs: this.options.cancelGraceMs,
+                        folder: plan.cwd,
+                        folderIsRemote: this.options.folderIsRemote,
+                        gate: this.options.gate ?? declineGate,
+                        lifecycle:
+                            hooks === undefined
+                                ? undefined
+                                : { ended: () => runner?.stop(), turnEnded: () => runner?.turnEnded(), turnStarted: () => runner?.turnStarted() },
+                        log: this.options.log,
+                        onChange: () => this.sessionChanged(),
+                        process: child,
+                        startupTimeoutMs: this.options.startupTimeoutMs,
+                        terminals: this.options.terminals,
+                        ...remoteFields,
+                        ...resumeFields,
+                        ...hostFields,
+                    });
+                } catch (error) {
+                    // Nothing holds the agent yet: no session was registered, so nothing else would stop it. It is stopped here, and the
+                    // refusal is reported as it was.
+                    child.killNow();
+
+                    throw error;
+                }
+
+                this.sessions.set(created.id, created);
+
+                if (hooks !== undefined) {
+                    runner = new HookRunner({
+                        agentKey,
+                        approvals: hooks.approvals,
+                        folder: plan.cwd,
+                        fs: hooks.fs ?? nodeHookFs,
+                        isIdle: () => created.summary().status === "idle",
+                        log: this.options.log,
+                        onChange: () => this.changed(),
+                        send: (prompt) => {
+                            created.send(prompt);
+                        },
+                    });
+                    this.runners.set(created.id, runner);
+                }
+
+                return created;
             });
-        } catch (error) {
-            // Nothing holds the agent yet: no session was registered, so nothing else would stop it. It is stopped here, and the
-            // refusal is reported as it was.
-            child.killNow();
-
-            throw error;
-        }
-
-        this.sessions.set(session.id, session);
-
-        if (hooks !== undefined) {
-            runner = new HookRunner({
-                agentKey,
-                approvals: hooks.approvals,
-                folder: plan.cwd,
-                fs: hooks.fs ?? nodeHookFs,
-                isIdle: () => session.summary().status === "idle",
-                log: this.options.log,
-                onChange: () => this.changed(),
-                send: (prompt) => {
-                    session.send(prompt);
-                },
-            });
-            this.runners.set(session.id, runner);
+        } finally {
+            if (holding) {
+                this.starting -= 1;
+            }
         }
 
         // The window may ask for the hooks while the session starts: the runner is looking at the folder from here on,
@@ -607,14 +611,22 @@ export class AcpManager {
         }
     }
 
-    /** Throws when no session of `agentKey` may start now: its account is changing, or too many agents run. */
-    private refuseStart(agentKey: string): void {
-        // Again: a sign-out can have begun while the superseded sessions were closing.
+    /** Throws when no process of `agentKey` may start now: its account is changing, or the server is being removed. */
+    private refuseSpawn(agentKey: string): void {
         this.refuseHeld(agentKey);
+        this.refuseRetired();
+    }
 
+    private refuseRetired(): void {
         if (this.retired) {
             throw new Error("that server is being removed");
         }
+    }
+
+    /** Throws when no session of `agentKey` may start now: its account is changing, or too many agents run. */
+    private refuseStart(agentKey: string): void {
+        // Again: a sign-out can have begun while the superseded sessions were closing.
+        this.refuseSpawn(agentKey);
 
         if (this.summaries().filter((session) => session.status !== "ended").length + this.starting >= MAX_SESSIONS) {
             throw new Error(`at most ${String(MAX_SESSIONS)} agents at once; close one first`);
@@ -624,14 +636,14 @@ export class AcpManager {
     /**
      * The core's plan, made again when approvals were revoked while it was being made (an install replaced the
      * agent): the plan that was in flight may belong to files or a folder consent that no longer exist, and the
-     * session it would become is not yet there for `closeUnapproved` to close. Nothing awaits between the last
-     * check and the spawn that follows.
+     * session it would become is not yet there for `closeUnapproved` to close. `start` runs in the same continuation as the
+     * last check, so nothing can revoke the plan between that check and what `start` does with it.
      */
-    private async planCurrent(agentKey: string, folder: string | null): Promise<SpawnPlan> {
+    private async planCurrent<Started>(agentKey: string, folder: string | null, start: (plan: SpawnPlan) => Started): Promise<Started> {
         this.planning.set(agentKey, (this.planning.get(agentKey) ?? 0) + 1);
 
         try {
-            return await this.planUntilCurrent(agentKey, folder);
+            return await this.planUntilCurrent(agentKey, folder, start);
         } finally {
             const left = (this.planning.get(agentKey) ?? 1) - 1;
 
@@ -643,14 +655,24 @@ export class AcpManager {
         }
     }
 
-    private async planUntilCurrent(agentKey: string, folder: string | null): Promise<SpawnPlan> {
+    private async planUntilCurrent<Started>(agentKey: string, folder: string | null, start: (plan: SpawnPlan) => Started): Promise<Started> {
         for (let attempt = 0; ; attempt += 1) {
             const before = this.revocations.get(agentKey) ?? 0;
             // eslint-disable-next-line no-await-in-loop -- each plan depends on the approvals as they are now
             const plan = await this.options.plan(agentKey, folder);
 
             if (before === (this.revocations.get(agentKey) ?? 0)) {
-                return plan;
+                try {
+                    return start(plan);
+                } catch (error) {
+                    // The folder exists before anything starts; a start that fails must not leave it behind.
+                    if (plan.scratch) {
+                        // eslint-disable-next-line no-await-in-loop -- the loop ends here either way
+                        await removeQuietly(plan.cwd);
+                    }
+
+                    throw error;
+                }
             }
 
             // The plan is dropped, and with it the scratch folder a probe plan made for itself.
@@ -673,13 +695,21 @@ export class AcpManager {
         const next = new Map<string, string>();
 
         for (const agent of view.agents) {
-            const folders = view.consents
-                .filter((consent) => consent.agentKey === agent.key)
-                .map((consent) => consent.folderPath);
+            const folders = view.consents.filter((consent) => consent.agentKey === agent.key).map((consent) => consent.folderPath);
 
             folders.sort((left, right) => left.localeCompare(right));
 
-            next.set(agent.key, JSON.stringify([agent.command, agent.args, agent.install?.version ?? null, agent.install?.sha256 ?? null, agent.install?.treeSha256 ?? null, folders]));
+            next.set(
+                agent.key,
+                JSON.stringify([
+                    agent.command,
+                    agent.args,
+                    agent.install?.version ?? null,
+                    agent.install?.sha256 ?? null,
+                    agent.install?.treeSha256 ?? null,
+                    folders,
+                ]),
+            );
         }
 
         const keys = new Set([...this.approvalState.keys(), ...this.planning.keys(), ...next.keys()]);
@@ -743,7 +773,10 @@ export class AcpManager {
      */
     private sessionChanged(): void {
         this.changed();
-        this.options.sleepLock?.report(this, this.summaries().some((summary) => summary.status === "busy"));
+        this.options.sleepLock?.report(
+            this,
+            this.summaries().some((summary) => summary.status === "busy"),
+        );
     }
 
     private spawn(plan: SpawnPlan, agentKey: string): AgentProcess {
