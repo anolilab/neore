@@ -335,13 +335,14 @@ fn unpair_dry_run(vault: &Vault<'_>) -> ExitCode {
 }
 
 fn hold_unless_running(vault: &Vault<'_>) -> Option<RunLock> {
-    let lock = RunLock::acquire(vault.dir()).ok();
+    match RunLock::acquire(vault.dir()) {
+        Ok(lock) => Some(lock),
+        Err(error) => {
+            eprintln!("neore-host: {error}");
 
-    if lock.is_none() {
-        eprintln!("neore-host: `neore-host run` is using this pairing; stop it first, then unpair");
+            None
+        }
     }
-
-    lock
 }
 
 /// Erases the local credential only after a yes: `--yes`, or an answer at a terminal. Refused while `run` holds the
@@ -351,11 +352,11 @@ fn unpair(vault: &Vault<'_>, confirmed: bool) -> ExitCode {
         return ExitCode::FAILURE;
     };
 
-    // Nothing paired is already the state `unpair` aims for, so it asks nothing. A history left by an earlier unpair
-    // whose clean-up failed is removed here, so running it again finishes that clean-up.
+    // Nothing paired is already the state `unpair` aims for, so it asks nothing. What an interrupted pairing or an
+    // earlier unpair whose clean-up failed left behind (a temporary record, the call history) is removed here.
     let asked_about = match vault.record() {
         Ok(None) => {
-            return match forget_nonces(vault.dir()) {
+            return match vault.forget().and_then(|()| forget_nonces(vault.dir())) {
                 Ok(()) => {
                     println!("This machine holds no pairing. Nothing to remove.");
 
@@ -430,6 +431,18 @@ fn unpair(vault: &Vault<'_>, confirmed: bool) -> ExitCode {
 /// old secret is erased), and a damaged one would stop the next pairing's `run` from starting.
 fn forget_nonces(dir: &Path) -> Result<(), String> {
     let path = dir.join(NONCE_FILE);
+
+    // The record's removal goes to disk first: a power loss must not keep the old pairing while losing its history,
+    // which would let a call it already accepted be accepted again.
+    #[cfg(unix)]
+    std::fs::File::open(dir)
+        .and_then(|folder| folder.sync_all())
+        .map_err(|error| {
+            format!(
+                "the pairing was removed, but {} could not be synced: {error}",
+                dir.display()
+            )
+        })?;
 
     match std::fs::remove_file(&path) {
         Ok(()) => Ok(()),

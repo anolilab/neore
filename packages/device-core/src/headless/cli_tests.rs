@@ -142,12 +142,15 @@ fn unpairing_a_machine_that_is_not_paired_succeeds_and_asks_nothing() {
         format!("{:?}", ExitCode::SUCCESS)
     );
 
-    // A history an earlier unpair failed to remove goes when unpair runs again.
+    // What an interrupted pairing or a failed clean-up left behind goes when unpair runs again: the history, and a
+    // temporary record that can hold a file pairing's secret.
     std::fs::write(dir.join(NONCE_FILE), "{ damaged").unwrap();
+    std::fs::write(dir.join("host.json.tmp"), "{ \"secret\": \"x\" }").unwrap();
 
     assert_eq!(
         format!("{:?}", unpair(&vault, false)),
         format!("{:?}", ExitCode::SUCCESS)
     );
     assert!(!dir.join(NONCE_FILE).exists());
+    assert!(!dir.join("host.json.tmp").exists());
 }
