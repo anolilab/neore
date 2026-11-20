@@ -22,8 +22,8 @@ import { useAction, useCRPC } from "@/lib/lunora/crpc";
  */
 const CONNECT_WINDOW_MS = 60_000;
 
-/** `size="sm"` is 24 px tall: on a touch screen the card's buttons grow to 44 px. */
-const TOUCH_TARGET = "pointer-coarse:min-h-11 pointer-coarse:min-w-11";
+/** `size="sm"` is 24 px tall: on any touch pointer (also a touchscreen laptop driven by a trackpad) the card's buttons grow to 44 px. */
+const TOUCH_TARGET = "any-pointer-coarse:min-h-11 any-pointer-coarse:min-w-11";
 
 /**
  * `opening` and `open` carry the attempt they belong to (only that attempt's answer may fill the view), the browser it
