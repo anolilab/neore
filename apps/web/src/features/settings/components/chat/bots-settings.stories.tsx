@@ -185,6 +185,101 @@ export const RemovedServer: Story = {
     },
 };
 
+/** A connector in the catalog, connected (`connection`) or not. */
+const connectorFixture = (
+    slug: string,
+    name: string,
+    connection: { hasRefreshToken: boolean; status: "connected" | "disconnected" | "error" | "expired" } | null,
+) => {
+    return {
+        category: "productivity",
+        configured: true,
+        connection: connection && {
+            connectedAt: ago(DAY),
+            connectorDefinitionId: `def-${slug}`,
+            hasRefreshToken: connection.hasRefreshToken,
+            id: `conn-${slug}`,
+            scopes: [],
+            status: connection.status,
+        },
+        description: `${name} connector`,
+        id: `def-${slug}`,
+        isPremium: false,
+        name,
+        requestedScopes: [],
+        requiresOAuth: true,
+        slug,
+        status: "active" as const,
+    };
+};
+
+/** The patches the disconnected-connector story below sent. */
+const disconnectedPatches: unknown[] = [];
+
+/**
+ * An exclusion of a connector that is not connected, or whose connection expired, names it with a disconnected mark,
+ * never as a removed server; a name typed for one is saved by its key, so it keeps excluding once the connector is back.
+ */
+export const DisconnectedConnector: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...botFixtures(),
+                    lunora(api.bots.functions.listBots, [
+                        { ...BOT, toolSelection: { exclude: ["connector=gmail:*", "connector=gone:*", "connector=slack:*"] } },
+                    ]),
+                    lunora(api.connectors.user_connectors.listConnectorCatalog, [
+                        connectorFixture("gmail", "Gmail", { hasRefreshToken: false, status: "expired" }),
+                        connectorFixture("notion", "Notion", null),
+                        // A run retries a failed refresh, and refreshes an expired grant that has a refresh token: both are connected.
+                        connectorFixture("linear", "Linear", { hasRefreshToken: false, status: "error" }),
+                        connectorFixture("slack", "Slack", { hasRefreshToken: true, status: "expired" }),
+                    ]),
+                    lunora(api.bots.functions.updateBot, (args) => {
+                        disconnectedPatches.push(args.patch);
+
+                        return { toolSelection: args.patch.toolSelection ?? null };
+                    }),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        disconnectedPatches.length = 0;
+        await lunoraAnswered(api.bots.functions.listBots);
+        await lunoraAnswered(api.connectors.user_connectors.listConnectorCatalog);
+        const dialog = await openTools(canvas);
+
+        // The dialog opens with an animation (a sheet on a phone).
+        await waitFor(async () => await expect(within(dialog).getByRole("button", { name: "Remove Gmail:*" })).toBeVisible());
+        await expect(within(dialog).getByRole("button", { name: "Remove Gmail:*" }).closest("li")).toHaveTextContent("(disconnected)");
+        // A connector that is not in the catalog at all is the one removed.
+        await expect(within(dialog).getByRole("button", { name: "Remove Removed server:*" })).toBeVisible();
+        // Only a connector a run can use is offered; a disconnected one can still be typed.
+        const excluded = within(dialog).getByRole("combobox", { name: "Excluded tools" });
+        const offered = excluded instanceof HTMLInputElement ? [...(excluded.list?.options ?? [])].map((option) => option.value) : [];
+
+        await expect(offered).toContain("Linear:*");
+        await expect(offered).not.toContain("Notion:*");
+
+        await userEvent.type(excluded, "Notion:search{Enter}");
+        const notion = within(dialog).getByRole("button", { name: "Remove Notion:search" });
+
+        await expect(notion.closest("li")).toHaveTextContent("(disconnected)");
+        // A connected one carries no mark.
+        await expect(within(dialog).getByRole("button", { name: "Remove Slack:*" }).closest("li")).not.toHaveTextContent("(disconnected)");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Save tools" }));
+
+        await waitFor(
+            async () =>
+                await expect(disconnectedPatches).toStrictEqual([
+                    { toolSelection: { exclude: ["connector=gmail:*", "connector=gone:*", "connector=slack:*", "connector=notion:search"] } },
+                ]),
+        );
+    },
+};
+
 /** The patches the toggle story below sent. */
 const toggledPatches: unknown[] = [];
 
@@ -416,11 +511,14 @@ export const ReopenBeforeRefresh: Story = {
     },
 };
 
-/** Lets the slow create below finish once the story checked the form is locked. */
+/** Lets the slow create below finish once the story checked the form is locked; set once the create reached the server. */
 const slowCreate: { finish?: () => void } = {};
 
 /** The create sends the form as it was when clicked, so the form is locked until it ends and then starts empty. */
 export const CreateLocksForm: Story = {
+    beforeEach: () => {
+        slowCreate.finish = undefined;
+    },
     parameters: {
         msw: {
             handlers: {
@@ -448,7 +546,10 @@ export const CreateLocksForm: Story = {
         await expect(canvas.getByRole("radio", { name: "Custom" })).toHaveAttribute("aria-disabled", "true");
         await expect(canvas.getByRole("switch", { name: "Computer" })).toHaveAttribute("aria-disabled", "true");
 
+        // The form locks on the click, before the create reaches the server: only once it did can the story let it finish.
+        await waitFor(async () => await expect(slowCreate.finish).toBeDefined());
         slowCreate.finish?.();
+        await lunoraAnswered(api.bots.functions.createBot);
         await waitFor(async () => await expect(canvas.getByRole("textbox", { name: "Name" })).toBeEnabled());
         await expect(canvas.getByRole("textbox", { name: "Name" })).toHaveValue("");
         await expect(canvas.getByRole("radio", { name: "Custom" })).not.toHaveAttribute("aria-disabled", "true");

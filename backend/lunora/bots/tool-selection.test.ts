@@ -168,6 +168,19 @@ describe("selectionServerKey", () => {
         expect(selectionServerKey(edited, { connectorSlug: "gmail" }, [DOCS_URL], OWNER_RUN)).toBe(MAIL);
     });
 
+    it("keeps a connector's exclusion whatever its connection: saved while disconnected, it still excludes once reconnected", () => {
+        // The web app saves the exclusion of a connector that is not connected under its slug's key, as for a connected one.
+        const excluded = { exclude: [`${MAIL}:*`] };
+        const reconnected = { connectorSlug: "gmail", url: "https://mail.example/mcp" };
+
+        // The run keys the reconnected connector by its slug alone, never by its connection or the user's saved servers.
+        expect(selectionServerKey(excluded, reconnected, [], OWNER_RUN)).toBe(MAIL);
+        expect(selectionMayKeepServer(excluded, MAIL)).toBe(false);
+        expect(selectionKeeps(excluded, "mcp_mail__send", { server: selectionServerKey(excluded, reconnected, [], OWNER_RUN), tool: "send" })).toBe(false);
+        // A connector's exclusion is not a stale user server: the user's own servers keep their tools.
+        expect(selectionServerKey(excluded, docs, [DOCS_URL], OWNER_RUN)).toBe(DOCS);
+    });
+
     it("strips in a collaborator's run only a server the owner also saved, once the owner's exclusion went stale", () => {
         const edited = { exclude: [`${mcpServerKey("https://docs.example/old") ?? ""}:*`] };
 

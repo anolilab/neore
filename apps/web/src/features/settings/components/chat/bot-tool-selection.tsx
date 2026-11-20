@@ -25,9 +25,21 @@ import { useCRPC } from "@/lib/lunora/crpc";
 
 /** A server the user can name in a selector: its display name, and the stable key the selector stores. */
 export interface KnownToolServer {
+    /**
+     * A connector the user has not connected, or whose connection a run cannot use: its selectors stay valid (the run
+     * matches a connector by its slug, so an exclusion keeps excluding once it is connected again), but it has no tools now.
+     */
+    disconnected?: boolean;
     key: string;
     name: string;
 }
+
+/**
+ * Whether a run can use a connection: the statuses `listConnectorGrants` (`connectors/store.ts`) gives a run, where an
+ * `error` is retried and an `expired` one is refreshed when it can be.
+ */
+const isUsableConnection = (connection: { hasRefreshToken: boolean; status: string }): boolean =>
+    connection.status === "connected" || connection.status === "error" || (connection.status === "expired" && connection.hasRefreshToken);
 
 /** What the lists offer and resolve against: every available built-in, and the user's servers, connectors and computers. */
 export interface ToolCatalog {
@@ -70,11 +82,16 @@ export const useToolCatalog = (): ToolCatalog => {
             ...(preferences?.mcpServers ?? []).map((server) => {
                 return { key: mcpServerKey(server.url), name: server.name };
             }),
-            ...(connectors ?? []).flatMap((connector) => (connector.connection ? [{ key: connectorServerKey(connector.slug), name: connector.name }] : [])),
+            // Every connector, connected or not: a selector naming one that is disconnected is not a removed server.
+            ...(connectors ?? []).map((connector) => {
+                const disconnected = connector.connection === null || !isUsableConnection(connector.connection);
+
+                return { key: connectorServerKey(connector.slug), name: connector.name, ...(disconnected && { disconnected }) };
+            }),
             ...(devices ?? []).map((device) => {
                 return { key: deviceServerKey(device._id), name: device.name };
             }),
-        ].flatMap((server) => (server.key === undefined ? [] : [{ key: server.key, name: server.name }])),
+        ].flatMap(({ key, ...server }) => (key === undefined ? [] : [{ key, ...server }])),
         retryServers: () => {
             for (const query of failed) {
                 void query.refetch();
@@ -86,8 +103,8 @@ export const useToolCatalog = (): ToolCatalog => {
 
 /**
  * The stored selectors for what was typed: a built-in's name as is, and `name:tool` with the server's name swapped for its
- * stable key, so renaming the server later keeps the selector matching. Every server of that name is named. `null` = no
- * server of that name.
+ * stable key, so renaming the server later keeps the selector matching. Every server of that name is named, a disconnected
+ * connector only when nothing the user can use now has the same name. `null` = no server of that name.
  */
 export const resolveTypedSelector = (typed: string, servers: ReadonlyArray<KnownToolServer>): string[] | null => {
     const parsed = parseServerSelector(typed);
@@ -102,6 +119,11 @@ export const resolveTypedSelector = (typed: string, servers: ReadonlyArray<Known
         .toSorted((a, b) => b.name.length - a.name.length);
     const longest = named[0]?.name.length;
     const matches = named.filter((server) => server.name.length === longest);
+    const usable = matches.filter((server) => server.disconnected !== true);
+
+    if (usable.length > 0) {
+        return usable.map((server) => `${server.key}:${typed.slice(server.name.length + 1)}`);
+    }
 
     return matches.length === 0 ? null : matches.map((server) => `${server.key}:${typed.slice(server.name.length + 1)}`);
 };
@@ -171,7 +193,8 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
             ? t`Your servers, connectors and computers are still loading. Try again in a moment.`
             : t`No server, connector or computer matches ${unknownServer}.`;
     };
-    const suggestions = [...catalog.builtIns, ...catalog.servers.map((server) => `${server.name}:*`)];
+    // A connector that is not connected is not offered, but its name can still be typed.
+    const suggestions = [...catalog.builtIns, ...catalog.servers.flatMap((server) => (server.disconnected ? [] : [`${server.name}:*`]))];
 
     /** A selector as the user reads it: a server's current name in place of its key. */
     const labelOf = (selector: string): string => {
@@ -314,10 +337,13 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
                 <ul aria-label={label} className="flex flex-wrap gap-2">
                     {values.map((selector) => {
                         const shown = labelOf(selector);
+                        const server = parseServerSelector(selector)?.server;
+                        const disconnected = server !== undefined && catalog.servers.some((known) => known.key === server && known.disconnected === true);
 
                         return (
                             <li className="bg-muted flex items-center gap-1 rounded-md py-0.5 pr-0.5 pl-2 font-mono text-xs" key={selector}>
                                 {shown}
+                                {disconnected && <span className="text-muted-foreground font-sans">{t`(disconnected)`}</span>}
                                 <Button
                                     aria-label={t`Remove ${shown}`}
                                     className="pointer-coarse:size-11"
