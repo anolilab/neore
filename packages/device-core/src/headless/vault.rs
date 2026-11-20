@@ -700,4 +700,4 @@ fn replace_file_with(
 
 #[cfg(test)]
 #[path = "vault_tests.rs"]
-mod tests;
+pub(super) mod tests;
