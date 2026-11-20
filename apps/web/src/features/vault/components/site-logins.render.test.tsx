@@ -261,12 +261,42 @@ describe("SiteLogins", () => {
 
         await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Login saved"));
         expect(valueOf("Label (optional)")).toBe("Work");
-        expect(passwordField().value).toBe(PASSWORD);
+        // The saved password is not kept to be sent again with the later edit.
+        expect(passwordField().value).toBe("");
 
         // The kept edits now belong to the saved login: saving them again changes it rather than creating a second one.
         await user.click(screen.getByRole("button", { name: "Save changes" }));
         await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledTimes(2));
         expect(harness.saveSiteLogin.mock.calls[1]?.[0]).toMatchObject({ label: "Work", loginId: "login-1" });
+        expect(harness.saveSiteLogin.mock.calls[1]?.[0]).toHaveProperty("password", undefined);
+    });
+
+    it("keeps a password typed while a save was in flight, and only that one", async () => {
+        const user = userEvent.setup();
+        let finishSave: (value: string) => void = () => {};
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const heldSave = new Promise<string>((resolve) => {
+            finishSave = resolve;
+        });
+
+        harness.saveSiteLogin.mockReturnValueOnce(heldSave).mockResolvedValue("login-1");
+        mount();
+
+        await user.type(screen.getByLabelText("Site"), SITE);
+        await user.type(screen.getByLabelText("Username or email"), "ada@example.com");
+        await user.type(passwordField(), PASSWORD);
+        await user.click(screen.getByRole("button", { name: "Save login" }));
+        await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
+
+        await user.type(passwordField(), "!");
+        finishSave("login-1");
+
+        await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Login saved"));
+        expect(passwordField().value).toBe(`${PASSWORD}!`);
+
+        await user.click(screen.getByRole("button", { name: "Save changes" }));
+        await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledTimes(2));
+        expect(harness.saveSiteLogin.mock.calls[1]?.[0]).toMatchObject({ loginId: "login-1", password: `${PASSWORD}!` });
     });
 
     it("offers no save, edit or delete while an admin impersonates the user, and still lists the logins", async () => {

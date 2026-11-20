@@ -62,6 +62,7 @@ const sameSite = (a: string, b: string): boolean => {
 /**
  * Empties the form only if it still holds `submitted`. Edits made while that save was in flight were not sent, so they
  * stay; when the save created the login, they become an edit of it, so saving them again does not create a second one.
+ * The password just saved never stays: kept, it would be sent again with the later edit. One typed since the submit stays.
  */
 const afterSave =
     (submitted: LoginDraft, savedId: Id<"savedSiteLogins">) =>
@@ -70,7 +71,15 @@ const afterSave =
             return emptyDraft();
         }
 
-        return current.id === undefined && sameSite(current.site, submitted.site) ? { ...current, id: savedId } : current;
+        const becameEdit = current.id === undefined && submitted.id === undefined && sameSite(current.site, submitted.site);
+
+        if (!becameEdit && current.id !== submitted.id) {
+            return current;
+        }
+
+        const kept = current.password === submitted.password ? { ...current, password: "" } : current;
+
+        return becameEdit ? { ...kept, id: savedId } : kept;
     };
 
 /** Empties the form when it is editing the login `id`, which is gone. */
