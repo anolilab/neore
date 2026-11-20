@@ -108,8 +108,8 @@ impl Http for UreqHttp {
             .send(body.to_string())
             .map_err(|error| error.to_string())?;
         let status = response.status().as_u16();
-        // An answer cut off on its way is a transport failure: for an approved poll it may carry the secret, and
-        // the next poll gets the same device again. Wiped once parsed, since it may hold the secret.
+        // An answer cut off on its way is a transport failure, so the poll is retried rather than taken as a refusal.
+        // The text may hold the secret, so it is wiped once parsed.
         let text = Zeroizing::new(
             response
                 .body_mut()
