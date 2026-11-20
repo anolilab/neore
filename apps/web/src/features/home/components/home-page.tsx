@@ -11,7 +11,7 @@ import type { FC, FormEvent, ReactNode } from "react";
 import { useId, useState } from "react";
 
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
-import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
+import { handOffLandingMessage } from "@/features/marketing/stores/landing-store";
 import NotificationList from "@/features/notifications/components/notification-list";
 import useNotificationInbox from "@/features/notifications/hooks/use-notification-inbox";
 import { formatRelativeTime } from "@/features/notifications/lib/relative-time";
@@ -52,7 +52,7 @@ const Row: FC<{ children: ReactNode; meta?: ReactNode; to: string }> = ({ childr
 
 const Empty: FC<{ children: ReactNode }> = ({ children }) => <p className="text-muted-foreground px-4 py-2 text-sm">{children}</p>;
 
-/** Starts a chat through the same hand-off the landing page and onboarding use (`LANDING_MESSAGE_KEY`). */
+/** Starts a chat through the same hand-off the landing page and onboarding use (`handOffLandingMessage`). */
 const HomeComposer: FC = () => {
     const { t } = useLingui();
     const navigate = useNavigate();
@@ -69,7 +69,7 @@ const HomeComposer: FC = () => {
         }
 
         try {
-            sessionStorage.setItem(LANDING_MESSAGE_KEY, text);
+            handOffLandingMessage(text);
         } catch {
             // No sessionStorage: the chat opens empty rather than failing.
         }

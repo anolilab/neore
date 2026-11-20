@@ -245,3 +245,16 @@ export const addApprovalBotLookup = defineMigration({
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
 });
+
+/**
+ * A queued steer's not-typed mark (`persistentStreams.notTypedSteers`, `lib/not-typed-text.ts`) gained draft kinds:
+ * forwarded messages, a reply sent on as a prompt, a suggestion, the prompt improver's rewrite, a gallery prompt and an
+ * organization's value. Only the union widened, so every stored mark still fits. A no-op, so `lunora prepare` records the
+ * wider shape in the baseline.
+ */
+export const widenNotTypedSteerDrafts = defineMigration({
+    id: "widen-not-typed-steer-drafts",
+    table: "persistentStreams",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});

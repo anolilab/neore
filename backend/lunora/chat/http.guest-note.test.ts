@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { claimRow, GUEST_SEND_LEASE_MS, GUEST_SEND_SCOPE } from "../lib/claim-once";
 import { enqueueJob } from "../lib/job-queue";
+import { NOT_TYPED_DRAFTS } from "../lib/not-typed-text";
 import schema from "../schema";
 import { gateThreadActionHandler } from "./functions";
 import { claimGuestNoteSend, getGuestNoteForSend, recordGuestNoteSent, recordResumedGuestNoteSent, releaseGuestNoteSend } from "./guest-links";
@@ -505,7 +506,7 @@ describe("/chat/start with text the owner did not type", () => {
         expect(saved.prompts[0]?.message.content).toStrictEqual([{ text: "sign in to my bank", type: "text" }]);
     });
 
-    it.each(["promptLink", "shellLink", "sharedPrompt"])("saves a prompt filled from a %s marked", async (draftFrom) => {
+    it.each(NOT_TYPED_DRAFTS)("saves a prompt filled from a %s marked", async (draftFrom) => {
         expect((await start({ draftFrom })).status).toBe(200);
         expect(saved.prompts[0]?.message.content).toStrictEqual(marked({ draft: draftFrom }));
     });

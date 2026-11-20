@@ -9,12 +9,12 @@ import { toast } from "sonner";
 import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
-import { noteSavedPrompt } from "@/features/chat/core/utils/draft-origin";
+import { markComposerDraft, noteSavedPrompt } from "@/features/chat/core/utils/draft-origin";
 import useFeatureFlaggedModels, { useFeatureFlaggedModelsSettled } from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import validatePromptSettings from "../lib/prompt-validation";
-import { getAutoPopulatedVariables, replaceVariables } from "../lib/prompt-variables";
+import { fillsAnyOf, getAutoPopulatedVariables, organizationValueNames, replaceVariables } from "../lib/prompt-variables";
 
 /**
  * Hook to load a prompt by ID and apply its settings to the chat
@@ -105,6 +105,12 @@ const usePromptLoader = (promptId: string | undefined) => {
         // Set the composer text with the prompt content
         setComposerText(content);
         noteSavedPrompt(prompt, sessionData?.user?.id, { replaced: true });
+
+        // The organization's name filled in is not the person's own words.
+        if (fillsAnyOf(prompt.content, values, organizationValueNames(undefined))) {
+            markComposerDraft("organizationValue");
+        }
+
         toast.success(t`Prompt loaded`);
         handledPromptId.current = promptId;
     }, [promptId, prompt, models, modelsSettled, isSessionPending, setComposerText, setSelectedModel, setPendingSettings, sessionData, activeOrganization, t]);

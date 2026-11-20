@@ -44,7 +44,20 @@ export const steerRun = authMutation
     .use(rateLimit("chat/steer"))
     .input({
         /** The steer holds a composer draft the owner did not type (`lib/not-typed-text.ts`): it is delivered marked. */
-        draftFrom: v.optional(v.union(v.literal("promptLink"), v.literal("shellLink"), v.literal("sharedPrompt"), v.literal("impersonated"))),
+        draftFrom: v.optional(
+            v.union(
+                v.literal("promptLink"),
+                v.literal("shellLink"),
+                v.literal("sharedPrompt"),
+                v.literal("forwarded"),
+                v.literal("assistantText"),
+                v.literal("suggestion"),
+                v.literal("improvedPrompt"),
+                v.literal("galleryPrompt"),
+                v.literal("organizationValue"),
+                v.literal("impersonated"),
+            ),
+        ),
         /**
          * The client's id for this steer. Sending the same id again queues nothing
          * more, so a call whose answer was lost can be reconciled instead of repeated.

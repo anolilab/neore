@@ -775,11 +775,14 @@ for a schema table that is neither policed nor listed:
   filled until it is sent or emptied, through edits, a pane switch, a reload, the queue and a failed send, and each send
   names it as `draftFrom`. Its sources: a `?prompt=` link or a chat's `?initialMessage=` (`promptLink`), an
   saved prompt whose current words (content and variable defaults) the viewer did not all write themselves (`sharedPrompt`: every write of them records `contentBy` from the session and sets `contentByOthers` / `contentByImpersonator` once anyone else, or anyone impersonated, wrote part of them, which only a restore clears; a copy or restore carries the copied words' record, and a row without them is the viewer's only as their own personal prompt; `prompts/content-author.ts`; the `?promptId=` loader decides only once the session has loaded), a desktop `neore://new?text=` link, share or Quick Composer (`shellLink`),
-  and an admin's prompt sent again (`impersonated`); prompt history recall and Restore to input keep every mark. Any
+  forwarded messages (`forwarded`), a reply's text sent as a prompt by Generate image/video (`assistantText`), a clicked
+  suggestion: follow-ups, the welcome screen, search, canvas quick actions, onboarding templates (`suggestion`), the
+  prompt improver's Apply (`improvedPrompt`), a media gallery item's stored prompt, edited or not (`galleryPrompt`), an
+  organization's variable default or name filled into a prompt (`organizationValue`), and an admin's prompt sent again (`impersonated`); prompt history recall and Restore to input keep every mark. Any
   prompt, edit, steer or local turn an admin sent while impersonating (or, on `/chat/edit`, under a sign-in that cannot
   be confirmed) is marked by the server. The client's `draftFrom` only ever restricts. Still unmarked, and to be marked
-  before the fill tool ships: forwarded messages, Generate image/video (a reply's text sent as a prompt), follow-up and
-  welcome-screen suggestions, the prompt improver's Apply, the media gallery's stored prompt and an organization's variable defaults filled into a prompt (`getResolvedVariables`) and the organization's name a loaded prompt fills in (`getAutoPopulatedVariables`).
+  before the fill tool ships: bot instructions, personalization and variable defaults an impersonating admin wrote, an
+  accepted ghost-text completion, and Restore to input of a collaborator's message in a shared chat.
 
 ## Removed from the client surface in this audit
 

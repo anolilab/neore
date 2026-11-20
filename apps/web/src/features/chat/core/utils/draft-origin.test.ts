@@ -1,8 +1,18 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { handOffLandingMessage, LANDING_MESSAGE_FROM_KEY, takeLandingMessage } from "@/features/marketing/stores/landing-store";
+
 import type { PendingAttachment } from "../stores/chat-ui-store";
 import { useChatUIStore } from "../stores/chat-ui-store";
-import { composerDraftFrom, draftFromField, isOwnPromptContent, markComposerDraft, noteSavedPrompt, prefillDraftFrom } from "./draft-origin";
+import {
+    composerDraftFrom,
+    draftFromField,
+    holdLandingDraftFrom,
+    isOwnPromptContent,
+    markComposerDraft,
+    noteSavedPrompt,
+    prefillDraftFrom,
+} from "./draft-origin";
 
 const ui = () => useChatUIStore.getState();
 
@@ -141,7 +151,41 @@ describe(isOwnPromptContent, () => {
 
 describe(prefillDraftFrom, () => {
     it("marks a chat's `?initialMessage=` prefill, which a link wrote, and not the new chat's hand-off of typed text", () => {
+        holdLandingDraftFrom(undefined);
+
         expect(prefillDraftFrom("thread-1")).toBe("promptLink");
         expect(prefillDraftFrom(undefined)).toBeUndefined();
+    });
+
+    it("gives the new chat's prefill its hand-off's mark once: forwarded messages, an onboarding template", () => {
+        holdLandingDraftFrom("forwarded");
+
+        expect(prefillDraftFrom(undefined)).toBe("forwarded");
+        expect(prefillDraftFrom(undefined)).toBeUndefined();
+
+        holdLandingDraftFrom("suggestion");
+
+        expect(prefillDraftFrom(undefined)).toBe("suggestion");
+    });
+});
+
+describe(handOffLandingMessage, () => {
+    it("hands forwarded text over with its mark, and typed text with none left over from an earlier hand-off", () => {
+        handOffLandingMessage("> quoted", "forwarded");
+
+        expect(takeLandingMessage()).toStrictEqual({ from: "forwarded", text: "> quoted" });
+        expect(takeLandingMessage()).toBeUndefined();
+
+        handOffLandingMessage("> quoted", "forwarded");
+        handOffLandingMessage("my words");
+
+        expect(takeLandingMessage()).toStrictEqual({ from: undefined, text: "my words" });
+    });
+
+    it("reads a mark nobody named as a link's", () => {
+        handOffLandingMessage("> quoted");
+        sessionStorage.setItem(LANDING_MESSAGE_FROM_KEY, "typed");
+
+        expect(takeLandingMessage()).toStrictEqual({ from: "promptLink", text: "> quoted" });
     });
 });

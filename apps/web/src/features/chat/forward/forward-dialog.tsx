@@ -5,7 +5,7 @@
  * NEW chat whose first message quotes the selected messages.
  *
  * The new chat is started through the same hand-off the home page, landing
- * page and onboarding use (`LANDING_MESSAGE_KEY` → `/chat?initialMessage=true`):
+ * page and onboarding use (`handOffLandingMessage` → `/chat?initialMessage=true`, marked `forwarded`):
  * the composer opens pre-filled with `/<skill> <note>` and the quotes, and the
  * chat — with that skill active — is created by the ordinary send, on the
  * caller's own shard. See `build-forward-text.ts` for why the quotes need no
@@ -26,7 +26,7 @@ import { useNavigate } from "@tanstack/react-router";
 import type { FC, FormEvent } from "react";
 import { useId, useState } from "react";
 
-import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
+import { handOffLandingMessage } from "@/features/marketing/stores/landing-store";
 import { useAction } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
@@ -89,7 +89,7 @@ const ForwardDialog: FC<ForwardDialogProps> = ({ messages, onDone, onOpenChange 
         });
 
         try {
-            sessionStorage.setItem(LANDING_MESSAGE_KEY, text);
+            handOffLandingMessage(text, "forwarded");
         } catch {
             showError(t`Could not prepare the new chat. Copy the messages instead.`);
 

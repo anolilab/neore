@@ -56,16 +56,22 @@
   Text the owner did not type is marked where it is saved (`lib/not-typed-text.ts`, `neore.notTyped`) and refused by
   name: a prompt, edit, steer or local turn an admin sent while impersonating, and a composer draft from a `?prompt=` or
   `?initialMessage=` link, anything the desktop shell hands over (a `neore://new?text=` link, a share, the Quick
-  Composer) or a saved prompt whose words (content, variable defaults) not all the viewer wrote, unimpersonated (`isOwnPromptContent`;
+  Composer), a saved prompt whose words (content, variable defaults) not all the viewer wrote, unimpersonated (`isOwnPromptContent`;
   `prompts/content-author.ts` records them from the session, never `userId`, and only grows: another writer or an
-  impersonated write of any part stays on the row until a restore). `usePromptLoader` waits for the session first. The web client marks the draft itself, never matches text: the mark stays
+  impersonated write of any part stays on the row until a restore), forwarded messages (`handOffLandingMessage` carries
+  the mark to the new chat), a reply's text sent as a prompt (Generate image/video, `assistantText`), any suggestion
+  clicked (follow-ups, welcome screen, search, canvas quick actions, onboarding templates), the prompt improver's Apply,
+  a gallery item's stored prompt even edited, and an organization's variable default or name filled into a prompt
+  (`organizationValueNames`). `usePromptLoader` waits for the session first. The web client marks the draft itself, never matches text: the mark stays
   through edits, pane switches, a reload, the queue and a failed send, and goes when the draft is sent or emptied
   (`features/chat/core/utils/draft-origin.ts`); each send names it as `draftFrom`. An edit keeps the original's mark;
   a steer's lives in `persistentStreams.notTypedSteers` until delivery. A stateless run saves its prompt again: pass it
   through `statelessPrompt` with the saved row's marks, never the bare text. Prompt history and Restore to input send an
-  admin's prompt again as `draftFrom: "impersonated"`. A plain-text paste stays unseen. Still unmarked, to mark (a draft
-  kind the verdict names) before the fill ships: forwarded messages, Generate image/video (the reply's text sent as a
-  prompt), follow-up and welcome-screen suggestions, the prompt improver's Apply, the media gallery's stored prompt, an organization's variable defaults filled into a prompt (`getResolvedVariables`), the organization's name a loaded prompt fills in (`getAutoPopulatedVariables`); and bot instructions and personalization an impersonating admin wrote (a
-  `systemContext` kind that refuses). The allowlist refuses a step holding a page's result or an approval's
+  admin's prompt again as `draftFrom: "impersonated"`. A plain-text paste stays unseen. A new draft kind goes in
+  `NOT_TYPED_DRAFTS` and the three validators that list it (`not-typed-text-validator.ts`, `steerRun`, `saveLocalTurn`);
+  the `/chat/start`, steer and verdict tests walk the list (`saveLocalTurn`'s does not). Still unmarked, to mark
+  before the fill ships: bot instructions and personalization an impersonating admin wrote (a `systemContext` kind
+  that refuses) and the variable defaults one wrote; an accepted ghost-text completion (`composer-tiptap/extensions/ghost-completion.ts`);
+  Restore to input of a collaborator's message in a shared chat. The allowlist refuses a step holding a page's result or an approval's
   request and response parts: the fill navigates and types inside its one call, and its own approval parts are admitted
   only for that call's id, added here on purpose.

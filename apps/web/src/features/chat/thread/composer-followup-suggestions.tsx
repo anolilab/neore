@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { afterLastContextReset, isClearDivider } from "@/features/chat/core/context/chat-action-shared";
 import { useChatIsRunning, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
 import usePromptImprovementStore from "@/features/chat/prompt-improvement/stores/prompt-improvement-store";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
@@ -175,6 +176,8 @@ const ComposerFollowupSuggestions: FC = () => {
     const handleClick = useCallback(
         (suggestion: string) => {
             setComposerText(suggestion);
+            // The model wrote it: sent, it is not the person's own words (`draft-origin.ts`).
+            markComposerDraft("suggestion");
             userManuallyClosedRef.current = true;
             userManuallyOpenedRef.current = false;
             setIsOpen(false);

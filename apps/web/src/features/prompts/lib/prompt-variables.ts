@@ -248,6 +248,31 @@ export const getAutoPopulatedVariables = (userContext?: UserContext): Record<str
     return values;
 };
 
+/** Where a resolved variable's value came from (`prompts.functions.getResolvedVariables`). */
+export type VariableSource = "organization" | "thread" | "user";
+
+/**
+ * The variables whose value the organization set and the person did not override: its variable defaults, and its name
+ * (`user.organization`, auto-populated). Filled into a prompt, they are not the person's own words (`draft-origin.ts`).
+ */
+export const organizationValueNames = (sources: Readonly<Record<string, VariableSource>> | undefined): Set<string> => {
+    const names = new Set(
+        Object.entries(sources ?? {})
+            .filter(([, source]) => source === "organization")
+            .map(([name]) => name),
+    );
+
+    if (sources?.["user.organization"] === undefined) {
+        names.add("user.organization");
+    }
+
+    return names;
+};
+
+/** Whether filling `content` with `values` (as `replaceVariables` does) puts in the value of any of `names`. */
+export const fillsAnyOf = (content: string, values: Readonly<Record<string, string>>, names: ReadonlySet<string>): boolean =>
+    extractVariables(content).some((name) => names.has(name) && Object.hasOwn(values, name));
+
 /**
  * List of auto-populated variable names (for documentation/UI)
  */

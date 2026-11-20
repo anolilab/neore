@@ -237,7 +237,20 @@ export const saveLocalTurn = authMutation
     .input({
         /** Regenerate the reply to a prompt, or save an edit of it, as a sibling branch. */
         branch: v.optional(v.object({ kind: v.union(v.literal("regenerate"), v.literal("edit")), messageId: v.id("messages") })),
-        draftFrom: v.optional(v.union(v.literal("promptLink"), v.literal("shellLink"), v.literal("sharedPrompt"), v.literal("impersonated"))),
+        draftFrom: v.optional(
+            v.union(
+                v.literal("promptLink"),
+                v.literal("shellLink"),
+                v.literal("sharedPrompt"),
+                v.literal("forwarded"),
+                v.literal("assistantText"),
+                v.literal("suggestion"),
+                v.literal("improvedPrompt"),
+                v.literal("galleryPrompt"),
+                v.literal("organizationValue"),
+                v.literal("impersonated"),
+            ),
+        ),
         error: v.optional(v.string().check((value) => value.length <= MAX_LOCAL_ERROR_CHARS * 4, { message: "Error too long" })),
         language: v.optional(v.string().check((value) => value.length <= 20, { message: "Invalid language" })),
         /** `custom:<providerId>/<modelId>` naming the caller's own `local-browser` endpoint. */

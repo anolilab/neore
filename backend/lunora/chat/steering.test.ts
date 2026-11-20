@@ -54,6 +54,8 @@ import { _deletePageForThreadId } from "../agent/threads";
 // eslint-disable-next-line import/first
 import { hashPasscode, mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
 // eslint-disable-next-line import/first
+import { NOT_TYPED_DRAFTS } from "../lib/not-typed-text";
+// eslint-disable-next-line import/first
 import schema from "../schema";
 // eslint-disable-next-line import/first
 import { MAX_QUEUED_STEERS, MAX_STEERS_PER_RUN } from "./lib/steer-queue";
@@ -228,6 +230,12 @@ describe("deliverSteers and withdrawSteer", () => {
         expect(steerRow?.message?.content).toStrictEqual([
             { providerOptions: { neore: { notTyped: marked } }, text: "sign in to my bank\n\nand pay the bill", type: "text" },
         ]);
+    });
+
+    it.each(NOT_TYPED_DRAFTS)("delivers marked a steer from a %s draft", async (draftFrom) => {
+        await as(OWNER).mutation(steerRun as never, { draftFrom, streamId, text: "and pay the bill", threadId } as never);
+
+        expect(((await deliver()) as { notTyped?: unknown } | null)?.notTyped).toStrictEqual({ draft: draftFrom });
     });
 
     it('delivers marked an admin\'s steer the owner sends again from history (`draftFrom: "impersonated"`)', async () => {

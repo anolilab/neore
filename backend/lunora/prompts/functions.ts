@@ -1463,9 +1463,13 @@ export const getResolvedVariables = authQuery
         }
 
         if (userDefaults?.variables) {
+            // An organization's row carries the `userId` of the admin who created it: its values are the organization's,
+            // which the composer marks as not the person's own words (`organizationValueNames`).
+            const source = userDefaults.organizationId === undefined ? "user" : "organization";
+
             for (const innerV of userDefaults.variables) {
                 values[innerV.name] = innerV.value;
-                sources[innerV.name] = "user";
+                sources[innerV.name] = source;
             }
         }
 

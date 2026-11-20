@@ -3,12 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
     extractVariables,
+    fillsAnyOf,
     filterVariables,
     formatVariable,
     getAllCommonVariables,
     hasVariables,
     highlightVariables,
     isSystemManagedVariable,
+    organizationValueNames,
     parseVariableMatch,
     replaceVariables,
     replaceWithDefaults,
@@ -284,5 +286,23 @@ describe("getAllCommonVariables", () => {
 
     it("should translate the descriptions", () => {
         expect(getAllCommonVariables(i18n)).toContainEqual({ description: "«User's display name»", name: "user.name" });
+    });
+});
+
+describe("an organization's values filled into a prompt", () => {
+    it("names its variable defaults nobody overrode, and its name unless the person set one", () => {
+        expect(organizationValueNames({ brand: "organization", "context.year": "user", tone: "user" })).toStrictEqual(new Set(["brand", "user.organization"]));
+        expect(organizationValueNames({ "user.organization": "thread" })).toStrictEqual(new Set());
+        expect(organizationValueNames(undefined)).toStrictEqual(new Set(["user.organization"]));
+    });
+
+    it("tells whether filling a prompt puts one of them in", () => {
+        const names = organizationValueNames({ brand: "organization", tone: "user" });
+
+        expect(fillsAnyOf("Write as {{brand}}", { brand: "Acme" }, names)).toBe(true);
+        expect(fillsAnyOf("For {{user.organization}}", { "user.organization": "Acme" }, names)).toBe(true);
+        expect(fillsAnyOf("In a {{tone}} tone", { tone: "dry" }, names)).toBe(false);
+        // A variable left unfilled puts nothing in.
+        expect(fillsAnyOf("Write as {{brand}}", {}, names)).toBe(false);
     });
 });

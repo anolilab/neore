@@ -4,7 +4,9 @@ import { useChatUIStore } from "../stores/chat-ui-store";
 
 /**
  * Text that entered the composer without the person typing it: a prompt link (`?prompt=`, a chat's `?initialMessage=`), the
- * desktop shell (a `neore://new?text=` link, a share, the Quick Composer), or a saved prompt whose words someone else wrote. The draft
+ * desktop shell (a `neore://new?text=` link, a share, the Quick Composer), a saved prompt whose words someone else wrote,
+ * forwarded messages, a suggestion they clicked, the prompt improver's rewrite, a gallery item's stored prompt, or an
+ * organization's value filled into a prompt. The draft
  * carries the mark (`composerDraftFrom` in `chat-ui-store.ts`) from then on, through edits, a pane switch, a reload
  * (`split/stored-drafts.ts`), the queue and a failed send handed back, until it is sent or emptied. A send names it
  * (`draftFrom`), and the backend saves the prompt marked (`backend/lunora/lib/not-typed-text.ts`), so the agent never reads it
@@ -65,8 +67,28 @@ export const noteSavedPrompt = (prompt: SavedPromptAuthorship, viewerId: string 
 /** A request's `draftFrom`, spread into its body: nothing for the person's own words. */
 export const draftFromField = (origin: DraftOrigin | undefined): { draftFrom?: DraftOrigin } => (origin === undefined ? {} : { draftFrom: origin });
 
+/** The mark of the new-chat hand-off the chat index read last (`handOffLandingMessage`), until the composer applies it. */
+const landing: { draftFrom: DraftOrigin | undefined } = { draftFrom: undefined };
+
+/** Set when the chat index reads a hand-off: its mark, or none, so an earlier one never marks the next. Taken by `prefillDraftFrom`. */
+export const holdLandingDraftFrom = (origin: DraftOrigin | undefined): void => {
+    landing.draftFrom = origin;
+};
+
 /**
- * The mark of a composer's `initialMessage` prefill. A chat's comes from its address (`/chat/$threadId?initialMessage=`),
- * which a link wrote; the new-chat composer's from the hand-off of text typed on the landing or home page.
+ * The mark of a composer's `initialMessage` prefill, taken when the text is put in. A chat's comes from its address
+ * (`/chat/$threadId?initialMessage=`), which a link wrote. The new-chat composer's is its hand-off's
+ * (`handOffLandingMessage`): none for text typed on the landing or home page, `forwarded` for forwarded messages,
+ * `suggestion` for an onboarding template.
  */
-export const prefillDraftFrom = (threadId: string | undefined): DraftOrigin | undefined => (threadId ? "promptLink" : undefined);
+export const prefillDraftFrom = (threadId: string | undefined): DraftOrigin | undefined => {
+    if (threadId) {
+        return "promptLink";
+    }
+
+    const origin = landing.draftFrom;
+
+    landing.draftFrom = undefined;
+
+    return origin;
+};

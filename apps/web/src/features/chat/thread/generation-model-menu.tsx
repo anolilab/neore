@@ -78,7 +78,8 @@ const GenerationModelMenu = memo(({ disabled, icon, messageText, mode, threadId,
 
         // `.catch(rethrow)` rather than `try/finally` so the React Compiler can
         // still optimize this component (it bails on `finally` clauses).
-        await sendMessage(messageText).catch((error: unknown) => {
+        // The reply's text goes out as the prompt: the person did not type it (`draft-origin.ts`).
+        await sendMessage(messageText, undefined, { draftFrom: "assistantText" }).catch((error: unknown) => {
             setIsGenerating(false);
 
             throw error;
