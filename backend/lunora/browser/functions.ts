@@ -10,6 +10,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type QueryCtx } from "../_generated/server";
 import { encryptKey } from "../lib/encryption";
 import { patchRow, withoutUndefined } from "../lib/patch";
+import { controlStateOf, watchableSessionId } from "./live-view-logic";
 // ── Utility ─────────────────────────────────────────────────────────────
 
 /** Generate a cryptographically random 8-character uppercase pairing code. */
@@ -111,19 +112,44 @@ const holdsAfter = (holds: ReadonlyArray<number> | undefined, now: number, relea
 };
 
 /**
- * A browser action is about to run on this session's browser: it holds the browser until `until` (the renderer
- * call's deadline), so a slow action does not read as idle. Only for a browser that is still alive; a reaped one is
- * replaced by the renderer, and the row shows it again once {@link logAction} records the new one. Each action adds
- * its own hold beside those of actions still running.
+ * A browser action is about to run on this session's browser. In one transaction with {@link takeControl}'s claim, so
+ * an agent action and a person's control never overlap:
+ * - `controlled`: a person drives the browser; the action must not run.
+ * - `returned`: a person drove it and gave it back since the agent's last action; read once, then cleared.
+ * - `held`: the browser is still alive, so the action holds it until `until` (the renderer call's deadline) and a slow
+ *   action does not read as idle. A reaped one is not held (the renderer replaces it, and {@link logAction} records the
+ *   new one). Each action adds its own hold beside those of actions still running.
  */
 export const beginSessionUse = internalMutation
     .input({ sessionId: v.id("browserSessions"), until: v.number() })
+    .output(
+        v.object({
+            controlled: v.boolean(),
+            held: v.boolean(),
+            returned: v.optional(v.union(v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
+        }),
+    )
     .mutation(async ({ args: { sessionId, until }, ctx }) => {
         const session = await ctx.db.get("browserSessions", sessionId);
 
-        if (session) {
-            await patchRow(ctx.db, "browserSessions", session, { inUseHolds: [...(holdsAfter(session.inUseHolds, ctx.now) ?? []), until] });
+        if (!session) {
+            return { controlled: false, held: false };
         }
+
+        const control = controlStateOf(session, ctx.now);
+
+        if (control === "person") {
+            return { controlled: true, held: false };
+        }
+
+        const held = watchableSessionId(session, ctx.now) !== undefined;
+
+        await patchRow(ctx.db, "browserSessions", session, {
+            ...(control === "returned" && { control: undefined }),
+            ...(held && { inUseHolds: [...(holdsAfter(session.inUseHolds, ctx.now) ?? []), until] }),
+        });
+
+        return { controlled: false, held, ...(control === "returned" && { returned: session.control?.ended ?? ("idle" as const) }) };
     });
 
 /**
@@ -159,10 +185,12 @@ export const logAction = internalMutation
         value: v.optional(v.string()),
     })
     /**
+     * `closed`: the session was closed while this action ran (a later action may already run a fresh browser), so its
+     * result is of a browser the thread no longer has.
      * `replaced`: the row moved on to another browser while this action ran, so its result is of a browser the thread
      * no longer uses; `currentUrl` is then the kept browser's page, for the agent to look at again.
      */
-    .output(v.object({ currentUrl: v.optional(v.string()), replaced: v.boolean() }))
+    .output(v.object({ closed: v.optional(v.boolean()), currentUrl: v.optional(v.string()), replaced: v.boolean() }))
     .mutation(
         async ({
             args: {
@@ -199,6 +227,12 @@ export const logAction = internalMutation
             }
 
             const inUseHolds = holdsAfter(session.inUseHolds, ctx.now, heldUntil);
+
+            // Closed while this action ran (the person ended it, or the run did): nothing of this result is the thread's
+            // browser any more, and a closed row is never brought back to life.
+            if (session.status !== "active") {
+                return { closed: true, replaced: true };
+            }
 
             // Another action moved the row to a newer browser while this one ran (it replaced the old browser, or the
             // renderer closed it): this result is about a browser the row no longer names. Only the audit row and the

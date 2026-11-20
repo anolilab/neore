@@ -77,7 +77,7 @@ type Asked = { attempt: number; browserId: string; connectBy: number; renewed: b
  * What the view becomes after the person asked for it. `ended` reads as unavailable too: the browser may be gone before the
  * status read drops the card, or the provider may not see it at all, and either way the click must not do nothing.
  */
-const viewFrom = (asked: Asked, result: { status: "ended" | "unavailable" } | { status: "ok"; url: string }, now: number): View =>
+const viewFrom = (asked: Asked, result: { status: "controlled" | "ended" | "unavailable" } | { status: "ok"; url: string }, now: number): View =>
     result.status === "ok" ? { ...asked, connected: false, kind: "open", stale: now >= asked.connectBy, url: result.url } : { kind: "unavailable" };
 
 /** The answer to `attempt`, applied only while the view still waits for that attempt. */

@@ -8,12 +8,13 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { logAction } from "./functions";
-import { getThreadBrowser, openLiveView } from "./live-view";
-import { BROWSER_IDLE_REAP_MS } from "./live-view-logic";
+import { getThreadBrowser, handBack, keepControl, navigateInControl, openLiveView, takeControl } from "./live-view";
+import { BROWSER_IDLE_REAP_MS, CONTROL_IDLE_MS } from "./live-view-logic";
 
 const OWNER = "user-owner";
 const READER = "user-reader";
 const STRANGER = "user-stranger";
+const WRITER = "user-writer";
 /** The frozen clock every test reads, in the code and in the assertions alike. */
 const NOW = Date.UTC(2026, 10, 20, 12);
 /** The provider session ids the tests use: a browser name a client sees must hold neither. */
@@ -83,6 +84,18 @@ vi.mock("../agent/thread-read-access", async (importOriginal) => {
     };
 });
 
+const { renderer } = vi.hoisted(() => {
+    return { renderer: vi.fn() };
+});
+
+vi.mock("../lib/services", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("../lib/services")>()), isServiceBound: () => true, serviceFetch: () => fetch };
+});
+
+vi.mock("@neore/service-sdk/browser-renderer", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("@neore/service-sdk/browser-renderer")>()), browserAction: renderer };
+});
+
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
 });
@@ -131,6 +144,7 @@ beforeEach(async () => {
         const id = await ctx.db.insert("threads", { status: "active", title: "T", userId: OWNER });
 
         await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "read", threadId: id, userId: READER });
+        await ctx.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId: id, userId: WRITER });
 
         return id;
     })) as string;
@@ -140,6 +154,7 @@ afterEach(() => {
     delete replica.grant;
     harness.close();
     fetchMock.mockReset();
+    renderer.mockReset();
     vi.unstubAllGlobals();
     vi.useRealTimers();
 });
@@ -190,7 +205,12 @@ describe("a running browser", () => {
 
         await addSession({ inUseHolds: [heldUntil], lastActivityAt: NOW - BROWSER_IDLE_REAP_MS - 1000 });
 
-        await expect(statusFor(OWNER)).resolves.toEqual({ browserId: expect.any(String), currentUrl: "https://example.com/login", idleUntil: heldUntil });
+        await expect(statusFor(OWNER)).resolves.toEqual({
+            browserId: expect.any(String),
+            canControl: true,
+            currentUrl: "https://example.com/login",
+            idleUntil: heldUntil,
+        });
         await expect(open(OWNER)).resolves.toMatchObject({ status: "ok" });
     });
 
@@ -426,5 +446,174 @@ describe("a browser that ended", () => {
         await expect(statusFor(OWNER)).resolves.toBeNull();
         await expect(open(OWNER)).resolves.toEqual({ status: "ended" });
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+});
+
+describe("taking control of the browser", () => {
+    const take = async (userId: string): Promise<any> => await as(userId).action(takeControl as never, { threadId } as never);
+    const control = async (): Promise<any> => ((await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").first())) as any).control;
+
+    it("gives the owner an interactive view and refuses the agent's turn to anyone else meanwhile", async () => {
+        await addSession();
+
+        await expect(take(OWNER)).resolves.toMatchObject({ status: "ok", url: VIEW_URL });
+
+        const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+
+        // Interactive: the read-only guardrail is left out, so the person's input reaches the page.
+        expect(JSON.parse(init.body as string)).not.toHaveProperty("guardrails");
+        await expect(control()).resolves.toMatchObject({ by: OWNER, since: NOW, until: NOW + CONTROL_IDLE_MS });
+        await expect(statusFor(OWNER)).resolves.toMatchObject({ control: { byYou: true, until: NOW + CONTROL_IDLE_MS } });
+        // Someone else watching sees that a person drives it, and gets no view of what they type.
+        await expect(statusFor(READER)).resolves.toMatchObject({ canControl: false, control: { byYou: false } });
+        await expect(open(READER)).resolves.toEqual({ status: "controlled" });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("lets a writer take control, but only one person at a time", async () => {
+        await addSession();
+
+        await expect(take(WRITER)).resolves.toMatchObject({ status: "ok" });
+        await expect(take(OWNER)).resolves.toEqual({ status: "taken" });
+        await expect(control()).resolves.toMatchObject({ by: WRITER });
+    });
+
+    it("refuses a read-only reader, a stranger, and a reader whose grant the primary no longer has", async () => {
+        await addSession();
+
+        await expect(take(READER)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        await expect(take(STRANGER)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: WRITER } });
+
+            replica.grant = grant;
+            await ctx.db.delete("threadAccess", grant._id);
+        });
+        await expect(take(WRITER)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await expect(control()).resolves.toBeUndefined();
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("waits while an agent action still runs on the browser", async () => {
+        await addSession({ inUseHolds: [NOW + 10_000] });
+
+        await expect(take(OWNER)).resolves.toEqual({ status: "busy" });
+        await expect(control()).resolves.toBeUndefined();
+    });
+
+    it("drops the claim when no view could be opened, so the agent is never stopped for nothing", async () => {
+        await addSession();
+        fetchMock.mockResolvedValue(answer(500, {}));
+
+        await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+        await expect(control()).resolves.toBeUndefined();
+    });
+
+    it("renews on input, and ends when handed back or left, only for the person in control", async () => {
+        await addSession();
+        await take(OWNER);
+        vi.setSystemTime(NOW + 60_000);
+
+        await expect(as(OWNER).mutation(keepControl as never, { threadId } as never)).resolves.toEqual({ until: NOW + 60_000 + CONTROL_IDLE_MS });
+        await expect(as(WRITER).mutation(keepControl as never, { threadId } as never)).resolves.toBeNull();
+        await as(WRITER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
+        await expect(control()).resolves.toMatchObject({ by: OWNER, until: NOW + 60_000 + CONTROL_IDLE_MS });
+
+        await as(OWNER).mutation(handBack as never, { reason: "left", threadId } as never);
+
+        await expect(control()).resolves.toMatchObject({ ended: "left", until: NOW + 60_000 });
+        await expect(statusFor(READER)).resolves.not.toHaveProperty("control");
+        await expect(as(OWNER).mutation(keepControl as never, { threadId } as never)).resolves.toBeNull();
+    });
+
+    it("returns control on its own after the idle timeout", async () => {
+        // A fresh answer per call: a body is read once.
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+        await addSession();
+        await take(OWNER);
+        vi.setSystemTime(NOW + CONTROL_IDLE_MS);
+
+        await expect(statusFor(OWNER)).resolves.not.toHaveProperty("control");
+        await expect(take(WRITER)).resolves.toMatchObject({ status: "ok" });
+    });
+
+    it("keeps the lease when a renewal by its holder fails to mint", async () => {
+        await addSession();
+        await take(OWNER);
+        fetchMock.mockResolvedValue(answer(500, {}));
+
+        await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+        await expect(control()).resolves.toMatchObject({ by: OWNER, until: NOW + CONTROL_IDLE_MS });
+    });
+
+    it("stops renewing a writer whose grant was lowered to read", async () => {
+        await addSession();
+        await take(WRITER);
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: WRITER } });
+
+            await ctx.db.patch("threadAccess", grant._id, { permission: "read" });
+        });
+
+        await expect(as(WRITER).mutation(keepControl as never, { threadId } as never)).resolves.toBeNull();
+    });
+});
+
+describe("opening a page while in control", () => {
+    const take = async (userId: string): Promise<any> => await as(userId).action(takeControl as never, { threadId } as never);
+    const navigate = async (userId: string, url = "https://example.com/next"): Promise<any> =>
+        await as(userId).action(navigateInControl as never, { threadId, url } as never);
+    const session = async (): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").first());
+
+    it("navigates the browser for the person in control, and never writes their page for others to read", async () => {
+        await addSession();
+        await take(OWNER);
+        renderer.mockResolvedValueOnce({ data: { sessionId: "s-1", success: true, url: "https://example.com/next?token=1" }, response: { ok: true } });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ status: "ok", url: "https://example.com/next?token=1" });
+        expect(renderer.mock.calls[0]?.[0]).toMatchObject({ body: { action: "navigate", sessionId: "s-1", url: "https://example.com/next" } });
+
+        const after = await session();
+
+        expect(after.currentUrl).toBe("https://example.com/login");
+        expect(after.control).not.toHaveProperty("navigatingUntil");
+    });
+
+    it("refuses someone who does not hold control, and a page the owner's lists or the address guard block", async () => {
+        await addSession();
+        await take(OWNER);
+        await harness.run(
+            async (ctx: any) => await ctx.db.insert("aiUserPreferences", { browserSettings: { domainBlocklist: ["blocked.example"] }, userId: OWNER }),
+        );
+
+        await expect(navigate(WRITER)).resolves.toMatchObject({ status: "refused" });
+        await expect(navigate(STRANGER)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await expect(navigate(OWNER, "https://blocked.example/")).resolves.toMatchObject({ status: "refused" });
+        await expect(navigate(OWNER, "http://169.254.169.254/")).resolves.toMatchObject({ status: "refused" });
+        expect(renderer).not.toHaveBeenCalled();
+    });
+
+    it("keeps the agent off the browser until the person's page has loaded, also when they hand back meanwhile", async () => {
+        await addSession();
+        await take(OWNER);
+        let duringLoad: any;
+
+        renderer.mockImplementationOnce(async () => {
+            await as(OWNER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
+            const loading = await session();
+
+            duringLoad = loading.control;
+
+            return { data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } };
+        });
+
+        await navigate(OWNER);
+
+        // Handed back mid-load: the lease still runs until the navigation's deadline, so the agent is still refused.
+        expect(duringLoad).toMatchObject({ ended: "handed_back", navigatingUntil: NOW + 60_000, until: NOW + 60_000 });
+        // Loaded: the lease ends now, and the agent's next action hears of the hand back.
+        const loaded = await session();
+
+        expect(loaded.control).toEqual({ by: OWNER, ended: "handed_back", since: NOW, until: NOW });
     });
 });

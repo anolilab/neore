@@ -26,14 +26,37 @@ export const LIVE_VIEW_CONNECT_DEADLINE_MS = 60_000;
 /** The only origin a live view URL may point at. Anything else from the provider is refused, never framed. */
 export const LIVE_VIEW_ORIGIN = "https://live.browser.run";
 
-type SessionRow = Pick<Doc<"browserSessions">, "inUseHolds" | "lastActivityAt" | "providerSessionId" | "source" | "status">;
+/**
+ * How long a person keeps control of the browser with no input the card can see. The card warns
+ * {@link CONTROL_WARNING_MS} before, with a button to keep control; then the agent may act again.
+ */
+export const CONTROL_IDLE_MS = 120_000;
+
+/** The warning before an idle hand back: long enough to read it and press "Keep control" (WCAG 2.2.1 asks for 20 s). */
+export const CONTROL_WARNING_MS = 30_000;
+
+type SessionRow = Pick<Doc<"browserSessions">, "control" | "inUseHolds" | "lastActivityAt" | "providerSessionId" | "source" | "status">;
+
+/** Who drives the browser: `person` (the lease is ahead), `returned` (it ended, the agent was not told yet), or `agent`. */
+export const controlStateOf = (session: Pick<SessionRow, "control">, now: number): "agent" | "person" | "returned" => {
+    if (session.control === undefined) {
+        return "agent";
+    }
+
+    return session.control.until > now ? "person" : "returned";
+};
 
 /**
  * Until when the browser is certainly still there: one idle window after its last action (less the margin), or, while an action is in
- * flight, until the latest deadline of those actions (the provider does not reap a browser a renderer call is connected to).
+ * flight, until the latest deadline of those actions (the provider does not reap a browser a renderer call is connected to). A
+ * person's control keeps it too: their live view stays connected to it.
  */
-export const browserAliveUntil = (session: Pick<SessionRow, "inUseHolds" | "lastActivityAt">): number =>
-    Math.max(session.lastActivityAt + BROWSER_IDLE_REAP_MS - BROWSER_REAP_MARGIN_MS, ...(session.inUseHolds ?? []));
+export const browserAliveUntil = (session: Pick<SessionRow, "control" | "inUseHolds" | "lastActivityAt">): number =>
+    Math.max(
+        session.lastActivityAt + BROWSER_IDLE_REAP_MS - BROWSER_REAP_MARGIN_MS,
+        ...(session.inUseHolds ?? []),
+        ...(session.control === undefined ? [] : [session.control.until]),
+    );
 
 /** The provider session id a person can watch, or `undefined`: closed, idle past the reap, the extension, or none. */
 export const watchableSessionId = (session: SessionRow | null | undefined, now: number): string | undefined => {
@@ -50,11 +73,15 @@ export const watchableSessionId = (session: SessionRow | null | undefined, now: 
     return id === undefined || ["", NO_PROVIDER_SESSION].includes(id) ? undefined : id;
 };
 
-/** The request that mints a read-only view of the session's first page. */
-export const liveViewRequest = (accountId: string, apiToken: string, providerSessionId: string): { init: RequestInit; url: string } => {
+/** The request that mints a view of the session's first page: read-only, or `interactive` for the person in control. */
+export const liveViewRequest = (accountId: string, apiToken: string, providerSessionId: string, interactive = false): { init: RequestInit; url: string } => {
     return {
         init: {
-            body: JSON.stringify({ expiresInMs: LIVE_VIEW_CONNECT_DEADLINE_MS, guardrails: { mode: "readonly" }, mode: "tab" }),
+            body: JSON.stringify({
+                expiresInMs: LIVE_VIEW_CONNECT_DEADLINE_MS,
+                ...(!interactive && { guardrails: { mode: "readonly" } }),
+                mode: "tab",
+            }),
             headers: { Authorization: `Bearer ${apiToken}`, "Content-Type": "application/json" },
             method: "POST",
         },

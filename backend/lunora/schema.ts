@@ -422,6 +422,21 @@ export const schema = defineSchema({
     browserSessions: defineTable({
         completedAt: v.optional(v.number()),
         connectUrl: v.optional(v.string()),
+        /**
+         * A person drives the browser (`browser/live-view.ts#takeControl`): the agent's actions are refused while
+         * `until` is ahead. Kept after it ends, until the agent's next action reads it and is told the person drove.
+         * `ended`: how the person gave it back; absent once `until` passed is the idle timeout.
+         */
+        control: v.optional(
+            v.object({
+                by: v.string(),
+                ended: v.optional(v.union(v.literal("handed_back"), v.literal("left"))),
+                /** A page the person asked for loads until then: the lease lasts at least as long. */
+                navigatingUntil: v.optional(v.number()),
+                since: v.number(),
+                until: v.number(),
+            }),
+        ),
         currentUrl: v.optional(v.string()),
         /** When the action that wrote `currentUrl` started, so an older action finishing later does not overwrite it. */
         currentUrlStartedAt: v.optional(v.number()),

@@ -8,10 +8,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../../test/registered-api";
 import schema from "../../schema";
-import { BROWSER_IDLE_REAP_MS, BROWSER_REAP_MARGIN_MS, browserAliveUntil, watchableSessionId } from "../../browser/live-view-logic";
+import { BROWSER_IDLE_REAP_MS, BROWSER_REAP_MARGIN_MS, browserAliveUntil, CONTROL_IDLE_MS, watchableSessionId } from "../../browser/live-view-logic";
 import { logAction } from "../../browser/functions";
 import { FETCH_TIMEOUT_LONG_MS } from "../../lib/fetch-timeout";
-import { executeBrowserAction } from "./browser-node";
+import { BROWSER_CLOSED_DURING_ACTION, executeBrowserAction, PERSON_HAS_CONTROL } from "./browser-node";
 
 const { registry, renderer } = vi.hoisted(() => {
     return { registry: new Map<string, unknown>(), renderer: vi.fn() };
@@ -39,6 +39,7 @@ const REPLACED_NOTE_FOR_A = /at the same time.*https:\/\/example\.com\/a.*screen
 const NOW = Date.UTC(2026, 10, 20, 12);
 
 interface SessionRow {
+    control?: { by: string; ended?: "handed_back" | "left"; since: number; until: number };
     currentUrl?: string;
     inUseHolds?: number[];
     lastActivityAt: number;
@@ -368,5 +369,107 @@ describe("a browser action after the provider reaped the browser", () => {
         expect(after).toMatchObject({ providerSessionId: "s-2" });
         expect(after.currentUrl).toBeUndefined();
         expect(watchableSessionId(after, NOW)).toBe("s-2");
+    });
+});
+
+describe("a browser a person took control of", () => {
+    const giveControl = async (control: Record<string, unknown>): Promise<void> => {
+        await harness.run(async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { control: { by: OWNER, since: NOW - 1000, ...control } }));
+    };
+
+    it("refuses the agent's action while the person drives it, and never reaches the renderer", async () => {
+        await addSession(NOW - 1000);
+        await giveControl({ until: NOW + CONTROL_IDLE_MS });
+
+        await expect(act("click")).resolves.toEqual({ error: PERSON_HAS_CONTROL, success: false });
+        expect(renderer).not.toHaveBeenCalled();
+        const after = await row();
+
+        expect(after.inUseHolds).toBeUndefined();
+    });
+
+    it.each([
+        ["handed_back", "handed it back"],
+        ["left", "left the live view"],
+        [undefined, "stopped using it"],
+    ])("after it ended (%s), looks at the page instead of acting, and says on which page it is", async (ended, reason) => {
+        await addSession(NOW - 1000);
+        await giveControl({ ended, until: NOW - 1 });
+        renderer.mockResolvedValueOnce(
+            answered({ screenshot: "png", screenshotFormat: "png", sessionId: "s-1", success: true, url: "https://example.com/person" }),
+        );
+
+        const result = (await act("click")) as Record<string, unknown>;
+
+        // The planned click is not run: a screenshot of the page the person left comes back in its place.
+        expect(renderer.mock.calls[0]?.[0]).toMatchObject({ body: { action: "screenshot", sessionId: "s-1" } });
+        expect(result).toMatchObject({ screenshot: "png", success: false, url: "https://example.com/person" });
+        expect(result.error).toContain(reason);
+        expect(result.error).toContain("The browser is now on https://example.com/person.");
+        expect(result.error).toContain("Your click action was not run");
+
+        // Told once: the next action runs as asked.
+        const after = await row();
+
+        expect(after.control).toBeUndefined();
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-1", success: true, url: "https://example.com/next" }));
+        await expect(act("click")).resolves.toEqual({ sessionId: "s-1", success: true, url: "https://example.com/next" });
+    });
+
+    it("runs a look at the page as asked after a hand back, with the note", async () => {
+        await addSession(NOW - 1000);
+        await giveControl({ ended: "handed_back", until: NOW - 1 });
+        renderer.mockResolvedValueOnce(answered({ content: "text", sessionId: "s-1", success: true, url: "https://example.com/person" }));
+
+        const result = (await act("extract")) as Record<string, unknown>;
+
+        expect(renderer.mock.calls[0]?.[0]).toMatchObject({ body: { action: "extract" } });
+        expect(result).toMatchObject({ content: "text", success: true });
+        expect(result.error).toContain("Look at this result again before you act.");
+    });
+});
+
+describe("a browser session closed while an action ran", () => {
+    it("still tells the agent of a hand back when the action's result is discarded", async () => {
+        await addSession(NOW - 1000);
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.patch("browserSessions", sessionId, { control: { by: OWNER, ended: "handed_back", since: NOW - 5000, until: NOW - 1 } }),
+        );
+        renderer.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { status: "terminated" }));
+
+            return answered({ sessionId: "s-1", success: true, url: "https://example.com/old" });
+        });
+
+        const result = (await act("screenshot")) as { error: string; success: boolean };
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("The person had control of the browser and handed it back");
+        expect(result.error).toContain(BROWSER_CLOSED_DURING_ACTION);
+    });
+
+    it("never hands the old action's result to the agent once a new action opened a fresh browser", async () => {
+        await addSession(NOW - 1000);
+        const older = pendingAnswer();
+        const olderRun = act("click");
+
+        await older.reached;
+        // The person closes the session; the next action opens a fresh browser on a new row.
+        await harness.run(async (ctx: any) => await ctx.db.patch("browserSessions", sessionId, { status: "terminated" }));
+        const closedId = sessionId;
+
+        renderer.mockResolvedValueOnce(answered({ sessionId: "s-2", success: true, url: "https://example.com/fresh" }));
+        await expect(act()).resolves.toMatchObject({ sessionId: "s-2", success: true });
+
+        older.release(answered({ content: "secret of the old page", sessionId: "s-1", success: true, url: "https://example.com/old" }));
+
+        await expect(olderRun).resolves.toEqual({ error: BROWSER_CLOSED_DURING_ACTION, success: false });
+
+        const rows = (await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").collect())) as (SessionRow & { _id: string })[];
+        const fresh = rows.find((candidate) => candidate._id !== closedId);
+
+        expect(fresh).toMatchObject({ currentUrl: "https://example.com/fresh", providerSessionId: "s-2", status: "active" });
+        expect(rows.find((candidate) => candidate._id === closedId)).toMatchObject({ currentUrl: "https://example.com/before", status: "terminated" });
     });
 });

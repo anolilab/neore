@@ -13,7 +13,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import { internalAction } from "../../_generated/server";
-import { NO_PROVIDER_SESSION, watchableSessionId } from "../../browser/live-view-logic";
+import { NO_PROVIDER_SESSION } from "../../browser/live-view-logic";
 import { FETCH_TIMEOUT_LONG_MS } from "../../lib/fetch-timeout";
 import { isServiceBound, serviceFetch } from "../../lib/services";
 import { validateDomain } from "./utilities";
@@ -66,6 +66,8 @@ export const executeBrowserAction = internalAction
             const startTime = Date.now();
             // The session this action holds while it runs, and its hold's deadline; released if the action fails.
             let held: { sessionId: Id<"browserSessions">; until: number } | undefined;
+            // A person's hand back this action is the first to hear of; the note reaches the agent even if the action fails.
+            let returned: BrowserReturn | undefined;
 
             try {
                 // Check for existing CF session to enable multi-step workflows
@@ -76,23 +78,37 @@ export const executeBrowserAction = internalAction
 
                 // A browser still alive is in use from here on, not only once the action returns: a slow action must not
                 // read as idle. A reaped one is not held: its old page must not come back while the renderer replaces it.
-                if (sessionDocument && watchableSessionId(sessionDocument, Date.now()) !== undefined) {
-                    held = { sessionId: sessionDocument._id, until: Date.now() + FETCH_TIMEOUT_LONG_MS };
-                    await ctx.runMutation(internal.browser.functions.beginSessionUse, held);
+                // The same write refuses the action while a person drives the browser, and tells of a hand back once.
+
+                if (sessionDocument) {
+                    const until = Date.now() + FETCH_TIMEOUT_LONG_MS;
+                    const use = await ctx.runMutation(internal.browser.functions.beginSessionUse, { sessionId: sessionDocument._id, until });
+
+                    if (use.controlled) {
+                        return { error: PERSON_HAS_CONTROL, success: false };
+                    }
+
+                    held = use.held ? { sessionId: sessionDocument._id, until } : undefined;
+                    returned = use.returned;
                 }
+
+                // After a hand back the page is not the one the agent planned against: it looks before it acts.
+                const looksFirst = returned !== undefined && action !== "screenshot" && action !== "extract";
 
                 const client = createBrowserRendererClient({ fetch: serviceFetch(ctx, "browserRenderer") });
 
                 const { data, error, response } = await browserAction({
-                    body: {
-                        action,
-                        direction: args.direction as "up" | "down" | undefined,
-                        fullPage: args.fullPage,
-                        selector: args.selector,
-                        sessionId: cfSessionId,
-                        text: args.text,
-                        url: args.url,
-                    },
+                    body: looksFirst
+                        ? { action: "screenshot", sessionId: cfSessionId }
+                        : {
+                              action,
+                              direction: args.direction as "up" | "down" | undefined,
+                              fullPage: args.fullPage,
+                              selector: args.selector,
+                              sessionId: cfSessionId,
+                              text: args.text,
+                              url: args.url,
+                          },
                     client,
                     signal: AbortSignal.timeout(FETCH_TIMEOUT_LONG_MS),
                 });
@@ -122,7 +138,7 @@ export const executeBrowserAction = internalAction
 
                 // One write: a replaced browser's id, the page this action left it on, the activity stamp, this action's hold's end.
                 const logged = await ctx.runMutation(internal.browser.functions.logAction, {
-                    action,
+                    action: looksFirst ? "screenshot" : action,
                     currentUrl: result.url,
                     durationMs,
                     errorMessage: result.error,
@@ -132,27 +148,33 @@ export const executeBrowserAction = internalAction
                     startedAt: startTime,
                     startedWithProviderSessionId,
                     success: result.success ?? false,
-                    target: args.url ?? args.selector,
-                    value: args.text,
+                    target: looksFirst ? undefined : (args.url ?? args.selector),
+                    value: looksFirst ? undefined : args.text,
                 });
 
                 // Another action at the same time left the thread on another browser: this result's page, content and
                 // screenshot are of a browser the next step will not use, so none of it reaches the model.
-                if (logged.replaced) {
-                    return browserReplacedResult(logged.currentUrl);
+                if (logged.closed === true || logged.replaced) {
+                    const discarded =
+                        logged.closed === true ? { error: BROWSER_CLOSED_DURING_ACTION, success: false } : browserReplacedResult(logged.currentUrl);
+
+                    return returned === undefined ? discarded : handedBackResult(discarded, returned);
                 }
 
-                return result;
+                if (returned === undefined) {
+                    return result;
+                }
+
+                return handedBackResult(result, returned, looksFirst ? action : undefined);
             } catch (error) {
                 if (held !== undefined) {
                     // Whether the browser survived is unknown: the row falls back to its last confirmed activity.
                     await ctx.runMutation(internal.browser.functions.endSessionUse, held).catch(() => undefined);
                 }
 
-                return {
-                    error: `CF Browser Rendering error: ${sanitizeBrowserError(error)}`,
-                    success: false,
-                };
+                const failed = { error: `CF Browser Rendering error: ${sanitizeBrowserError(error)}`, success: false };
+
+                return returned === undefined ? failed : handedBackResult(failed, returned);
             }
         }
 
@@ -169,6 +191,37 @@ export const executeBrowserAction = internalAction
             success: false,
         };
     });
+
+type BrowserReturn = "handed_back" | "idle" | "left";
+
+/** What the agent hears while a person drives the browser from the live view: it never acts beside their input. */
+export const PERSON_HAS_CONTROL =
+    "The person watching this chat has taken control of the browser and is using it now, so this action was not run. Do not use the browser until they hand it back: tell them what you are waiting for, or ask them, and try again later.";
+
+/** The session was closed while the action ran: a later action starts from a new, empty browser. */
+export const BROWSER_CLOSED_DURING_ACTION =
+    "The browser session was closed while this action ran, so its result was discarded: it is not about the browser the next action will use. That browser starts empty: navigate to the page you need first.";
+
+const RETURN_REASON: Record<BrowserReturn, string> = {
+    handed_back: "handed it back",
+    idle: "stopped using it, so control returned to you",
+    left: "left the live view, so control returned to you",
+};
+
+/**
+ * The first action after a person drove the browser: the result says so, and names the page the browser is on now. An
+ * action that would change the page (`skipped`) was not run; a screenshot of the page came back in its place.
+ */
+const handedBackResult = <T extends { error?: string; success?: boolean; url?: string }>(result: T, returned: BrowserReturn, skipped?: string): T => {
+    const page = result.url === undefined ? "The current page is unknown." : `The browser is now on ${result.url}.`;
+    const note = `The person had control of the browser and ${RETURN_REASON[returned]}; the page may have changed. ${page} ${
+        skipped === undefined
+            ? "Look at this result again before you act."
+            : `Your ${skipped} action was not run: this is a screenshot of the page instead. Look at it, then decide what to do.`
+    }`;
+
+    return { ...result, error: result.error === undefined ? note : `${note} ${result.error}`, ...(skipped !== undefined && { success: false }) };
+};
 
 /** What the agent hears from an action whose browser another, concurrent action replaced: look again, on the kept browser. */
 const browserReplacedResult = (keptUrl: string | undefined): { error: string; success: false; url?: string } => {
