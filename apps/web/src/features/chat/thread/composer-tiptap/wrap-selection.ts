@@ -36,6 +36,13 @@ const trailingBackslashes = (text: string): number => {
     return count;
 };
 
+/**
+ * Whether the delimiter character is right beside the wrap, where it would join the new delimiter's run. One before the
+ * opener that an odd run of backslashes escapes is literal and joins nothing.
+ */
+const joinsRun = (beforeOpen: string, openBefore: string, closeAfter: string, delimiter: string): boolean =>
+    closeAfter === delimiter || (openBefore === delimiter && trailingBackslashes(beforeOpen.slice(0, -openBefore.length)) % 2 === 0);
+
 /** Whether an odd run of backslashes before the opener would escape it, or a backtick beside a code wrap would join its fence. */
 const collidesWithMarkup = (beforeOpen: string, typed: string, openBefore: string, closeAfter: string): boolean =>
     trailingBackslashes(beforeOpen) % 2 === 1 || (typed === "`" && (openBefore === "`" || closeAfter === "`"));
@@ -210,7 +217,7 @@ const planWrap = (state: EditorState, from: number, to: number, typed: string): 
     // A copy of the delimiter character right beside the wrap joins its run, and CommonMark then pairs the wrong runs.
     const delimiter = wrap.open.charAt(0);
 
-    if (typed !== "`" && (openBefore === delimiter || closeAfter === delimiter)) {
+    if (typed !== "`" && joinsRun(beforeOpen, openBefore, closeAfter, delimiter)) {
         return REFUSED;
     }
 

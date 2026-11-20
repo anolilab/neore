@@ -11,6 +11,10 @@ import { WrapSelection, wrapSelection, wrapSelectionOnTextInput } from "./wrap-s
 
 const editors: Editor[] = [];
 
+const BACKSLASH = "\\";
+
+const BACKTICK = "`";
+
 const editorWith = (content: string): Editor => {
     const editor = new Editor({ content, coreExtensionOptions: composerCoreExtensionOptions, extensions: [StarterKitExtension] });
 
@@ -594,6 +598,55 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         wrapSelectionOnTextInput(editor.view, 7, 8, "*");
 
         expect(text(editor)).toBe("[a](b **c**) d");
+    });
+
+    it("avoids the fence length of a backtick after two backslashes, which is not escaped", () => {
+        const editor = editorWith("<p>a &#92;&#92;`b foo</p>");
+
+        select(editor, 8, 11);
+        wrapSelectionOnTextInput(editor.view, 8, 11, "`");
+
+        expect(text(editor)).toBe(`a ${BACKSLASH}${BACKSLASH}${BACKTICK}b ${BACKTICK.repeat(2)}foo${BACKTICK.repeat(2)}`);
+    });
+
+    it("keeps a backslash before a closing backtick inside the code span, as CommonMark does", () => {
+        const editor = editorWith("<p>x `a*&#92;` y</p>");
+
+        select(editor, 3, 8);
+        wrapSelectionOnTextInput(editor.view, 3, 8, "*");
+
+        expect(text(editor)).toBe(`x **${BACKTICK}a*${BACKSLASH}${BACKTICK}** y`);
+    });
+
+    it("leaves a shortcut reference's text alone, which is its identifier", () => {
+        const editor = editorWith("<p>see [docs] now</p><p></p><p>[docs]: https://example.com</p>");
+        const before = text(editor);
+
+        select(editor, 6, 10);
+
+        expect(selectedText(editor)).toBe("docs");
+        expect(wrapSelectionOnTextInput(editor.view, 6, 10, "*")).toBe(true);
+        expect(text(editor)).toBe(before);
+    });
+
+    it("leaves a whole reference definition alone, which wrapping would unlink", () => {
+        const editor = editorWith("<p>[docs] x</p><p></p><p>[docs]: https://example.com</p>");
+        const before = text(editor);
+
+        select(editor, 13, 40);
+
+        expect(selectedText(editor)).toBe("[docs]: https://example.com");
+        expect(wrapSelectionOnTextInput(editor.view, 13, 40, "*")).toBe(true);
+        expect(text(editor)).toBe(before);
+    });
+
+    it("wraps beside an escaped star, which does not join the new delimiter run", () => {
+        const editor = editorWith("<p>a&#92;*foo b</p>");
+
+        select(editor, 4, 7);
+        wrapSelectionOnTextInput(editor.view, 4, 7, "*");
+
+        expect(text(editor)).toBe(String.raw`a\***foo** b`);
     });
 
     it("wraps literal ](url) text that has no link label before it", () => {

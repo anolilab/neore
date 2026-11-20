@@ -6,6 +6,7 @@ import { unified } from "unified";
 interface MarkdownNode {
     children?: MarkdownNode[];
     position?: { end: { offset?: number }; start: { offset?: number } };
+    referenceType?: string;
     type: string;
 }
 
@@ -15,6 +16,8 @@ interface MarkdownNode {
  */
 interface Construct {
     code: boolean;
+    /** Whether a wrap may hold the whole construct. A definition may not: delimiters before it end its syntax. */
+    holdable: boolean;
     inner?: [number, number];
     range: [number, number];
 }
@@ -131,7 +134,10 @@ const rangeOf = (node: MarkdownNode): [number, number] | undefined => {
  * URL, and an image's alt text is not formatted, so neither has a part a wrap may sit inside.
  */
 const labelOf = (node: MarkdownNode, range: [number, number], text: string): [number, number] | undefined => {
-    if ((node.type !== "link" && node.type !== "linkReference") || text[range[0]] !== "[") {
+    // A shortcut or collapsed reference (`[docs]`, `[docs][]`) uses its text as the identifier, so a wrap there unlinks it.
+    const fullReference = node.type === "linkReference" && node.referenceType === "full";
+
+    if (text[range[0]] !== "[" || (!fullReference && node.type !== "link")) {
         return undefined;
     }
 
@@ -147,7 +153,7 @@ const collect = (node: MarkdownNode, text: string, constructs: Construct[]): voi
     const range = rangeOf(node);
 
     if (range !== undefined && (LINK_TYPES.has(node.type) || CODE_TYPES.has(node.type))) {
-        constructs.push({ code: CODE_TYPES.has(node.type), inner: labelOf(node, range, text), range });
+        constructs.push({ code: CODE_TYPES.has(node.type), holdable: node.type !== "definition", inner: labelOf(node, range, text), range });
     }
 
     const children = node.children ?? [];
@@ -204,7 +210,7 @@ const breaks = (construct: Construct, from: number, to: number): boolean => {
     }
 
     const overlaps = from < end && to > start;
-    const holdsAll = from <= start && to >= end;
+    const holdsAll = construct.holdable && from <= start && to >= end;
     const insideLabel = construct.inner !== undefined && from >= construct.inner[0] && to <= construct.inner[1];
 
     return overlaps && !holdsAll && !insideLabel;
