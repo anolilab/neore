@@ -958,6 +958,39 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor)).toBe(before);
     });
 
+    it("leaves part of bold text alone when bolding it, as the new delimiters would pair with the old", () => {
+        const editor = editorWith("<p>**hello world**</p>");
+
+        select(editor, 4, 8);
+
+        expect(selectedText(editor)).toBe("ello");
+        expect(wrapSelectionOnTextInput(editor.view, 4, 8, "*")).toBe(true);
+        expect(text(editor)).toBe("**hello world**");
+    });
+
+    it("leaves a selection across the edge of bold text alone", () => {
+        const editor = editorWith("<p>**hello** world</p>");
+
+        select(editor, 6, 14);
+
+        expect(wrapSelectionOnTextInput(editor.view, 6, 14, "_")).toBe(true);
+        expect(text(editor)).toBe("**hello** world");
+    });
+
+    it.each([
+        ["text after bold text", "<p>**hello** world</p>", 11, 16, "*", "**hello** **world**"],
+        ["a word in italic text with an underscore, which nests", "<p>*hello world*</p>", 8, 13, "_", "*hello _world_*"],
+        ["a www. address inside a word, which GFM does not link", "<p>mywww.example.com</p>", 7, 14, "*", "mywww.**example**.com"],
+        ["an http address right after a letter, which GFM does not link", "<p>xhttps://e.com</p>", 10, 11, "*", "xhttps://**e**.com"],
+    ])("wraps %s", (_name, content, from, to, typed, expected) => {
+        const editor = editorWith(content);
+
+        select(editor, from, to);
+        wrapSelectionOnTextInput(editor.view, from, to, typed);
+
+        expect(text(editor)).toBe(expected);
+    });
+
     it("wraps literal ](url) text that has no link label before it", () => {
         const editor = editorWith("<p>literal ](url) text</p>");
 

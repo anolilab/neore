@@ -445,6 +445,32 @@ const CHARACTER_REFERENCE = /&(?:#\d{1,7}|#x[\da-f]{1,6}|[a-z][\da-z]{1,31});/gi
 /** A bare web address, which the GFM message renderer links although GFM is not parsed here. */
 const BARE_WEB_ADDRESS = /(?:https?:\/\/|www\.)[^\s<]+/gi;
 
+const WHITESPACE_CHARACTER = /\s/u;
+
+/** What may stand right before a GFM `www.` address: the line start, a space, or one of `*`, `_`, `~`, `(`. */
+const ADDRESS_LEAD: ReadonlySet<string> = new Set(["(", "*", "_", "~"]);
+
+/** An ASCII letter: an `http(s)://` address right after one is part of a word, which GFM does not link. */
+const ASCII_LETTER = /[a-z]/i;
+
+/**
+ * The bare web addresses in `text` that GFM links, by its rules for what may come before one: a `www.` address needs the
+ * line start, a space or one of `*`, `_`, `~`, `(` (`mywww.example.com` is text), and an `http(s)://` one only needs no
+ * ASCII letter (`xhttps://` is text, `\<https://` is a link).
+ */
+const webAddresses = (text: string): [number, number][] =>
+    [...text.matchAll(BARE_WEB_ADDRESS)]
+        .filter((match) => {
+            const before = text[match.index - 1] ?? "";
+
+            if (!match[0].toLowerCase().startsWith("www.")) {
+                return !ASCII_LETTER.test(before);
+            }
+
+            return before === "" || WHITESPACE_CHARACTER.test(before) || ADDRESS_LEAD.has(before);
+        })
+        .map((match): [number, number] => [match.index, match.index + match[0].length]);
+
 /** A character of an email address before its `@`, and one after it. */
 const EMAIL_LOCAL = /[\w.+-]/;
 
@@ -482,22 +508,20 @@ const TRAILING_PUNCTUATION: ReadonlySet<string> = new Set(["!", '"', "'", ")", "
 
 /** The bare links in `text`, as constructs a wrap may hold whole but not split. */
 const bareLinks = (text: string): Construct[] =>
-    [...[...text.matchAll(BARE_WEB_ADDRESS)].map((match): [number, number] => [match.index, match.index + match[0].length]), ...bareEmails(text)].map(
-        ([start, matchEnd]) => {
-            const address = text.slice(start, matchEnd);
-            // GFM keeps a closing parenthesis that a `(` inside the address balances (`.../Foo_(bar)`): the counts are
-            // taken once, and each trimmed `)` lowers its own.
-            let unbalanced = address.split(")").length - address.split("(").length;
-            let end = matchEnd;
+    [...webAddresses(text), ...bareEmails(text)].map(([start, matchEnd]) => {
+        const address = text.slice(start, matchEnd);
+        // GFM keeps a closing parenthesis that a `(` inside the address balances (`.../Foo_(bar)`): the counts are
+        // taken once, and each trimmed `)` lowers its own.
+        let unbalanced = address.split(")").length - address.split("(").length;
+        let end = matchEnd;
 
-            while (end > start && TRAILING_PUNCTUATION.has(text[end - 1] ?? "") && (text[end - 1] !== ")" || unbalanced > 0)) {
-                unbalanced -= text[end - 1] === ")" ? 1 : 0;
-                end -= 1;
-            }
+        while (end > start && TRAILING_PUNCTUATION.has(text[end - 1] ?? "") && (text[end - 1] !== ")" || unbalanced > 0)) {
+            unbalanced -= text[end - 1] === ")" ? 1 : 0;
+            end -= 1;
+        }
 
-            return { code: false, holdable: true, range: [start, end] };
-        },
-    );
+        return { code: false, holdable: true, range: [start, end] };
+    });
 
 /**
  * The bare links that start outside every parsed construct. An address that starts inside a link (its label or its
@@ -608,3 +632,59 @@ export const markupAround = (
         takenFences: new Set(unmatched.filter((run) => run.start < draftFrom).map((run) => run.length)),
     };
 };
+
+/** The longest line parsed for emphasis: emphasis parsing is quadratic on some pastes, so a longer line is not checked. */
+const MAX_EMPHASIS_LINE = 2000;
+
+const emphasisParser = unified().use(remarkParse);
+
+/** An emphasis or strong span in a textblock: its whole range, its content, and its delimiter character. */
+interface EmphasisSpan {
+    character: string;
+    inner: [number, number];
+    range: [number, number];
+}
+
+/**
+ * The emphasis and strong spans of a textblock's text (`paragraph`, indexed by parent offsets). The main parse turns
+ * emphasis off for speed, so this one parses only the selection's own textblock, up to `MAX_EMPHASIS_LINE` characters.
+ */
+const emphasisSpans = (paragraph: string): EmphasisSpan[] => {
+    if (paragraph.length > MAX_EMPHASIS_LINE) {
+        return [];
+    }
+
+    const spans: EmphasisSpan[] = [];
+    const pending: MarkdownNode[] = [emphasisParser.parse(paragraph) as MarkdownNode];
+    let node = pending.pop();
+
+    while (node !== undefined) {
+        const range = rangeOf(node);
+        const first = node.children?.[0];
+        const last = node.children?.at(-1);
+        const inner = first && last ? [rangeOf(first)?.[0], rangeOf(last)?.[1]] : undefined;
+
+        if ((node.type === "emphasis" || node.type === "strong") && range !== undefined && inner?.[0] !== undefined && inner[1] !== undefined) {
+            spans.push({ character: paragraph[range[0]] ?? "", inner: [inner[0], inner[1]], range });
+        }
+
+        pending.push(...(node.children ?? []));
+        node = pending.pop();
+    }
+
+    return spans;
+};
+
+/**
+ * Whether an emphasis wrap of `from`..`to` with `delimiter` would break existing emphasis in the textblock: the new
+ * delimiters would cross one of its edges, or sit inside one made with the same character, where they would pair with
+ * its delimiters (`**h**ello** world**`).
+ */
+export const breaksEmphasis = (paragraph: string, from: number, to: number, delimiter: string): boolean =>
+    emphasisSpans(paragraph).some(({ character, inner, range }) => {
+        const overlaps = from < range[1] && to > range[0];
+        const holdsAll = from <= range[0] && to >= range[1];
+        const inside = from >= inner[0] && to <= inner[1];
+
+        return overlaps && !holdsAll && (!inside || character === delimiter);
+    });

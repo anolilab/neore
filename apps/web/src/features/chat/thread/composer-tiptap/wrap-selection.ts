@@ -3,7 +3,7 @@ import type { EditorState, Transaction } from "@tiptap/pm/state";
 import { Plugin, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 
-import { markupAround, scanBackticks } from "./wrap-markup";
+import { breaksEmphasis, markupAround, scanBackticks } from "./wrap-markup";
 
 type Marker = "`" | "*" | "_";
 
@@ -223,7 +223,10 @@ const planWrap = (state: EditorState, from: number, to: number, typed: string): 
     // A copy of the delimiter character right beside the wrap joins its run, and CommonMark then pairs the wrong runs.
     const delimiter = wrap.open.charAt(0);
 
-    if (typed !== "`" && joinsRun(beforeOpen, openBefore, closeAfter, delimiter)) {
+    if (
+        typed !== "`" &&
+        (joinsRun(beforeOpen, openBefore, closeAfter, delimiter) || breaksEmphasis(markup.paragraph, $from.parentOffset, $to.parentOffset, delimiter))
+    ) {
         return REFUSED;
     }
 
