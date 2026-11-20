@@ -70,8 +70,10 @@ import { servesUser } from "../../lib/shard-context";
 import { runAfterOnShard } from "../../lib/shard-scheduler";
 import { shouldNoteBriefActivity } from "../../notifications/daily-brief-logic";
 import { buildKnowledgeCitations, type KnowledgeSource } from "../../knowledge/citations";
+import { EXTRACTION_USER_MESSAGE_CHARS } from "../../memory/gate";
 import type { ReplySkill } from "../../usage/activity-logic";
 import { type DispatchOrigin, stopWhenRequested } from "../../sub-agents/logic";
+import { localDayOf, resolveTimeZone } from "../../memory/reflection-logic";
 import { writeLoopStopNotice } from "../loop-stop";
 import { type LoopFinding, type RepeatedCallGuard, repeatedCallGuard } from "./repeated-call-guard";
 
@@ -360,6 +362,8 @@ const MIN_MEMORY_SEARCH_WORDS = 3;
 // Japanese sentence (no spaces) as one word, so such a prompt never reached memory search.
 const WORD_SEGMENTER = new Intl.Segmenter(undefined, { granularity: "word" });
 const MEMORY_RETRIEVAL_CACHE_TTL_MS = 60_000;
+// How long a search may run between setting the cache lifetime and writing the result.
+const RETRIEVAL_SEARCH_MARGIN_MS = 30_000;
 
 /** Word-like segments of a prompt, by the locale's rules (see {@link WORD_SEGMENTER}). */
 export const countSearchWords = (text: string): number => {
@@ -374,12 +378,28 @@ export const countSearchWords = (text: string): number => {
     return count;
 };
 
+/** The cache lives for at most a minute, and never past the user's next local midnight: a fact that expires then must not be served. */
+const retrievalCacheTtl = (timeZone: string | null | undefined): number => {
+    const now = Date.now();
+    const day = localDayOf(now, timeZone);
+    let instant = now;
+
+    // Looks a margin past the full lifetime, so a midnight hours away leaves the whole minute.
+    while (instant - now < MEMORY_RETRIEVAL_CACHE_TTL_MS + RETRIEVAL_SEARCH_MARGIN_MS && localDayOf(instant, timeZone) === day) {
+        instant += 1000;
+    }
+
+    // The lifetime is set before the search runs and the result is written after it, so a search of up to 30 s can end past midnight.
+    return Math.max(0, Math.min(MEMORY_RETRIEVAL_CACHE_TTL_MS, instant - now - RETRIEVAL_SEARCH_MARGIN_MS));
+};
+
 /** The memory block for the system prompt, and which memories went into it. */
 const retrieveMemories = async (
     ctx: ActionCtx,
     userId: string,
     searchText: string,
     botId?: string,
+    timeZone?: string | null,
 ): Promise<{ context: string | undefined; refs: RetrievedMemoryRef[] }> => {
     // A prompt of two words or fewer ("thanks", "ok", "yes") has nothing to match
     // a memory against, so it skips the embedding and the vector search.
@@ -396,11 +416,16 @@ const retrieveMemories = async (
         // from a 60 s cache. A memory deleted in that minute can still reach one
         // reply, which is the cost of skipping the embedding call.
         const memories = servesUser(userId)
-            ? await new ActionCache<{ botId?: string; searchText: string; userId: string }, RetrievedMemory[]>(undefined, {
+            ? await new ActionCache<{ botId?: string; localDay?: string; searchText: string; userId: string }, RetrievedMemory[]>(undefined, {
                   action: internal.memory.retrieve.retrieveRelevantMemories,
                   name: "memory/retrieve",
-                  ttl: MEMORY_RETRIEVAL_CACHE_TTL_MS,
-              }).fetch(ctx, { botId, searchText: searchText.trim().toLowerCase(), userId })
+                  ttl: retrievalCacheTtl(timeZone),
+              }).fetch(ctx, {
+                  botId,
+                  localDay: timeZone === undefined ? undefined : localDayOf(Date.now(), timeZone),
+                  searchText: searchText.trim().toLowerCase(),
+                  userId,
+              })
             : await callOnShard(internal.memory.retrieve.retrieveRelevantMemories, { botId, searchText, userId }, { shardKey: userId });
 
         return {
@@ -416,8 +441,14 @@ const retrieveMemories = async (
     }
 };
 
-export const retrieveMemoryContext = async (ctx: ActionCtx, userId: string, searchText: string, botId?: string): Promise<string | undefined> => {
-    const { context } = await retrieveMemories(ctx, userId, searchText, botId);
+export const retrieveMemoryContext = async (
+    ctx: ActionCtx,
+    userId: string,
+    searchText: string,
+    botId?: string,
+    timeZone?: string | null,
+): Promise<string | undefined> => {
+    const { context } = await retrieveMemories(ctx, userId, searchText, botId, timeZone);
 
     return context;
 };
@@ -491,7 +522,7 @@ export const loadRunContext = async (
 
             const memoryBot = await botPromise;
 
-            return await retrieveMemories(ctx, userId, retrievalText, memoryBot?.botId);
+            return await retrieveMemories(ctx, userId, retrievalText, memoryBot?.botId, loaded.timezone);
         }),
         retrievalText ? retrieveKnowledgeContext(ctx, { ...(args.admittedRun && { admittedRun: true }), query: retrievalText, threadId, userId }) : undefined,
         threadSettingsPromise.then(async (settings) =>
@@ -594,6 +625,56 @@ const summariseToolResults = (savedMessages: ReadonlyArray<MessageDoc>): { summa
     return toolResults;
 };
 
+/** A message the user sent into a running reply, and when they sent it. */
+interface SteeredText {
+    /** The saved message row the steer was delivered in (`deliverSteers`); steers delivered together share it. */
+    messageId?: string;
+    /** When the user sent it (`steerRun`), not when the run took it. */
+    sentAt: number;
+    text: string;
+}
+
+/**
+ * Where each steer starts in the prompt-and-steers text extraction reads (joined a blank line apart, each as
+ * `texts` gives it: day label included), with when it was sent and the message it was saved in, so a memory quoting it
+ * links there.
+ */
+const steerOffsets = (
+    prompt: string,
+    steered: ReadonlyArray<SteeredText>,
+    texts: ReadonlyArray<string>,
+): { at: number; from: number; messageId?: string }[] => {
+    // An empty prompt (an approval continuation extracts only its steers) leaves no separator before the first steer.
+    let from = prompt.length > 0 ? prompt.length + 2 : 0;
+
+    return steered.map((part, index) => {
+        const offset = { at: part.sentAt, from, ...(part.messageId !== undefined && { messageId: part.messageId }) };
+
+        from += (texts[index] ?? part.text).length + 2;
+
+        return offset;
+    });
+};
+
+/**
+ * The steers as memory extraction reads them: one sent on another local day than `sinceAt` (the prompt's) starts with
+ * `[sent on YYYY-MM-DD]`, so "tomorrow" in it is read against its own day (`EXTRACTION_SYSTEM_PROMPT`).
+ */
+export const labelSentDays = (
+    texts: ReadonlyArray<string>,
+    sentAt: ReadonlyArray<number> | undefined,
+    sinceAt: number | undefined,
+    timeZone: string | undefined,
+): string[] => {
+    const since = sinceAt === undefined ? undefined : localDayOf(sinceAt, timeZone);
+
+    return texts.map((text, index) => {
+        const at = sentAt?.[index];
+        const day = at === undefined ? undefined : localDayOf(at, timeZone);
+
+        return day === undefined || since === undefined || day === since ? text : `[sent on ${day}] ${text}`;
+    });
+};
 /**
  * Bookkeeping after a streamed run: the reply's timing (awaited before this
  * returns, so the action does not end with it in flight), the memories its
@@ -602,6 +683,7 @@ const summariseToolResults = (savedMessages: ReadonlyArray<MessageDoc>): { summa
  * (`memory/reflection.ts`). Billing is not here; the LLM Gateway usage webhook
  * owns it.
  */
+
 export const afterRun = async (
     ctx: Pick<ActionCtx, "runMutation" | "scheduler">,
     args: {
@@ -612,6 +694,12 @@ export const afterRun = async (
         /** From `loadRunContext`; recorded on the reply's first row as citation sources. */
         knowledgeSources?: ReadonlyArray<KnowledgeSource>;
         prompt: string;
+        /** When the user sent the prompt (its row's `_creationTime`): "tomorrow" in it is read against that day, and a memory quoting it is dated by it. */
+        promptAt?: number;
+        /** The user's message row the prompt was saved as; a memory learned from it links there. */
+        promptMessageId?: string;
+        /** The part of the prompt the user typed (`typedTextOf`): the only text a memory's quote may come from. */
+        quotablePrompt?: string;
         /** `false` when the caller records the reply's usage itself (the watchdog's close does, inside its transaction). */
         recordUsage?: boolean;
         /** From `loadRunContext`; recorded on the reply's first row, the id its UI message carries. */
@@ -619,8 +707,11 @@ export const afterRun = async (
         savedMessages: ReadonlyArray<MessageDoc> | undefined;
         /** The skill that answered, for the usage page's per-skill breakdown; absent for the plain assistant. */
         skill?: ReplySkill;
-        /** What the user sent into the reply while it ran (`createRunSteering`); memory extraction reads it with the prompt. */
-        steeredTexts?: ReadonlyArray<string>;
+        /**
+         * What the user sent into the reply while it ran, each with when they sent it (`createRunSteering`): memory extraction
+         * reads it with the prompt, and "tomorrow" in one sent after midnight means the day after.
+         */
+        steered?: ReadonlyArray<SteeredText>;
         /**
          * The replying user's `threadSummariesEnabled`. Off (the default) schedules no summary job at all; the job
          * re-checks the thread owner's own setting, which is the one that decides.
@@ -668,7 +759,7 @@ export const afterRun = async (
 
 /** Schedules every post-run job and settles once each `runAfter` has; a rejected one is in the result, not thrown. */
 const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Parameters<typeof afterRun>[1]): Promise<PromiseSettledResult<unknown>[]> => {
-    const { prompt, savedMessages = [], steeredTexts = [], threadId, userId } = args;
+    const { prompt, savedMessages = [], steered = [], threadId, userId } = args;
     const scheduled: Promise<unknown>[] = [];
 
     const firstReplyRow = savedMessages.find((m) => m.message?.role !== "user");
@@ -729,7 +820,7 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
         });
     }
 
-    if (!args.extractMemory || !prompt) {
+    if (!args.extractMemory || (!prompt && steered.length === 0)) {
         return await Promise.allSettled(scheduled);
     }
 
@@ -754,16 +845,35 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
     }
 
     const toolResults = summariseToolResults(savedMessages);
+    // Each steer as extraction reads it: one sent on another day than the prompt carries that day (`labelSentDays`).
+    const steeredTexts = labelSentDays(
+        steered.map((part) => part.text),
+        steered.map((part) => part.sentAt),
+        args.promptAt ?? args.timingStart,
+        args.timeZone,
+    );
 
     scheduled.push(
         scheduleMemory(internal.memory.extract.extractMemories, {
             ...(args.botId && { botId: args.botId }),
             assistantResponse: assistantText.slice(0, 4000),
+            // When it was said, not when the reply ended or the job runs: a reply or a pause can cross midnight.
+            messageAt: args.promptAt ?? args.timingStart ?? Date.now(),
+            ...(args.promptAt !== undefined && { promptAt: args.promptAt }),
+            ...(args.promptMessageId && { promptMessageId: args.promptMessageId }),
+            // Extraction reads only the start of the prompt, so a quote comes from there; the cap keeps a long prompt from doubling the job's payload.
+            ...(args.quotablePrompt !== undefined && { quotablePrompt: args.quotablePrompt.slice(0, 2 * EXTRACTION_USER_MESSAGE_CHARS) }),
             threadId: threadId as Id<"threads">,
+            // The timezone the message was sent in, UTC when none is set: a change before the job runs does not move its dates.
+            timeZone: resolveTimeZone(args.timeZone),
             userId,
             // A steer can carry the very fact worth keeping ("actually, I'm vegetarian"); `steeredFrom` keeps it whole when a long prompt is cut.
-            userMessage: [prompt, ...steeredTexts].join("\n\n"),
-            ...(steeredTexts.length > 0 && { steeredFrom: prompt.length + 2 }),
+            userMessage: [...(prompt ? [prompt] : []), ...steeredTexts].join("\n\n"),
+            ...(steered.length > 0 && {
+                steeredAt: Math.max(...steered.map((part) => part.sentAt)),
+                steeredFrom: prompt.length > 0 ? prompt.length + 2 : 0,
+                steers: steerOffsets(prompt, steered, steeredTexts),
+            }),
             ...(toolResults.length > 0 && { toolResults: toolResults.slice(0, 10) }),
         }),
     );
@@ -854,11 +964,12 @@ export const memoryToCarry = (run: { botId?: string; extractMemory: boolean; pro
 export const createRunSteering = (
     ctx: Pick<ActionCtx, "runMutation">,
     run: { streamId: string; threadId: string; userId: string },
-): { steeredBefore: () => boolean; steeredTexts: () => string[]; takeSteer: TakeSteer } => {
+): { steered: () => SteeredText[]; steeredBefore: () => boolean; takeSteer: TakeSteer } => {
     let restartsDue = 0;
-    const texts: string[] = [];
+    const steered: SteeredText[] = [];
 
     return {
+        steered: () => [...steered],
         steeredBefore: () => {
             const due = restartsDue > 0;
 
@@ -868,7 +979,6 @@ export const createRunSteering = (
 
             return due;
         },
-        steeredTexts: () => [...texts],
         takeSteer: async ({ pendingMessageId }) => {
             try {
                 const delivered = await ctx.runMutation(internal.chat.steering.deliverSteers, {
@@ -880,7 +990,12 @@ export const createRunSteering = (
 
                 if (delivered) {
                     restartsDue += 1;
-                    texts.push(delivered.text);
+                    // One entry per steer the delivery joined, each with when the user sent it and the row it was saved in.
+                    steered.push(
+                        ...delivered.parts.map((part) => {
+                            return { ...part, messageId: delivered.messageId };
+                        }),
+                    );
                 }
 
                 return delivered;
@@ -1210,6 +1325,15 @@ export const resumeApprovedRun = async (
         throw new AgentRunError("left-organization", LEFT_ORGANIZATION_MESSAGE);
     }
 
+    // A sub-agent child is rebuilt under its chain's bot's mode, as it ran (`runHeadlessAgent`); a failed read fails closed.
+    const childBotMode = subAgentChild
+        ? await ctx.runQuery(internal.bots.functions.getBotPermissionModeForRun, { threadId, userId }).catch((error: unknown) => {
+              console.warn("[agent-run] bot permission mode unavailable, using supervised", error);
+
+              return "supervised" as const;
+          })
+        : null;
+
     const [toolResult, userProviderKeys, preferences] = await Promise.all([
         buildAgentTools(ctx, {
             ...(options.admittedRun && { admittedRun: true }),
@@ -1220,6 +1344,7 @@ export const resumeApprovedRun = async (
                 headless: true,
                 headlessCanAsk: true,
                 ...(config.headlessApproved && { headlessApproved: config.headlessApproved }),
+                ...(childBotMode && { unattendedMode: childBotMode }),
             }),
             mcpProgress: toolProgressSink(ctx, streamId),
             model: config.model,
@@ -1462,14 +1587,21 @@ export const resumeApprovedRun = async (
             const prefs = await ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
 
             // The run that paused extracted its own prompt and steers; this one extracts the steers it took.
-            const steered = steering?.steeredTexts() ?? [];
+            const steered = steering?.steered() ?? [];
 
             await afterRun(ctx, {
                 ...(config.memory?.botId && { botId: config.memory.botId }),
                 extractMemory: extractMemory && config.memory !== undefined && prefs.memoryEnabled,
                 firstTokenTime,
-                prompt: steered.join("\n\n"),
+                // No prompt here: the steers are what this run took. `quotablePrompt: ""` (not unset) lets a quote come from
+                // them: `factEvidence` reads a steer's text only once the turn names a quotable prompt. The first steer's
+                // send time stands for the prompt's, so relative dates in each steer still read against its own day:
+                // the first is never labelled, a later one sent on another day is (`labelSentDays`).
+                prompt: "",
+                ...(steered[0] && { promptAt: steered[0].sentAt }),
+                quotablePrompt: "",
                 savedMessages,
+                steered,
                 summarizeThread: prefs.threadSummariesEnabled,
                 threadId,
                 ...(prefs.timezone && { timeZone: prefs.timezone }),

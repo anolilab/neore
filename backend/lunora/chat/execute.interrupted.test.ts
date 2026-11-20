@@ -915,6 +915,36 @@ describe("a run the watchdog reads wrongly", () => {
         expect(afterRun).toHaveBeenCalledOnce();
     });
 
+    it("quotes nothing of a recovered prompt an outside agent wrote", async () => {
+        modelState.memory = true;
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+        const stream = await readStream();
+
+        await patchStream({ runArgs: { ...stream.runArgs, origin: "outside_agent" } });
+        await harness.action(async (ctx: any) => await ctx.runAction(watchRun, { streamId: ids.streamId as never }));
+
+        expect(afterRun).toHaveBeenCalledOnce();
+
+        const [, args] = vi.mocked(afterRun).mock.calls[0]!;
+
+        expect(args.quotablePrompt).toBeUndefined();
+        expect(args.promptMessageId).toBeUndefined();
+    });
+
+    it("quotes nothing of a recovered prompt someone else typed", async () => {
+        modelState.memory = true;
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids.messageId, { userId: "collaborator-1" }));
+        await harness.action(async (ctx: any) => await ctx.runAction(watchRun, { streamId: ids.streamId as never }));
+
+        expect(afterRun).toHaveBeenCalledOnce();
+
+        const [, args] = vi.mocked(afterRun).mock.calls[0]!;
+
+        expect(args.quotablePrompt).toBeUndefined();
+        expect(args.promptMessageId).toBeUndefined();
+    });
+
     it("runs the after-run work of a resumed reply once, for the whole reply, and stamps the resume's own rows", async () => {
         modelState.memory = true;
         modelState.mcpLabels = { echo: { serverName: "srv", toolName: "echo" } };

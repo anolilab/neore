@@ -86,6 +86,23 @@ export interface FilesPage {
     truncated: boolean;
 }
 
+/** One page of the folders inside a folder on a connected server (`host_browse`): names only. */
+export interface BrowsePage {
+    entries: { name: string }[];
+    host: string;
+    next: string | null;
+    parent: string | null;
+    path: string;
+    /** True when the folder is the server's home folder or above: the host refuses to share it. */
+    refusedRoot: boolean;
+}
+
+/** What creating a folder on a server did (`host_make_dir`). */
+export interface CreatedFolder {
+    created: boolean;
+    path: string;
+}
+
 /** A file of a server as text (`host_file_read`). */
 export interface FileRead {
     host: string;
@@ -214,6 +231,7 @@ export interface DeviceCore {
     /** What to start for an approved agent on a server (JSON): only the user's variables, the server builds the rest. */
     acpHostSpawnPlan: (deviceId: string, agentKey: string, folder: string) => string;
     acpInstall: (request: string) => string;
+    acpInstallNpm: (request: string) => Promise<string>;
     acpInstallPrune: (agentKey: string) => void;
     acpInstallStage: () => string;
     /** Coding agents (ACP): JSON strings, parsed by `acp/`. The spawn plan holds secrets and never leaves the main process. */
@@ -229,7 +247,7 @@ export interface DeviceCore {
     /** Reads a file an agent's reply refers to, in Rust: only inside the folder the agent was approved for, only an allowed type. */
     acpReadMedia: (agentKey: string, folder: string, reference: string) => Promise<MediaRead>;
     acpSign: (envelope: string, signature: string, outcome: string) => string;
-    acpSpawnPlan: (agentKey: string, folder: string | null) => string;
+    acpSpawnPlanAsync: (agentKey: string, folder: string | null) => Promise<string>;
     /** A coding agent's terminals (`acp/terminals.ts`), run by Rust in the shell sandbox; JSON strings. */
     acpTerminalAvailable: (folder: string) => boolean;
     acpTerminalKill: (handle: number) => void;
@@ -246,12 +264,14 @@ export interface DeviceCore {
     hostAgentStart: (deviceId: string, handle: number, agentKey: string, folder: string) => string;
     hostAgentStop: (handle: number) => void;
     hostAgentWrite: (handle: number, bytes: Buffer) => void;
+    hostBrowse: (deviceId: string, path: string, after?: string) => Promise<string>;
     hostConnect: (deviceId: string, retry: boolean) => Promise<string>;
     hostDisconnect: (deviceId: string) => void;
     hostDownload: (deviceId: string, path: string, destination: string) => Promise<string>;
     hostFileRead: (deviceId: string, path: string) => Promise<string>;
     hostFilesList: (deviceId: string, path: string, after?: string) => Promise<string>;
     hostForgetKey: (deviceId: string) => void;
+    hostMakeDir: (deviceId: string, path: string) => Promise<string>;
     hostPair: (spec: string, deviceId: string, secret: string) => Promise<boolean>;
     hostProbe: (spec: string) => Promise<string>;
     hostRemove: (deviceId: string) => void;

@@ -6,8 +6,9 @@ import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
 import { collectAcpSessionPages } from "../acp/gdpr";
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
-import { collectAllRepositories } from "../projects/export-pages";
-import { feedbackReadBudget, projectDetailsReadBudget, repositoriesReadBudget, triggerReadBudget } from "./read-budget";
+import { collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
+import { feedbackReadBudget, projectDetailsReadBudget, repositoriesReadBudget, threadFollowsReadBudget, triggerReadBudget } from "./read-budget";
+import { collectAllThreadFollows } from "../chat/follows/export-pages";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import { internalAction, internalQuery } from "../_generated/server";
@@ -377,6 +378,18 @@ export const collectFiles = internalQuery
                     updatedAt: v.number(),
                 }),
             ),
+            // Saved site logins (`vault/site-logins.ts`): the site, the username and which teammates may use each; the
+            // secret stays out.
+            siteLogins: v.array(
+                v.object({
+                    createdAt: v.number(),
+                    label: v.optional(v.string()),
+                    site: v.string(),
+                    teammateIds: v.array(v.id("bots")),
+                    updatedAt: v.number(),
+                    username: v.string(),
+                }),
+            ),
         }),
     )
     .query(async ({ args: { userId }, ctx: context }) => {
@@ -388,6 +401,11 @@ export const collectFiles = internalQuery
         const folders = await context.db
             .query("folders")
             .withIndex("by_user_and_parent", (q) => q.eq("userId", userId))
+            .collect();
+
+        const siteLogins = await context.db
+            .query("savedSiteLogins")
+            .withIndex("by_userId_origin", (q) => q.eq("userId", userId))
             .collect();
 
         return {
@@ -408,6 +426,16 @@ export const collectFiles = internalQuery
                     createdAt: f.createdAt,
                     name: f.name,
                     updatedAt: f.updatedAt,
+                };
+            }),
+            siteLogins: siteLogins.map((login) => {
+                return {
+                    createdAt: login.createdAt,
+                    label: login.label,
+                    site: login.origin,
+                    teammateIds: login.teammateIds ?? [],
+                    updatedAt: login.updatedAt,
+                    username: login.username,
                 };
             }),
         };
@@ -609,8 +637,21 @@ export const generateExportFile = internalAction
             async (cursor) => await context.runQuery(internal.feedback.gdpr.collectFeedbackForExport, { cursor, userId: args.userId }),
             feedbackReadBudget(earlierReadBytes + repositories.readBytes),
         );
+        // Every project the user owns, the ones without a repository too: an owner's computer and folder are their data.
+        // It shares the read budget left after the repositories and the feedback; no floor, so past it a project loses its details (marked) and is never left out.
+        const ownedProjects = await collectAllOwnedProjects(
+            async (cursor) => await context.runQuery(internal.projects.gdpr.collectOwnedProjectsForExport, { cursor, userId: args.userId }),
+            projectDetailsReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes),
+        );
+        // The user's follow states, a page per query within what the sections above left; past it marked as cut.
+        const threadFollows = await collectAllThreadFollows(
+            async (cursor) => await context.runQuery(internal.chat.follows.functions.collectThreadFollowsForExport, { cursor, userId: args.userId }),
+            threadFollowsReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes),
+        );
         // The projects read for their details count too: a row is read whole, however little of it is exported.
-        const triggerReadBytes = triggerReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes);
+        const triggerReadBytes = triggerReadBudget(
+            earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes + threadFollows.readBytes,
+        );
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
@@ -632,6 +673,7 @@ export const generateExportFile = internalAction
             pages: args.pages ?? { comments: [], favorites: [], grants: [], pages: [] },
             profile: args.profile,
             projectRepositories,
+            projects: ownedProjects.projects,
             prompts: args.prompts,
             pullRequestGuides: args.pullRequestGuides ?? { guides: [] },
             pullRequestThreads: args.pullRequestThreads ?? { links: [] },
@@ -639,6 +681,7 @@ export const generateExportFile = internalAction
             settings: args.settings,
             subAgentRuns: activity?.subAgentRuns ?? [],
             tasks: args.tasks ?? { goals: [], tasks: [] },
+            threadFollows: threadFollows.section,
             threadTags: args.threadTags ?? [],
             // Triggers with their settings and their newest runs, read here within a byte budget (`triggers/gdpr.ts`).
             triggers: await collectAllTriggers(

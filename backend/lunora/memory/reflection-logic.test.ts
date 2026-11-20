@@ -4,6 +4,9 @@ import {
     buildReflectionPrompt,
     checkReflectionEligibility,
     clusterBySimilarity,
+    committedReflectionOps,
+    countAppliedMerges,
+    countResolvedContradictions,
     createReflectionBudget,
     DECAY_INTERVAL_MS,
     DECAY_STEP,
@@ -28,6 +31,7 @@ import {
     revisionToOps,
     selectReflectionInputs,
     similarity,
+    splitExpired,
     STALE_AFTER_MS,
 } from "./reflection-logic";
 
@@ -109,8 +113,16 @@ describe("merge", () => {
         const ops = mergeToOps({ absorbedIds: [weak.id], survivorId: strong.id, texts: [], type: "preference" }, byId([weak, strong]), NOW, " Merged. ");
 
         expect(ops).toEqual([
-            { confidence: 90, kind: "patch", lastConfirmedAt: NOW, memory: "Merged.", memoryId: strong.id },
-            { byMemoryId: strong.id, kind: "supersede", memoryId: weak.id },
+            {
+                checkDates: { memory: {} },
+                confidence: 90,
+                kind: "patch",
+                lastConfirmedAt: NOW,
+                memory: "Merged.",
+                memoryId: strong.id,
+                readText: "User prefers tabs.",
+            },
+            { absorbedText: "User prefers tabs", byMemoryId: strong.id, checkDates: { by: {}, memory: {} }, kind: "supersede", memoryId: weak.id, merge: true },
         ]);
     });
 
@@ -119,6 +131,48 @@ describe("merge", () => {
         const [patch] = mergeToOps({ absorbedIds: [], survivorId: a.id, texts: [], type: "preference" }, byId([a]), NOW, " ".repeat(3));
 
         expect(patch).not.toHaveProperty("memory");
+    });
+
+    it("counts no merge the write skipped because a row changed after the plan", () => {
+        const merges = [
+            { absorbedIds: ["a1"], survivorId: "a", texts: [], type: "preference" as const },
+            { absorbedIds: ["b1"], survivorId: "b", texts: [], type: "preference" as const },
+        ];
+        const ops = [
+            { absorbedText: "x", byMemoryId: "a", kind: "supersede" as const, memoryId: "a1", merge: true as const },
+            { absorbedText: "y", byMemoryId: "b", kind: "supersede" as const, memoryId: "b1", merge: true as const },
+        ];
+
+        // The write superseded only `a1`: `b`'s survivor was edited meanwhile.
+        expect(countAppliedMerges(merges, committedReflectionOps(ops, ["a1"]))).toBe(1);
+    });
+
+    it("counts only the merges whose rows the written ops still supersede", () => {
+        const applied = { absorbedIds: ["a1"], survivorId: "a", texts: [], type: "preference" as const };
+        const skipped = { absorbedIds: ["b1"], survivorId: "b", texts: [], type: "preference" as const };
+        // A revision superseding with the skipped merge's survivor is no merge of its own.
+        const ops = [
+            { byMemoryId: "a", kind: "supersede" as const, memoryId: "a1" },
+            { byMemoryId: "b", kind: "supersede" as const, memoryId: "other" },
+        ];
+
+        expect(countAppliedMerges([applied, skipped], ops)).toBe(1);
+    });
+});
+
+describe(countResolvedContradictions, () => {
+    it("counts only the pairs whose supersession the written ops still carry", () => {
+        const updated = { newerId: "n1", newerText: "", olderId: "o1", olderText: "" };
+        const ignored = { newerId: "n2", newerText: "", olderId: "o2", olderText: "" };
+        // An UPDATE whose merged wording was only a secret: redaction kept the patch's metadata and dropped its supersession.
+        const dropped = { newerId: "n3", newerText: "", olderId: "o3", olderText: "" };
+        const ops = [
+            { byMemoryId: "n1", kind: "supersede" as const, memoryId: "o1" },
+            { byMemoryId: "o2", kind: "supersede" as const, memoryId: "n2" },
+            { kind: "patch" as const, lastConfirmedAt: 1, memoryId: "n3" },
+        ];
+
+        expect(countResolvedContradictions([updated, ignored, dropped], ops)).toBe(2);
     });
 });
 
@@ -136,9 +190,11 @@ describe("promotion", () => {
         expect(findPromotionCandidates(activities(2), REFLECTION_LIMITS)).toEqual([]);
     });
 
-    it("ignores non-activity types and pinned observations", () => {
+    it("ignores non-activity types, pinned observations and dated ones", () => {
         expect(findPromotionCandidates(activities(3, { type: "preference" }), REFLECTION_LIMITS)).toEqual([]);
         expect(findPromotionCandidates(activities(3, { pinned: true }), REFLECTION_LIMITS)).toEqual([]);
+        // The promoted pattern carries no dates, so it would outlive the facts behind it.
+        expect(findPromotionCandidates(activities(3, { validUntil: "2026-10-01" }), REFLECTION_LIMITS)).toEqual([]);
     });
 
     it("builds a more confident memory of the accepted type, capped at 95", () => {
@@ -252,6 +308,86 @@ describe("planReflection", () => {
         // Both are stale activities, but the merge claimed them first.
         expect(plan.decay).toEqual([]);
         expect(plan.retire).toEqual([]);
+    });
+});
+
+describe(splitExpired, () => {
+    it("retires a fact the day after its end date, whatever its type, but never a pinned one", () => {
+        const ended = memory({ text: "User is in Lisbon", type: "context", validUntil: "2026-09-22" });
+        const endsToday = memory({ text: "User is on leave", type: "context", validUntil: "2026-09-23" });
+        const pinned = memory({ pinned: true, text: "User is at a conference", type: "context", validUntil: "2026-09-01" });
+        const pastEvent = memory({ eventStart: "2026-09-01", text: "User ran a marathon", type: "experience" });
+
+        expect(splitExpired([ended, endsToday, pinned, pastEvent], "2026-09-23")).toEqual({ expire: [ended.id], live: [endsToday, pastEvent] });
+    });
+
+    it("keeps a pinned expired fact out of planning, so it never absorbs a live restatement", () => {
+        const pinned = memory({ pinned: true, text: "User is in Lisbon for work", validUntil: "2026-09-01" });
+        const renewed = memory({ text: "User is in Lisbon for work.", validUntil: "2026-09-30" });
+
+        expect(splitExpired([pinned, renewed], "2026-09-23")).toEqual({ expire: [], live: [renewed] });
+    });
+});
+
+describe("the newer statement decides the dates", () => {
+    it("never merges rows whose dates differ, so a survivor's text and its dates never part and a pinned row keeps its own", () => {
+        const until = memory({ confidence: 90, text: "User is in Lisbon until 2026-11-20", validUntil: "2026-11-20" });
+        const later = memory({ lastConfirmedAt: NOW, text: "User is in Lisbon until 2026-11-20.", validUntil: "2026-12-05" });
+        const pinnedEvent = memory({ eventStart: "2026-12-12", pinned: true, text: "User has a wedding on 2026-12-12" });
+        const undated = memory({ lastConfirmedAt: NOW, text: "User has a wedding on 2026-12-12." });
+
+        expect(findMergeCandidates([until, later, pinnedEvent, undated], REFLECTION_LIMITS)).toEqual([]);
+    });
+
+    it("merges rows of the same dates and leaves the survivor's dates alone", () => {
+        const survivor = memory({ confidence: 90, text: "User flies to Paris", validUntil: "2026-11-20" });
+        const absorbed = memory({ text: "User flies to Paris.", validUntil: "2026-11-20" });
+        const [merge] = findMergeCandidates([survivor, absorbed], REFLECTION_LIMITS);
+
+        expect(merge).toMatchObject({ absorbedIds: [absorbed.id], survivorId: survivor.id });
+        expect(mergeToOps(merge!, byId([survivor, absorbed]), NOW)[0]).not.toHaveProperty("dates");
+    });
+
+    it("never pairs two events on different days for revision: a second trip is not a changed plan", () => {
+        const first = memory({ eventStart: "2026-11-20", text: "User flies to Paris for a client meeting" });
+        const second = memory({ eventStart: "2026-12-04", text: "User flies to Paris for a design workshop" });
+
+        expect(findContradictionCandidates([first, second], REFLECTION_LIMITS)).toEqual([]);
+        expect(findContradictionCandidates([first, memory({ eventStart: "2026-11-20", text: second.text })], REFLECTION_LIMITS)).toHaveLength(1);
+    });
+
+    it("never clusters two events on different days, however alike", () => {
+        const first = memory({ eventStart: "2026-11-20", text: "User has a piano lesson with Anna" });
+        const second = memory({ eventStart: "2026-11-27", text: "User has a piano lesson with Anna." });
+
+        // An undated row like both does not chain them.
+        const undated = memory({ confidence: 90, text: "User has a piano lesson with Anna!" });
+
+        expect(findMergeCandidates([undated, first, second], REFLECTION_LIMITS)).toEqual([]);
+    });
+
+    it("writes the merged wording onto the newer row, which keeps its own dates, and lets the newer row stand on IGNORE", () => {
+        const older = memory({ text: "User is in Lisbon with their sister until 2026-11-20", validUntil: "2026-11-20" });
+        const newer = memory({ text: "User is in Lisbon for work" });
+        const pair = { newerId: newer.id, newerText: newer.text, olderId: older.id, olderText: older.text };
+
+        // The merged wording was written for the newer row's dates, so it keeps the older row's other details.
+        expect(revisionToOps(pair, { action: "UPDATE", mergedMemory: "User is in Lisbon for work with their sister" }, NOW, byId([older, newer]))[0]).toEqual({
+            checkDates: { memory: {} },
+            kind: "patch",
+            lastConfirmedAt: NOW,
+            memory: "User is in Lisbon for work with their sister",
+            memoryId: newer.id,
+        });
+        expect(
+            revisionToOps(pair, { action: "UPDATE", mergedMemory: "both" }, NOW, byId([memory({ ...older, validUntil: undefined }), newer]))[0],
+        ).toMatchObject({
+            memory: "both",
+        });
+        expect(revisionToOps(pair, { action: "IGNORE" }, NOW, byId([older, newer]))).toEqual([
+            { kind: "patch", lastConfirmedAt: NOW, memoryId: newer.id },
+            { byMemoryId: newer.id, checkDates: { by: {}, memory: { validUntil: "2026-11-20" } }, kind: "supersede", memoryId: older.id },
+        ]);
     });
 });
 

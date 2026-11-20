@@ -2,7 +2,8 @@ import type { Infer } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
-import { internalMutation, internalQuery, type QueryCtx as QueryContext } from "../_generated/server";
+import { internal } from "../_generated/internal";
+import { internalMutation, internalQuery, type MutationCtx, type QueryCtx as QueryContext } from "../_generated/server";
 
 /**
  * Thread access and invite operations.
@@ -163,6 +164,58 @@ export const updateThreadAccess = internalMutation
 
         return null;
     });
+
+/** Grants and invites one `revokeThreadGrantsJob` run removes: each is one D1 statement, under a Worker invocation's cap. */
+const REVOKE_BATCH = 40;
+
+/**
+ * Removes up to `limit` of a thread's share grants, then revokes its pending invites within what is left; `true` when
+ * none of either is left. Primary reads: a replica that lags a fresh grant would leave it behind.
+ */
+const revokeThreadGrantsPage = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">, limit: number): Promise<boolean> => {
+    const grants = await ctx.db.threadAccess.findMany({ consistency: "primary", limit: limit + 1, where: { threadId } });
+
+    for (const grant of grants.page.slice(0, limit)) {
+        await ctx.db.delete("threadAccess", grant._id);
+    }
+
+    const room = limit - Math.min(grants.page.length, limit);
+
+    if (grants.page.length > limit || room === 0) {
+        return false;
+    }
+
+    const invites = await ctx.db.threadInvites.findMany({ consistency: "primary", limit: room + 1, where: { status: "pending", threadId } });
+
+    for (const invite of invites.page.slice(0, room)) {
+        await ctx.db.patch("threadInvites", invite._id, { status: "revoked" });
+    }
+
+    return invites.page.length <= room;
+};
+
+/**
+ * Removes every share grant of a deleted thread and revokes its pending invites, a batch at a time, so no collaborator
+ * keeps reading it, or a memory's quote from it (`memory/functions.ts#getMemorySource`, which sees only the grant), and
+ * no invite redeemed later grants it again. Scheduled by the delete (`revokeThreadGrants`) rather than run inside it, so
+ * a widely shared chat never takes the delete past the statement cap. A chat restored from the trash is shared again by
+ * hand.
+ */
+export const revokeThreadGrantsJob = internalMutation
+    .input({ threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        if (!(await revokeThreadGrantsPage(ctx, args.threadId, REVOKE_BATCH))) {
+            await ctx.scheduler.runAfter(0, internal.agent.sharing.revokeThreadGrantsJob, args);
+        }
+
+        return null;
+    });
+
+/** Starts revoking a deleted thread's share grants and pending invites ({@link revokeThreadGrantsJob}). */
+export const revokeThreadGrants = async (ctx: Pick<MutationCtx, "scheduler">, threadId: Id<"threads">): Promise<void> => {
+    await ctx.scheduler.runAfter(0, internal.agent.sharing.revokeThreadGrantsJob, { threadId });
+};
 
 export const deleteThreadAccess = internalMutation
     .input({

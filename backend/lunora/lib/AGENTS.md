@@ -62,3 +62,8 @@
   staging key an hour after its upload is created; the shard housekeeping sweep
   (`file.sweepStagedChatUploads`) is the backstop and also drops upload state
   untouched for an hour. There is no signed `PUT` path any more.
+
+- **Secret detection** — `lib/secret-redaction.ts` (`redactSecrets`, `containsSecret`)
+  is the one detector for provider keys, JWTs, `Bearer` values, private key blocks,
+  `password:`-style values and long random strings. Reuse it for any text the backend
+  keeps or forwards; add a shape there (with a keep-case test), never a local copy.

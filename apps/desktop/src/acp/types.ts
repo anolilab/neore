@@ -3,7 +3,7 @@
  * Everything in a transcript came from an agent: the window renders it with `textContent` only.
  */
 
-/** What the Rust core returns for `acpSpawnPlan`; the environment holds secrets and stays in the main process. */
+/** What the Rust core returns for `acpSpawnPlanAsync`; the environment holds secrets and stays in the main process. */
 export interface SpawnPlan {
     args: string[];
     command: string;
@@ -44,9 +44,15 @@ export interface PermissionView {
 
 /** What a registry install pinned; set only on an agent that came from one. */
 export interface AcpInstall {
+    /** The package index's hash an npm install was verified against; absent on a binary install. */
+    indexIntegrity?: string;
     publisher: string;
+    /** The names of the variables the registry set at this install; a reinstall drops those it no longer sets. */
+    registryEnv?: string[];
     sha256: string;
     source: string;
+    /** Hash of the installed files, checked before every start; npm installs only. */
+    treeSha256?: string;
     version: string;
 }
 

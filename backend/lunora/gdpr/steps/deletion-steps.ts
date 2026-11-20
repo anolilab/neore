@@ -13,6 +13,7 @@ import {
     eraseThreadSuggestionsAndInvites,
 } from "../../agent/gdpr";
 import { eraseThreadPinsAndTagsForUser, erasePersistentStreamsForUser, erasePresentationsForUser } from "../../chat/gdpr";
+import { deleteFollowRowsOfUserBatch } from "../../chat/follows/functions";
 import { eraseVaultForUser } from "../../vault/gdpr";
 import { erasePromptsForUser } from "../../prompts/gdpr";
 import { eraseMemoriesForUser } from "../../memory/gdpr";
@@ -75,6 +76,14 @@ export const deleteUserSettings = internalMutation
     });
 
 // --- Thread-dependent deletions (MUST run before thread deletion) ---
+
+/** One batch of the user's follow rows on any thread (`chat/follows/functions.ts`); drained by the workflow. */
+export const deleteUserFollowRows = internalMutation
+    .input({ userId: v.string() })
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }) => {
+        return { hasMore: !(await deleteFollowRowsOfUserBatch(context, userId)) };
+    });
 
 export const deleteUserThreadMetadata = internalMutation
     .input({ userId: v.string() })

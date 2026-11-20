@@ -27,6 +27,7 @@ import {
     ProjectRepoError,
     withDefault,
 } from "./repositories";
+import { forViewer, resolveProjectLocation } from "./machine-location";
 
 /** Whether `userId` is a current member of an organization. */
 type MembershipCheck = (organizationId: string) => Promise<boolean>;
@@ -53,7 +54,9 @@ export const readableProject = async (
     // NON-active organization is invisible to the guarded `ctx.db` until the org is admitted.
     const found = await systemDb(context).projects.findFirst({ where: { _id: projectId }, ...consistency });
 
-    const isMember: MembershipCheck = async (organizationId) => (await getMemberByOrganizationAndUser(context, organizationId, userId)) !== null;
+    // On the primary too when asked: a membership revoked a moment ago must not admit the project from a lagging replica.
+    const isMember: MembershipCheck = async (organizationId) =>
+        (await getMemberByOrganizationAndUser(context, organizationId, userId, primary ? "primary" : undefined)) !== null;
 
     if (!found || !(await mayReadProject(found, userId, isMember))) {
         return null;
@@ -196,7 +199,11 @@ export const getProject = authQuery
     .input({
         projectId: v.id("projects"),
     })
-    .query(async ({ args: { projectId }, ctx: context }) => await readableProject(context, projectId as Id<"projects">, context.user.userId));
+    .query(async ({ args: { projectId }, ctx: context }) => {
+        const project = await readableProject(context, projectId as Id<"projects">, context.user.userId);
+
+        return project && forViewer(project, context.user.userId);
+    });
 
 export const listProjects = authQuery
     .input({
@@ -222,11 +229,9 @@ export const listProjects = authQuery
     .query(async ({ args: { organizationId, paginationOpts }, ctx: context }) => {
         const { userId } = context.user;
 
-        if (organizationId) {
-            return await listProjectsHandler(context, { organizationId, paginationOpts });
-        }
+        const result = await listProjectsHandler(context, organizationId ? { organizationId, paginationOpts } : { paginationOpts, userId });
 
-        return await listProjectsHandler(context, { paginationOpts, userId });
+        return { ...result, page: result.page.map((project) => forViewer(project, userId)) };
     });
 
 export const listPinnedProjects = authQuery
@@ -237,11 +242,9 @@ export const listPinnedProjects = authQuery
     .query(async ({ args: { organizationId }, ctx: context }) => {
         const { userId } = context.user;
 
-        if (organizationId) {
-            return await listPinnedProjectsHandler(context, { organizationId });
-        }
+        const pinned = await listPinnedProjectsHandler(context, organizationId ? { organizationId } : { userId });
 
-        return await listPinnedProjectsHandler(context, { userId });
+        return pinned.map((project) => forViewer(project, userId));
     });
 
 export const createProject = authMutation
@@ -254,21 +257,31 @@ export const createProject = authMutation
         defaultReasoningEffort: v.optional(v.number()),
         description: v.optional(v.string().max(MAX_LENGTH.long)),
         icon: v.optional(v.string().max(MAX_LENGTH.url)),
+        // The device the folder lives on, with the folder's absolute path on it (checked in the handler).
+        machineId: v.optional(v.id("devices")),
         organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
+        path: v.optional(v.string().max(MAX_LENGTH.key)),
         title: v.string().max(MAX_LENGTH.long),
     })
     .output(v.string())
-    .mutation(async ({ args, ctx: context }) => {
+    .mutation(async ({ args: { machineId, path, ...args }, ctx: context }) => {
         const { userId } = context.user;
 
         assertOwnOrganizationId(context.user, args.organizationId);
 
+        const location = await resolveProjectLocation(context, userId, machineId, path);
+
         const project = await context.runMutation(internal.agent.projects.createProject, {
             ...args,
+            ...location,
             userId,
         });
 
-        context.log.event("projects.create_project", { hasOrganization: args.organizationId !== undefined, projectId: project._id });
+        context.log.event("projects.create_project", {
+            hasMachine: location.machineId !== undefined,
+            hasOrganization: args.organizationId !== undefined,
+            projectId: project._id,
+        });
 
         return project._id;
     });

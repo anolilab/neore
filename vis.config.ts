@@ -145,9 +145,11 @@ export default defineConfig({
     staged: {
         // The same formatters as `pnpm lint:oxfmt`: oxfmt for code, data, CSS and HTML, Prettier
         // for Markdown. Both read the root .gitignore and .prettierignore, so an ignored file
-        // that is staged is left alone.
+        // that is staged is left alone. Prettier fails on a symlink named on its command line, such as
+        // a `CLAUDE.md` -> `AGENTS.md` link; `--no-error-on-unmatched-pattern` makes it skip the link
+        // and format the real files.
         "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts,json,jsonc,json5,yml,yaml,css,html}": "pnpm exec oxfmt --no-error-on-unmatched-pattern",
-        "*.{md,mdx}": "pnpm exec prettier --config=.prettierrc.cjs --write",
+        "*.{md,mdx}": "pnpm exec prettier --config=.prettierrc.cjs --write --no-error-on-unmatched-pattern",
         // CI checks the key order of every package.json (`lint.yml`, "Types").
         "**/package.json": "sort-package-json",
     },
@@ -215,11 +217,31 @@ export default defineConfig({
             cache: true,
         },
         test: {
-            inputs: ["default", "^production", "{projectRoot}/vite.config.ts", "{projectRoot}/vitest.config.ts"],
+            inputs: [
+                "default",
+                "^production",
+                "{projectRoot}/vite.config.ts",
+                "{projectRoot}/vitest.config.ts",
+                // Which files a shard runs: the split, the timings it is made from, and the shard itself.
+                "{workspaceRoot}/scripts/vitest/time-sharding.ts",
+                "{workspaceRoot}/scripts/vitest/timings/*.json",
+                { env: "VITEST_SHARD" },
+                { env: "VITEST_RECORD_TIMINGS" },
+            ],
             cache: true,
         },
         "test:coverage": {
-            inputs: ["default", "^production", "{projectRoot}/vite.config.ts", "{projectRoot}/vitest.config.ts"],
+            inputs: [
+                "default",
+                "^production",
+                "{projectRoot}/vite.config.ts",
+                "{projectRoot}/vitest.config.ts",
+                // Which files a shard runs: the split, the timings it is made from, and the shard itself.
+                "{workspaceRoot}/scripts/vitest/time-sharding.ts",
+                "{workspaceRoot}/scripts/vitest/timings/*.json",
+                { env: "VITEST_SHARD" },
+                { env: "VITEST_RECORD_TIMINGS" },
+            ],
             cache: true,
         },
         // Every story of the project, in Chromium, once per mode (`apps/web/vitest.storybook.config.ts`).

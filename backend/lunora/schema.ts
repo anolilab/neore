@@ -44,6 +44,7 @@ import {
     vRetrievalMetrics,
 } from "./evals/validators";
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
+import { vMemoryEvidence } from "./memory/evidence";
 import { vCapabilityReport } from "./lib/capability-report";
 import { notificationInputFields } from "./notifications/validators";
 import {
@@ -351,6 +352,25 @@ export const schema = defineSchema({
         .index("timestamp", ["timestamp"]),
 
     /**
+     * Who created each bot, kept for as long as the bot id can appear on a memory. A global table: a memory is written on
+     * the shard of the person it belongs to, and a shared chat's bot lives on its owner's shard, so the write cannot read
+     * the bot row there. Written by `createBot`; a row outlives its bot (a deleted bot still names its owner) and is
+     * erased with its owner (`bots/gdpr.ts`). `deletedAt` is set by `deleteBot`, so the memory list can tell a shared bot
+     * that is gone from one that is still live; a deleted bot's row is removed 90 days later (`bots/owner.ts`,
+     * `BOT_OWNER_TOMBSTONE_TTL_MS`), so the table holds live bots and recent deletions only. Bots created before this
+     * table have no row.
+     */
+    botOwners: defineTable({
+        botId: v.id("bots"),
+        createdAt: v.number(),
+        deletedAt: v.optional(v.number()),
+        ownerId: v.string(),
+    })
+        .global()
+        .index("by_botId", ["botId"])
+        .index("by_ownerId", ["ownerId"]),
+
+    /**
      * A persistent teammate: a named persona (instructions + model) the user
      * chats with and schedules routines for. Its threads, routines, memories and
      * computer carry `botId`; deleting the bot unlinks nothing, so anything still
@@ -363,6 +383,9 @@ export const schema = defineSchema({
         instructions: v.string(),
         model: v.string(),
         name: v.string(),
+        // The mode a new chat with this bot starts in (`chat/lib/thread-permission-mode.ts`); absent = the default. A run
+        // nobody watches takes it only when it asks more (`unattendedMode` in `chat/lib/tool-permissions.ts`).
+        permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
         updatedAt: v.number(),
         userId: v.string(),
     })
@@ -400,9 +423,16 @@ export const schema = defineSchema({
         completedAt: v.optional(v.number()),
         connectUrl: v.optional(v.string()),
         currentUrl: v.optional(v.string()),
+        /** When the action that wrote `currentUrl` started, so an older action finishing later does not overwrite it. */
+        currentUrlStartedAt: v.optional(v.number()),
         errorMessage: v.optional(v.string()),
         extensionId: v.optional(v.string()),
         extensionVersion: v.optional(v.string()),
+        /**
+         * The deadlines of the browser actions in flight, one per action (its renderer deadline): each holds the browser
+         * until it ends, and removes only its own hold, so overlapping actions never end each other's.
+         */
+        inUseHolds: v.optional(v.array(v.number())),
         lastActivityAt: v.number(),
         providerSessionId: v.optional(v.string()),
         source: v.optional(v.string()),
@@ -1446,14 +1476,22 @@ export const schema = defineSchema({
         botId: v.optional(v.id("bots")),
         confidence: v.optional(v.number()),
         embeddingId: v.optional(v.string()),
+        // The day or days the event happens, local `YYYY-MM-DD` (`memory/dates.ts`).
+        eventEnd: v.optional(v.string()),
+        eventStart: v.optional(v.string()),
+        // Where the memory was learned: a short verbatim quote of the user's own words and the message they were in.
+        // Replaced whole when newer evidence revises the memory. See `memory/evidence.ts`.
+        evidence: v.optional(vMemoryEvidence),
         importance: v.optional(v.number()),
+        // The assistant an `imported` memory was brought in from (`memory/import.ts`).
+        importedFrom: v.optional(v.union(v.literal("chatgpt"), v.literal("claude"), v.literal("gemini"), v.literal("other"))),
         // Last time evidence confirmed the memory (a restatement, a reflection
         // merge, a user edit). Unset reads as `updatedAt` — see `memory/taxonomy.ts`.
         lastConfirmedAt: v.optional(v.number()),
         memory: v.string(),
         // Pinned by the user: nightly reflection never decays, retires or merges it away.
         pinned: v.optional(v.boolean()),
-        source: v.optional(v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"))),
+        source: v.optional(v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"), v.literal("imported"))),
         supersededBy: v.optional(v.id("memories")),
         supersedes: v.optional(v.id("memories")),
         threadId: v.optional(v.id("threads")),
@@ -1461,6 +1499,8 @@ export const schema = defineSchema({
         type: v.union(v.literal("identity"), v.literal("preference"), v.literal("context"), v.literal("activity"), v.literal("experience")),
         updatedAt: v.optional(v.number()),
         userId: v.optional(v.string()),
+        // Last local day the fact holds; after it the memory is not injected and reflection retires it.
+        validUntil: v.optional(v.string()),
         version: v.optional(v.number()),
     })
         .shardBy("userId")
@@ -1470,7 +1510,9 @@ export const schema = defineSchema({
         .index("by_userId_supersededBy", ["userId", "supersededBy"])
         // A scope's rows read directly: the user's own (`botId` null) or one bot's. `type` keeps
         // the type-first order the old by_userId_type read had, so a window still keeps preferences.
-        .index("by_userId_botId", ["userId", "botId", "type"]),
+        .index("by_userId_botId", ["userId", "botId", "type"])
+        // The same scope, active rows only: superseded history never enters a read. `supersededBy` is null for an active row.
+        .index("by_userId_botId_active", ["userId", "botId", "supersededBy", "type"]),
 
     // One nightly-reflection digest ("what I learned today") per run. See `memory/reflection.ts`.
     memoryDigests: defineTable({
@@ -2000,8 +2042,15 @@ export const schema = defineSchema({
                     messageId: v.optional(v.string()),
                     /** Set on delivery: the run's pending row, moved under that message, so a stop finds it even when that message is gone. */
                     pendingMessageId: v.optional(v.string()),
+                    /**
+                     * When the user sent it: memory reads "tomorrow" in it against that day, not the delivery's, and a memory
+                     * quoting it is dated by it. Kept on delivery, so a recovered reply dates its steers.
+                     */
+                    sentAt: v.optional(v.number()),
                     status: v.union(v.literal("queued"), v.literal("delivered"), v.literal("withdrawn")),
                     text: v.optional(v.string()),
+                    /** Set on delivery: the length of the text, so a recovered reply can split the combined row into its steers. */
+                    textLength: v.optional(v.number()),
                 }),
             ),
         ),
@@ -2122,8 +2171,11 @@ export const schema = defineSchema({
         galleryViewCount: v.optional(v.number()),
         icon: v.optional(v.string()),
         isPublic: v.optional(v.boolean()),
+        // The device the project's folder lives on (this computer, or an SSH server's device) and the absolute folder path on it.
+        machineId: v.optional(v.id("devices")),
         order: v.optional(v.number()),
         organizationId: v.optional(v.string()),
+        path: v.optional(v.string()),
         pinnedAt: v.optional(v.number()),
         projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
         publicAccessToken: v.optional(v.string()),
@@ -2448,6 +2500,26 @@ export const schema = defineSchema({
         .index("by_botId_status", ["botId", "status"])
         .index("by_userId", ["userId"])
         .index("by_status", ["status"]),
+
+    /**
+     * A site login the user saved for the agent's browser (`vault/site-logins.ts`). The password is encrypted
+     * (`site-logins` key purpose) and leaves the server only as the keystrokes the browser types. No audit triggers:
+     * a history snapshot would keep the ciphertext after the row is gone.
+     */
+    savedSiteLogins: defineTable({
+        createdAt: v.number(),
+        encryptedPassword: v.string(),
+        label: v.optional(v.string().max(80)),
+        // The exact origin (`https://example.com`); a fill types only into a page of this origin.
+        origin: v.string().max(255),
+        // Teammates whose threads may use the login. None: only the user's own chats (threads without a teammate).
+        teammateIds: v.optional(v.array(v.id("bots"))),
+        updatedAt: v.number(),
+        userId: v.string(),
+        username: v.string().max(320),
+    })
+        .shardBy("userId")
+        .index("by_userId_origin", ["userId", "origin"]),
 
     session: defineTable({
         activeOrganizationId: v.optional(v.string()),
@@ -3031,6 +3103,25 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
+    // Whether a person follows a thread for new-reply notifications (`chat/follows/functions.ts`). A row exists only
+    // once a state is set (by the person, or by share/accept); no row means "off".
+    // Global (D1) like `threadAccess`: the follower, the thread's owner and the erasure of either read the same rows.
+    threadFollows: defineTable({
+        createdAt: v.number(),
+        state: v.union(v.literal("on"), v.literal("off"), v.literal("muted")),
+        threadId: v.id("threads"),
+        updatedAt: v.number(),
+        userId: v.string(),
+    })
+        .global()
+        .index("by_thread", ["threadId"])
+        .index("by_user_and_thread", ["userId", "threadId"], { unique: true })
+        .relations((r) => {
+            return {
+                thread: r.one("threads", { field: "threadId" }),
+            };
+        }),
+
     threadGoals: defineTable({
         // The highest round whose review has been claimed (`chat/goals/internal.ts#claimGoalRound`):
         // the review job is queued at least once, and only the delivery that claims a round reviews it.

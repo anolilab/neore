@@ -10,6 +10,6 @@
         },
         "types": ["vite/client"]
     },
-    "include": ["**/*.ts", "**/*.tsx", "eslint.config.js", "prettier.config.js"],
+    "include": ["**/*.ts", "**/*.tsx", "eslint.config.js", "prettier.config.js", "../../scripts/vitest/time-sharding.ts"],
     "exclude": ["dist", "**/*.md", "**/*.json"]
 }

@@ -26,6 +26,7 @@ import { getMCPTools } from "./mcp-tools";
 import { isSafeToRepeat } from "./repeatable-tools";
 import { connectorTrustId, mcpTrustId } from "./low-risk-trust";
 import type { ToolProgressSink } from "./mcp-progress";
+import type { ThreadPermissionMode } from "./thread-permission-mode";
 import type { SearchMode } from "./tool-builder";
 import { ToolName } from "../tools";
 import { admittedKnowledgeSearchTool } from "../tools/knowledge-search";
@@ -105,6 +106,8 @@ export interface BuildAgentToolsOptions {
      * `ask` tool pauses for a person.
      */
     threadId?: string;
+    /** Headless only: the mode of the bot the run belongs to, applied only where it asks more (`ToolPermissionOptions.unattendedMode`). */
+    unattendedMode?: ThreadPermissionMode;
     /**
      * Resolves to whether the run's prompt carries knowledge, memory or project context (`RunContext.untrustedContext`).
      * The quick check never runs after any of them; omitted, that is unknown and counts as present. A promise, because
@@ -157,6 +160,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         skillTools,
         snapshot,
         threadId,
+        unattendedMode,
         untrustedContext = true,
         userId,
     } = options;
@@ -396,6 +400,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         ...(trusted && { lowRiskTrusted: trusted }),
         ...(headlessCanAsk && { headlessCanAsk: true }),
         ...(threadMode && { threadMode }),
+        ...(unattendedMode && { unattendedMode }),
         timedGrants,
     });
 

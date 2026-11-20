@@ -1074,6 +1074,14 @@ pub trait HostLink: Send + Sync {
     fn list_files(&self, _params: &Value, _wait: Duration) -> Result<Value, String> {
         Err("this connection cannot list files".into())
     }
+    /// The folders inside an absolute path on the server (`browse`, `host::BrowseParams` as JSON).
+    fn browse(&self, _params: &Value, _wait: Duration) -> Result<Value, String> {
+        Err("this connection cannot browse folders".into())
+    }
+    /// Creates an absolute folder on the server (`mkdir`, `host::MakeDirParams` as JSON).
+    fn make_dir(&self, _params: &Value, _wait: Duration) -> Result<Value, String> {
+        Err("this connection cannot create folders".into())
+    }
     /// Starts a coding agent on the server (`agent_host::AgentParams` as JSON). Its output and its end go to `sink`;
     /// the returned handle names it for [`Self::agent_write`] and [`Self::agent_stop`].
     fn agent_start(&self, _params: &Value, _sink: Arc<dyn AgentSink>) -> Result<u64, String> {
@@ -1440,6 +1448,14 @@ impl HostLink for HostConnection {
 
     fn list_files(&self, params: &Value, wait: Duration) -> Result<Value, String> {
         self.request("list", params, wait)
+    }
+
+    fn browse(&self, params: &Value, wait: Duration) -> Result<Value, String> {
+        self.request("browse", params, wait)
+    }
+
+    fn make_dir(&self, params: &Value, wait: Duration) -> Result<Value, String> {
+        self.request("mkdir", params, wait)
     }
 
     fn download(

@@ -5,11 +5,13 @@
  * NOTE: Table renamed from 'files' to 'chatFiles' to avoid conflict with vault/files table.
  */
 import type { InferArgs } from "lunorash/server";
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx as MutationContext, type QueryCtx } from "../_generated/server";
+import { claimFence, releaseClaim } from "../lib/claim-once";
 import { isThreadLocked } from "../lib/thread-lock";
+import { FILE_ATTACH_SCOPE, FILE_ATTACH_TTL_MS } from "./file-attach-claim";
 import { checkThreadAccessBatchHandler } from "./threads";
 import { isLockedWithoutProof } from "./thread-passcode";
 import { paginatedDocsOf } from "../lib/output-validators";
@@ -222,6 +224,76 @@ export const fileGatedByLockedChat = async (
 
     return false;
 };
+
+/**
+ * The `fileIds` that are gated for `userId` (`fileGatedByLockedChat`), checked on the shard it runs on.
+ *
+ * Run on the CALLER's shard, never only the thread owner's. A collaborator's own locked chat has its passcode rows and
+ * file links on the collaborator's shard, so the owner's shard cannot see that the file is gated: a file from the
+ * collaborator's locked chat would attach to the owner's shared chat with no passcode. `/chat/start` and `/chat/edit`
+ * call this on the caller's shard before they switch to the thread's shard.
+ */
+export const gatedFileIdsOnCallerShard = async (
+    context: Pick<QueryCtx, "db">,
+    { fileIds, threadId, unlockProof, userId }: { fileIds: Id<"chatFiles">[]; threadId?: Id<"threads">; unlockProof?: string; userId: string },
+): Promise<Id<"chatFiles">[]> => {
+    const gated: Id<"chatFiles">[] = [];
+
+    // A repeated id is checked once: each check reads the caller's locked chats again.
+    const distinctFileIds = [...new Set(fileIds)];
+
+    for (const fileId of distinctFileIds) {
+        if (await fileGatedByLockedChat(context, { fileId, threadId, unlockProof, userId })) {
+            gated.push(fileId);
+        }
+    }
+
+    return gated;
+};
+
+/**
+ * Checks the attach's files on the caller's shard AND takes its in-flight claim (`agent/file-attach-claim.ts`), in one
+ * transaction: the lock cannot commit between the check and the claim. Returns the gated ids (no claim taken when any is
+ * gated) and, when the files may attach, the claim's `claimedAt`, which `endFileAttach` releases.
+ */
+export const beginFileAttach = internalMutation
+    .input({
+        fileIds: v.array(v.id("chatFiles")),
+        requestId: v.string().max(MAX_LENGTH.id),
+        threadId: v.optional(v.id("threads")),
+        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+        userId: v.string(),
+    })
+    .output(v.object({ claimedAt: v.optional(v.number()), gated: v.array(v.id("chatFiles")) }))
+    .mutation(async ({ args, ctx }) => {
+        const gated = await gatedFileIdsOnCallerShard(ctx, args);
+
+        if (gated.length > 0 || args.fileIds.length === 0) {
+            return { gated };
+        }
+
+        const claimedAt = await claimFence(ctx, FILE_ATTACH_SCOPE, `${args.userId}:${args.requestId}`, {
+            ttlMs: FILE_ATTACH_TTL_MS,
+            userId: args.userId,
+        });
+
+        // A request id is unique per attach, so a held key is not expected. Throwing refuses the attach (fail closed).
+        if (claimedAt === null) {
+            throw new LunoraError("CONFLICT", "The file attach is already in progress.");
+        }
+
+        return { claimedAt, gated };
+    });
+
+/** Releases the claim `beginFileAttach` took, once the attach's message is saved. A claim that is no longer the caller's is left alone. */
+export const endFileAttach = internalMutation
+    .input({ claimedAt: v.number(), requestId: v.string().max(MAX_LENGTH.id), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await releaseClaim(ctx, FILE_ATTACH_SCOPE, `${args.userId}:${args.requestId}`, args.claimedAt);
+
+        return null;
+    });
 
 /**
  * The file, if `userId` may attach it: they stored the bytes themselves

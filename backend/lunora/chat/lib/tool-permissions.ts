@@ -181,6 +181,12 @@ export interface ToolPermissionOptions {
      * headless run inherits nothing, and `off` stays off.
      */
     timedGrants?: ToolPermissionGrants;
+    /**
+     * Headless only: the mode of the bot the run belongs to (`bots.permissionMode`). Nobody is there to widen anything, so it
+     * applies only when it asks MORE than the headless defaults: `supervised` moves a default as it does in a chat, and its
+     * `ask` then meets the headless clamp below (removed, or paused when `headlessCanAsk`). `auto` and `full` change nothing.
+     */
+    unattendedMode?: ThreadPermissionMode;
 }
 
 export interface ResolvedToolPermission {
@@ -249,8 +255,9 @@ export const resolveToolPermissionWithGrant = (
     // taken back by `supervised`, a chosen `ask` is not lifted by `full`); the thread's mode moves only the default. A
     // headless run ignores it: nobody is there, and its own clamp below decides. The organization's cap then clamps
     // whichever was chosen, so neither an override nor `full` lifts a tool above it, and everything below (grants,
-    // headless, the origin clamp) reads the clamped mode.
-    const modeForDefault = options.headless ? undefined : options.threadMode;
+    // headless, the origin clamp) reads the clamped mode. A headless run takes only a bot's `supervised` (`unattendedMode`).
+    const headlessMode = options.unattendedMode === "supervised" ? "supervised" : undefined;
+    const modeForDefault = options.headless ? headlessMode : options.threadMode;
     let chosen = clampToolPermission(
         isToolPermissionMode(override)
             ? override

@@ -14,6 +14,8 @@ const DEPLOY_FILES = [
     "scripts/check-web-size.ts",
     "scripts/check-web-bundle.ts",
     "scripts/profile-worker-startup.ts",
+    "scripts/vitest/time-sharding.ts",
+    "scripts/vitest/time-sharding.test.ts",
 ];
 
 export default [

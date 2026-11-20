@@ -260,7 +260,7 @@ export const useLayoutState = (): LayoutStateHookReturn => {
     };
 };
 
-const SEND_BEHAVIORS = new Set<UserPreferences["sendBehavior"]>(["button", "enter", "shiftEnter"]);
+const SEND_BEHAVIORS = new Set<UserPreferences["sendBehavior"]>(["button", "enter", "modEnter", "shiftEnter"]);
 
 const isSendBehavior = (value: unknown): value is UserPreferences["sendBehavior"] => SEND_BEHAVIORS.has(value as UserPreferences["sendBehavior"]);
 

@@ -187,6 +187,10 @@ describe("whether a child may pause for its owner", () => {
         return runs.at(-1)!;
     };
 
+    it("reads its bot's mode through its lead's thread", async () => {
+        expect(await oneShot({})).toMatchObject({ modeThreadId: leadId });
+    });
+
     it("pauses a one-shot child of the owner's own turn, and withholds the dispatch tools at the depth cap", async () => {
         expect(await oneShot({})).toMatchObject({ pauseForApproval: { subAgentRunId: expect.any(String) } });
         expect(runs.at(-1)).not.toHaveProperty("withheldTools");

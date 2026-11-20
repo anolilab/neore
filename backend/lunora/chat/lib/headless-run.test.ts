@@ -17,6 +17,10 @@ vi.mock("../../_generated/internal", async (importOriginal) => mappedReferences(
 const seen = vi.hoisted(() => {
     return {
         backups: [] as (string | undefined)[],
+        /** The bot's permission mode `bots_functions:getBotPermissionModeForRun` answers, and the arguments it was asked with. */
+        botMode: null as "auto" | "full" | "supervised" | null,
+        botModeFails: false,
+        botModeReads: [] as unknown[],
         buildOptions: [] as unknown[],
         callOptions: [] as unknown[],
         created: [] as unknown[],
@@ -149,9 +153,19 @@ const fakeCtx = (prefs: typeof PREFS = PREFS) =>
     ({
         runAction: vi.fn(),
         runMutation: vi.fn(async (reference: string) => (reference === "chat_goals_internal:chargeGoalRound" ? true : null)),
-        runQuery: vi.fn(async (reference: string) => {
+        runQuery: vi.fn(async (reference: string, args?: unknown) => {
             if (reference === "auth_functions:getUserPreferencesQuery") {
                 return prefs;
+            }
+
+            if (reference === "bots_functions:getBotPermissionModeForRun") {
+                seen.botModeReads.push(args);
+
+                if (seen.botModeFails) {
+                    throw new Error("bot unavailable");
+                }
+
+                return seen.botMode;
             }
 
             if (reference === "auth_functions:getAgentModulePreferencesQuery") {
@@ -428,6 +442,26 @@ describe("runHeadlessAgent thread tags", () => {
         expect(patches[0]).toEqual({ botId: "bot-1" });
     });
 
+    it("gives a new thread of a bot the bot's mode before it names the bot", async () => {
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        seen.botMode = "supervised";
+
+        try {
+            await run(ctx, { botId: "bot-1", thread: { title: "Chat" } });
+        } finally {
+            seen.botMode = null;
+        }
+
+        const writes = ctx.runMutation.mock.calls.map(([reference, args]) => [reference, args]);
+        const stamp = writes.findIndex(([reference]) => reference === "chat_thread_state:copyThreadPermissionMode");
+        const named = writes.findIndex(([, args]) => (args as { patch?: { botId?: string } }).patch?.botId === "bot-1");
+
+        expect(writes[stamp]?.[1]).toMatchObject({ mode: "supervised" });
+        expect(stamp).toBeGreaterThanOrEqual(0);
+        expect(stamp).toBeLessThan(named);
+    });
+
     it("creates a new thread with the run's organization, so no linked thread exists without it", async () => {
         const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
 
@@ -531,8 +565,13 @@ describe("runHeadlessAgent fresh context and reasoning effort", () => {
 
 describe("runHeadlessAgent tool allowlist", () => {
     beforeEach(() => {
+        seen.botModeReads = [];
         seen.buildOptions = [];
         seen.tools = [];
+    });
+
+    afterEach(() => {
+        seen.botMode = null;
     });
 
     const run = async (extra: Partial<Parameters<typeof runHeadlessAgent>[1]>) =>
@@ -563,6 +602,66 @@ describe("runHeadlessAgent tool allowlist", () => {
             ["imageGeneration", "webSearch"],
             ["imageGeneration", "mcp_notes_search", "webSearch"],
         ]);
+    });
+
+    it("builds its tools under the mode of the bot whose thread it continues", async () => {
+        seen.botMode = "supervised";
+
+        await run({});
+
+        expect(seen.botModeReads).toStrictEqual([{ botId: undefined, threadId: "thread-1", userId: "owner" }]);
+        expect(seen.buildOptions[0]).toMatchObject({ headless: true, unattendedMode: "supervised" });
+    });
+
+    it("builds a new thread's tools under the mode of the bot its lead thread leads to, and stamps nothing", async () => {
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        seen.botMode = "supervised";
+
+        await runHeadlessAgent(ctx as never, {
+            maxSteps: 5,
+            memory: false,
+            model: "test-model",
+            modeThreadId: "lead-1",
+            organizationId: null,
+            origin: "lead",
+            personalization: "none",
+            thread: { title: "Child" },
+            tools: "headless",
+            userId: "owner",
+        });
+
+        expect(seen.botModeReads).toStrictEqual([{ botId: undefined, threadId: "lead-1", userId: "owner" }]);
+        expect(seen.buildOptions[0]).toMatchObject({ headless: true, unattendedMode: "supervised" });
+        expect(ctx.runMutation.mock.calls.some(([reference]) => reference === "chat_thread_state:copyThreadPermissionMode")).toBe(false);
+    });
+
+    it("builds its tools supervised when the bot's mode cannot be read, and starts a new thread of the bot supervised", async () => {
+        const ctx = fakeCtx() as unknown as { runMutation: ReturnType<typeof vi.fn> };
+
+        seen.botModeFails = true;
+
+        try {
+            await runHeadlessAgent(ctx as never, {
+                botId: "bot-1",
+                maxSteps: 5,
+                memory: false,
+                model: "test-model",
+                organizationId: null,
+                origin: "lead",
+                personalization: "none",
+                thread: { title: "Chat" },
+                tools: "headless",
+                userId: "owner",
+            });
+        } finally {
+            seen.botModeFails = false;
+        }
+
+        expect(seen.buildOptions[0]).toMatchObject({ headless: true, unattendedMode: "supervised" });
+        expect(ctx.runMutation.mock.calls.find(([reference]) => reference === "chat_thread_state:copyThreadPermissionMode")?.[1]).toMatchObject({
+            mode: "supervised",
+        });
     });
 
     it("offers extra built-ins to the tool builder as candidates, headless", async () => {
@@ -676,6 +775,32 @@ describe("runHeadlessAgent with a goal and memory", () => {
         });
 
         expect(extractions(ctx as never)).toEqual(["only answer"]);
+    });
+
+    it("reads relative dates against when the prompt was saved, not when the run started", async () => {
+        const savedAt = Date.UTC(2026, 10, 18, 0, 1);
+
+        seen.replies = ["only answer"];
+        seen.saved = [[{ _creationTime: savedAt, _id: "p1", message: { content: "Book it for tomorrow", role: "user" }, order: 0, stepOrder: 0 }]];
+
+        const ctx = fakeCtx({ ...PREFS, memoryEnabled: true });
+
+        await runHeadlessAgent(ctx, {
+            memory: true,
+            model: "test-model",
+            organizationId: null,
+            origin: "lead",
+            personalization: "none",
+            prompt: "Book it for tomorrow",
+            thread: { title: "t" },
+            tools: "none",
+            userId: "owner",
+        });
+
+        const { runAfter } = (ctx as unknown as { scheduler: { runAfter: ReturnType<typeof vi.fn> } }).scheduler;
+        const extraction = runAfter.mock.calls.find((call) => (call[2] as { assistantResponse?: string } | undefined)?.assistantResponse);
+
+        expect(extraction?.[2]).toMatchObject({ messageAt: savedAt });
     });
 });
 

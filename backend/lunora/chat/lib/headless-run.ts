@@ -64,6 +64,7 @@ import getAgent from "./get-agent";
 import { closeMCPClients } from "./mcp-tools";
 import type { SearchMode } from "./tool-builder";
 import { servesUser } from "../../lib/shard-context";
+import { resolveTimeZone } from "../../memory/reflection-logic";
 import { applyToolAllowlist, stopWhenRequested } from "../../sub-agents/logic";
 import type { ReplySkill, SavedRowLike } from "../../usage/activity-logic";
 import { replyUsageArgs } from "../../usage/activity-logic";
@@ -118,6 +119,11 @@ export interface HeadlessRunOptions {
     /** Retrieve memories before, and extract them after. */
     memory: boolean;
     model: string;
+    /**
+     * The thread whose bot's mode the run's tools take, when the run starts a thread of its own: a sub-agent child's lead. A run
+     * that continues a thread reads it from that thread. Never stamped on the new thread.
+     */
+    modeThreadId?: string;
     /**
      * Called right before the model is asked, after the model, keys, tools and thread are ready: the
      * point from which a failure means the run reached the model (and may have been billed). A caller
@@ -266,28 +272,43 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
     // A run that continues a thread gets that thread's tools too (its linked pull requests); a new thread has none yet.
     const continuedThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
-    const toolResult =
-        options.tools === "headless" && allowTools
-            ? await buildAgentTools(ctx, {
-                  headless: true,
-                  ...(continuedThreadId !== undefined && { threadId: continuedThreadId }),
-                  ...(options.approvedTools && { headlessApproved: options.approvedTools }),
-                  ...(options.pauseForApproval && { headlessCanAsk: true }),
-                  model,
-                  organizationId: options.organizationId,
-                  searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
-                  skillTools: headlessSkillTools(skill?.config, options.additionalTools, options.withheldTools),
-                  userId,
-              })
-            : {
-                  mcpClients: [],
-                  mcpLabels: {},
-                  mcpServerNames: [],
-                  mcpToolFingerprints: NO_PERMISSION_KEYS,
-                  permissionKeys: NO_PERMISSION_KEYS,
-                  requiresApproval: [],
-                  tools: {},
-              };
+    const buildsTools = options.tools === "headless" && allowTools;
+    // The bot's mode: stamped on a new thread of the bot, and the run's tools take it where it asks more. Read for the bot the run
+    // names, else for the bot of the thread it continues or of `modeThreadId`. A failed read fails closed: this run's tools, and a new
+    // thread of the bot, are supervised, so a later chat there never starts wider than the bot asks; the owner can widen the thread.
+    const modeThreadId = continuedThreadId ?? options.modeThreadId;
+    const botMode =
+        options.botId !== undefined || (buildsTools && modeThreadId !== undefined)
+            ? await ctx
+                  .runQuery(internal.bots.functions.getBotPermissionModeForRun, { botId: options.botId, threadId: modeThreadId, userId })
+                  .catch((error: unknown) => {
+                      console.warn("[headless-run] bot permission mode unavailable, using supervised", error);
+
+                      return "supervised" as const;
+                  })
+            : null;
+    const toolResult = buildsTools
+        ? await buildAgentTools(ctx, {
+              headless: true,
+              ...(continuedThreadId !== undefined && { threadId: continuedThreadId }),
+              ...(options.approvedTools && { headlessApproved: options.approvedTools }),
+              ...(options.pauseForApproval && { headlessCanAsk: true }),
+              model,
+              organizationId: options.organizationId,
+              searchMode: (skill?.config?.searchMode as SearchMode | undefined) ?? DEFAULT_HEADLESS_SEARCH_MODE,
+              skillTools: headlessSkillTools(skill?.config, options.additionalTools, options.withheldTools),
+              ...(botMode && { unattendedMode: botMode }),
+              userId,
+          })
+        : {
+              mcpClients: [],
+              mcpLabels: {},
+              mcpServerNames: [],
+              mcpToolFingerprints: NO_PERMISSION_KEYS,
+              permissionKeys: NO_PERMISSION_KEYS,
+              requiresApproval: [],
+              tools: {},
+          };
     const toolAllowlist =
         options.toolAllowlist && options.toolAllowlistKeepsMcp ? [...options.toolAllowlist, ...Object.keys(toolResult.mcpLabels)] : options.toolAllowlist;
 
@@ -321,7 +342,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             userProviderKeys,
         });
 
-        const memoryContext = extractMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId) : undefined;
+        const memoryContext = extractMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId, prefs.timezone) : undefined;
         const extraParts = [options.system, memoryContext].filter((part): part is string => !!part);
         // Without extra parts the agent falls back to its own instructions.
         const system = extraParts.length > 0 ? [agent.options.instructions, ...extraParts].filter(Boolean).join("\n\n") : undefined;
@@ -369,6 +390,11 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // Before the run: a tool call reads `thread.botId` to find the bot's computer, and a later threaded run reads the
             // thread's organization, which went in with the insert above. A thread that already exists is never moved.
             if (options.botId) {
+                // The mode before the bot: a thread that names its bot always carries the bot's mode, like a chat started with it.
+                if (botMode) {
+                    await ctx.runMutation(internal.chat.thread_state.copyThreadPermissionMode, { mode: botMode, threadId });
+                }
+
                 await ctx.runMutation(internal.agent.threads.updateThread, {
                     patch: { botId: options.botId },
                     threadId: threadId as Id<"threads">,
@@ -400,6 +426,11 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         };
         const result = await thread.generateText(generateArgs as never, callOptions).catch(wakeOnFailure);
         const text = result.text ?? "";
+        // When the prompt was saved, which the generation does after preparing its context: "tomorrow" in it is read against that day.
+        const promptAt =
+            (result as { savedMessages?: ReadonlyArray<{ _creationTime: number; message?: { role?: string } }> }).savedMessages?.find(
+                (row) => row.message?.role === "user",
+            )?._creationTime ?? startedAt;
         // Usage heatmap + per-skill breakdown, keyed on the reply's first row so a
         // redelivered record counts once. Every round of a goal is a reply of its own. Scheduled before any write below:
         // the generation is paid for even when a later write (the pause's, the thread's) fails.
@@ -507,7 +538,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 void ctx.scheduler.runAfter(0, internal.memory.extract.extractMemories, {
                     assistantResponse: answer.slice(0, 4000),
                     ...(options.botId && { botId: options.botId }),
+                    messageAt: promptAt,
                     threadId: threadId as Id<"threads">,
+                    // The timezone the run read, UTC when none is set: a change before the job runs does not move its dates.
+                    timeZone: resolveTimeZone(prefs.timezone),
                     userId,
                     userMessage: prompt,
                 });

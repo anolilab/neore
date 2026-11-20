@@ -9,7 +9,7 @@
  * which is a separate BrowserWindow with its own preload and a file: URL. The site cannot reach these,
  * and the device window cannot reach the relay (`isTrusted` rejects its frame).
  */
-import { arch, homedir, platform, release } from "node:os";
+import { arch, homedir, platform, release, userInfo } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -25,6 +25,7 @@ import { HostPoster } from "../acp/ingest";
 import { AgentInstaller } from "../acp/install";
 import { SleepLock } from "../acp/keep-awake";
 import { AcpManager } from "../acp/manager";
+import { findNodeTools } from "../acp/node-tools";
 import { coreGate } from "../acp/permission";
 import { acpSupported, spawnAgent } from "../acp/process";
 import { AgentRegistry } from "../acp/registry";
@@ -37,6 +38,8 @@ import { backendOrigin } from "../site";
 import type { TerminalOpener } from "../terminal/index";
 import { DEVICE_CHANNEL, LOCAL_CHANNEL, LOCAL_EVENT } from "./channels";
 import { deviceDiagnostics, serverDiagnostics } from "./diagnostics";
+import { createAddProjectMachines } from "./machines";
+import { readSshConfig } from "./ssh-config";
 import type { HostTransport } from "./transport";
 import { createLocalTransport } from "./transport";
 import type { CoreEvent, DeviceCore, Prompt, SettingsView } from "./types";
@@ -51,6 +54,9 @@ import {
     readHooksHash,
     readHostPairing,
     readHostSpec,
+    readMachineId,
+    readMachinePath,
+    readMachineRequest,
     readNativeSessionId,
     readOptionalDeviceId,
     readOptionId,
@@ -67,6 +73,7 @@ import {
     readSessionTitle,
     readSettingsUpdate,
     readSigned,
+    readSshAlias,
 } from "./validate";
 
 /** A file name for the archive of a server folder: the folder's own name, without anything a file name may not hold. */
@@ -375,7 +382,8 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
             log: (message) => console.error(message),
             observer: host,
             onChange: () => send(state.local?.webContents, LOCAL_EVENT.acp),
-            plan: (agentKey, folder) => JSON.parse(core.acpSpawnPlan(agentKey, folder)) as SpawnPlan,
+            // Off the main thread: the plan hashes an installed npm agent's files before it answers.
+            plan: async (agentKey, folder) => JSON.parse(await core.acpSpawnPlanAsync(agentKey, folder)) as SpawnPlan,
             sleepLock,
             spawn: spawnAgent,
             // Run by the core in the shell sandbox, after a once-only prompt in this computer's window.
@@ -654,6 +662,60 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
         requireTransport().hostDisconnect(readDeviceId(deviceId));
     });
 
+    // The add-project picker: this computer and the ssh hosts of ~/.ssh/config. The page asks; a connection, a folder
+    // created on a server and a folder shared from one each need a native confirmation (`machines.ts`).
+    const machines = createAddProjectMachines({
+        confirm: async ({ detail, message }) => {
+            const dialogOptions = { buttons: ["Cancel", "OK"], cancelId: 0, defaultId: 0, detail, message, noLink: true, type: "question" as const };
+            const parent = liveLocal();
+            const result = parent === undefined ? await dialog.showMessageBox(dialogOptions) : await dialog.showMessageBox(parent, dialogOptions);
+
+            return result.response === 1;
+        },
+        home: () => homedir(),
+        hostBrowse: async (deviceId, folder, after) => requireTransport().hostBrowse(deviceId, folder, after),
+        hostConnect: async (deviceId) => requireTransport().hostConnect(deviceId, false),
+        hostMakeDir: async (deviceId, folder) => requireTransport().hostMakeDir(deviceId, folder),
+        setRoots: (deviceId, roots) => {
+            requireTransport().settingsUpdate(JSON.stringify({ host: { deviceId, roots } }));
+        },
+        settings: () => requireTransport().settingsGet(),
+        sshHosts: () => readSshConfig(),
+        status: () => requireTransport().status(),
+        username: () => userInfo().username,
+    });
+
+    relay(DEVICE_CHANNEL.listAddProjectMachines, () => machines.list());
+
+    relay(DEVICE_CHANNEL.connectAddProjectMachine, async (_event, alias) => machines.connect(readSshAlias(alias)));
+
+    /** The machine id and a path of a request; "absolute" means this computer's rule or a server's, so the machine is looked up first. */
+    const readMachineCall = (request: unknown, allowEmpty = false): { after: unknown; machineId: string; path: string } => {
+        const { after, machineId, path: folder } = readMachineRequest(request);
+        const id = readMachineId(machineId);
+        const onThisComputer = requireTransport().status().deviceId === id;
+
+        return { after, machineId: id, path: readMachinePath(folder, onThisComputer, allowEmpty) };
+    };
+
+    relay(DEVICE_CHANNEL.browseMachineFolders, async (_event, request) => {
+        const call = readMachineCall(request, true);
+
+        return machines.browse(call.machineId, call.path, readAfter(call.after));
+    });
+
+    relay(DEVICE_CHANNEL.createMachineFolder, async (_event, request) => {
+        const call = readMachineCall(request);
+
+        return machines.createFolder(call.machineId, call.path);
+    });
+
+    relay(DEVICE_CHANNEL.shareMachineFolder, async (_event, request) => {
+        const call = readMachineCall(request);
+
+        return machines.shareFolder(call.machineId, call.path);
+    });
+
     relay(DEVICE_CHANNEL.execute, async (_event, call) => {
         const { envelope, signature } = readSigned(call);
 
@@ -791,12 +853,17 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
 
     const updateAcp = async (update: string): Promise<AcpView> => {
         const parsed = JSON.parse(update) as AcpUpdate;
-        const { key, op } = parsed as { key?: string; op?: string };
+        const { agentKey, key, op } = parsed as { agentKey?: string; key?: string; op?: string };
 
         // Refused before anything is saved: a sign-out is checking the account on the command or variables it would change.
         state.acp?.refuseUpdateWhileSigningOut(parsed);
 
         const view = JSON.parse(requireCore().acpUpdate(update)) as AcpView;
+
+        // A plan in flight holds the variables as they were.
+        if (op === "setEnv" || op === "removeEnv") {
+            state.acp?.environmentChanged(agentKey);
+        }
 
         // What an agent reported says nothing about a different program.
         if (key !== undefined && (op === "saveAgent" || op === "removeAgent")) {
@@ -816,7 +883,7 @@ export const registerDeviceIpc = (options: DeviceIpcOptions): boolean => {
     // The registry is read when the window searches, never otherwise: there is no timer and no check of installed
     // agents against it, so nothing updates an agent but an install the user confirms again.
     const requireRegistry = (): AgentRegistry => {
-        state.registry ??= new AgentRegistry({ fetch: options.fetch, supported: acpSupported });
+        state.registry ??= new AgentRegistry({ fetch: options.fetch, hasNpmTools: () => findNodeTools() !== undefined, supported: acpSupported });
 
         return state.registry;
     };

@@ -33,6 +33,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import ComposerAskAside from "@/features/chat/aside/composer-ask-aside";
+import BrowserLiveView from "@/features/chat/browser-live-view/browser-live-view";
 import CompactionChip from "@/features/chat/compaction/compaction-chip";
 import { CinemaPanel } from "@/features/chat/components/cinema-studio";
 import { DEFAULT_MESSAGE_OPTS } from "@/features/chat/core/constants/query-options";
@@ -68,6 +69,7 @@ import ComposerLanguageSelector from "./composer-language-selector";
 import ComposerMCPSelector from "./composer-mcp-selector";
 import ComposerModelSelector from "./composer-model-selector";
 import ComposerThreadPermissionMode, { usePermissionModeSaving } from "./composer-permission-mode";
+import ComposerProjectHint from "./composer-project-hint";
 import ComposerReferencesButton from "./composer-references-button";
 import ComposerResearchDepth from "./composer-research-depth";
 import ComposerSearchMode from "./composer-search-mode";
@@ -688,6 +690,9 @@ const Composer: FC<ComposerProps> = ({
                     <div className="text-foreground absolute top-full w-full pt-2 text-center text-xs">{t`Neore can make mistakes. Check important information.`}</div>
                 )}
 
+                {/* The agent's cloud browser while one runs for this thread: watch it live, read-only */}
+                {!minimal && <BrowserLiveView threadId={validThreadId} />}
+
                 {/* Mode-specific content above composer with animations */}
                 <AnimatePresence initial={animateEntrance} mode="popLayout">
                     {composerMode === "text" && !isDrawOpen && (
@@ -705,6 +710,9 @@ const Composer: FC<ComposerProps> = ({
                             {!minimal && isEnableFollowupSuggestions && !isImageModel && !isVideoModel && !isAudioModel && !isStreaming && !isSubmitting && (
                                 <ComposerFollowupSuggestions />
                             )}
+
+                            {/* Project hint for a new thread's first message - not in a comparison fan-out, which files nothing */}
+                            {!minimal && !onSubmitOverride && !isStreaming && !isSubmitting && <ComposerProjectHint />}
 
                             {/* Search suggestions while typing - only in search modes */}
                             {composerMode === "text" && searchMode !== "chat" && !isStreaming && !isSubmitting && <ComposerSearchSuggestions />}

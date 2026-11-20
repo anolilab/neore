@@ -15,6 +15,7 @@
  * two share lives in `lib/agent-run.ts`.
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
+import { messageCarriesOutsideAgentText, typedTextOf } from "./lib/attached-text";
 import { estimateTokensFromCharacters, hasActiveFilters, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
@@ -731,7 +732,12 @@ export const runStreamingAgent = internalAction
                     });
 
                 // A sidebar stop during the run ends it here, with the reply it still owed saved (`endStoppedRun`).
-                const recordRun = async (extra: Pick<Parameters<typeof afterRun>[1], "botId" | "extractMemory" | "firstTokenTime" | "prompt">) => {
+                const recordRun = async (
+                    extra: Pick<
+                        Parameters<typeof afterRun>[1],
+                        "botId" | "extractMemory" | "firstTokenTime" | "prompt" | "promptAt" | "promptMessageId" | "quotablePrompt"
+                    >,
+                ) => {
                     // The rows an earlier invocation of this reply saved (before a pause or a death) were never stamped with their
                     // tool names: this run's labels are the same ones. Idempotent, and never masks how the run ended.
                     if (priorRows.length > 0) {
@@ -751,9 +757,10 @@ export const runStreamingAgent = internalAction
                         // A run resumed after a pause records the whole reply: its earlier rows come first, so the key is the reply's first row.
                         savedMessages: [...priorRows, ...(result.savedMessages ?? [])],
                         ...(skill && { skill }),
-                        steeredTexts: steering.steeredTexts(),
+                        steered: steering.steered(),
                         summarizeThread: runContext.prefs.threadSummariesEnabled,
                         threadId,
+                        ...(message && { promptAt: message._creationTime }),
                         ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }),
                         timingStart,
                         userId,
@@ -901,6 +908,15 @@ export const runStreamingAgent = internalAction
                     extractMemory,
                     firstTokenTime,
                     prompt,
+                    // Only the user's own words are quoted: not a prompt an outside agent wrote (its origin, or the mark it was saved with, since a
+                    // regenerate runs with no origin), nor a collaborator's prompt the user regenerated.
+                    ...(origin !== "outside_agent" &&
+                        !messageCarriesOutsideAgentText(message?.message) &&
+                        (message?.userId === undefined || message.userId === userId) && {
+                            ...(message && { promptAt: message._creationTime }),
+                            promptMessageId: messageId,
+                            quotablePrompt: typedTextOf(message?.message),
+                        }),
                 });
 
                 // A run that belongs to a goal is reviewed before the chat settles: the goal keeps the thread running

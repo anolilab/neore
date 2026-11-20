@@ -24,6 +24,7 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
+import { guestHasFollowRows } from "../chat/follows/follow-writes";
 import { ADMIN } from "../env";
 import { noteShardActivity } from "../lib/shard-housekeeping";
 import { deleteShardRoutesOf } from "../lib/shard-routes";
@@ -162,11 +163,12 @@ const cascadeDelete = async (ctx: MutationCtx, user: Id<"user">): Promise<void> 
  * Delete a guest whose rows have been moved to the account it converted to, the way the anonymous plugin deletes it
  * when the conversion completes in the guest's own browser. The last step of `lib/account-merge.ts#runGuestMerge`,
  * run on the guest's shard. Only ever an anonymous user: a missing or real one is left alone, so a second run (queue
- * redelivery) or a wrong id does nothing.
+ * redelivery) or a wrong id does nothing. A guest still named by a thread follow (one written after the merge read its
+ * last page) is kept and `followsRemain` is set, so the merge fails and its redelivery moves the row first.
  */
 export const deleteMergedGuest = internalMutation
     .input({ userId: v.string() })
-    .output(v.object({ deleted: v.boolean() }))
+    .output(v.object({ deleted: v.boolean(), followsRemain: v.optional(v.boolean()) }))
     .mutation(async ({ args, ctx }) => {
         const user = (await ctx.db.user.findFirst({ where: { _id: ctx.db.asId("user", args.userId) } })) as {
             _id: Id<"user">;
@@ -175,6 +177,10 @@ export const deleteMergedGuest = internalMutation
 
         if (user?.isAnonymous !== true) {
             return { deleted: false };
+        }
+
+        if (await guestHasFollowRows(ctx.db, user._id)) {
+            return { deleted: false, followsRemain: true };
         }
 
         await cascadeDelete(ctx, user._id);

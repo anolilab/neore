@@ -39,6 +39,23 @@ vi.mock("@/lib/toast", () => {
     return { showError: () => {}, showSuccess: () => {} };
 });
 
+const follow = vi.hoisted(() => {
+    return {
+        error: null as Error | null,
+        isPending: false,
+        setState: vi.fn(),
+        state: "off" as "on" | "off" | "muted" | undefined,
+    };
+});
+
+vi.mock("../follows/use-thread-follow", () => {
+    return {
+        useThreadFollow: () => {
+            return { error: follow.error, isPending: follow.isPending, setState: follow.setState, state: follow.state };
+        },
+    };
+});
+
 const { default: ThreadOptionsMenu } = await import("./thread-options-menu");
 
 const OPEN_IN_SPLIT_VIEW = { name: "Open in split view" };
@@ -105,5 +122,84 @@ describe("ThreadOptionsMenu", () => {
         fireEvent.click(screen.getByRole("menuitem", OPEN_IN_SPLIT_VIEW));
 
         expect(onOpenInSplitView).toHaveBeenCalledTimes(1);
+    });
+
+    describe("follow items", () => {
+        beforeEach(() => {
+            follow.error = null;
+            follow.isPending = false;
+            follow.setState.mockReset();
+        });
+
+        it("offers Follow and Mute while the thread is not followed", () => {
+            follow.state = "off";
+            renderMenu();
+
+            expect(screen.getByRole("menuitem", { name: "Follow thread" })).toBeTruthy();
+            expect(screen.getByRole("menuitem", { name: "Mute thread" })).toBeTruthy();
+            expect(screen.queryByRole("menuitem", { name: "Unfollow thread" })).toBeNull();
+        });
+
+        it("offers Unfollow and Mute while the thread is followed", () => {
+            follow.state = "on";
+            renderMenu();
+
+            expect(screen.getByRole("menuitem", { name: "Unfollow thread" })).toBeTruthy();
+            expect(screen.getByRole("menuitem", { name: "Mute thread" })).toBeTruthy();
+            expect(screen.queryByRole("menuitem", { name: "Follow thread" })).toBeNull();
+        });
+
+        it("offers Follow and Unfollow while the thread is muted", () => {
+            follow.state = "muted";
+            renderMenu();
+
+            expect(screen.getByRole("menuitem", { name: "Follow thread" })).toBeTruthy();
+            expect(screen.getByRole("menuitem", { name: "Unfollow thread" })).toBeTruthy();
+            expect(screen.queryByRole("menuitem", { name: "Mute thread" })).toBeNull();
+        });
+
+        it("shows no follow item until the state has loaded", () => {
+            follow.state = undefined;
+            renderMenu();
+
+            expect(screen.queryByRole("menuitem", { name: "Follow thread" })).toBeNull();
+            expect(screen.queryByRole("menuitem", { name: "Mute thread" })).toBeNull();
+        });
+
+        it("says the follow state could not be loaded, instead of hiding the items", () => {
+            follow.state = undefined;
+            follow.error = new Error("network");
+            renderMenu();
+
+            expect(screen.getByRole("menuitem", { name: "Couldn't load follow state" }).getAttribute("aria-disabled")).toBe("true");
+            expect(screen.queryByRole("menuitem", { name: "Follow thread" })).toBeNull();
+        });
+
+        it("offers no follow choice from a cached state while the refetch fails", () => {
+            follow.state = "off";
+            follow.error = new Error("network");
+            renderMenu();
+
+            expect(screen.getByRole("menuitem", { name: "Couldn't load follow state" })).toBeTruthy();
+            expect(screen.queryByRole("menuitem", { name: "Follow thread" })).toBeNull();
+            expect(screen.queryByRole("menuitem", { name: "Mute thread" })).toBeNull();
+        });
+
+        it("disables the follow items while a change is in flight", () => {
+            follow.state = "off";
+            follow.isPending = true;
+            renderMenu();
+
+            expect(screen.getByRole("menuitem", { name: "Follow thread" }).getAttribute("aria-disabled")).toBe("true");
+            expect(screen.getByRole("menuitem", { name: "Mute thread" }).getAttribute("aria-disabled")).toBe("true");
+        });
+
+        it("sets the chosen state when an item is clicked", () => {
+            follow.state = "off";
+            renderMenu();
+            fireEvent.click(screen.getByRole("menuitem", { name: "Mute thread" }));
+
+            expect(follow.setState).toHaveBeenCalledWith("muted");
+        });
     });
 });

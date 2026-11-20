@@ -38,15 +38,19 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { getUtilityModel } from "../lib/utility-model";
 import { runBeliefRevision } from "./extract";
+import { reembedRewordedMemory } from "./functions";
 import {
     buildReflectionPrompt,
     checkReflectionEligibility,
     createReflectionBudget,
     decayToOps,
     digestDayOf,
+    expiryToOps,
     estimateTokens,
+    localDayOf,
     mergeToOps,
     nextReflectionRunAt,
     planActivityUpdate,
@@ -54,11 +58,19 @@ import {
     promotionToOp,
     REFLECTION_LIMITS,
     REFLECTION_SYSTEM_PROMPT,
+    type ContradictionCandidate,
     type ReflectionMemory,
     type ReflectionOp,
     revisionToOps,
+    committedReflectionOps,
+    countAppliedMerges,
+    countResolvedContradictions,
     selectReflectionInputs,
+    splitExpired,
 } from "./reflection-logic";
+import { newestEvidence } from "./evidence";
+import { logRedaction, redactDigestSummary, redactMemoryText, redactReflectionOps } from "./redact";
+import { factDatesOf, hasFactDates, isExpired, normalizeFactDates, sameFactDates } from "./dates";
 import { lastConfirmedOf } from "./taxonomy";
 import { MAX_LENGTH } from "../lib/validators";
 
@@ -210,50 +222,66 @@ export const claimReflectionRun = internalMutation
 // Inputs and writes
 // ============================================================================
 
+const vReflectionRow = v.object({
+    confidence: v.number(),
+    createdAt: v.number(),
+    eventEnd: v.optional(v.string()),
+    eventStart: v.optional(v.string()),
+    id: v.string(),
+    importance: v.number(),
+    lastConfirmedAt: v.number(),
+    pinned: v.boolean(),
+    text: v.string(),
+    threadId: v.optional(v.string()),
+    type: vReflectionMemoryType,
+    updatedAt: v.number(),
+    validUntil: v.optional(v.string()),
+});
+
+/**
+ * Expiry reads a scope's active rows in pages of `EXPIRY_PAGE_ROWS`, each its own query (one transaction stays far below
+ * the read limit), at most `EXPIRY_READ_PAGES` of them.
+ */
+const EXPIRY_PAGE_ROWS = 250;
+const EXPIRY_READ_PAGES = 40;
+/** Expiry retirements per write, so a scope with many expired rows never needs one oversized transaction. */
+const EXPIRY_WRITE_BATCH = 250;
+/** How long a failed expiry batch waits before it is written again. */
+const EXPIRY_RETRY_DELAY_MS = 5 * 60_000;
+
+const toReflectionRow = (m: Doc<"memories">) => {
+    return {
+        confidence: m.confidence ?? 70,
+        createdAt: m._creationTime,
+        id: m._id as string,
+        importance: m.importance ?? 50,
+        lastConfirmedAt: lastConfirmedOf(m),
+        pinned: m.pinned === true,
+        text: m.memory,
+        type: m.type,
+        updatedAt: m.updatedAt ?? m._creationTime,
+        ...(m.threadId && { threadId: m.threadId as string }),
+        ...factDatesOf(m),
+    };
+};
+
 export const loadReflectionInputs = internalQuery
     .input({ botId: v.optional(v.string()), now: v.number(), userId: v.string() })
     .output(
         v.object({
-            memories: v.array(
-                v.object({
-                    confidence: v.number(),
-                    createdAt: v.number(),
-                    id: v.string(),
-                    importance: v.number(),
-                    lastConfirmedAt: v.number(),
-                    pinned: v.boolean(),
-                    text: v.string(),
-                    threadId: v.optional(v.string()),
-                    type: vReflectionMemoryType,
-                    updatedAt: v.number(),
-                }),
-            ),
+            memories: v.array(vReflectionRow),
             threadTitles: v.array(v.string()),
         }),
     )
     .query(async ({ args: { botId, now, userId }, ctx }) => {
         // One scope per call: the user's own memories (no bot), or one bot's. Merging, decay and
         // promotion never cross a scope, so one bot's memory never merges into another's or the user's.
+        const scopeBot = (botId ?? null) as Id<"bots"> | null;
         const rows = await ctx.db
             .query("memories")
-            .withIndex("by_userId_botId", (q) => q.eq("userId", userId).eq("botId", (botId ?? null) as Id<"bots"> | null))
+            .withIndex("by_userId_botId", (q) => q.eq("userId", userId).eq("botId", scopeBot))
             .take(REFLECTION_READ_CAP);
-        const memories = rows
-            .filter((m) => !m.supersededBy)
-            .map((m) => {
-                return {
-                    confidence: m.confidence ?? 70,
-                    createdAt: m._creationTime,
-                    id: m._id as string,
-                    importance: m.importance ?? 50,
-                    lastConfirmedAt: lastConfirmedOf(m),
-                    pinned: m.pinned === true,
-                    text: m.memory,
-                    type: m.type,
-                    updatedAt: m.updatedAt ?? m._creationTime,
-                    ...(m.threadId && { threadId: m.threadId as string }),
-                };
-            });
+        const memories = rows.filter((m) => !m.supersededBy).map((m) => toReflectionRow(m));
 
         // "The day's threads": the ones that produced a memory in the last day.
         const since = now - DAY_MS;
@@ -273,14 +301,55 @@ export const loadReflectionInputs = internalQuery
         return { memories, threadTitles };
     });
 
+/** One page of a scope's active rows, keeping those past their end date (unpinned): expiry reads the whole scope, page by page. */
+export const loadExpiredMemoriesPage = internalQuery
+    .input({ botId: v.optional(v.string()), cursor: v.union(v.string(), v.null()), now: v.number(), timeZone: v.optional(v.string()), userId: v.string() })
+    .output(v.object({ continueCursor: v.union(v.string(), v.null()), expired: v.array(vReflectionRow), isDone: v.boolean() }))
+    .query(async ({ args: { botId, cursor, now, timeZone, userId }, ctx }) => {
+        const today = localDayOf(now, timeZone);
+        const result = await ctx.db
+            .query("memories")
+            .withIndex("by_userId_botId_active", (q) =>
+                q
+                    .eq("userId", userId)
+                    .eq("botId", (botId ?? null) as Id<"bots"> | null)
+                    .eq("supersededBy", null),
+            )
+            .order("desc")
+            .paginate({ cursor, numItems: EXPIRY_PAGE_ROWS });
+
+        return {
+            continueCursor: result.continueCursor,
+            expired: result.page.filter((m) => m.pinned !== true && isExpired(m, today)).map((m) => toReflectionRow(m)),
+            isDone: result.isDone,
+        };
+    });
+
 const vReflectionOp = v.union(
-    v.object({ byMemoryId: v.string(), kind: v.literal("supersede"), memoryId: v.string() }),
     v.object({
+        absorbedText: v.optional(v.string()),
+        byMemoryId: v.string(),
+        checkDates: v.optional(
+            v.object({
+                by: v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) }),
+                memory: v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) }),
+            }),
+        ),
+        expiredOn: v.optional(v.string()),
+        kind: v.literal("supersede"),
+        memoryId: v.string(),
+        merge: v.optional(v.literal(true)),
+    }),
+    v.object({
+        checkDates: v.optional(
+            v.object({ memory: v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) }) }),
+        ),
         confidence: v.optional(v.number()),
         kind: v.literal("patch"),
         lastConfirmedAt: v.optional(v.number()),
         memory: v.optional(v.string()),
         memoryId: v.string(),
+        readText: v.optional(v.string()),
     }),
     v.object({
         confidence: v.number(),
@@ -288,6 +357,7 @@ const vReflectionOp = v.union(
         kind: v.literal("promote"),
         memory: v.string(),
         sourceIds: v.array(v.string()),
+        sourceTexts: v.optional(v.array(v.object({ id: v.string(), memory: v.string() }))),
         threadId: v.optional(v.string()),
         type: vReflectionMemoryType,
     }),
@@ -296,15 +366,27 @@ const vReflectionOp = v.union(
 /**
  * Applies a run's writes. Every op re-reads its rows and re-checks ownership,
  * that the row is still active, and — defence in depth for the plan's own rule
- * — that a pinned row is never superseded.
+ * — that a pinned row is never superseded. Each row whose wording it wrote is
+ * re-embedded. It returns what it committed: the rows it superseded and the
+ * wording it wrote, for the digest.
  */
 export const applyReflectionOps = internalMutation
     .input({ botId: v.optional(v.string()), ops: v.array(vReflectionOp), userId: v.string() })
-    .output(v.object({ applied: v.number(), promotedIds: v.array(v.string()), textChangedIds: v.array(v.string()) }))
+    // One `promotedIds` entry per promote op, in order: `null` where the promotion was not made.
+    .output(
+        v.object({
+            applied: v.number(),
+            promotedIds: v.array(v.union(v.string(), v.null())),
+            supersededIds: v.array(v.string()),
+            written: v.array(v.object({ memory: v.string(), memoryId: v.string() })),
+        }),
+    )
     .mutation(async ({ args: { botId, ops, userId }, ctx }) => {
         const { now } = ctx;
-        const promotedIds: string[] = [];
-        const textChangedIds: string[] = [];
+        const promotedIds: (string | null)[] = [];
+        const supersededIds: string[] = [];
+        // The last wording written to each row.
+        const written = new Map<Id<"memories">, string>();
         let applied = 0;
 
         // A row outside this scope is refused, so one scope's ops can never write another's rows.
@@ -314,14 +396,52 @@ export const applyReflectionOps = internalMutation
             return row?.userId === userId && (row.botId as string | undefined) === botId && !row.supersededBy ? row : null;
         };
 
+        // A merge applies whole or not at all: when its survivor was edited, or a row it absorbs was revised, deleted,
+        // retired, pinned or given other dates after the plan read it, neither the survivor's new wording nor any retirement
+        // of that merge is written, so no merged text overwrites the user's edit, outlives the fact it read or carries one the
+        // user removed.
+        const staleMerges = new Set<string>();
+        const datesMoved = (row: Doc<"memories">, planned: { eventEnd?: string; eventStart?: string; validUntil?: string } | undefined): boolean =>
+            planned !== undefined && !sameFactDates(factDatesOf(row), normalizeFactDates(planned));
+
+        for (const op of ops) {
+            if (op.kind === "patch" && op.readText !== undefined) {
+                const row = await active(op.memoryId);
+
+                if (row?.memory !== op.readText || datesMoved(row, op.checkDates?.memory)) {
+                    staleMerges.add(op.memoryId);
+                }
+
+                continue;
+            }
+
+            if (op.kind !== "supersede" || op.merge !== true || op.absorbedText === undefined) {
+                continue;
+            }
+
+            const row = await active(op.memoryId);
+
+            if (!row || row.pinned === true || row.memory !== op.absorbedText || datesMoved(row, op.checkDates?.memory)) {
+                staleMerges.add(op.byMemoryId);
+            }
+        }
+
         for (const op of ops) {
             switch (op.kind) {
                 case "patch": {
                     const row = await active(op.memoryId);
 
-                    if (!row) {
+                    if (!row || staleMerges.has(op.memoryId)) {
                         break;
                     }
+
+                    // A wording planned for other dates than the row holds now is not written: a person's date edit wins.
+                    if (op.checkDates && !sameFactDates(factDatesOf(row), normalizeFactDates(op.checkDates.memory))) {
+                        break;
+                    }
+
+                    // The backstop: a wording that is nothing but a secret keeps the row's text; the rest of the patch applies.
+                    const memory = op.memory === undefined ? undefined : (redactMemoryText(op.memory) ?? undefined);
 
                     await ctx.db.patch(
                         "memories",
@@ -332,13 +452,13 @@ export const applyReflectionOps = internalMutation
                             // effective confirmation time, which would otherwise
                             // follow `updatedAt` forward.
                             lastConfirmedAt: op.lastConfirmedAt ?? lastConfirmedOf(row),
-                            memory: op.memory,
+                            memory,
                             updatedAt: now,
                         }),
                     );
 
-                    if (op.memory !== undefined && op.memory !== row.memory) {
-                        textChangedIds.push(row._id);
+                    if (memory !== undefined && memory !== row.memory) {
+                        written.set(row._id, memory);
                     }
 
                     applied += 1;
@@ -346,18 +466,31 @@ export const applyReflectionOps = internalMutation
                 }
                 case "promote": {
                     const rows = await Promise.all(op.sourceIds.map(async (id) => active(id)));
-                    const sources = rows.filter((row): row is Doc<"memories"> => row !== null && row.pinned !== true);
+                    const read = new Map(op.sourceTexts?.map((source) => [source.id, source.memory]));
+                    const sources = rows.filter(
+                        (row): row is Doc<"memories"> => row !== null && row.pinned !== true && (read.get(row._id as string) ?? row.memory) === row.memory,
+                    );
+                    // A promotion that is nothing but a secret is not made, and its sources stay.
+                    const memory = redactMemoryText(op.memory);
+                    // Planned from undated activities: a source dated since is an occurrence, not a habit, so nothing is promoted.
+                    const datedSince = sources.some((row) => hasFactDates(factDatesOf(row)));
 
-                    if (sources.length === 0) {
+                    // A source revised, deleted or pinned since the synthesis read it leaves the promotion unmade: the
+                    // promoted wording still holds its old fact, and every source stays active for the next run.
+                    if (sources.length === 0 || sources.length !== rows.length || memory === null || datedSince) {
+                        promotedIds.push(null);
                         break;
                     }
 
+                    const evidence = newestEvidence(sources);
                     const promotedId = await ctx.db.insert("memories", {
                         botId: botId as Id<"bots"> | undefined,
                         confidence: op.confidence,
+                        // The newest words among the merged rows back the promoted one.
+                        ...(evidence && { evidence }),
                         importance: op.importance,
                         lastConfirmedAt: now,
-                        memory: op.memory,
+                        memory,
                         source: "reflection",
                         threadId: op.threadId as Id<"threads"> | undefined,
                         type: op.type,
@@ -368,10 +501,11 @@ export const applyReflectionOps = internalMutation
 
                     for (const source of sources) {
                         await ctx.db.patch("memories", source._id, { supersededBy: promotedId, updatedAt: now });
+                        supersededIds.push(source._id);
                     }
 
                     promotedIds.push(promotedId);
-                    textChangedIds.push(promotedId);
+                    written.set(promotedId, memory);
                     applied += 1;
                     break;
                 }
@@ -379,11 +513,41 @@ export const applyReflectionOps = internalMutation
                     const row = await active(op.memoryId);
                     const by = op.byMemoryId === op.memoryId ? row : await active(op.byMemoryId);
 
-                    if (!row || !by || row.pinned === true) {
+                    // An expiry planned before a restatement moved the end date no longer holds. A merge whose absorbed row
+                    // was revised since the plan read it is left out: its newer words are a different fact, and it stays
+                    // active for the next run.
+                    if (
+                        !row ||
+                        !by ||
+                        row.pinned === true ||
+                        (op.expiredOn !== undefined && !isExpired(row, op.expiredOn)) ||
+                        (op.merge === true && staleMerges.has(op.byMemoryId))
+                    ) {
+                        break;
+                    }
+
+                    // A supersession decided on dates the rows no longer hold (a person edited one meanwhile) is not applied.
+                    if (
+                        op.checkDates &&
+                        (!sameFactDates(factDatesOf(row), normalizeFactDates(op.checkDates.memory)) ||
+                            !sameFactDates(factDatesOf(by), normalizeFactDates(op.checkDates.by)))
+                    ) {
                         break;
                     }
 
                     await ctx.db.patch("memories", row._id, { supersededBy: by._id, updatedAt: now });
+
+                    // The survivor takes the absorbed row's words when they were said later. Outside a merge, a survivor
+                    // with no quote takes none: it is the newer belief that contradicts or reworded the absorbed one.
+                    // Only a merge hands the absorbed row's words on: a replacing belief keeps its own quote, never the replaced one's.
+                    // A survivor the user wrote (`manual`) takes none: its words are theirs, not anything they were quoted saying.
+                    const evidence = by._id === row._id || op.merge !== true || by.source === "manual" ? undefined : newestEvidence([by, row]);
+
+                    if (evidence !== undefined && evidence !== by.evidence) {
+                        await ctx.db.patch("memories", by._id, { evidence });
+                    }
+
+                    supersededIds.push(row._id);
                     applied += 1;
                     break;
                 }
@@ -393,7 +557,21 @@ export const applyReflectionOps = internalMutation
             }
         }
 
-        return { applied, promotedIds, textChangedIds };
+        // A later op may have superseded a row whose wording was written: it needs no vector of its own then.
+        for (const memoryId of written.keys()) {
+            if (!supersededIds.includes(memoryId)) {
+                await reembedRewordedMemory(ctx, memoryId, userId);
+            }
+        }
+
+        return {
+            applied,
+            promotedIds,
+            supersededIds,
+            written: [...written].map(([memoryId, memory]) => {
+                return { memory, memoryId };
+            }),
+        };
     });
 
 export const saveMemoryDigest = internalMutation
@@ -454,14 +632,39 @@ interface ScopeOutcome {
  */
 const reflectScope = async (
     ctx: ActionCtx,
-    scope: { botId: string | undefined; budget: ReflectionBudget; model: UtilityModel | undefined; now: number; userId: string },
+    scope: { botId: string | undefined; budget: ReflectionBudget; model: UtilityModel | undefined; now: number; timeZone: string | undefined; userId: string },
 ): Promise<ScopeOutcome> => {
-    const { botId, budget, model, now, userId } = scope;
+    const { botId, budget, model, now, timeZone, userId } = scope;
     const inputs = await ctx.runQuery(internal.memory.reflection.loadReflectionInputs, { botId, now, userId });
-    const memories: ReflectionMemory[] = selectReflectionInputs(inputs.memories, now, REFLECTION_LIMITS);
+    // Expiry is read in the user's own calendar: a fact held "until the 20th" is retired on the 21st there.
+    const today = localDayOf(now, timeZone);
+    // The capped read plans the rest; expiry also sees every active row, page by page, so an old expired fact is retired.
+    const expiredRows: ReflectionMemory[] = [];
+    let cursor: string | null = null;
+
+    for (let page = 0; page < EXPIRY_READ_PAGES; page += 1) {
+        const result: { continueCursor: string | null; expired: ReflectionMemory[]; isDone: boolean } = await ctx.runQuery(
+            internal.memory.reflection.loadExpiredMemoriesPage,
+            { botId, cursor, now, timeZone, userId },
+        );
+
+        expiredRows.push(...result.expired);
+
+        if (result.isDone) {
+            break;
+        }
+
+        cursor = result.continueCursor;
+    }
+
+    const everyRow = [...new Map([...inputs.memories, ...expiredRows].map((m) => [m.id, m])).values()];
+    const { expire, live } = splitExpired(everyRow, today);
+    const memories: ReflectionMemory[] = selectReflectionInputs(live, now, REFLECTION_LIMITS);
     const byId = new Map(memories.map((m) => [m.id, m]));
     const plan = planReflection(memories, now);
     const learnedToday = memories.filter((m) => m.createdAt >= now - DAY_MS);
+    // Retirements for expiry are written apart, in bounded batches: a scope can hold thousands of expired rows.
+    const expiryOps = expiryToOps(expire, today);
     const ops: ReflectionOp[] = decayToOps(plan);
 
     // 1. One synthesis call: merge wording, promotion decisions, the digest.
@@ -493,7 +696,8 @@ const reflectScope = async (
         }
     }
 
-    const mergedText = new Map((synthesis?.merges ?? []).map((m) => [m.id, m.text.slice(0, REFLECTION_LIMITS.maxMemoryChars)]));
+    // Cut to length only after redaction (in `redactReflectionOps`), so a cut never hides the end of a secret.
+    const mergedText = new Map((synthesis?.merges ?? []).map((m) => [m.id, m.text]));
 
     for (const [index, merge] of plan.merges.entries()) {
         ops.push(...mergeToOps(merge, byId, now, mergedText.get(index)));
@@ -508,15 +712,16 @@ const reflectScope = async (
             continue;
         }
 
-        const op = promotionToOp(candidate, byId, { memory: decision.text.slice(0, REFLECTION_LIMITS.maxMemoryChars), type: decision.type });
+        const op = promotionToOp(candidate, byId, { memory: decision.text, type: decision.type });
 
         if (op) {
             ops.push(op);
         }
     }
 
-    // 2. Contradictions, through the extractor's own belief revision.
-    let contradictionsResolved = 0;
+    // 2. Contradictions, through the extractor's own belief revision. Their merged text is stored whole, never cut.
+    const revisedPairs: ContradictionCandidate[] = [];
+    const revisionOps = new Set<ReflectionOp>();
 
     for (const pair of plan.contradictions) {
         if (!model || !budget.tryReserve(estimateTokens(pair.olderText + pair.newerText) + 200)) {
@@ -524,64 +729,98 @@ const reflectScope = async (
         }
 
         try {
-            const decision = await runBeliefRevision(model, pair.olderText, pair.newerText, REFLECTION_LIMITS.maxOutputTokensPerCall);
-            const revisionOps = revisionToOps(pair, decision, now);
+            const older = byId.get(pair.olderId);
+            const newer = byId.get(pair.newerId);
+            // The newer row keeps its own dates: an UPDATE's merged wording is written for them when the two rows' differ.
+            const newDates = older && newer && !sameFactDates(factDatesOf(older), factDatesOf(newer)) ? factDatesOf(newer) : undefined;
+            const decision = await runBeliefRevision(model, pair.olderText, pair.newerText, REFLECTION_LIMITS.maxOutputTokensPerCall, newDates);
+            const pairOps = revisionToOps(pair, decision, now, byId);
 
-            if (revisionOps.length > 0) {
-                contradictionsResolved += 1;
-                ops.push(...revisionOps);
+            if (pairOps.length > 0) {
+                revisedPairs.push(pair);
+                ops.push(...pairOps);
+
+                for (const op of pairOps) {
+                    revisionOps.add(op);
+                }
             }
         } catch (error) {
             console.warn("[memory/reflection] Belief revision failed:", error);
         }
     }
 
-    // 3. Write, then re-embed whatever changed wording.
-    const result =
-        ops.length > 0
-            ? await ctx.runMutation(internal.memory.reflection.applyReflectionOps, { botId, ops, userId })
-            : { applied: 0, promotedIds: [] as string[], textChangedIds: [] as string[] };
+    // 3. Write with secrets redacted, then re-embed whatever changed wording.
+    const redaction = redactReflectionOps(ops, REFLECTION_LIMITS.maxMemoryChars, revisionOps);
+    const writeOps = redaction.ops;
 
-    for (const memoryId of result.textChangedIds) {
-        await ctx.scheduler.runAfter(0, internal.memory.extract.regenerateMemoryEmbedding, { memoryId: memoryId as Id<"memories">, userId });
+    logRedaction(ctx.log, "reflection", redaction);
+    let expiryApplied = 0;
+    const expirySuperseded: string[] = [];
+
+    // A batch that fails does not stop the run, which still writes the rest and its digest. The batch is written again
+    // on its own, without waiting for another run (which needs the user to be active): each retirement rechecks its row.
+    for (let start = 0; start < expiryOps.length; start += EXPIRY_WRITE_BATCH) {
+        const batchOps = expiryOps.slice(start, start + EXPIRY_WRITE_BATCH);
+
+        try {
+            const batch = await ctx.runMutation(internal.memory.reflection.applyReflectionOps, { botId, ops: batchOps, userId });
+
+            expiryApplied += batch.applied;
+            expirySuperseded.push(...batch.supersededIds);
+        } catch (error) {
+            console.warn("[memory/reflection] An expiry batch failed; retrying it on its own:", error);
+            // On the owner's shard, where the rows live.
+            await runAfterOnShard(
+                ctx.scheduler,
+                EXPIRY_RETRY_DELAY_MS,
+                internal.memory.reflection.applyReflectionOps,
+                { botId, ops: batchOps, userId },
+                userId,
+            );
+        }
     }
 
-    // 4. What the digest says about this scope.
-    const superseded = new Set(
-        ops.flatMap((op) => {
-            if (op.kind === "supersede") {
-                return [op.memoryId];
-            }
+    const result =
+        writeOps.length > 0
+            ? await ctx.runMutation(internal.memory.reflection.applyReflectionOps, { botId, ops: writeOps, userId })
+            : { applied: 0, promotedIds: [] as (string | null)[], supersededIds: [] as string[], written: [] as { memory: string; memoryId: string }[] };
 
-            return op.kind === "promote" ? op.sourceIds : [];
-        }),
-    );
-    const promoteOps = ops.filter((op): op is Extract<ReflectionOp, { kind: "promote" }> => op.kind === "promote");
+    // 4. What the digest says about this scope, from what the write committed: a source pinned meanwhile stays active
+    // and is still listed, and a row it reworded is listed with its new wording.
+    const superseded = new Set([...expirySuperseded, ...result.supersededIds]);
+    const committed = new Map(result.written.map(({ memory, memoryId }) => [memoryId, memory]));
+    const promoteOps = writeOps.filter((op): op is Extract<ReflectionOp, { kind: "promote" }> => op.kind === "promote");
+    const committedOps = committedReflectionOps(writeOps, result.supersededIds);
     const learned = [
         ...promoteOps.flatMap((op, index) => {
             const memoryId = result.promotedIds[index];
 
-            return memoryId ? [{ memory: op.memory, memoryId, type: op.type as string }] : [];
+            return memoryId ? [{ memory: committed.get(memoryId) ?? op.memory, memoryId, type: op.type as string }] : [];
         }),
+        // A row written before redaction existed may still hold a secret: redacted here, left out when that is all it is.
         ...learnedToday
             .filter((m) => !superseded.has(m.id))
-            .map((m) => {
-                return { memory: m.text, memoryId: m.id, type: m.type as string };
+            .flatMap((m) => {
+                const memory = committed.get(m.id) ?? redactMemoryText(m.text);
+
+                return memory === null ? [] : [{ memory, memoryId: m.id, type: m.type as string }];
             }),
     ].slice(0, REFLECTION_LIMITS.maxDigestItems);
 
     return {
-        applied: result.applied,
+        applied: expiryApplied + result.applied,
         learned,
         stats: {
-            contradictionsResolved,
+            // Counted from what is written: a revision whose wording was only a secret resolves nothing.
+            contradictionsResolved: countResolvedContradictions(revisedPairs, committedOps),
             decayed: plan.decay.length,
-            merged: plan.merges.length,
+            merged: countAppliedMerges(plan.merges, committedOps),
             newMemories: learnedToday.length,
-            promoted: result.promotedIds.length,
-            retired: plan.retire.length,
+            promoted: result.promotedIds.filter((id) => id !== null).length,
+            // A retirement is a supersession of a row by itself (decay or expiry); count only those the write committed.
+            retired: [...expiryOps, ...writeOps].filter((op) => op.kind === "supersede" && op.byMemoryId === op.memoryId && superseded.has(op.memoryId)).length,
         },
-        summary: (synthesis?.summary ?? "").trim().slice(0, REFLECTION_LIMITS.maxSummaryChars),
+        summary: redactDigestSummary(synthesis?.summary ?? "", REFLECTION_LIMITS.maxSummaryChars),
     };
 };
 
@@ -613,12 +852,12 @@ export const runMemoryReflection = internalAction
 
         // The user's own memories first, then each bot's, each planned on its own.
         const botIds = await ctx.runQuery(internal.bots.functions.listBotIdsForUser, { userId });
-        const userScope = await reflectScope(ctx, { botId: undefined, budget, model, now, userId });
+        const userScope = await reflectScope(ctx, { botId: undefined, budget, model, now, timeZone: claim.timeZone, userId });
         const botScopes: ScopeOutcome[] = [];
 
         for (const botId of botIds) {
             try {
-                botScopes.push(await reflectScope(ctx, { botId, budget, model, now, userId }));
+                botScopes.push(await reflectScope(ctx, { botId, budget, model, now, timeZone: claim.timeZone, userId }));
             } catch (error) {
                 // One bot's failure must not skip the other bots or the user's digest.
                 console.warn("[memory/reflection] A bot's reflection failed, continuing:", error);

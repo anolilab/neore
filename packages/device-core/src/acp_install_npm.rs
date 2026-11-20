@@ -11,8 +11,10 @@
 //!    with a scrubbed environment, so no `PATH` lookup, user `.npmrc` or `NODE_OPTIONS` reaches them;
 //! 3. the installed package must be the name and version that was pinned, and its program is resolved INSIDE it;
 //! 4. every file, folder and link of the prefix is hashed ([`tree_hash`]) and the hash recorded in the pin next
-//!    to the index's integrity, the folder is renamed to `acp-agents/<key>/<version>` and the agent is recorded
-//!    to run `node <program>`: the command is never `npx`, and nothing is resolved at launch.
+//!    to the index's integrity, the folder is renamed to `acp-agents/<key>/npm-<version>-<tree hash prefix>` and the
+//!    agent is recorded to run `node <program>`: the command is never `npx`, and nothing is resolved at launch.
+//!    The folder is named by its content, so a reinstall with other bytes never replaces files a plan already
+//!    verified: it lands in a folder of its own, and the old one goes only when the desktop prunes it.
 //!
 //! Only the package's own dependencies are checked before npm runs (`refuse_unverified_dependencies`): what the
 //! registry's packages depend on in turn is still left to npm, so one hop through a registry package can reach a
@@ -36,8 +38,8 @@ use sha2::{Digest, Sha256, Sha512};
 
 use crate::acp::{validate_agent, AcpAgent, AcpInstall, AcpView, EnvVars};
 use crate::acp_install::{
-    create_private_dir, run_id, safe_relative, sha256_reader, validate_provenance, INSTALLING_DIR,
-    UNPACKED_DIR,
+    create_private_dir, install_dir_name, run_id, safe_relative, sha256_reader,
+    validate_provenance, INSTALLING_DIR, UNPACKED_DIR,
 };
 use crate::engine::{now_ms, DeviceState, Event};
 use crate::hmac::to_hex;
@@ -45,8 +47,11 @@ use crate::hmac::to_hex;
 const MAX_TREE_ENTRIES: usize = 200_000;
 const TARBALL: &str = "package.tgz";
 const HOME_DIR: &str = "home";
-/// How often the staging folder is measured while npm runs, in 100 ms polls.
-const STAGE_CHECK_EVERY: u32 = 5;
+/// When the staging folder is first measured while npm runs. The wait doubles after each measurement, up to
+/// [`STAGE_CHECK_MAX`]: a measurement walks the whole folder, which on a large dependency tree is hundreds of
+/// thousands of `stat` calls competing with npm for the disk.
+const STAGE_CHECK_FIRST: Duration = Duration::from_millis(500);
+const STAGE_CHECK_MAX: Duration = Duration::from_secs(8);
 /// Variables the install passes on: a proxy and certificate settings decide whether the network is reachable behind
 /// a corporate proxy. None of them names a program to run. Everything else is left out.
 const PASSED_ENV: [&str; 7] = [
@@ -650,6 +655,9 @@ fn run_npm(
         .args([
             "install",
             "--ignore-scripts",
+            // A git dependency can name its own git through its `.npmrc`, which runs code whatever `--ignore-scripts`
+            // says (npm before 11.10 has no switch for it; the desktop refuses those).
+            "--allow-git=none",
             "--no-audit",
             "--no-fund",
             "--no-package-lock",
@@ -686,15 +694,15 @@ fn run_npm(
     let mut child = spawn_retrying_busy(&mut command)
         .map_err(|error| format!("npm could not be started: {error}"))?;
     let deadline = Instant::now() + limits.npm_timeout;
-    let mut until_check = STAGE_CHECK_EVERY;
+    let mut check_every = STAGE_CHECK_FIRST;
+    let mut next_check = Instant::now() + check_every;
 
     loop {
-        until_check -= 1;
-
         // A package and its dependencies can expand far beyond the tarball that was verified: stop npm while it
         // runs, not after it has filled the disk.
-        if until_check == 0 {
-            until_check = STAGE_CHECK_EVERY;
+        if Instant::now() >= next_check {
+            check_every = (check_every * 2).min(STAGE_CHECK_MAX);
+            next_check = Instant::now() + check_every;
 
             if stage_over(stage, limits.stage_bytes) {
                 stop_npm(&mut child);
@@ -1045,10 +1053,19 @@ impl DeviceState {
         }
 
         let tree = tree_hash(&prefix)?;
+        let pin = AcpInstall {
+            index_integrity: Some(request.integrity.clone()),
+            publisher: request.publisher.clone(),
+            registry_env: request.env.keys().cloned().collect(),
+            sha256,
+            source: request.source.clone(),
+            tree_sha256: Some(tree.clone()),
+            version: request.version.clone(),
+        };
         let final_dir = self
             .install_root()
             .join(&request.key)
-            .join(&request.version);
+            .join(install_dir_name(&pin));
         let in_final = final_dir
             .join("node_modules")
             .join(&request.package)
@@ -1064,14 +1081,7 @@ impl DeviceState {
             // identity was checked in `validate`; a link that is re-pointed later is the person's own change.
             command: node.to_string_lossy().into_owned(),
             env: EnvVars(request.env.clone()),
-            install: Some(AcpInstall {
-                index_integrity: Some(request.integrity.clone()),
-                publisher: request.publisher.clone(),
-                sha256,
-                source: request.source.clone(),
-                tree_sha256: Some(tree.clone()),
-                version: request.version.clone(),
-            }),
+            install: Some(pin),
             key: request.key.clone(),
             label: request.label.trim().to_owned(),
         };
@@ -1100,7 +1110,10 @@ impl DeviceState {
         let Some(expected) = &pin.tree_sha256 else {
             return Ok(());
         };
-        let dir = self.install_root().join(&agent.key).join(&pin.version);
+        let dir = self
+            .install_root()
+            .join(&agent.key)
+            .join(self.installed_dir_name(agent, pin));
 
         // The interpreter is the person's own Node, not part of the hashed files. When an upgrade or a version
         // manager removed it, say so rather than letting the start fail with an operating-system error.
@@ -1139,7 +1152,7 @@ impl DeviceState {
                 }));
 
                 return Err(format!(
-                    "{} {} has a node_modules folder next to its install that Neore did not put there ({}). Neore will not start it. Remove that folder, or reinstall the agent.",
+                    "{} {} has a node_modules folder next to its install that Neore did not put there ({}). Neore will not start it. Look at what is in that folder, then move or remove it.",
                     agent.label,
                     pin.version,
                     outside.display()

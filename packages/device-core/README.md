@@ -215,12 +215,49 @@ the pinned program keeps it.
 The check reads files after a type check, so it guards against changes made at rest, not against someone who can
 write to the folder while the agent is starting (a known limit).
 
+The installed folder is `acp-agents/<key>/npm-<version>-<16 hex of the tree hash>` (`install_dir_name`): a reinstall with
+other bytes lands beside the old folder, so a plan already verified never runs files it did not hash. The old folder
+goes when the desktop calls `acpInstallPrune`, after it closed the sessions started from it.
+
+The pin records the names of the variables the registry set (`registry_env`). A reinstall keeps the person's own
+variables, lays the registry's new ones over them and drops those the registry set before and no longer sets.
+
 An install, a removal and a prune of old versions run one at a time (`lock_installs`). Deleting an install or a
 staging folder renames it into `acp-agents/.trash` under that lock and deletes it on a thread; trash names carry a
-per-run id, and the sweep at the next install stage removes the entries of other runs only.
+per-run id, and the sweep at the next install stage removes the entries of other runs only. When the rename fails,
+the entry is deleted where it is, on the calling thread.
 
-`acp_install_npm` (addon only; no desktop caller yet) installs a downloaded tarball: its SHA-512 must equal the
-package index's integrity before and after npm runs, npm runs with `--ignore-scripts` and a scrubbed environment by
-the absolute `node` and `npm` the desktop found (refused if either resolves elsewhere than when the person
-confirmed), the installed package must be the pinned name and version, and its program (a JavaScript file, picked
+`acp_install_npm` (called by the desktop's `acp/install.ts`) installs a downloaded tarball: its SHA-512 must equal the
+package index's integrity before and after npm runs, npm runs with `--ignore-scripts`, `--allow-git=none` and a
+scrubbed environment by the absolute `node` and `npm` the desktop gave (refused if either is not the file it was when
+the person confirmed). The desktop resolves a version manager's shim to the Node.js binary it runs and the npm next to
+it, and refuses npm older than 11.10 (`acp/node-tools.ts#resolveNodeTools`); the installed package must be the pinned name and version, and its program (a JavaScript file, picked
 like `npx` would) must be inside it. The agent is recorded to run `node <program>`.
+
+## Headless host (`neore-host pair | run | unpair`, feature `headless`)
+
+A machine the owner pairs by code, as a device with its own secret (unlike an SSH server, whose secret stays on the
+desktop). The `headless` feature links the keyring and an HTTPS client; the build shipped to SSH servers stays
+`--no-default-features`.
+
+- **Pairing.** `pair` asks the backend for a `neore-host` code on the device-authorization plugin the CLI sign-in
+  uses (same table, rate limits, expiry and one-time claim) and announces `storage: keychain|file`, so the approval
+  page says where the secret will live. The owner approves in the web app; the machine's next poll claims the code,
+  the device is registered, and the secret is in that one response. A full account (`device_limit`) is waited on with
+  the code unspent; a registration that fails for a reason of ours puts the code back, and registration is
+  idempotent per code, so a lost reply yields one device.
+- **Address.** https only. A loopback address over plain http is accepted by a debug build with
+  `NEORE_HOST_DEV_INSECURE_LOOPBACK=1`; a release build never reads the flag.
+- **Storage.** The OS keychain when a probe round-trips, else a 0600 file in a 0700 folder (`NEORE_HOST_DIR`; macOS
+  `~/Library/Application Support/Neore Host`, Linux `$XDG_CONFIG_HOME/neore-host` or `~/.config/neore-host`). The
+  folder must be a real folder of the user that others cannot enter, the record a plain file of the user. The record
+  is replaced through a temporary file. A group-readable secret file, or a keychain that lost its secret, is refused
+  at load. The keychain account is `<length of backend>:<backend>|<device id>`.
+- **Commands.** `pair` opens no listener. `run` only decides which signed calls are for this device
+  (`envelope::verify_call`, nonces persisted, a damaged history refuses to start) over its own stdin. `pair`, `run`
+  and `unpair` take one lock on the folder; `unpair` asks first (`--yes`, `--dry-run`) without holding the lock,
+  then removes the keychain entry, the record and the used-nonce history, and is refused while `run` holds the
+  pairing.
+- **Exit codes of `pair`.** 0 paired, 2 usage, 3 denied, 4 expired, 5 code invalid or used, 6 refused, 7 backend
+  unreachable (worth retrying), 8 possibly registered or not stored, 1 other (among them a machine
+  with nowhere private to keep the secret, which asks for no code).
