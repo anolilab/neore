@@ -419,6 +419,27 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor)).toBe("x `foo` y");
     });
 
+    it("finds a code span opened right after a line break, which a backslash before the break does not escape", () => {
+        // a, backslash, line break, then `foo` with "foo" at positions 5 to 8.
+        const editor = editorWith("<p>a&#92;<br>`foo` b</p>");
+        const before = text(editor);
+
+        select(editor, 5, 8);
+
+        expect(wrapSelectionOnTextInput(editor.view, 5, 8, "*")).toBe(true);
+        expect(text(editor)).toBe(before);
+    });
+
+    it("wraps quickly beside many unmatched backtick runs of different lengths", () => {
+        const runs = Array.from({ length: 600 }, (_, index) => `${"`".repeat(index + 1)}x`).join("");
+        const editor = editorWith(`<p>hello ${runs}</p>`);
+
+        select(editor, 1, 6);
+
+        expect(wrapSelectionOnTextInput(editor.view, 1, 6, "*")).toBe(true);
+        expect(text(editor).startsWith("**hello** `x")).toBe(true);
+    });
+
     it("wraps a selection that holds a whole inline code span, since both of its ends are outside the span", () => {
         const editor = editorWith("<p>x `foo` y</p>");
 

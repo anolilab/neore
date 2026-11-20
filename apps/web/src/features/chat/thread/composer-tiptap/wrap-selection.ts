@@ -35,47 +35,57 @@ const runLength = (text: string, start: number): number => {
     return end - start;
 };
 
-/** The index of the next backtick run of exactly `length` at or after `start`, or -1. */
-const findRun = (text: string, start: number, length: number): number => {
-    let index = start;
+/**
+ * A lookup of the next backtick run of an exact length at or after a position. The runs are found in one pass and each
+ * length keeps a cursor that only moves forward, because the scan in `codeSpans` asks with rising positions: the whole
+ * paragraph is read a bounded number of times, however many runs it has.
+ */
+const nextRunFinder = (text: string): ((start: number, length: number) => number) => {
+    const runsByLength = new Map<number, number[]>();
 
-    while (index < text.length) {
-        if (text[index] === "`") {
-            const run = runLength(text, index);
+    for (const run of text.matchAll(/`+/g)) {
+        const starts = runsByLength.get(run[0].length) ?? [];
 
-            if (run === length) {
-                return index;
-            }
-
-            index += run;
-        } else {
-            index += 1;
-        }
+        starts.push(run.index);
+        runsByLength.set(run[0].length, starts);
     }
 
-    return -1;
+    const cursors = new Map<number, number>();
+
+    return (start, length) => {
+        const starts = runsByLength.get(length) ?? [];
+        let cursor = cursors.get(length) ?? 0;
+
+        while (cursor < starts.length && (starts[cursor] ?? 0) < start) {
+            cursor += 1;
+        }
+
+        cursors.set(length, cursor);
+
+        return starts[cursor] ?? -1;
+    };
 };
 
 /**
  * The inline code spans of a paragraph, as parent offsets. Markdown shows everything inside one literally, so a delimiter
- * inserted there would not render. A backtick escaped by a backslash outside code does not open a span.
+ * inserted there would not render. A backtick escaped by a backslash outside code does not open a span. A line break or
+ * other inline node counts as a line ending, so a backslash before it escapes nothing after it.
  */
 const codeSpans = (parent: ProseMirrorNode): [number, number][] => {
     const offsets: number[] = [];
     let text = "";
 
     parent.forEach((child, offset) => {
-        if (!child.isText) {
-            return;
-        }
+        const part = child.isText ? (child.text ?? "") : "\n";
 
-        for (let index = 0; index < (child.text ?? "").length; index += 1) {
+        for (let index = 0; index < part.length; index += 1) {
             offsets.push(offset + index);
         }
 
-        text += child.text ?? "";
+        text += part;
     });
 
+    const findRun = nextRunFinder(text);
     const spans: [number, number][] = [];
     let index = 0;
 
@@ -84,7 +94,7 @@ const codeSpans = (parent: ProseMirrorNode): [number, number][] => {
             index += 2;
         } else if (text[index] === "`") {
             const length = runLength(text, index);
-            const closing = findRun(text, index + length, length);
+            const closing = findRun(index + length, length);
 
             if (closing === -1) {
                 index += length;
