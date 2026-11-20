@@ -658,3 +658,22 @@ fn control_characters_from_the_backend_never_reach_the_terminal() {
     assert_eq!(paired.name, "box]0;x");
     assert_eq!(paired.account, "o***@example.com[2K");
 }
+
+#[test]
+fn an_approval_link_that_is_not_https_is_refused_before_it_is_shown() {
+    for (field, link) in [
+        ("verification_uri", "javascript:alert(1)"),
+        ("verification_uri", "http://neore.ai/auth/device"),
+        ("verification_uri_complete", "file:///etc/passwd"),
+    ] {
+        let mut backend = FakeBackend::new(vec![]);
+
+        backend.code.body[field] = json!(link);
+
+        let (outcome, shown, timer) = run(&backend, &FakeKeychain::default(), "link");
+
+        assert!(matches!(outcome, Err(PairError::Refused(_))), "{link}");
+        assert!(shown.is_empty(), "{link}");
+        assert!(timer.slept.borrow().is_empty(), "{link}");
+    }
+}

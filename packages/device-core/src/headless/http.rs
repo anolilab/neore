@@ -28,7 +28,7 @@ pub trait Http {
 /// reads it, so a packaged `neore-host` cannot be told to send the secret unencrypted.
 pub const DEV_INSECURE_LOOPBACK_VAR: &str = "NEORE_HOST_DEV_INSECURE_LOOPBACK";
 
-fn dev_insecure_loopback() -> bool {
+pub(super) fn dev_insecure_loopback() -> bool {
     cfg!(debug_assertions) && std::env::var(DEV_INSECURE_LOOPBACK_VAR).as_deref() == Ok("1")
 }
 
