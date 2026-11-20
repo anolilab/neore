@@ -427,8 +427,9 @@ describe(factEvidence, () => {
             factEvidence("hunter22 and I love jazz", 999, { quotablePrompt: "hunter22 and I love jazz", threadId: "t1", userMessage: steered }),
         ).toBeUndefined();
 
-        // An ordinary short answer under a quoted question keeps its quote.
-        const answered = `> Where do you live?\nI live in Porto`;
+        // An ordinary short answer under a quoted question keeps its quote: the composer ends a quote with a blank line, and a
+        // line straight under it would read as part of the quote (`withoutQuotedLines`).
+        const answered = `> Where do you live?\n\nI live in Porto`;
 
         expect(factEvidence("I live in Porto", 999, { ...steerTurn, userMessage: answered })?.quote).toBe("I live in Porto");
         expect(factEvidence("I live in Porto", 999, { quotablePrompt: "I live in Porto", threadId: "t1", userMessage: answered })?.quote).toBe(

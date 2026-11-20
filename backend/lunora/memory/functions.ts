@@ -220,6 +220,8 @@ export const getMemorySource = authQuery
                 messageOrder: v.optional(v.number()),
                 messageStepOrder: v.optional(v.number()),
                 quote: v.optional(v.string()),
+                /** When the quoted words were said, read with the quote: the list's date may be older than a newer quote. */
+                quoteAt: v.optional(v.number()),
                 quoteHidden: v.optional(v.boolean()),
                 threadId: v.optional(v.string()),
             }),
@@ -245,9 +247,10 @@ export const getMemorySource = authQuery
             (access === null && (await holdsThreadGrant(context, threadId, userId)));
         const quoteHidden = !readable && memory.evidence?.quote !== undefined;
         const quote = readable ? memory.evidence?.quote : undefined;
+        const quoteAt = quote === undefined ? undefined : memory.evidence?.at;
 
         if (access?.kind !== "full" || access.thread.deleted === true) {
-            return withoutUndefined({ quote, quoteHidden: quoteHidden || undefined });
+            return withoutUndefined({ quote, quoteAt, quoteHidden: quoteHidden || undefined });
         }
 
         const messageId = memory.evidence?.messageId;
@@ -270,6 +273,7 @@ export const getMemorySource = authQuery
             messageOrder: onPath ? message?.order : undefined,
             messageStepOrder: onPath ? (message?.stepOrder ?? 0) : undefined,
             quote,
+            quoteAt,
             threadId,
         });
     });

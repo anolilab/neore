@@ -147,7 +147,7 @@ describe("extraction evidence", () => {
 
 describe("belief revision", () => {
     /** `meanwhile` runs while the model words the merge. */
-    const revise = async (userMessage: string, quote: string | undefined, meanwhile?: () => Promise<void>) => {
+    const revise = async (userMessage: string, quote: string | undefined, meanwhile?: () => Promise<void>, promptAt?: number) => {
         // The new fact is close to the stored one (Jaccard), and the revision merges them.
         generateText
             .mockResolvedValueOnce({
@@ -165,6 +165,7 @@ describe("belief revision", () => {
             async (ctx: any) =>
                 await ctx.runAction(extractMemories, {
                     assistantResponse: "Noted.",
+                    ...(promptAt !== undefined && { promptAt }),
                     promptMessageId: "message-2",
                     quotablePrompt: userMessage,
                     threadId,
@@ -199,14 +200,15 @@ describe("belief revision", () => {
     it("quotes the words a slow revision's wording came from, even when the row's quote was said later", async () => {
         expect.assertions(1);
 
-        const newer = { at: Date.now() + 60_000, messageId: "message-9", quote: "newer words", threadId };
+        // Both send times fixed: the row's quote was said at 2000, the slow revision's words at 1000.
+        const newer = { at: 2000, messageId: "message-9", quote: "newer words", threadId };
 
         await insertMemory({ evidence: newer, memory: "The user works as a nurse in Hamburg" });
 
-        const rows = await revise(MESSAGE, "I work as a nurse in Hamburg");
+        const rows = await revise(MESSAGE, "I work as a nurse in Hamburg", undefined, 1000);
 
         expect(rows[0]).toMatchObject({
-            evidence: { quote: "I work as a nurse in Hamburg", threadId },
+            evidence: { at: 1000, quote: "I work as a nurse in Hamburg", threadId },
             memory: "The user works as a nurse in Hamburg city centre",
         });
     });
@@ -535,9 +537,10 @@ describe("evidence through reflection and export", () => {
 
         const survivor = await insertMemory({ evidence: { at: 1, quote: "I drink tea" }, memory: "The user drinks tea" });
         const absorbed = await insertMemory({ evidence: { at: 2, quote: "I drink it every morning" }, memory: "The user drinks tea every morning" });
-        const patch = change === "pinned" ? { pinned: true } : { supersededBy: await insertMemory({ memory: "The user drinks coffee" }) };
 
-        await harness.run(async (ctx: any) => await ctx.db.patch("memories", absorbed, patch));
+        await harness.run(async (ctx: any) =>
+            change === "pinned" ? await ctx.db.patch("memories", absorbed, { pinned: true }) : await ctx.db.delete("memories", absorbed),
+        );
         await harness.run(
             async (ctx: any) =>
                 await ctx.runMutation(applyReflectionOps, {
@@ -575,7 +578,7 @@ describe("evidence through reflection and export", () => {
     });
 
     it("gives a superseding row without a quote none of the replaced belief's words", async () => {
-        expect.assertions(1);
+        expect.assertions(2);
 
         const replaced = await insertMemory({ evidence: { at: 1, quote: "I live in Paris" }, memory: "The user lives in Paris" });
         const survivor = await insertMemory({ memory: "The user lives in Berlin" });
@@ -585,8 +588,9 @@ describe("evidence through reflection and export", () => {
                 await ctx.runMutation(applyReflectionOps, { ops: [{ byMemoryId: survivor, kind: "supersede", memoryId: replaced }], userId: USER }),
         );
 
-        const kept = await harness.run(async (ctx: any) => await ctx.db.get("memories", survivor));
+        const [kept, retired] = await harness.run(async (ctx: any) => await Promise.all([ctx.db.get("memories", survivor), ctx.db.get("memories", replaced)]));
 
+        expect(retired.supersededBy).toBe(survivor);
         expect(kept.evidence).toBeUndefined();
     });
 

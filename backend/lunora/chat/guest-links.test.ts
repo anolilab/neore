@@ -68,6 +68,7 @@ const { default: schema } = await import("../schema");
 const guestLinks = await import("./guest-links");
 const { _deletePageForThreadId, createTemporaryThread, deleteAllForThreadIdAsync, markThreadArchived, softDeleteThread } = await import("../agent/threads");
 const { enableThreadLock } = await import("../agent/thread-lock");
+const sharing = await import("../agent/sharing");
 const { GUEST_ROUTE_BATCH, scheduleGuestLinkRouteDrop, withdrawGuestLinksForThread } = await import("./lib/guest-link-store");
 
 const OWNER = "user-owner";
@@ -193,6 +194,21 @@ describe("a deleted chat's share grants", () => {
             });
         });
         await remove();
+
+        // The delete schedules the revocation; it runs a batch at a time and schedules the next until none is left.
+        const ran = new Set<string>();
+
+        for (let pass = 0; pass < 10; pass += 1) {
+            const due = harness.scheduler.list().filter((job) => !ran.has(job.id) && Object.keys(job.args).join(",") === "threadId");
+
+            for (const job of due) {
+                ran.add(job.id);
+                await harness.run(async (ctx: any) => await ctx.runMutation(sharing.revokeThreadGrantsJob, job.args));
+            }
+        }
+
+        // 121 grants and an invite take four batches.
+        expect(ran.size).toBeGreaterThan(3);
 
         const grants = await harness.run(async (ctx: any) => await ctx.db.threadAccess.findMany({ where: { userId: "collaborator" } }));
         const invites = await harness.run(async (ctx: any) => await ctx.db.threadInvites.findMany({ where: { threadId } }));

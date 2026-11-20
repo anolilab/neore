@@ -102,7 +102,7 @@ const useLearnedLabel = (memory: MemoryItemData, learnedOn: string): string => {
  */
 /** `describedBy` names the memory's text, so each "Open message" link says which memory it belongs to. */
 const MemorySource: FC<{ describedBy: string; memoryId: string }> = ({ describedBy, memoryId }) => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const {
         data: source,
@@ -138,7 +138,15 @@ const MemorySource: FC<{ describedBy: string; memoryId: string }> = ({ described
                     {source?.quoteHidden === true ? t`The quote stays hidden while you can't open its chat.` : t`No quote was kept for this memory.`}
                 </p>
             ) : (
-                <blockquote className="text-muted-foreground text-xs italic">{`“${source.quote}”`}</blockquote>
+                <>
+                    <blockquote className="text-muted-foreground text-xs italic">{`“${source.quote}”`}</blockquote>
+                    {/* The quote's own date, read with it: the row's date comes from the list and may predate a newer quote. */}
+                    {source.quoteAt !== undefined && (
+                        <time className="text-muted-foreground text-[10px]" dateTime={new Date(source.quoteAt).toISOString()}>
+                            {i18n.date(new Date(source.quoteAt), { dateStyle: "medium" })}
+                        </time>
+                    )}
+                </>
             )}
             {source?.threadId !== undefined && (
                 <Link

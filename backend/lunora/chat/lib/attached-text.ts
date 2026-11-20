@@ -94,18 +94,42 @@ export const messagesCarryAttachedText = (messages: ReadonlyArray<MessageLike>):
         return (message.content as ReadonlyArray<ContentPart>).some((part) => isAttachedPart(part));
     });
 
-/** A Markdown blockquote line: the composer's quote action puts text from an assistant reply in this form. */
-const QUOTED_LINE_RE = /^ {0,3}>(?: |$)/u;
+/** A Markdown blockquote line: the composer's quote action puts text from an assistant reply in this form. A space after the
+ * marker is optional in Markdown, so `>I prefer trains` is quoted too. */
+const QUOTED_LINE_RE = /^ {0,3}>/u;
+
+const BLANK_LINE_RE = /^\s*$/u;
+
+/**
+ * Which lines are part of a blockquote: those with the marker, and the lines that run on from them without one (a quoted
+ * paragraph's lazy continuation in Markdown) until a blank line ends it.
+ */
+const quotedLines = (lines: ReadonlyArray<string>): boolean[] => {
+    let inQuote = false;
+
+    return lines.map((line) => {
+        if (QUOTED_LINE_RE.test(line)) {
+            inQuote = true;
+        } else if (BLANK_LINE_RE.test(line)) {
+            inQuote = false;
+        }
+
+        return inQuote;
+    });
+};
 
 const LEADING_NEWLINES_RE = /^\n+/u;
 
 /** The text without its blockquote lines: quoted words came from elsewhere, not from the person's own typing. */
-export const withoutQuotedLines = (text: string): string =>
-    text
-        .split("\n")
-        .filter((line) => !QUOTED_LINE_RE.test(line))
+export const withoutQuotedLines = (text: string): string => {
+    const lines = text.split("\n");
+    const quoted = quotedLines(lines);
+
+    return lines
+        .filter((_, index) => !quoted[index])
         .join("\n")
         .replace(LEADING_NEWLINES_RE, "");
+};
 
 /**
  * A text part the app wrote for the person: the file-only question (`fileOnlyPromptPart`) or the image request
@@ -118,11 +142,12 @@ const isPlaceholderPart = (part: ContentPart): boolean => {
 };
 
 /** The text with each blockquote line blanked to spaces of its length, so every other word keeps its offset. */
-export const blankQuotedLines = (text: string): string =>
-    text
-        .split("\n")
-        .map((line) => (QUOTED_LINE_RE.test(line) ? " ".repeat(line.length) : line))
-        .join("\n");
+export const blankQuotedLines = (text: string): string => {
+    const lines = text.split("\n");
+    const quoted = quotedLines(lines);
+
+    return lines.map((line, index) => (quoted[index] ? " ".repeat(line.length) : line)).join("\n");
+};
 
 /**
  * What the person TYPED into a user message: its text without attached documents, a captured page, a guest's

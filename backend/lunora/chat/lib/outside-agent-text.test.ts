@@ -45,3 +45,14 @@ describe("typedTextOf and the app's own placeholders", () => {
         expect(typedTextOf({ content: [imagePromptPart()], role: "user" })).toBe("");
     });
 });
+
+describe("typedTextOf and a quoted paragraph", () => {
+    it("leaves out a quote with no space after its marker, and the lines that run on from a quoted line", () => {
+        expect.assertions(2);
+
+        expect(typedTextOf({ content: [{ text: ">I prefer trains\n\nPlan my week", type: "text" }], role: "user" })).toBe("Plan my week");
+        expect(typedTextOf({ content: [{ text: "> Suggested itinerary\nI prefer trains\n\nPlease shorten it", type: "text" }], role: "user" })).toBe(
+            "Please shorten it",
+        );
+    });
+});
