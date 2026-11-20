@@ -1,6 +1,7 @@
 /**
  * `<SiteLogins>`: a typed password never outlasts its account, a save or a failed delete never discards edits it did
- * not send, an edit never drops a login's bots while the bot list is missing, and the form stops at the server's limit.
+ * not send, an edit never drops a login's bots while the bot list is missing, the form stops at the server's limit, and
+ * another account's cached logins and bots never show.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -10,13 +11,15 @@ import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const SITE = "https://example.com";
+const USERNAME_TEXT = /ada@example\.com/u;
 
 const harness = vi.hoisted(() => {
     return {
-        bots: [] as { _id: string; name: string }[],
+        bots: [] as { _id: string; name: string; userId: string }[],
         botsState: "loaded" as "failed" | "loaded" | "pending",
         deleteSiteLogin: vi.fn(),
         logins: [] as { hasPassword: true; id: string; site: string; teammateIds: string[]; updatedAt: number; username: string }[],
+        loginsPending: false,
         saveSiteLogin: vi.fn(),
         userId: "user-a" as string | undefined,
     };
@@ -77,7 +80,12 @@ vi.mock("@/lib/lunora/crpc", () => {
                         },
                         listSiteLogins: {
                             queryOptions: () => {
-                                return { queryFn: async () => harness.logins, queryKey: ["site-logins"] };
+                                // One key for every account, as in the app: a switch finds the last account's list cached.
+                                return {
+                                    queryFn: async () =>
+                                        harness.loginsPending ? await new Promise(() => {}) : { logins: harness.logins, userId: harness.userId },
+                                    queryKey: ["site-logins"],
+                                };
                             },
                         },
                         saveSiteLogin: {
@@ -102,12 +110,17 @@ const savedLogin = (teammateIds: string[] = []) => {
     return { hasPassword: true as const, id: "login-1", site: SITE, teammateIds, updatedAt: 1, username: "ada@example.com" };
 };
 
+const botsOf = (userId: string, count: number) =>
+    Array.from({ length: count }, (_, index) => {
+        return { _id: `bot-${index}`, name: `Bot ${index}`, userId };
+    });
+
 const mount = () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const tree = () => createElement(QueryClientProvider, { client: queryClient }, createElement(SiteLogins));
     const view = render(tree());
 
-    return { rerender: () => view.rerender(tree()) };
+    return { queryClient, rerender: () => view.rerender(tree()) };
 };
 
 const passwordField = () => screen.getByLabelText("Password") as HTMLInputElement;
@@ -122,6 +135,7 @@ afterEach(() => {
     harness.bots = [];
     harness.botsState = "loaded";
     harness.logins = [];
+    harness.loginsPending = false;
     harness.userId = "user-a";
     vi.clearAllMocks();
 });
@@ -206,9 +220,7 @@ describe("SiteLogins", () => {
     it("stops ticking bots at the most a login may name", async () => {
         const user = userEvent.setup();
 
-        harness.bots = Array.from({ length: 21 }, (_, index) => {
-            return { _id: `bot-${index}`, name: `Bot ${index}` };
-        });
+        harness.bots = botsOf("user-a", 21);
         mount();
 
         const boxes = await screen.findAllByRole("checkbox");
@@ -220,5 +232,57 @@ describe("SiteLogins", () => {
         expect(isDisabled(boxes[20])).toBe(true);
         expect(screen.getByRole("status").textContent).toContain("at most 20 bots");
         expect(isDisabled(boxes[0])).toBe(false);
+    });
+
+    it("does not count a deleted bot toward the limit", async () => {
+        const user = userEvent.setup();
+
+        harness.bots = botsOf("user-a", 21);
+        harness.logins = [savedLogin([...harness.bots.slice(0, 19).map((bot) => bot._id), "bot-deleted"])];
+        mount();
+
+        await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+
+        const boxes = screen.getAllByRole("checkbox");
+
+        expect(isDisabled(boxes[19])).toBe(false);
+        expect(screen.queryByRole("status")).toBeNull();
+    });
+
+    it("never shows the last account's cached logins or bots after a switch", async () => {
+        harness.bots = botsOf("user-a", 1);
+        harness.logins = [savedLogin(["bot-0"])];
+        const view = mount();
+
+        await screen.findByRole("button", { name: `Edit login for ${SITE}` });
+        expect(screen.getByText("Bot 0")).toBeDefined();
+
+        harness.userId = "user-b";
+        harness.loginsPending = true;
+        harness.botsState = "pending";
+        view.rerender();
+
+        expect(screen.queryByRole("button", { name: `Edit login for ${SITE}` })).toBeNull();
+        expect(screen.queryByText(USERNAME_TEXT)).toBeNull();
+        expect(screen.queryByText("Bot 0")).toBeNull();
+    });
+
+    it("keeps a login's bots on a save while only the last account's empty bot list is cached", async () => {
+        const user = userEvent.setup();
+        const view = mount();
+
+        await waitFor(() => expect(view.queryClient.getQueryData(["bots"])).toStrictEqual([]));
+
+        harness.userId = "user-b";
+        harness.botsState = "pending";
+        harness.logins = [savedLogin(["bot-0"])];
+        harness.saveSiteLogin.mockResolvedValue("login-1");
+        view.rerender();
+
+        await user.click(await screen.findByRole("button", { name: `Edit login for ${SITE}` }));
+        await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+        await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledOnce());
+        expect(harness.saveSiteLogin.mock.calls[0]?.[0]).toMatchObject({ teammateIds: ["bot-0"] });
     });
 });

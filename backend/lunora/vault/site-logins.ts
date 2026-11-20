@@ -61,19 +61,28 @@ const assertOwnShard = (userId: string): void => {
     }
 };
 
-/** The caller's teammates among `ids`, refused as a whole when one is not theirs. */
+/**
+ * The caller's own teammates among `ids`. An id the caller cannot read (deleted, or someone else's bot, which row-level
+ * security hides) is dropped, so a client whose bot list is not loaded yet can send a login's ids as they are; a bot
+ * read as someone else's refuses the save.
+ */
 const assertOwnTeammates = async (ctx: Pick<MutationCtx, "db">, userId: string, ids: Id<"bots">[]): Promise<Id<"bots">[]> => {
-    const unique = [...new Set(ids)];
+    const kept: Id<"bots">[] = [];
+    const unique = new Set(ids);
 
     for (const id of unique) {
         const bot = await ctx.db.get("bots", id);
 
-        if (!bot || bot.userId !== userId) {
+        if (bot && bot.userId !== userId) {
             throw new LunoraError("NOT_FOUND", "Teammate not found");
+        }
+
+        if (bot) {
+            kept.push(id);
         }
     }
 
-    return unique;
+    return kept;
 };
 
 const trimmedLabel = (label: string | undefined): string | undefined => {
@@ -82,25 +91,33 @@ const trimmedLabel = (label: string | undefined): string | undefined => {
     return value === undefined || value === "" ? undefined : value;
 };
 
-/** The caller's saved logins: site, username, label and teammates. Never the password or its ciphertext. */
-export const listSiteLogins = authQuery.output(v.array(vSiteLogin)).query(async ({ ctx }) => {
-    if (!onOwnShard(ctx.user.userId)) {
-        return [];
+/**
+ * The caller's saved logins: site, username, label and teammates. Never the password or its ciphertext. The result names
+ * the user it was read for: an account switch keeps the last account's cached list, and the form shows only its own.
+ */
+export const listSiteLogins = authQuery.output(v.object({ logins: v.array(vSiteLogin), userId: v.string() })).query(async ({ ctx }) => {
+    const { userId } = ctx.user;
+
+    if (!onOwnShard(userId)) {
+        return { logins: [], userId };
     }
 
-    const rows = await ownLogins(ctx, ctx.user.userId);
+    const rows = await ownLogins(ctx, userId);
 
-    return rows.map((row) => {
-        return {
-            hasPassword: true as const,
-            id: row._id,
-            label: row.label,
-            site: row.origin,
-            teammateIds: row.teammateIds ?? [],
-            updatedAt: row.updatedAt,
-            username: row.username,
-        };
-    });
+    return {
+        logins: rows.map((row) => {
+            return {
+                hasPassword: true as const,
+                id: row._id,
+                label: row.label,
+                site: row.origin,
+                teammateIds: row.teammateIds ?? [],
+                updatedAt: row.updatedAt,
+                username: row.username,
+            };
+        }),
+        userId,
+    };
 });
 
 /**

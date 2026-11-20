@@ -13,8 +13,9 @@
   thread only the logins naming that teammate, and none once the teammate is deleted (its threads keep `botId`).
 - Logins live on the owner's own shard: save/delete refuse and list returns nothing on `__root__` or when `servesUser`
   is false (`servesUser` alone admits `__root__`, which any caller can name; a collaborator reaches every procedure on a
-  shared thread's shard). Dev `SHARD_ROUTING=off` puts everyone on root, so root is allowed there. Teammate ids are
-  owner-checked on save.
+  shared thread's shard). Dev `SHARD_ROUTING=off` puts everyone on root, so root is allowed there. A save keeps only
+  the caller's own teammate ids and drops any other (deleted, or hidden as someone else's), so the web form sends a
+  login's ids unfiltered when its bot list could be another account's cached one.
 - The export carries each login's `teammateIds`, never the password or ciphertext.
 - No audit triggers on `savedSiteLogins`: a history snapshot would outlive the row with the ciphertext in it.
 - The fill itself (browser tool, approval per site per thread, activity entry) is the next part. It passes

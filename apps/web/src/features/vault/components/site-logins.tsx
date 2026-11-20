@@ -35,7 +35,8 @@ const emptyDraft = (): LoginDraft => {
 
 /**
  * What the save sends: a trimmed draft, with an empty password meaning "keep the saved one". `botName` is `undefined`
- * until the bot list has loaded; only then is a deleted teammate dropped, so a list that failed to load never clears them.
+ * until a bot list known to be this user's has loaded; only then is a deleted teammate dropped here, so a list that failed
+ * to load, or another account's cached one, never clears them. The server drops a deleted one in any case.
  */
 const saveArgs = (draft: LoginDraft, botName: Map<string, string> | undefined) => {
     return {
@@ -70,7 +71,7 @@ const clearIfEditing =
 
 const errorText = (error: unknown, fallback: string): string => (error instanceof Error && error.message !== "" ? error.message : fallback);
 
-const SiteLoginsForm = () => {
+const SiteLoginsForm = ({ userId }: { userId: string }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
@@ -82,8 +83,14 @@ const SiteLoginsForm = () => {
     const teammatesId = useId();
 
     const loginsQuery = crpc.vault.site_logins.listSiteLogins.queryOptions({});
-    const { data: logins = [] } = useQuery(loginsQuery);
-    const { data: bots = [], isSuccess: botsLoaded } = useQuery(crpc.bots.functions.listBots.queryOptions({}));
+    const { data: loginList } = useQuery(loginsQuery);
+    const { data: botList = [], isSuccess: botListLoaded } = useQuery(crpc.bots.functions.listBots.queryOptions({}));
+    // An account switch keeps the last account's cached lists until this one's arrive: show only what is this user's.
+    const logins = loginList?.userId === userId ? loginList.logins : [];
+    const bots = botList.filter((bot) => bot.userId === userId);
+    const botsLoaded = botListLoaded && bots.length === botList.length;
+    // An empty list could be the last account's cached one, so only a non-empty one may drop a deleted teammate here.
+    const knownBots = botsLoaded && bots.length > 0;
     const saveMutation = useMutation(crpc.vault.site_logins.saveSiteLogin.mutationOptions());
     const deleteMutation = useMutation(crpc.vault.site_logins.deleteSiteLogin.mutationOptions());
 
@@ -94,7 +101,8 @@ const SiteLoginsForm = () => {
     // An edit waits for the bot list: saved without it, the login's teammates could not be shown or kept as they are.
     const canSave = draft.site.trim() !== "" && draft.username.trim() !== "" && (isEditing ? botsLoaded : draft.password !== "");
     const botName = new Map(bots.map((bot) => [bot._id as string, bot.name]));
-    const atTeammateLimit = draft.teammateIds.length >= MAX_TEAMMATES;
+    // A deleted bot has no checkbox and the save drops it, so it does not count toward the limit.
+    const atTeammateLimit = (knownBots ? draft.teammateIds.filter((id) => botName.has(id)) : draft.teammateIds).length >= MAX_TEAMMATES;
 
     const toggleTeammate = (botId: Id<"bots">, checked: boolean) => {
         setDraft((current) => {
@@ -110,7 +118,7 @@ const SiteLoginsForm = () => {
         }
 
         const submitted = draft;
-        const args = saveArgs(submitted, botsLoaded ? botName : undefined);
+        const args = saveArgs(submitted, knownBots ? botName : undefined);
         const saved = isEditing ? t`Login updated` : t`Login saved`;
         const fallback = t`Could not save the login.`;
 
@@ -300,7 +308,7 @@ const SiteLogins = () => {
     const { data: session } = useAuthSession();
     const userId = session?.user.id;
 
-    return userId ? <SiteLoginsForm key={userId} /> : null;
+    return userId ? <SiteLoginsForm key={userId} userId={userId} /> : null;
 };
 
 export default SiteLogins;

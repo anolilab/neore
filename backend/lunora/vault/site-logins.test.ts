@@ -65,7 +65,6 @@ const HTTPS_ONLY = /https/;
 const PASSWORD_REQUIRED = /password is required/;
 const CANNOT_CHANGE = /cannot change/;
 const ALREADY_SAVED = /already saved/;
-const TEAMMATE_NOT_FOUND = /Teammate not found/;
 const NOT_FOUND = /not found/;
 const OWN_ACCOUNT_ONLY = /own account only/;
 
@@ -86,6 +85,9 @@ const insertBot = async (userId: string, name: string) =>
         async (ctx: any) =>
             await ctx.db.insert("bots", { computerEnabled: false, createdAt: 1, instructions: "", model: "test-model", name, updatedAt: 1, userId }),
     )) as string;
+
+const listLogins = async (userId: string) =>
+    (await as(userId).query(listSiteLogins as never, {} as never)) as { logins: Record<string, unknown>[]; userId: string };
 
 const save = async (args: Record<string, unknown>, userId = OWNER) =>
     (await as(userId).mutation(saveSiteLogin as never, { site: SITE, teammateIds: [], username: "ada@example.com", ...args } as never)) as string;
@@ -125,9 +127,11 @@ describe("saving a site login", () => {
         expect(JSON.stringify(row)).not.toContain(PASSWORD);
         expect(await decryptKey(row?.["encryptedPassword"] as string, "site-logins")).toBe(PASSWORD);
 
-        const listed = await as(OWNER).query(listSiteLogins as never, {} as never);
+        const listed = await listLogins(OWNER);
 
-        expect(listed).toStrictEqual([
+        expect(listed.userId).toBe(OWNER);
+
+        expect(listed.logins).toStrictEqual([
             { hasPassword: true, id: row?.["_id"], label: "Work", site: SITE, teammateIds: [], updatedAt: expect.any(Number), username: "ada@example.com" },
         ]);
         expect(JSON.stringify(listed)).not.toContain(PASSWORD);
@@ -161,10 +165,25 @@ describe("saving a site login", () => {
         await expect(save({ password: PASSWORD, site: "example.com" })).rejects.toThrow(ALREADY_SAVED);
     });
 
-    it("refuses a teammate that is not the caller's", async () => {
+    it("never stores a teammate that is not the caller's", async () => {
         const strangersBot = await insertBot(STRANGER, "Eve");
 
-        await expect(save({ password: PASSWORD, teammateIds: [strangersBot] })).rejects.toThrow(TEAMMATE_NOT_FOUND);
+        await save({ password: PASSWORD, teammateIds: [strangersBot, botId] });
+
+        const [row] = await rows();
+
+        expect(row?.["teammateIds"]).toStrictEqual([botId]);
+    });
+
+    it("drops a teammate that was deleted, so an edit sent before the bot list loaded still saves", async () => {
+        const id = await save({ password: PASSWORD, teammateIds: [botId, otherBotId] });
+
+        await harness.run(async (ctx: any) => await ctx.db.delete("bots", otherBotId));
+        await save({ loginId: id, teammateIds: [botId, otherBotId] });
+
+        const [row] = await rows();
+
+        expect(row?.["teammateIds"]).toStrictEqual([botId]);
     });
 
     it("lets no one else change, delete or list the owner's login", async () => {
@@ -172,7 +191,7 @@ describe("saving a site login", () => {
 
         await expect(save({ loginId: id, password: "other" }, STRANGER)).rejects.toThrow(NOT_FOUND);
         await expect(as(STRANGER).mutation(deleteSiteLogin as never, { loginId: id } as never)).rejects.toThrow(NOT_FOUND);
-        expect(await as(STRANGER).query(listSiteLogins as never, {} as never)).toStrictEqual([]);
+        expect(await listLogins(STRANGER)).toStrictEqual({ logins: [], userId: STRANGER });
 
         await as(OWNER).mutation(deleteSiteLogin as never, { loginId: id } as never);
         expect(await rows()).toHaveLength(0);
@@ -183,13 +202,13 @@ describe("saving a site login", () => {
 
         await expect(save({ password: PASSWORD })).rejects.toThrow(OWN_ACCOUNT_ONLY);
         expect(await rows()).toHaveLength(0);
-        expect(await as(OWNER).query(listSiteLogins as never, {} as never)).toStrictEqual([]);
+        expect(await listLogins(OWNER)).toStrictEqual({ logins: [], userId: OWNER });
     });
 
     it("refuses a save on the shared root shard, which the user's export and erasure never read", async () => {
         await runInShard(ROOT_SHARD_KEY, async () => {
             await expect(save({ password: PASSWORD })).rejects.toThrow(OWN_ACCOUNT_ONLY);
-            expect(await as(OWNER).query(listSiteLogins as never, {} as never)).toStrictEqual([]);
+            expect(await listLogins(OWNER)).toStrictEqual({ logins: [], userId: OWNER });
         });
         expect(await rows()).toHaveLength(0);
     });
@@ -201,7 +220,9 @@ describe("saving a site login", () => {
         try {
             await runInShard(ROOT_SHARD_KEY, async () => {
                 await save({ password: PASSWORD });
-                expect(await as(OWNER).query(listSiteLogins as never, {} as never)).toHaveLength(1);
+                const listed = await listLogins(OWNER);
+
+                expect(listed.logins).toHaveLength(1);
             });
         } finally {
             delete workerEnv.ENVIRONMENT;
