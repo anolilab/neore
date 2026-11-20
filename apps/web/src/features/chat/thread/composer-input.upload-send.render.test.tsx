@@ -4,7 +4,7 @@
  * never sent.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode, Ref } from "react";
 import { useImperativeHandle } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -229,6 +229,23 @@ describe("ComposerInput send during an upload", () => {
             expect(harness.sendMessage).toHaveBeenCalledWith("see notes", [expect.objectContaining({ fileId: "file-1", id, status: "complete" })]);
         });
         expect(sendState()).toBe("ready");
+    });
+
+    it("ends the wait when the finished draft is sent by hand, so no unsent notice follows it", async () => {
+        const id = addUpload("uploading");
+
+        renderComposer();
+        pressSend();
+
+        act(() => {
+            useChatUIStore.getState().updateAttachment(id, { fileId: "file-1", status: "complete" });
+            pressSend();
+        });
+
+        await waitFor(() => {
+            expect(harness.sendMessage).toHaveBeenCalledTimes(1);
+        });
+        expect(harness.showInfo).not.toHaveBeenCalled();
     });
 
     it("sends only once, however often send is pressed while waiting", async () => {

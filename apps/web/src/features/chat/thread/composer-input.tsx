@@ -1197,6 +1197,9 @@ const ComposerInput = ({
             return;
         }
 
+        // Every upload is done, so this send goes out now: a wait still pending would read the cleared draft as an edit.
+        setUploadWait(null);
+
         const intent = composerSubmitIntent({
             hasAttachments: draftAttachments.length > 0,
             isComparisonValid,
@@ -1381,6 +1384,14 @@ const ComposerInput = ({
     // upload stops it, so an unfinished attachment is never sent.
     useEffect(() => {
         if (uploadWait === null) {
+            return;
+        }
+
+        // Send was pressed while the session was loading: the wait belongs to the account that resolves first, and only a
+        // later change of account cancels it.
+        if (uploadWait.accountId === undefined && accountId !== undefined) {
+            setUploadWait({ ...uploadWait, accountId });
+
             return;
         }
 

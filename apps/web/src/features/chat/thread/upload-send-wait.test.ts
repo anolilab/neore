@@ -101,6 +101,14 @@ describe("settleUploadWait", () => {
         });
     });
 
+    it("keeps waiting, not cancelled, when the account was still loading as send was pressed", () => {
+        const wait = startUploadWait({ attachments: files(["a", "uploading"]), references: [], text: "see files" }, "thread-1");
+
+        expect(settleUploadWait(wait, { attachments: files(["a", "complete"]), references: [], text: "see files" }, "thread-1", "user-1")).toStrictEqual({
+            kind: "send",
+        });
+    });
+
     it("cancels quietly when the account changed, even in the same chat", () => {
         const wait = startUploadWait({ attachments: files(["a", "uploading"]), references: [], text: "see files" }, "thread-1", "user-1");
         const done = { attachments: files(["a", "complete"]), references: [], text: "see files" };

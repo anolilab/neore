@@ -81,7 +81,8 @@ const sameReferences = (references: ReadonlyArray<WaitedReference>, ids: Readonl
  * cancels it quietly, so the draft of the account that pressed send is never sent by another.
  */
 export const settleUploadWait = (wait: UploadWait, draft: Draft, threadId: string | undefined, accountId?: string): UploadWaitOutcome => {
-    if (wait.threadId !== threadId || wait.accountId !== accountId) {
+    // A wait pressed while the session was still loading has no account yet; the composer binds it to the first one.
+    if (wait.threadId !== threadId || (wait.accountId !== undefined && wait.accountId !== accountId)) {
         return { kind: "cancelled" };
     }
 
