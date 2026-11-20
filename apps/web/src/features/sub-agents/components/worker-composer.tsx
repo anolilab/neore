@@ -16,6 +16,7 @@ import { SendIcon } from "lucide-react";
 import type { FC, KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 
+import BrowserLiveView from "@/features/chat/browser-live-view/browser-live-view";
 import { peekWorkerDraft, saveWorkerDraft } from "@/features/chat/split/composer-drafts";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
@@ -86,40 +87,43 @@ const WorkerComposer: FC<WorkerComposerProps> = ({ archived, busy, className, fo
     };
 
     return (
-        <form
-            className={className}
-            onSubmit={(event) => {
-                event.preventDefault();
-                submit();
-            }}
-        >
-            {notice && (
-                <p className="text-muted-foreground mb-2 text-xs" role="status">
-                    {notice}
-                </p>
-            )}
-            <div className="flex items-end gap-2">
-                <Textarea
-                    aria-label={t`Message the worker`}
-                    className="min-h-[44px] flex-1"
-                    // The box is the composer's focus area for F6, as the cloud composer's editor is (`composer-tiptap/editor-attributes.ts`).
-                    data-focus-area="composer"
-                    disabled={archived}
-                    onChange={(event) => {
-                        // A changed draft is a new message: it must not reuse the last one's id.
-                        clientId.current = undefined;
-                        draft.current = event.target.value;
-                        setText(event.target.value);
-                    }}
-                    onKeyDown={onKeyDown}
-                    placeholder={t`Message the worker...`}
-                    value={text}
-                />
-                <Button aria-label={t`Send`} disabled={!canSend} size="icon" type="submit">
-                    <SendIcon aria-hidden="true" />
-                </Button>
-            </div>
-        </form>
+        <div className={className}>
+            {/* A cloud worker drives the browser too: watch it live, read-only, as from the chat composer. */}
+            <BrowserLiveView threadId={workerId as Id<"threads">} />
+            <form
+                onSubmit={(event) => {
+                    event.preventDefault();
+                    submit();
+                }}
+            >
+                {notice && (
+                    <p className="text-muted-foreground mb-2 text-xs" role="status">
+                        {notice}
+                    </p>
+                )}
+                <div className="flex items-end gap-2">
+                    <Textarea
+                        aria-label={t`Message the worker`}
+                        className="min-h-[44px] flex-1"
+                        // The box is the composer's focus area for F6, as the cloud composer's editor is (`composer-tiptap/editor-attributes.ts`).
+                        data-focus-area="composer"
+                        disabled={archived}
+                        onChange={(event) => {
+                            // A changed draft is a new message: it must not reuse the last one's id.
+                            clientId.current = undefined;
+                            draft.current = event.target.value;
+                            setText(event.target.value);
+                        }}
+                        onKeyDown={onKeyDown}
+                        placeholder={t`Message the worker...`}
+                        value={text}
+                    />
+                    <Button aria-label={t`Send`} disabled={!canSend} size="icon" type="submit">
+                        <SendIcon aria-hidden="true" />
+                    </Button>
+                </div>
+            </form>
+        </div>
     );
 };
 

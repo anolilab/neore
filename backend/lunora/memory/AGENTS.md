@@ -18,28 +18,28 @@
   LLM only words merges/promotions/the digest — WHICH rows change is decided by
   the pure, tested planner. Injected memories are recorded on the reply's first
   row (`messages.retrievedMemories`) for the "memories used" popover.
-  **Import** (`memory/import*.ts`): another assistant's memory, pasted. Lines are
-  split by the pure parser and stored as pasted (the model labels `type`; only a
-  belief-revision UPDATE rewords a row), so a repeat import is the same text and
-  dedup confirms it. Near-match dedup reads a 1000-row window (type first, then newest), not
-  extraction's 50. The action only plans; one mutation (`saveImportedMemoryBatch`) applies every merge,
-  confirmation and insert after re-checking the memory setting, so turning memory off meanwhile writes
-  nothing. It also re-checks exact text (the newest 5000 own active rows), so a repeat past the window or
-  a second tab saving the same paste confirms, not adds. Vector dedup (`dedup.ts`, shared with extraction)
-  walks hits best first, reads one past the window by its embedding id, and passes over a row of another
-  scope (user vs bot) or one this save superseded. An import never revises a pinned row,
-  and a merged text that fails the paste's rules saves the fact as new. Rows are `source: "imported"` with
-  `importedFrom`; both actions refuse while memory is off. The whole save is ONE write: a confirmation that
-  cannot apply is inserted by that write, and a row the save confirmed or reworded is never superseded by a later
-  fact of the same save. A merge whose text another own row holds confirms that row. Vector lookups are capped per
-  save (`IMPORT_MAX_VECTOR_LOOKUPS`); the 1000-row window is widened to 5000 rows once, the first time a fact must
-  be matched by words.
-- **Extraction** never revises a pinned row (a near-match is saved beside it). Its write runs in order: revisions
-  (`reviseExtractedMemory`, which re-embeds in the same write and applies only while the row reads as the decided
-  text), then confirmations (`confirmMemories`, same check), then ONE save of every new memory, with the fallbacks
-  of unapplied revisions and confirmations. A supersession applies only while its target still reads as the text
-  the decision read (`saveMemoryBatch`, `supersedesBase`). A row revised earlier in one run is matched by words
-  against its revised text, and carries the confidence its revision set.
+  **Import** (`memory/import*.ts`): another assistant's memory, pasted. Lines are split by the pure parser and stored
+  as pasted (the model labels `type`; only a belief-revision UPDATE rewords a row), so a repeat import is the same
+  text and dedup confirms it. Near-match dedup reads a 1000-row window (type first, then newest), not extraction's 50.
+  The action only plans; one mutation (`saveImportedMemoryBatch`) applies every merge, confirmation and insert after
+  re-checking the memory setting, so turning memory off meanwhile writes nothing. It also re-checks exact text (the
+  newest 5000 own active rows), so a repeat past the window or a second tab saving the same paste confirms, not adds.
+  Vector dedup (`dedup.ts`, shared with extraction) walks hits best first, reads one past the window by its embedding
+  id, and passes over a row of another scope (user vs bot) or one this save superseded. Rows are `source: "imported"`
+  with `importedFrom`; both actions refuse while memory is off. The whole save is ONE write: a confirmation that
+  cannot apply is inserted by that write, and a row the save confirmed or reworded is never superseded by a later fact
+  of the same save. A merge whose text another own row holds confirms that row. Vector lookups (2 calls each, at most
+  half) and belief revisions (1 each) share `IMPORT_DEDUP_CALL_BUDGET`, so a save stays under the Free plan's 50
+  subrequests (`import.test.ts` counts a worst case). The 1000-row window widens to 5000 once, on the first fact
+  matched by words.
+- **One decision per fact** for extraction and the import: `decideFact` (`dedup.ts`) confirms a match at 0.95 or more,
+  revises only when the caller passes `revise` (extraction passes none for a pinned or other-day match), and saves the
+  fact as new when a revision fails, is refused (`acceptMerge`) or carries no merged text.
+- **Extraction** writes in order: revisions (`reviseExtractedMemory`, which re-embeds in the same write and applies
+  only while the row reads as the decided text), then confirmations (`confirmMemories`, same check), then ONE save of
+  every new memory, with the fallbacks of unapplied revisions and confirmations. A supersession applies only while
+  its target still reads as the text the decision read (`saveMemoryBatch`, `supersedesBase`). A row revised earlier
+  in one run is matched by words against its revised text, and carries the confidence its revision set.
 - **Vectors link only while the row reads as the embedded text** (`linkMemoryEmbeddings`, via `linkMemoryVectors`
   in `dedup.ts`): the mutation deletes a vector it does not keep (rejected, or replaced) through the retrying delete;
   a link mutation that fails deletes the vectors it carried. Every wording change (manual edit, import merge,

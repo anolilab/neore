@@ -11,9 +11,19 @@ import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { REDACTED } from "../lib/secret-redaction";
 import { importFacts, labelImportedText } from "./import";
+import { IMPORT_DEDUP_CALL_BUDGET, IMPORT_LOOKUP_CALL_SHARE, IMPORT_LOOKUP_CALLS, IMPORT_MAX_FACTS } from "./import-logic";
 
-const { embedMany, generateText, registry, searchVectors } = vi.hoisted(() => {
-    return { embedMany: vi.fn(), generateText: vi.fn(), registry: new Map<string, unknown>(), searchVectors: vi.fn() };
+const { embedMany, generateText, getUtilityModelForUser, registry, searchVectors } = vi.hoisted(() => {
+    return {
+        embedMany: vi.fn(),
+        generateText: vi.fn(),
+        // The default utility model, which reasons before it answers.
+        getUtilityModelForUser: vi.fn(async () => {
+            return { modelId: "cf-gpt-oss-20b" };
+        }),
+        registry: new Map<string, unknown>(),
+        searchVectors: vi.fn(),
+    };
 });
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
@@ -23,9 +33,7 @@ vi.mock("ai", async (importOriginal) => {
 });
 vi.mock("../chat/lib/model-filter-rules", () => {
     return {
-        getUtilityModelForUser: async () => {
-            return {};
-        },
+        getUtilityModelForUser,
         loadModelFilterRules: async () => {
             return {};
         },
@@ -131,6 +139,7 @@ afterEach(() => {
     harness.close();
     embedMany.mockReset();
     generateText.mockReset();
+    getUtilityModelForUser.mockClear();
     searchVectors.mockReset();
 });
 
@@ -143,6 +152,24 @@ describe("importing another assistant's memory", () => {
         await expect(save(FACTS.slice(0, 3))).rejects.toThrow(MEMORY_OFF_RE);
         await expect(harness.action(async (ctx: any) => await labelImportedText(ctx, USER, "The user is a nurse in Hamburg"))).rejects.toThrow(MEMORY_OFF_RE);
         expect(await memories()).toHaveLength(0);
+    });
+
+    it("asks the model for low reasoning effort when it labels a paste and when it revises a near-match", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER });
+        });
+        generateText.mockResolvedValueOnce({ output: { keep: [{ line: 1, type: "identity" }] } }).mockResolvedValueOnce({ output: { action: "ADD" } });
+
+        await harness.action(async (ctx: any) => await labelImportedText(ctx, USER, "The user is a nurse in Hamburg"));
+        await save([{ memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" }]);
+
+        const low = { "workers-ai": { reasoning_effort: "low" } };
+
+        expect(generateText.mock.calls[0]?.[0].providerOptions).toStrictEqual(low);
+        expect(generateText.mock.calls[1]?.[0].providerOptions).toStrictEqual(low);
     });
 
     it("marks every saved row as imported from the chosen app", async () => {
@@ -1084,17 +1111,94 @@ describe("import limits", () => {
         expect(row?.lastConfirmedAt).toBeTypeOf("number");
     });
 
-    it("looks up at most ten facts by vector in one save", async () => {
+    it("still revises a late near-match after earlier facts that match nothing spent their vector lookups", async () => {
         expect.assertions(2);
 
         await setMemoryEnabled(true);
         useFakeVectors();
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER });
+        });
+        generateText.mockResolvedValue({ output: { action: "ADD" } });
 
-        const facts = FACTS.slice(0, 30);
+        await save([...FACTS.slice(0, 20), { memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" }]);
 
-        expect(await save(facts)).toStrictEqual({ added: 30, alreadyKnown: 0, updated: 0 });
-        // Each lookup is a vector query plus a row read, so the count bounds a save's subrequests.
-        expect(searchVectors.mock.calls.length).toBeLessThanOrEqual(10);
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(searchVectors.mock.calls.length * IMPORT_LOOKUP_CALLS).toBeLessThanOrEqual(IMPORT_LOOKUP_CALL_SHARE);
+    });
+
+    it("stops asking for a model for the rest of a save once no model is allowed", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+        useFakeVectors();
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER });
+            await ctx.db.insert("memories", { memory: "The user plays the cello in a small orchestra every weekend", type: "context", userId: USER });
+        });
+        getUtilityModelForUser.mockRejectedValueOnce(new Error("no model"));
+
+        await save([
+            { memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" },
+            { memory: "The user plays the cello in a small orchestra every weekend now", type: "context" },
+        ]);
+
+        expect(getUtilityModelForUser).toHaveBeenCalledOnce();
+        expect(generateText).not.toHaveBeenCalled();
+    });
+
+    it("keeps a worst-case save under the Free plan's 50 subrequests", async () => {
+        expect.assertions(3);
+
+        await setMemoryEnabled(true);
+        useFakeVectors();
+        // Every fact is a near-match of its own row by vector (0.9) and by words, so each one would go to belief revision.
+        await harness.run(async (ctx: any) => {
+            for (let item = 0; item < IMPORT_MAX_FACTS; item += 1) {
+                const embeddingId = await ctx.db.insert("embeddings_128", { model: "m", table: "memories", userId: USER, vector: nearVectorOf(item) });
+
+                await ctx.db.insert("memories", {
+                    embeddingId,
+                    memory: `The user owns collection item ${String(item)} at home`,
+                    type: "context",
+                    userId: USER,
+                });
+            }
+        });
+        generateText.mockResolvedValue({ output: { action: "ADD" } });
+
+        const calls = { mutation: 0, query: 0 };
+        const facts = Array.from({ length: IMPORT_MAX_FACTS }, (_, item) => {
+            return { memory: `The user owns collection item ${String(item)} at home now`, type: "context" as const };
+        });
+
+        await harness.action(async (ctx: any) => {
+            const counted = {
+                ...ctx,
+                runMutation: async (...args: unknown[]) => {
+                    calls.mutation += 1;
+
+                    return await ctx.runMutation(...args);
+                },
+                runQuery: async (...args: unknown[]) => {
+                    calls.query += 1;
+
+                    return await ctx.runQuery(...args);
+                },
+            };
+
+            return await importFacts(counted, { app: "gemini", facts, userId: USER });
+        });
+
+        // Outside what this test counts, read off the code: the session check (about 2) and the rate limit (1) in the
+        // procedure's middleware, `loadModelFilterRules` (2 queries) and `getUtilityModelForUser` (the shared rules and
+        // the model pick, about 3).
+        const outside = 8;
+        const total = outside + calls.query + calls.mutation + embedMany.mock.calls.length + searchVectors.mock.calls.length + generateText.mock.calls.length;
+
+        expect(searchVectors.mock.calls.length * IMPORT_LOOKUP_CALLS + generateText.mock.calls.length).toBeLessThanOrEqual(IMPORT_DEDUP_CALL_BUDGET);
+        expect(generateText.mock.calls.length).toBeGreaterThan(0);
+        expect(total).toBeLessThanOrEqual(40);
     });
 
     it("does not revise a pinned row, and saves the fact beside it", async () => {

@@ -13,9 +13,18 @@ import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
 import { getUtilityModelForUser, loadModelFilterRules } from "../chat/lib/model-filter-rules";
+import { lowReasoningUtilityOptions } from "../chat/lib/reasoning-options";
 import { authAction, rateLimit } from "../lib/crpc";
 import { gatewayFetch } from "../lib/services";
-import { type DedupMemory, embedMemoryFacts, findSimilarMemoryByJaccard, findSimilarMemoryByVector, saveMemoryVectors, type WordSetCache } from "./dedup";
+import {
+    decideFact,
+    type DedupMemory,
+    embedMemoryFacts,
+    findSimilarMemoryByJaccard,
+    findSimilarMemoryByVector,
+    saveMemoryVectors,
+    type WordSetCache,
+} from "./dedup";
 import { runBeliefRevision } from "./extract";
 import {
     applyImportLabels,
@@ -26,7 +35,9 @@ import {
     IMPORT_MAX_FACT_CHARS,
     IMPORT_MAX_FACTS,
     IMPORT_MAX_INPUT_CHARS,
-    IMPORT_MAX_VECTOR_LOOKUPS,
+    IMPORT_DEDUP_CALL_BUDGET,
+    IMPORT_LOOKUP_CALL_SHARE,
+    IMPORT_LOOKUP_CALLS,
     IMPORT_MEMORY_OFF_MESSAGE,
     IMPORT_WIDE_WINDOW_ROWS,
     isLongEnoughFact,
@@ -47,12 +58,7 @@ import { MEMORY_TYPES, vMemoryType } from "./taxonomy";
  */
 const IMPORT_DEDUP_WINDOW = 1000;
 
-/**
- * Belief-revision calls one save may make. Past it a near-match is saved as new, as a failed
- * revision is: the client chooses the facts, so this bounds what one save can spend.
- */
-const IMPORT_MAX_REVISIONS = 20;
-/** Reasoning utility models spend output tokens before they answer: the caps leave room for that. */
+/** Reasoning utility models spend output tokens before they answer: the calls ask for low effort, and the caps leave room. */
 const REVISION_MAX_OUTPUT_TOKENS = REFLECTION_LIMITS.maxOutputTokensPerCall;
 const LABEL_MAX_OUTPUT_TOKENS = 8000;
 
@@ -150,16 +156,19 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
     };
 
     const planned: PlannedFact[] = [];
-    let revisions = 0;
-    let lookups = 0;
+    // Vector and model calls spent on dedup so far, against `IMPORT_DEDUP_CALL_BUDGET`; `lookupCalls` is the lookups' part.
+    let spent = 0;
+    let lookupCalls = 0;
 
     for (const [index, fact] of facts.entries()) {
         const embedding = embeddings[index] ?? null;
-        const vectorAllowed = embedding !== null && lookups < IMPORT_MAX_VECTOR_LOOKUPS;
+        const vectorAllowed =
+            embedding !== null && lookupCalls + IMPORT_LOOKUP_CALLS <= IMPORT_LOOKUP_CALL_SHARE && spent + IMPORT_LOOKUP_CALLS <= IMPORT_DEDUP_CALL_BUDGET;
         let byVector: Awaited<ReturnType<typeof findSimilarMemoryByVector>> = null;
 
         if (embedding && vectorAllowed) {
-            lookups += 1;
+            spent += IMPORT_LOOKUP_CALLS;
+            lookupCalls += IMPORT_LOOKUP_CALLS;
             byVector = await findSimilarMemoryByVector(ctx, { activeOn, botId: undefined, embedding, existing, retired, userId: args.userId }).catch(
                 (error: unknown) => {
                     console.warn("[memory/import] Vector dedup failed, deduping by text:", error);
@@ -185,68 +194,82 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
         const similar = usableVector ?? findSimilarMemoryByJaccard(fact.memory, existing, words);
         // Later facts compare against the row as this save leaves it: merged text, or gone once superseded.
         const match = similar ? existing.find((row) => row._id === similar.id) : undefined;
-        let action: "ADD" | "IGNORE" | "SUPERSEDE" | "UPDATE" = "ADD";
-        let memory = "";
-        let mergeRedacted = false;
-
-        if (similar && similar.score >= 0.95) {
-            action = "IGNORE";
-        } else if (similar && !modelUnavailable && revisions < IMPORT_MAX_REVISIONS && !match?.pinned) {
-            // A pinned row is never reworded or replaced by an import; the fact is saved beside it.
-            revisions += 1;
-
-            try {
-                model ??= await getUtilityModelForUser(ctx, gatewayFetch(ctx), { userId: args.userId });
-
-                const revision = await runBeliefRevision(model, similar.memory, fact.memory, REVISION_MAX_OUTPUT_TOKENS);
-
-                // The merged text is model output over pasted text: held to the paste's rules, or the fact is saved as new.
-                // A merge too long to store whole is not cut, which would drop what it merged.
-                const merged = revision.mergedMemory?.trim() ?? "";
-
-                // A merge that is nothing but a secret is no merge.
+        // A pinned row is never reworded or replaced by an import (`decideFact`); the fact is saved beside it.
+        const canRevise = !modelUnavailable && spent < IMPORT_DEDUP_CALL_BUDGET;
+        const decision = await decideFact(similar, {
+            // The merged text is model output over pasted text: held to the paste's rules, or the fact is saved as new.
+            // A merge too long to store whole is not cut, which would drop what it merged; one that is only a secret is no merge.
+            acceptMerge: (mergedMemory) => {
+                const merged = mergedMemory.trim();
                 const cleaned = cleanImportLine(merged);
-                const redacted = redactMemoryText(cleaned);
+                const memory = redactMemoryText(cleaned) ?? "";
 
-                memory = redacted ?? "";
-                mergeRedacted = redacted !== cleaned;
-                action =
-                    revision.action === "UPDATE" &&
-                    (merged.length > IMPORT_MAX_FACT_CHARS || memory.length > IMPORT_MAX_FACT_CHARS || !isLongEnoughFact(memory) || looksSensitive(memory))
-                        ? "ADD"
-                        : revision.action;
-            } catch (error) {
-                console.error("[memory/import] Belief revision failed, saving as new:", error);
+                if (merged.length > IMPORT_MAX_FACT_CHARS || memory.length > IMPORT_MAX_FACT_CHARS || !isLongEnoughFact(memory) || looksSensitive(memory)) {
+                    return undefined;
+                }
 
-                modelUnavailable = !model;
+                return { memory, redacted: memory !== cleaned };
+            },
+            logPrefix: "[memory/import]",
+            revise: canRevise
+                ? async (existingMemory) => {
+                      spent += 1;
+                      // No allowed model: the rest of the save does not ask again.
+                      model ??= await getUtilityModelForUser(ctx, gatewayFetch(ctx), { userId: args.userId }).catch((error: unknown) => {
+                          modelUnavailable = true;
+                          throw error;
+                      });
+
+                      return await runBeliefRevision(model, existingMemory, fact.memory, REVISION_MAX_OUTPUT_TOKENS);
+                  }
+                : undefined,
+        });
+
+        switch (decision.action) {
+            case "IGNORE": {
+                planned.push({ confirm: { base: decision.similar.memory, memoryId: decision.similar.id }, embedding, fact });
+                break;
             }
-        }
 
-        if (similar && action === "IGNORE") {
-            planned.push({ confirm: { base: similar.memory, memoryId: similar.id }, embedding, fact });
-        } else if (similar && action === "UPDATE") {
-            planned.push({
-                embedding,
-                fact,
-                merge: { base: similar.memory, confidence: Math.max(IMPORTED_CONFIDENCE, similar.confidence ?? 50), memory, memoryId: similar.id },
-                mergeRedacted,
-            });
-
-            reworded.add(similar.id);
-            rewordedText.set(similar.id, memory);
-
-            if (match) {
-                match.memory = memory;
-            }
-        } else {
-            planned.push({ embedding, fact, supersede: action === "SUPERSEDE" && similar ? { base: similar.memory, memoryId: similar.id } : undefined });
-
-            if (action === "SUPERSEDE" && similar) {
-                retired.add(similar.id);
+            case "SUPERSEDE": {
+                planned.push({ embedding, fact, supersede: { base: decision.similar.memory, memoryId: decision.similar.id } });
+                retired.add(decision.similar.id);
 
                 if (match) {
                     existing.splice(existing.indexOf(match), 1);
                 }
+
+                break;
+            }
+
+            case "UPDATE": {
+                const { memory, redacted } = decision.merge;
+
+                planned.push({
+                    embedding,
+                    fact,
+                    merge: {
+                        base: decision.similar.memory,
+                        confidence: Math.max(IMPORTED_CONFIDENCE, decision.similar.confidence ?? 50),
+                        memory,
+                        memoryId: decision.similar.id,
+                    },
+                    mergeRedacted: redacted,
+                });
+
+                reworded.add(decision.similar.id);
+                rewordedText.set(decision.similar.id, memory);
+
+                if (match) {
+                    match.memory = memory;
+                }
+
+                break;
+            }
+
+            default: {
+                planned.push({ embedding, fact });
+                break;
             }
         }
     }
@@ -348,6 +371,7 @@ export const labelImportedText = async (ctx: ActionCtx, userId: string, text: st
             }),
         }),
         prompt: buildImportLabelPrompt(lines),
+        providerOptions: lowReasoningUtilityOptions(model),
         system: IMPORT_LABEL_SYSTEM_PROMPT,
     });
     const facts = applyImportLabels(lines, output?.keep ?? []);

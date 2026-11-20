@@ -425,9 +425,16 @@ export const schema = defineSchema({
         completedAt: v.optional(v.number()),
         connectUrl: v.optional(v.string()),
         currentUrl: v.optional(v.string()),
+        /** When the action that wrote `currentUrl` started, so an older action finishing later does not overwrite it. */
+        currentUrlStartedAt: v.optional(v.number()),
         errorMessage: v.optional(v.string()),
         extensionId: v.optional(v.string()),
         extensionVersion: v.optional(v.string()),
+        /**
+         * The deadlines of the browser actions in flight, one per action (its renderer deadline): each holds the browser
+         * until it ends, and removes only its own hold, so overlapping actions never end each other's.
+         */
+        inUseHolds: v.optional(v.array(v.number())),
         lastActivityAt: v.number(),
         providerSessionId: v.optional(v.string()),
         source: v.optional(v.string()),

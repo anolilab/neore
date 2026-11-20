@@ -119,7 +119,7 @@ msgstr "(caso eliminado)"
 msgid "(deleted task)"
 msgstr "(tarea eliminada)"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:342
+#: src/features/settings/components/chat/bot-tool-selection.tsx:348
 msgid "(disconnected)"
 msgstr "(desconectado)"
 
@@ -1190,7 +1190,7 @@ msgstr "hace {minutes} min"
 msgid "{minutes}m remaining"
 msgstr "Quedan {minutes} min"
 
-#: src/features/chat/thread/composer.tsx:234
+#: src/features/chat/thread/composer.tsx:235
 msgid "{modeLabel} mode — click to change"
 msgstr "Modo {modeLabel}: haz clic para cambiarlo"
 
@@ -1808,7 +1808,7 @@ msgstr "El título de un {requestNoun} tiene como máximo {0} caracteres."
 msgid "A background run never stops to wait for you. Questions to you are dropped from it, so it finishes on its own or fails."
 msgstr "Una ejecución en segundo plano nunca se detiene a esperarte. Las preguntas para ti se descartan, así que termina sola o falla."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:471
+#: src/features/settings/components/chat/bot-tool-selection.tsx:477
 msgid "A built-in tool by its name, a server's tool as server:tool, or a whole server as server:*."
 msgstr "Una herramienta integrada por su nombre, la herramienta de un servidor como server:tool o un servidor entero como server:*."
 
@@ -1889,7 +1889,7 @@ msgstr "Hay una clave guardada. Déjalo en blanco para conservarla."
 msgid "A key is saved. Leave blank to keep it. Changing the endpoint, region or access key id requires entering it again."
 msgstr "Hay una clave guardada. Déjalo en blanco para conservarla. Si cambias el endpoint, la región o el ID de clave de acceso, tendrás que introducirla de nuevo."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:323
+#: src/features/settings/components/chat/bot-tool-selection.tsx:329
 msgid "A listed built-in tool no longer exists. Remove it before saving."
 msgstr "Una herramienta integrada de la lista ya no existe. Quítala antes de guardar."
 
@@ -2303,7 +2303,7 @@ msgstr "Actividad por mes"
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:225
 #: src/features/projects/components/project-repositories.tsx:425
-#: src/features/settings/components/chat/bot-tool-selection.tsx:314
+#: src/features/settings/components/chat/bot-tool-selection.tsx:320
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:102
 #: src/features/workflow/components/gallery/publish-dialog.tsx:220
 msgid "Add"
@@ -3402,7 +3402,7 @@ msgstr "Se han medido todos los shards."
 msgid "All tasks"
 msgstr "Todas las tareas"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:430
+#: src/features/settings/components/chat/bot-tool-selection.tsx:436
 msgid "All tools"
 msgstr "Todas las herramientas"
 
@@ -3473,7 +3473,7 @@ msgstr "Proveedores permitidos"
 msgid "Allowed Regions"
 msgstr "Regiones permitidas"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:473
+#: src/features/settings/components/chat/bot-tool-selection.tsx:479
 msgid "Allowed tools"
 msgstr "Herramientas permitidas"
 
@@ -3590,7 +3590,7 @@ msgstr "Se produjo un error al cargar la página {routeName}."
 msgid "An event cannot end before it starts."
 msgstr "Un evento no puede terminar antes de empezar."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:486
+#: src/features/settings/components/chat/bot-tool-selection.tsx:492
 msgid "An excluded server was removed or its address changed. Until you remove it here, the bot gets none of your own servers' tools."
 msgstr "Se eliminó un servidor excluido o cambió su dirección. Hasta que lo quites aquí, el bot no recibe ninguna herramienta de tus propios servidores."
 
@@ -4262,7 +4262,7 @@ msgstr "Pregunta lo que quieras para iniciar un chat…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "Haz la misma pregunta a GPT-4, Claude y Gemini. Ejecuta el mismo prompt en FLUX, Imagen y Stable Diffusion. Quédate con el ganador, no con el predeterminado."
 
-#: src/features/chat/thread/composer.tsx:270
+#: src/features/chat/thread/composer.tsx:271
 msgid "Ask me anything..."
 msgstr "Pregúntame lo que quieras..."
 
@@ -4400,7 +4400,7 @@ msgstr "Auckland"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:781
 #: src/components/model-picker/model-picker.tsx:1291
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:131
+#: src/features/chat/thread/composer.tsx:132
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -5332,6 +5332,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Explora, bifurca y remezcla flujos de trabajo compartidos por la comunidad"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:745
+#: src/features/chat/browser-live-view/browser-live-view.tsx:196
+#: src/features/chat/browser-live-view/browser-live-view.tsx:274
 msgid "Browser"
 msgstr "Navegador"
 
@@ -8837,7 +8839,7 @@ msgstr "No se pudo guardar tu respuesta. Inténtalo de nuevo."
 msgid "Could not send the change."
 msgstr "No se pudo enviar el cambio."
 
-#: src/features/sub-agents/components/worker-composer.tsx:69
+#: src/features/sub-agents/components/worker-composer.tsx:70
 msgid "Could not send the message."
 msgstr "No se pudo enviar el mensaje."
 
@@ -9420,7 +9422,7 @@ msgstr "Restringidos actualmente"
 #: src/features/marketing/components/gateway-landing-page.tsx:792
 #: src/features/marketing/components/landing-page.tsx:1014
 #: src/features/prompts/components/prompt-form-dialog.tsx:444
-#: src/features/settings/components/chat/bot-tool-selection.tsx:434
+#: src/features/settings/components/chat/bot-tool-selection.tsx:440
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:77
 msgid "Custom"
 msgstr "Personalizado"
@@ -9722,7 +9724,7 @@ msgstr "Rondas de debate"
 msgid "Debates for {0} rounds."
 msgstr "Debate durante {0} rondas."
 
-#: src/features/chat/thread/composer.tsx:276
+#: src/features/chat/thread/composer.tsx:277
 msgid "Debug an error or review my code..."
 msgstr "Depura un error o revisa mi código..."
 
@@ -11142,7 +11144,7 @@ msgstr "Borrador"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "Redacta una carta de presentación para un puesto de ingeniería de software"
 
-#: src/features/chat/thread/composer.tsx:274
+#: src/features/chat/thread/composer.tsx:275
 msgid "Draft an email, report, or essay..."
 msgstr "Redacta un correo, un informe o un ensayo..."
 
@@ -12729,7 +12731,7 @@ msgstr "Renderizado de texto excepcional dentro de las imágenes"
 msgid "Exceptionally sharp detail and clarity"
 msgstr "Detalle y nitidez excepcionales"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:483
+#: src/features/settings/components/chat/bot-tool-selection.tsx:489
 msgid "Excluded tools"
 msgstr "Herramientas excluidas"
 
@@ -12951,7 +12953,7 @@ msgstr "Caduca: {expiresAt}"
 msgid "Expiring soon"
 msgstr "Caduca pronto"
 
-#: src/features/chat/thread/composer.tsx:277
+#: src/features/chat/thread/composer.tsx:278
 msgid "Explain a concept in simple terms..."
 msgstr "Explica un concepto en términos sencillos..."
 
@@ -15377,7 +15379,7 @@ msgstr "Genera una imagen a partir de un prompt de texto y amplíala a 4x"
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "Genera una imagen de un rincón de lectura acogedor con luz cálida y plantas."
 
-#: src/features/chat/thread/composer.tsx:279
+#: src/features/chat/thread/composer.tsx:280
 msgid "Generate an image or video..."
 msgstr "Genera una imagen o un video..."
 
@@ -16370,6 +16372,10 @@ msgstr "Ocultar columna"
 msgid "Hide follow-up suggestions"
 msgstr "Ocultar sugerencias de seguimiento"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:200
+msgid "Hide live view"
+msgstr ""
+
 #: src/features/workflow/components/nodes/base-node.tsx:278
 msgid "Hide output"
 msgstr "Ocultar salida"
@@ -16875,7 +16881,7 @@ msgstr "ilustración"
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:343
 #: src/components/model-picker/model-picker.tsx:1265
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:129
+#: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:282
 #: src/features/settings/components/chat/models-settings.tsx:41
@@ -19011,6 +19017,10 @@ msgstr "Vista previa en vivo: se muestra cuando el componente termina de transmi
 msgid "Live preview — updating as the artifact streams"
 msgstr "Vista previa en vivo: se actualiza mientras se transmite el artefacto"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:236
+msgid "Live view of the agent's browser (read-only)"
+msgstr ""
+
 #: src/features/marketing/components/gateway-landing-page.tsx:37
 msgid "LLaMA, Mixtral, Gemma — fastest inference"
 msgstr "LLaMA, Mixtral, Gemma: la inferencia más rápida"
@@ -19322,7 +19332,7 @@ msgstr "Cargando tu resumen…"
 msgid "Loading your projects…"
 msgstr "Cargando tus proyectos…"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:442
+#: src/features/settings/components/chat/bot-tool-selection.tsx:448
 msgid "Loading your servers, connectors and computers…"
 msgstr "Cargando tus servidores, conectores y ordenadores…"
 
@@ -20313,11 +20323,11 @@ msgstr "Selección de mensajes"
 msgid "Message the agent on your computer"
 msgstr "Escribe al agente en tu ordenador"
 
-#: src/features/sub-agents/components/worker-composer.tsx:103
+#: src/features/sub-agents/components/worker-composer.tsx:106
 msgid "Message the worker"
 msgstr "Escribe al worker"
 
-#: src/features/sub-agents/components/worker-composer.tsx:115
+#: src/features/sub-agents/components/worker-composer.tsx:118
 msgid "Message the worker..."
 msgstr "Escribe al worker..."
 
@@ -20634,7 +20644,7 @@ msgid "Mobile app icon"
 msgstr "Icono de app móvil"
 
 #: src/features/chat/host/host-options.tsx:146
-#: src/features/chat/thread/composer.tsx:223
+#: src/features/chat/thread/composer.tsx:224
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
 #: src/features/workflow/components/nodes/text-node.tsx:123
@@ -21481,7 +21491,7 @@ msgstr "Neore {0}"
 msgid "Neore agent"
 msgstr "Agente de Neore"
 
-#: src/features/chat/thread/composer.tsx:689
+#: src/features/chat/thread/composer.tsx:690
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore puede cometer errores. Verifica la información importante."
 
@@ -21617,7 +21627,7 @@ msgstr "Nunca cubre una herramienta que hayas configurado en Preguntar tú mismo
 msgid "Never expires"
 msgstr "No caduca nunca"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:481
+#: src/features/settings/components/chat/bot-tool-selection.tsx:487
 msgid "Never given to the bot, even when allowed above."
 msgstr "Nunca se dan al bot, aunque estén permitidas arriba."
 
@@ -21862,7 +21872,7 @@ msgstr "Coincidencia siguiente"
 msgid "Next option"
 msgstr "Opción siguiente"
 
-#: src/features/chat/thread/composer.tsx:240
+#: src/features/chat/thread/composer.tsx:241
 msgid "Next output mode"
 msgstr "Siguiente modo de salida"
 
@@ -22008,7 +22018,7 @@ msgstr "Aún no hay bots."
 msgid "No budget alerts configured."
 msgstr "No hay alertas de presupuesto configuradas."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:180
+#: src/features/settings/components/chat/bot-tool-selection.tsx:186
 msgid "No built-in tool is named {unknownBuiltIn}."
 msgstr "Ninguna herramienta integrada se llama {unknownBuiltIn}."
 
@@ -22468,7 +22478,7 @@ msgstr "No se encontraron resultados."
 msgid "No runs yet. Start one to score every case."
 msgstr "Aún no hay ejecuciones. Inicia una para puntuar todos los casos."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:190
+#: src/features/settings/components/chat/bot-tool-selection.tsx:196
 msgid "No server, connector or computer matches {unknownServer}."
 msgstr "Ningún servidor, conector u ordenador coincide con {unknownServer}."
 
@@ -23281,7 +23291,7 @@ msgstr "Continúa solo si acabas de iniciar esto ejecutando `neore-host pair` en
 msgid "Only in one run"
 msgstr "Solo en una ejecución"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:455
+#: src/features/settings/components/chat/bot-tool-selection.tsx:461
 msgid "Only listed tools"
 msgstr "Solo las herramientas indicadas"
 
@@ -23993,6 +24003,10 @@ msgstr "Abriendo pull request…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "Abrir el asistente sin una conversación te lleva a la más reciente en lugar de a un chat en blanco."
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:207
+msgid "Opening the live view…"
+msgstr ""
+
 #: src/features/pages/components/page-invite-accept.tsx:54
 msgid "Opening the shared page…"
 msgstr "Abriendo la página compartida…"
@@ -24348,7 +24362,7 @@ msgstr "Formato de salida"
 msgid "Output is not loaded in this view."
 msgstr "La salida no se carga en esta vista."
 
-#: src/features/chat/thread/composer.tsx:251
+#: src/features/chat/thread/composer.tsx:252
 msgid "Output Mode"
 msgstr "Modo de salida"
 
@@ -25166,7 +25180,7 @@ msgstr "plan"
 msgid "Plan"
 msgstr "Plan"
 
-#: src/features/chat/thread/composer.tsx:273
+#: src/features/chat/thread/composer.tsx:274
 msgid "Plan a project or brainstorm ideas..."
 msgstr "Planifica un proyecto o genera ideas..."
 
@@ -25714,7 +25728,7 @@ msgstr "Coincidencia anterior"
 msgid "Previous option"
 msgstr "Opción anterior"
 
-#: src/features/chat/thread/composer.tsx:206
+#: src/features/chat/thread/composer.tsx:207
 msgid "Previous output mode"
 msgstr "Modo de salida anterior"
 
@@ -27395,7 +27409,7 @@ msgstr "Quitar {modelId} de la lista de bloqueados"
 msgid "Remove {name}"
 msgstr "Quitar a {name}"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:344
+#: src/features/settings/components/chat/bot-tool-selection.tsx:350
 msgid "Remove {shown}"
 msgstr "Quitar {shown}"
 
@@ -27590,7 +27604,7 @@ msgstr "Eliminado"
 msgid "Removed from favorites"
 msgstr "Quitado de favoritos"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:214
+#: src/features/settings/components/chat/bot-tool-selection.tsx:220
 msgid "Removed server"
 msgstr "Servidor eliminado"
 
@@ -27842,7 +27856,7 @@ msgstr "Investigación"
 msgid "Research a topic"
 msgstr "Investiga un tema"
 
-#: src/features/chat/thread/composer.tsx:275
+#: src/features/chat/thread/composer.tsx:276
 msgid "Research a topic in depth..."
 msgstr "Investiga un tema en profundidad..."
 
@@ -28087,7 +28101,7 @@ msgstr "reintentar"
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/onboarding/components/setup-checklist.tsx:238
 #: src/features/settings/components/chat/agent-settings.tsx:224
-#: src/features/settings/components/chat/bot-tool-selection.tsx:449
+#: src/features/settings/components/chat/bot-tool-selection.tsx:455
 #: src/features/tasks/components/task-detail-dialog.tsx:108
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
@@ -29563,7 +29577,7 @@ msgstr "Estilo visual semirrealista"
 #: src/features/chat/guest-links/guest-link-panel.tsx:430
 #: src/features/chat/host/host-composer.tsx:707
 #: src/features/feedback/components/send-feedback-dialog.tsx:389
-#: src/features/sub-agents/components/worker-composer.tsx:118
+#: src/features/sub-agents/components/worker-composer.tsx:121
 msgid "Send"
 msgstr "Enviar"
 
@@ -32202,7 +32216,7 @@ msgstr "Resume mis notas de hoy"
 msgid "Summarise my notes in three bullets."
 msgstr "Resume mis notas en tres viñetas."
 
-#: src/features/chat/thread/composer.tsx:272
+#: src/features/chat/thread/composer.tsx:273
 msgid "Summarize a document or URL..."
 msgstr "Resume un documento o una URL..."
 
@@ -32886,7 +32900,7 @@ msgstr "texto"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1252
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:128
+#: src/features/chat/thread/composer.tsx:129
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:238
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -33246,6 +33260,10 @@ msgstr "El agente aún está abriendo su sesión. Inténtalo de nuevo en un mome
 msgid "The agent is still working on the last message."
 msgstr "El agente sigue trabajando en el último mensaje."
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:197
+msgid "The agent is using a browser"
+msgstr ""
+
 #: src/features/chat/host/diff-comments-draft.tsx:74
 msgid "The agent is working. You can send these when it is done."
 msgstr "El agente está trabajando. Puedes enviarlos cuando termine."
@@ -33315,7 +33333,7 @@ msgstr "El asistente necesita un secreto"
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr "El bot y su ordenador se eliminan. Sus chats se conservan, como chats normales."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:457
+#: src/features/settings/components/chat/bot-tool-selection.tsx:463
 msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
 msgstr "El bot recibe solo las herramientas que permitas. Si no permites ninguna, no recibe herramientas."
 
@@ -33335,11 +33353,11 @@ msgstr "El navegador no puede leer este vídeo para capturar un fotograma"
 msgid "The builder could not answer. Try again."
 msgstr "El creador no pudo responder. Inténtalo de nuevo."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:179
+#: src/features/settings/components/chat/bot-tool-selection.tsx:185
 msgid "The built-in tools are still loading. Try again in a moment."
 msgstr "Las herramientas integradas aún se están cargando. Inténtalo de nuevo en un momento."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:175
+#: src/features/settings/components/chat/bot-tool-selection.tsx:181
 msgid "The built-in tools could not be loaded. Reload the page to add one."
 msgstr "No se pudieron cargar las herramientas integradas. Recarga la página para añadir una."
 
@@ -33692,6 +33710,18 @@ msgstr "Puede que el enlace sea incorrecto o que su propietario haya hecho priva
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "Puede que el enlace sea incorrecto o que su propietario haya despublicado o eliminado la página."
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:218
+msgid "The live view could not be opened."
+msgstr ""
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:223
+#~ msgid "The live view could not be opened. Try again."
+#~ msgstr ""
+
+#: src/features/chat/browser-live-view/browser-live-view.tsx:212
+msgid "The live view is not available right now."
+msgstr ""
+
 #. placeholder {0}: info.detail
 #: src/features/local-models/lib/local-errors.ts:195
 msgid "The local model reported an error: {0}"
@@ -34009,11 +34039,11 @@ msgstr "La voz con la que el modo manos libres lee las respuestas. Una habilidad
 msgid "The whole answer, exactly"
 msgstr "La respuesta completa, exactamente"
 
-#: src/features/sub-agents/components/worker-composer.tsx:53
+#: src/features/sub-agents/components/worker-composer.tsx:54
 msgid "The worker is busy. Your message runs after the earlier ones."
 msgstr "El worker está ocupado. Tu mensaje se ejecuta después de los anteriores."
 
-#: src/features/sub-agents/components/worker-composer.tsx:53
+#: src/features/sub-agents/components/worker-composer.tsx:54
 msgid "The worker is working on an earlier message."
 msgstr "El worker está trabajando en un mensaje anterior."
 
@@ -34515,7 +34545,7 @@ msgstr "Este enlace está incompleto. Pide el enlace completo."
 msgid "This link is not taking messages right now. Try again later."
 msgstr "Este enlace no acepta mensajes en este momento. Inténtalo más tarde."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:320
+#: src/features/settings/components/chat/bot-tool-selection.tsx:326
 msgid "This list is full: remove a tool before adding another."
 msgstr "{'de': 'Diese Liste ist voll: Entferne ein Tool, bevor du ein weiteres hinzufügst.', 'es': 'Esta lista está llena: quita una herramienta antes de añadir otra.', 'fr': 'Cette liste est pleine : retirez un outil avant d’en ajouter un autre.', 'it': 'Questo elenco è pieno: rimuovi uno strumento prima di aggiungerne un altro.', 'ja': 'このリストは上限に達しています。別のツールを追加する前に、ツールを1つ削除してください。', 'pl': 'Ta lista jest pełna: usuń narzędzie, zanim dodasz kolejne.', 'pt': 'Esta lista está cheia: remova uma ferramenta antes de adicionar outra.', 'zh': '此列表已满：请先移除一个工具，再添加新的。'}"
 
@@ -34826,7 +34856,7 @@ msgstr "Esto eliminará de forma permanente estos {0} archivos de tu base de con
 msgid "This workbook has {sheetCount} sheets — only the first sheet was imported."
 msgstr "Este libro tiene {sheetCount} hojas: solo se importó la primera."
 
-#: src/features/sub-agents/components/worker-composer.tsx:51
+#: src/features/sub-agents/components/worker-composer.tsx:52
 msgid "This worker is archived. Restore it to message it again."
 msgstr "Este worker está archivado. Restáuralo para volver a enviarle mensajes."
 
@@ -35216,6 +35246,10 @@ msgstr "Demasiados intentos. Espera unos segundos y vuelve a intentarlo."
 msgid "too many files"
 msgstr "demasiados archivos"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:218
+msgid "Too many live views were opened. Try again later."
+msgstr ""
+
 #: src/features/chat/guest-links/guest-page.tsx:95
 msgid "Too many messages. Please try again later."
 msgstr "Demasiados mensajes. Inténtalo más tarde."
@@ -35271,7 +35305,7 @@ msgstr "Permisos de herramientas"
 msgid "Tool Provider Keys"
 msgstr "Claves de proveedores de herramientas"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:421
+#: src/features/settings/components/chat/bot-tool-selection.tsx:427
 #: src/features/settings/components/chat/bots-settings.tsx:376
 #: src/features/settings/components/chat/custom-providers-settings.tsx:373
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:134
@@ -35451,7 +35485,7 @@ msgstr "Imagen transformada"
 msgid "Translate"
 msgstr "Traducir"
 
-#: src/features/chat/thread/composer.tsx:278
+#: src/features/chat/thread/composer.tsx:279
 msgid "Translate text to another language..."
 msgstr "Traduce un texto a otro idioma..."
 
@@ -35615,6 +35649,8 @@ msgstr "Prueba a ajustar los términos de búsqueda."
 #: src/features/admin/components/admin-shard-footprint-row.tsx:131
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
+#: src/features/chat/browser-live-view/browser-live-view.tsx:222
+#: src/features/chat/browser-live-view/browser-live-view.tsx:289
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -37144,7 +37180,7 @@ msgstr "vídeo"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: src/components/model-picker/model-picker.tsx:1278
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:130
+#: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:324
 #: src/features/settings/components/chat/models-settings.tsx:46
@@ -37685,6 +37721,10 @@ msgstr "¿Quieres continuar desde aquí?"
 msgid "Watch"
 msgstr "Vigilar"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:200
+msgid "Watch live"
+msgstr ""
+
 #: src/features/settings/components/chat/event-trigger-fields.tsx:230
 msgid "Watch only this part (optional)"
 msgstr "Vigilar solo esta parte (opcional)"
@@ -37796,7 +37836,7 @@ msgstr "URL del webhook copiada al portapapeles"
 msgid "WebP (Smaller)"
 msgstr "WebP (más ligero)"
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:301
+#: src/features/settings/components/chat/bot-tool-selection.tsx:307
 msgid "webSearch or server:tool"
 msgstr "webSearch o server:tool"
 
@@ -38081,6 +38121,10 @@ msgstr "Donde las ideas<0/><1>se convierten en acciones.</1>"
 msgid "Where you stay in control"
 msgstr "Dónde mantienes el control"
 
+#: src/features/chat/browser-live-view/browser-live-view.tsx:276
+msgid "Whether the agent is using a browser could not be checked."
+msgstr ""
+
 #: src/features/marketing/components/landing-page.tsx:258
 msgid "Which AI models are included?"
 msgstr "¿Qué modelos de IA se incluyen?"
@@ -38284,7 +38328,7 @@ msgstr "Escribe contenido extenso junto al chat"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "Escribe contenido extenso en un editor de lienzo lateral. Pasa del chat al documento terminado sin cambiar de herramienta."
 
-#: src/features/chat/thread/composer.tsx:271
+#: src/features/chat/thread/composer.tsx:272
 msgid "Write some code for me..."
 msgstr "Escríbeme algo de código..."
 
@@ -38948,15 +38992,15 @@ msgstr "Se solicitó tu revisión"
 msgid "Your saved MCP servers could not be loaded, so this cannot be saved yet."
 msgstr "No se pudieron cargar tus servidores MCP guardados, así que esto aún no se puede guardar."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:189
+#: src/features/settings/components/chat/bot-tool-selection.tsx:195
 msgid "Your servers, connectors and computers are still loading. Try again in a moment."
 msgstr "Tus servidores, conectores y ordenadores aún se están cargando. Inténtalo de nuevo en un momento."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:447
+#: src/features/settings/components/chat/bot-tool-selection.tsx:453
 msgid "Your servers, connectors and computers could not be loaded."
 msgstr "No se pudieron cargar tus servidores, conectores y ordenadores."
 
-#: src/features/settings/components/chat/bot-tool-selection.tsx:185
+#: src/features/settings/components/chat/bot-tool-selection.tsx:191
 msgid "Your servers, connectors and computers could not be loaded. Retry above to add one by name."
 msgstr "No se pudieron cargar tus servidores, conectores y ordenadores. Reintenta arriba para añadir uno por su nombre."
 
