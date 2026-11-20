@@ -11,7 +11,7 @@ import { endThreadAttach } from "../agent/file-attach-thread";
 import { fileAttachInThread } from "../agent/file-attach-claim";
 import { mintUnlockProof, newPasscodeEpoch } from "../lib/thread-lock";
 import schema from "../schema";
-import { chatHeldOnShard, gateReferenceRowsOnCallerShard, holdReferenceChatOnShard, threadReadableOnShard } from "./reference-gate";
+import { gateReferenceRowsOnCallerShard, holdReferenceChatOnShard, threadReadableOnShard } from "./reference-gate";
 
 const SECRET = "test-storage-signing-secret";
 const OWNER = "reference-owner";
@@ -227,10 +227,16 @@ describe("a media request's references: each chat on its owner's shard", () => {
 });
 
 describe("a queued media job rechecks each referenced chat on its owner's shard", () => {
-    const heldFor = async (threadId: string, userId: string, requestedAt: number): Promise<boolean> => {
-        const { held } = await run(async (ctx) => await ctx.runQuery(chatHeldOnShard as never, { requestedAt, threadId, userId }));
+    let requestSeq = 0;
 
-        return held as boolean;
+    /** The job's own recheck (`holdReferenceChatOnShard`): a fresh request id per call, so each check takes its own hold. */
+    const heldFor = async (threadId: string, userId: string, requestedAt: number): Promise<boolean> => {
+        requestSeq += 1;
+        const { held } = (await run(
+            async (ctx) => await ctx.runMutation(holdReferenceChatOnShard as never, { requestedAt, requestId: `held-${String(requestSeq)}`, threadId, userId }),
+        )) as { held: boolean };
+
+        return held;
     };
 
     it("holds an unlocked chat the caller owns", async () => {

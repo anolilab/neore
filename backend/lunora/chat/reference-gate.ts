@@ -128,18 +128,6 @@ const chatHeld = async (ctx: Pick<QueryCtx, "db">, { requestedAt, threadId, user
     return (await threadGateOutcome(ctx, { level: "read", threadId: threadId as Id<"threads">, userId })) === "ok";
 };
 
-/** {@link chatHeld} as a read, for a caller that only asks. */
-export const chatHeldOnShard = internalQuery
-    .input({
-        requestedAt: v.number(),
-        threadId: v.string().max(MAX_LENGTH.id),
-        userId: v.string(),
-    })
-    .output(v.object({ held: v.boolean() }))
-    .query(async ({ args, ctx }) => {
-        return { held: await chatHeld(ctx, args) };
-    });
-
 /**
  * How long a media job's hold on its chats lasts. It outlives the attach window (`FILE_ATTACH_TTL_MS`): the job checks its chats one
  * after another and then waits for the provider, which can take minutes, and a lock must not land while the reference is still in use.
