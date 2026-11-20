@@ -2,7 +2,7 @@
 
 /**
  * "Restore to input" puts a message's text in the composer, from where it goes out as the owner's own words: a guest's note
- * the owner sent on must not offer it, nor one an admin wrote while acting as the owner; a link's draft keeps its mark.
+ * the owner sent on must not offer it; text the owner did not type (a link's draft, an admin's message) keeps its mark.
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -56,10 +56,11 @@ describe("RestoreToInputAction", () => {
         expect(screen.queryByRole("button", { name: "Restore to input" })).toBeNull();
     });
 
-    it("offers nothing for a message an admin wrote while acting as the owner", () => {
+    it("sends a message an admin wrote while acting as the owner back marked, so the owner's send of it is not their own", () => {
         render(<RestoreToInputAction message={userMessage({ providerMetadata: { neore: { notTyped: { impersonated: true } } } })} />);
+        fireEvent.click(screen.getByRole("button", { name: "Restore to input" }));
 
-        expect(screen.queryByRole("button", { name: "Restore to input" })).toBeNull();
+        expect(requestComposerRestore).toHaveBeenLastCalledWith({ draftFrom: "impersonated", files: [], text: "please call me back" });
     });
 
     it("sends a link's draft back to the composer with its mark, so its next send is marked", () => {

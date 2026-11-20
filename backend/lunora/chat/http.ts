@@ -33,7 +33,15 @@ import getAgent from "./lib/get-agent";
 import { capTitlePrompt, fileOnlyPromptPart, imagePromptPart } from "./lib/first-user-prompt";
 import type { StartTitleJob } from "./lib/start-title-jobs";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
-import { mergeNotTypedMarks, type NotTypedMarks, notTypedMarksOfMessage, parseNotTypedDraft, withNotTypedMarks } from "../lib/not-typed-text";
+import {
+    hasNotTypedMarks,
+    mergeNotTypedMarks,
+    type NotTypedMarks,
+    notTypedMarksOfDraftFrom,
+    notTypedMarksOfMessage,
+    parseNotTypedDraft,
+    withNotTypedMarks,
+} from "../lib/not-typed-text";
 import { documentTextPart, guestNoteIdOfMessage, guestTextPart, outsideAgentTextPart } from "./lib/attached-text";
 import { unsendableGuestText } from "./lib/guest-link-store";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
@@ -1196,10 +1204,7 @@ const runChatStartOnShard = async (
     // Text the owner did not type is saved marked: a draft from outside, and anything an admin acting as them sends.
     // `draftFrom` was checked by `runChatStart`: only a known source reaches here.
     const draftFrom = parseNotTypedDraft(body.draftFrom) ?? undefined;
-    const notTyped: NotTypedMarks = mergeNotTypedMarks(
-        draftFrom === undefined ? {} : { draft: draftFrom },
-        placed?.impersonating === true ? { impersonated: true } : {},
-    );
+    const notTyped: NotTypedMarks = mergeNotTypedMarks(notTypedMarksOfDraftFrom(draftFrom), placed?.impersonating === true ? { impersonated: true } : {});
 
     const promptIndex = messageContent.indexOf(promptPart);
 
@@ -1968,7 +1973,7 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
         // So does text the owner did not type (`lib/not-typed-text.ts`), and an admin acting as the owner marks the edit.
         const notTyped = mergeNotTypedMarks(
             notTypedMarksOfMessage(message.message as Parameters<typeof notTypedMarksOfMessage>[0]),
-            draftFrom === undefined ? {} : { draft: draftFrom },
+            notTypedMarksOfDraftFrom(draftFrom),
             (await notOwnSignIn) ? { impersonated: true } : {},
         );
 
@@ -2167,6 +2172,7 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
                 messageId: editedMessageId,
                 model: model as string,
                 parentId: editedMessageId, // Use the edited message as parent
+                ...(hasNotTypedMarks(notTyped) && { notTyped }),
                 prompt: editedTextContent,
                 reasoningEffort: appThread?.reasoningEffort,
                 statelessMode: appThread?.statelessMode,

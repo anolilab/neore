@@ -59,8 +59,11 @@
   Composer) or someone else's saved prompt. The web client marks the draft itself, never matches text: the mark stays
   through edits, pane switches, a reload, the queue and a failed send, and goes when the draft is sent or emptied
   (`features/chat/core/utils/draft-origin.ts`); each send names it as `draftFrom`. An edit keeps the original's mark;
-  a steer's lives in `persistentStreams.notTypedSteers` until delivery. A plain-text paste stays unseen. Still unmarked:
-  bot instructions and personalization an impersonating admin wrote: mark them (a `systemContext` kind that refuses)
-  before the fill ships. The allowlist refuses a step holding a page's result or an approval's
+  a steer's lives in `persistentStreams.notTypedSteers` until delivery. A stateless run saves its prompt again: pass it
+  through `statelessPrompt` with the saved row's marks, never the bare text. Prompt history and Restore to input send an
+  admin's prompt again as `draftFrom: "impersonated"`. A plain-text paste stays unseen. Still unmarked, to mark (a draft
+  kind the verdict names) before the fill ships: forwarded messages, Generate image/video (the reply's text sent as a
+  prompt), follow-up suggestions; and bot instructions and personalization an impersonating admin wrote (a
+  `systemContext` kind that refuses). The allowlist refuses a step holding a page's result or an approval's
   request and response parts: the fill navigates and types inside its one call, and its own approval parts are admitted
   only for that call's id, added here on purpose.

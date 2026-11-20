@@ -16,7 +16,7 @@
  */
 
 import { stripHiddenText } from "@neore/ai/utils";
-import type { NotTypedDraft } from "@neore/backend/not-typed-text";
+import type { DraftFrom } from "@neore/backend/not-typed-text";
 import { parseNotTypedDraft } from "@neore/backend/not-typed-text";
 
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
@@ -24,7 +24,7 @@ import type { ReferenceSelection } from "@/features/chat/components/reference-pi
 export interface QueuedPrompt<A> {
     attachments: A[];
     /** The draft's not-typed mark when it was queued (`core/utils/draft-origin.ts`): its send carries it, also after an edit here. */
-    draftFrom?: NotTypedDraft;
+    draftFrom?: DraftFrom;
     /** Attachments that did not survive a reload: ones that had no uploaded file id to keep. */
     droppedAttachments?: number;
     id: string;
@@ -220,7 +220,7 @@ interface StoredPromptQueue {
     format?: 2;
     items: {
         attachments?: StoredAttachment[];
-        draftFrom?: NotTypedDraft;
+        draftFrom?: DraftFrom;
         droppedAttachments: number;
         id: string;
         steer?: QueuedSteer;

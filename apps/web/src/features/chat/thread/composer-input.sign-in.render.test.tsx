@@ -8,7 +8,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Editor } from "@tiptap/core";
 import { StarterKit } from "@tiptap/starter-kit";
 import type { ReactNode, Ref } from "react";
-import { useImperativeHandle } from "react";
+import { useEffect, useImperativeHandle } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useLoginPromptStore } from "@/features/auth/stores/login-prompt-store";
@@ -27,13 +27,20 @@ import { appendPlainText, composerCoreExtensionOptions, pastePlainText } from ".
 const harness = vi.hoisted(() => {
     return {
         isStreaming: false,
+        /** Every mutation the composer calls through `useCRPC`, with its arguments. */
+        mutate: vi.fn(async (_args: unknown) => undefined),
         mustSignIn: true,
+        /** A send held through sign-in, handed back once by `usePendingSend`. */
+        pending: undefined as { draftFrom?: string; text: string } | undefined,
+        /** The runner's report: `steer` gives the composer its steer control. */
+        runner: null as unknown,
         sendComparisonMessage: vi.fn(async () => undefined),
         sendMessage: vi.fn(async () => undefined),
         /** The input row's editor; none by default, as a composer before the editor loads. */
         editor: null as ComposerTiptapEditorRef | null,
         showError: vi.fn(),
         showInfo: vi.fn(),
+        sseStreamState: null as string | null,
         threadId: undefined as string | undefined,
         view: "online" as "offline" | "online" | "reconnecting",
     };
@@ -66,7 +73,19 @@ vi.mock("@/features/auth/hooks/use-invite-only", () => {
 vi.mock("@/features/chat/core/hooks/use-pending-send", async (importOriginal) => {
     const original = await importOriginal<typeof import("@/features/chat/core/hooks/use-pending-send")>();
 
-    return { ...original, default: () => undefined };
+    return {
+        ...original,
+        default: function usePendingSendStub(enabled: boolean, send: (pending: { draftFrom?: string; text: string }) => void) {
+            useEffect(() => {
+                const { pending } = harness;
+
+                if (enabled && pending !== undefined) {
+                    harness.pending = undefined;
+                    send(pending);
+                }
+            });
+        },
+    };
 });
 
 vi.mock("@/features/chat/core/context/chat-context", () => {
@@ -75,7 +94,7 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
             return { cancelStream: vi.fn(), jwtToken: "", sendMessage: harness.sendMessage };
         },
         useChatIsStreaming: () => {
-            return { isStreaming: harness.isStreaming, sseStreamState: null };
+            return { isStreaming: harness.isStreaming, sseStreamState: harness.sseStreamState };
         },
         useChatLunora: () => {
             return {};
@@ -106,7 +125,7 @@ vi.mock("@/features/chat/core/hooks/use-comparison-chat", () => {
 });
 
 vi.mock("@/features/chat/core/hooks/use-runner-capabilities", () => {
-    return { default: () => null };
+    return { default: () => harness.runner };
 });
 
 // The upload path reads `VITE_LUNORA_URL` at import time (the env schema and the session-token server function),
@@ -126,7 +145,7 @@ vi.mock("@/lib/env", () => {
 vi.mock("@/lib/lunora/crpc", () => {
     const proxy: unknown = new Proxy(() => undefined, {
         apply: () => {
-            return { mutationFn: async () => undefined };
+            return { mutationFn: harness.mutate };
         },
         get: () => proxy,
     });
@@ -145,11 +164,13 @@ vi.mock("./composer-tiptap/use-composer-autocomplete", () => {
 
 const InputArea = ({
     onPaste,
+    onSteer,
     onSubmit,
     ref,
     value,
 }: {
     onPaste?: (event: unknown) => void;
+    onSteer?: () => void;
     onSubmit: () => void;
     ref?: Ref<ComposerInputAreaRef>;
     value: string;
@@ -166,6 +187,11 @@ const InputArea = ({
             <button onClick={onSubmit} type="button">
                 Send message
             </button>
+            {onSteer && (
+                <button onClick={onSteer} type="button">
+                    Steer
+                </button>
+            )}
         </div>
     );
 };
@@ -442,6 +468,9 @@ describe("ComposerInput and the draft's not-typed mark", () => {
 
     afterEach(() => {
         harness.isStreaming = false;
+        harness.pending = undefined;
+        harness.runner = null;
+        harness.sseStreamState = null;
         harness.threadId = undefined;
         usePromptQueueStore.setState({ queues: {} });
         useChatUIStore.getState().clearComposer();
@@ -468,6 +497,34 @@ describe("ComposerInput and the draft's not-typed mark", () => {
         fireEvent.click(screen.getByRole("button", { name: "Send message" }));
 
         expect(usePromptQueueStore.getState().queues["thread-1"]?.items[0]).toMatchObject({ draftFrom: "sharedPrompt", text: "a colleague's prompt" });
+    });
+
+    it("steers the running reply with the draft's mark, an admin's recalled prompt too", async () => {
+        harness.isStreaming = true;
+        harness.runner = { groups: { turns: { followUp: { kind: "steer" } } } };
+        harness.sseStreamState = "stream-1";
+        harness.threadId = "thread-1";
+        useChatUIStore.getState().setComposerText("and pay the bill");
+        useChatUIStore.getState().setComposerDraftFrom("impersonated");
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Steer" }));
+
+        await waitFor(() => {
+            expect(harness.mutate).toHaveBeenCalledWith(
+                expect.objectContaining({ draftFrom: "impersonated", streamId: "stream-1", text: "and pay the bill" }),
+                expect.anything(),
+            );
+        });
+    });
+
+    it("sends a message held through sign-in with the mark its draft had", async () => {
+        harness.threadId = "thread-1";
+        harness.pending = { draftFrom: "sharedPrompt", text: "a colleague's prompt" };
+        renderComposer();
+
+        await waitFor(() => {
+            expect(harness.sendMessage).toHaveBeenCalledWith("a colleague's prompt", [], { draftFrom: "sharedPrompt" });
+        });
     });
 
     it("sends text the desktop shell hands over (a share, the Quick Composer) as not typed", async () => {

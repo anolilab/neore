@@ -1,5 +1,5 @@
 import { stripHiddenText } from "@neore/ai/utils";
-import type { NotTypedDraft } from "@neore/backend/not-typed-text";
+import type { DraftFrom } from "@neore/backend/not-typed-text";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { ComposerMode, PendingSettings } from "@/features/chat/core/stores/model-store";
@@ -66,7 +66,7 @@ type ComposerContent = Pick<ComposerDraft, "attachedReferences" | "composerAttac
  * Hands a failed send's text back to the chat that sent it: its live composer when it is focused, else its parked draft. The
  * send's not-typed mark (`draftFrom`) comes back with it.
  */
-export const restoreTextFor = (ownerId: string | undefined, text: string, draftFrom?: NotTypedDraft): void => {
+export const restoreTextFor = (ownerId: string | undefined, text: string, draftFrom?: DraftFrom): void => {
     if (ownerId === undefined || isOwnerLive(ownerId)) {
         useChatUIStore.getState().setComposerText(text);
 

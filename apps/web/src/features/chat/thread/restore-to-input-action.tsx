@@ -8,7 +8,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { isGuestTextPart } from "@neore/backend/guest-text";
-import { mergeNotTypedMarks, notTypedMarksOfPart } from "@neore/backend/not-typed-text";
+import { draftFromOfMarks, mergeNotTypedMarks, notTypedMarksOfPart } from "@neore/backend/not-typed-text";
 import { MessageAction } from "@neore/ui/components/ai-elements/message";
 import { Undo2Icon } from "lucide-react";
 import type { FC } from "react";
@@ -24,18 +24,18 @@ const carriesGuestText = (message: UIMessage): boolean =>
 const notTypedMarksOf = (message: UIMessage) =>
     mergeNotTypedMarks(...message.parts.map((part) => (part.type === "text" ? notTypedMarksOfPart({ providerOptions: part.providerMetadata }) : {})));
 
-/** Back into the composer; a draft from a link or someone else's prompt keeps its mark there, so its next send is marked. */
+/** Back into the composer; text the owner did not type keeps its mark there (an admin's as `impersonated`), so its next send is marked. */
 const restore = (message: UIMessage): void => {
-    const { draft } = notTypedMarksOf(message);
+    const draftFrom = draftFromOfMarks(notTypedMarksOf(message));
 
-    requestComposerRestore({ ...extractComposerRestorePayload(message), ...(draft !== undefined && { draftFrom: draft }) });
+    requestComposerRestore({ ...extractComposerRestorePayload(message), ...(draftFrom !== undefined && { draftFrom }) });
 };
 
 const RestoreToInputAction: FC<{ message: UIMessage }> = ({ message }) => {
     const { t } = useLingui();
 
-    // In the composer a guest's words, or an admin's written while acting as the owner, would go out again as the owner's own.
-    if (carriesGuestText(message) || notTypedMarksOf(message).impersonated === true) {
+    // In the composer a guest's words would go out again as the owner's own.
+    if (carriesGuestText(message)) {
         return null;
     }
 

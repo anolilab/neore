@@ -16,7 +16,7 @@
  * ✅ Safe to import in client components
  */
 
-import type { NotTypedDraft } from "@neore/backend/not-typed-text";
+import type { DraftFrom } from "@neore/backend/not-typed-text";
 import { parseNotTypedDraft } from "@neore/backend/not-typed-text";
 
 const PENDING_SEND_KEY = "neore:pending-send";
@@ -26,7 +26,7 @@ export const PENDING_SEND_MAX_AGE_MS = 30 * 60 * 1000;
 
 export interface PendingSend {
     /** Text in it the visitor did not type came from here. */
-    draftFrom?: NotTypedDraft;
+    draftFrom?: DraftFrom;
     /** The pathname of the chat it was typed in. */
     path: string;
     savedAt: number;
@@ -45,7 +45,7 @@ const storage = (): Storage | undefined => {
     }
 };
 
-export const savePendingSend = (text: string, path: string = currentPath(), now: number = Date.now(), draftFrom?: NotTypedDraft): void => {
+export const savePendingSend = (text: string, path: string = currentPath(), now: number = Date.now(), draftFrom?: DraftFrom): void => {
     try {
         storage()?.setItem(PENDING_SEND_KEY, JSON.stringify({ ...(draftFrom !== undefined && { draftFrom }), path, savedAt: now, text } satisfies PendingSend));
     } catch {

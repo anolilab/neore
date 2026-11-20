@@ -31,7 +31,7 @@ import { LunoraError, v } from "lunorash/server";
 import { internalMutation } from "../_generated/server";
 import { insertSteerRow } from "../agent/steer-rows";
 import { authMutation, rateLimit } from "../lib/crpc";
-import { hasNotTypedMarks, mergeNotTypedMarks } from "../lib/not-typed-text";
+import { hasNotTypedMarks, mergeNotTypedMarks, notTypedMarksOfDraftFrom } from "../lib/not-typed-text";
 import { vNotTypedMarks } from "../lib/not-typed-text-validator";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
@@ -44,7 +44,7 @@ export const steerRun = authMutation
     .use(rateLimit("chat/steer"))
     .input({
         /** The steer holds a composer draft the owner did not type (`lib/not-typed-text.ts`): it is delivered marked. */
-        draftFrom: v.optional(v.union(v.literal("promptLink"), v.literal("shellLink"), v.literal("sharedPrompt"))),
+        draftFrom: v.optional(v.union(v.literal("promptLink"), v.literal("shellLink"), v.literal("sharedPrompt"), v.literal("impersonated"))),
         /**
          * The client's id for this steer. Sending the same id again queues nothing
          * more, so a call whose answer was lost can be reconciled instead of repeated.
@@ -100,7 +100,7 @@ export const steerRun = authMutation
 
         const steerId = requestedId ?? ctx.newId();
         // An admin acting as the owner steers marked, as `/chat/start` saves their prompt.
-        const notTyped = mergeNotTypedMarks(draftFrom === undefined ? {} : { draft: draftFrom }, impersonatedBy ? { impersonated: true } : {});
+        const notTyped = mergeNotTypedMarks(notTypedMarksOfDraftFrom(draftFrom), impersonatedBy ? { impersonated: true } : {});
         const steers = queueSteer(stream.steers ?? [], { id: steerId, sentAt: ctx.now, text });
 
         if (!steers) {

@@ -8,7 +8,7 @@
  * channel (`core/stores/request-channel-store.ts`).
  */
 
-import type { NotTypedDraft } from "@neore/backend/not-typed-text";
+import type { DraftFrom } from "@neore/backend/not-typed-text";
 import { getVisibleUserText } from "@neore/chat-ui/utils/page-context";
 
 import { createRequestChannel } from "@/features/chat/core/stores/request-channel-store";
@@ -23,7 +23,7 @@ export interface ComposerRestorePayload {
     /** Add to what is typed instead of replacing it: text that arrives from outside (dictation) must not cost the user their unsent message. */
     append?: boolean;
     /** The text was not typed by the owner (`draft-origin.ts`): the draft it lands in is marked. */
-    draftFrom?: NotTypedDraft;
+    draftFrom?: DraftFrom;
     files: ComposerRestoreFile[];
     /** A quoted reply, added as a quote chip linked to the reply (`text` is then unused). */
     quote?: { messageId: string; text: string };

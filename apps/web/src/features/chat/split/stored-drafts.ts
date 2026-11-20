@@ -1,4 +1,4 @@
-import type { NotTypedDraft } from "@neore/backend/not-typed-text";
+import type { DraftFrom } from "@neore/backend/not-typed-text";
 import { parseNotTypedDraft } from "@neore/backend/not-typed-text";
 
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
@@ -45,7 +45,7 @@ export const DRAFT_CLOCK_SKEW_MS = 24 * 60 * 60 * 1000;
 export interface StoredDraft {
     a?: StoredAttachment[];
     /** Text in it the owner did not type came from here (`composerDraftFrom`). */
-    o?: NotTypedDraft;
+    o?: DraftFrom;
     r?: ReferenceSelection[];
     t: string;
 }

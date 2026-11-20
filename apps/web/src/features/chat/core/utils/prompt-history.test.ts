@@ -43,6 +43,21 @@ describe(buildPromptHistoryMarks, () => {
             ]),
         ).toStrictEqual(new Map([["a colleague's prompt", "sharedPrompt"]]));
     });
+
+    it("keeps an admin's mark on a prompt they wrote as the owner, over a draft's", () => {
+        const byAdmin = (notTyped: unknown, text: string) => {
+            return { parts: [{ providerMetadata: { neore: { notTyped } }, text, type: "text" }], role: "user" };
+        };
+
+        expect(
+            buildPromptHistoryMarks([byAdmin({ impersonated: true }, "sent as you"), byAdmin({ draft: "promptLink", impersonated: true }, "a link, as you")]),
+        ).toStrictEqual(
+            new Map([
+                ["a link, as you", "impersonated"],
+                ["sent as you", "impersonated"],
+            ]),
+        );
+    });
 });
 
 describe(navigatePromptHistory, () => {

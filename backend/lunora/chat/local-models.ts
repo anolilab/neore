@@ -43,7 +43,14 @@ import {
     resolveLocalModel,
 } from "./lib/local-turn";
 import { requireOwnedThread } from "../agent/thread-read-access";
-import { mergeNotTypedMarks, type NotTypedDraft, notTypedMarksOfMessage, userTextContent, withNotTypedMarks } from "../lib/not-typed-text";
+import {
+    type DraftFrom,
+    mergeNotTypedMarks,
+    notTypedMarksOfDraftFrom,
+    notTypedMarksOfMessage,
+    userTextContent,
+    withNotTypedMarks,
+} from "../lib/not-typed-text";
 
 /** Regenerate the reply to `messageId` (a prompt), or save an edit of it. Requires `threadId`. */
 export interface LocalTurnBranch {
@@ -54,7 +61,7 @@ export interface LocalTurnBranch {
 export interface SaveLocalTurnArgs {
     branch?: LocalTurnBranch;
     /** The prompt holds a composer draft the owner did not type (`lib/not-typed-text.ts`): it is saved marked. */
-    draftFrom?: NotTypedDraft;
+    draftFrom?: DraftFrom;
     error?: string;
     language?: string;
     model: string;
@@ -164,7 +171,7 @@ export const saveLocalTurnHandler = async (
         }
     }
 
-    const notTyped = mergeNotTypedMarks(args.draftFrom === undefined ? {} : { draft: args.draftFrom }, impersonated ? { impersonated: true } : {});
+    const notTyped = mergeNotTypedMarks(notTypedMarksOfDraftFrom(args.draftFrom), impersonated ? { impersonated: true } : {});
     const userMessage = { ...buildLocalPromptMessage(prompt), message: { content: userTextContent(prompt, notTyped), role: "user" as const } };
     const replyMessage = buildLocalReplyMessage({
         error: args.error,
@@ -230,7 +237,7 @@ export const saveLocalTurn = authMutation
     .input({
         /** Regenerate the reply to a prompt, or save an edit of it, as a sibling branch. */
         branch: v.optional(v.object({ kind: v.union(v.literal("regenerate"), v.literal("edit")), messageId: v.id("messages") })),
-        draftFrom: v.optional(v.union(v.literal("promptLink"), v.literal("shellLink"), v.literal("sharedPrompt"))),
+        draftFrom: v.optional(v.union(v.literal("promptLink"), v.literal("shellLink"), v.literal("sharedPrompt"), v.literal("impersonated"))),
         error: v.optional(v.string().check((value) => value.length <= MAX_LOCAL_ERROR_CHARS * 4, { message: "Error too long" })),
         language: v.optional(v.string().check((value) => value.length <= 20, { message: "Invalid language" })),
         /** `custom:<providerId>/<modelId>` naming the caller's own `local-browser` endpoint. */

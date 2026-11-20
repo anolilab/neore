@@ -1,4 +1,4 @@
-import type { NotTypedDraft } from "@neore/backend/not-typed-text";
+import type { DraftFrom } from "@neore/backend/not-typed-text";
 
 import { useChatUIStore } from "../stores/chat-ui-store";
 
@@ -12,7 +12,7 @@ import { useChatUIStore } from "../stores/chat-ui-store";
  *
  * Set it after the text is in: emptying the draft drops the mark.
  */
-export type DraftOrigin = NotTypedDraft;
+export type DraftOrigin = DraftFrom;
 
 /** Marks the live composer's draft as holding text from `origin`. */
 export const markComposerDraft = (origin: DraftOrigin): void => {
@@ -37,3 +37,9 @@ export const noteSavedPrompt = (prompt: { userId: string }, viewerId: string | u
 
 /** A request's `draftFrom`, spread into its body: nothing for the person's own words. */
 export const draftFromField = (origin: DraftOrigin | undefined): { draftFrom?: DraftOrigin } => (origin === undefined ? {} : { draftFrom: origin });
+
+/**
+ * The mark of a composer's `initialMessage` prefill. A chat's comes from its address (`/chat/$threadId?initialMessage=`),
+ * which a link wrote; the new-chat composer's from the hand-off of text typed on the landing or home page.
+ */
+export const prefillDraftFrom = (threadId: string | undefined): DraftOrigin | undefined => (threadId ? "promptLink" : undefined);

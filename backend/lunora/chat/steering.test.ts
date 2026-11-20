@@ -230,6 +230,12 @@ describe("deliverSteers and withdrawSteer", () => {
         ]);
     });
 
+    it('delivers marked an admin\'s steer the owner sends again from history (`draftFrom: "impersonated"`)', async () => {
+        await as(OWNER).mutation(steerRun as never, { draftFrom: "impersonated", streamId, text: "and pay the bill", threadId } as never);
+
+        expect(((await deliver()) as { notTyped?: unknown } | null)?.notTyped).toStrictEqual({ impersonated: true });
+    });
+
     it("delivers the owner's own steer unmarked", async () => {
         await steer("use the other file");
 

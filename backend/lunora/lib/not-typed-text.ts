@@ -10,18 +10,33 @@ export const NOT_TYPED_DRAFTS = ["promptLink", "shellLink", "sharedPrompt"] as c
 
 export type NotTypedDraft = (typeof NOT_TYPED_DRAFTS)[number];
 
+/** What a send may name as `draftFrom`: a draft's source, or `impersonated` for a prompt an admin wrote as the owner, recalled. */
+export type DraftFrom = NotTypedDraft | "impersonated";
+
 export type NotTypedMarks = { draft?: NotTypedDraft; impersonated?: true };
 
 const isNotTypedDraft = (value: unknown): value is NotTypedDraft => (NOT_TYPED_DRAFTS as ReadonlyArray<unknown>).includes(value);
 
 /** A request's `draftFrom`: `undefined` when it names none, `null` when it names something unknown (refused). */
-export const parseNotTypedDraft = (value: unknown): NotTypedDraft | null | undefined => {
+export const parseNotTypedDraft = (value: unknown): DraftFrom | null | undefined => {
     if (value === undefined) {
         return undefined;
     }
 
-    return isNotTypedDraft(value) ? value : null;
+    return value === "impersonated" || isNotTypedDraft(value) ? value : null;
 };
+
+/** The marks a send's `draftFrom` stands for. */
+export const notTypedMarksOfDraftFrom = (draftFrom: DraftFrom | undefined): NotTypedMarks => {
+    if (draftFrom === undefined) {
+        return {};
+    }
+
+    return draftFrom === "impersonated" ? { impersonated: true } : { draft: draftFrom };
+};
+
+/** The `draftFrom` that sends a stored prompt's marks again (prompt history, Restore to input): an admin's writing first. */
+export const draftFromOfMarks = (marks: NotTypedMarks): DraftFrom | undefined => (marks.impersonated === true ? "impersonated" : marks.draft);
 
 export const hasNotTypedMarks = (marks: NotTypedMarks): boolean => marks.draft !== undefined || marks.impersonated === true;
 
@@ -78,3 +93,10 @@ type MarkedTextPart = { providerOptions?: Record<string, Record<string, unknown>
 /** A user message's content for `text`: the plain string the owner typed, or one marked text part. */
 export const userTextContent = (text: string, marks: NotTypedMarks): string | MarkedTextPart[] =>
     hasNotTypedMarks(marks) ? [withNotTypedMarks<MarkedTextPart>({ text, type: "text" }, marks)] : text;
+
+/** A stateless run's `prompt`, which it saves again as a new row: the saved prompt's marks go with it. */
+export const statelessPrompt = (text: string, marks: NotTypedMarks): string | [{ content: MarkedTextPart[]; role: "user" }] => {
+    const content = userTextContent(text, marks);
+
+    return typeof content === "string" ? content : [{ content, role: "user" }];
+};

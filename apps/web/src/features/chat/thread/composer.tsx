@@ -52,7 +52,7 @@ import type {
 } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
-import { markComposerDraft } from "@/features/chat/core/utils/draft-origin";
+import { markComposerDraft, prefillDraftFrom } from "@/features/chat/core/utils/draft-origin";
 import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
 import ComposerGoal from "@/features/chat/goal/composer-goal";
 import HostComposer from "@/features/chat/host/host-composer";
@@ -597,10 +597,11 @@ const Composer: FC<ComposerProps> = ({
                 draftOwnership.prefill = initialMessage;
                 ui.setComposerText(initialMessage);
 
-                // A chat's prefill comes from its address (`/chat/$threadId?initialMessage=`), which a link wrote. The new-chat
-                // composer's comes from the hand-off of text typed on the landing or home page (`LANDING_MESSAGE_KEY`).
-                if (threadId) {
-                    markComposerDraft("promptLink");
+                // A link's prefill is not the person's own words.
+                const origin = prefillDraftFrom(threadId);
+
+                if (origin !== undefined) {
+                    markComposerDraft(origin);
                 }
             }
 

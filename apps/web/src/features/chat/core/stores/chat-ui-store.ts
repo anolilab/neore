@@ -8,7 +8,7 @@
  */
 
 import { stripHiddenText } from "@neore/ai/utils";
-import type { NotTypedDraft } from "@neore/backend/not-typed-text";
+import type { DraftFrom } from "@neore/backend/not-typed-text";
 import { forgetPdfUrls } from "@neore/ui/utils/pdf-preview-event";
 import { create } from "zustand";
 import { devtools, subscribeWithSelector } from "zustand/middleware";
@@ -22,8 +22,8 @@ import { updateParkedAttachment } from "@/features/chat/split/composer-drafts";
  */
 const keptDraftFrom = (
     draft: { attachedReferences: ReadonlyArray<unknown>; composerAttachments: ReadonlyArray<unknown>; composerText: string },
-    current: NotTypedDraft | undefined,
-): NotTypedDraft | undefined =>
+    current: DraftFrom | undefined,
+): DraftFrom | undefined =>
     draft.composerText === "" && draft.composerAttachments.length === 0 && draft.attachedReferences.length === 0 ? undefined : current;
 
 /**
@@ -127,7 +127,7 @@ interface ChatUIStore {
     // Banned content error returned by the server — restores composer text + shows inline error
     composerBannedContent: { message: string; words: string[] } | null;
     /** Where text in the draft that the owner did not type came from; its send carries it (`core/utils/draft-origin.ts`). */
-    composerDraftFrom: NotTypedDraft | undefined;
+    composerDraftFrom: DraftFrom | undefined;
     /** Hidden characters (tag block, bidi controls, ...) taken out of the draft since it was last empty; drives the composer's notice. */
     composerHiddenRemoved: number;
     // Composer state
@@ -163,7 +163,7 @@ interface ChatUIStore {
     restoreComposer: (draft: {
         attachedReferences: ReferenceSelection[];
         composerAttachments: PendingAttachment[];
-        composerDraftFrom?: NotTypedDraft;
+        composerDraftFrom?: DraftFrom;
         composerText: string;
     }) => void;
     setActiveDocumentId: (documentId: string | null) => void;
@@ -182,7 +182,7 @@ interface ChatUIStore {
     // Banned content actions
     setComposerBannedContent: (value: { message: string; words: string[] } | null) => void;
     /** Marks the draft as holding text from `origin`; `undefined` only when that text was replaced as a whole. */
-    setComposerDraftFrom: (origin: NotTypedDraft | undefined) => void;
+    setComposerDraftFrom: (origin: DraftFrom | undefined) => void;
     setComposerText: (text: string) => void;
 
     setCopiedMessageId: (id: string | null) => void;
@@ -233,7 +233,7 @@ const initialState = {
     canvasViewMode: "editor" as "editor" | "history",
     composerAttachments: [] as PendingAttachment[],
     composerBannedContent: null as { message: string; words: string[] } | null,
-    composerDraftFrom: undefined as NotTypedDraft | undefined,
+    composerDraftFrom: undefined as DraftFrom | undefined,
     composerHiddenRemoved: 0,
     composerText: "",
     copiedMessageId: null as string | null,

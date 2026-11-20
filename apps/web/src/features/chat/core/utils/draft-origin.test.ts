@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import type { PendingAttachment } from "../stores/chat-ui-store";
 import { useChatUIStore } from "../stores/chat-ui-store";
-import { composerDraftFrom, draftFromField, markComposerDraft, noteSavedPrompt } from "./draft-origin";
+import { composerDraftFrom, draftFromField, markComposerDraft, noteSavedPrompt, prefillDraftFrom } from "./draft-origin";
 
 const ui = () => useChatUIStore.getState();
 
@@ -108,5 +108,12 @@ describe("the composer draft's not-typed mark", () => {
         noteSavedPrompt({ userId: "user-c" }, undefined, { replaced: true });
 
         expect(composerDraftFrom()).toBe("sharedPrompt");
+    });
+});
+
+describe(prefillDraftFrom, () => {
+    it("marks a chat's `?initialMessage=` prefill, which a link wrote, and not the new chat's hand-off of typed text", () => {
+        expect(prefillDraftFrom("thread-1")).toBe("promptLink");
+        expect(prefillDraftFrom(undefined)).toBeUndefined();
     });
 });

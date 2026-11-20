@@ -1,4 +1,4 @@
-import type { NotTypedDraft } from "@neore/backend/not-typed-text";
+import type { DraftFrom } from "@neore/backend/not-typed-text";
 import { create } from "zustand";
 
 import type { ReferenceSelection } from "@/features/chat/components/reference-picker/types";
@@ -15,7 +15,7 @@ export interface ComposerDraft {
     attachedReferences: ReferenceSelection[];
     composerAttachments: PendingAttachment[];
     /** The draft's not-typed mark (`chat-ui-store.ts`), parked and stored with it. */
-    composerDraftFrom?: NotTypedDraft;
+    composerDraftFrom?: DraftFrom;
     composerText: string;
 }
 

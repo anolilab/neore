@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => {
     return {
         charges: 0,
-        enqueued: [] as { prompt?: string }[],
+        enqueued: [] as { notTyped?: unknown; prompt?: string }[],
         /** The edited row is a guest's note the owner sent on. */
         guestRow: false,
         /** The thread's owner; anyone else editing in it is a stranger. */
@@ -242,6 +242,20 @@ describe("editMessageHttpAction text the owner did not type", () => {
             marked({ impersonated: true }),
             marked({ impersonated: true }),
         ]);
+    });
+
+    it("hands a stateless reply the marks, so the prompt it saves again stays marked; an own edit hands none", async () => {
+        state.stateless = true;
+        await edit("fix this", { draftFrom: "sharedPrompt" });
+        await edit("fix this");
+
+        expect(state.enqueued.map((job) => job.notTyped)).toStrictEqual([{ draft: "sharedPrompt" }, undefined]);
+    });
+
+    it('marks a recalled prompt an admin wrote as the owner, sent again as "impersonated"', async () => {
+        await edit("fix this", { draftFrom: "impersonated" });
+
+        expect(state.saved[0]?.message.content).toStrictEqual(marked({ impersonated: true }));
     });
 
     it("refuses a draft source nobody named, and saves nothing", async () => {

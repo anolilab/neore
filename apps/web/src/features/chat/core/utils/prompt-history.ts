@@ -7,8 +7,8 @@
  * this module owns WHAT the navigation does to the text.
  */
 
-import type { NotTypedDraft } from "@neore/backend/not-typed-text";
-import { notTypedMarksOfPart } from "@neore/backend/not-typed-text";
+import type { DraftFrom } from "@neore/backend/not-typed-text";
+import { draftFromOfMarks, mergeNotTypedMarks, notTypedMarksOfPart } from "@neore/backend/not-typed-text";
 
 /** `null` while the user is editing their own draft rather than a recalled entry. */
 export type PromptHistoryState = {
@@ -69,22 +69,25 @@ export const buildPromptHistoryEntries = (messages: ReadonlyArray<MessageLike>):
 
 /**
  * The not-typed mark of each entry whose message the server saved marked (`@neore/backend/not-typed-text`), so a recalled
- * entry goes out marked again. A text sent both marked and unmarked keeps the mark.
+ * entry goes out marked again: a draft's source, or `impersonated` for one an admin wrote as the owner. A text sent both
+ * marked and unmarked keeps the mark.
  */
-export const buildPromptHistoryMarks = (messages: ReadonlyArray<MessageLike>): Map<string, NotTypedDraft> => {
-    const marks = new Map<string, NotTypedDraft>();
+export const buildPromptHistoryMarks = (messages: ReadonlyArray<MessageLike>): Map<string, DraftFrom> => {
+    const marks = new Map<string, DraftFrom>();
 
     for (const message of messages) {
-        const draft =
+        const draftFrom =
             message.role === "user"
-                ? (message.parts ?? [])
-                      .map((part) => (part.type === "text" ? notTypedMarksOfPart({ providerOptions: part.providerMetadata }).draft : undefined))
-                      .find(Boolean)
+                ? draftFromOfMarks(
+                      mergeNotTypedMarks(
+                          ...(message.parts ?? []).map((part) => (part.type === "text" ? notTypedMarksOfPart({ providerOptions: part.providerMetadata }) : {})),
+                      ),
+                  )
                 : undefined;
         const text = messageText(message).trim();
 
-        if (draft !== undefined && text) {
-            marks.set(text, draft);
+        if (draftFrom !== undefined && text) {
+            marks.set(text, draftFrom);
         }
     }
 
