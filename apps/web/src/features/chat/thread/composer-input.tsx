@@ -1720,9 +1720,13 @@ const ComposerInput = ({
     const handleAttachmentUpdate = useCallback(
         async (attachmentId: string, newFile: File) => {
             try {
+                const revision = useChatUIStore.getState().composerAttachments.find((attachment) => attachment.id === attachmentId)?.revision ?? 0;
+
+                // A user edit: a send waiting on this file ends rather than send the edited content without a new press.
                 updateAttachment(attachmentId, {
                     file: newFile,
                     name: newFile.name,
+                    revision: revision + 1,
                     status: "uploading",
                 });
 

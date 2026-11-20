@@ -30,8 +30,8 @@ describe("startUploadWait", () => {
             accountId: undefined,
             attachmentIds: ["b"],
             pressedAttachments: [
-                { complete: true, file: undefined, fileId: "f1", id: "a" },
-                { complete: false, file: undefined, fileId: undefined, id: "b" },
+                { complete: true, fileId: "f1", id: "a", revision: 0 },
+                { complete: false, fileId: undefined, id: "b", revision: 0 },
             ],
             referenceIds: ["r1"],
             target: "",
@@ -118,16 +118,14 @@ describe("settleUploadWait", () => {
         expect(settleUploadWait(wait, { ...done, target: "" }, "thread-1")).toStrictEqual({ kind: "send" });
     });
 
-    it("ends as edited when a file still uploading is edited, which replaces its file under the same id", () => {
-        const before = new File(["a"], "a.txt");
-        const edited = new File(["b"], "a.txt");
-        const wait = startUploadWait({ attachments: [{ ...file("a", "uploading"), file: before }], references: [], text: "see files" }, "thread-1");
-        const done = (current: File) => {
-            return { attachments: [{ ...file("a", "complete", "f1"), file: current }], references: [], text: "see files" };
+    it("ends as edited when the user edits a file still uploading, but not when its placeholder is swapped for the real file", () => {
+        const wait = startUploadWait({ attachments: [file("a", "uploading")], references: [], text: "see files" }, "thread-1");
+        const done = (revision: number) => {
+            return { attachments: [{ ...file("a", "complete", "f1"), revision }], references: [], text: "see files" };
         };
 
-        expect(settleUploadWait(wait, done(edited), "thread-1")).toStrictEqual({ kind: "edited" });
-        expect(settleUploadWait(wait, done(before), "thread-1")).toStrictEqual({ kind: "send" });
+        expect(settleUploadWait(wait, done(1), "thread-1")).toStrictEqual({ kind: "edited" });
+        expect(settleUploadWait(wait, done(0), "thread-1")).toStrictEqual({ kind: "send" });
     });
 
     it("cancels quietly when the account changed, even in the same chat", () => {
