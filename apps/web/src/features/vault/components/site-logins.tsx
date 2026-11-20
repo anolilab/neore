@@ -8,6 +8,7 @@ import { Checkbox } from "@neore/ui/components/checkbox";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
+import type { Mutation } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { KeyRound, Pencil, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
@@ -134,8 +135,27 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
     // An empty list could be the last account's cached one, so only a non-empty one may drop a deleted teammate here.
     const knownBots = botsLoaded && bots.length > 0;
     // Offline, the default network mode pauses a write and sends it on reconnect, by then perhaps under another account
-    // with the typed password still in it. These fail at once instead.
-    const saveMutation = useMutation(crpc.vault.site_logins.saveSiteLogin.mutationOptions({ networkMode: "always", retry: 0 }, { onlineOnly: true }));
+    // with the typed password still in it. These fail at once instead. The mutation cache would also keep the password for
+    // five minutes after the save settles: `gcTime: 0` and the removal on settle drop it, as Lunora's own hook does for a
+    // `v.sensitive` argument.
+    const saveMutation = useMutation(
+        crpc.vault.site_logins.saveSiteLogin.mutationOptions(
+            {
+                gcTime: 0,
+                networkMode: "always",
+                onSettled: (_data: unknown, _error: unknown, variables: unknown) => {
+                    const cache = queryClient.getMutationCache();
+                    const settled = cache.findAll({ predicate: (entry: Mutation) => entry.state.variables === variables });
+
+                    for (const mutation of settled) {
+                        cache.remove(mutation);
+                    }
+                },
+                retry: 0,
+            },
+            { onlineOnly: true },
+        ),
+    );
     const deleteMutation = useMutation(crpc.vault.site_logins.deleteSiteLogin.mutationOptions({ networkMode: "always", retry: 0 }, { onlineOnly: true }));
     // A save or delete that ends after an account switch (this form unmounts) does not report to the next account.
     const mounted = useRef(true);
@@ -176,9 +196,11 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
         const saved = isEditing ? t`Login updated` : t`Login saved`;
         const fallback = t`Could not save the login.`;
 
+        // `reset` after each outcome: the hook would otherwise keep the call, password included, until the next save.
         try {
             const savedId = await saveMutation.mutateAsync(args);
 
+            saveMutation.reset();
             setDraft(afterSave(submitted, savedId));
             await queryClient.invalidateQueries({ queryKey: loginsQuery.queryKey });
 
@@ -186,6 +208,8 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                 toast.success(saved);
             }
         } catch (error) {
+            saveMutation.reset();
+
             if (mounted.current) {
                 toast.error(errorText(error, fallback));
             }

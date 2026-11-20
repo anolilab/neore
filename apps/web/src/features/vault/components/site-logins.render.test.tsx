@@ -5,6 +5,7 @@
  * retry; it never passes for an empty one.
  */
 
+import type { UseMutationOptions } from "@tanstack/react-query";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -77,8 +78,9 @@ vi.mock("@/lib/lunora/crpc", () => {
         vault: {
             site_logins: {
                 deleteSiteLogin: {
-                    mutationOptions: () => {
-                        return { mutationFn: harness.deleteSiteLogin };
+                    // As the shim does: the call site's options apply on top.
+                    mutationOptions: (overrides?: Partial<UseMutationOptions>) => {
+                        return { mutationFn: harness.deleteSiteLogin, ...overrides };
                     },
                 },
                 listSiteLogins: {
@@ -102,8 +104,9 @@ vi.mock("@/lib/lunora/crpc", () => {
                     },
                 },
                 saveSiteLogin: {
-                    mutationOptions: () => {
-                        return { mutationFn: harness.saveSiteLogin };
+                    // As the shim does: the call site's options apply on top.
+                    mutationOptions: (overrides?: Partial<UseMutationOptions>) => {
+                        return { mutationFn: harness.saveSiteLogin, ...overrides };
                     },
                 },
             },
@@ -170,6 +173,27 @@ describe("SiteLogins", () => {
         harness.userId = undefined;
         view.rerender();
         expect(screen.queryByLabelText("Password")).toBeNull();
+    });
+
+    it("keeps no typed password in the mutation cache once a save settles", async () => {
+        const user = userEvent.setup();
+
+        harness.saveSiteLogin.mockResolvedValueOnce("login-1");
+        const view = mount();
+        const cachedPasswords = () =>
+            view.queryClient
+                .getMutationCache()
+                .getAll()
+                .filter((mutation) => (mutation.state.variables as { password?: string } | undefined)?.password === PASSWORD);
+
+        await user.type(screen.getByLabelText("Site"), SITE);
+        await user.type(screen.getByLabelText("Username or email"), "ada@example.com");
+        await user.type(passwordField(), PASSWORD);
+        await user.click(screen.getByRole("button", { name: "Save login" }));
+        await waitFor(() => expect(toast.success).toHaveBeenCalledOnce());
+
+        expect(cachedPasswords()).toHaveLength(0);
+        expect(passwordField().value).toBe("");
     });
 
     it("does not report a save that ends after the account switched", async () => {
