@@ -13,6 +13,7 @@ import type { HttpActionCtx } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
 import type { BetterAuthUser } from "../../auth/lib/types";
+import { chatLogger } from "../../lib/logger";
 import { getUserTier, type RateLimitKey } from "../../lib/rate-limiter";
 
 export type DailyLimitKind = "Audio" | "Image" | "Text" | "Video";
@@ -106,10 +107,15 @@ export const refundDailyLimit = async (
         return;
     }
 
-    await context.runMutation(internal.chat.daily_charge.refundDailyCharge, {
-        ...(chargeKey !== undefined && { chargeKey }),
-        count: 1,
-        identifier: user._id,
-        key,
-    });
+    // Best effort: the refusal it follows is the answer the client gets, so a failed refund must not replace it with a 500.
+    try {
+        await context.runMutation(internal.chat.daily_charge.refundDailyCharge, {
+            ...(chargeKey !== undefined && { chargeKey }),
+            count: 1,
+            identifier: user._id,
+            key,
+        });
+    } catch (error) {
+        chatLogger.error("Could not refund a daily quota unit:", error);
+    }
 };
