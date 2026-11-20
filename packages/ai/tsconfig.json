@@ -9,6 +9,6 @@
             "@neore/ai/*": ["./src/*"]
         }
     },
-    "include": ["**/*.ts", "**/*.d.ts", "eslint.config.js", "prettier.config.js"],
+    "include": ["**/*.ts", "**/*.d.ts", "eslint.config.js", "prettier.config.js", "../../scripts/vitest/time-sharding.ts"],
     "exclude": ["dist", "**/*.md", "**/*.json"]
 }

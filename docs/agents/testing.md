@@ -26,6 +26,9 @@ Rules for agents writing tests and for review bots reviewing them. Change this f
   not implementation details.
 - Mobile: test the pure rules directly; inject a store or a platform module rather than mocking native modules
   globally.
+- CI splits every project's unit tests into three shards by recorded time (`scripts/vitest/time-sharding.ts`). A new
+  `vitest.config.*` spreads `timeSharding(import.meta.url)` into `test`, or every shard runs all its files. Each
+  test file must pass alone: a shard can hold any subset.
 
 ## For reviewers
 

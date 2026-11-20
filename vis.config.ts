@@ -217,11 +217,23 @@ export default defineConfig({
             cache: true,
         },
         test: {
-            inputs: ["default", "^production", "{projectRoot}/vite.config.ts", "{projectRoot}/vitest.config.ts"],
+            inputs: [
+                "default",
+                "^production",
+                "{projectRoot}/vite.config.ts",
+                "{projectRoot}/vitest.config.ts",
+                "{workspaceRoot}/scripts/vitest/time-sharding.ts",
+            ],
             cache: true,
         },
         "test:coverage": {
-            inputs: ["default", "^production", "{projectRoot}/vite.config.ts", "{projectRoot}/vitest.config.ts"],
+            inputs: [
+                "default",
+                "^production",
+                "{projectRoot}/vite.config.ts",
+                "{projectRoot}/vitest.config.ts",
+                "{workspaceRoot}/scripts/vitest/time-sharding.ts",
+            ],
             cache: true,
         },
         // Every story of the project, in Chromium, once per mode (`apps/web/vitest.storybook.config.ts`).

@@ -69,9 +69,19 @@ jobs:
               run: "pnpm --filter @neore/backend run codegen"
 
             # Not the `affected` variant: this measures the whole tree.
+            # Also records how long each test file took, for the shards in `test.yml` (`scripts/vitest/time-sharding.ts`).
             - name: "Run all tests with coverage"
               shell: "bash"
-              run: "pnpm exec vis run test:coverage"
+              env:
+                  VITEST_RECORD_TIMINGS: "1"
+              run: "pnpm exec vis run test:coverage --no-cache"
+
+            # Saved from main, whose caches every pull request can restore. A run whose tests failed saves nothing.
+            - name: "Save the test timings"
+              uses: "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
+              with:
+                  path: "scripts/vitest/timings"
+                  key: "test-timings-${{ github.run_id }}"
 
             # The one project with a `test` target and no `test:coverage`.
             - name: "Run the Rust Worker tests"
