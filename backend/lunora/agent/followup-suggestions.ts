@@ -12,8 +12,12 @@ import { isThreadLocked } from "../lib/thread-lock";
 
 /** One paid suggestion call per reply: keyed `<threadId>:<lastMessageId>`, so a second run of the same reply finds it taken. */
 export const FOLLOWUP_CLAIM_SCOPE = "followup-suggestions";
-/** A reply is paid for once, so its claim outlives any retry of its job: a retry after a failed call is not charged again. */
-const FOLLOWUP_CLAIM_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/**
+ * The claim covers one run in flight, and lapses so an interrupted run (a killed action leaves no catch to release it) can be retried.
+ * A retry is not charged again: the Text charge is keyed per reply and holds for a day (`chat/daily-charge.ts`). Once a reply is
+ * cached, the cache check ends every later run before admission.
+ */
+const FOLLOWUP_CLAIM_TTL_MS = 60 * 60 * 1000;
 
 /** A model request in flight for a chat: a lock waits for it, and the claim goes as soon as the request settles. */
 export const FOLLOWUP_DISPATCH_SCOPE = "followup-dispatch";
