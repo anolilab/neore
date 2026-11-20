@@ -8,7 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 
-import { admitFollowupSuggestions } from "../agent/followup-suggestions";
+import { admitFollowupSuggestions, cacheFollowupSuggestions, getCachedFollowupSuggestionsHandler } from "../agent/followup-suggestions";
 import schema from "../schema";
 import { generateFollowupSuggestionsForThread } from "./functions";
 
@@ -109,5 +109,26 @@ describe("one paid call per reply", () => {
         );
 
         await expect(admit("reply-1", locked)).resolves.toBe(false);
+    });
+});
+
+describe("a late run cannot replace a newer cache", () => {
+    const cache = async (lastMessageId: string, order: number, suggestions: string[]) =>
+        await harness.action(async (context: any) => await context.runMutation(cacheFollowupSuggestions, { lastMessageId, order, suggestions, threadId }));
+
+    const cached = async () => await harness.run(async (ctx: any) => await getCachedFollowupSuggestionsHandler(ctx, { threadId }));
+
+    it("an older turn that finishes after a newer one is refused", async () => {
+        await cache("reply-new", 5, ["newer?"]);
+        await cache("reply-old", 3, ["older?"]);
+
+        await expect(cached()).resolves.toEqual({ lastMessageId: "reply-new", suggestions: ["newer?"] });
+    });
+
+    it("a newer turn replaces an older cache", async () => {
+        await cache("reply-old", 3, ["older?"]);
+        await cache("reply-new", 5, ["newer?"]);
+
+        await expect(cached()).resolves.toEqual({ lastMessageId: "reply-new", suggestions: ["newer?"] });
     });
 });

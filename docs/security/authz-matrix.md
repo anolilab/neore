@@ -316,7 +316,6 @@ for a schema table that is neither policed nor listed:
 | `chat_functions.getBrowserSettings` | query | authQuery | — | caller-scoped (ctx.user) | ok |
 | `chat_functions.getCachedFollowupSuggestions` | query | authQuery | threads | thread access (owner/grant) | ok |
 | `chat_functions.getChildThreads` | query | authQuery | threads | row.userId == caller | **fixed** (high) — children filtered to the caller's own |
-| `chat_functions.getFollowupSuggestions` | action | authAction + RL | threads | thread access (owner/grant) | **fixed** (low) — rate limit on an LLM call |
 | `chat_functions.getFullThreadForExport` | query | authQuery | threads | row.userId == caller | **fixed** (critical) — parent messages read only when the caller owns the parent |
 | `chat_functions.getMessageRateLimit` | query | optionalAuthQuery | — | caller's own counter | ok |
 | `chat_functions.getPinnedThreads` | query | authQuery | — | caller-scoped (ctx.user) | ok |

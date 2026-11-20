@@ -1265,6 +1265,8 @@ export const schema = defineSchema({
     followupSuggestions: defineTable({
         createdAt: v.number(),
         lastMessageId: v.string(),
+        // The turn's `order` the suggestions were made for. A write for an older turn is refused, so a slow run cannot replace a newer cache. Unset on rows from before this column.
+        order: v.optional(v.number()),
         suggestions: v.array(v.string()),
         threadId: v.string(),
         updatedAt: v.number(),

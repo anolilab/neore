@@ -670,6 +670,8 @@ const ComposerTiptapEditor = ({
 
         if (!nextPromptSuggestion || readComposerText(editor) !== "") {
             editor.commands.setSuggestedPrompt(null);
+            // The cleanup below cancels this suggestion's clear timer, so its line is cleared here instead of being left in the live region.
+            setGhostAnnouncement("");
 
             return undefined;
         }
