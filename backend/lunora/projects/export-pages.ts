@@ -161,8 +161,8 @@ interface RuleFilesPage {
  * The user's projects from {@link collectAllOwnedProjects}, each with its rule files (`ruleFiles`), a legacy `context`
  * first (`projectRuleFiles`, from `contexts`, the project rows already read), the saved rows read
  * {@link PROJECTS_PER_DETAILS_READ} projects to a query. Once the reads reach `maxBytes` the remaining projects' files are
- * not read and the project says so (`ruleFilesOmitted: true`); the export still completes. A project without rule files
- * is left as it is.
+ * not read and the project says so (`ruleFilesOmitted: true`), still with its legacy `context`, which costs no read; the
+ * export still completes. A project without rule files is left as it is.
  */
 export const attachProjectRuleFiles = async (
     projects: object[],
@@ -206,7 +206,9 @@ export const attachProjectRuleFiles = async (
             const { projectId } = project as { projectId: string };
 
             if (omitted.has(projectId)) {
-                return { ...project, ruleFilesOmitted: true };
+                const kept = projectRuleFiles({ context: contexts.get(projectId) });
+
+                return { ...project, ...(kept.length > 0 && { ruleFiles: kept }), ruleFilesOmitted: true };
             }
 
             const files = ruleFiles.get(projectId);

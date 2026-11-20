@@ -353,7 +353,8 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
     const canEdit = data?.canEdit === true;
     const isDirty = draft !== null;
     // An older context longer than a rule file may be, left exactly as it was (first, same name, mode and text): it stays
-    // where it is, as the backend keeps it. Any change to it makes it an ordinary file, held to the limits.
+    // first, as the backend keeps it, and while it is kept no move takes it or puts another file above it. Any change to
+    // it makes it an ordinary file, held to the limits.
     const legacy = savedFiles[0];
     const keptLegacyId =
         legacy && legacy.id === data?.legacyContextId && legacy.content.length > MAX_RULE_FILE_LENGTH && sameFile(files[0], legacy) ? legacy.id : undefined;
@@ -587,8 +588,8 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
                                     focusRequest={focusRequest}
                                     index={index}
                                     invalid={invalid?.fileId === file.id ? invalid.field : undefined}
-                                    isFirst={index === 0}
-                                    isLast={index === files.length - 1}
+                                    isFirst={index === 0 || (index === 1 && keptLegacyId !== undefined)}
+                                    isLast={index === files.length - 1 || file.id === keptLegacyId}
                                     key={file.id}
                                     onChange={(next) => change(files.map((current) => (current.id === file.id ? next : current)))}
                                     onMove={(offset) => change(moved(files, index, offset))}

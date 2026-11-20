@@ -11,6 +11,9 @@ import { BATCH, type BatchResult, full } from "../gdpr/batch";
 import { MAX_LENGTH } from "../lib/validators";
 import { MAX_PAYLOAD_LENGTH, sliceUnits } from "./webhook-template";
 
+/** What reading `row` costs against the export action's read budget, counted as the whole row's JSON. */
+const rowBytes = (row: unknown): number => new TextEncoder().encode(JSON.stringify(row)).byteLength;
+
 /** Triggers with their run history. A trigger whose history is longer than one batch stays for the next round. */
 export const eraseTriggersForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
     const triggers = await ctx.db
@@ -61,7 +64,7 @@ export const collectTriggersForExport = internalQuery
         cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
         userId: v.string().max(MAX_LENGTH.id),
     })
-    .output(v.object({ cursor: v.union(v.string(), v.null()), triggers: v.array(v.any()) }))
+    .output(v.object({ cursor: v.union(v.string(), v.null()), readBytes: v.number(), triggers: v.array(v.any()) }))
     .query(async ({ args: { cursor, userId }, ctx }) => {
         const page = await ctx.db
             .query("triggers")
@@ -70,6 +73,8 @@ export const collectTriggersForExport = internalQuery
 
         return {
             cursor: page.isDone ? null : page.continueCursor,
+            // What this page read: whole rows, the fields left out of the export included.
+            readBytes: page.page.reduce((sum, trigger) => sum + rowBytes(trigger), 0),
             triggers: page.page.map((trigger) => {
                 return {
                     botComputer: trigger.botComputer ?? null,
@@ -133,8 +138,8 @@ export const collectTriggerRunsForExport = internalQuery
 
         return {
             cursor: page.isDone ? null : page.continueCursor,
-            // What this page read, whole rows included: the export action's queries share one read budget.
-            readBytes: page.page.reduce((sum, run) => sum + new TextEncoder().encode(JSON.stringify(run)).byteLength, 0),
+            // What this page read, whole rows included, the trigger's own row too: the export action's queries share one read budget.
+            readBytes: page.page.reduce((sum, run) => sum + rowBytes(run), rowBytes(trigger)),
             runs: page.page.map((run) => {
                 // A thread watcher's run quotes the watched thread in its payload and prompt, and the owner may no longer
                 // have access to that thread: neither is exported, as with a pending run (`withoutPendingPayload`).

@@ -56,4 +56,5 @@
   projects), so a read that budgets its cost measures whole rows: `findProjectRowsMeasured` / `projectRowsReadBytes`.
   The export returns rule files only from their own pass (`attachProjectRuleFiles`, which reads and counts only the
   rule-file rows: each legacy `context` comes from the owned-projects page, which read the project rows), after that
-  page; past the budget a project is marked `ruleFilesOmitted`.
+  page; past the budget a project is marked `ruleFilesOmitted`, still with that `context`. Their budget counts the bytes
+  the triggers actually read (`collectAllTriggers` reports `readBytes`), not the triggers' allowance.

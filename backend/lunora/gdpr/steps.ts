@@ -652,7 +652,19 @@ export const generateExportFile = internalAction
         const triggerReadBytes = triggerReadBudget(
             earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes + threadFollows.readBytes,
         );
-        // The projects' rule files, read last within what everything above, the triggers' whole budget included, leaves.
+        // Triggers with their settings and their newest runs, read here within a byte budget (`triggers/gdpr.ts`).
+        const triggers = await collectAllTriggers(
+            async (cursor) => await context.runQuery(internal.triggers.gdpr.collectTriggersForExport, { cursor, userId: args.userId }),
+            async (triggerId, cursor) =>
+                await context.runQuery(internal.triggers.gdpr.collectTriggerRunsForExport, {
+                    cursor,
+                    triggerId: triggerId as Id<"triggers">,
+                    userId: args.userId,
+                }),
+            TRIGGER_EXPORT_BYTES,
+            triggerReadBytes,
+        );
+        // The projects' rule files, read last within what everything above leaves, counting what the triggers actually read.
         const ownedWithRules = await attachProjectRuleFiles(
             // Each is an object `collectOwnedProjectsForExport` returned.
             ownedProjects.projects as object[],
@@ -663,7 +675,7 @@ export const generateExportFile = internalAction
                     projectIds: projectIds as Id<"projects">[],
                 }),
             projectDetailsReadBudget(
-                earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes + threadFollows.readBytes + triggerReadBytes,
+                earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes + threadFollows.readBytes + triggers.readBytes,
             ),
         );
         const exportData = {
@@ -697,18 +709,7 @@ export const generateExportFile = internalAction
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadFollows: threadFollows.section,
             threadTags: args.threadTags ?? [],
-            // Triggers with their settings and their newest runs, read here within a byte budget (`triggers/gdpr.ts`).
-            triggers: await collectAllTriggers(
-                async (cursor) => await context.runQuery(internal.triggers.gdpr.collectTriggersForExport, { cursor, userId: args.userId }),
-                async (triggerId, cursor) =>
-                    await context.runQuery(internal.triggers.gdpr.collectTriggerRunsForExport, {
-                        cursor,
-                        triggerId: triggerId as Id<"triggers">,
-                        userId: args.userId,
-                    }),
-                TRIGGER_EXPORT_BYTES,
-                triggerReadBytes,
-            ),
+            triggers: { triggers: triggers.triggers },
             // An export from before the usage pieces existed carries its rows in `activity`; otherwise the usage JSON is spliced in below.
             ...(usageJson === undefined && { usageDaily: activity?.usageDaily ?? [] }),
             watchedRepositories: args.watchedRepositories ?? { watched: [] },

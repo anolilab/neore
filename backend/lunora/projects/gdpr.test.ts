@@ -325,6 +325,25 @@ describe("project rule files in the GDPR export", () => {
         expect(projects.filter((project) => "ruleFilesOmitted" in project)).toEqual([expect.objectContaining({ ruleFilesOmitted: true })]);
     });
 
+    it("still exports a legacy context past the budget: it was read with the project's page, so it costs no read", async () => {
+        await harness.run((async (ctx: any) => {
+            for (let index = 0; index < 3; index += 1) {
+                const projectId = await ctx.db.insert("projects", { context: `Context ${String(index)}.`, createdAt: index, title: `p${index}`, userId: A });
+
+                await ctx.db.insert("projectRuleFiles", { files: [{ ...sql, content: "x".repeat(1000) }], projectId, updatedAt: 0, userId: A });
+            }
+        }) as never);
+
+        const { projects } = await withRules(100);
+        const omitted = projects.filter((project) => "ruleFilesOmitted" in project);
+
+        expect(omitted).toHaveLength(1);
+        // The saved list was not read, the context still is exported, and the project says the rest was left out.
+        const title = (omitted[0] as { title?: string } | undefined)?.title ?? "";
+
+        expect(omitted).toMatchObject([{ ruleFiles: [{ content: `Context ${title.slice(1)}.`, id: "context" }], ruleFilesOmitted: true }]);
+    });
+
     it("reads no project row again: large rows cost the projects' page only, not the rule files' budget", async () => {
         const workflowContent = { edges: [], nodes: [{ data: { text: "w".repeat(50_000) }, id: "n", position: { x: 0, y: 0 }, type: "note" }] };
 

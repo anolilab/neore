@@ -479,6 +479,33 @@ describe("project rule files", () => {
         expect(screen.getByRole("alert").textContent).toContain("at most 20 rule files");
     });
 
+    it("keeps an unchanged long older context first and kept while the files after it are reordered", async () => {
+        const user = userEvent.setup();
+
+        backend.listed = {
+            ...backend.listed,
+            files: [
+                { content: "x".repeat(100_001), id: "context", mode: "always", title: "Project context" },
+                backend.listed.files[1],
+                { content: "Docs.", id: "docs", mode: "always", title: "Docs" },
+            ],
+            legacyContextId: "context",
+        };
+        renderEditor();
+
+        // Nothing moves above the kept context, nor the context itself: the backend keeps it first.
+        const sqlUp = await screen.findByRole("button", { name: "Move SQL up" });
+
+        expect(sqlUp.hasAttribute("disabled")).toBe(true);
+        expect(screen.getByRole("button", { name: "Move Project context down" }).hasAttribute("disabled")).toBe(true);
+
+        await user.click(screen.getByRole("button", { name: "Move Docs up" }));
+        await user.click(screen.getByRole("button", { name: "Save rule files" }));
+
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(backend.save.mock.calls[0]?.[0]).toMatchObject({ keepContext: true, ruleFiles: [{ id: "docs" }, { id: "sql" }] });
+    });
+
     it("holds an older context longer than a rule file to the limits once it was changed", async () => {
         const user = userEvent.setup();
 
@@ -489,7 +516,7 @@ describe("project rule files", () => {
         };
         renderEditor();
 
-        await user.click(await screen.findByRole("button", { name: "Move SQL up" }));
+        await user.type(within(await screen.findByRole("listitem", { name: "Project context" })).getByLabelText("Instructions"), "!");
         await user.click(screen.getByRole("button", { name: "Save rule files" }));
 
         expect(backend.save).not.toHaveBeenCalled();
