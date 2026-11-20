@@ -8,6 +8,7 @@ import { trackEvent } from "@/lib/analytics";
 
 import { fetchWithDeadline } from "../lib/fetch-with-deadline";
 import { useModelStore } from "../stores/model-store";
+import { draftFromField } from "../utils/draft-origin";
 import type { ChangedSettings, ChatActionBase } from "./chat-action-shared";
 import { afterLastContextReset, localModelError, unhiding, withoutMessage } from "./chat-action-shared";
 import type { ThreadData, ThreadRow } from "./chat-context-types";
@@ -331,6 +332,7 @@ export const runEditMessage = async (env: EditMessageEnv, messageId: string, raw
     try {
         const requestBody = {
             content: [{ text: newText, type: "text" as const }],
+            ...draftFromField(newText),
             messageId,
             // Routes the edit to the thread owner's shard (a shared thread lives there).
             threadId,

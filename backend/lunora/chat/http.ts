@@ -33,6 +33,7 @@ import getAgent from "./lib/get-agent";
 import { capTitlePrompt, fileOnlyPromptPart, imagePromptPart } from "./lib/first-user-prompt";
 import type { StartTitleJob } from "./lib/start-title-jobs";
 import { mediaThreadTitle, startTitleJobs } from "./lib/start-title-jobs";
+import { mergeNotTypedMarks, type NotTypedMarks, notTypedMarksOfMessage, parseNotTypedDraft, withNotTypedMarks } from "../lib/not-typed-text";
 import { documentTextPart, guestNoteIdOfMessage, guestTextPart, outsideAgentTextPart } from "./lib/attached-text";
 import { unsendableGuestText } from "./lib/guest-link-store";
 import { formatPageContextPart, parsePageContext } from "./lib/page-context";
@@ -365,6 +366,8 @@ export interface ChatStartBody {
      */
     clientMessageId?: string;
     customSystemPrompt?: string;
+    /** The composer was filled with text the owner did not type (`lib/not-typed-text.ts`): the prompt is saved marked. */
+    draftFrom?: string;
     duration?: number;
     enabledFeatures?: string[];
     fileIds?: string[];
@@ -692,6 +695,12 @@ export const runChatStart = async (
         return Response.json({ error: "GUEST_NOTE_AS_GOAL", message: "A guest's message cannot be sent as a goal." }, { status: 400 });
     }
 
+    const draftFrom = parseNotTypedDraft(body.draftFrom);
+
+    if (draftFrom === null) {
+        return Response.json({ error: "Invalid draftFrom" }, { status: 400 });
+    }
+
     // Auth: extract user from the forwarded JWT
     let user: BetterAuthUser | undefined;
 
@@ -794,6 +803,7 @@ const startSettingsOf = (body: ChatStartBody, pageContext: ReturnType<typeof par
         autoModel: body.autoModel,
         cinemaSettings: body.cinemaSettings,
         customSystemPrompt: body.customSystemPrompt,
+        draftFrom: body.draftFrom,
         duration: body.duration,
         enabledFeatures: body.enabledFeatures,
         goalMaxRounds: body.goal?.maxRounds,
@@ -963,6 +973,9 @@ const runChatStartOnShard = async (
     } else {
         messageContent.push(fileOnlyPromptPart());
     }
+
+    // Marked once the sign-in is read, below: the prompt text the owner may not have typed.
+    const promptPart = messageContent[0];
 
     // Page context goes in front of the typed text, like extracted documents,
     // wrapped as untrusted data (see `chat/lib/page-context.ts`). Text runs only:
@@ -1174,9 +1187,28 @@ const runChatStartOnShard = async (
     }
 
     // The sign-in check, read alongside the rest: an unconfirmed sign-in is refused here, before the first write.
-    if ((await placedPromise) === null) {
+    const placed = await placedPromise;
+
+    if (placed === null) {
         return Response.json({ error: "Your sign-in could not be confirmed. Sign in again, then retry." }, { status: 401 });
     }
+
+    // Text the owner did not type is saved marked: a draft from outside, and anything an admin acting as them sends.
+    // `draftFrom` was checked by `runChatStart`: only a known source reaches here.
+    const draftFrom = parseNotTypedDraft(body.draftFrom) ?? undefined;
+    const notTyped: NotTypedMarks = mergeNotTypedMarks(
+        draftFrom === undefined ? {} : { draft: draftFrom },
+        placed?.impersonating === true ? { impersonated: true } : {},
+    );
+
+    const promptIndex = messageContent.indexOf(promptPart);
+
+    // The part was only ever moved by an unshift or a push, so it is there; were it not, the send must not go out unmarked.
+    if (promptIndex === -1) {
+        throw new Error("The prompt part was not found to mark");
+    }
+
+    messageContent[promptIndex] = withNotTypedMarks(promptPart, notTyped);
 
     // Rate limiting. Media prompts are charged where the paid generation actually
     // runs — `/chat/media`, which the client calls next with this prompt's id —
@@ -1762,6 +1794,23 @@ const runChatStartOnShard = async (
  * `/chat/edit`. The attach's claim is taken after the thread's gate, inside `editMessageAttached`, and released here once the
  * edit has answered, so the claim covers the file reads and the save.
  */
+/**
+ * Whether a request's sign-in is an admin acting as `userId`, or cannot be confirmed as the user's own (no session, or one
+ * gone): what it writes is then marked as not typed by the owner (`lib/not-typed-text.ts`). Only ever restricts.
+ */
+const signInNotOwn = async (context: HttpActionCtx, userId: string): Promise<boolean> => {
+    // Never throws: a failed read is a sign-in that cannot be confirmed.
+    const signIn = requestSignIn(await context.auth.getIdentity().catch(() => null));
+
+    if (signIn === undefined) {
+        return true;
+    }
+
+    const placed = await context.runQuery(internal.auth.session_organization.getSessionOrganizationForCap, { sessionId: signIn, userId }).catch(() => null);
+
+    return placed === null || placed.impersonating === true;
+};
+
 export const editMessageHttpAction = async (context: HttpActionCtx, request: Request) => {
     const holder: { attach?: FileAttach; threadAttach?: ThreadAttach } = {};
 
@@ -1774,12 +1823,25 @@ export const editMessageHttpAction = async (context: HttpActionCtx, request: Req
 };
 
 const editMessageAttached = async (context: HttpActionCtx, request: Request, holder: { attach?: FileAttach; threadAttach?: ThreadAttach }) => {
-    const { content, fileIds, messageId, unlockProof } = (await request.json()) as {
+    const {
+        content,
+        draftFrom: rawDraftFrom,
+        fileIds,
+        messageId,
+        unlockProof,
+    } = (await request.json()) as {
         content: ({ text: string; type: "text" } | { image: string; type: "image" } | { data: string; filename?: string; mimeType?: string; type: "file" })[];
+        /** As `/chat/start`'s: the edit's text holds a draft the owner did not type. */
+        draftFrom?: string;
         fileIds?: string[];
         messageId: string;
         unlockProof?: string;
     };
+    const draftFrom = parseNotTypedDraft(rawDraftFrom);
+
+    if (draftFrom === null) {
+        return Response.json({ error: "Invalid draftFrom" }, { headers: { "Content-Type": "application/json" }, status: 400 });
+    }
 
     // Validate messageId format
     if (!messageId || !isValidDocumentIdFormat(messageId)) {
@@ -1832,6 +1894,9 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
             { headers: { "Content-Type": "application/json" }, status: 401 },
         );
     }
+
+    // Read alongside the rest: whether an admin acting as the owner sends the edit, which marks it as not typed.
+    const notOwnSignIn = signInNotOwn(context, userId);
 
     try {
         // Get the message to find its thread. The thread is not known yet, so the raw row is read and the gate below decides.
@@ -1900,6 +1965,12 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
 
         // An edit of a guest's note the owner sent on is still the guest's words: it keeps the mark and the note's id.
         const guestNoteId = guestNoteIdOfMessage(message.message as Parameters<typeof guestNoteIdOfMessage>[0]);
+        // So does text the owner did not type (`lib/not-typed-text.ts`), and an admin acting as the owner marks the edit.
+        const notTyped = mergeNotTypedMarks(
+            notTypedMarksOfMessage(message.message as Parameters<typeof notTypedMarksOfMessage>[0]),
+            draftFrom === undefined ? {} : { draft: draftFrom },
+            (await notOwnSignIn) ? { impersonated: true } : {},
+        );
 
         // A stateless reply saves its prompt again from the plain text (`streamAsync`), an untagged copy of the guest's words
         // under the tagged edit: refused there, before anything is saved or charged.
@@ -2026,7 +2097,7 @@ const editMessageAttached = async (context: HttpActionCtx, request: Request, hol
                         break;
                     }
 
-                    messageContent.push(guestNoteId === undefined ? { text, type: "text" } : guestTextPart(text, guestNoteId));
+                    messageContent.push(withNotTypedMarks(guestNoteId === undefined ? { text, type: "text" } : guestTextPart(text, guestNoteId), notTyped));
 
                     break;
                 }

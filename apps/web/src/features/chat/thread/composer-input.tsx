@@ -55,6 +55,7 @@ import { captureScreenFrame, isScreenCaptureSupported } from "@/features/chat/co
 import type { ComposerRestoreFile } from "@/features/chat/core/utils/composer-restore";
 import { loadRestoreFile, onComposerRestore, textAfterRestore } from "@/features/chat/core/utils/composer-restore";
 import { onComposerAttachRequest, onComposerSubmitRequest } from "@/features/chat/core/utils/composer-submit";
+import { draftFromField } from "@/features/chat/core/utils/draft-origin";
 import { isSendStarting } from "@/features/chat/core/utils/send-in-flight";
 import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button";
 import { draftOwnership } from "@/features/chat/split/composer-drafts";
@@ -1128,7 +1129,13 @@ const ComposerInput = ({
 
         const unanswered = setTimeout(settleSteer, STEER_ANSWER_MS, threadId, steerId, "accepted");
 
-        void steerRun({ steerId, streamId: streamId as Id<"persistentStreams">, text: steerText, threadId: threadId as Id<"threads"> })
+        void steerRun({
+            ...draftFromField(steerText),
+            steerId,
+            streamId: streamId as Id<"persistentStreams">,
+            text: steerText,
+            threadId: threadId as Id<"threads">,
+        })
             .then(() => settleSteer(threadId, steerId, "accepted"))
             .catch((error: unknown) => settleSteer(threadId, steerId, wasRefused(error) ? "refused" : "accepted"))
             .finally(() => clearTimeout(unanswered));

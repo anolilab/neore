@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
+import { noteSavedPrompt } from "@/features/chat/core/utils/draft-origin";
 import useFeatureFlaggedModels, { useFeatureFlaggedModelsSettled } from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -100,6 +101,7 @@ const usePromptLoader = (promptId: string | undefined) => {
         const content = replaceVariables(prompt.content, values, { keepUnmatched: true });
 
         // Set the composer text with the prompt content
+        noteSavedPrompt(prompt, sessionData?.user?.id, content);
         setComposerText(content);
         toast.success(t`Prompt loaded`);
         handledPromptId.current = promptId;

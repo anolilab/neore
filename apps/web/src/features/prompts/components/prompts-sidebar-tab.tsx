@@ -21,6 +21,7 @@ import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks
 import useCheckout from "@/features/billing/hooks/use-checkout";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
+import { noteSavedPrompt } from "@/features/chat/core/utils/draft-origin";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC, useLunoraActionOptions } from "@/lib/lunora/crpc";
 
@@ -218,18 +219,23 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
             content = replaceVariables(content, values, { keepUnmatched: true });
 
             // Use Zustand store to set the composer text
+            noteSavedPrompt(prompt, sessionData?.user?.id, content);
             setComposerText(content);
             toast.success(t`Prompt added to input`);
             // Record usage
             recordUsage({ promptId: prompt._id });
         },
-        [setComposerText, t, variableValues, getMissingVariables, models, recordUsage, threadId, setSelectedModel, setPendingSettings],
+        [setComposerText, t, variableValues, getMissingVariables, models, recordUsage, threadId, setSelectedModel, setPendingSettings, sessionData?.user?.id],
     );
 
     const handleFillDialogUse = useCallback(
         (content: string, _newValues: Record<string, string>) => {
             // Use the content with filled variables
             // Note: newValues could be saved to thread variables in the future
+            if (fillDialogPrompt) {
+                noteSavedPrompt(fillDialogPrompt, sessionData?.user?.id, content);
+            }
+
             setComposerText(content);
             toast.success(t`Prompt added to input`);
 
@@ -240,11 +246,15 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
 
             setFillDialogPrompt(null);
         },
-        [setComposerText, t, fillDialogPrompt, recordUsage],
+        [setComposerText, t, fillDialogPrompt, recordUsage, sessionData?.user?.id],
     );
 
     const handleFillDialogUseAnyway = useCallback(
         (content: string) => {
+            if (fillDialogPrompt) {
+                noteSavedPrompt(fillDialogPrompt, sessionData?.user?.id, content);
+            }
+
             setComposerText(content);
             toast.success(t`Prompt added with placeholders`);
 
@@ -255,7 +265,7 @@ const PromptsSidebarTab = ({ threadId }: PromptsSidebarTabProps) => {
 
             setFillDialogPrompt(null);
         },
-        [setComposerText, t, fillDialogPrompt, recordUsage],
+        [setComposerText, t, fillDialogPrompt, recordUsage, sessionData?.user?.id],
     );
 
     const handleFillDialogCancel = useCallback(() => {

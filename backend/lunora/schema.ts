@@ -44,6 +44,7 @@ import {
     vRetrievalMetrics,
 } from "./evals/validators";
 import { AUDIT_TABLES, auditTriggersFor } from "./lib/audit-triggers";
+import { vNotTypedMarks } from "./lib/not-typed-text-validator";
 import { vMemoryEvidence } from "./memory/evidence";
 import { vCapabilityReport } from "./lib/capability-report";
 import { notificationInputFields } from "./notifications/validators";
@@ -1977,6 +1978,9 @@ export const schema = defineSchema({
         // How many times the run was resumed after its worker died (`interrupted.ts`); capped, the next one fails the run.
         interruptions: v.optional(v.number()),
         messageId: v.string(),
+        // The steers above holding text the run's user did not type (`lib/not-typed-text.ts`), by id: the row they are
+        // delivered as, and the run's message, carry the mark. At most one per steer (`MAX_STEERS_PER_RUN`).
+        notTypedSteers: v.optional(v.array(v.object({ id: v.string(), notTyped: vNotTypedMarks }))),
         // The run is waiting out a provider rate limit (`chat/lib/rate-limit-pause.ts`). The stream stays live
         // (pending/streaming) so a stop, the live query and the expiry sweep treat it as the run it is; `id`
         // names this pause, and exactly one resume claims it (`claimRunResume`). `run` is the job's own

@@ -23,6 +23,7 @@ import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useCompactThread from "@/features/chat/compaction/use-compact-thread";
 import useClearContext from "@/features/chat/context-reset/use-clear-context";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
+import { noteSavedPrompt } from "@/features/chat/core/utils/draft-origin";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 import type { ComposerSlashState, SlashCommandMatch } from "./extensions/slash-command";
@@ -394,10 +395,11 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
                 return;
             }
 
+            noteSavedPrompt(prompt, user?.id, prompt.content);
             onReplace(match.from, match.to, prompt.content);
             onDismiss();
         },
-        [match, onReplace, onDismiss],
+        [match, onReplace, onDismiss, user?.id],
     );
 
     const handleSelectSkill = useCallback(

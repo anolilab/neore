@@ -32,6 +32,7 @@ import type { PendingAttachment } from "../stores/chat-ui-store";
 import { useChatUIStore } from "../stores/chat-ui-store";
 import type { PendingSettings } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
+import { draftFromField } from "../utils/draft-origin";
 import { newChatTemporaryFields } from "../utils/new-chat-temporary";
 import type { ReadinessGate } from "../utils/readiness-gate";
 import { clearSendStarting, markSendStarting } from "../utils/send-in-flight";
@@ -449,6 +450,7 @@ const runSendMessageBody = async (
             mode: currentMode,
             model,
             prompt: text,
+            ...draftFromField(text),
             researchDepth: searchMode === "chat" ? undefined : researchDepth,
             searchMode,
             threadId: threadId || undefined, // undefined triggers thread creation

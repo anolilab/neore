@@ -20430,6 +20430,70 @@
           "optional": false,
           "unique": false
         },
+        "notTypedSteers": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "object",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "fields": {
+              "id": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              },
+              "notTyped": {
+                "kind": "object",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "fields": {
+                  "draft": {
+                    "kind": "union",
+                    "nullable": false,
+                    "optional": true,
+                    "unique": false,
+                    "members": [
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"promptLink\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"sharedPrompt\""
+                      },
+                      {
+                        "kind": "literal",
+                        "nullable": false,
+                        "optional": false,
+                        "unique": false,
+                        "literal": "\"shellLink\""
+                      }
+                    ]
+                  },
+                  "impersonated": {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": true,
+                    "unique": false,
+                    "literal": "true"
+                  }
+                }
+              }
+            }
+          }
+        },
         "pause": {
           "kind": "object",
           "nullable": false,
