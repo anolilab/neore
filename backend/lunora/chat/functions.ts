@@ -4614,6 +4614,7 @@ export const generateFollowupSuggestionsForThread = internalAction
             // A long tool turn can run past one page, so the turn's pages are read until the rows of an older turn appear.
             const turnRows: (typeof newest)[] = [];
             let turnPage = messagesResult;
+            let turnComplete = false;
 
             for (let pages = 0; pages < MAX_TURN_PAGES; pages += 1) {
                 let reachedOlderTurn = false;
@@ -4630,7 +4631,13 @@ export const generateFollowupSuggestionsForThread = internalAction
                     turnRows.push(messageDocument);
                 }
 
-                if (reachedOlderTurn || turnPage.isDone || !turnPage.continueCursor) {
+                if (reachedOlderTurn || turnPage.isDone) {
+                    turnComplete = true;
+
+                    break;
+                }
+
+                if (!turnPage.continueCursor) {
                     break;
                 }
 
@@ -4638,6 +4645,13 @@ export const generateFollowupSuggestionsForThread = internalAction
                     paginationOpts: { cursor: turnPage.continueCursor, numItems: 10 },
                     threadId,
                 });
+            }
+
+            // A turn longer than the pages read has no known first row, so the reply the composer shows cannot be keyed. Nothing is paid.
+            if (!turnComplete) {
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] The turn is longer than the rows read, not suggesting: ${threadId}`);
+
+                return;
             }
 
             const firstRow = replyAnchorRow(turnRows, newest);
@@ -4677,10 +4691,34 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
+            // The reply is still the newest of the thread. A newer message has its own run, which pays for its own reply.
+            const isStillNewest = async (): Promise<boolean> => {
+                const page = await agent.listMessages(context, {
+                    paginationOpts: { cursor: null, numItems: 10 },
+                    threadId,
+                });
+                const latest = rowsAfterContextReset(page.page || [], contextReset).find((messageDocument) => {
+                    const role = messageDocument.message?.role;
+
+                    return role === "user" || role === "assistant";
+                });
+
+                return latest?._id === newest._id;
+            };
+
             try {
+                // A newer message landed since the check above: nothing is paid for this reply.
+                if (!(await isStillNewest())) {
+                    await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { lastMessageId, threadId, userId });
+
+                    return;
+                }
+
                 // One Text unit per reply, on whoever the background model bills, keyed per reply so a retry is not charged again.
+                // The thread's organization is passed, so a member is charged the organization's plan as on the chat routes.
                 const charged = await context.runMutation(internal.chat.daily_charge.chargeDailyUnit, {
                     kind: "Text",
+                    organizationId: threadData.organizationId ?? undefined,
                     requestId: `followup:${threadId}:${lastMessageId}`,
                     userId: background.billedUserId ?? userId,
                 });
@@ -4709,17 +4747,7 @@ export const generateFollowupSuggestionsForThread = internalAction
                 );
 
                 // A newer message may have landed while the model worked. Its own run suggests for it, so this one must not overwrite that.
-                const latestPage = await agent.listMessages(context, {
-                    paginationOpts: { cursor: null, numItems: 10 },
-                    threadId,
-                });
-                const latestNewest = rowsAfterContextReset(latestPage.page || [], contextReset).find((messageDocument) => {
-                    const role = messageDocument.message?.role;
-
-                    return role === "user" || role === "assistant";
-                });
-
-                if (latestNewest?._id !== newest._id) {
+                if (!(await isStillNewest())) {
                     chatLogger.debug(`[generateFollowupSuggestionsForThread] A newer message arrived, not caching: ${threadId}`);
 
                     return;
