@@ -163,16 +163,12 @@ const botKeepsAppTool = async (
 
         // The caller's saved servers tell whether the key stands for this server alone, as in the run (`selectionServerKey`); for
         // a collaborator, an owner's edited address strips only a server the owner also saved.
-        const saved = (await context.runQuery(internal.auth.functions.getMCPServersQuery, { userId })) as Pick<MCPServerConfig, "url">[];
+        // Read so that a failure throws (and denies): an empty list would read as no duplicate address.
+        const savedUrls = await context.runQuery(internal.bots.functions.getSavedMcpServerUrls, { userId });
         const { ownerId, ownerServerKeys, selection } = thread.toolSelection;
 
         return selectionKeeps(selection, toolName, {
-            server: selectionServerKey(
-                selection,
-                serverConfig,
-                saved.map((server) => server.url),
-                { runs: ownerId === userId, serverKeys: ownerServerKeys },
-            ),
+            server: selectionServerKey(selection, serverConfig, savedUrls, { runs: ownerId === userId, serverKeys: ownerServerKeys }),
             tool: toolName,
         });
     } catch (error: unknown) {

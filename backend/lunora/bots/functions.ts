@@ -6,6 +6,7 @@ import { internal } from "../_generated/internal";
 import type { QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { DEFAULT_THREAD_PERMISSION_MODE, type ThreadPermissionMode } from "../chat/lib/thread-permission-mode";
+import { listBuiltInTools } from "../chat/lib/tool-builder";
 import { deleteBotConnectorAccess } from "../connectors/access";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow, withoutUndefined } from "../lib/patch";
@@ -14,7 +15,7 @@ import { SUB_AGENT_MAX_DEPTH } from "../sub-agents/logic";
 import { isTaskModelAllowed } from "../tasks/logic";
 import { markBotOwnerDeleted } from "./owner";
 import type { BotToolSelection } from "./tool-selectors";
-import { readRunToolSelection } from "./run-tool-selection";
+import { readRunToolSelection, savedServerUrlsOf } from "./run-tool-selection";
 import { BOT_TOOL_SELECTOR_MAX_COUNT, BOT_TOOL_SELECTOR_MAX_LENGTH, normalizeBotToolSelection } from "./tool-selectors";
 
 const vPermissionMode = v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"));
@@ -66,13 +67,16 @@ const selectionCounts = (selection: BotToolSelection | undefined): { allowed: nu
 
 const sameSelection = (a: BotToolSelection | undefined, b: BotToolSelection | undefined): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
-/** `null` = every tool, stored as no selection; anything else is normalized, or refused when it breaks a cap. */
+/**
+ * `null` = every tool, stored as no selection; anything else is normalized, or refused when it breaks a cap or names a
+ * built-in tool that does not exist (available here or not: a tool missing its key is still a real name).
+ */
 const storedToolSelection = (selection: BotToolSelection | null): BotToolSelection | undefined => {
     if (selection === null) {
         return undefined;
     }
 
-    const normalized = normalizeBotToolSelection(selection);
+    const normalized = normalizeBotToolSelection(selection, new Set(listBuiltInTools().map((tool) => tool.name as string)));
 
     if ("error" in normalized) {
         throw new LunoraError("INVALID_ARGUMENT", normalized.error);
@@ -378,6 +382,15 @@ export const getBotToolSelectionForRun = internalQuery
     .input({ botId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.optional(v.string().max(MAX_LENGTH.id)) })
     .output(v.union(v.object({ ownerId: v.string(), ownerServerKeys: v.array(v.string()), selection: vToolSelection }), v.null()))
     .query(async ({ args, ctx }) => await readRunToolSelection(ctx, args));
+
+/**
+ * The addresses of the servers a user saved. Internal: `chat/lib/mcp-apps.ts`, which tells by them whether a key stands for one
+ * server alone. Unlike `getMCPServersQuery` a failed read throws, so the app call is refused rather than read as none saved.
+ */
+export const getSavedMcpServerUrls = internalQuery
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.array(v.string()))
+    .query(async ({ args: { userId }, ctx }) => await savedServerUrlsOf(ctx, userId));
 
 /**
  * Whether any of the user's bots has a tool selection. Internal: `chat/lib/mcp-apps.ts`, which refuses an app call that names

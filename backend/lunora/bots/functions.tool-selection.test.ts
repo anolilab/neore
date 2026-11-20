@@ -111,10 +111,12 @@ describe("a bot's tool selection", () => {
         expect(await selectionOf(botId)).toBeUndefined();
     });
 
-    it("refuses a selector with control characters, and any change by an admin impersonating the owner", async () => {
+    it("refuses a selector with control characters or naming no built-in, and any change by an admin impersonating the owner", async () => {
         await expect(created({ exclude: [`${DOCS}:\nsearch`] })).rejects.toThrow("Invalid tool selector");
         // A server named by its display name would stop matching on a rename.
         await expect(created({ exclude: ["docs:*"] })).rejects.toThrow("Invalid tool selector");
+        // A mistyped built-in would exclude nothing, so the bot would keep the tool its owner meant to remove.
+        await expect(created({ exclude: ["webSerch"] })).rejects.toThrow("No built-in tool is named webSerch");
 
         const botId = await created({ allow: [], exclude: [] });
 

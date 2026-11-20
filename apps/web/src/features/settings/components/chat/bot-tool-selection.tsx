@@ -3,6 +3,7 @@
 import { useLingui } from "@lingui/react/macro";
 import type { BotToolSelection } from "@neore/backend/bots/tool-selectors";
 import {
+    BOT_TOOL_SELECTION_MAX_LIST_CHARS,
     BOT_TOOL_SELECTOR_MAX_COUNT,
     BOT_TOOL_SELECTOR_MAX_LENGTH,
     connectorServerKey,
@@ -30,19 +31,25 @@ export interface KnownToolServer {
 
 /** What the lists offer and resolve against: every available built-in, and the user's servers, connectors and computers. */
 export interface ToolCatalog {
+    /** Every built-in tool's name, available or not, as the server checks a save against; `undefined` until it is read. */
+    builtInNames?: ReadonlySet<string>;
+    /** The built-in tools could not be read, so a bare name cannot be checked. */
+    builtInNamesFailed?: boolean;
     builtIns: string[];
     servers: KnownToolServer[];
 }
 
 export const useToolCatalog = (): ToolCatalog => {
     const crpc = useCRPC();
-    const { data: settings } = useQuery(crpc.chat.tool_permissions.getToolPermissionSettings.queryOptions({}));
+    const { data: settings, isError: settingsFailed } = useQuery(crpc.chat.tool_permissions.getToolPermissionSettings.queryOptions({}));
     const { data: preferences } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
     const { data: connectors } = useQuery(crpc.connectors.user_connectors.listConnectorCatalog.queryOptions({}));
     const { data: devices } = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
 
     return {
         builtIns: (settings?.builtIn ?? []).flatMap((tool) => (tool.available ? [tool.name] : [])),
+        builtInNames: settings && new Set(settings.builtIn.map((tool) => tool.name)),
+        builtInNamesFailed: settings === undefined && settingsFailed,
         servers: [
             ...(preferences?.mcpServers ?? []).map((server) => {
                 return { key: mcpServerKey(server.url), name: server.name };
@@ -99,8 +106,21 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
     const listId = useId();
     const [entry, setEntry] = useState("");
     const [unknownServer, setUnknownServer] = useState<string | null>(null);
+    const [unknownBuiltIn, setUnknownBuiltIn] = useState<string | null>(null);
     const [overCap, setOverCap] = useState(false);
     const full = values.length >= BOT_TOOL_SELECTOR_MAX_COUNT;
+    const invalid = unknownServer !== null || unknownBuiltIn !== null || overCap;
+
+    /** Why a bare name was not added: not a built-in, or the built-ins are not read (yet, or at all). */
+    const unknownBuiltInMessage = (): string => {
+        if (catalog.builtInNamesFailed) {
+            return t`The built-in tools could not be loaded. Reload the page to add one.`;
+        }
+
+        return catalog.builtInNames === undefined
+            ? t`The built-in tools are still loading. Try again in a moment.`
+            : t`No built-in tool is named ${unknownBuiltIn}.`;
+    };
     const suggestions = [...catalog.builtIns, ...catalog.servers.map((server) => `${server.name}:*`)];
 
     /** A selector as the user reads it: a server's current name in place of its key. */
@@ -125,6 +145,14 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
             return;
         }
 
+        // A mistyped built-in would select nothing: in the exclude list the bot would keep the tool meant to go. Until the names
+        // are read, a bare name waits in the field.
+        if (parseServerSelector(typed) === undefined && catalog.builtInNames?.has(typed) !== true) {
+            setUnknownBuiltIn(typed);
+
+            return;
+        }
+
         const resolved = resolveTypedSelector(typed, catalog.servers);
 
         // Kept in the field with the reason, never saved by name: a name stops matching when the server is renamed.
@@ -136,7 +164,11 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
 
         const added = resolved.filter((selector) => !values.includes(selector));
 
-        if (values.length + added.length > BOT_TOOL_SELECTOR_MAX_COUNT) {
+        // The server's caps: how many selectors, and how many characters they take together (a server's key holds its address).
+        if (
+            values.length + added.length > BOT_TOOL_SELECTOR_MAX_COUNT ||
+            [...values, ...added].reduce((total, selector) => total + selector.length, 0) > BOT_TOOL_SELECTION_MAX_LIST_CHARS
+        ) {
             setOverCap(true);
 
             return;
@@ -147,6 +179,7 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
         }
 
         setUnknownServer(null);
+        setUnknownBuiltIn(null);
         setOverCap(false);
         setEntry("");
         onPendingChange(false);
@@ -165,8 +198,8 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
             </p>
             <div className="flex gap-2">
                 <Input
-                    aria-describedby={unknownServer === null && !overCap ? descriptionId : `${descriptionId} ${errorId}`}
-                    aria-invalid={unknownServer !== null || overCap}
+                    aria-describedby={invalid ? `${descriptionId} ${errorId}` : descriptionId}
+                    aria-invalid={invalid}
                     disabled={disabled || (full && entry === "")}
                     id={inputId}
                     list={listId}
@@ -175,6 +208,7 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
                     onChange={(event) => {
                         setEntry(event.target.value);
                         setUnknownServer(null);
+                        setUnknownBuiltIn(null);
                         setOverCap(false);
                         onPendingChange(event.target.value.trim() !== "");
                     }}
@@ -202,8 +236,13 @@ const SelectorList: FC<SelectorListProps> = ({ catalog, description, disabled, l
             </div>
             <p aria-live="polite" className="text-destructive text-xs" id={errorId}>
                 {unknownServer !== null && t`No server, connector or computer matches ${unknownServer}.`}
+                {unknownBuiltIn !== null && unknownBuiltInMessage()}
                 {overCap && t`This list is full: remove a tool before adding another.`}
             </p>
+            {catalog.builtInNames !== undefined &&
+                values.some((selector) => parseServerSelector(selector) === undefined && catalog.builtInNames?.has(selector) !== true) && (
+                    <p className="text-destructive text-xs">{t`A listed built-in tool no longer exists. Remove it before saving.`}</p>
+                )}
             {removedServerWarning !== undefined &&
                 values.some((selector) => {
                     const server = parseServerSelector(selector)?.server;

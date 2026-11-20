@@ -5,6 +5,7 @@
 import type { ToolSet } from "ai";
 import { describe, expect, it } from "vitest";
 
+import { MAX_LENGTH } from "../lib/validators";
 import { applyBotToolSelection } from "./tool-selection";
 import type { ToolOrigin } from "./tool-selectors";
 import {
@@ -100,10 +101,28 @@ describe("normalizeBotToolSelection", () => {
         expect(normalizeBotToolSelection({ exclude: [`${DOCS}:\nsearch`] })).toHaveProperty("error");
     });
 
+    it("takes a server at the longest address a user can save, and refuses a list that grows past its total", () => {
+        const longest = mcpServerKey(`https://docs.example/${"中".repeat(MAX_LENGTH.url - "https://docs.example/".length)}`) ?? "";
+
+        expect(normalizeBotToolSelection({ exclude: [`${longest}:*`] })).toStrictEqual({ selection: { exclude: [`${longest}:*`] } });
+        expect(normalizeBotToolSelection({ exclude: [`${longest}:a`, `${longest}:b`, `${longest}:c`] })).toHaveProperty("error");
+    });
+
     it("refuses a server named by its display name, which a rename would stop matching", () => {
         expect(normalizeBotToolSelection({ exclude: ["docs:*"] })).toHaveProperty("error");
         expect(normalizeBotToolSelection({ allow: ["GitHub:create_issue"], exclude: [] })).toHaveProperty("error");
         expect(normalizeBotToolSelection({ exclude: [`${DOCS}:`] })).toHaveProperty("error");
+    });
+
+    it("refuses, given the built-in names, a built-in selector that names none: a mistyped exclusion would remove nothing", () => {
+        const builtIns = new Set(["dateTime", "webSearch"]);
+
+        expect(normalizeBotToolSelection({ exclude: ["webSerch"] }, builtIns)).toStrictEqual({ error: "No built-in tool is named webSerch" });
+        expect(normalizeBotToolSelection({ allow: ["datetime"], exclude: [] }, builtIns)).toHaveProperty("error");
+        // Server selectors are not built-ins: their tools are only known once a run connects.
+        expect(normalizeBotToolSelection({ allow: ["dateTime", `${DOCS}:anything`], exclude: ["webSearch"] }, builtIns)).toStrictEqual({
+            selection: { allow: ["dateTime", `${DOCS}:anything`], exclude: ["webSearch"] },
+        });
     });
 });
 
@@ -133,9 +152,12 @@ describe("selectionServerKey", () => {
         expect(selectionServerKey({ exclude: [] }, { connectorSlug: "gmail", url: "https://x" }, [], OWNER_RUN)).toBe(MAIL);
     });
 
-    it("keeps none of a server's tools when another saved server shares its address", () => {
+    it("keeps none of a server's tools when the allow list names its key and another saved server shares its address", () => {
         expect(selectionServerKey({ allow: [`${DOCS}:*`], exclude: [] }, docs, [DOCS_URL, DOCS_URL], OWNER_RUN)).toBe("");
         expect(selectionServerKey({ allow: [`${DOCS}:*`], exclude: [] }, docs, [DOCS_URL, DOCS_URL], { runs: false, serverKeys: [] })).toBe("");
+        // Nothing admits the shared key: an exclusion of it removes both servers' tools, and any other pick keeps them.
+        expect(selectionServerKey({ exclude: ["webSearch"] }, docs, [DOCS_URL, DOCS_URL], OWNER_RUN)).toBe(DOCS);
+        expect(selectionServerKey({ exclude: [`${DOCS}:write`] }, docs, [DOCS_URL, DOCS_URL], OWNER_RUN)).toBe(DOCS);
     });
 
     it("keeps no user server's tools when an exclusion names an address no saved server has any more", () => {

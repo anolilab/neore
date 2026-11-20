@@ -20,14 +20,21 @@ export interface RunToolSelection {
 /** What a run reads when its bot cannot be told: no tools, owned by no one. */
 export const NO_TOOLS_RUN_SELECTION: RunToolSelection = { ownerId: "", ownerServerKeys: [], selection: NO_TOOLS_SELECTION };
 
-/** The keys of the servers a user saved, enabled or not. */
-const savedServerKeysOf = async (ctx: QueryCtx, userId: string): Promise<string[]> => {
+/** The addresses of the servers a user saved, enabled or not. A failed read throws: an empty list would be taken as none saved. */
+export const savedServerUrlsOf = async (ctx: QueryCtx, userId: string): Promise<string[]> => {
     const preferences = await ctx.db
         .query("aiUserPreferences")
         .withIndex("by_userId", (q) => q.eq("userId", userId))
         .unique();
 
-    return (preferences?.mcpServers ?? []).flatMap((server) => mcpServerKey(server.url) ?? []);
+    return (preferences?.mcpServers ?? []).map((server) => server.url);
+};
+
+/** The keys of the servers a user saved, enabled or not. */
+const savedServerKeysOf = async (ctx: QueryCtx, userId: string): Promise<string[]> => {
+    const urls = await savedServerUrlsOf(ctx, userId);
+
+    return urls.flatMap((url) => mcpServerKey(url) ?? []);
 };
 
 /** A thread has one parent link per way it was made (branch, continuation, sub-agent): a few at most. */

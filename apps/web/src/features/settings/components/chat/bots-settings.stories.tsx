@@ -5,7 +5,7 @@ import { expect, screen, userEvent, waitFor, within } from "storybook/test";
 import { ago, DAY } from "@/storybook/clock";
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
 import { userFixtures } from "@/storybook/fixtures/user";
-import { lunora, lunoraAnswered, lunoraError, lunoraHandlers } from "@/storybook/lunora";
+import { lunora, lunoraAnswered, lunoraError, lunoraHandlers, lunoraIdle } from "@/storybook/lunora";
 
 import BotsSettings from "./bots-settings";
 
@@ -67,6 +67,7 @@ type Story = StoryObj<typeof meta>;
 export const CustomTools: Story = {
     play: async ({ canvas }) => {
         await lunoraAnswered(api.bots.functions.listBots);
+        await lunoraAnswered(api.chat.tool_permissions.getToolPermissionSettings);
         await expect(await canvas.findByText("Custom tools")).toBeVisible();
 
         await userEvent.click(canvas.getByRole("radio", { name: "Custom" }));
@@ -126,6 +127,7 @@ export const SavesTypedName: Story = {
     play: async ({ canvas }) => {
         savedPatches.length = 0;
         await lunoraAnswered(api.bots.functions.listBots);
+        await lunoraAnswered(api.chat.tool_permissions.getToolPermissionSettings);
         await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
 
         const dialog = await screen.findByRole("dialog");
@@ -252,5 +254,96 @@ export const RefusesUnaddedTool: Story = {
         await waitFor(async () => await expect(await screen.findByText("A tool you typed was not added. Add it or clear the field first.")).toBeVisible());
         await expect(screen.getByRole("dialog")).toBeVisible();
         await expect(refusedPatches).toStrictEqual([]);
+    },
+};
+
+/** The patches the unknown built-in story below sent: none. */
+const unknownBuiltInPatches: unknown[] = [];
+
+/** A mistyped built-in tool would exclude nothing: it is kept in the field with the reason and the save is refused. */
+export const RefusesUnknownBuiltIn: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...botFixtures(),
+                    lunora(api.bots.functions.updateBot, (args) => {
+                        unknownBuiltInPatches.push(args.patch);
+
+                        return null;
+                    }),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        unknownBuiltInPatches.length = 0;
+        await lunoraAnswered(api.bots.functions.listBots);
+        // The field checks a bare name against the built-in tools once they are read.
+        await lunoraAnswered(api.chat.tool_permissions.getToolPermissionSettings);
+        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
+
+        const dialog = await screen.findByRole("dialog");
+
+        await waitFor(async () => await expect(within(dialog).getByRole("combobox", { name: "Excluded tools" })).toBeVisible());
+        const excluded = within(dialog).getByRole("combobox", { name: "Excluded tools" });
+
+        await userEvent.type(excluded, "webSerch{Enter}");
+        await expect(within(dialog).getByText("No built-in tool is named webSerch.")).toBeVisible();
+        await expect(excluded).toHaveAttribute("aria-invalid", "true");
+        await userEvent.click(within(dialog).getByRole("button", { name: "Save tools" }));
+        await lunoraIdle();
+
+        await expect(screen.getByRole("dialog")).toBeVisible();
+        await expect(unknownBuiltInPatches).toStrictEqual([]);
+    },
+};
+
+/** Lets the slow save below finish once the dialog was closed and opened again. */
+const slowSave: { finish?: () => void } = {};
+
+/**
+ * A save that ends after the dialog was closed and reopened leaves the reopened dialog open, and the reopened copy, read
+ * before the save landed, takes the saved pick instead of writing the old one back.
+ */
+export const EarlierSaveKeepsReopenedDialog: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...botFixtures(),
+                    lunora(
+                        api.bots.functions.updateBot,
+                        async () =>
+                            await new Promise<null>((resolve) => {
+                                slowSave.finish = () => resolve(null);
+                            }),
+                    ),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await lunoraAnswered(api.bots.functions.listBots);
+        await userEvent.click(await canvas.findByRole("button", { name: "Tools for Docs helper" }));
+
+        const first = await screen.findByRole("dialog");
+
+        await waitFor(async () => await expect(within(first).getByRole("button", { name: "Save tools" })).toBeVisible());
+        await userEvent.click(within(first).getByRole("radio", { name: "All tools" }));
+        await userEvent.click(within(first).getByRole("button", { name: "Save tools" }));
+        await userEvent.click(within(first).getByRole("button", { name: "Cancel" }));
+        await waitFor(async () => await expect(screen.queryByRole("dialog")).toBeNull());
+
+        await userEvent.click(canvas.getByRole("button", { name: "Tools for Docs helper" }));
+        await waitFor(async () => await expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Save tools" })).toBeVisible());
+        await expect(within(screen.getByRole("dialog")).getByRole("radio", { name: "Custom" })).toBeChecked();
+        slowSave.finish?.();
+        await lunoraAnswered(api.bots.functions.updateBot);
+        // The save then refreshes the bots list before it would close a dialog.
+        await lunoraIdle();
+
+        await expect(screen.getByRole("dialog")).toBeVisible();
+        await expect(within(screen.getByRole("dialog")).getByRole("radio", { name: "All tools" })).toBeChecked();
     },
 };

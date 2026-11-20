@@ -24,8 +24,8 @@ const state = vi.hoisted(() => {
         connects: 0,
         crossed: [] as string[],
         overrides: {} as Record<string, string>,
-        /** The caller's own saved servers (`auth_functions:getMCPServersQuery`). */
-        savedServers: [] as { name: string; url: string }[],
+        /** The caller's own saved servers (`bots_functions:getSavedMcpServerUrls`); `"fail"` throws. */
+        savedServers: [] as "fail" | { name: string; url: string }[],
         seenTokens: [] as string[],
         shard: "alice",
         thread: { allowed: true, mode: null, organizationId: null } as {
@@ -158,8 +158,12 @@ const context = {
             return state.threadCap;
         }
 
-        if (ref.__lunoraRef === "auth_functions:getMCPServersQuery") {
-            return state.savedServers;
+        if (ref.__lunoraRef === "bots_functions:getSavedMcpServerUrls") {
+            if (state.savedServers === "fail") {
+                throw new Error("preferences unavailable");
+            }
+
+            return state.savedServers.map((server) => server.url);
         }
 
         if (ref.__lunoraRef === "bots_functions:hasBotWithToolSelection") {
@@ -618,6 +622,36 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         };
 
         expect(await statusOf("search")).toBe(403);
+    });
+
+    it("refuses an allowed server's call when the caller's saved servers cannot be read, rather than reading them as none", async () => {
+        const url = "https://docs.example/mcp";
+        const allowed = { allow: ["mcp=https%3A%2F%2Fdocs.example%2Fmcp:*"], exclude: [] };
+
+        state.config = { enabled: true, headers: [{ key: "Authorization", value: "Bearer fresh" }], name: "Docs", protocol: "http", url };
+        state.overrides = { "mcp:Docs:search": "auto" };
+        state.thread = { allowed: true, mode: null, organizationId: null, toolSelection: { ownerId: "alice", ownerServerKeys: [], selection: allowed } };
+        state.savedServers = [{ name: "Docs", url }];
+
+        const statusOf = async (): Promise<number> => {
+            const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Docs", toolName: "search" }));
+
+            return response.status;
+        };
+
+        expect(await statusOf()).toBe(200);
+
+        // Another saved server at the address: the allowed key would admit both.
+        state.savedServers = [
+            { name: "Docs", url },
+            { name: "Docs (work)", url },
+        ];
+
+        expect(await statusOf()).toBe(403);
+
+        state.savedServers = "fail";
+
+        expect(await statusOf()).toBe(403);
     });
 
     it("refuses a call that names no chat when any of the caller's bots has a selection, or when that cannot be read", async () => {

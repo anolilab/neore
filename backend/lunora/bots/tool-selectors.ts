@@ -11,8 +11,21 @@
 /** At most this many selectors in each list. */
 export const BOT_TOOL_SELECTOR_MAX_COUNT = 100;
 
-/** At most this many characters in one selector: a server key carries the server's encoded address. */
-export const BOT_TOOL_SELECTOR_MAX_LENGTH = 512;
+/** The longest address a user can save for a server (`MAX_LENGTH.url` in `lib/validators.ts`). */
+const SERVER_URL_MAX_LENGTH = 8192;
+
+/** The longest tool name a selector holds after its server key. */
+const SELECTOR_TOOL_MAX_LENGTH = 256;
+
+/**
+ * At most this many characters in one selector: a server key carries the server's encoded address, and encoding turns one
+ * character into at most nine (three UTF-8 bytes, `%XX` each), so a server at the longest address a user can save is still
+ * selectable.
+ */
+export const BOT_TOOL_SELECTOR_MAX_LENGTH = "mcp=".length + 9 * SERVER_URL_MAX_LENGTH + 1 + SELECTOR_TOOL_MAX_LENGTH;
+
+/** At most this many characters in all of one list's selectors together, so a few long addresses cannot grow a bot without bound. */
+export const BOT_TOOL_SELECTION_MAX_LIST_CHARS = 131_072;
 
 /**
  * Stored on the bot; absent = every tool the run would get anyway. `allow` absent = every tool, present = only the
@@ -65,7 +78,8 @@ export const serverKeyOf = (server: { connectorSlug?: string; url?: string }): s
 /**
  * The key a server's tools are matched by under a selection, or `""` (none of its tools kept) when its key cannot stand for
  * it alone. For a server the user added (`savedUrls`: the addresses of every server they saved, enabled or not):
- * - another saved server shares its address, so an allowed key would let the other one in too;
+ * - the allow list names its key and another saved server shares its address, so the key would let the other one in too
+ *   (an exclusion of the key removes both, which is the safe direction, so it keeps the key);
  * - an exclusion names a user server's key the bot's owner no longer has: an address was edited, and which server the
  *   exclusion meant cannot be told. In the owner's own run (`owner.runs`) no user server is trusted to be outside it. In a
  *   collaborator's run (whose servers are the collaborator's own) only a server the owner also saved can be the edited one
@@ -88,7 +102,8 @@ export const selectionServerKey = (
     }
 
     const savedKeys = savedUrls.flatMap((url) => mcpServerKey(url) ?? []);
-    const shared = savedKeys.filter((saved) => saved === key).length > 1;
+    const allowsKey = selection.allow?.some((selector) => parseServerSelector(selector)?.server === key) === true;
+    const shared = allowsKey && savedKeys.filter((saved) => saved === key).length > 1;
     // The owner's own run judges by the servers it read itself; a collaborator's by the owner's, read with the bot.
     const ownerKeys = owner.runs ? savedKeys : owner.serverKeys;
     const stale = selection.exclude.some((selector) => {
@@ -123,21 +138,37 @@ const isValidSelector = (selector: string): boolean => {
     return parsed === undefined || (SERVER_KEY.test(parsed.server) && parsed.tool !== "");
 };
 
-const normalizeList = (list: ReadonlyArray<string>): { error: string } | { selectors: string[] } => {
+const normalizeList = (list: ReadonlyArray<string>, builtIns: ReadonlySet<string> | undefined): { error: string } | { selectors: string[] } => {
     const selectors = [...new Set(list.map((selector) => selector.trim()).filter(Boolean))];
 
     if (selectors.length > BOT_TOOL_SELECTOR_MAX_COUNT) {
         return { error: `A bot's tool list can name at most ${String(BOT_TOOL_SELECTOR_MAX_COUNT)} tools.` };
     }
 
+    if (selectors.reduce((total, selector) => total + selector.length, 0) > BOT_TOOL_SELECTION_MAX_LIST_CHARS) {
+        return { error: "A bot's tool list is too long: remove a server with a long address." };
+    }
+
     const invalid = selectors.find((selector) => !isValidSelector(selector));
 
-    return invalid === undefined ? { selectors } : { error: `Invalid tool selector: ${invalid.slice(0, 64)}` };
+    if (invalid !== undefined) {
+        return { error: `Invalid tool selector: ${invalid.slice(0, 64)}` };
+    }
+
+    const unknown = builtIns && selectors.find((selector) => parseServerSelector(selector) === undefined && !builtIns.has(selector));
+
+    return unknown ? { error: `No built-in tool is named ${unknown.slice(0, 64)}` } : { selectors };
 };
 
-/** The selection as stored: trimmed and de-duplicated, within the caps; one that removes nothing is no selection (`null`). */
-export const normalizeBotToolSelection = (selection: BotToolSelection): { error: string } | { selection: BotToolSelection | null } => {
-    const exclude = normalizeList(selection.exclude);
+/**
+ * The selection as stored: trimmed and de-duplicated, within the caps; one that removes nothing is no selection (`null`).
+ * With `builtIns` (every built-in tool's name), a built-in selector must name one: a mistyped exclusion would remove nothing.
+ */
+export const normalizeBotToolSelection = (
+    selection: BotToolSelection,
+    builtIns?: ReadonlySet<string>,
+): { error: string } | { selection: BotToolSelection | null } => {
+    const exclude = normalizeList(selection.exclude, builtIns);
 
     if ("error" in exclude) {
         return exclude;
@@ -147,7 +178,7 @@ export const normalizeBotToolSelection = (selection: BotToolSelection): { error:
         return { selection: exclude.selectors.length > 0 ? { exclude: exclude.selectors } : null };
     }
 
-    const allow = normalizeList(selection.allow);
+    const allow = normalizeList(selection.allow, builtIns);
 
     return "error" in allow ? allow : { selection: { allow: allow.selectors, exclude: exclude.selectors } };
 };

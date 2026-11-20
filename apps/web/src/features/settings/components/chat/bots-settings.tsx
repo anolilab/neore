@@ -17,7 +17,7 @@ import { Textarea } from "@neore/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { FC, FormEvent } from "react";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
@@ -123,7 +123,16 @@ const BotsSettings = () => {
     const [editToolsPending, setEditToolsPending] = useState(false);
     const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
     // The tools dialog edits a copy: the bot's stored selection changes only once the server took the save.
-    const [editingTools, setEditingTools] = useState<{ id: string; name: string; selection: BotToolSelection | null } | null>(null);
+    // `touched`: the person changed the copy or typed into it; `revision` remounts the fields when the copy is replaced.
+    const [editingTools, setEditingTools] = useState<{
+        id: string;
+        name: string;
+        revision: number;
+        selection: BotToolSelection | null;
+        touched: boolean;
+    } | null>(null);
+    // Counts each opening of the tools dialog: a save closes only the dialog it was started from, never one reopened since.
+    const toolsDialogSession = useRef(0);
     const toolCatalog = useToolCatalog();
 
     const canCreate = draft.name.trim().length > 0 && draft.instructions.trim().length > 0;
@@ -193,11 +202,25 @@ const BotsSettings = () => {
             return;
         }
 
+        const session = toolsDialogSession.current;
+        const { id: savedId, selection: saved } = editingTools;
+
         try {
-            await updateMutation.mutateAsync({ botId: editingTools.id as Id<"bots">, patch: { toolSelection: editingTools.selection } });
-            await queryClient.invalidateQueries({ queryKey: botsQuery.queryKey });
-            setEditingTools(null);
+            await updateMutation.mutateAsync({ botId: savedId as Id<"bots">, patch: { toolSelection: saved } });
+
+            // Settled as soon as the save landed, before the list refresh: a reopened copy must not be saved back meanwhile.
+            if (toolsDialogSession.current === session) {
+                setEditingTools(null);
+            } else {
+                // Reopened meanwhile: an untouched copy of this bot was read before this save landed, so it takes the saved pick
+                // rather than writing the old one back on its own save.
+                setEditingTools((current) =>
+                    current?.id === savedId && !current.touched ? { ...current, revision: current.revision + 1, selection: saved } : current,
+                );
+            }
+
             toast.success(t`The bot's tools were saved`);
+            await queryClient.invalidateQueries({ queryKey: botsQuery.queryKey });
         } catch {
             // The dialog stays open with the unsaved pick; the bot keeps the tools it had.
             toast.error(t`Could not save the bot's tools. Its tools are unchanged.`);
@@ -315,8 +338,9 @@ const BotsSettings = () => {
                                     aria-label={t`Tools for ${bot.name}`}
                                     disabled={impersonating}
                                     onClick={() => {
+                                        toolsDialogSession.current += 1;
                                         setEditToolsPending(false);
-                                        setEditingTools({ id: bot._id, name: bot.name, selection: bot.toolSelection ?? null });
+                                        setEditingTools({ id: bot._id, name: bot.name, revision: 0, selection: bot.toolSelection ?? null, touched: false });
                                     }}
                                     size="sm"
                                     type="button"
@@ -360,8 +384,15 @@ const BotsSettings = () => {
                             <BotToolSelectionFields
                                 catalog={toolCatalog}
                                 disabled={updateMutation.isPending}
-                                onChange={(selection) => setEditingTools({ ...editingTools, selection })}
-                                onPendingChange={setEditToolsPending}
+                                key={editingTools.revision}
+                                onChange={(selection) => setEditingTools({ ...editingTools, selection, touched: true })}
+                                onPendingChange={(pending) => {
+                                    setEditToolsPending(pending);
+
+                                    if (pending) {
+                                        setEditingTools((current) => current && { ...current, touched: true });
+                                    }
+                                }}
                                 value={editingTools.selection}
                             />
                         )}
