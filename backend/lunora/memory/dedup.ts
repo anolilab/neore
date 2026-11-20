@@ -3,6 +3,7 @@
  * closest memory by vector (then by word overlap), and the vectors of the rows a run saved.
  */
 import type { ModelFilterRules } from "@neore/ai/models";
+import z from "zod/v4";
 
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
@@ -229,19 +230,20 @@ export const findSimilarMemoryByJaccard = (newFact: string, existingMemories: Re
 /** Score from which a near-match is the same fact stated again: it is confirmed, never revised. */
 const DUPLICATE_SCORE = 0.95;
 
-/** A belief revision's answer, as `runBeliefRevision` returns it. */
-export interface BeliefRevisionAnswer {
-    action: "ADD" | "IGNORE" | "SUPERSEDE" | "UPDATE";
-    mergedMemory?: string;
-}
+/** A belief revision's answer: the model's structured output in `runBeliefRevision`, and what `decideFact` reads. */
+export const beliefRevisionSchema = z.object({
+    action: z.enum(["UPDATE", "SUPERSEDE", "IGNORE", "ADD"]),
+    mergedMemory: z.string().optional(),
+});
+
+export type BeliefRevisionAnswer = z.infer<typeof beliefRevisionSchema>;
 
 /**
  * What to do with a fact, given its near-match: save it as new (`ADD`), confirm the match (`IGNORE`), save it in the
- * match's place (`SUPERSEDE`), or reword the match (`UPDATE`, with the caller's accepted merge). `failed` marks an `ADD`
- * that a revision error forced.
+ * match's place (`SUPERSEDE`), or reword the match (`UPDATE`, with the caller's accepted merge).
  */
 export type FactDecision<Merge> =
-    | { action: "ADD"; failed?: true }
+    | { action: "ADD" }
     | { action: "IGNORE" | "SUPERSEDE"; similar: SimilarMemoryResult }
     | { action: "UPDATE"; merge: Merge; similar: SimilarMemoryResult };
 
@@ -279,7 +281,7 @@ export const decideFact = async <Merge>(
     } catch (error) {
         console.error(`${options.logPrefix} Belief revision failed, saving as new:`, error);
 
-        return { action: "ADD", failed: true };
+        return { action: "ADD" };
     }
 
     switch (revision.action) {

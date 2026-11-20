@@ -23,7 +23,7 @@ import { v } from "lunorash/server";
 import z from "zod/v4";
 
 import { internal } from "../_generated/internal";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { type ActionCtx as ActionContext, internalAction } from "../_generated/server";
 import { validateVectorDimension, type VectorDimension } from "../agent/vector/tables";
 import { cacheKeyFor } from "../lib/action-cache";
@@ -45,6 +45,8 @@ import { lowReasoningUtilityOptions } from "../chat/lib/reasoning-options";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
 import { getUtilityModel, NoAllowedUtilityModelError } from "../lib/utility-model";
 import {
+    type BeliefRevisionAnswer,
+    beliefRevisionSchema,
     decideFact,
     embedMemoryFacts,
     findSimilarMemoryByJaccard,
@@ -122,11 +124,6 @@ const extractedFactSchema = z.object({
     quote: z.string().optional(),
     type: z.enum(MEMORY_TYPES),
     validUntil: z.string().optional().describe("Last day the fact holds, YYYY-MM-DD; omit for lasting or yearly facts"),
-});
-
-const beliefRevisionSchema = z.object({
-    action: z.enum(["UPDATE", "SUPERSEDE", "IGNORE", "ADD"]),
-    mergedMemory: z.string().optional(),
 });
 
 // ============================================================================
@@ -671,22 +668,16 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
 
                     // A row found by vector past the window is read first, so a failed read saves the fact as new before
                     // the run's state moves.
-                    const read = working
-                        ? { row: undefined }
-                        : await ctx
-                              .runQuery(internal.memory.functions.getMemoryById, { memoryId: similar.id })
-                              .then((row) => {
-                                  return { row };
-                              })
-                              .catch((error: unknown) => {
-                                  console.error("[memory/extract] Reading a matched memory failed, saving as new:", error);
+                    let row: Doc<"memories"> | null = null;
 
-                                  return undefined;
-                              });
-
-                    if (!read) {
-                        saveNew(fact, dates, factEmbedding, evidence);
-                        break;
+                    if (!working) {
+                        try {
+                            row = await ctx.runQuery(internal.memory.functions.getMemoryById, { memoryId: similar.id });
+                        } catch (error) {
+                            console.error("[memory/extract] Reading a matched memory failed, saving as new:", error);
+                            saveNew(fact, dates, factEmbedding, evidence);
+                            break;
+                        }
                     }
 
                     if (nextDates) {
@@ -698,28 +689,24 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
                     if (working) {
                         working.memory = mergedMemory;
                         working.confidence = confidence;
-                    } else {
+                    } else if (row) {
                         // The row joins the working set, so later facts match its revised words.
-                        const { row } = read;
-
-                        if (row) {
-                            if (!storedDates.has(row._id as string)) {
-                                storedDates.set(row._id as string, factDatesOf(row));
-                            }
-
-                            existingMemories.push({
-                                _id: row._id,
-                                confidence,
-                                createdAt: row._creationTime,
-                                embeddingId: row.embeddingId ?? undefined,
-                                importance: row.importance ?? undefined,
-                                lastConfirmedAt: lastConfirmedOf(row),
-                                memory: mergedMemory,
-                                pinned: row.pinned === true,
-                                type: row.type,
-                                ...factDatesOf(nextDates ?? row),
-                            });
+                        if (!storedDates.has(row._id as string)) {
+                            storedDates.set(row._id as string, factDatesOf(row));
                         }
+
+                        existingMemories.push({
+                            _id: row._id,
+                            confidence,
+                            createdAt: row._creationTime,
+                            embeddingId: row.embeddingId ?? undefined,
+                            importance: row.importance ?? undefined,
+                            lastConfirmedAt: lastConfirmedOf(row),
+                            memory: mergedMemory,
+                            pinned: row.pinned === true,
+                            type: row.type,
+                            ...factDatesOf(nextDates ?? row),
+                        });
                     }
 
                     revisedIds.add(similar.id);
@@ -1073,7 +1060,7 @@ export const runBeliefRevision = async (
     maxOutputTokens?: number,
     /** The dates the revised memory will hold, when they differ from the existing memory's. */
     newDates?: FactDates,
-): Promise<z.infer<typeof beliefRevisionSchema>> => {
+): Promise<BeliefRevisionAnswer> => {
     const result = await generateText({
         ...(maxOutputTokens !== undefined && { maxOutputTokens }),
         model,

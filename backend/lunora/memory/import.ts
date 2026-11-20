@@ -214,17 +214,16 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
             revise: canRevise
                 ? async (existingMemory) => {
                       spent += 1;
-                      model ??= await getUtilityModelForUser(ctx, gatewayFetch(ctx), { userId: args.userId });
+                      // No allowed model: the rest of the save does not ask again.
+                      model ??= await getUtilityModelForUser(ctx, gatewayFetch(ctx), { userId: args.userId }).catch((error: unknown) => {
+                          modelUnavailable = true;
+                          throw error;
+                      });
 
                       return await runBeliefRevision(model, existingMemory, fact.memory, REVISION_MAX_OUTPUT_TOKENS);
                   }
                 : undefined,
         });
-
-        if (decision.action === "ADD" && decision.failed) {
-            // No allowed model: the rest of the save does not ask again.
-            modelUnavailable = !model;
-        }
 
         switch (decision.action) {
             case "IGNORE": {

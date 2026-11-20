@@ -35,14 +35,14 @@ describe(decideFact, () => {
         expect(await decideFact(match(0.9), { acceptMerge: accept, logPrefix: "[test]", revise: undefined })).toStrictEqual({ action: "ADD" });
     });
 
-    it("saves the fact as new, marked failed, when the revision throws", async () => {
+    it("saves the fact as new when the revision throws", async () => {
         vi.spyOn(console, "error").mockImplementation(() => undefined);
 
         const revise = vi.fn(async () => {
             throw new Error("model down");
         });
 
-        expect(await decideFact(match(0.9), { acceptMerge: accept, logPrefix: "[test]", revise })).toStrictEqual({ action: "ADD", failed: true });
+        expect(await decideFact(match(0.9), { acceptMerge: accept, logPrefix: "[test]", revise })).toStrictEqual({ action: "ADD" });
     });
 
     it("passes on the model's SUPERSEDE and IGNORE", async () => {

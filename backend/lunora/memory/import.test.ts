@@ -13,8 +13,17 @@ import { REDACTED } from "../lib/secret-redaction";
 import { importFacts, labelImportedText } from "./import";
 import { IMPORT_DEDUP_CALL_BUDGET, IMPORT_LOOKUP_CALL_SHARE, IMPORT_LOOKUP_CALLS, IMPORT_MAX_FACTS } from "./import-logic";
 
-const { embedMany, generateText, registry, searchVectors } = vi.hoisted(() => {
-    return { embedMany: vi.fn(), generateText: vi.fn(), registry: new Map<string, unknown>(), searchVectors: vi.fn() };
+const { embedMany, generateText, getUtilityModelForUser, registry, searchVectors } = vi.hoisted(() => {
+    return {
+        embedMany: vi.fn(),
+        generateText: vi.fn(),
+        // The default utility model, which reasons before it answers.
+        getUtilityModelForUser: vi.fn(async () => {
+            return { modelId: "cf-gpt-oss-20b" };
+        }),
+        registry: new Map<string, unknown>(),
+        searchVectors: vi.fn(),
+    };
 });
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
@@ -24,10 +33,7 @@ vi.mock("ai", async (importOriginal) => {
 });
 vi.mock("../chat/lib/model-filter-rules", () => {
     return {
-        // The default utility model, which reasons before it answers.
-        getUtilityModelForUser: async () => {
-            return { modelId: "cf-gpt-oss-20b" };
-        },
+        getUtilityModelForUser,
         loadModelFilterRules: async () => {
             return {};
         },
@@ -133,6 +139,7 @@ afterEach(() => {
     harness.close();
     embedMany.mockReset();
     generateText.mockReset();
+    getUtilityModelForUser.mockClear();
     searchVectors.mockReset();
 });
 
@@ -1118,6 +1125,26 @@ describe("import limits", () => {
 
         expect(generateText).toHaveBeenCalledOnce();
         expect(searchVectors.mock.calls.length * IMPORT_LOOKUP_CALLS).toBeLessThanOrEqual(IMPORT_LOOKUP_CALL_SHARE);
+    });
+
+    it("stops asking for a model for the rest of a save once no model is allowed", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+        useFakeVectors();
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER });
+            await ctx.db.insert("memories", { memory: "The user plays the cello in a small orchestra every weekend", type: "context", userId: USER });
+        });
+        getUtilityModelForUser.mockRejectedValueOnce(new Error("no model"));
+
+        await save([
+            { memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" },
+            { memory: "The user plays the cello in a small orchestra every weekend now", type: "context" },
+        ]);
+
+        expect(getUtilityModelForUser).toHaveBeenCalledOnce();
+        expect(generateText).not.toHaveBeenCalled();
     });
 
     it("keeps a worst-case save under the Free plan's 50 subrequests", async () => {
