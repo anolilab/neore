@@ -11,6 +11,7 @@ import {
     buildPollCommand,
     buildPullRequestScript,
     buildRunScript,
+    CODEX_LAST_MESSAGE_PATH,
     CODING_AGENTS,
     GIT_AUTH_PATH,
     KEY_WANTED_PATH,
@@ -58,6 +59,8 @@ const EXACT_VERSION = /^\d+\.\d+\.\d+$/u;
 const SUBSHELL_EXPORT = /\( if \[ -s \S+ \]; then export GIT_CONFIG_COUNT=1/u;
 const FAKE_GITHUB_TOKEN = fakeKey("github");
 const NUL_ERROR = /NUL/u;
+const CASE_END = / ;;$/u;
+const FINISH_CALL = /finish \S+/gu;
 const BRANCH_ERROR = /branch/u;
 const PR_BRANCH = /^neore\/agent-[a-z0-9]{1,12}$/u;
 
@@ -203,19 +206,26 @@ describe("buildRunScript", () => {
         expect(script).toContain(`sudo -n chown -R "$(id -u):$(id -g)" /home/user/repo/.git`);
     });
 
-    it("kills what setup left running and takes the repository back before the key is requested", () => {
+    it("kills what setup left running, takes the repository back and checks .git before the key is requested", () => {
         const keyWanted = script.indexOf(`touch ${KEY_WANTED_PATH}`);
+        const afterSetup = script.slice(script.indexOf(setupLine), keyWanted);
 
-        expect(script.indexOf(`sudo -n pkill -KILL -u ${SETUP_USER}`)).toBeGreaterThan(script.indexOf(setupLine));
-        expect(script.indexOf(`sudo -n pkill -KILL -u ${SETUP_USER}`)).toBeLessThan(keyWanted);
-        expect(script.indexOf("finish setup-failed:repo-setup")).toBeLessThan(keyWanted);
+        expect(afterSetup).toContain(`sudo -n pkill -KILL -u ${SETUP_USER}`);
+        expect(afterSetup).toContain(`sudo -n pgrep -u ${SETUP_USER} >/dev/null && finish setup-failed:repo-setup`);
+        expect(afterSetup).toContain(`timeout 180 sudo -n chown -R "$(id -u):$(id -g)" /home/user/repo || finish setup-failed:repo-setup`);
+        // Owning the working tree is enough to swap `.git` for one whose config runs a command.
+        expect(script.indexOf("git_id=$(stat -c %i:%u .git)")).toBeLessThan(script.indexOf(setupLine));
+        expect(afterSetup).toContain('[ "$(stat -c %i:%u .git 2>/dev/null)" = "$git_id" ] || finish setup-failed:repo-setup');
+        // A file the agent writes later exists before setup, so setup cannot own it.
+        expect(script.indexOf(`: > ${CODEX_LAST_MESSAGE_PATH}`)).toBeLessThan(script.indexOf(setupLine));
     });
 
     it("lets a failed or timed-out setup through to the agent, with a note, and skips setup without sudo", () => {
         const afterSetup = script.slice(script.indexOf(setupLine), script.indexOf(`touch ${KEY_WANTED_PATH}`));
 
-        // The only way setup ends the run: the repository could not be handed back.
-        expect(afterSetup.match(/finish /gu)).toHaveLength(1);
+        // The only way setup ends the run: the repository could not be taken back safely.
+        expect(afterSetup.match(FINISH_CALL)).toEqual(["finish setup-failed:repo-setup", "finish setup-failed:repo-setup", "finish setup-failed:repo-setup"]);
+        expect(afterSetup).toContain("124 | 137)");
         expect(afterSetup).toContain(`>> ${PROMPT_PATH}`);
         expect(afterSetup).toContain("the agent starts anyway");
         expect(script).toContain("repository setup skipped");
@@ -230,11 +240,27 @@ describe("buildRunScript", () => {
         expect(script).toContain("finish setup-failed:agent-key");
     });
 
+    it("leaves repository setup out when asked, keeping the key hand-off", () => {
+        const skipped = buildRunScript({ agent: "claude_code", repo: parseRepoUrl("a/b"), skipRepoSetup: true, timeoutSeconds: 1080 });
+
+        expect(skipped).not.toContain(`sudo -n -u ${SETUP_USER}`);
+        expect(skipped).not.toContain("setup-failed:repo-setup");
+        expect(skipped).toContain(`repository setup (${REPO_SETUP_FILE}) skipped for this run`);
+        expect(skipped).toContain(`touch ${KEY_WANTED_PATH}`);
+        expect(buildRunScript({ agent: "claude_code", repo: parseRepoUrl("a/b"), skipRepoSetup: false, timeoutSeconds: 1080 })).toBe(
+            buildRunScript({ agent: "claude_code", repo: parseRepoUrl("a/b"), timeoutSeconds: 1080 }),
+        );
+    });
+
     it.skipIf(NO_BASH)("writes the setup notes to the prompt with real newlines", () => {
         const noteLine = script.split("\n").find((line) => line.includes("printf") && line.includes(PROMPT_PATH)) ?? "";
-        const output = execFileSync("/bin/bash", ["-c", noteLine.trim().replace(`>> ${PROMPT_PATH}`, "")], { encoding: "utf8" });
+        const output = execFileSync("/bin/bash", ["-c", `setup_exit=0; ${noteLine.trim().replace(`>> ${PROMPT_PATH}`, "").replace(CASE_END, "")}`], {
+            encoding: "utf8",
+        });
 
-        expect(output.startsWith("\n\nThe repository's setup script")).toBe(true);
+        expect(output).toBe(
+            `\n\nThe repository's setup script (${REPO_SETUP_FILE}) ran before you started (exit code 0); its output is in ${SETUP_LOG_PATH}.\n`,
+        );
     });
 
     it("parses the status the script writes", () => {

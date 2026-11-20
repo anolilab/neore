@@ -121,15 +121,6 @@ const describeFailure = (step: string, outcome: CommandOutcome): string => {
     return `${step} failed (exit ${String(outcome.exitCode)})${detail ? `: ${detail}` : ""}`;
 };
 
-const OBJECT_ID = /^[0-9a-f]{40}$/u;
-
-/** The tree the repository's setup script left, when it ran (its changes are not the agent's), else the clone's commit. */
-const diffBaseOf = (baseSha: string, setupTree: string | undefined): string => {
-    const tree = setupTree?.trim();
-
-    return tree !== undefined && OBJECT_ID.test(tree) ? tree : baseSha;
-};
-
 const setupFailure = (step: string): string => {
     const label = SETUP_STEP_LABELS[step];
 
@@ -293,7 +284,7 @@ export const finalizeRun = async (
 
     try {
         const baseInfo = await sandbox.readFile(BASE_INFO_PATH).catch(() => "");
-        const [baseSha, baseBranch, setupTree] = baseInfo.trim().split("\n", 3);
+        const [baseSha, baseBranch] = baseInfo.trim().split("\n", 2);
 
         if (baseSha?.trim()) {
             outcome.baseSha = baseSha.trim();
@@ -332,8 +323,7 @@ export const finalizeRun = async (
         }
 
         if (outcome.baseSha) {
-            const diffBase = diffBaseOf(outcome.baseSha, setupTree);
-            const diff = await sandbox.run(buildDiffCommand(diffBase), { cwd: REPO_DIR, timeoutMs: COMMAND_TIMEOUT_MS });
+            const diff = await sandbox.run(buildDiffCommand(outcome.baseSha), { cwd: REPO_DIR, timeoutMs: COMMAND_TIMEOUT_MS });
 
             if (diff.exitCode !== 0) {
                 outcome.error = redact(describeFailure("git diff", diff));
@@ -341,7 +331,7 @@ export const finalizeRun = async (
                 return outcome;
             }
 
-            const stat = await sandbox.run(buildDiffStatCommand(diffBase), { cwd: REPO_DIR, timeoutMs: COMMAND_TIMEOUT_MS });
+            const stat = await sandbox.run(buildDiffStatCommand(outcome.baseSha), { cwd: REPO_DIR, timeoutMs: COMMAND_TIMEOUT_MS });
 
             outcome.diffTruncated = diff.stdout.length > DIFF_MAX_BYTES;
             outcome.diff = redact(diff.stdout.slice(0, DIFF_MAX_BYTES));

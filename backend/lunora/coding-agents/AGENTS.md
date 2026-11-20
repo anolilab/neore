@@ -22,13 +22,14 @@
 - **Repository setup runs with no secret in the sandbox.** `.neore/setup`
   (`repoSetupLines` in `commands.ts`) is repository content that executes, so
   it runs after the clone deleted `GIT_AUTH_PATH`, as `SETUP_USER` (no sudo;
-  `env -i`; it owns the working tree, never `.git`), and its leftovers are
-  killed before the key exists. The script's own env holds no key
+  `env -i`; it owns the working tree, never `.git`). Before the key exists its
+  processes are killed, the tree is taken back, and `.git` must be the same
+  inode (owning the tree lets it swap `.git` for one whose config runs a
+  command). Files the agent writes in `/tmp` are created before setup. The script's own env holds no key
   (`agentEnv`): `pollRun` writes it into the 0700 `RUN_DIR` only when the
   script asks (`KEY_WANTED_PATH`), and the script exports it to the agent
   command alone. Never pass the key in `startDetached` envs again. Setup
-  failing or timing out does not fail the run; the diff is taken against the
-  tree setup left (third line of `BASE_INFO_PATH`).
+  failing or timing out does not fail the run; the agent is told.
 - **Project repositories** — a project lists the repositories its runs pick
   from, one `projectRepositories` row each, added and edited only by the
   per-row procedures in `projects/functions.ts`; a project delete and the

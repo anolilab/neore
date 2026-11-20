@@ -287,18 +287,6 @@ describe("finalizeRun", () => {
         expect(sandbox.killed).toBe(1);
     });
 
-    it("diffs against the tree the repository's setup left, when it ran", async () => {
-        const setupTree = "fedcba9876543210fedcba9876543210fedcba98";
-        const sandbox = fakeSandbox();
-
-        sandbox.files.set(BASE_INFO_PATH, `${BASE_SHA}\nmain\n${setupTree}\n`);
-
-        const outcome = await finalizeRun(sandbox, { ...base, agent: "claude_code", status: { exitCode: 0, kind: "agent" } });
-
-        expect(outcome.baseSha).toBe(BASE_SHA);
-        expect(sandbox.calls.map((call) => call.command).filter((command) => command.includes(setupTree))).toHaveLength(2);
-    });
-
     it("reads codex's summary from its last-message file", async () => {
         const outcome = await finalizeRun(fakeSandbox(), { ...base, agent: "codex", status: { exitCode: 0, kind: "agent" } });
 

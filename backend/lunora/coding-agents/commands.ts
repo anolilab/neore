@@ -353,7 +353,7 @@ export const RUN_SCRIPT_PATH = "/tmp/neore-run.sh";
 /** The GitHub Basic credential, read and deleted by the clone step before the agent starts. */
 export const GIT_AUTH_PATH = "/tmp/neore-git-auth";
 
-/** Base commit and branch of the clone, one per line; a third line is the tree after repository setup. */
+/** Base commit and branch of the clone, one per line. */
 export const BASE_INFO_PATH = "/tmp/neore-base";
 
 /** The repository's own setup script, relative to its root. Executed directly when executable, else with bash. */
@@ -371,8 +371,7 @@ export const SETUP_TIMEOUT_S = 300;
 const CLONE_TIMEOUT_S = 180;
 const INSTALL_TIMEOUT_S = 300;
 /** How long the script waits for the poller (every 4s) to hand over the key. */
-const KEY_WAIT_S = 120;
-const SETUP_INDEX_PATH = "/tmp/neore-setup.index";
+const KEY_WAIT_S = 60;
 
 /** Readable names of the steps a `setup-failed:<step>` status names, for the run's error. */
 export const SETUP_STEP_LABELS: Readonly<Record<string, string>> = {
@@ -386,9 +385,11 @@ export const SETUP_STEP_LABELS: Readonly<Record<string, string>> = {
 /**
  * Runs {@link REPO_SETUP_FILE}, when the repository has one, as {@link SETUP_USER} with an empty environment apart from
  * the hints below. At that point no secret exists in the sandbox: the clone has deleted the git credential, and the
- * provider key has not been delivered yet. The setup user owns the working tree but not `.git` (so it cannot plant
- * hooks), and whatever it leaves running is killed before the key arrives. A sandbox without passwordless sudo
- * cannot separate the users, so setup is skipped there rather than run as the agent's user.
+ * provider key has not been delivered yet. The setup user owns the working tree but not `.git`. Before the key is
+ * requested, every process it left is killed, the tree is taken back, and `.git` must still be the inode the clone
+ * made: owning the working tree is enough to swap `.git` for one whose config runs a command in the next `git` call.
+ * A sandbox without passwordless sudo cannot separate the users, so setup is skipped there rather than run as the
+ * agent's user. Files the agent writes later in `/tmp` exist before setup, so setup cannot take them over.
  *
  * A failure or timeout does not fail the run: whatever setup did install stays, and the agent is told.
  */
@@ -410,33 +411,43 @@ const repoSetupLines = (): string[] => {
         "GIT_CONFIG_KEY_0=safe.directory",
         `GIT_CONFIG_VALUE_0=${REPO_DIR}`,
     ].join(" ");
-    const note = (text: string): string => `${String.raw`printf '\n\n%s\n'`} ${shellQuote(text)} >> ${PROMPT_PATH}`;
+    const limit = `${String(SETUP_TIMEOUT_S / 60)}-minute`;
+    /** Appends a note to the agent's prompt; `%s` in `text` takes the exit code. */
+    const note = (text: string): string => `printf ${shellQuote(String.raw`\n\n${text}\n`)} "$setup_exit" >> ${PROMPT_PATH}`;
+    const takeBack = "finish setup-failed:repo-setup";
 
     return [
         `if [ -f ${REPO_SETUP_FILE} ]; then`,
         `  echo ${shellQuote(`$ ${REPO_SETUP_FILE} (repository setup as ${SETUP_USER}, without secrets, up to ${String(SETUP_TIMEOUT_S / 60)} min)`)}`,
+        "  git_id=$(stat -c %i:%u .git)",
+        `  : > ${CODEX_LAST_MESSAGE_PATH}`,
         `  if sudo -n true 2>/dev/null && { id -u ${SETUP_USER} >/dev/null 2>&1 || sudo -n useradd -m -s /bin/bash ${SETUP_USER}; } && chmod o+x /home/user; then`,
-        `    sudo -n chown -R ${SETUP_USER}: ${REPO_DIR} && sudo -n chown -R ${owner} ${REPO_DIR}/.git`,
-        `    timeout -k 10 ${String(SETUP_TIMEOUT_S)} sudo -n -u ${SETUP_USER} -- ${env} bash -c ${shellQuote(run)} > ${SETUP_LOG_PATH} 2>&1 < /dev/null`,
-        "    setup_exit=$?",
-        `    sudo -n pkill -KILL -u ${SETUP_USER}`,
-        `    sudo -n find /tmp -maxdepth 1 -user ${SETUP_USER} -exec rm -rf -- {} +`,
-        `    sudo -n chown -R ${owner} ${REPO_DIR} || finish setup-failed:repo-setup`,
-        // The diff is taken against the tree setup left, so its changes (a lockfile, generated code) are not the agent's.
-        `    cp .git/index ${SETUP_INDEX_PATH} && setup_tree=$(GIT_INDEX_FILE=${SETUP_INDEX_PATH} timeout 120 git add -A && GIT_INDEX_FILE=${SETUP_INDEX_PATH} git write-tree) && echo "$setup_tree" >> ${BASE_INFO_PATH}`,
-        `    rm -f ${SETUP_INDEX_PATH}`,
-        '    if [ "$setup_exit" -eq 0 ]; then',
-        '      echo "repository setup finished after $SECONDS s of the run"',
-        `      ${note(`The repository's setup script (${REPO_SETUP_FILE}) ran before you started; its output is in ${SETUP_LOG_PATH}.`)}`,
+        `    if timeout 180 sudo -n chown -R ${SETUP_USER}: ${REPO_DIR} && timeout 180 sudo -n chown -R ${owner} ${REPO_DIR}/.git; then`,
+        `      timeout -k 10 ${String(SETUP_TIMEOUT_S)} sudo -n -u ${SETUP_USER} -- ${env} bash -c ${shellQuote(run)} > ${SETUP_LOG_PATH} 2>&1 < /dev/null`,
+        "      setup_exit=$?",
         "    else",
-        `      tail -n 20 ${SETUP_LOG_PATH}`,
-        `      echo "repository setup exited with $setup_exit (124: timed out); the agent starts anyway"`,
-        `      ${note(`Note: the repository's setup script (${REPO_SETUP_FILE}) did not complete (exit code below; 124 means it hit its ${String(SETUP_TIMEOUT_S / 60)}-minute limit). Its output is in ${SETUP_LOG_PATH}. Dependencies may be missing or only partly installed.`)}`,
-        `      echo "setup exit code: $setup_exit" >> ${PROMPT_PATH}`,
+        `      setup_exit=1; echo 'could not hand the working tree to the setup user' > ${SETUP_LOG_PATH}`,
         "    fi",
+        `    for _ in 1 2 3 4 5; do sudo -n pkill -KILL -u ${SETUP_USER} || break; sleep 1; done`,
+        `    sudo -n pgrep -u ${SETUP_USER} >/dev/null && ${takeBack}`,
+        `    timeout 180 sudo -n chown -R ${owner} ${REPO_DIR} || ${takeBack}`,
+        `    [ "$(stat -c %i:%u .git 2>/dev/null)" = "$git_id" ] || ${takeBack}`,
+        '    case "$setup_exit" in',
+        "      0)",
+        '        echo "repository setup finished after $SECONDS s of the run"',
+        `        ${note(`The repository's setup script (${REPO_SETUP_FILE}) ran before you started (exit code %s); its output is in ${SETUP_LOG_PATH}.`)} ;;`,
+        "      124 | 137)",
+        `        tail -n 20 ${SETUP_LOG_PATH}`,
+        `        echo 'repository setup hit its ${limit} limit; the agent starts anyway'`,
+        `        ${note(`Note: the repository's setup script (${REPO_SETUP_FILE}) was stopped at its ${limit} limit (exit code %s). Its output is in ${SETUP_LOG_PATH}. Dependencies may be missing or only partly installed.`)} ;;`,
+        "      *)",
+        `        tail -n 20 ${SETUP_LOG_PATH}`,
+        '        echo "repository setup exited with $setup_exit; the agent starts anyway"',
+        `        ${note(`Note: the repository's setup script (${REPO_SETUP_FILE}) failed (exit code %s). Its output is in ${SETUP_LOG_PATH}. Dependencies may be missing or only partly installed.`)} ;;`,
+        "    esac",
         "  else",
         `    echo 'repository setup skipped: this sandbox cannot run it as a separate user'`,
-        `    ${note(`Note: the repository's setup script (${REPO_SETUP_FILE}) was not run; dependencies are not installed.`)}`,
+        `    setup_exit=skipped; ${note(`Note: the repository's setup script (${REPO_SETUP_FILE}) was not run (%s); dependencies are not installed.`)}`,
         "  fi",
         "fi",
     ];
@@ -455,8 +466,16 @@ const repoSetupLines = (): string[] => {
  * key is requested only after repository setup ended ({@link KEY_WANTED_PATH}),
  * read from {@link AGENT_KEY_PATH}, deleted, and exported to the agent alone.
  * The agent's timeout is what is left of `timeoutSeconds` since the script began.
+ * `skipRepoSetup` leaves the repository's setup script out; the key hand-off stays.
  */
-export const buildRunScript = (input: { agent: CodingAgentId; branch?: string; repo: ParsedRepo; timeoutSeconds: number }): string => {
+export const buildRunScript = (input: {
+    agent: CodingAgentId;
+    branch?: string;
+    repo: ParsedRepo;
+    /** Leave out {@link REPO_SETUP_FILE}, e.g. for a run that fixes a failed repository setup. */
+    skipRepoSetup?: boolean;
+    timeoutSeconds: number;
+}): string => {
     const { envVar, label } = CODING_AGENTS[input.agent];
     const budgetSeconds = Math.max(60, Math.floor(input.timeoutSeconds));
 
@@ -476,11 +495,11 @@ export const buildRunScript = (input: { agent: CodingAgentId; branch?: string; r
         `{ git rev-parse HEAD && git rev-parse --abbrev-ref HEAD; } > ${BASE_INFO_PATH} || finish setup-failed:rev-parse`,
         `echo ${shellQuote(`$ install ${label} ${CODING_AGENTS[input.agent].npmVersion}`)}`,
         `timeout ${String(INSTALL_TIMEOUT_S)} bash -c ${shellQuote(buildInstallCommand(input.agent))} > /tmp/neore-install.log 2>&1 || { tail -n 20 /tmp/neore-install.log; finish setup-failed:install; }`,
-        ...repoSetupLines(),
+        ...(input.skipRepoSetup ? [`echo ${shellQuote(`repository setup (${REPO_SETUP_FILE}) skipped for this run`)}`] : repoSetupLines()),
         `touch ${KEY_WANTED_PATH}`,
         `waited=0; while [ ! -s ${AGENT_KEY_PATH} ]; do [ "$waited" -ge ${String(KEY_WAIT_S)} ] && finish setup-failed:agent-key; sleep 1; waited=$((waited + 1)); done`,
         `rm -f ${KEY_WANTED_PATH}; agent_key=$(cat ${AGENT_KEY_PATH}); rm -f ${AGENT_KEY_PATH}`,
-        `agent_s=$((${String(budgetSeconds)} - SECONDS)); [ "$agent_s" -lt 60 ] && agent_s=60`,
+        `agent_s=$((${String(budgetSeconds)} - SECONDS)); [ "$agent_s" -lt 30 ] && agent_s=30`,
         `echo ${shellQuote(`$ ${label}`)}`,
         `${envVar}="$agent_key" timeout "$agent_s" ${buildAgentCommand(input.agent)} 2>&1`,
         'finish "agent:$?"',
@@ -527,7 +546,7 @@ export const buildPollCommand = (offset: number): string => {
     return `cat ${RUN_STATUS_PATH} 2>/dev/null; echo; [ -e ${KEY_WANTED_PATH} ] && [ ! -e ${AGENT_KEY_PATH} ] && printf ${KEY_WANTED_MARK}; echo; tail -c +${String(offset + 1)} ${RUN_LOG_PATH} 2>/dev/null | head -c ${String(READ_CHUNK_BYTES)}`;
 };
 
-/** Stage everything (the agent may also have committed) and diff against the clone's HEAD, or the tree setup left. */
+/** Stage everything (the agent may also have committed) and diff against the clone's HEAD. */
 export const buildDiffCommand = (baseSha: string): string => {
     if (!COMMIT_SHA.test(baseSha)) {
         throw new Error("Invalid base commit");

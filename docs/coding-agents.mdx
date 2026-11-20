@@ -34,8 +34,12 @@ npm run build
   `NEORE_REPO_DIR` are set. Use `NEORE` to detect the sandbox.
 - **No secrets.** Setup runs as a separate, unprivileged user. Your API key and GitHub credentials are not in the
   sandbox while it runs, so a script cannot read them. The agent gets the key only after setup has ended. Anything
-  setup leaves running is stopped first. The script cannot change the repository's `.git` directory.
-- **Changes setup makes** (a regenerated lockfile, generated code) are left out of the agent's diff and pull request.
+  setup leaves running is stopped first. If the script tampers with the repository's `.git` directory, the run stops
+  before the agent starts.
+- **Changes setup makes** to tracked files (a regenerated lockfile, generated code) show up in the agent's diff. Keep
+  build output in ignored paths.
+- **Cloud runs only.** Runs on your own computer or an SSH server use that machine as it is and do not run
+  `.neore/setup`.
 - **Tools installed globally** go to the setup user's home and are not on the agent's `PATH`. Install what the
   agent needs into the repository instead, for example as `node_modules` or a `.venv`.
 
