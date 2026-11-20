@@ -65,8 +65,18 @@ const runTool: RunTool = async (program, args) => {
     return stdout;
 };
 
+/** `major.minor.patch` at the start of what `npm --version` prints. */
+const NPM_VERSION = /^(\d+)\.(\d+)\.\d+/u;
+
+/** Whether `version` is older than `major.minor`; a version that cannot be read counts as older. */
 const olderThan = (version: string, [major, minor]: readonly [number, number]): boolean => {
-    const [gotMajor = 0, gotMinor = 0] = version.split(".").map((part) => Number.parseInt(part, 10));
+    const match = NPM_VERSION.exec(version);
+
+    if (match === null) {
+        return true;
+    }
+
+    const [gotMajor, gotMinor] = [Number(match[1]), Number(match[2])];
 
     return gotMajor < major || (gotMajor === major && gotMinor < minor);
 };
@@ -81,7 +91,9 @@ export const resolveNodeTools = async (found: NodeTools, run: RunTool = runTool,
     let node: string;
 
     try {
-        node = (await run(found.node, ["-p", "process.execPath"])).trim();
+        const printed = await run(found.node, ["-p", "process.execPath"]);
+
+        node = printed.trim();
     } catch {
         throw new Error(`${found.node} did not run. Check that Node.js works in a terminal, then try again.`);
     }
@@ -99,7 +111,9 @@ export const resolveNodeTools = async (found: NodeTools, run: RunTool = runTool,
     let version: string;
 
     try {
-        version = (await run(node, [npm, "--version"])).trim();
+        const printed = await run(node, [npm, "--version"]);
+
+        version = printed.trim();
     } catch {
         throw new Error(`npm (${npm}) did not run. Check that npm works in a terminal, then try again.`);
     }

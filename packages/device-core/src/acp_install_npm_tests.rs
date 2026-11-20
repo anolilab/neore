@@ -2593,3 +2593,74 @@ fn an_install_in_the_older_version_named_folder_still_starts_and_is_kept_by_a_pr
     );
     assert!(state.acp_spawn_plan("fixture", None).is_ok());
 }
+
+#[test]
+fn a_registry_variable_the_person_changed_is_theirs_and_a_reinstall_keeps_it() {
+    let (state, dir) = state("registry-env-override");
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let install = |env: &[(&str, &str)]| {
+        let mut request = request(&state, &node, &npm, &bytes, integrity(&bytes));
+
+        request.env = env
+            .iter()
+            .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+            .collect();
+        state.acp_install_npm(request).unwrap();
+    };
+
+    install(&[("FIXTURE_MODE", "legacy")]);
+    state
+        .acp_update(
+            serde_json::from_value(json!({
+                "op": "setEnv", "agentKey": "fixture", "name": "FIXTURE_MODE", "value": "mine",
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+    install(&[]);
+
+    assert_eq!(
+        state.settings().acp_agents[0].env.0.get("FIXTURE_MODE"),
+        Some(&"mine".to_owned())
+    );
+}
+
+#[test]
+fn the_installed_folder_is_the_programs_the_command_for_a_binary_and_the_first_argument_for_npm() {
+    let (state, dir) = state("installed-folder");
+    let key_dir = dir.join("acp-agents/fixture");
+    let in_key = |path: &str| key_dir.join(path).to_string_lossy().into_owned();
+    let pin = |tree: Option<&str>| AcpInstall {
+        index_integrity: None,
+        publisher: "Example Inc.".into(),
+        registry_env: Vec::new(),
+        sha256: "0".repeat(64),
+        source: "https://example.com/agent.tgz".into(),
+        tree_sha256: tree.map(str::to_owned),
+        version: "1.0.0".into(),
+    };
+    let agent = AcpAgent {
+        // An argument that also points into the agent's folder, but not at its program.
+        args: vec![in_key("shared/config.json")],
+        command: in_key("1.0.0/bin/agent"),
+        env: EnvVars(BTreeMap::new()),
+        install: None,
+        key: "fixture".into(),
+        label: "Fixture".into(),
+    };
+
+    assert_eq!(state.installed_dir_name(&agent, &pin(None)), "1.0.0");
+
+    let npm = AcpAgent {
+        args: vec![in_key("1.0.0/node_modules/fixture-agent/cli.js")],
+        command: "/usr/bin/node".into(),
+        ..agent
+    };
+
+    assert_eq!(
+        state.installed_dir_name(&npm, &pin(Some(&"a".repeat(64)))),
+        "1.0.0"
+    );
+}

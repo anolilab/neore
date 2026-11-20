@@ -113,6 +113,13 @@ describe(resolveNodeTools, () => {
         await expect(resolveNodeTools(shim, answers("10.9.2"), (file) => files.has(file))).rejects.toThrow("older than 11.10");
     });
 
+    it("refuses an npm whose version it cannot read", async () => {
+        for (const version of ["", "npm", "eleven", "11"]) {
+            // eslint-disable-next-line no-await-in-loop -- one case at a time
+            await expect(resolveNodeTools(shim, answers(version), (file) => files.has(file))).rejects.toThrow("older than 11.10");
+        }
+    });
+
     it("refuses a node that names no binary, and one with no npm beside it", async () => {
         const relative = async (): Promise<string> => "node\n";
 

@@ -91,9 +91,9 @@ export interface InstallerOptions {
     fetch?: typeof fetch;
     /** Where node and npm are; the default searches `PATH` and the usual package-manager folders. */
     locateTools?: () => NodeTools | undefined;
+    registry: AgentRegistry;
     /** The Node.js binary behind what was found, and its npm (`resolveNodeTools`). */
     resolveTools?: (found: NodeTools) => Promise<NodeTools>;
-    registry: AgentRegistry;
     /** The core's `toolIdentity`; the default loads it from the addon. */
     toolIdentity?: (file: string) => string | null;
 }

@@ -128,7 +128,7 @@ vi.mock("./addon", () => {
 
             return CoreStub;
         },
-        loadToolIdentity: () => (path: string) => `identity of ${path}`,
+        loadToolIdentity: () => (file: string) => `identity of ${file}`,
     };
 });
 

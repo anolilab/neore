@@ -726,20 +726,16 @@ describe("starts that wait for their plan", () => {
         const target = make(
             {},
             {
-                // Not async: the manager's `await` must sit on `made` itself, right behind the job queued below.
-                // eslint-disable-next-line @typescript-eslint/promise-function-async -- see above
-                plan: (_key, folder) => {
-                    const made = Promise.resolve(scratch.plan({}, folder));
-
-                    // Queued to run right after the manager's check of this plan, before anything else of the start.
-                    // eslint-disable-next-line promise/prefer-await-to-then -- the order of the queued jobs is what is tested
-                    void made.then(() => {
+                plan: async (_key, folder) => {
+                    // Queued before the manager awaits the plan; it queues the revocation, which so runs right after the
+                    // manager's check of this plan, before anything else of the start.
+                    queueMicrotask(() => {
                         queueMicrotask(() => {
                             revoking ??= target.closeUnapproved({ agents: [], consents: [] });
                         });
                     });
 
-                    return made;
+                    return scratch.plan({}, folder);
                 },
             },
         );

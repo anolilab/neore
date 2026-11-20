@@ -480,19 +480,20 @@ impl DeviceState {
         }
     }
 
-    /// The folder under `acp-agents/<key>/` that `agent`'s pinned program is in: its first argument (an npm agent runs
-    /// `node <program>`) or its command (a binary one). The program cannot be edited without dropping the pin, so this is
-    /// the folder that was installed, also one named before [`install_dir_name`] took its current form. An agent whose
+    /// The folder under `acp-agents/<key>/` that `agent`'s pinned program is in: the first argument of an npm agent (it
+    /// runs `node <program>`), the command of a binary one. The program cannot be edited without dropping the pin, so this
+    /// is the folder that was installed, also one named before [`install_dir_name`] took its current form. An agent whose
     /// program is not under its key's folder has the pin's own name.
     pub(crate) fn installed_dir_name(&self, agent: &AcpAgent, pin: &AcpInstall) -> String {
         let key_dir = self.install_root().join(&agent.key);
+        let program = if pin.tree_sha256.is_some() {
+            agent.args.first()
+        } else {
+            Some(&agent.command)
+        };
 
-        agent
-            .args
-            .first()
-            .into_iter()
-            .chain(std::iter::once(&agent.command))
-            .find_map(|program| {
+        program
+            .and_then(|program| {
                 match Path::new(program)
                     .strip_prefix(&key_dir)
                     .ok()?
