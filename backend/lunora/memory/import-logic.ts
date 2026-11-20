@@ -40,10 +40,15 @@ export const IMPORT_WIDE_WINDOW_ROWS = 5000;
  * and the rest of a save makes about a dozen fixed calls (the session and rate-limit checks, the memory setting, the
  * filter rules, the one embedding call, the window reads, the model lookup, the one write and the vector link), so
  * this keeps a whole save under the cap with room to spare. `import.test.ts` counts the calls of a worst-case save.
- * A vector lookup costs {@link IMPORT_LOOKUP_CALLS}, a belief revision one model call. Past the budget a fact is
- * matched by words and not revised: a near-match is saved beside its row, as for a failed revision.
+ * A vector lookup costs {@link IMPORT_LOOKUP_CALLS}, a belief revision one model call. Lookups may spend at most
+ * {@link IMPORT_LOOKUP_CALL_SHARE} of it, so facts that match nothing cannot use it up before a later near-match is
+ * revised; revisions take the rest. Past the budget a fact is matched by words and not revised: a near-match is saved
+ * beside its row, as for a failed revision.
  */
 export const IMPORT_DEDUP_CALL_BUDGET = 24;
+
+/** The part of {@link IMPORT_DEDUP_CALL_BUDGET} vector lookups may spend: six lookups. */
+export const IMPORT_LOOKUP_CALL_SHARE = 12;
 
 /** A vector lookup: the vector query, and the read of a hit past the window. */
 export const IMPORT_LOOKUP_CALLS = 2;

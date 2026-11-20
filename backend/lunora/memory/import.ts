@@ -36,6 +36,7 @@ import {
     IMPORT_MAX_FACTS,
     IMPORT_MAX_INPUT_CHARS,
     IMPORT_DEDUP_CALL_BUDGET,
+    IMPORT_LOOKUP_CALL_SHARE,
     IMPORT_LOOKUP_CALLS,
     IMPORT_MEMORY_OFF_MESSAGE,
     IMPORT_WIDE_WINDOW_ROWS,
@@ -155,16 +156,19 @@ export const importFacts = async (ctx: ActionCtx, args: { app: ImportApp; facts:
     };
 
     const planned: PlannedFact[] = [];
-    // Vector and model calls spent on dedup so far, against `IMPORT_DEDUP_CALL_BUDGET`.
+    // Vector and model calls spent on dedup so far, against `IMPORT_DEDUP_CALL_BUDGET`; `lookupCalls` is the lookups' part.
     let spent = 0;
+    let lookupCalls = 0;
 
     for (const [index, fact] of facts.entries()) {
         const embedding = embeddings[index] ?? null;
-        const vectorAllowed = embedding !== null && spent + IMPORT_LOOKUP_CALLS <= IMPORT_DEDUP_CALL_BUDGET;
+        const vectorAllowed =
+            embedding !== null && lookupCalls + IMPORT_LOOKUP_CALLS <= IMPORT_LOOKUP_CALL_SHARE && spent + IMPORT_LOOKUP_CALLS <= IMPORT_DEDUP_CALL_BUDGET;
         let byVector: Awaited<ReturnType<typeof findSimilarMemoryByVector>> = null;
 
         if (embedding && vectorAllowed) {
             spent += IMPORT_LOOKUP_CALLS;
+            lookupCalls += IMPORT_LOOKUP_CALLS;
             byVector = await findSimilarMemoryByVector(ctx, { activeOn, botId: undefined, embedding, existing, retired, userId: args.userId }).catch(
                 (error: unknown) => {
                     console.warn("[memory/import] Vector dedup failed, deduping by text:", error);

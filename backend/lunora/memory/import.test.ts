@@ -11,7 +11,7 @@ import { internal } from "../_generated/internal";
 import schema from "../schema";
 import { REDACTED } from "../lib/secret-redaction";
 import { importFacts, labelImportedText } from "./import";
-import { IMPORT_DEDUP_CALL_BUDGET, IMPORT_LOOKUP_CALLS, IMPORT_MAX_FACTS } from "./import-logic";
+import { IMPORT_DEDUP_CALL_BUDGET, IMPORT_LOOKUP_CALL_SHARE, IMPORT_LOOKUP_CALLS, IMPORT_MAX_FACTS } from "./import-logic";
 
 const { embedMany, generateText, registry, searchVectors } = vi.hoisted(() => {
     return { embedMany: vi.fn(), generateText: vi.fn(), registry: new Map<string, unknown>(), searchVectors: vi.fn() };
@@ -1104,6 +1104,22 @@ describe("import limits", () => {
         expect(row?.lastConfirmedAt).toBeTypeOf("number");
     });
 
+    it("still revises a late near-match after earlier facts that match nothing spent their vector lookups", async () => {
+        expect.assertions(2);
+
+        await setMemoryEnabled(true);
+        useFakeVectors();
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", { memory: "The user lives in Berlin near the river with a garden and bikes", type: "context", userId: USER });
+        });
+        generateText.mockResolvedValue({ output: { action: "ADD" } });
+
+        await save([...FACTS.slice(0, 20), { memory: "The user lives in Berlin near the river with a garden and bikes daily", type: "context" }]);
+
+        expect(generateText).toHaveBeenCalledOnce();
+        expect(searchVectors.mock.calls.length * IMPORT_LOOKUP_CALLS).toBeLessThanOrEqual(IMPORT_LOOKUP_CALL_SHARE);
+    });
+
     it("keeps a worst-case save under the Free plan's 50 subrequests", async () => {
         expect.assertions(3);
 
@@ -1147,8 +1163,10 @@ describe("import limits", () => {
             return await importFacts(counted, { app: "gemini", facts, userId: USER });
         });
 
-        // Outside `importFacts`: the session and rate-limit checks, the model filter rules and the utility model lookup.
-        const outside = 4;
+        // Outside what this test counts, read off the code: the session check (about 2) and the rate limit (1) in the
+        // procedure's middleware, `loadModelFilterRules` (2 queries) and `getUtilityModelForUser` (the shared rules and
+        // the model pick, about 3).
+        const outside = 8;
         const total = outside + calls.query + calls.mutation + embedMany.mock.calls.length + searchVectors.mock.calls.length + generateText.mock.calls.length;
 
         expect(searchVectors.mock.calls.length * IMPORT_LOOKUP_CALLS + generateText.mock.calls.length).toBeLessThanOrEqual(IMPORT_DEDUP_CALL_BUDGET);

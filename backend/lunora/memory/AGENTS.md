@@ -32,7 +32,8 @@
   `importedFrom`; both actions refuse while memory is off. The whole save is ONE write: a confirmation that
   cannot apply is inserted by that write, and a row the save confirmed or reworded is never superseded by a later
   fact of the same save. A merge whose text another own row holds confirms that row. Vector lookups (2 calls each) and
-  belief revisions (1 each) share one budget per save (`IMPORT_DEDUP_CALL_BUDGET`), so a whole save stays under the
+  belief revisions (1 each) share one budget per save (`IMPORT_DEDUP_CALL_BUDGET`; lookups take at most half, so
+  revisions are never starved), so a whole save stays under the
   Free plan's 50 subrequests; `import.test.ts` counts a worst-case save. The 1000-row window is widened to 5000 rows
   once, the first time a fact must be matched by words.
 - **One decision per fact** for extraction and the import: `decideFact` (`dedup.ts`) confirms a match at 0.95 or more,
