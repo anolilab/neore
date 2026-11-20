@@ -537,6 +537,61 @@ describe("project rule files", () => {
         expect(onDirtyChange).toHaveBeenLastCalledWith(false);
     });
 
+    it("says beside Save why the project save was refused, focuses Save, and drops the notice once discarded", async () => {
+        const user = userEvent.setup();
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        const editor = (blockedSaveRequest: number) => (
+            <QueryClientProvider client={client}>
+                <ProjectRuleFiles blockedSaveRequest={blockedSaveRequest} projectId="p1" />
+            </QueryClientProvider>
+        );
+        const { rerender } = render(editor(0));
+
+        await user.click(await screen.findByRole("button", { name: "Move SQL up" }));
+        expect(screen.queryByRole("alert")).toBeNull();
+
+        rerender(editor(1));
+
+        const notice = await screen.findByText("Save or discard your rule file changes first.");
+        const save = screen.getByRole("button", { name: "Save rule files" });
+
+        // Read once, as Save's description where focus lands, not announced a second time as an alert.
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(save.getAttribute("aria-describedby")).toBe(notice.id);
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        await waitFor(() => expect(document.activeElement).toBe(save));
+
+        // Each refused project save moves focus back to Save.
+        await user.click(screen.getByRole("button", { name: "Add rule file" }));
+        rerender(editor(2));
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Save rule files" })));
+
+        await user.click(screen.getByRole("button", { name: "Discard changes" }));
+        expect(screen.queryByText("Save or discard your rule file changes first.")).toBeNull();
+
+        // A new draft starts without the old notice.
+        await user.click(await screen.findByRole("button", { name: "Move SQL up" }));
+        expect(screen.queryByText("Save or discard your rule file changes first.")).toBeNull();
+        expect(screen.getByRole("button", { name: "Save rule files" }).hasAttribute("aria-describedby")).toBe(false);
+    });
+
+    it("takes no refusal made before it was mounted as its own: no notice, focus left where it is", async () => {
+        const user = userEvent.setup();
+
+        render(
+            <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+                <ProjectRuleFiles blockedSaveRequest={3} projectId="p1" />
+            </QueryClientProvider>,
+        );
+
+        await user.click(await screen.findByRole("button", { name: "Move SQL up" }));
+
+        expect(screen.queryByText("Save or discard your rule file changes first.")).toBeNull();
+        // eslint-disable-next-line testing-library/no-node-access -- where the focus lands is what this asserts
+        expect(document.activeElement).not.toBe(screen.getByRole("button", { name: "Save rule files" }));
+    });
+
     it("offers no discard while a save is on its way, and tells the dialog it is saving", async () => {
         const user = userEvent.setup();
         const onSavingChange = vi.fn();

@@ -101,6 +101,8 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
     const ruleFilesSaving = useRef(false);
     // Asking whether to drop those changes, after a close (Cancel, Escape, outside click, the close button) while they are open.
     const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+    // How many project saves were refused for those changes: the rule files section says why beside its Save, and focuses it.
+    const [blockedSaves, setBlockedSaves] = useState(0);
     const [wasOpen, setWasOpen] = useState(open);
 
     // Closed from outside while it asked: the next open starts without the question.
@@ -138,7 +140,7 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
             }
 
             if (editingProject && ruleFilesDirty.current) {
-                toast.error(t`Save or discard your rule file changes first.`);
+                setBlockedSaves((count) => count + 1);
 
                 return;
             }
@@ -447,6 +449,7 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                             {/* Keyed: an unsaved draft for one project never stays for the next one edited. */}
                             {editingProject && (
                                 <ProjectRuleFiles
+                                    blockedSaveRequest={blockedSaves}
                                     key={`rule-files-${editingProject._id}`}
                                     onDirtyChange={(dirty: boolean) => {
                                         ruleFilesDirty.current = dirty;

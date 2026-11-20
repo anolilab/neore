@@ -305,22 +305,33 @@ const RuleFileFields: FC<{
     );
 };
 
+/** The ids an element is described by, or none: `aria-describedby` with no id left. */
+const describedBy = (ids: (string | false | undefined)[]): string | undefined => {
+    const present = ids.filter((id): id is string => typeof id === "string" && id !== "");
+
+    return present.length > 0 ? present.join(" ") : undefined;
+};
+
 /**
  * A project's rule files: instructions added to the project's runs, each always or only when the run's files match its
  * patterns. Edited as one list and saved together (`setProjectRuleFiles`), so adding, changing, reordering and deleting
  * are one save. A project's older single context shows as its first file. Only the project's owner edits them, the
  * rule of the project's other settings; others read them. `onDirtyChange` says whether unsaved changes are open, and
  * `onSavingChange` whether a save is on its way: it cannot be called back, so nothing may offer to discard it meanwhile.
+ * `blockedSaveRequest` counts the project saves refused for those changes: each says so beside Save and focuses it.
  */
-const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingChange?: (saving: boolean) => void; projectId: string }> = ({
-    onDirtyChange,
-    onSavingChange,
-    projectId,
-}) => {
+const ProjectRuleFiles: FC<{
+    blockedSaveRequest?: number;
+    onDirtyChange?: (dirty: boolean) => void;
+    onSavingChange?: (saving: boolean) => void;
+    projectId: string;
+}> = ({ blockedSaveRequest = 0, onDirtyChange, onSavingChange, projectId }) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
     const errorId = useId();
+    const blockedId = useId();
+    const saveId = useId();
     const queryClient = useQueryClient();
     const args = { projectId: projectId as Id<"projects"> };
     const listOptions = crpc.projects.functions.listProjectRuleFiles.queryOptions(args);
@@ -360,6 +371,29 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
         legacy && legacy.id === data?.legacyContextId && legacy.content.length > MAX_RULE_FILE_LENGTH && sameFile(files[0], legacy) ? legacy.id : undefined;
 
     const isSaving = saved.isPending;
+
+    // Whether the project's save was refused for these changes; cleared once a save of them starts or they are discarded.
+    const [blocked, setBlocked] = useState(false);
+    const [seenBlockedSave, setSeenBlockedSave] = useState(blockedSaveRequest);
+
+    if (seenBlockedSave !== blockedSaveRequest) {
+        setSeenBlockedSave(blockedSaveRequest);
+        setBlocked(true);
+    }
+
+    const showBlocked = blocked && isDirty && !isSaving;
+    // The request this section was mounted with is not its own: a section mounted again keeps focus where it is.
+    const handledBlockedSave = useRef(blockedSaveRequest);
+
+    // By id, as the rows do: the refused project save leaves focus on the button that saves these changes.
+    useEffect(() => {
+        if (blockedSaveRequest === handledBlockedSave.current) {
+            return;
+        }
+
+        handledBlockedSave.current = blockedSaveRequest;
+        document.querySelector<HTMLElement>(`#${CSS.escape(saveId)}`)?.focus();
+    }, [blockedSaveRequest, saveId]);
 
     useEffect(() => {
         onDirtyChange?.(isDirty);
@@ -513,6 +547,8 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
     }, [addId, afterRemove]);
 
     const save = async () => {
+        setBlocked(false);
+
         const refusal = problem();
 
         if (refusal) {
@@ -619,8 +655,9 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
                             <>
                                 <Button
                                     // A refusal of the whole list names no field: it describes the button that was refused.
-                                    aria-describedby={error && !invalid ? errorId : undefined}
+                                    aria-describedby={describedBy([showBlocked && blockedId, error && !invalid && errorId])}
                                     disabled={saved.isPending}
+                                    id={saveId}
                                     onClick={() => {
                                         save().catch(() => undefined);
                                     }}
@@ -636,6 +673,7 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
                                         // Read again: after a refused save the cached list is the one another save replaced.
                                         refetch().catch(() => undefined);
                                         setDraft(null);
+                                        setBlocked(false);
                                         setError(undefined);
                                         setInvalid(undefined);
                                     }}
@@ -649,6 +687,12 @@ const ProjectRuleFiles: FC<{ onDirtyChange?: (dirty: boolean) => void; onSavingC
                         )}
                     </div>
                 </>
+            )}
+            {showBlocked && (
+                // Read as Save's description once focus lands there; announced itself only when there is no Save to focus.
+                <p className="text-destructive text-sm" id={blockedId} role={canEdit ? undefined : "alert"}>
+                    {t`Save or discard your rule file changes first.`}
+                </p>
             )}
             {error && (
                 <p className="text-destructive text-sm" id={errorId} role="alert">

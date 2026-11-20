@@ -43,19 +43,28 @@ vi.mock("@/hooks/use-feature-flagged-models", () => {
     return { default: () => [] };
 });
 
-const { toastInfo } = vi.hoisted(() => {
-    return { toastInfo: vi.fn() };
+const { toastError, toastInfo } = vi.hoisted(() => {
+    return { toastError: vi.fn(), toastInfo: vi.fn() };
 });
 
 vi.mock("sonner", () => {
-    return { toast: { error: vi.fn(), info: toastInfo } };
+    return { toast: { error: toastError, info: toastInfo } };
 });
 
 // The rule files section stands in as controls that open unsaved changes, as an edit there does, and start a save of them.
 vi.mock("@/features/projects/components/project-rule-files", () => {
     return {
-        default: ({ onDirtyChange, onSavingChange }: { onDirtyChange: (dirty: boolean) => void; onSavingChange: (saving: boolean) => void }) => (
+        default: ({
+            blockedSaveRequest,
+            onDirtyChange,
+            onSavingChange,
+        }: {
+            blockedSaveRequest: number;
+            onDirtyChange: (dirty: boolean) => void;
+            onSavingChange: (saving: boolean) => void;
+        }) => (
             <>
+                <output>Refused project saves: {blockedSaveRequest}</output>
                 <button onClick={() => onDirtyChange(true)} type="button">
                     Edit a rule file
                 </button>
@@ -163,6 +172,23 @@ describe("project form dialog", () => {
         await waitFor(() => {
             expect(toastInfo).toHaveBeenCalledWith("Your rule files are still saving.");
         });
+        expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("hands a project save refused for unsaved rule file changes to the rule files section, not to a toast", async () => {
+        const user = userEvent.setup();
+        const onClose = vi.fn();
+
+        render(<ProjectFormDialog editingProject={project} onClose={onClose} open />);
+
+        expect(screen.getByText("Refused project saves: 0")).toBeTruthy();
+        await user.click(screen.getByRole("button", { name: "Edit a rule file" }));
+        await user.click(screen.getByRole("button", { name: "Update Project" }));
+        expect(await screen.findByText("Refused project saves: 1")).toBeTruthy();
+        await user.click(screen.getByRole("button", { name: "Update Project" }));
+        expect(await screen.findByText("Refused project saves: 2")).toBeTruthy();
+
+        expect(toastError).not.toHaveBeenCalled();
         expect(onClose).not.toHaveBeenCalled();
     });
 
