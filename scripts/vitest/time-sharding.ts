@@ -40,7 +40,7 @@ const readTimings = (file: string): Timings => {
 
 /** Longest first; equal weights fall back to the id so every shard computes the same order. */
 const longestFirst = <T>(items: readonly T[], weigh: (item: T) => number, id: (item: T) => string): T[] =>
-    [...items].sort((a, b) => weigh(b) - weigh(a) || id(a).localeCompare(id(b)));
+    items.toSorted((a, b) => weigh(b) - weigh(a) || id(a).localeCompare(id(b)));
 
 /** Deals the items into `count` buckets, each to the lightest so far. Pure, so every shard agrees on the split. */
 export const partition = <T>(items: readonly T[], count: number, weigh: (item: T) => number, id: (item: T) => string): T[][] => {
@@ -113,7 +113,7 @@ class TimingsReporter implements Reporter {
         // Sorted, one key per line, and pruned of deleted files, so a refresh diffs cleanly.
         const kept = Object.keys(timings)
             .filter((key) => existsSync(join(this.#root, key)))
-            .sort();
+            .toSorted();
 
         mkdirSync(dirname(file), { recursive: true });
         writeFileSync(file, `${JSON.stringify(Object.fromEntries(kept.map((key) => [key, timings[key]])), undefined, 4)}\n`);
