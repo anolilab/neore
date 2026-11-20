@@ -79,7 +79,7 @@ const storedToolSelection = (selection: BotToolSelection | null): BotToolSelecti
     const normalized = normalizeBotToolSelection(selection, new Set(listBuiltInTools().map((tool) => tool.name as string)));
 
     if ("error" in normalized) {
-        throw new LunoraError("INVALID_ARGUMENT", normalized.error);
+        throw new LunoraError("BAD_REQUEST", normalized.error);
     }
 
     return normalized.selection ?? undefined;

@@ -119,6 +119,8 @@ describe("a bot's tool selection", () => {
 
     it("refuses a selector with control characters or naming no built-in, and any change by an admin impersonating the owner", async () => {
         await expect(created({ exclude: [`${DOCS}:\nsearch`] })).rejects.toThrow("Invalid tool selector");
+        // A catalogued code, so the client gets a 400 rather than a 500.
+        await expect(created({ exclude: [`${DOCS}:\nsearch`] })).rejects.toMatchObject({ code: "BAD_REQUEST" });
         // A server named by its display name would stop matching on a rename.
         await expect(created({ exclude: ["docs:*"] })).rejects.toThrow("Invalid tool selector");
         // A mistyped built-in would exclude nothing, so the bot would keep the tool its owner meant to remove.
