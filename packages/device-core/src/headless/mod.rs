@@ -8,6 +8,8 @@
 //! approved poll carries the device id and secret, once, and `pair` stores them in the vault. Pairing is an outbound
 //! request (`http`); nothing here listens.
 
+pub mod cli;
 pub mod http;
 pub mod pair;
+pub mod serve;
 pub mod vault;
