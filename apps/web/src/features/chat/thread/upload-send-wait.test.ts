@@ -52,11 +52,11 @@ describe("settleUploadWait", () => {
     });
 
     it("stops at a failed upload and names the file", () => {
-        expect(settleNow(files(["a", "complete"], ["b", "error"]))).toStrictEqual({ kind: "failed", name: "b.txt" });
+        expect(settleNow(files(["a", "complete"], ["b", "error"]))).toStrictEqual({ error: undefined, kind: "failed", name: "b.txt" });
     });
 
     it("reports a failure even while another waited upload still runs", () => {
-        expect(settleNow(files(["a", "uploading"], ["b", "error"]))).toStrictEqual({ kind: "failed", name: "b.txt" });
+        expect(settleNow(files(["a", "uploading"], ["b", "error"]))).toStrictEqual({ error: undefined, kind: "failed", name: "b.txt" });
     });
 
     it("ends as edited when the text changed, so only the draft pressed on could be sent", () => {

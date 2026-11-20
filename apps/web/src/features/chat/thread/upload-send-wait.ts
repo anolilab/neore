@@ -1,6 +1,6 @@
 import type { PendingAttachment } from "../core/stores/chat-ui-store";
 
-type WaitedAttachment = Partial<Pick<PendingAttachment, "revision">> & Pick<PendingAttachment, "fileId" | "id" | "name" | "status">;
+type WaitedAttachment = Partial<Pick<PendingAttachment, "error" | "revision">> & Pick<PendingAttachment, "fileId" | "id" | "name" | "status">;
 
 /** A reference image attached to the next message: only its id matters here. */
 interface WaitedReference {
@@ -42,7 +42,7 @@ export interface UploadWait {
 export type UploadWaitOutcome =
     | { kind: "cancelled" }
     | { kind: "edited" }
-    | { kind: "failed"; name: string }
+    | { error?: string; kind: "failed"; name: string }
     | { kind: "retargeted" }
     | { kind: "send" }
     | { kind: "waiting" };
@@ -112,7 +112,7 @@ export const settleUploadWait = (wait: UploadWait, draft: Draft, threadId: strin
     const failed = waited.find((attachment) => attachment.status === "error");
 
     if (failed) {
-        return { kind: "failed", name: failed.name };
+        return { error: failed.error, kind: "failed", name: failed.name };
     }
 
     if (waited.some((attachment) => attachment.status !== "complete")) {

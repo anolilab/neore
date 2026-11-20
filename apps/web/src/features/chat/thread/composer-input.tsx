@@ -112,6 +112,9 @@ const fetchVaultFile = async (url: string, fileName: string, fileType: string): 
     return new File([await response.blob()], fileName, { type: fileType });
 };
 
+/** The account key of a guest whose session has loaded, so a sign-in during a waiting send reads as an account change. */
+const SIGNED_OUT = "signed-out";
+
 /** Messages already toasted (no second announcement), and those a retry cannot fix (too large, unsupported, content mismatch). */
 const toastedMessages = new Set<string>();
 const permanentMessages = new Set<string>();
@@ -1144,7 +1147,7 @@ const ComposerInput = ({
 
     const notifyFailedUpload = useCallback(
         (fileName: string) => {
-            showError(t`"${fileName}" could not be uploaded. Remove it to send.`);
+            showError(t`"${fileName}" could not be uploaded, so the message was not sent.`);
         },
         [t],
     );
@@ -1153,8 +1156,10 @@ const ComposerInput = ({
     // Optimistic state (user message + Thinking...) is shown immediately inside
     // sendMessage before the first await. The network request runs in the background.
     // Content safety (banned words) is validated server-side in the /chat/stream endpoint.
-    const { data: sessionData } = useAuthSession();
-    const accountId = sessionData?.user?.id;
+    const { data: sessionData, isPending: sessionPending } = useAuthSession();
+    // The account a send belongs to: the user's id, `signed-out` for a guest whose session has loaded, or undefined while
+    // it still loads. Only that last case is bound to the account that resolves; a guest who signs in cancels the wait.
+    const accountId = sessionData?.user?.id ?? (sessionPending ? undefined : SIGNED_OUT);
 
     const handleSubmit = useCallback(() => {
         // Read the draft from the store, not the render: a key pressed right after typing runs the handler of
@@ -1422,7 +1427,10 @@ const ComposerInput = ({
             }
 
             case "failed": {
-                notifyFailedUpload(outcome.name);
+                // The upload's own toast already gave the reason when it recognised the failure: one message is enough.
+                if (!toastedMessages.has(outcome.error ?? "")) {
+                    notifyFailedUpload(outcome.name);
+                }
 
                 break;
             }

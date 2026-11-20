@@ -18,6 +18,7 @@ const harness = vi.hoisted(() => {
         sendMessage: vi.fn(async () => undefined),
         isStreaming: false,
         showError: vi.fn(),
+        session: { data: { user: { id: "user-1" } } as { user: { id: string } } | null, isPending: false },
         showInfo: vi.fn(),
     };
 });
@@ -40,9 +41,7 @@ vi.mock("@lingui/react/macro", () => {
 
 vi.mock("@/features/auth/hooks/use-auth-session", () => {
     return {
-        useAuthSession: () => {
-            return { data: { user: { id: "user-1" } } };
-        },
+        useAuthSession: () => harness.session,
     };
 });
 vi.mock("@/features/auth/hooks/use-invite-only", () => {
@@ -210,6 +209,7 @@ const editedMessage = "Your message changed while the uploads ran, so it was not
 
 describe("ComposerInput send during an upload", () => {
     beforeEach(() => {
+        harness.session = { data: { user: { id: "user-1" } }, isPending: false };
         useChatUIStore.getState().setComposerText("see notes");
     });
 
@@ -314,6 +314,28 @@ describe("ComposerInput send during an upload", () => {
         expect(harness.sendMessage).not.toHaveBeenCalled();
     });
 
+    it("does not send a guest's waiting draft as the account the guest signs into", async () => {
+        harness.session = { data: null, isPending: false };
+
+        const id = addUpload("uploading");
+        const view = renderComposer();
+
+        pressSend();
+
+        harness.session = { data: { user: { id: "user-2" } }, isPending: false };
+        view.rerender(
+            <QueryClientProvider client={new QueryClient()}>
+                <ComposerInput />
+            </QueryClientProvider>,
+        );
+        useChatUIStore.getState().updateAttachment(id, { fileId: "file-1", status: "complete" });
+
+        await waitFor(() => {
+            expect(sendState()).toBe("ready");
+        });
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+    });
+
     it("sends only once, however often send is pressed while waiting", async () => {
         const id = addUpload("uploading");
 
@@ -328,7 +350,7 @@ describe("ComposerInput send during an upload", () => {
         });
     });
 
-    it("does not send when an upload fails, and tells the user to remove the file", async () => {
+    it("does not send when an upload fails, and says so", async () => {
         const id = addUpload("uploading");
 
         renderComposer();
@@ -337,7 +359,7 @@ describe("ComposerInput send during an upload", () => {
         useChatUIStore.getState().updateAttachment(id, { error: "boom", status: "error" });
 
         await waitFor(() => {
-            expect(harness.showError).toHaveBeenCalledWith('"notes.txt" could not be uploaded. Remove it to send.');
+            expect(harness.showError).toHaveBeenCalledWith('"notes.txt" could not be uploaded, so the message was not sent.');
         });
         expect(harness.sendMessage).not.toHaveBeenCalled();
         expect(sendState()).toBe("ready");
@@ -349,7 +371,7 @@ describe("ComposerInput send during an upload", () => {
         renderComposer();
         pressSend();
 
-        expect(harness.showError).toHaveBeenCalledWith('"notes.txt" could not be uploaded. Remove it to send.');
+        expect(harness.showError).toHaveBeenCalledWith('"notes.txt" could not be uploaded, so the message was not sent.');
         expect(harness.sendMessage).not.toHaveBeenCalled();
 
         useChatUIStore.getState().removeAttachment(id);
