@@ -4674,6 +4674,28 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
+            // The reply is still the newest of the thread. A newer message has its own run, which pays for its own reply. Checked before
+            // the claim, so a superseded reply never takes its paid claim.
+            const isStillNewest = async (): Promise<boolean> => {
+                const page = await agent.listMessages(context, {
+                    paginationOpts: { cursor: null, numItems: 10 },
+                    threadId,
+                });
+                const latest = rowsAfterContextReset(page.page || [], contextReset).find((messageDocument) => {
+                    const role = messageDocument.message?.role;
+
+                    return role === "user" || role === "assistant";
+                });
+
+                return latest?._id === newest._id;
+            };
+
+            if (!(await isStillNewest())) {
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] A newer message arrived before the claim, not suggesting: ${threadId}`);
+
+                return;
+            }
+
             // One paid call per reply: a second run of this reply, or one on a thread locked since the check above, stops here.
             if (!(await context.runMutation(internal.agent.followup_suggestions.admitFollowupSuggestions, { lastMessageId, threadId, userId }))) {
                 return;
@@ -4690,21 +4712,6 @@ export const generateFollowupSuggestionsForThread = internalAction
 
                 return;
             }
-
-            // The reply is still the newest of the thread. A newer message has its own run, which pays for its own reply.
-            const isStillNewest = async (): Promise<boolean> => {
-                const page = await agent.listMessages(context, {
-                    paginationOpts: { cursor: null, numItems: 10 },
-                    threadId,
-                });
-                const latest = rowsAfterContextReset(page.page || [], contextReset).find((messageDocument) => {
-                    const role = messageDocument.message?.role;
-
-                    return role === "user" || role === "assistant";
-                });
-
-                return latest?._id === newest._id;
-            };
 
             try {
                 // A newer message landed since the check above: nothing is paid for this reply.
