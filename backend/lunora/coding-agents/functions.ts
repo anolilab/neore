@@ -30,6 +30,7 @@ import type { CommitAuthor } from "./commands";
 import { isValidBranchName, parseRepoUrl, prBranchName, PROMPT_MAX, RUN_TIMEOUT_MS } from "./commands";
 import { repoLabel } from "./repo-label";
 import { PR_BUDGET_MS } from "./runner";
+import { buildSetupFixPrompt, isFixableSetupStep, SETUP_STEP_MAX, setupLogTail } from "./setup-fix";
 import { vCodingAgentId, vCodingAgentRunStatus } from "./validators";
 import { isThreadLocked } from "../lib/thread-lock";
 
@@ -67,6 +68,9 @@ const vRunView = v.object({
     prPending: v.boolean(),
     prUrl: v.union(v.string(), v.null()),
     repoUrl: v.string(),
+    // The prepared "Fix setup" task, while one may be started from this run.
+    setupFix: v.union(v.object({ prompt: v.string(), step: v.string() }), v.null()),
+    setupFixRunId: v.union(v.id("codingAgentRuns"), v.null()),
     startedAt: v.union(v.number(), v.null()),
     status: vCodingAgentRunStatus,
     summary: v.union(v.string(), v.null()),
@@ -92,6 +96,19 @@ const isCurrentPullRequestAttempt = (run: Pick<RunDoc, "prStartedAt" | "prStatus
 export const isPullRequestStale = (run: Pick<RunDoc, "prStartedAt" | "prStatus" | "updatedAt">, now: number): boolean =>
     run.prStatus === "pending" && now - (run.prStartedAt ?? run.updatedAt) > PR_REAP_AFTER_MS;
 
+/** The step "Fix setup" applies to: a failed run that stopped at a fixable setup step and has no fix run yet. */
+export const setupFixStep = (run: Pick<RunDoc, "setupFailure" | "setupFixRunId" | "status">) => {
+    const step = run.setupFailure?.step;
+
+    return run.status === "failed" && run.setupFixRunId === undefined && step !== undefined && isFixableSetupStep(step) ? step : undefined;
+};
+
+const setupFixView = (run: RunDoc): { prompt: string; step: string } | null => {
+    const step = setupFixStep(run);
+
+    return step && run.setupFailure ? { prompt: buildSetupFixPrompt({ logTail: run.setupFailure.logTail, step }), step } : null;
+};
+
 const toView = (run: RunDoc) => {
     return {
         _id: run._id,
@@ -110,6 +127,8 @@ const toView = (run: RunDoc) => {
         prPending: run.prStatus === "pending",
         prUrl: run.prUrl ?? null,
         repoUrl: run.repoUrl,
+        setupFix: setupFixView(run),
+        setupFixRunId: run.setupFixRunId ?? null,
         startedAt: run.startedAt ?? null,
         status: run.status,
         summary: run.summary ?? null,
@@ -258,11 +277,79 @@ const startProblem = async (ctx: MutationCtx, userId: string): Promise<string | 
     return ok ? undefined : "You have started too many coding agent runs recently. Try again later.";
 };
 
+interface NewRun {
+    agent: RunDoc["agent"];
+    branch?: string;
+    fixesSetupStep?: string;
+    openPr: boolean;
+    prompt: string;
+    repoUrl: string;
+    taskId?: Id<"tasks">;
+    taskRunId?: Id<"taskRuns">;
+    threadId?: string;
+    toolCallId?: string;
+    userId: string;
+}
+
 /**
  * Create a run after every admission check: account, one active run per user,
  * rate limit, a valid repo/branch/prompt. The start step and the reaper are
  * scheduled in the same transaction, so a created run always has both.
  */
+const insertRun = async (ctx: MutationCtx, args: NewRun): Promise<{ error: string } | { runId: Id<"codingAgentRuns"> }> => {
+    let repoUrl: string;
+
+    try {
+        repoUrl = parseRepoUrl(args.repoUrl).cloneUrl;
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : "Invalid repository" };
+    }
+
+    const branch = args.branch?.trim() || undefined;
+
+    if (branch !== undefined && !isValidBranchName(branch)) {
+        return { error: "Invalid branch name" };
+    }
+
+    // The sandbox agent runs this text with the user's key: hidden characters never reach it.
+    const prompt = stripHiddenText(args.prompt).text.trim();
+
+    if (prompt.length === 0 || prompt.length > PROMPT_MAX) {
+        return { error: `The task must be between 1 and ${String(PROMPT_MAX)} characters` };
+    }
+
+    const problem = await startProblem(ctx, args.userId);
+
+    if (problem) {
+        return { error: problem };
+    }
+
+    const { now } = ctx;
+    const runId = await ctx.db.insert("codingAgentRuns", {
+        agent: args.agent,
+        branch,
+        createdAt: now,
+        fixesSetupStep: args.fixesSetupStep,
+        log: "",
+        openPr: args.openPr,
+        prompt,
+        repoUrl,
+        status: "queued",
+        taskId: args.taskId,
+        taskRunId: args.taskRunId,
+        threadId: args.threadId,
+        toolCallId: args.toolCallId,
+        updatedAt: now,
+        userId: args.userId,
+    });
+
+    // Jobs queue (`lib/job-queue.ts`); a redelivery is refused by `claimRun`.
+    await enqueueJob(internal.coding_agents.execute.startCodingAgentRun, { runId });
+    await ctx.scheduler.runAfter(RUN_TIMEOUT_MS + REAPER_GRACE_MS, internal.coding_agents.execute.reapRun, { runId });
+
+    return { runId };
+};
+
 export const createRun = internalMutation
     .input({
         agent: vCodingAgentId,
@@ -277,57 +364,47 @@ export const createRun = internalMutation
         userId: v.string(),
     })
     .output(v.union(v.object({ runId: v.id("codingAgentRuns") }), v.object({ error: v.string() })))
+    .mutation(async ({ args, ctx }) => await insertRun(ctx, args));
+
+/**
+ * "Fix setup" in the run view: start a run on the same repository and branch, in the same thread, with the task the
+ * person read and may have edited. Only from the caller's own failed run that stopped at a fixable step, and once.
+ */
+export const startSetupFix = authMutation
+    .use(rateLimit("chat/update"))
+    .input({ prompt: v.string(), runId: v.id("codingAgentRuns") })
+    .output(v.union(v.object({ runId: v.id("codingAgentRuns") }), v.object({ error: v.string() })))
     .mutation(async ({ args, ctx }) => {
-        let repoUrl: string;
+        const run = await ctx.db.get("codingAgentRuns", args.runId);
 
-        try {
-            repoUrl = parseRepoUrl(args.repoUrl).cloneUrl;
-        } catch (error) {
-            return { error: error instanceof Error ? error.message : "Invalid repository" };
+        if (!run || run.userId !== ctx.user.userId) {
+            throw new LunoraError("NOT_FOUND", "Run not found");
         }
 
-        const branch = args.branch?.trim() || undefined;
+        const step = setupFixStep(run);
 
-        if (branch !== undefined && !isValidBranchName(branch)) {
-            return { error: "Invalid branch name" };
+        if (!step) {
+            return { error: "This run cannot start a setup fix." };
         }
 
-        // The sandbox agent runs this text with the user's key: hidden characters never reach it.
-        const prompt = stripHiddenText(args.prompt).text.trim();
-
-        if (prompt.length === 0 || prompt.length > PROMPT_MAX) {
-            return { error: `The task must be between 1 and ${String(PROMPT_MAX)} characters` };
-        }
-
-        const problem = await startProblem(ctx, args.userId);
-
-        if (problem) {
-            return { error: problem };
-        }
-
-        const { now } = ctx;
-        const runId = await ctx.db.insert("codingAgentRuns", {
-            agent: args.agent,
-            branch,
-            createdAt: now,
-            log: "",
-            openPr: args.openPr,
-            prompt,
-            repoUrl,
-            status: "queued",
-            taskId: args.taskId,
-            taskRunId: args.taskRunId,
-            threadId: args.threadId,
-            toolCallId: args.toolCallId,
-            updatedAt: now,
-            userId: args.userId,
+        const created = await insertRun(ctx, {
+            agent: run.agent,
+            ...(run.branch !== undefined && { branch: run.branch }),
+            fixesSetupStep: step,
+            openPr: false,
+            prompt: args.prompt,
+            repoUrl: run.repoUrl,
+            ...(run.threadId !== undefined && { threadId: run.threadId }),
+            userId: ctx.user.userId,
         });
 
-        // Jobs queue (`lib/job-queue.ts`); a redelivery is refused by `claimRun`.
-        await enqueueJob(internal.coding_agents.execute.startCodingAgentRun, { runId });
-        await ctx.scheduler.runAfter(RUN_TIMEOUT_MS + REAPER_GRACE_MS, internal.coding_agents.execute.reapRun, { runId });
+        if ("runId" in created) {
+            await patchById(ctx.db, "codingAgentRuns", run._id, { setupFixRunId: created.runId, updatedAt: ctx.now });
+        }
 
-        return { runId };
+        ctx.log.event("coding_agents.start_setup_fix", { started: "runId" in created, step });
+
+        return created;
     });
 
 /** `queued` → `running`; `null` when the run is gone or no longer queued. */
@@ -556,7 +633,14 @@ export const getRunForPoll = internalQuery
 
 /** One poll's worth of redacted log. Answers whether the run was cancelled meanwhile. */
 export const recordPoll = internalMutation
-    .input({ offset: v.number(), runId: v.id("codingAgentRuns"), summary: v.optional(v.string()), text: v.string() })
+    .input({
+        offset: v.number(),
+        runId: v.id("codingAgentRuns"),
+        // The poll that saw `setup-failed:<step>`: the end of the log is kept with the step, for "Fix setup".
+        setupFailedStep: v.optional(v.string()),
+        summary: v.optional(v.string()),
+        text: v.string(),
+    })
     .output(vCancelled)
     .mutation(async ({ args, ctx }) => {
         const run = await ctx.db.get("codingAgentRuns", args.runId);
@@ -565,8 +649,13 @@ export const recordPoll = internalMutation
             return { cancelled: true };
         }
 
+        const log = args.text ? appendToLog(run.log, args.text) : run.log;
+
         await patchById(ctx.db, "codingAgentRuns", run._id, {
-            ...(args.text && { log: appendToLog(run.log, args.text) }),
+            ...(args.text && { log }),
+            ...(args.setupFailedStep !== undefined && {
+                setupFailure: { logTail: setupLogTail(log), step: args.setupFailedStep.slice(0, SETUP_STEP_MAX) },
+            }),
             logOffset: args.offset,
             ...(args.summary !== undefined && { summary: args.summary.slice(0, 20_000) }),
             updatedAt: ctx.now,
