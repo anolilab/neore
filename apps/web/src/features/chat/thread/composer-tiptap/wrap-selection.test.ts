@@ -440,6 +440,44 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor).startsWith("**hello** `x")).toBe(true);
     });
 
+    it("leaves a wrap alone inside a link destination, so the link keeps pointing where it did", () => {
+        const editor = editorWith("<p>see [docs](https://example.com) now</p>");
+
+        select(editor, 20, 27);
+
+        expect(selectedText(editor)).toBe("example");
+        expect(wrapSelectionOnTextInput(editor.view, 20, 27, "*")).toBe(true);
+        expect(text(editor)).toBe("see [docs](https://example.com) now");
+    });
+
+    it("still wraps a link's label", () => {
+        const editor = editorWith("<p>see [docs](https://example.com) now</p>");
+
+        select(editor, 6, 10);
+        wrapSelectionOnTextInput(editor.view, 6, 10, "*");
+
+        expect(text(editor)).toBe("see [**docs**](https://example.com) now");
+    });
+
+    it("uses a fence length that an earlier unmatched backtick cannot pair with", () => {
+        const editor = editorWith("<p>`a foo bar</p>");
+
+        select(editor, 4, 7);
+        wrapSelectionOnTextInput(editor.view, 4, 7, "`");
+
+        expect(text(editor)).toBe("`a ``foo`` bar");
+        expect(selectedText(editor)).toBe("foo");
+    });
+
+    it("leaves a star inside a selected code span unescaped, where a backslash would show", () => {
+        const editor = editorWith("<p>x `a*b` y</p>");
+
+        select(editor, 3, 8);
+        wrapSelectionOnTextInput(editor.view, 3, 8, "*");
+
+        expect(text(editor)).toBe("x **`a*b`** y");
+    });
+
     it("wraps a selection that holds a whole inline code span, since both of its ends are outside the span", () => {
         const editor = editorWith("<p>x `foo` y</p>");
 

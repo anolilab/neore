@@ -66,12 +66,56 @@ const nextRunFinder = (text: string): ((start: number, length: number) => number
     };
 };
 
+/** A backtick run that no later run of the same length closes, so Markdown shows it as a literal backtick. */
+interface UnmatchedRun {
+    length: number;
+    start: number;
+}
+
 /**
- * The inline code spans of a paragraph, as parent offsets. Markdown shows everything inside one literally, so a delimiter
- * inserted there would not render. A backtick escaped by a backslash outside code does not open a span. A line break or
- * other inline node counts as a line ending, so a backslash before it escapes nothing after it.
+ * The inline code spans of `text`, as `[start, end)` indices, and the runs that open none. Markdown shows everything
+ * inside a span literally. A backtick escaped by a backslash outside code does not open a span.
  */
-const codeSpans = (parent: ProseMirrorNode): [number, number][] => {
+const scanBackticks = (text: string): { spans: [number, number][]; unmatched: UnmatchedRun[] } => {
+    const findRun = nextRunFinder(text);
+    const spans: [number, number][] = [];
+    const unmatched: UnmatchedRun[] = [];
+    let index = 0;
+
+    while (index < text.length) {
+        if (text[index] === "\\") {
+            index += 2;
+        } else if (text[index] === "`") {
+            const length = runLength(text, index);
+            const closing = findRun(index + length, length);
+
+            if (closing === -1) {
+                unmatched.push({ length, start: index });
+                index += length;
+            } else {
+                spans.push([index, closing + length]);
+                index = closing + length;
+            }
+        } else {
+            index += 1;
+        }
+    }
+
+    return { spans, unmatched };
+};
+
+/** A link destination `](...)`: the text between the parentheses, as `[start, end)` indices. */
+const LINK_DESTINATION = /\]\(([^)]*)\)/g;
+
+/**
+ * What the Markdown already in a paragraph means for a wrap of `from`..`to` (parent offsets). The wrap is `blocked` when
+ * an end of the selection is strictly inside a code span, where a delimiter would show literally, or when the selection
+ * overlaps a link destination, whose URL it would change. `takenFences` are the lengths of unmatched backtick runs before
+ * the selection: a code fence of such a length would pair with that earlier run instead of its own closer.
+ *
+ * A line break or other inline node counts as a line ending, so a backslash before it escapes nothing after it.
+ */
+const markupAround = (parent: ProseMirrorNode, from: number, to: number): { blocked: boolean; takenFences: ReadonlySet<number> } => {
     const offsets: number[] = [];
     let text = "";
 
@@ -85,38 +129,20 @@ const codeSpans = (parent: ProseMirrorNode): [number, number][] => {
         text += part;
     });
 
-    const findRun = nextRunFinder(text);
-    const spans: [number, number][] = [];
-    let index = 0;
+    // Every index of `text` has an offset, so both lookups exist; `?? 0` only narrows the type.
+    const toOffsets = ([start, end]: [number, number]): [number, number] => [offsets[start] ?? 0, (offsets[end - 1] ?? 0) + 1];
+    const { spans, unmatched } = scanBackticks(text);
+    const inCode = spans.map((span) => toOffsets(span)).some(([start, end]) => (from > start && from < end) || (to > start && to < end));
+    const inLink = [...text.matchAll(LINK_DESTINATION)]
+        .filter((match) => (match[1] ?? "") !== "")
+        .map((match) => toOffsets([match.index + 2, match.index + 2 + (match[1] ?? "").length]))
+        .some(([start, end]) => from < end && to > start);
 
-    while (index < text.length) {
-        if (text[index] === "\\") {
-            index += 2;
-        } else if (text[index] === "`") {
-            const length = runLength(text, index);
-            const closing = findRun(index + length, length);
-
-            if (closing === -1) {
-                index += length;
-            } else {
-                // Every index of `text` has an offset, so both lookups exist; `?? 0` only narrows the type.
-                spans.push([offsets[index] ?? 0, (offsets[closing + length - 1] ?? 0) + 1]);
-                index = closing + length;
-            }
-        } else {
-            index += 1;
-        }
-    }
-
-    return spans;
+    return {
+        blocked: inCode || inLink,
+        takenFences: new Set(unmatched.filter((run) => (offsets[run.start] ?? 0) < from).map((run) => run.length)),
+    };
 };
-
-/**
- * Whether either end of the selection is strictly inside an inline code span: a delimiter inserted there would show as
- * literal text. A selection that only holds a whole span is fine, because both of its ends are outside it.
- */
-const insideCodeSpan = (parent: ProseMirrorNode, from: number, to: number): boolean =>
-    codeSpans(parent).some(([start, end]) => (from > start && from < end) || (to > start && to < end));
 
 const trailingBackslashes = (text: string): number => {
     let count = 0;
@@ -132,18 +158,33 @@ const trailingBackslashes = (text: string): number => {
 const collidesWithMarkup = (beforeOpen: string, typed: string, openBefore: string, closeAfter: string): boolean =>
     trailingBackslashes(beforeOpen) % 2 === 1 || (typed === "`" && (openBefore === "`" || closeAfter === "`"));
 
-/** A copy of `character` in the text is escaped, unless an odd run of backslashes before it already escapes it. */
+/**
+ * A copy of `character` in the text is escaped, unless an odd run of backslashes before it already escapes it. Text
+ * inside a code span is left as it is, because a backslash there would show.
+ */
 const escapeCharacter = (text: string, character: string): string => {
+    const { spans } = scanBackticks(text);
     let escaped = "";
     let backslashes = 0;
+    let span = 0;
+
+    // `index` counts UTF-16 units, as the span indices do, while the loop reads whole characters.
+    let index = 0;
 
     for (const current of text) {
-        if (current === character && backslashes % 2 === 0) {
+        while (span < spans.length && (spans[span]?.[1] ?? 0) <= index) {
+            span += 1;
+        }
+
+        const inCode = index >= (spans[span]?.[0] ?? Infinity);
+
+        if (!inCode && current === character && backslashes % 2 === 0) {
             escaped += "\\";
         }
 
         escaped += current;
-        backslashes = current === "\\" ? backslashes + 1 : 0;
+        backslashes = !inCode && current === "\\" ? backslashes + 1 : 0;
+        index += current.length;
     }
 
     // An odd run at the end would escape the closing delimiter, so it is doubled: the text renders the same.
@@ -182,8 +223,9 @@ interface Wrap {
 /**
  * The wrap a marker makes of `body`. The composer sends its text as Markdown and its bold, italic and code marks are off,
  * so the delimiters are the formatting. `insideWord` is whether the selection touches a letter or digit on either side.
+ * `takenFences` are fence lengths an earlier unmatched backtick run would pair with.
  */
-const wrapFor = (marker: Marker, body: string, insideWord: boolean): Wrap => {
+const wrapFor = (marker: Marker, body: string, insideWord: boolean, takenFences: ReadonlySet<number>): Wrap => {
     if (marker === "`") {
         // A fence longer than any backtick run in the code keeps it one code span; a space pads a backtick at an edge.
         let longestRun = 0;
@@ -192,7 +234,13 @@ const wrapFor = (marker: Marker, body: string, insideWord: boolean): Wrap => {
             longestRun = Math.max(longestRun, run[0].length);
         }
 
-        const fence = "`".repeat(longestRun + 1);
+        let fenceLength = longestRun + 1;
+
+        while (takenFences.has(fenceLength)) {
+            fenceLength += 1;
+        }
+
+        const fence = "`".repeat(fenceLength);
         const pad = body.startsWith("`") || body.endsWith("`") ? " " : "";
 
         return { body, close: `${pad}${fence}`, open: `${fence}${pad}` };
@@ -213,7 +261,8 @@ const wrapFor = (marker: Marker, body: string, insideWord: boolean): Wrap => {
  * Returns `null` when the typed text is no marker, nothing is selected, the selection is not inside one textblock (a
  * select-all or a range over several paragraphs), it holds a node other than text (a quote chip, a line break), or it
  * is only whitespace. It also returns `null` when the wrap would not render: a backtick beside a code wrap, a backslash
- * before the opening delimiter, or delimiters that do not open or close beside the text.
+ * before the opening delimiter, delimiters that do not open or close beside the text, an end inside a code span, or a
+ * selection over a link destination.
  * The marker is then dropped and the selection stays, so the selected text is never replaced.
  */
 const REFUSED = "refused";
@@ -267,11 +316,13 @@ const planWrap = (state: EditorState, from: number, to: number, typed: string): 
         return REFUSED;
     }
 
-    if (insideCodeSpan(parent, $from.parentOffset, $to.parentOffset)) {
+    const markup = markupAround(parent, $from.parentOffset, $to.parentOffset);
+
+    if (markup.blocked) {
         return REFUSED;
     }
 
-    const wrap = wrapFor(typed, body, insideWord);
+    const wrap = wrapFor(typed, body, insideWord, markup.takenFences);
     const underscore = typed === "_" && !insideWord;
 
     // A copy of the delimiter character right beside the wrap joins its run, and CommonMark then pairs the wrong runs.
