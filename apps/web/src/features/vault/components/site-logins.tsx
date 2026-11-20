@@ -15,6 +15,7 @@ import type { FormEvent } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { useImpersonationState } from "@/features/admin/hooks/use-is-impersonating";
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -90,6 +91,10 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
     const passwordId = useId();
     const labelId = useId();
     const teammatesId = useId();
+    // The server refuses a save or delete to an admin acting as this account. Until the session shows whose it is, the
+    // controls are withheld without a reason, so an ordinary user never reads one (as the API key card does).
+    const impersonation = useImpersonationState();
+    const canWrite = impersonation === "self";
 
     const loginsQuery = crpc.vault.site_logins.listSiteLogins.queryOptions({});
     const { data: loginList, isError: loginListFailed, isFetching: loginsFetching, refetch: refetchLogins } = useQuery(loginsQuery);
@@ -266,6 +271,10 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                 </div>
             )}
 
+            {impersonation === "impersonating" && (
+                <p className="text-muted-foreground text-sm" role="status">{t`Site logins can't be saved, changed or deleted while impersonating.`}</p>
+            )}
+
             {logins.length > 0 && (
                 <ul className="divide-border divide-y rounded-md border">
                     {logins.map((login) => {
@@ -288,38 +297,42 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                                         {login.username} · {t`Password set`} · {access}
                                     </p>
                                 </div>
-                                <Button
-                                    aria-label={t`Edit login for ${login.site}`}
-                                    onClick={() => {
-                                        setDraft({
-                                            id: login.id,
-                                            label: login.label ?? "",
-                                            password: "",
-                                            site: login.site,
-                                            teammateIds: login.teammateIds,
-                                            username: login.username,
-                                        });
-                                    }}
-                                    size="icon"
-                                    variant="ghost"
-                                >
-                                    <Pencil aria-hidden="true" className="size-4" />
-                                </Button>
-                                <Button
-                                    aria-label={t`Delete login for ${login.site}`}
-                                    onClick={() => setPendingDelete({ id: login.id, site: login.site })}
-                                    size="icon"
-                                    variant="ghost"
-                                >
-                                    <Trash2 aria-hidden="true" className="size-4" />
-                                </Button>
+                                {canWrite && (
+                                    <>
+                                        <Button
+                                            aria-label={t`Edit login for ${login.site}`}
+                                            onClick={() => {
+                                                setDraft({
+                                                    id: login.id,
+                                                    label: login.label ?? "",
+                                                    password: "",
+                                                    site: login.site,
+                                                    teammateIds: login.teammateIds,
+                                                    username: login.username,
+                                                });
+                                            }}
+                                            size="icon"
+                                            variant="ghost"
+                                        >
+                                            <Pencil aria-hidden="true" className="size-4" />
+                                        </Button>
+                                        <Button
+                                            aria-label={t`Delete login for ${login.site}`}
+                                            onClick={() => setPendingDelete({ id: login.id, site: login.site })}
+                                            size="icon"
+                                            variant="ghost"
+                                        >
+                                            <Trash2 aria-hidden="true" className="size-4" />
+                                        </Button>
+                                    </>
+                                )}
                             </li>
                         );
                     })}
                 </ul>
             )}
 
-            {!loginsFailed && (
+            {!loginsFailed && canWrite && (
                 <form className="grid max-w-xl gap-4" onSubmit={handleSave}>
                     <h3 className="text-base font-medium">{isEditing ? t`Edit login` : t`New login`}</h3>
                     <div className="space-y-2">
@@ -428,7 +441,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                         setPendingDelete(null);
                     }
                 }}
-                open={pendingDelete !== null}
+                open={pendingDelete !== null && canWrite}
                 title={t`Delete this login?`}
             />
         </section>

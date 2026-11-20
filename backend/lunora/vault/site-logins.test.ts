@@ -11,10 +11,16 @@ const keyBytes = new Uint8Array(32);
 crypto.getRandomValues(keyBytes);
 vi.stubEnv("ENCRYPTION_KEY", btoa(String.fromCodePoint(...keyBytes)));
 
-const { sessionFrom } = vi.hoisted(() => {
+const { impersonation, sessionFrom } = vi.hoisted(() => {
+    // Set while a test acts as an admin impersonating the signed-in user.
+    const state = { by: undefined as string | undefined };
+
     return {
+        impersonation: state,
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
-            context.auth.userId ? { activeOrganization: null, id: context.auth.userId, isAdmin: false, userId: context.auth.userId } : null,
+            context.auth.userId
+                ? { activeOrganization: null, id: context.auth.userId, impersonatedBy: state.by, isAdmin: false, userId: context.auth.userId }
+                : null,
     };
 });
 
@@ -67,6 +73,8 @@ const CANNOT_CHANGE = /cannot change/;
 const ALREADY_SAVED = /already saved/;
 const NOT_FOUND = /not found/;
 const OWN_ACCOUNT_ONLY = /own account only/;
+const SAVE_WHILE_IMPERSONATING = /cannot be saved while impersonating/;
+const DELETE_WHILE_IMPERSONATING = /cannot be deleted while impersonating/;
 
 // Built at run time, so no secret-shaped literal sits in the source.
 const PASSWORD = ["pw", crypto.randomUUID(), "x"].join("-");
@@ -105,6 +113,7 @@ const insertThread = async (fields: Record<string, unknown>) =>
 
 beforeEach(async () => {
     shard.servesOwnUser = true;
+    impersonation.by = undefined;
     harness = lunoraTest(schema as never);
     botId = await insertBot(OWNER, "Ada");
     otherBotId = await insertBot(OWNER, "Bo");
@@ -114,6 +123,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+    impersonation.by = undefined;
     harness.close();
 });
 
@@ -228,6 +238,53 @@ describe("saving a site login", () => {
             delete workerEnv.ENVIRONMENT;
             delete workerEnv.SHARD_ROUTING;
         }
+    });
+});
+
+describe("while an admin impersonates the owner", () => {
+    it("refuses a new login", async () => {
+        impersonation.by = "admin-1";
+
+        await expect(save({ password: PASSWORD })).rejects.toThrow(SAVE_WHILE_IMPERSONATING);
+        expect(await rows()).toHaveLength(0);
+    });
+
+    it("refuses to swap a saved login's username or password, or to add a teammate to it", async () => {
+        const id = await save({ password: PASSWORD });
+        const [before] = await rows();
+
+        impersonation.by = "admin-1";
+
+        await expect(save({ loginId: id, password: "planted", username: "admin@example.com" })).rejects.toThrow(SAVE_WHILE_IMPERSONATING);
+        await expect(save({ loginId: id, teammateIds: [botId] })).rejects.toThrow(SAVE_WHILE_IMPERSONATING);
+        expect(await rows()).toStrictEqual([before]);
+    });
+
+    it("refuses to delete a login, and still lists them without the password", async () => {
+        const id = await save({ password: PASSWORD });
+
+        impersonation.by = "admin-1";
+
+        await expect(as(OWNER).mutation(deleteSiteLogin as never, { loginId: id } as never)).rejects.toThrow(DELETE_WHILE_IMPERSONATING);
+        expect(await rows()).toHaveLength(1);
+
+        const listed = await listLogins(OWNER);
+
+        expect(listed.logins).toHaveLength(1);
+        expect(JSON.stringify(listed)).not.toContain(PASSWORD);
+    });
+
+    it("the owner signed in as themselves still saves, edits and deletes", async () => {
+        const id = await save({ password: PASSWORD });
+
+        await save({ loginId: id, password: "changed", teammateIds: [botId], username: "ada2@example.com" });
+        const [edited] = await rows();
+
+        expect(edited?.["username"]).toBe("ada2@example.com");
+        expect(edited?.["teammateIds"]).toStrictEqual([botId]);
+
+        await as(OWNER).mutation(deleteSiteLogin as never, { loginId: id } as never);
+        expect(await rows()).toHaveLength(0);
     });
 });
 

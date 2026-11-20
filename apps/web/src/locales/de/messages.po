@@ -1886,7 +1886,7 @@ msgstr "Ein Schlüssel ist gespeichert. Leer lassen, um ihn zu behalten. Wenn du
 msgid "A locked chat cannot have a guest link."
 msgstr "Ein gesperrter Chat kann keinen Gastlink haben."
 
-#: src/features/vault/components/site-logins.tsx:366
+#: src/features/vault/components/site-logins.tsx:403
 msgid "A login can name at most {MAX_TEAMMATES} bots."
 msgstr "Ein Login kann höchstens {MAX_TEAMMATES} Bots nennen."
 
@@ -5176,7 +5176,7 @@ msgstr "Bot-Token aus dem Discord Developer Portal"
 msgid "Bots"
 msgstr "Bots"
 
-#: src/features/vault/components/site-logins.tsx:361
+#: src/features/vault/components/site-logins.tsx:398
 msgid "Bots that may use it"
 msgstr "Bots, die ihn nutzen dürfen"
 
@@ -5726,7 +5726,7 @@ msgstr "Kanada"
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:636
-#: src/features/vault/components/site-logins.tsx:390
+#: src/features/vault/components/site-logins.tsx:427
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -8551,7 +8551,7 @@ msgstr "Der Bot konnte nicht gelöscht werden."
 msgid "Could not delete the comment"
 msgstr "Der Kommentar konnte nicht gelöscht werden"
 
-#: src/features/vault/components/site-logins.tsx:213
+#: src/features/vault/components/site-logins.tsx:242
 msgid "Could not delete the login."
 msgstr "Der Login konnte nicht gelöscht werden."
 
@@ -8787,7 +8787,7 @@ msgstr "Die Einstellung für das Daily Brief konnte nicht gespeichert werden."
 msgid "Could not save the email setting."
 msgstr "Die E-Mail-Einstellung konnte nicht gespeichert werden."
 
-#: src/features/vault/components/site-logins.tsx:177
+#: src/features/vault/components/site-logins.tsx:202
 msgid "Could not save the login."
 msgstr "Der Login konnte nicht gespeichert werden."
 
@@ -9984,7 +9984,7 @@ msgstr "Aufgaben an Devin delegieren, den KI-Softwareentwickler"
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
-#: src/features/vault/components/site-logins.tsx:398
+#: src/features/vault/components/site-logins.tsx:435
 msgid "Delete"
 msgstr "Löschen"
 
@@ -10099,7 +10099,7 @@ msgid "Delete group and children"
 msgstr "Gruppe und untergeordnete Elemente löschen"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:285
+#: src/features/vault/components/site-logins.tsx:320
 msgid "Delete login for {0}"
 msgstr "Login für {0} löschen"
 
@@ -10233,7 +10233,7 @@ msgstr "Den geöffneten Thread nach Bestätigung löschen ({0})"
 msgid "Delete this case?"
 msgstr "Diesen Testfall löschen?"
 
-#: src/features/vault/components/site-logins.tsx:408
+#: src/features/vault/components/site-logins.tsx:445
 msgid "Delete this login?"
 msgstr "Diesen Login löschen?"
 
@@ -11533,12 +11533,12 @@ msgstr "Bild bearbeiten"
 msgid "Edit Image"
 msgstr "Bild bearbeiten"
 
-#: src/features/vault/components/site-logins.tsx:300
+#: src/features/vault/components/site-logins.tsx:337
 msgid "Edit login"
 msgstr "Login bearbeiten"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:268
+#: src/features/vault/components/site-logins.tsx:303
 msgid "Edit login for {0}"
 msgstr "Login für {0} bearbeiten"
 
@@ -18249,7 +18249,7 @@ msgstr "Kirgisistan"
 msgid "Label"
 msgstr "Bezeichnung"
 
-#: src/features/vault/components/site-logins.tsx:338
+#: src/features/vault/components/site-logins.tsx:375
 msgid "Label (optional)"
 msgstr "Bezeichnung (optional)"
 
@@ -18666,7 +18666,7 @@ msgstr "Leer lassen für \"beliebiges Modell\"."
 msgid "Leave empty for transparent background"
 msgstr "Leer lassen für transparenten Hintergrund"
 
-#: src/features/vault/components/site-logins.tsx:331
+#: src/features/vault/components/site-logins.tsx:368
 msgid "Leave empty to keep the saved password"
 msgstr "Leer lassen, um das gespeicherte Passwort zu behalten"
 
@@ -19448,7 +19448,7 @@ msgstr "Abmelden"
 msgid "Login"
 msgstr "Anmelden"
 
-#: src/features/vault/components/site-logins.tsx:209
+#: src/features/vault/components/site-logins.tsx:238
 msgid "Login deleted"
 msgstr "Login gelöscht"
 
@@ -19456,11 +19456,11 @@ msgstr "Login gelöscht"
 msgid "login refused"
 msgstr "Anmeldung abgelehnt"
 
-#: src/features/vault/components/site-logins.tsx:176
+#: src/features/vault/components/site-logins.tsx:201
 msgid "Login saved"
 msgstr "Login gespeichert"
 
-#: src/features/vault/components/site-logins.tsx:176
+#: src/features/vault/components/site-logins.tsx:201
 msgid "Login updated"
 msgstr "Login aktualisiert"
 
@@ -19468,7 +19468,7 @@ msgstr "Login aktualisiert"
 msgid "Logins"
 msgstr "Logins"
 
-#: src/features/vault/components/site-logins.tsx:225
+#: src/features/vault/components/site-logins.tsx:254
 msgid "Logins the agent's browser can sign in with. The password is typed into the site by the server; the AI never sees it."
 msgstr "Logins, mit denen sich der Browser des Agenten anmelden kann. Das Passwort gibt der Server auf der Website ein; die KI sieht es nie."
 
@@ -21741,7 +21741,7 @@ msgstr "Neues hochwertiges Modell für Fotorealismus und Textdarstellung"
 msgid "New line in message"
 msgstr "Neue Zeile in der Nachricht"
 
-#: src/features/vault/components/site-logins.tsx:300
+#: src/features/vault/components/site-logins.tsx:337
 msgid "New login"
 msgstr "Neuer Login"
 
@@ -24656,7 +24656,7 @@ msgstr "Passkeys ermöglichen es dir, dich sicher mit der biometrischen Authenti
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
-#: src/features/vault/components/site-logins.tsx:325
+#: src/features/vault/components/site-logins.tsx:362
 msgid "Password"
 msgstr "Passwort"
 
@@ -24703,7 +24703,7 @@ msgstr "E-Mail zum Zurücksetzen des Passworts gesendet"
 msgid "Password reset successful"
 msgstr "Passwort erfolgreich zurückgesetzt"
 
-#: src/features/vault/components/site-logins.tsx:264
+#: src/features/vault/components/site-logins.tsx:297
 msgid "Password set"
 msgstr "Passwort gesetzt"
 
@@ -28754,7 +28754,7 @@ msgstr "Testfall speichern"
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
 #: src/features/tasks/components/task-form-dialog.tsx:639
-#: src/features/vault/components/site-logins.tsx:386
+#: src/features/vault/components/site-logins.tsx:423
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "Änderungen speichern"
@@ -28771,7 +28771,7 @@ msgstr "Speichern fehlgeschlagen"
 msgid "Save Image"
 msgstr "Bild speichern"
 
-#: src/features/vault/components/site-logins.tsx:386
+#: src/features/vault/components/site-logins.tsx:423
 msgid "Save login"
 msgstr "Login speichern"
 
@@ -30489,13 +30489,17 @@ msgstr "Singhalesisch"
 msgid "Sinhala (Sri Lanka)"
 msgstr "Singhalesisch (Sri Lanka)"
 
-#: src/features/vault/components/site-logins.tsx:302
+#: src/features/vault/components/site-logins.tsx:339
 msgid "Site"
 msgstr "Website"
 
-#: src/features/vault/components/site-logins.tsx:223
+#: src/features/vault/components/site-logins.tsx:252
 msgid "Site logins"
 msgstr "Website-Logins"
+
+#: src/features/vault/components/site-logins.tsx:275
+msgid "Site logins can't be saved, changed or deleted while impersonating."
+msgstr "Website-Logins können beim Imitieren eines Kontos nicht gespeichert, geändert oder gelöscht werden."
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:245
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:352
@@ -33203,7 +33207,7 @@ msgid "The agent can no longer ask this device for anything. Its activity log st
 msgstr "Der Agent kann dieses Gerät um nichts mehr bitten. Sein Aktivitätsprotokoll bleibt, bis es abläuft."
 
 #. placeholder {0}: pendingDelete?.site ?? ""
-#: src/features/vault/components/site-logins.tsx:399
+#: src/features/vault/components/site-logins.tsx:436
 msgid "The agent can no longer sign in to {0} with it."
 msgstr "Der Agent kann sich damit nicht mehr bei {0} anmelden."
 
@@ -35637,8 +35641,8 @@ msgstr "Versuche, deine Suchbegriffe anzupassen."
 #: src/features/projects/components/project-repo-picker.tsx:198
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/tasks/components/task-form-dialog.tsx:459
-#: src/features/vault/components/site-logins.tsx:240
-#: src/features/vault/components/site-logins.tsx:355
+#: src/features/vault/components/site-logins.tsx:269
+#: src/features/vault/components/site-logins.tsx:392
 msgid "Try again"
 msgstr "Erneut versuchen"
 
@@ -36817,7 +36821,7 @@ msgstr "Benutzername"
 msgid "Username is required"
 msgstr "Benutzername ist erforderlich"
 
-#: src/features/vault/components/site-logins.tsx:314
+#: src/features/vault/components/site-logins.tsx:351
 msgid "Username or email"
 msgstr "Benutzername oder E-Mail"
 
@@ -38747,7 +38751,7 @@ msgstr "Dein Hintergrund, deine Vorlieben oder dein Standort, damit die KI dich 
 msgid "Your bots"
 msgstr "Deine Bots"
 
-#: src/features/vault/components/site-logins.tsx:344
+#: src/features/vault/components/site-logins.tsx:381
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 msgstr "Deine Bots konnten nicht geladen werden. Änderungen an einem gespeicherten Login lassen sich speichern, sobald sie geladen sind, damit seine Bots erhalten bleiben."
 
@@ -38764,11 +38768,11 @@ msgid "Your browser talks to the server on this computer directly — the prompt
 msgstr "Dein Browser spricht direkt mit dem Server auf diesem Computer – Prompt und Antwort laufen nie über unsere KI-Server, und es wird nichts abgerechnet."
 
 #. placeholder {0}: teammates.join(", ")
-#: src/features/vault/components/site-logins.tsx:253
+#: src/features/vault/components/site-logins.tsx:286
 msgid "Your chats and {0}"
 msgstr "Deine Chats und {0}"
 
-#: src/features/vault/components/site-logins.tsx:255
+#: src/features/vault/components/site-logins.tsx:288
 msgid "Your chats and the bots you chose"
 msgstr "Deine Chats und die gewählten Bots"
 
@@ -38930,11 +38934,11 @@ msgstr "Deine Übersicht konnte nicht geladen werden."
 msgid "Your own Anthropic key. Required to delegate work to Claude Code."
 msgstr "Dein eigener Anthropic-Schlüssel. Erforderlich, um Arbeit an Claude Code zu delegieren."
 
-#: src/features/vault/components/site-logins.tsx:363
+#: src/features/vault/components/site-logins.tsx:400
 msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
 msgstr "Deine eigenen Chats können ihn immer nutzen. Die Chats eines Bots nur, wenn du diesen Bot hier anhakst. Geteilte, öffentliche, Gruppen- und Messenger-Chats nie."
 
-#: src/features/vault/components/site-logins.tsx:250
+#: src/features/vault/components/site-logins.tsx:283
 msgid "Your own chats only"
 msgstr "Nur deine eigenen Chats"
 
@@ -38988,7 +38992,7 @@ msgstr "Dein Review bleibt erhalten."
 msgid "Your review was requested"
 msgstr "Dein Review wurde angefragt"
 
-#: src/features/vault/components/site-logins.tsx:231
+#: src/features/vault/components/site-logins.tsx:260
 msgid "Your saved logins could not be loaded."
 msgstr "Deine gespeicherten Logins konnten nicht geladen werden."
 

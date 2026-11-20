@@ -55,6 +55,17 @@ const ownLogins = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<Doc
  */
 const onOwnShard = (userId: string): boolean => (currentShard() !== ROOT_SHARD_KEY || !isShardRoutingEnabled(env)) && servesUser(userId);
 
+/**
+ * An admin acting as the owner saves, changes and deletes no login: the agent types a login in the owner's own turns, so
+ * a planted or swapped one, or a teammate added to it, would outlive the impersonation. The list stays readable, as the
+ * API key list does: it carries no password. The pattern of `auth_api_keys.createScopedApiKey`.
+ */
+const refuseImpersonation = (impersonatedBy: string | null | undefined, refused: string): void => {
+    if (impersonatedBy) {
+        throw new LunoraError("FORBIDDEN", `${refused} while impersonating`);
+    }
+};
+
 const assertOwnShard = (userId: string): void => {
     if (!onOwnShard(userId)) {
         throw new LunoraError("FORBIDDEN", "Site logins are saved on your own account only");
@@ -142,8 +153,9 @@ export const saveSiteLogin = authMutation
     })
     .output(v.id("savedSiteLogins"))
     .mutation(async ({ args, ctx }) => {
-        const { userId } = ctx.user;
+        const { impersonatedBy, userId } = ctx.user;
 
+        refuseImpersonation(impersonatedBy, "Site logins cannot be saved");
         assertOwnShard(userId);
         const origin = normalizeSiteOrigin(args.site);
 
@@ -210,6 +222,7 @@ export const deleteSiteLogin = authMutation
     .input({ loginId: v.id("savedSiteLogins") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
+        refuseImpersonation(ctx.user.impersonatedBy, "Site logins cannot be deleted");
         assertOwnShard(ctx.user.userId);
         const row = await ctx.db.get("savedSiteLogins", args.loginId);
 

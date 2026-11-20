@@ -21,6 +21,8 @@ const harness = vi.hoisted(() => {
         bots: [] as { _id: string; name: string; userId: string }[],
         botsState: "loaded" as "failed" | "loaded" | "pending",
         deleteSiteLogin: vi.fn(),
+        // Set while an admin acts as the signed-in user: the session's `impersonatedBy` mark.
+        impersonatedBy: undefined as string | undefined,
         logins: [] as { hasPassword: true; id: string; site: string; teammateIds: string[]; updatedAt: number; username: string }[],
         loginsFailed: false,
         loginsPending: false,
@@ -44,7 +46,11 @@ vi.mock("sonner", () => {
 vi.mock("@/features/auth/hooks/use-auth-session", () => {
     return {
         useAuthSession: () => {
-            return { data: harness.userId ? { user: { id: harness.userId } } : null };
+            return {
+                data: harness.userId ? { session: { impersonatedBy: harness.impersonatedBy }, user: { id: harness.userId } } : null,
+                error: null,
+                isPending: false,
+            };
         },
     };
 });
@@ -151,6 +157,7 @@ const isDisabled = (element: Element | undefined) =>
 afterEach(() => {
     harness.bots = [];
     harness.botsState = "loaded";
+    harness.impersonatedBy = undefined;
     harness.logins = [];
     harness.loginsFailed = false;
     harness.loginsPending = false;
@@ -259,6 +266,29 @@ describe("SiteLogins", () => {
         await user.click(screen.getByRole("button", { name: "Save changes" }));
         await waitFor(() => expect(harness.saveSiteLogin).toHaveBeenCalledTimes(2));
         expect(harness.saveSiteLogin.mock.calls[1]?.[0]).toMatchObject({ label: "Work", loginId: "login-1" });
+    });
+
+    it("offers no save, edit or delete while an admin impersonates the user, and still lists the logins", async () => {
+        harness.impersonatedBy = "admin-1";
+        harness.logins = [savedLogin()];
+        mount();
+
+        expect(await screen.findByText(USERNAME_TEXT)).toBeDefined();
+        expect(screen.getByRole("status").textContent).toContain("while impersonating");
+        expect(screen.queryByRole("button", { name: `Edit login for ${SITE}` })).toBeNull();
+        expect(screen.queryByRole("button", { name: `Delete login for ${SITE}` })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Save login" })).toBeNull();
+        expect(screen.queryByLabelText("Password")).toBeNull();
+    });
+
+    it("offers save, edit and delete to the user signed in as themselves", async () => {
+        harness.logins = [savedLogin()];
+        mount();
+
+        expect(await screen.findByRole("button", { name: `Edit login for ${SITE}` })).toBeDefined();
+        expect(screen.getByRole("button", { name: `Delete login for ${SITE}` })).toBeDefined();
+        expect(screen.getByRole("button", { name: "Save login" })).toBeDefined();
+        expect(screen.queryByText("while impersonating", { exact: false })).toBeNull();
     });
 
     it("keeps the open edit when its delete fails", async () => {

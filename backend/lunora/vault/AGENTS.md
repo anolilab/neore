@@ -18,9 +18,14 @@
   shared thread's shard). Dev `SHARD_ROUTING=off` puts everyone on root, so root is allowed there. A save keeps only
   the caller's own teammate ids and drops any other (deleted, or hidden as someone else's), so the web form sends a
   login's ids unfiltered when its bot list could be another account's cached one.
+- An admin acting as the owner saves, changes and deletes no login (`refuseImpersonation`, `FORBIDDEN` "… while
+  impersonating"): the agent types a login in the owner's own turns, so a planted one would outlive the impersonation.
+  The list stays readable (no secret in it, as the API key list); the web form hides save, edit and delete until the
+  session reads as the user's own (`useImpersonationState`).
 - The export carries each login's `teammateIds`, never the password or ciphertext.
 - No audit triggers on `savedSiteLogins`: a history snapshot would outlive the row with the ciphertext in it.
 - The fill itself (browser tool, approval per site per thread, activity entry) is the next part. It passes
   `siteLoginForFill` the origin of the page the browser is on, never a site the model names; checks that origin again
   inside the browser-renderer right before typing, after any navigation; and decrypts and types in one action, never
-  returning the ciphertext from a workflow step or putting it in a queue payload.
+  returning the ciphertext from a workflow step or putting it in a queue payload. It must also type nothing in a turn an impersonating
+  admin sent, even when that turn records the owner as `startedBy`.
