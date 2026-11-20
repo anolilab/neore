@@ -98,6 +98,42 @@ environments, so this check is inactive today. See
 [NSFW checker service](/docs/services/nsfw-checker).
 :::
 
+## Site logins
+
+Below your files, **Site logins** keeps a username and password for a site the
+agent's cloud browser may need to sign in to, so you never have to paste a
+password into the chat.
+
+| Field | What it holds |
+|---|---|
+| Site | The exact `https://` address, such as `https://example.com`. A login for `example.com` is not used on `login.example.com`, another port, or a lookalike name |
+| Username or email | What the site asks for as the account name |
+| Password | Stored encrypted. It is never shown again: the list says only that a password is set. To change it, edit the login and type a new one; leave the field empty to keep the saved one |
+| Label | Optional, to tell logins apart |
+| Bots that may use it | Your own chats can always use a login. A bot's chats can use it only when you tick that bot |
+
+A login is used only in a chat you started and nobody else can reach: never in
+a chat you shared, a public chat, a group chat or a messenger conversation.
+It is also used only while everything the agent has read in that chat is your
+own typing or its own replies. Once the chat holds a web page, an attached file,
+a tool's results, a sub-agent's or coding agent's reply, knowledge, memories,
+project context or a skill, the agent does not sign in for you there; start a
+new chat for it.
+
+The site of a saved login cannot be changed; save a new login for the other
+site and delete the old one. You can keep one login per site and up to 100 in
+all.
+
+:::note
+Saving logins is available now. The agent signing in with them comes in a later
+release: the server types the username and password into the page itself, after
+checking the page is on exactly the saved site, so the AI never sees the
+password.
+:::
+
+Your data export lists each saved site, its username and the bots that may use it, never the password.
+Deleting your account deletes them.
+
 ## Common Use Cases
 
 **Reference documents**

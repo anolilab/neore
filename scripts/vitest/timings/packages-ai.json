@@ -1,0 +1,23 @@
+{
+    "src/capabilities/isolation.test.ts": 25,
+    "src/capabilities/rules.test.ts": 47,
+    "src/gateway.test.ts": 29,
+    "src/models/capabilities.test.ts": 52,
+    "src/models/custom-model-id.test.ts": 30,
+    "src/models/fal-video-inputs.test.ts": 52,
+    "src/models/fal-video-prices.test.ts": 46,
+    "src/models/free-tier.test.ts": 60,
+    "src/models/gateway-models.test.ts": 80,
+    "src/models/local-endpoint.test.ts": 16,
+    "src/models/model-filters.test.ts": 21,
+    "src/models/prompt-cache.test.ts": 28,
+    "src/models/registry.test.ts": 139,
+    "src/models/stream-parts.test.ts": 27,
+    "src/models/workflow-defaults.test.ts": 43,
+    "src/prompts/optimizer/render.test.ts": 34,
+    "src/prompts/prompts.test.ts": 86,
+    "src/provenance/ai-image-mark.test.ts": 32,
+    "src/provenance/output-format.test.ts": 19,
+    "src/utils/hidden-text.test.ts": 97,
+    "src/utils/region.test.ts": 16
+}

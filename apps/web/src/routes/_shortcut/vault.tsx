@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
 import VaultHeader from "@/features/vault/components/header";
+import SiteLogins from "@/features/vault/components/site-logins";
 import VaultView from "@/features/vault/components/view";
 
 export const Route = createFileRoute("/_shortcut/vault")({
@@ -12,6 +13,7 @@ export const Route = createFileRoute("/_shortcut/vault")({
                 <div className="space-y-6">
                     <VaultHeader />
                     <VaultView />
+                    <SiteLogins />
                 </div>
             </ScrollArea>
         </RouteErrorBoundary>
