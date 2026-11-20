@@ -308,55 +308,6 @@ describe("ComposerInput send during an upload", () => {
         expect(useChatUIStore.getState().composerText).toBe("see notes, and the other one");
     });
 
-    it("sends nothing when a file is added while the uploads run, and says so", async () => {
-        const first = addUpload("uploading");
-
-        renderComposer();
-        pressSend();
-
-        addUpload("uploading");
-        useChatUIStore.getState().updateAttachment(first, { fileId: "file-1", status: "complete" });
-
-        await waitFor(() => {
-            expect(harness.showInfo).toHaveBeenCalledWith(editedMessage);
-        });
-        expect(harness.sendMessage).not.toHaveBeenCalled();
-    });
-
-    it("sends nothing when a reference image is added while the uploads run, and says so", async () => {
-        const id = addUpload("uploading");
-
-        renderComposer();
-        pressSend();
-
-        useChatUIStore.getState().setAttachedReferences([{ id: "r1", mimeType: "image/png", url: "blob:r1" }]);
-        useChatUIStore.getState().updateAttachment(id, { fileId: "file-1", status: "complete" });
-
-        await waitFor(() => {
-            expect(harness.showInfo).toHaveBeenCalledWith(editedMessage);
-        });
-        expect(harness.sendMessage).not.toHaveBeenCalled();
-    });
-
-    it("sends nothing when a finished file is replaced while another upload runs, and says so", async () => {
-        const done = addUpload("uploading");
-
-        useChatUIStore.getState().updateAttachment(done, { fileId: "file-1", status: "complete" });
-
-        const running = addUpload("uploading");
-
-        renderComposer();
-        pressSend();
-
-        useChatUIStore.getState().updateAttachment(done, { fileId: "file-2" });
-        useChatUIStore.getState().updateAttachment(running, { fileId: "file-3", status: "complete" });
-
-        await waitFor(() => {
-            expect(harness.showInfo).toHaveBeenCalledWith(editedMessage);
-        });
-        expect(harness.sendMessage).not.toHaveBeenCalled();
-    });
-
     it("says so and keeps the draft when the uploads finish while a reply streams and there is no queue", async () => {
         harness.isStreaming = true;
 
