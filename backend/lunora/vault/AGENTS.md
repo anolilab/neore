@@ -2,8 +2,10 @@
 
 ## SAVED SITE LOGINS (`site-logins.ts`)
 
-- The password is encrypted with the `site-logins` key purpose and never leaves the server: no procedure, export,
-  log line or model-facing list returns it or its ciphertext. The UI learns only `hasPassword: true`.
+- The password is encrypted with the `site-logins` key purpose and never leaves the server: no client-reachable
+  procedure, export, log line or model-facing list returns it or its ciphertext. The UI learns only `hasPassword: true`.
+  The one exception is the internal `siteLoginForFill`, which returns the ciphertext for the server-side fill action (the next part);
+  keep it internal and keep the ciphertext inside the action that decrypts it.
 - A login belongs to one exact origin (`lib/site-origin.ts#normalizeSiteOrigin`: HTTPS only, punycode host, default
   port dropped, a trailing-dot host refused since the browser keeps the dot). Compare origins as plain strings; never match a subdomain, port or suffix. The origin of a saved login
   never changes on edit.
