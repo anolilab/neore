@@ -601,7 +601,7 @@ fn refuse_shared_mode(_path: &Path, _mode: u32) -> Result<(), String> {
 
 /// The folder, made owner-only if it is missing, and refused if it is there and others can enter it. Everything
 /// that creates the vault folder goes through this, so no command leaves one the vault would then refuse.
-fn ensure_private_dir(dir: &Path) -> Result<(), String> {
+pub(super) fn ensure_private_dir(dir: &Path) -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
