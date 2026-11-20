@@ -267,7 +267,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
             <div className="space-y-1">
                 <h2 className="text-lg font-semibold" id={headingId}>{t`Site logins`}</h2>
                 <p className="text-muted-foreground text-sm">
-                    {t`Logins the agent's browser can sign in with. The password is typed into the site by the server; the AI never sees it.`}
+                    {t`Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it.`}
                 </p>
             </div>
 
@@ -449,7 +449,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
 
             <ConfirmDialog
                 confirmLabel={t`Delete`}
-                description={t`The agent can no longer sign in to ${pendingDelete?.site ?? ""} with it.`}
+                description={t`The agent's browser won't be able to use it to sign in to ${pendingDelete?.site ?? ""}.`}
                 loading={deleteMutation.isPending}
                 onConfirm={handleDelete}
                 onOpenChange={(open) => {

@@ -1886,7 +1886,7 @@ msgstr "已保存密钥。留空即可保留。更改端点、区域或访问密
 msgid "A locked chat cannot have a guest link."
 msgstr "已锁定的聊天不能有访客链接。"
 
-#: src/features/vault/components/site-logins.tsx:403
+#: src/features/vault/components/site-logins.tsx:419
 msgid "A login can name at most {MAX_TEAMMATES} bots."
 msgstr "一个登录信息最多可指定 {MAX_TEAMMATES} 个机器人。"
 
@@ -5176,7 +5176,7 @@ msgstr "来自 Discord Developer Portal 的机器人 token"
 msgid "Bots"
 msgstr "机器人"
 
-#: src/features/vault/components/site-logins.tsx:398
+#: src/features/vault/components/site-logins.tsx:414
 msgid "Bots that may use it"
 msgstr "可以使用它的机器人"
 
@@ -5726,7 +5726,7 @@ msgstr "加拿大"
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
 #: src/features/tasks/components/task-form-dialog.tsx:636
-#: src/features/vault/components/site-logins.tsx:427
+#: src/features/vault/components/site-logins.tsx:443
 #: src/features/workflow/components/nodes/mask-editor.tsx:286
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:236
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:142
@@ -8551,7 +8551,7 @@ msgstr "无法删除机器人。"
 msgid "Could not delete the comment"
 msgstr "无法删除评论"
 
-#: src/features/vault/components/site-logins.tsx:242
+#: src/features/vault/components/site-logins.tsx:258
 msgid "Could not delete the login."
 msgstr "无法删除登录信息。"
 
@@ -8787,7 +8787,7 @@ msgstr "无法保存每日简报设置。"
 msgid "Could not save the email setting."
 msgstr "无法保存邮件设置。"
 
-#: src/features/vault/components/site-logins.tsx:202
+#: src/features/vault/components/site-logins.tsx:218
 msgid "Could not save the login."
 msgstr "无法保存登录信息。"
 
@@ -9984,7 +9984,7 @@ msgstr "将任务委派给 AI 软件工程师 Devin"
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
-#: src/features/vault/components/site-logins.tsx:435
+#: src/features/vault/components/site-logins.tsx:451
 msgid "Delete"
 msgstr "删除"
 
@@ -10099,7 +10099,7 @@ msgid "Delete group and children"
 msgstr "删除分组及其子节点"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:320
+#: src/features/vault/components/site-logins.tsx:336
 msgid "Delete login for {0}"
 msgstr "删除 {0} 的登录信息"
 
@@ -10233,7 +10233,7 @@ msgstr "确认后删除当前对话（{0}）"
 msgid "Delete this case?"
 msgstr "删除此用例？"
 
-#: src/features/vault/components/site-logins.tsx:445
+#: src/features/vault/components/site-logins.tsx:461
 msgid "Delete this login?"
 msgstr "删除此登录信息？"
 
@@ -11533,12 +11533,12 @@ msgstr "编辑图片"
 msgid "Edit Image"
 msgstr "编辑图片"
 
-#: src/features/vault/components/site-logins.tsx:337
+#: src/features/vault/components/site-logins.tsx:353
 msgid "Edit login"
 msgstr "编辑登录信息"
 
 #. placeholder {0}: login.site
-#: src/features/vault/components/site-logins.tsx:303
+#: src/features/vault/components/site-logins.tsx:319
 msgid "Edit login for {0}"
 msgstr "编辑 {0} 的登录信息"
 
@@ -18249,7 +18249,7 @@ msgstr "吉尔吉斯斯坦"
 msgid "Label"
 msgstr "标签"
 
-#: src/features/vault/components/site-logins.tsx:375
+#: src/features/vault/components/site-logins.tsx:391
 msgid "Label (optional)"
 msgstr "标签（可选）"
 
@@ -18666,7 +18666,7 @@ msgstr "留空表示“任意模型”。"
 msgid "Leave empty for transparent background"
 msgstr "留空则使用透明背景"
 
-#: src/features/vault/components/site-logins.tsx:368
+#: src/features/vault/components/site-logins.tsx:384
 msgid "Leave empty to keep the saved password"
 msgstr "留空以保留已保存的密码"
 
@@ -19448,7 +19448,7 @@ msgstr "退出登录"
 msgid "Login"
 msgstr "登录"
 
-#: src/features/vault/components/site-logins.tsx:238
+#: src/features/vault/components/site-logins.tsx:254
 msgid "Login deleted"
 msgstr "登录信息已删除"
 
@@ -19456,11 +19456,11 @@ msgstr "登录信息已删除"
 msgid "login refused"
 msgstr "登录被拒绝"
 
-#: src/features/vault/components/site-logins.tsx:201
+#: src/features/vault/components/site-logins.tsx:217
 msgid "Login saved"
 msgstr "登录信息已保存"
 
-#: src/features/vault/components/site-logins.tsx:201
+#: src/features/vault/components/site-logins.tsx:217
 msgid "Login updated"
 msgstr "登录信息已更新"
 
@@ -19468,9 +19468,9 @@ msgstr "登录信息已更新"
 msgid "Logins"
 msgstr "登录名"
 
-#: src/features/vault/components/site-logins.tsx:254
-msgid "Logins the agent's browser can sign in with. The password is typed into the site by the server; the AI never sees it."
-msgstr "智能体的浏览器可用于登录的账号信息。密码由服务器输入到网站中，AI 永远看不到。"
+#: src/features/vault/components/site-logins.tsx:270
+msgid "Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it."
+msgstr "为智能体浏览器保存的登录信息。使用它们登录将在后续更新中提供：届时由服务器在网站上输入密码，AI 永远看不到它。"
 
 #: src/features/auth/components/organization/create-organization-dialog.tsx:212
 #: src/features/auth/components/organization/organization-logo-card.tsx:136
@@ -21741,7 +21741,7 @@ msgstr "擅长照片级写实和文字渲染的新款高质量模型"
 msgid "New line in message"
 msgstr "消息中换行"
 
-#: src/features/vault/components/site-logins.tsx:337
+#: src/features/vault/components/site-logins.tsx:353
 msgid "New login"
 msgstr "新建登录信息"
 
@@ -24656,7 +24656,7 @@ msgstr "通行密钥让你可以使用设备的生物识别或安全密钥安全
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
-#: src/features/vault/components/site-logins.tsx:362
+#: src/features/vault/components/site-logins.tsx:378
 msgid "Password"
 msgstr "密码"
 
@@ -24703,7 +24703,7 @@ msgstr "重置密码邮件已发送"
 msgid "Password reset successful"
 msgstr "密码重置成功"
 
-#: src/features/vault/components/site-logins.tsx:297
+#: src/features/vault/components/site-logins.tsx:313
 msgid "Password set"
 msgstr "已设置密码"
 
@@ -28754,7 +28754,7 @@ msgstr "保存用例"
 #: src/features/skills/components/skill-form-dialog.tsx:152
 #: src/features/tasks/components/goal-form-dialog.tsx:167
 #: src/features/tasks/components/task-form-dialog.tsx:639
-#: src/features/vault/components/site-logins.tsx:423
+#: src/features/vault/components/site-logins.tsx:439
 #: src/features/workflow/components/canvas/workflow-controls.tsx:406
 msgid "Save changes"
 msgstr "保存更改"
@@ -28771,7 +28771,7 @@ msgstr "保存失败"
 msgid "Save Image"
 msgstr "保存图像"
 
-#: src/features/vault/components/site-logins.tsx:423
+#: src/features/vault/components/site-logins.tsx:439
 msgid "Save login"
 msgstr "保存登录信息"
 
@@ -30489,15 +30489,15 @@ msgstr "僧伽罗语"
 msgid "Sinhala (Sri Lanka)"
 msgstr "僧伽罗语（斯里兰卡）"
 
-#: src/features/vault/components/site-logins.tsx:339
+#: src/features/vault/components/site-logins.tsx:355
 msgid "Site"
 msgstr "网站"
 
-#: src/features/vault/components/site-logins.tsx:252
+#: src/features/vault/components/site-logins.tsx:268
 msgid "Site logins"
 msgstr "网站登录信息"
 
-#: src/features/vault/components/site-logins.tsx:275
+#: src/features/vault/components/site-logins.tsx:291
 msgid "Site logins can't be saved, changed or deleted while impersonating."
 msgstr "模拟用户期间无法保存、更改或删除网站登录信息。"
 
@@ -33206,11 +33206,6 @@ msgstr "智能体在有风险的操作前询问"
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "智能体将无法再向此设备请求任何操作。其活动日志会保留到过期为止。"
 
-#. placeholder {0}: pendingDelete?.site ?? ""
-#: src/features/vault/components/site-logins.tsx:436
-msgid "The agent can no longer sign in to {0} with it."
-msgstr "智能体将无法再用它登录 {0}。"
-
 #. placeholder {0}: nameOfValue(changed, answered.valueId)
 #. placeholder {1}: changed.name
 #. placeholder {2}: nameOfValue(changed, changed.current)
@@ -33293,6 +33288,11 @@ msgstr "智能体未更改任何文件。"
 #: src/features/develop/components/guide-tab.tsx:197
 msgid "The agent on your computer is reading the change…"
 msgstr "你电脑上的智能体正在读取此变更…"
+
+#. placeholder {0}: pendingDelete?.site ?? ""
+#: src/features/vault/components/site-logins.tsx:452
+msgid "The agent's browser won't be able to use it to sign in to {0}."
+msgstr "智能体的浏览器将无法用它登录 {0}。"
 
 #: src/features/chat/thread/host-activity.tsx:89
 msgid "The agent's plan"
@@ -35641,8 +35641,8 @@ msgstr "尝试调整搜索词。"
 #: src/features/projects/components/project-repo-picker.tsx:198
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/tasks/components/task-form-dialog.tsx:459
-#: src/features/vault/components/site-logins.tsx:269
-#: src/features/vault/components/site-logins.tsx:392
+#: src/features/vault/components/site-logins.tsx:285
+#: src/features/vault/components/site-logins.tsx:408
 msgid "Try again"
 msgstr "重试"
 
@@ -36821,7 +36821,7 @@ msgstr "用户名"
 msgid "Username is required"
 msgstr "请输入用户名"
 
-#: src/features/vault/components/site-logins.tsx:351
+#: src/features/vault/components/site-logins.tsx:367
 msgid "Username or email"
 msgstr "用户名或邮箱"
 
@@ -38751,7 +38751,7 @@ msgstr "你的背景、偏好或所在地，帮助 AI 更好地了解你"
 msgid "Your bots"
 msgstr "你的机器人"
 
-#: src/features/vault/components/site-logins.tsx:381
+#: src/features/vault/components/site-logins.tsx:397
 msgid "Your bots could not be loaded. Changes to a saved login can be saved once they load, so its bots are kept."
 msgstr "无法加载你的机器人。加载完成后才能保存对已保存登录信息的更改，以便保留其机器人。"
 
@@ -38768,11 +38768,11 @@ msgid "Your browser talks to the server on this computer directly — the prompt
 msgstr "你的浏览器直接与此电脑上的服务器通信——提示词和回复绝不会经过我们的 AI 服务器，也不会产生费用。"
 
 #. placeholder {0}: teammates.join(", ")
-#: src/features/vault/components/site-logins.tsx:286
+#: src/features/vault/components/site-logins.tsx:302
 msgid "Your chats and {0}"
 msgstr "你的聊天和 {0}"
 
-#: src/features/vault/components/site-logins.tsx:288
+#: src/features/vault/components/site-logins.tsx:304
 msgid "Your chats and the bots you chose"
 msgstr "你的聊天和你选择的机器人"
 
@@ -38934,11 +38934,11 @@ msgstr "无法加载你的概览。"
 msgid "Your own Anthropic key. Required to delegate work to Claude Code."
 msgstr "你自己的 Anthropic 密钥。将工作委派给 Claude Code 时必需。"
 
-#: src/features/vault/components/site-logins.tsx:400
+#: src/features/vault/components/site-logins.tsx:416
 msgid "Your own chats can always use it. A bot's chats can use it only when you tick that bot here. Shared, public, group and messenger chats never can."
 msgstr "你自己的聊天始终可以使用它。机器人的聊天只有在你在此勾选该机器人时才能使用。共享、公开、群组和消息应用聊天永远不能使用。"
 
-#: src/features/vault/components/site-logins.tsx:283
+#: src/features/vault/components/site-logins.tsx:299
 msgid "Your own chats only"
 msgstr "仅限你自己的聊天"
 
@@ -38992,7 +38992,7 @@ msgstr "你的审查已保留。"
 msgid "Your review was requested"
 msgstr "有人请求了你的审查"
 
-#: src/features/vault/components/site-logins.tsx:260
+#: src/features/vault/components/site-logins.tsx:276
 msgid "Your saved logins could not be loaded."
 msgstr "无法加载你保存的登录信息。"
 
