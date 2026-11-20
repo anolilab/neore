@@ -418,6 +418,38 @@ describe("a browser a person took control of", () => {
         await expect(act("click")).resolves.toEqual({ sessionId: "s-1", success: true, url: "https://example.com/next" });
     });
 
+    it("looks again on the next action when the first look after a hand back failed", async () => {
+        await addSession(NOW - 1000);
+        await giveControl({ ended: "handed_back", until: NOW - 1 });
+        renderer
+            .mockResolvedValueOnce(answered({ error: "Timeout", sessionId: "s-1", success: false }))
+            .mockResolvedValueOnce(answered({ screenshot: "png", sessionId: "s-1", success: true, url: "https://example.com/person" }));
+
+        await act("click");
+        await expect(row()).resolves.toMatchObject({ control: { ended: "handed_back" } });
+
+        const second = (await act("click")) as Record<string, unknown>;
+
+        expect(renderer.mock.calls[1]?.[0]).toMatchObject({ body: { action: "screenshot" } });
+        expect(second.error).toContain("Your click action was not run");
+        await expect(row()).resolves.not.toHaveProperty("control");
+    });
+
+    it("has every action started side by side after a hand back look first", async () => {
+        await addSession(NOW - 1000);
+        await giveControl({ ended: "left", until: NOW - 1 });
+        const first = pendingAnswer();
+        const firstRun = act("click");
+
+        await first.reached;
+        renderer.mockResolvedValueOnce(answered({ screenshot: "png", sessionId: "s-1", success: true, url: "https://example.com/person" }));
+        await act("type");
+        first.release(answered({ screenshot: "png", sessionId: "s-1", success: true, url: "https://example.com/person" }));
+        await firstRun;
+
+        expect(renderer.mock.calls.map(([request]) => (request as { body: { action: string } }).body.action)).toEqual(["screenshot", "screenshot"]);
+    });
+
     it("runs a look at the page as asked after a hand back, with the note", async () => {
         await addSession(NOW - 1000);
         await giveControl({ ended: "handed_back", until: NOW - 1 });

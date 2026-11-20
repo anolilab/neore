@@ -115,7 +115,9 @@ const holdsAfter = (holds: ReadonlyArray<number> | undefined, now: number, relea
  * A browser action is about to run on this session's browser. In one transaction with {@link takeControl}'s claim, so
  * an agent action and a person's control never overlap:
  * - `controlled`: a person drives the browser; the action must not run.
- * - `returned`: a person drove it and gave it back since the agent's last action; read once, then cleared.
+ * - `returned`: a person drove it and gave it back, and the agent has not looked at the page since. Every action
+ *   that starts until one has looked hears it (`inspecting` names the lease), so actions side by side all look first;
+ *   only {@link logAction} of a look that came back clears it, so a failed or lost one leaves the next to look again.
  * - `held`: the browser is still alive, so the action holds it until `until` (the renderer call's deadline) and a slow
  *   action does not read as idle. A reaped one is not held (the renderer replaces it, and {@link logAction} records the
  *   new one). Each action adds its own hold beside those of actions still running.
@@ -126,6 +128,7 @@ export const beginSessionUse = internalMutation
         v.object({
             controlled: v.boolean(),
             held: v.boolean(),
+            inspecting: v.optional(v.string()),
             returned: v.optional(v.union(v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
         }),
     )
@@ -143,13 +146,17 @@ export const beginSessionUse = internalMutation
         }
 
         const held = watchableSessionId(session, ctx.now) !== undefined;
+        const inspecting = control === "returned" ? session.control : undefined;
 
-        await patchRow(ctx.db, "browserSessions", session, {
-            ...(control === "returned" && { control: undefined }),
-            ...(held && { inUseHolds: [...(holdsAfter(session.inUseHolds, ctx.now) ?? []), until] }),
-        });
+        if (held) {
+            await patchRow(ctx.db, "browserSessions", session, { inUseHolds: [...(holdsAfter(session.inUseHolds, ctx.now) ?? []), until] });
+        }
 
-        return { controlled: false, held, ...(control === "returned" && { returned: session.control?.ended ?? ("idle" as const) }) };
+        return {
+            controlled: false,
+            held,
+            ...(inspecting !== undefined && { inspecting: inspecting.claim, returned: inspecting.ended ?? ("idle" as const) }),
+        };
     });
 
 /**
@@ -174,6 +181,8 @@ export const logAction = internalMutation
         errorMessage: v.optional(v.string()),
         /** The hold this action took with {@link beginSessionUse}, if it took one. */
         heldUntil: v.optional(v.number()),
+        /** The ended lease whose page this action looked at, and the look came back ({@link beginSessionUse}): it is done with. */
+        inspected: v.optional(v.string()),
         providerSessionId: v.optional(v.string()),
         sessionId: v.id("browserSessions"),
         /** When the action started: its page is written only if no action that started later wrote one already. */
@@ -199,6 +208,7 @@ export const logAction = internalMutation
                 durationMs,
                 errorMessage,
                 heldUntil,
+                inspected,
                 providerSessionId,
                 sessionId,
                 startedAt,
@@ -259,6 +269,9 @@ export const logAction = internalMutation
             // Every action keeps the provider's browser alive for another idle window; the live view reads this to tell
             // a running browser from one the provider has reaped (`browser/live-view-logic.ts`). This action's hold ends;
             // the holds of actions still running stay.
+            // The agent saw the page a person left: the lease is done with (not when the look was of a browser the row no
+            // longer names, above: the next action looks again).
+            const looked = inspected !== undefined && session.control?.claim === inspected && controlStateOf(session, ctx.now) === "returned";
             // A person's lease is on the browser their view shows: once it is gone, the lease ends with it, and the
             // agent's next action hears that a person drove.
             const leaseEnds = replaced && session.control !== undefined && controlStateOf(session, ctx.now) === "person";
@@ -269,6 +282,7 @@ export const logAction = internalMutation
                 lastActivityAt: Math.max(session.lastActivityAt, ctx.now),
                 ...page,
                 ...(leaseEnds && session.control !== undefined && { control: { ...session.control, navigatingUntil: undefined, until: ctx.now } }),
+                ...(looked && { control: undefined }),
             });
 
             return { replaced: false };

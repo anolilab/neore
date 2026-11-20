@@ -369,7 +369,7 @@ describe("BrowserLiveView", () => {
         expect(backend.open).toHaveBeenCalledTimes(2);
     });
 
-    it("closes an open view while someone else has control, and offers it again once their control ends", async () => {
+    it("closes an open view while the server says someone else has control, and offers it again once it says it ended", async () => {
         backend.browser = { browserId: "b-1", idleUntil: Date.now() + 600_000 };
         backend.open.mockResolvedValue({ connectBy: Date.now() + 60_000, status: "ok", url: URL });
         const queryClient = mountCard();
@@ -377,7 +377,8 @@ describe("BrowserLiveView", () => {
         await userEvent.click(await screen.findByRole("button", { name: "Watch live" }));
         await screen.findByTitle(LIVE_VIEW);
 
-        backend.browser = { browserId: "b-1", control: { byYou: false, until: Date.now() + 120_000 }, idleUntil: Date.now() + 600_000 };
+        // This device's clock runs ahead of the server's: the lease reads as passed here, and the view closes all the same.
+        backend.browser = { browserId: "b-1", control: { byYou: false, until: Date.now() - 1000 }, idleUntil: Date.now() + 600_000 };
         await act(async () => {
             await queryClient.invalidateQueries();
         });
@@ -396,6 +397,35 @@ describe("BrowserLiveView", () => {
         await vi.waitFor(() => {
             expect(screen.getByRole("button", { name: "Watch live" })).toHaveProperty("disabled", false);
         });
+    });
+
+    it("asks the status again until the server drops another person's lease that looks over on this device", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        backend.browser = { browserId: "b-1", control: { byYou: false, until: Date.now() - 1000 }, idleUntil: Date.now() + 600_000 };
+        mountCard();
+
+        await screen.findByText("Someone else has control of this browser.");
+        const reads = backend.statusReads;
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(5000);
+        });
+        // The server still names the lease: still closed, and asked again.
+        expect(backend.statusReads).toBeGreaterThan(reads);
+        expect(screen.getByRole("button", { name: "Watch live" })).toHaveProperty("disabled", true);
+
+        backend.browser = { browserId: "b-1", idleUntil: Date.now() + 600_000 };
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(5000);
+        });
+
+        expect(screen.getByRole("button", { name: "Watch live" })).toHaveProperty("disabled", false);
+        const settled = backend.statusReads;
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(15_000);
+        });
+        expect(backend.statusReads).toBe(settled);
     });
 
     it("says the browser status could not be read, instead of hiding the card, and reads it again on request", async () => {

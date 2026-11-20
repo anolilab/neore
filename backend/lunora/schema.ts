@@ -424,7 +424,7 @@ export const schema = defineSchema({
         connectUrl: v.optional(v.string()),
         /**
          * A person drives the browser (`browser/live-view.ts#takeControl`): the agent's actions are refused while
-         * `until` is ahead. Kept after it ends, until the agent's next action reads it and is told the person drove.
+         * `until` is ahead. Kept after it ends, until an agent action has looked at the page the person left (told that they drove).
          * `ended`: how the person gave it back; absent once `until` passed is the idle timeout.
          */
         control: v.optional(

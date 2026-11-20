@@ -68,6 +68,8 @@ export const executeBrowserAction = internalAction
             let held: { sessionId: Id<"browserSessions">; until: number } | undefined;
             // A person's hand back this action is the first to hear of; the note reaches the agent even if the action fails.
             let returned: BrowserReturn | undefined;
+            // The ended lease this action looks at the page for: once a look came back, the next actions act again.
+            let inspecting: string | undefined;
 
             try {
                 // Check for existing CF session to enable multi-step workflows
@@ -90,6 +92,7 @@ export const executeBrowserAction = internalAction
 
                     held = use.held ? { sessionId: sessionDocument._id, until } : undefined;
                     returned = use.returned;
+                    inspecting = use.inspecting;
                 }
 
                 // After a hand back the page is not the one the agent planned against: it looks before it acts.
@@ -143,6 +146,7 @@ export const executeBrowserAction = internalAction
                     durationMs,
                     errorMessage: result.error,
                     heldUntil: held?.until,
+                    ...(inspecting !== undefined && result.success === true && { inspected: inspecting }),
                     providerSessionId: returnedSessionId,
                     sessionId: sessionDocument!._id,
                     startedAt: startTime,

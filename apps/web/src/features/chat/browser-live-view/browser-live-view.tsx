@@ -46,6 +46,9 @@ const failureReasonOf = (error: unknown): FailureReason => {
     return code === "TOO_MANY_REQUESTS" || data?.code === "TOO_MANY_REQUESTS" ? "rate-limited" : "other";
 };
 
+/** How often the status is asked again while another person's lease looks over here but the server still names it. */
+const CONTROL_END_POLL_MS = 5000;
+
 const CLOSED: View = { kind: "closed" };
 
 /** The longest delay a browser timer keeps (2^31 − 1 ms, about 24.8 days); a longer one fires at once. */
@@ -282,17 +285,30 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
     // A grantee's grant ended: nothing re-runs the live query when only the clock moves, so the card goes at once and the
     // status is asked again; the server answers nothing after the grant's end.
     const accessEnded = usePassed(browser?.accessUntil);
-    // Another person's lease ends on the clock too: the view may be asked for again then.
+    // Another person's lease ends on the server's clock, and a lease that runs out writes nothing the live query sees:
+    // the status is asked again once it looks over here, and again every few seconds while the server still names it (a
+    // clock running ahead asks too early). Only the server's answer opens the view again.
     const controlEnded = usePassed(browser?.control?.until);
+    const awaitingControlEnd = controlEnded && browser?.control !== undefined && !browser.control.byYou;
     const refetchStatus = useEffectEvent((): void => {
         status.refetch().catch(() => undefined);
     });
 
     useEffect(() => {
-        if (accessEnded) {
+        if (accessEnded || controlEnded) {
             refetchStatus();
         }
-    }, [accessEnded]);
+    }, [accessEnded, controlEnded]);
+
+    useEffect(() => {
+        if (!awaitingControlEnd) {
+            return undefined;
+        }
+
+        const timer = setInterval(refetchStatus, CONTROL_END_POLL_MS);
+
+        return () => clearInterval(timer);
+    }, [awaitingControlEnd]);
 
     // The status could not be read: a running browser must not look like no browser, so the card says so and can ask again.
     // This holds after an earlier answer too: the cached browser may be one the person can no longer see, so its page and
@@ -333,7 +349,7 @@ const BrowserLiveView: FC<{ threadId: Id<"threads"> | undefined }> = ({ threadId
     return (
         <BrowserCard
             browserId={browser.browserId}
-            controlledByOther={browser.control !== undefined && !browser.control.byYou && !controlEnded}
+            controlledByOther={browser.control !== undefined && !browser.control.byYou}
             currentUrl={browser.currentUrl}
             key={threadId}
             threadId={threadId}
