@@ -107,7 +107,6 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
     const effectiveMode = own.mode ?? inherited?.mode ?? "prefer";
     const [draft, setDraft] = useState(own.instructions ?? "");
     const roleLabel = i18n._(ROLE_LABELS[name]);
-    const disabled = readOnly;
 
     const setOwn = (next: RoleConfig) => {
         const kept = compact(next) ?? {};
@@ -135,8 +134,7 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
 
             // A refused save leaves the card showing what the server has.
             if (!saved && inFlight.current === 0) {
-                ownRef.current = serverValue.current ?? {};
-                setOwnState(serverValue.current ?? {});
+                setOwn(serverValue.current ?? {});
             }
         };
 
@@ -205,7 +203,7 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
             <CardContent className="space-y-4">
                 <ModelSelect
                     description={effectiveModelId ? t`Delegated ${roleLabel.toLowerCase()} work runs on this model.` : t`Off until you pick a model.`}
-                    disabled={disabled}
+                    disabled={readOnly}
                     emptyLabel={isProject ? inheritLabel : t`Off`}
                     field={name}
                     label={t`Model`}
@@ -228,7 +226,7 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
                         </div>
                         <ToggleGroup
                             aria-labelledby={modeLabelId}
-                            disabled={disabled}
+                            disabled={readOnly}
                             onValueChange={(next) => {
                                 const mode = next?.[0];
 
@@ -255,7 +253,7 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
                         {t`Extra instructions`}
                     </Label>
                     <Textarea
-                        disabled={disabled}
+                        disabled={readOnly}
                         id={instructionsId}
                         maxLength={4000}
                         onBlur={() => {

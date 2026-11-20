@@ -11,7 +11,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { readUserRunPlan } from "../auth/lib/plan";
 import { backupFilterRejection } from "../chat/lib/backup-model";
-import type { CustomProviderType } from "../chat/lib/custom-providers";
+import type { StoredCustomProvider } from "../chat/lib/custom-providers";
 import { isLocalBrowserProvider } from "../chat/lib/custom-providers";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
 import { authQuery } from "../lib/crpc";
@@ -48,7 +48,7 @@ export const roleModelRefusal = async (ctx: QueryCtx | MutationCtx, userId: stri
 
     // The user's own endpoint, under the checks `resolveRunModel` makes: theirs, on, and one the server can call.
     if (custom) {
-        const provider = (preferences?.customAIProviders as Record<string, { enabled?: boolean; type?: CustomProviderType }> | undefined)?.[custom.providerId];
+        const provider = (preferences?.customAIProviders as Record<string, StoredCustomProvider> | undefined)?.[custom.providerId];
 
         if (!provider?.enabled) {
             return `${modelId} is not one of your enabled custom endpoints.`;
