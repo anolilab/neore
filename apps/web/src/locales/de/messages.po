@@ -61,19 +61,19 @@ msgstr "\"{0}\" startet, sobald seine Abhängigkeiten erledigt sind"
 msgid "\"{badLogin}\" is not a valid login. A login starts with a letter or digit, has at most {0} characters, and uses only letters, digits, and single hyphens or underscores."
 msgstr "„{badLogin}“ ist kein gültiger Login. Ein Login beginnt mit einem Buchstaben oder einer Ziffer, hat höchstens {0} Zeichen und enthält nur Buchstaben, Ziffern und einzelne Bindestriche oder Unterstriche."
 
-#: src/features/chat/thread/composer-input.tsx:640
+#: src/features/chat/thread/composer-input.tsx:643
 msgid "\"{fileName}\" cannot be attached: this file type is not supported."
 msgstr "„{fileName}“ kann nicht angehängt werden: Dieser Dateityp wird nicht unterstützt."
 
-#: src/features/chat/thread/composer-input.tsx:633
+#: src/features/chat/thread/composer-input.tsx:636
 msgid "\"{fileName}\" could not be attached: its contents do not match its file type."
 msgstr "„{fileName}“ konnte nicht angehängt werden: Der Inhalt passt nicht zum Dateityp."
 
-#: src/features/chat/thread/composer-input.tsx:1150
+#: src/features/chat/thread/composer-input.tsx:1153
 msgid "\"{fileName}\" could not be uploaded, so the message was not sent."
 msgstr "\"{fileName}\" konnte nicht hochgeladen werden, daher wurde die Nachricht nicht gesendet."
 
-#: src/features/chat/thread/composer-input.tsx:635
+#: src/features/chat/thread/composer-input.tsx:638
 msgid "\"{fileName}\" could not be uploaded. Check your connection and try again."
 msgstr "„{fileName}“ konnte nicht hochgeladen werden. Prüfe deine Verbindung und versuche es erneut."
 
@@ -81,11 +81,11 @@ msgstr "„{fileName}“ konnte nicht hochgeladen werden. Prüfe deine Verbindun
 #~ msgid "\"{fileName}\" could not be uploaded. Remove it to send."
 #~ msgstr "\"{fileName}\" konnte nicht hochgeladen werden. Entferne sie, um zu senden."
 
-#: src/features/chat/thread/composer-input.tsx:638
+#: src/features/chat/thread/composer-input.tsx:641
 msgid "\"{fileName}\" is too large. Documents can be at most {maxMegabytes} MB."
 msgstr "„{fileName}“ ist zu groß. Dokumente dürfen höchstens {maxMegabytes} MB groß sein."
 
-#: src/features/chat/thread/composer-input.tsx:639
+#: src/features/chat/thread/composer-input.tsx:642
 msgid "\"{fileName}\" is too large. Files of this type can be at most {maxMegabytes} MB."
 msgstr "„{fileName}“ ist zu groß. Dateien dieses Typs dürfen höchstens {maxMegabytes} MB groß sein."
 
@@ -783,7 +783,7 @@ msgstr "{activeCount, plural, one {Du hast # Messenger verbunden} other {Du hast
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{activeCount} von {0} MCP-Servern aktiv"
 
-#: src/features/develop/components/thread-pull-requests.tsx:133
+#: src/features/develop/components/thread-pull-requests.tsx:134
 msgid "{address}: {reason}"
 msgstr "{address}: {reason}"
 
@@ -1436,7 +1436,7 @@ msgstr "{star, plural, one {# Stern} other {# Sterne}}"
 msgid "{stateLabel} Stop hands-free voice mode"
 msgstr "{stateLabel} Freihand-Sprachmodus beenden"
 
-#: src/features/develop/components/thread-pull-requests.tsx:235
+#: src/features/develop/components/thread-pull-requests.tsx:237
 msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 msgstr "{success, plural, one {# Pull Request verknüpft.} other {# Pull Requests verknüpft.}}"
 
@@ -2539,7 +2539,7 @@ msgstr "Prompt hinzufügen"
 msgid "Add Provider"
 msgstr "Anbieter hinzufügen"
 
-#: src/features/develop/components/thread-pull-requests.tsx:213
+#: src/features/develop/components/thread-pull-requests.tsx:215
 msgid "Add pull requests that already exist to this thread. Each one is read from the host with your own connection first."
 msgstr "Füge bereits vorhandene Pull Requests zu diesem Thread hinzu. Jeder wird zuerst mit deiner eigenen Verbindung vom Host gelesen."
 
@@ -3501,7 +3501,7 @@ msgstr "Alphabetisch"
 msgid "Already have an account?"
 msgstr "Bereits ein Konto?"
 
-#: src/features/develop/components/thread-pull-requests.tsx:67
+#: src/features/develop/components/thread-pull-requests.tsx:68
 msgid "Already linked to this thread."
 msgstr "Bereits mit diesem Thread verknüpft."
 
@@ -4910,6 +4910,10 @@ msgstr "Einsteiger"
 msgid "Behavior"
 msgstr "Verhalten"
 
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:43
+msgid "Behind {base}"
+msgstr ""
+
 #: src/features/chat/core/utils/language-utilities.ts:336
 msgid "Belarus"
 msgstr "Weißrussland"
@@ -5936,6 +5940,14 @@ msgstr "Katalanisch (Spanien)"
 msgid "catalog"
 msgstr "Katalog"
 
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:55
+msgid "Catch up"
+msgstr ""
+
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:39
+msgid "Catch up {pullRequest} with {base}"
+msgstr ""
+
 #: src/features/skills/components/skill-builder-diff.tsx:27
 #: src/features/skills/components/skill-form-dialog.tsx:317
 #: src/features/skills/components/skill-marketplace.tsx:160
@@ -6670,7 +6682,7 @@ msgstr "Klicke auf das Pin-Symbol bei einer Nachricht, um sie hier zu speichern.
 msgid "Click the star on any model in All models to add it here."
 msgstr "Klicke bei einem beliebigen Modell unter Alle Modelle auf den Stern, um es hier hinzuzufügen."
 
-#: src/features/chat/thread/composer-input.tsx:323
+#: src/features/chat/thread/composer-input.tsx:324
 msgid "Click to edit"
 msgstr "Zum Bearbeiten klicken"
 
@@ -6725,7 +6737,7 @@ msgstr "Klonen oder neu erstellen…"
 #: src/features/canvas/canvas-panel.tsx:818
 #: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
-#: src/features/develop/components/thread-pull-requests.tsx:258
+#: src/features/develop/components/thread-pull-requests.tsx:260
 #: src/features/evals/components/save-eval-case-action.tsx:95
 #: src/features/prompts/components/prompt-history-dialog.tsx:195
 #: src/features/settings/components/chat/custom-providers-settings.tsx:441
@@ -7722,7 +7734,7 @@ msgstr "WhatsApp verbinden"
 msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 msgstr "Verbinde dein {label}-Konto, um zu sehen, was dein Review braucht, was dir gehört und was bereit zum Mergen ist."
 
-#: src/features/develop/components/thread-pull-requests.tsx:72
+#: src/features/develop/components/thread-pull-requests.tsx:73
 msgid "Connect your Git host in settings to link a pull request."
 msgstr "Verbinde deinen Git-Host in den Einstellungen, um einen Pull Request zu verknüpfen."
 
@@ -8129,8 +8141,8 @@ msgstr "Unterhaltungen und ausstehende Kommentare zu Dateien, die diese Liste ni
 msgid "Conversations on lines this diff no longer shows"
 msgstr "Unterhaltungen zu Zeilen, die dieser Diff nicht mehr zeigt"
 
-#: src/features/chat/thread/composer-input.tsx:824
-#: src/features/chat/thread/composer-input.tsx:1703
+#: src/features/chat/thread/composer-input.tsx:827
+#: src/features/chat/thread/composer-input.tsx:1727
 msgid "Conversion failed"
 msgstr "Konvertierung fehlgeschlagen"
 
@@ -8460,7 +8472,7 @@ msgstr "{0} konnte nicht angehängt werden. Die übrigen Dateien wurden angehän
 msgid "Could not attach {0}. Try those again."
 msgstr "{0} konnte nicht angehängt werden. Bitte versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:1725
+#: src/features/chat/thread/composer-input.tsx:1751
 msgid "Could not attach the chat"
 msgstr "Der Chat konnte nicht angehängt werden"
 
@@ -8622,7 +8634,7 @@ msgstr "Es konnte kein Entwurf erstellt werden. Versuche es erneut."
 msgid "Could not import the workflow"
 msgstr "Der Workflow konnte nicht importiert werden"
 
-#: src/features/develop/components/thread-pull-requests.tsx:149
+#: src/features/develop/components/thread-pull-requests.tsx:150
 msgid "Could not link. Try again."
 msgstr "Verknüpfen nicht möglich. Versuche es erneut."
 
@@ -8643,7 +8655,7 @@ msgstr "Weitere Projekte konnten nicht geladen werden."
 msgid "Could not load statistics for this thread."
 msgstr "Statistiken für diesen Thread konnten nicht geladen werden."
 
-#: src/features/develop/components/thread-pull-requests.tsx:167
+#: src/features/develop/components/thread-pull-requests.tsx:168
 msgid "Could not load the linked pull requests."
 msgstr "Die verknüpften Pull Requests konnten nicht geladen werden."
 
@@ -8764,11 +8776,11 @@ msgstr "Der Server ist nicht erreichbar, um die Generierung zu starten. Prüfe d
 msgid "Could not reach the server. Try again."
 msgstr "Der Server ist nicht erreichbar. Versuche es erneut."
 
-#: src/features/chat/thread/composer-input.tsx:1728
+#: src/features/chat/thread/composer-input.tsx:1754
 msgid "Could not read that chat"
 msgstr "Dieser Chat konnte nicht gelesen werden"
 
-#: src/features/chat/thread/composer-input.tsx:1729
+#: src/features/chat/thread/composer-input.tsx:1755
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Dieser Chat konnte nicht gelesen werden. Ist er gesperrt, entsperre ihn zuerst."
 
@@ -11242,7 +11254,7 @@ msgstr "Datei ablegen oder zum Hochladen klicken"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:686
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:765
-#: src/features/chat/thread/composer-input.tsx:1919
+#: src/features/chat/thread/composer-input.tsx:1945
 msgid "Drop files here"
 msgstr "Dateien hier ablegen"
 
@@ -11551,8 +11563,8 @@ msgstr "Sammlung bearbeiten"
 msgid "Edit comment"
 msgstr "Kommentar bearbeiten"
 
-#: src/features/chat/thread/composer-input.tsx:330
-#: src/features/chat/thread/composer-input.tsx:342
+#: src/features/chat/thread/composer-input.tsx:331
+#: src/features/chat/thread/composer-input.tsx:343
 msgid "Edit content"
 msgstr "Inhalt bearbeiten"
 
@@ -12270,7 +12282,7 @@ msgstr "Organisationsname eingeben"
 msgid "Enter organization slug"
 msgstr "Organisations-Slug eingeben"
 
-#: src/features/develop/components/thread-pull-requests.tsx:91
+#: src/features/develop/components/thread-pull-requests.tsx:92
 msgid "Enter pull requests as owner/name#123."
 msgstr "Gib Pull Requests als owner/name#123 ein."
 
@@ -13265,7 +13277,7 @@ msgid "Failed to attach collection"
 msgstr "Sammlung konnte nicht angehängt werden"
 
 #: src/features/chat/header/kb-attachment-button.tsx:128
-#: src/features/chat/thread/composer-input.tsx:1554
+#: src/features/chat/thread/composer-input.tsx:1563
 msgid "Failed to attach file"
 msgstr "Datei konnte nicht angehängt werden"
 
@@ -13675,7 +13687,7 @@ msgstr "Exportanfrage fehlgeschlagen"
 msgid "Failed to reset to defaults"
 msgstr "Zurücksetzen auf Standard fehlgeschlagen"
 
-#: src/features/chat/thread/composer-input.tsx:1586
+#: src/features/chat/thread/composer-input.tsx:1595
 msgid "Failed to restore attachment"
 msgstr "Anhang konnte nicht wiederhergestellt werden"
 
@@ -18954,7 +18966,7 @@ msgstr "Zeilen, die kein gültiges JSON sind"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
 #: src/features/auth/components/settings/providers/provider-cell.tsx:113
-#: src/features/develop/components/thread-pull-requests.tsx:260
+#: src/features/develop/components/thread-pull-requests.tsx:262
 msgid "Link"
 msgstr "Verknüpfen"
 
@@ -18962,7 +18974,7 @@ msgstr "Verknüpfen"
 msgid "Link active until {expiresAt}"
 msgstr "Link aktiv bis {expiresAt}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:103
+#: src/features/develop/components/thread-pull-requests.tsx:104
 msgid "Link at most {MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time."
 msgstr "Verknüpfe höchstens {MAX_PULL_REQUESTS_PER_ATTACH} Pull Requests auf einmal."
 
@@ -18980,11 +18992,11 @@ msgstr "Linkvorschau"
 msgid "Link previews"
 msgstr "Linkvorschauen"
 
-#: src/features/develop/components/thread-pull-requests.tsx:193
+#: src/features/develop/components/thread-pull-requests.tsx:195
 msgid "Link pull request"
 msgstr "Pull Request verknüpfen"
 
-#: src/features/develop/components/thread-pull-requests.tsx:212
+#: src/features/develop/components/thread-pull-requests.tsx:214
 msgid "Link pull requests"
 msgstr "Pull Requests verknüpfen"
 
@@ -18996,7 +19008,7 @@ msgstr "Manuell verknüpft"
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr "Verknüpfte Pull Requests: {linkedPullRequests}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:68
+#: src/features/develop/components/thread-pull-requests.tsx:69
 msgid "Linked to this thread."
 msgstr "Mit diesem Thread verknüpft."
 
@@ -19004,8 +19016,8 @@ msgstr "Mit diesem Thread verknüpft."
 msgid "LinkedIn Post"
 msgstr "LinkedIn-Beitrag"
 
-#: src/features/develop/components/thread-pull-requests.tsx:241
-#: src/features/develop/components/thread-pull-requests.tsx:260
+#: src/features/develop/components/thread-pull-requests.tsx:243
+#: src/features/develop/components/thread-pull-requests.tsx:262
 msgid "Linking…"
 msgstr "Wird verknüpft…"
 
@@ -19343,7 +19355,7 @@ msgstr "Gastlink wird geladen …"
 msgid "Loading the guide"
 msgstr "Leitfaden wird geladen"
 
-#: src/features/develop/components/thread-pull-requests.tsx:162
+#: src/features/develop/components/thread-pull-requests.tsx:163
 msgid "Loading the linked pull requests…"
 msgstr "Verknüpfte Pull Requests werden geladen…"
 
@@ -19601,7 +19613,7 @@ msgstr "Langer Text erkannt"
 msgid "Long text generation in images"
 msgstr "Generierung langer Texte in Bildern"
 
-#: src/features/chat/thread/composer-input.tsx:900
+#: src/features/chat/thread/composer-input.tsx:903
 msgid "Long text was attached as a file."
 msgstr "Der lange Text wurde als Datei angehängt."
 
@@ -22866,7 +22878,7 @@ msgstr "Nicht an die Leitung zugestellt"
 msgid "Not found"
 msgstr "Nicht gefunden"
 
-#: src/features/develop/components/thread-pull-requests.tsx:246
+#: src/features/develop/components/thread-pull-requests.tsx:248
 msgid "Not linked"
 msgstr "Nicht verknüpft"
 
@@ -23757,7 +23769,7 @@ msgstr "Modellauswahl im Eingabefeld öffnen ({0})"
 
 #. placeholder {0}: link.repository
 #. placeholder {1}: link.number
-#: src/features/develop/components/thread-pull-requests.tsx:178
+#: src/features/develop/components/thread-pull-requests.tsx:179
 msgid "Open the pull request {0}#{1}"
 msgstr "Pull Request {0}#{1} öffnen"
 
@@ -26433,7 +26445,7 @@ msgid "Pull request settings updated"
 msgstr "Pull-Request-Einstellungen aktualisiert"
 
 #: src/features/code/components/code-shell.tsx:95
-#: src/features/develop/components/thread-pull-requests.tsx:216
+#: src/features/develop/components/thread-pull-requests.tsx:218
 msgid "Pull requests"
 msgstr "Pull Requests"
 
@@ -26488,6 +26500,10 @@ msgstr "Push-Benachrichtigungen in diesem Browser"
 #: src/features/marketing/use-cases/use-case-data.ts:104
 msgid "Put several agents with their own roles in one thread. A review panel can check a change from security and performance angles, and a debate can argue both sides before a synthesis."
 msgstr "Bringe mehrere Agenten mit eigenen Rollen in einen Thread. Ein Review-Panel kann eine Änderung aus Sicherheits- und Performance-Sicht prüfen, und eine Debatte kann vor einer Synthese beide Seiten abwägen."
+
+#: src/features/develop/components/thread-pull-request-catch-up.tsx:57
+msgid "Puts a prompt in the composer to rebase this branch on {base}, resolve conflicts, check the build and tests, and push. Nothing is sent."
+msgstr ""
 
 #: src/features/chat/thread/composer-image-settings.tsx:181
 #: src/features/chat/thread/media-gallery-view.tsx:473
@@ -26800,7 +26816,7 @@ msgstr "Schreibgeschützte Vorschau – zum Bearbeiten forken"
 msgid "Read-only shared conversation"
 msgstr "Schreibgeschützte geteilte Unterhaltung"
 
-#: src/features/chat/thread/composer-input.tsx:287
+#: src/features/chat/thread/composer-input.tsx:288
 msgid "Reading \"{attachmentName}\"…"
 msgstr "„{attachmentName}“ wird gelesen …"
 
@@ -27049,7 +27065,7 @@ msgstr "Neu verbinden"
 msgid "Reconnect {0}"
 msgstr "{0} neu verbinden"
 
-#: src/features/develop/components/thread-pull-requests.tsx:71
+#: src/features/develop/components/thread-pull-requests.tsx:72
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr "Verbinde deinen Git-Host in den Einstellungen erneut, um einen Pull Request zu verknüpfen."
 
@@ -27431,10 +27447,10 @@ msgstr "Angemeldet bleiben"
 #: src/features/chat/host/host-composer.tsx:1033
 #: src/features/chat/sharing/thread-share-button.tsx:300
 #: src/features/chat/sharing/thread-share-button.tsx:372
-#: src/features/chat/thread/composer-input.tsx:349
-#: src/features/chat/thread/composer-input.tsx:361
-#: src/features/chat/thread/composer-input.tsx:415
-#: src/features/chat/thread/composer-input.tsx:424
+#: src/features/chat/thread/composer-input.tsx:350
+#: src/features/chat/thread/composer-input.tsx:362
+#: src/features/chat/thread/composer-input.tsx:416
+#: src/features/chat/thread/composer-input.tsx:425
 #: src/features/devices/components/devices-settings.tsx:334
 #: src/features/devices/components/devices-settings.tsx:340
 #: src/features/projects/components/project-form-dialog.tsx:265
@@ -28212,11 +28228,11 @@ msgstr "Jetzt wiederholen"
 msgid "Retry the device check"
 msgstr "Gerätprüfung erneut versuchen"
 
-#: src/features/chat/thread/composer-input.tsx:438
+#: src/features/chat/thread/composer-input.tsx:439
 msgid "Retry upload"
 msgstr "Upload wiederholen"
 
-#: src/features/chat/thread/composer-input.tsx:433
+#: src/features/chat/thread/composer-input.tsx:434
 msgid "Retry upload of {attachmentName}"
 msgstr "Upload von {attachmentName} wiederholen"
 
@@ -29041,7 +29057,7 @@ msgstr "Score"
 msgid "Scores each answer 0–100% against the expected answer or rubric. Adds a small model call per case."
 msgstr "Bewertet jede Antwort mit 0–100 % anhand der erwarteten Antwort oder der Bewertungsrubrik. Fügt pro Testfall einen kleinen Modellaufruf hinzu."
 
-#: src/features/chat/thread/composer-input.tsx:1513
+#: src/features/chat/thread/composer-input.tsx:1522
 msgid "Screen capture failed. Please try again."
 msgstr "Die Bildschirmaufnahme ist fehlgeschlagen. Bitte versuche es erneut."
 
@@ -33075,7 +33091,7 @@ msgstr "Textrichtung auf LTR gesetzt"
 msgid "Text direction set to RTL"
 msgstr "Textrichtung auf RTL gesetzt"
 
-#: src/features/chat/thread/composer-input.tsx:323
+#: src/features/chat/thread/composer-input.tsx:324
 msgid "Text document"
 msgstr "Textdokument"
 
@@ -33508,7 +33524,7 @@ msgstr "die Änderung wurde abgelehnt"
 msgid "The chat agent works the task with its tools, optionally following a skill."
 msgstr "Der Chat-Agent erledigt die Aufgabe mit seinen Tools und folgt optional einem Skill."
 
-#: src/features/chat/thread/composer-input.tsx:1000
+#: src/features/chat/thread/composer-input.tsx:1003
 msgid "The chat changed before the paste was ready, so it was not inserted."
 msgstr "Der Chat hat gewechselt, bevor das Einfügen fertig war, daher wurde nichts eingefügt."
 
@@ -33544,8 +33560,8 @@ msgstr "Die Kommandozeile wurde nicht angemeldet. Du kannst diesen Tab schließe
 msgid "The comparison could not be loaded."
 msgstr "Der Vergleich konnte nicht geladen werden."
 
-#: src/features/chat/thread/composer-input.tsx:1008
-#: src/features/chat/thread/composer-input.tsx:1030
+#: src/features/chat/thread/composer-input.tsx:1011
+#: src/features/chat/thread/composer-input.tsx:1033
 msgid "The composer was locked before the paste was ready, so it was not inserted."
 msgstr "Der Eingabebereich war gesperrt, bevor das Einfügen fertig war, daher wurde nichts eingefügt."
 
@@ -33733,7 +33749,7 @@ msgstr "Der Host"
 msgid "the host did not answer"
 msgstr "der Host hat nicht geantwortet"
 
-#: src/features/develop/components/thread-pull-requests.tsx:70
+#: src/features/develop/components/thread-pull-requests.tsx:71
 msgid "The host did not answer. Try again."
 msgstr "Der Host hat nicht geantwortet. Versuche es erneut."
 
@@ -33745,11 +33761,11 @@ msgstr "Der Host hat nicht geantwortet. Es wird später erneut versucht."
 msgid "the host did not change the option"
 msgstr "der Host hat die Option nicht geändert"
 
-#: src/features/develop/components/thread-pull-requests.tsx:73
+#: src/features/develop/components/thread-pull-requests.tsx:74
 msgid "The host has no pull request at that address."
 msgstr "Der Host hat unter dieser Adresse keinen Pull Request."
 
-#: src/features/develop/components/thread-pull-requests.tsx:75
+#: src/features/develop/components/thread-pull-requests.tsx:76
 msgid "The host is limiting requests. Try again shortly."
 msgstr "Der Host begrenzt die Anfragen. Versuche es in Kürze erneut."
 
@@ -33911,7 +33927,7 @@ msgstr "Das Modell im Link ist nicht verfügbar. Der Chat behält sein Modell."
 msgid "The model picker now lists {0} models from {1}"
 msgstr "Die Modellauswahl listet jetzt {0} Modelle von {1}"
 
-#: src/features/chat/thread/composer-input.tsx:1439
+#: src/features/chat/thread/composer-input.tsx:1457
 msgid "The model selection changed while the uploads ran, so the message was not sent. Press send to send it."
 msgstr "Die Modellauswahl hat sich während der Uploads geändert, daher wurde die Nachricht nicht gesendet. Drücke auf Senden, um sie zu senden."
 
@@ -33976,7 +33992,7 @@ msgstr "Die Seite zeigt jetzt die andere Version. Kopiere alles, was du aus dein
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "Die Seite, alle Unterseiten, ihre Kommentare und ihr Versionsverlauf werden gelöscht. Das kann nicht rückgängig gemacht werden."
 
-#: src/features/chat/thread/composer-input.tsx:1056
+#: src/features/chat/thread/composer-input.tsx:1059
 msgid "The pasted text could not be attached and was not inserted."
 msgstr "Der eingefügte Text konnte nicht angehängt werden und wurde nicht eingefügt."
 
@@ -34142,11 +34158,11 @@ msgstr "Die beiden Passcodes stimmen nicht überein."
 msgid "The unified LLM gateway for modern AI applications."
 msgstr "Das einheitliche LLM-Gateway für moderne KI-Anwendungen."
 
-#: src/features/chat/thread/composer-input.tsx:634
+#: src/features/chat/thread/composer-input.tsx:637
 msgid "The upload of \"{fileName}\" expired. Please attach it again."
 msgstr "Der Upload von „{fileName}“ ist abgelaufen. Bitte hänge die Datei erneut an."
 
-#: src/features/chat/thread/composer-input.tsx:1461
+#: src/features/chat/thread/composer-input.tsx:1470
 msgid "The uploads finished, but the message was not sent. Press send to send it."
 msgstr "Die Uploads sind abgeschlossen, aber die Nachricht wurde nicht gesendet. Drücke auf Senden, um sie zu senden."
 
@@ -34818,7 +34834,7 @@ msgstr "Dieser Prompt wird für jede Nachricht verwendet. Jede Nachricht wird un
 msgid "This prompt will configure:"
 msgstr "Dieser Prompt wird konfigurieren:"
 
-#: src/features/develop/components/thread-pull-requests.tsx:74
+#: src/features/develop/components/thread-pull-requests.tsx:75
 msgid "This pull request already has as many threads linked as it can keep."
 msgstr "An diesem Pull Request sind bereits so viele Threads verknüpft, wie er behalten kann."
 
@@ -34927,7 +34943,7 @@ msgstr "Dieser Text besteht nur aus unsichtbaren Zeichen, daher gibt es nichts z
 msgid "This thread"
 msgstr "Dieser Thread"
 
-#: src/features/develop/components/thread-pull-requests.tsx:76
+#: src/features/develop/components/thread-pull-requests.tsx:77
 msgid "This thread already has as many pull requests linked as it can keep."
 msgstr "An diesem Thread sind bereits so viele Pull Requests verknüpft, wie er behalten kann."
 
@@ -35805,7 +35821,7 @@ msgstr "Versuche, deine Suchbegriffe anzupassen."
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
-#: src/features/develop/components/thread-pull-requests.tsx:169
+#: src/features/develop/components/thread-pull-requests.tsx:170
 #: src/features/home/components/home-page.tsx:154
 #: src/features/projects/components/project-repo-picker.tsx:190
 #: src/features/projects/components/project-repo-picker.tsx:198
@@ -35998,7 +36014,7 @@ msgid "Type your answer…"
 msgstr "Gib deine Antwort ein…"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:249
-#: src/features/chat/thread/composer-input.tsx:1909
+#: src/features/chat/thread/composer-input.tsx:1935
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:202
 msgid "Type your message..."
 msgstr "Nachricht eingeben..."
@@ -36168,7 +36184,7 @@ msgstr "Unterstrichen"
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:68
 #: src/features/chat/thread-list/hooks/use-thread-state-actions.ts:95
 #: src/features/chat/thread/composer-draw-dialog.tsx:349
-#: src/features/chat/thread/composer-input.tsx:902
+#: src/features/chat/thread/composer-input.tsx:905
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:36
 msgid "Undo"
 msgstr "Rückgängig"
@@ -36420,7 +36436,7 @@ msgstr "Aktuelle Dokumentation für jede Bibliothek und jedes Framework"
 msgid "Update Duration"
 msgstr "Dauer aktualisieren"
 
-#: src/features/chat/thread/composer-input.tsx:1764
+#: src/features/chat/thread/composer-input.tsx:1790
 msgid "Update failed"
 msgstr "Aktualisierung fehlgeschlagen"
 
@@ -36614,14 +36630,14 @@ msgstr "CSVs hochladen, Python-Analysen ausführen und Diagramme exportieren –
 msgid "Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used."
 msgstr "Lade Dokumente in deine Wissensdatenbank hoch und gruppiere sie in Sammlungen. Die KI durchsucht sie nach relevantem Kontext und zitiert die verwendeten Abschnitte."
 
-#: src/features/chat/thread/composer-input.tsx:430
-#: src/features/chat/thread/composer-input.tsx:679
-#: src/features/chat/thread/composer-input.tsx:1681
+#: src/features/chat/thread/composer-input.tsx:431
+#: src/features/chat/thread/composer-input.tsx:682
+#: src/features/chat/thread/composer-input.tsx:1702
 msgid "Upload failed"
 msgstr "Hochladen fehlgeschlagen"
 
 #. placeholder {0}: fresh.name
-#: src/features/chat/thread/composer-input.tsx:1674
+#: src/features/chat/thread/composer-input.tsx:1695
 msgid "Upload failed: {0}"
 msgstr "Upload fehlgeschlagen: {0}"
 
@@ -36671,7 +36687,7 @@ msgstr "Hochgeladen"
 msgid "Uploaded {fileName}"
 msgstr "{fileName} hochgeladen"
 
-#: src/features/chat/thread/composer-input.tsx:367
+#: src/features/chat/thread/composer-input.tsx:368
 msgid "Uploading {attachmentName}"
 msgstr "{attachmentName} wird hochgeladen"
 
@@ -38676,8 +38692,8 @@ msgstr "Du beobachtest kein Repository."
 msgid "You are offline. Neore will reconnect when the network is back."
 msgstr "Du bist offline. Neore verbindet sich wieder, sobald das Netzwerk verfügbar ist."
 
-#: src/features/chat/thread/composer-input.tsx:1114
-#: src/features/chat/thread/composer-input.tsx:1223
+#: src/features/chat/thread/composer-input.tsx:1117
+#: src/features/chat/thread/composer-input.tsx:1231
 #: src/features/chat/thread/composer-prompt-queue.tsx:112
 msgid "You are offline. Your message stays here; send it once you are back online."
 msgstr "Du bist offline. Deine Nachricht bleibt hier; sende sie, sobald du wieder online bist."
@@ -38727,7 +38743,7 @@ msgstr "Du kannst diese Seite ansehen, aber nicht bearbeiten."
 msgid "You cannot ask a side question in this chat."
 msgstr "In diesem Chat kannst du keine Nebenfrage stellen."
 
-#: src/features/develop/components/thread-pull-requests.tsx:69
+#: src/features/develop/components/thread-pull-requests.tsx:70
 msgid "You cannot see that pull request on the host."
 msgstr "Du kannst diesen Pull Request auf dem Host nicht sehen."
 
@@ -39018,12 +39034,12 @@ msgid "Your First Chat"
 msgstr "Dein erster Chat"
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:744
+#: src/features/chat/thread/composer-input.tsx:747
 msgid "Your input is large (~{0} tokens) and will consume a significant portion of the model's context window."
 msgstr "Deine Eingabe ist groß (~{0} Token) und wird einen erheblichen Teil des Kontextfensters des Modells beanspruchen."
 
 #. placeholder {0}: formatNumber(contextStats.estimatedTokens, i18n.locale)
-#: src/features/chat/thread/composer-input.tsx:737
+#: src/features/chat/thread/composer-input.tsx:740
 msgid "Your input is too large (~{0} tokens) and exceeds the model's context window. Please reduce the message length or remove attachments to submit."
 msgstr "Deine Eingabe ist zu groß (~{0} Token) und überschreitet das Kontextfenster des Modells. Bitte kürze die Nachricht oder entferne Anhänge, um sie zu senden."
 
@@ -39056,7 +39072,7 @@ msgstr "Dein Standort (z. B. „New York, USA“, „Berlin, Deutschland“)."
 msgid "Your message"
 msgstr "Deine Nachricht"
 
-#: src/features/chat/thread/composer-input.tsx:1424
+#: src/features/chat/thread/composer-input.tsx:1442
 msgid "Your message changed while the uploads ran, so it was not sent. Press send to send it."
 msgstr "Deine Nachricht hat sich während der Uploads geändert, daher wurde sie nicht gesendet. Drücke auf Senden, um sie zu senden."
 

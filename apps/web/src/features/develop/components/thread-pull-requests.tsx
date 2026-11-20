@@ -19,6 +19,7 @@ import { useCRPC } from "@/lib/lunora/crpc";
 import { createDialogVisits } from "../lib/dialog-visit";
 import { MAX_PULL_REQUESTS_PER_ATTACH, parsePullRequestAddresses } from "../lib/pull-request-address";
 import { useAttachPullRequests, useThreadPullRequests } from "../lib/use-develop";
+import ThreadPullRequestCatchUp, { CATCH_UP_CHECKED_LINKS } from "./thread-pull-request-catch-up";
 
 type AttachStatus =
     | "already_linked"
@@ -172,8 +173,8 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
             )}
             {(links.data ?? []).length > 0 && (
                 <ul className="flex flex-wrap items-center gap-2">
-                    {(links.data ?? []).map((link) => (
-                        <li key={`${link.repository}#${link.number}`}>
+                    {(links.data ?? []).map((link, index) => (
+                        <li className="inline-flex items-center gap-2" key={`${link.repository}#${link.number}`}>
                             <Link
                                 aria-label={t`Open the pull request ${link.repository}#${link.number}`}
                                 className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs hover:underline"
@@ -185,6 +186,7 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
                                     {link.repository}#{link.number}
                                 </span>
                             </Link>
+                            {index < CATCH_UP_CHECKED_LINKS && <ThreadPullRequestCatchUp link={link} threadId={threadId} />}
                         </li>
                     ))}
                 </ul>
