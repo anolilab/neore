@@ -64,6 +64,16 @@ const PASSED_ENV: [&str; 7] = [
     "NODE_EXTRA_CA_CERTS",
 ];
 
+/// The homes of the version managers whose `node`/`npm` are shims (Volta, mise, asdf): `HOME` is the staging folder
+/// while npm runs, so a shim finds the person's installs only through these. One that is not set is passed as where
+/// the manager keeps it by default under the person's real home. They name folders, never a program to run.
+const MANAGER_HOMES: [(&str, &str); 4] = [
+    ("VOLTA_HOME", ".volta"),
+    ("MISE_DATA_DIR", ".local/share/mise"),
+    ("MISE_CONFIG_DIR", ".config/mise"),
+    ("ASDF_DATA_DIR", ".asdf"),
+];
+
 const OVER_BUDGET: &str =
     "the package needs more disk space than an agent may use. Nothing was installed";
 
@@ -685,6 +695,20 @@ fn run_npm(
     for name in PASSED_ENV {
         if let Some(value) = std::env::var_os(name) {
             command.env(name, value);
+        }
+    }
+
+    let real_home = std::env::var_os("HOME");
+
+    for (name, default) in MANAGER_HOMES {
+        match (std::env::var_os(name), &real_home) {
+            (Some(value), _) => {
+                command.env(name, value);
+            }
+            (None, Some(real_home)) => {
+                command.env(name, Path::new(real_home).join(default));
+            }
+            (None, None) => {}
         }
     }
 

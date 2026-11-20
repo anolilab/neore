@@ -1191,6 +1191,11 @@ fn npm_env_child() {
         "http_proxy",
         "no_proxy",
         "NODE_EXTRA_CA_CERTS",
+        // The version managers' homes, so a shim finds the person's installs.
+        "VOLTA_HOME",
+        "MISE_DATA_DIR",
+        "MISE_CONFIG_DIR",
+        "ASDF_DATA_DIR",
         // Set by the shell that runs the script, not passed in.
         "PWD",
         "OLDPWD",
@@ -1216,6 +1221,17 @@ fn npm_env_child() {
         );
     }
 
+    // One the parent set is passed as it is; one it did not is the manager's default under the real home.
+    for line in [
+        "VOLTA_HOME=/opt/volta-home",
+        "MISE_DATA_DIR=/home/test-person/.local/share/mise",
+    ] {
+        assert!(
+            seen.lines().any(|seen| seen == line),
+            "{line} did not reach npm"
+        );
+    }
+
     println!("npm-env-checked");
 }
 
@@ -1235,7 +1251,13 @@ fn only_the_variables_npm_needs_reach_it() {
         command.env(name, value);
     }
 
+    for (name, _) in MANAGER_HOMES {
+        command.env_remove(name);
+    }
+
     let output = command
+        .env("HOME", "/home/test-person")
+        .env("VOLTA_HOME", "/opt/volta-home")
         .env("NODE_OPTIONS", "--require /tmp/evil.js")
         .env("npm_config_foo", "bar")
         .env("NEORE_TEST_SECRET", "hunter2")
