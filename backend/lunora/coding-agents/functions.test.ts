@@ -13,8 +13,11 @@ import {
     createRun,
     expirePullRequest,
     isPullRequestStale,
+    recordPoll,
     setCodingAgentCommitIdentity,
     setPullRequestSandbox,
+    setupFixStep,
+    startSetupFix,
 } from "./functions";
 import { PR_BUDGET_MS } from "./runner";
 
@@ -438,5 +441,86 @@ describe("commit author lookup", () => {
         });
 
         expect(await lookup(userId)).toBeNull();
+    });
+});
+
+describe("setupFixStep", () => {
+    const run = { setupFailure: { logTail: "boom", step: "repo-setup" }, setupFixRunId: undefined, status: "failed" as const };
+
+    it("offers a fix for a failed run stopped at the repository's setup step", () => {
+        expect(setupFixStep(run)).toBe("repo-setup");
+    });
+
+    it.each([
+        ["a step the repository cannot break", { setupFailure: { logTail: "", step: "clone" } }],
+        ["no recorded setup failure", { setupFailure: undefined }],
+        ["a fix already started", { setupFixRunId: "run-2" as never }],
+        ["a run that did not fail", { status: "cancelled" as const }],
+    ])("not for %s", (_label, patch) => {
+        expect(setupFixStep({ ...run, ...patch })).toBeUndefined();
+    });
+});
+
+describe("setup fix", () => {
+    let harness: ReturnType<typeof lunoraTest>;
+
+    beforeEach(() => {
+        harness = lunoraTest(schema as never);
+    });
+
+    afterEach(() => {
+        harness.close();
+    });
+
+    const insertFailedRun = async (overrides: Record<string, unknown> = {}): Promise<string> =>
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("codingAgentRuns", {
+                    agent: "claude_code",
+                    createdAt: 1,
+                    log: "",
+                    openPr: false,
+                    prompt: "Fix it",
+                    repoUrl: "https://github.com/a/b.git",
+                    setupFailure: { logTail: "setup.sh: line 3: pnpm: not found", step: "repo-setup" },
+                    status: "failed",
+                    updatedAt: 1,
+                    userId: USER,
+                    ...overrides,
+                }),
+        );
+
+    it("keeps the step and the end of the log when a poll sees the setup fail", async () => {
+        const runId = await insertFailedRun({ setupFailure: undefined, status: "running" });
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(recordPoll, { offset: 10, runId, setupFailedStep: "repo-setup", text: "$ setup\npnpm: not found\n" }),
+        );
+
+        const run = await harness.run(async (ctx: any) => await ctx.db.get("codingAgentRuns", runId));
+
+        expect(run.setupFailure).toStrictEqual({ logTail: "$ setup\npnpm: not found", step: "repo-setup" });
+    });
+
+    it("answers NOT_FOUND for another user's run", async () => {
+        const runId = await insertFailedRun({ userId: "user-b" });
+
+        await expect(harness.withIdentity({ userId: USER } as never).mutation(startSetupFix as never, { prompt: "Fix", runId } as never)).rejects.toThrow(
+            "Run not found",
+        );
+    });
+
+    it("refuses a run whose step the repository cannot break, and starts nothing", async () => {
+        const runId = await insertFailedRun({ setupFailure: { logTail: "", step: "clone" } });
+
+        await expect(
+            harness.withIdentity({ userId: USER } as never).mutation(startSetupFix as never, { prompt: "Fix", runId } as never),
+        ).resolves.toStrictEqual({
+            error: "This run cannot start a setup fix.",
+        });
+
+        const runs = await harness.run(async (ctx: any) => await ctx.db.query("codingAgentRuns").collect());
+
+        expect(runs).toHaveLength(1);
     });
 });

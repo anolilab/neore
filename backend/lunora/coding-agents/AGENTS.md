@@ -19,6 +19,13 @@
   `-p` executes the repo's `.claude/settings.json` hooks and `.mcp.json`
   servers. CLI flags are cited in `buildAgentCommand`; re-check them when
   bumping `npmVersion`. E2B itself is unit-tested against a fake only.
+- **Fix setup** (`setup-fix.ts`) — a poll that sees `setup-failed:<step>` stores
+  the step and the capped end of the redacted log (`setupFailure`), so the run
+  view can offer a fix run after the sandbox is gone. Offered only for steps the
+  repository can break (`FIXABLE_SETUP_STEPS`: `repo-setup`); a fix run repeats
+  every step before its agent, so it must skip the step it repairs
+  (`fixesSetupStep` on its row). `startSetupFix` takes the task the person
+  edited; one fix per failed run (`setupFixRunId`).
 - **Project repositories** — a project lists the repositories its runs pick
   from, one `projectRepositories` row each, added and edited only by the
   per-row procedures in `projects/functions.ts`; a project delete and the

@@ -211,6 +211,7 @@ export const pollCodingAgentRun = internalAction
         const { cancelled } = await ctx.runMutation(internal.coding_agents.functions.recordPoll, {
             offset: polled.offset,
             runId,
+            ...(polled.status?.kind === "setup-failed" && { setupFailedStep: polled.status.step }),
             ...(polled.summary !== undefined && { summary: polled.summary }),
             text: polled.text,
         });

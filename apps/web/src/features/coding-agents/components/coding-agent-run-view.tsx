@@ -18,7 +18,7 @@ import { Badge } from "@neore/ui/components/badge";
 import { Button, buttonVariants } from "@neore/ui/components/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@neore/ui/components/collapsible";
 import cn from "@neore/ui/utils/cn";
-import { useMutation } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { ChevronRight, CircleStop, ExternalLink, GitPullRequest, Loader2, SquareTerminal } from "lucide-react";
 import type { FC } from "react";
 import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -28,6 +28,7 @@ import { showError, showSuccess } from "@/lib/toast";
 
 import type { DiffLineKind } from "../lib/diff-lines";
 import { DIFF_PREVIEW_LINES, diffFiles, parseDiff } from "../lib/diff-lines";
+import SetupFixButton from "./setup-fix-dialog";
 
 export type CodingAgentRun = NonNullable<ReturnOf<typeof api.coding_agents.functions.getRun>>;
 
@@ -143,6 +144,8 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
         }),
     );
     const createPr = useMutation(useLunoraActionOptions(api.coding_agents.execute.createPullRequest));
+    // The "Fix setup" run started from this one, shown under it so the fix is followed where the failure was.
+    const { data: fixRun } = useQuery(crpc.coding_agents.functions.getRun.queryOptions(run.setupFixRunId ? { runId: run.setupFixRunId } : skipToken));
 
     const openPullRequest = () => {
         createPr.mutate(
@@ -243,6 +246,7 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
                         {t`Create PR`}
                     </Button>
                 )}
+                {run.setupFix && <SetupFixButton prompt={run.setupFix.prompt} runId={run._id} step={run.setupFix.step} />}
                 {run.prUrl?.startsWith("https://github.com/") && (
                     <a className={buttonVariants({ size: "sm", variant: "outline" })} href={run.prUrl} rel="noopener noreferrer" target="_blank">
                         <ExternalLink aria-hidden="true" />
@@ -251,6 +255,8 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
                     </a>
                 )}
             </div>
+
+            {fixRun && <CodingAgentRunView className="mb-0 max-w-none" run={fixRun} />}
         </section>
     );
 };
