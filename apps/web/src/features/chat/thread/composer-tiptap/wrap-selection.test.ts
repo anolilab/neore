@@ -343,7 +343,7 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
 
         select(editor, 1, 4);
 
-        expect(wrapSelectionOnTextInput(editor.view, 1, 4, "`")).toBe(false);
+        expect(wrapSelectionOnTextInput(editor.view, 1, 4, "`")).toBe(true);
         expect(text(editor)).toBe("foo`");
     });
 
@@ -379,7 +379,7 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
 
         select(editor, 3, 6);
 
-        expect(wrapSelectionOnTextInput(editor.view, 3, 6, "*")).toBe(false);
+        expect(wrapSelectionOnTextInput(editor.view, 3, 6, "*")).toBe(true);
         expect(text(editor)).toBe(String.raw`a\foo`);
     });
 
@@ -388,7 +388,7 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
 
         select(editor, 2, 3);
 
-        expect(wrapSelectionOnTextInput(editor.view, 2, 3, "*")).toBe(false);
+        expect(wrapSelectionOnTextInput(editor.view, 2, 3, "*")).toBe(true);
         expect(text(editor)).toBe("a.b");
     });
 
@@ -397,7 +397,7 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
 
         select(editor, 5, 8);
 
-        expect(wrapSelectionOnTextInput(editor.view, 5, 8, "_")).toBe(false);
+        expect(wrapSelectionOnTextInput(editor.view, 5, 8, "_")).toBe(true);
         expect(text(editor)).toBe("foo_bar");
     });
 
@@ -406,7 +406,7 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
 
         select(editor, 4, 7);
 
-        expect(wrapSelectionOnTextInput(editor.view, 4, 7, "*")).toBe(false);
+        expect(wrapSelectionOnTextInput(editor.view, 4, 7, "*")).toBe(true);
         expect(text(editor)).toBe("a**foo");
     });
 });

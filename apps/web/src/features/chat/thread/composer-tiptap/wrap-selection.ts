@@ -115,10 +115,15 @@ const wrapFor = (marker: Marker, body: string, insideWord: boolean): Wrap => {
  * Returns `null` when the typed text is no marker, nothing is selected, the selection is not inside one textblock (a
  * select-all or a range over several paragraphs), it holds a node other than text (a quote chip, a line break), or it
  * is only whitespace. It also returns `null` when the wrap would not render: a backtick beside a code wrap, a backslash
- * before the opening delimiter, or delimiters that do not open or close beside the text. Typing then replaces the
- * selection as it always did.
+ * before the opening delimiter, or delimiters that do not open or close beside the text.
+ * The marker is then dropped and the selection stays, so the selected text is never replaced.
  */
-export const wrapSelection = (state: EditorState, from: number, to: number, typed: string): Transaction | null => {
+const REFUSED = "refused";
+
+type Plan = Transaction | typeof REFUSED | null;
+
+/** The transaction for a wrap, `REFUSED` when the Markdown would not render it, or `null` when the typed text is no wrap. */
+const planWrap = (state: EditorState, from: number, to: number, typed: string): Plan => {
     if (from === to || !isMarker(typed)) {
         return null;
     }
@@ -161,7 +166,7 @@ export const wrapSelection = (state: EditorState, from: number, to: number, type
 
     // An odd run of backslashes before the opener would escape it, and a backtick beside a code fence would join it.
     if (trailingBackslashes(beforeOpen) % 2 === 1 || (typed === "`" && (openBefore === "`" || closeAfter === "`"))) {
-        return null;
+        return REFUSED;
     }
 
     const wrap = wrapFor(typed, body, insideWord);
@@ -171,11 +176,11 @@ export const wrapSelection = (state: EditorState, from: number, to: number, type
     const delimiter = wrap.open.charAt(0);
 
     if (typed !== "`" && (openBefore === delimiter || closeAfter === delimiter)) {
-        return null;
+        return REFUSED;
     }
 
     if (typed !== "`" && !delimitersWork({ closeAfter, closeBefore: lastCharacter(body), openAfter: firstCharacter(body), openBefore, underscore })) {
-        return null;
+        return REFUSED;
     }
 
     const transaction = state.tr.insertText(`${selected.slice(0, lead)}${wrap.open}${wrap.body}${wrap.close}${trail}`, from, to);
@@ -188,6 +193,13 @@ export const wrapSelection = (state: EditorState, from: number, to: number, type
     );
 };
 
+/** The transaction that wraps the selection, or `null` when it does not wrap. */
+export const wrapSelection = (state: EditorState, from: number, to: number, typed: string): Transaction | null => {
+    const plan = planWrap(state, from, to, typed);
+
+    return plan === REFUSED ? null : plan;
+};
+
 /**
  * A marker typed over a selection wraps it. Composition text is left alone, so an IME commit replaces the selection as
  * it does today.
@@ -197,13 +209,18 @@ export const wrapSelectionOnTextInput = (view: EditorView, from: number, to: num
         return false;
     }
 
-    const transaction = wrapSelection(view.state, from, to, typed);
+    const plan = planWrap(view.state, from, to, typed);
 
-    if (transaction === null) {
+    // A marker the Markdown would not render is dropped and the selection stays: typing over it would lose the selected text.
+    if (plan === REFUSED) {
+        return true;
+    }
+
+    if (plan === null) {
         return false;
     }
 
-    view.dispatch(transaction);
+    view.dispatch(plan);
 
     return true;
 };
