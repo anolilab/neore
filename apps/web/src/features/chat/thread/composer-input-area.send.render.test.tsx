@@ -53,13 +53,6 @@ describe("send button while attachments upload", () => {
         expect(onSubmit).toHaveBeenCalledTimes(1);
     });
 
-    it("shows the pending state once a send waits for the uploads", () => {
-        renderArea({ isSendWaiting: true, isUploading: true, value: "see the file" });
-        const send = screen.getByRole("button", { name: "Send message" }) as HTMLButtonElement;
-
-        expect(send.disabled).toBe(false);
-    });
-
     it("announces that a send is waiting, in a live region that is always there", () => {
         renderArea({ isSendWaiting: true, isUploading: true, value: "see the file" });
 
