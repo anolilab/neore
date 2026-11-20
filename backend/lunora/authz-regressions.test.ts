@@ -660,6 +660,9 @@ describe("crons", () => {
         // The harness cannot dispatch a job scheduled by reference, so run each queued
         // chain step's body with its own args. A step queues the next one, until the last page.
         for (let ran = 0; ran < chainJobs().length; ran += 1) {
+            // A chain that never stops queueing steps fails here instead of hanging the suite.
+            expect(ran).toBeLessThan(10);
+
             const { args } = chainJobs()[ran]!;
 
             await run(async (context) => await context.runMutation(procedureAt("agent_threads", "deleteAllForThreadIdAsync"), args as never));
