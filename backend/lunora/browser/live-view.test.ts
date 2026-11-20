@@ -119,6 +119,13 @@ const fetchMock = vi.fn();
 const as = (userId: string) => harness.withIdentity({ userId } as never);
 const statusFor = async (userId: string): Promise<unknown> => await as(userId).query(getThreadBrowser as never, { threadId } as never);
 const open = async (userId: string): Promise<any> => await as(userId).action(openLiveView as never, { threadId } as never);
+/** The claim the lease holds now, as the person's newest view got it from `takeControl`. */
+const heldClaim = async (): Promise<string> =>
+    ((await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").first())) as any)?.control?.claim ?? "none";
+const keep = async (userId: string, claim?: string): Promise<any> =>
+    await as(userId).mutation(keepControl as never, { claim: claim ?? (await heldClaim()), threadId } as never);
+const giveBack = async (userId: string, reason: "handed_back" | "left", claim?: string): Promise<unknown> =>
+    await as(userId).mutation(handBack as never, { claim: claim ?? (await heldClaim()), reason, threadId } as never);
 
 const addSession = async (fields: Record<string, unknown> = {}): Promise<string> =>
     (await harness.run(
@@ -224,6 +231,8 @@ describe("a running browser", () => {
             canControl: true,
             currentUrl: "https://example.com/login",
             idleUntil: heldUntil,
+            // The server's clock, so a client tells a lease's end without a clock of its own.
+            now: NOW,
         });
         await expect(open(OWNER)).resolves.toMatchObject({ status: "ok" });
     });
@@ -528,16 +537,42 @@ describe("taking control of the browser", () => {
         await take(OWNER);
         vi.setSystemTime(NOW + 60_000);
 
-        await expect(as(OWNER).mutation(keepControl as never, { threadId } as never)).resolves.toEqual({ until: NOW + 60_000 + CONTROL_IDLE_MS });
-        await expect(as(WRITER).mutation(keepControl as never, { threadId } as never)).resolves.toBeNull();
-        await as(WRITER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
+        await expect(keep(OWNER)).resolves.toEqual({ until: NOW + 60_000 + CONTROL_IDLE_MS });
+        await expect(keep(WRITER)).resolves.toBeNull();
+        await giveBack(WRITER, "handed_back");
         await expect(control()).resolves.toMatchObject({ by: OWNER, until: NOW + 60_000 + CONTROL_IDLE_MS });
 
-        await as(OWNER).mutation(handBack as never, { reason: "left", threadId } as never);
+        await giveBack(OWNER, "left");
 
         await expect(control()).resolves.toMatchObject({ ended: "left", until: NOW + 60_000 });
         await expect(statusFor(READER)).resolves.not.toHaveProperty("control");
-        await expect(as(OWNER).mutation(keepControl as never, { threadId } as never)).resolves.toBeNull();
+        await expect(keep(OWNER)).resolves.toBeNull();
+    });
+
+    it("lets only the newest of a person's views renew, hand back or navigate: an older tab never ends a newer one's lease", async () => {
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+        await addSession();
+        const first = await take(OWNER);
+        const second = await take(OWNER);
+        const older = first.claim as string;
+        const newer = second.claim as string;
+
+        expect(newer).not.toBe(older);
+        await expect(heldClaim()).resolves.toBe(newer);
+        await expect(keep(OWNER, older)).resolves.toBeNull();
+        await expect(as(OWNER).action(navigateInControl as never, { claim: older, threadId, url: "https://example.com/next" } as never)).resolves.toEqual({
+            error: "You do not have control of the browser.",
+            status: "refused",
+        });
+        expect(renderer).not.toHaveBeenCalled();
+        // The older tab closes: the newer tab's lease goes on, and the agent is still refused.
+        await giveBack(OWNER, "left", older);
+        await expect(control()).resolves.not.toHaveProperty("ended");
+        await expect(statusFor(READER)).resolves.toMatchObject({ control: { byYou: false } });
+
+        await expect(keep(OWNER, newer)).resolves.toEqual({ until: NOW + CONTROL_IDLE_MS });
+        await giveBack(OWNER, "handed_back", newer);
+        await expect(control()).resolves.toMatchObject({ claim: newer, ended: "handed_back" });
     });
 
     it("keeps the browser watchable after a hand back that ends control longer than the idle window", async () => {
@@ -546,10 +581,10 @@ describe("taking control of the browser", () => {
 
         for (const minute of [1, 2, 3]) {
             vi.setSystemTime(NOW + minute * 60_000);
-            await as(OWNER).mutation(keepControl as never, { threadId } as never);
+            await keep(OWNER);
         }
 
-        await as(OWNER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
+        await giveBack(OWNER, "handed_back");
 
         await expect(statusFor(READER)).resolves.toMatchObject({ idleUntil: NOW + 3 * 60_000 + BROWSER_IDLE_REAP_MS - BROWSER_REAP_MARGIN_MS });
     });
@@ -565,13 +600,18 @@ describe("taking control of the browser", () => {
         await expect(take(WRITER)).resolves.toMatchObject({ status: "ok" });
     });
 
-    it("keeps the lease when a renewal by its holder fails to mint", async () => {
+    it("keeps the lease for the view that holds it when a renewal by its holder fails to mint", async () => {
         await addSession();
-        await take(OWNER);
+        const { claim } = await take(OWNER);
+
         fetchMock.mockResolvedValue(answer(500, {}));
 
         await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
-        await expect(control()).resolves.toMatchObject({ by: OWNER, until: NOW + CONTROL_IDLE_MS });
+        await expect(control()).resolves.toMatchObject({ by: OWNER, claim, until: NOW + CONTROL_IDLE_MS });
+        // The view that got no URL never held a claim: the one still open renews and hands back as before.
+        await expect(keep(OWNER, claim)).resolves.toEqual({ until: NOW + CONTROL_IDLE_MS });
+        await giveBack(OWNER, "handed_back", claim);
+        await expect(control()).resolves.toMatchObject({ claim, ended: "handed_back" });
     });
 
     it("stops renewing a writer whose grant was lowered to read", async () => {
@@ -583,12 +623,12 @@ describe("taking control of the browser", () => {
             await ctx.db.patch("threadAccess", grant._id, { permission: "read" });
         });
 
-        await expect(as(WRITER).mutation(keepControl as never, { threadId } as never)).resolves.toBeNull();
+        await expect(keep(WRITER)).resolves.toBeNull();
     });
     it("returns no URL when the lease was handed back, or the grant lowered, while the provider minted it", async () => {
         await addSession();
         fetchMock.mockImplementationOnce(async () => {
-            await as(OWNER).mutation(handBack as never, { reason: "left", threadId } as never);
+            await giveBack(OWNER, "left");
 
             return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
         });
@@ -657,7 +697,7 @@ describe("taking control of the browser", () => {
 describe("opening a page while in control", () => {
     const take = async (userId: string): Promise<any> => await as(userId).action(takeControl as never, { threadId } as never);
     const navigate = async (userId: string, url = "https://example.com/next"): Promise<any> =>
-        await as(userId).action(navigateInControl as never, { threadId, url } as never);
+        await as(userId).action(navigateInControl as never, { claim: await heldClaim(), threadId, url } as never);
     const session = async (): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").first());
 
     it("navigates the browser for the person in control, and never writes their page for others to read", async () => {
@@ -694,7 +734,7 @@ describe("opening a page while in control", () => {
         let duringLoad: any;
 
         renderer.mockImplementationOnce(async () => {
-            await as(OWNER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
+            await giveBack(OWNER, "handed_back");
             const loading = await session();
 
             duringLoad = loading.control;
@@ -720,7 +760,7 @@ describe("opening a page while in control", () => {
 
         renderer.mockImplementationOnce(async () => {
             during.push(await navigate(OWNER, "https://example.com/other"));
-            await as(OWNER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
+            await giveBack(OWNER, "handed_back");
             during.push(await navigate(OWNER, "https://example.com/other"));
 
             return { data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } };
@@ -741,7 +781,7 @@ describe("opening a page while in control", () => {
         await take(OWNER);
 
         renderer.mockImplementationOnce(async () => {
-            await as(OWNER).mutation(handBack as never, { reason: "left", threadId } as never);
+            await giveBack(OWNER, "left");
             vi.setSystemTime(NOW + 1000);
             await expect(take(OWNER)).resolves.toMatchObject({ status: "ok" });
 
@@ -754,7 +794,7 @@ describe("opening a page while in control", () => {
 
         expect(after.control).not.toHaveProperty("ended");
         expect(after.control.until).toBe(NOW + 1000 + CONTROL_IDLE_MS);
-        await expect(as(OWNER).mutation(keepControl as never, { threadId } as never)).resolves.toEqual({ until: NOW + 1000 + CONTROL_IDLE_MS });
+        await expect(keep(OWNER)).resolves.toEqual({ until: NOW + 1000 + CONTROL_IDLE_MS });
     });
 
     it("hands the lease back again when taking it back mid-load fails to mint", async () => {
@@ -762,7 +802,7 @@ describe("opening a page while in control", () => {
         await take(OWNER);
 
         renderer.mockImplementationOnce(async () => {
-            await as(OWNER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
+            await giveBack(OWNER, "handed_back");
             fetchMock.mockResolvedValueOnce(answer(500, {}));
             await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
             await expect(session()).resolves.toMatchObject({ control: { ended: "handed_back", until: controlNavigationHold(NOW) } });
@@ -804,7 +844,7 @@ describe("opening a page while in control", () => {
         await take(OWNER);
 
         renderer.mockImplementationOnce(async () => {
-            await as(OWNER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
+            await giveBack(OWNER, "handed_back");
 
             // An answer the audit row refuses: its write fails.
             return { data: { error: 42, success: false }, response: { ok: true } };
@@ -848,7 +888,7 @@ describe("opening a page while in control", () => {
         renderer.mockResolvedValue(loaded);
         await take(WRITER);
         await navigate(WRITER, "https://example.com/next?q=1");
-        await as(WRITER).mutation(handBack as never, { reason: "handed_back", threadId } as never);
+        await giveBack(WRITER, "handed_back");
         // Later, so the history's order is not a tie.
         vi.setSystemTime(NOW + 1000);
         await take(OWNER);

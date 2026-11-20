@@ -24,6 +24,8 @@ const { backend } = vi.hoisted(() => {
                 control?: { byYou: boolean; until: number };
                 currentUrl?: string;
                 idleUntil: number;
+                /** The server's clock at the answer; this device's when left out. */
+                now?: number;
             } | null,
             /** When set, the status read fails with it. */
             statusError: undefined as Error | undefined,
@@ -51,7 +53,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                                             throw backend.statusError;
                                         }
 
-                                        return backend.browser;
+                                        return backend.browser && { now: Date.now(), ...backend.browser };
                                     },
                                     queryKey: ["browser", args],
                                 };
@@ -180,6 +182,31 @@ describe("BrowserLiveView", () => {
         expect(screen.queryByRole("region", { name: "Browser" })).toBeNull();
         expect(screen.queryByText("https://example.com/login")).toBeNull();
         expect(backend.statusReads).toBeGreaterThan(readsBefore);
+    });
+
+    it("stays gone once a reader's grant ends, though asking again answers the same last push", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const pushedAt = Date.now();
+
+        // A live query's refetch answers the subscription's last push: the same answer, with the same server clock.
+        backend.browser = { accessUntil: pushedAt + 10_000, browserId: "b-1", idleUntil: pushedAt + 600_000, now: pushedAt };
+        mountCard();
+        await screen.findByRole("region", { name: "Browser" });
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(10_100);
+        });
+        expect(screen.queryByRole("region", { name: "Browser" })).toBeNull();
+
+        // The card asked again: its later receipt time never moves the grant's end back into the future.
+        for (const step of [1000, 5000, 30_000]) {
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(step);
+            });
+            expect(screen.queryByRole("region", { name: "Browser" })).toBeNull();
+        }
+
+        expect(backend.statusReads).toBeGreaterThan(1);
     });
 
     it("waits for a grant that ends weeks from now without waking up again and again, and leaves when it ends", async () => {
@@ -377,8 +404,9 @@ describe("BrowserLiveView", () => {
         await userEvent.click(await screen.findByRole("button", { name: "Watch live" }));
         await screen.findByTitle(LIVE_VIEW);
 
-        // This device's clock runs ahead of the server's: the lease reads as passed here, and the view closes all the same.
-        backend.browser = { browserId: "b-1", control: { byYou: false, until: Date.now() - 1000 }, idleUntil: Date.now() + 600_000 };
+        // This device's clock runs ahead of the server's: the lease reads as passed here, but not on the server's clock,
+        // and the view closes all the same.
+        backend.browser = { browserId: "b-1", control: { byYou: false, until: Date.now() - 1000 }, idleUntil: Date.now() + 600_000, now: Date.now() - 5000 };
         await act(async () => {
             await queryClient.invalidateQueries();
         });
@@ -399,33 +427,30 @@ describe("BrowserLiveView", () => {
         });
     });
 
-    it("asks the status again until the server drops another person's lease that looks over on this device", async () => {
+    it("offers the view again once another person's lease ends on the server's clock, though no new answer comes", async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
-        backend.browser = { browserId: "b-1", control: { byYou: false, until: Date.now() - 1000 }, idleUntil: Date.now() + 600_000 };
+        // The server's clock is 3 s behind this device's; the lease has 10 s left on it.
+        const serverNow = Date.now() - 3000;
+
+        backend.browser = { browserId: "b-1", control: { byYou: false, until: serverNow + 10_000 }, idleUntil: serverNow + 600_000, now: serverNow };
         mountCard();
 
         await screen.findByText("Someone else has control of this browser.");
         const reads = backend.statusReads;
 
+        // 7.5 s on: `until` has passed on this device's clock, but the lease has 2.5 s left on the server's.
         await act(async () => {
-            await vi.advanceTimersByTimeAsync(5000);
+            await vi.advanceTimersByTimeAsync(7500);
         });
-        // The server still names the lease: still closed, and asked again.
-        expect(backend.statusReads).toBeGreaterThan(reads);
         expect(screen.getByRole("button", { name: "Watch live" })).toHaveProperty("disabled", true);
 
-        backend.browser = { browserId: "b-1", idleUntil: Date.now() + 600_000 };
+        // A lease that runs out writes nothing: the status stays the last answer, which still names it.
         await act(async () => {
-            await vi.advanceTimersByTimeAsync(5000);
+            await vi.advanceTimersByTimeAsync(3000);
         });
-
         expect(screen.getByRole("button", { name: "Watch live" })).toHaveProperty("disabled", false);
-        const settled = backend.statusReads;
-
-        await act(async () => {
-            await vi.advanceTimersByTimeAsync(15_000);
-        });
-        expect(backend.statusReads).toBe(settled);
+        expect(screen.queryByText("Someone else has control of this browser.")).toBeNull();
+        expect(backend.statusReads).toBe(reads);
     });
 
     it("says the browser status could not be read, instead of hiding the card, and reads it again on request", async () => {

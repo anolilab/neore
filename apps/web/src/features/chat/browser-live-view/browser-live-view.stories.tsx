@@ -16,6 +16,7 @@ const running = lunora(api.browser.live_view.getThreadBrowser, {
     canControl: true,
     currentUrl: "https://example.com/account/login",
     idleUntil: STORY_NOW + 60_000,
+    now: STORY_NOW,
 });
 
 const meta = {
