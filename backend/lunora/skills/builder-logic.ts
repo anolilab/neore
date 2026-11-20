@@ -8,6 +8,9 @@
  * not on the whitelist is dropped here, never passed through — the builder must
  * not be a way to reach a disabled model or an unknown tool.
  */
+import type { ModelCandidate } from "@neore/ai/models";
+import { isSelectableTextModel } from "@neore/ai/models";
+
 import type { RawSkillDraft, SkillDraft } from "./generate-prompt";
 import { normalizeSkillDraft, SKILL_CATEGORIES } from "./generate-prompt";
 import { extractVariables, substituteVariables } from "./variables";
@@ -33,18 +36,7 @@ export { MAX_GOAL_LENGTH } from "./generate-prompt";
 // Whitelists
 // ============================================================================
 
-/** The subset of a `MODEL_REGISTRY` entry the whitelist reads. */
-export interface ModelCandidate {
-    enabled?: boolean;
-    featureFlag?: string;
-    id: string;
-    isPreprocessor?: boolean;
-    listed?: boolean;
-    mode?: string;
-    name?: string;
-    provider: string;
-    tier?: string;
-}
+export { isSelectableTextModel, type ModelCandidate } from "@neore/ai/models";
 
 export interface BuilderModelOption {
     id: string;
@@ -57,21 +49,6 @@ export interface BuilderWhitelist {
     searchModes: ReadonlyArray<{ description: string; id: string }>;
     tools: ReadonlyArray<{ description: string; name: string }>;
 }
-
-/**
- * The text models a builder may propose: enabled, platform-hosted (not
- * `external`, not a user's `custom:` endpoint), text mode, not behind a feature
- * flag, and listed — the same public catalogue the model picker shows. Mirrors
- * `resolveSkillModel`, which would ignore anything else at run time anyway.
- */
-export const isSelectableTextModel = (definition: ModelCandidate): boolean =>
-    definition.enabled !== false &&
-    definition.provider !== "external" &&
-    (definition.mode ?? "text") === "text" &&
-    !definition.featureFlag &&
-    !definition.isPreprocessor &&
-    definition.listed === true &&
-    !definition.id.startsWith("custom:");
 
 /** The registry entries {@link isSelectableTextModel} accepts, as picker options. */
 export const selectableTextModels = (definitions: ReadonlyArray<ModelCandidate>): BuilderModelOption[] =>

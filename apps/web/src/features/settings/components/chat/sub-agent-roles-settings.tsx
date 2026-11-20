@@ -4,6 +4,7 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import type { GatewayModel } from "@neore/ai/models";
+import { isSelectableTextModel, MODEL_LOOKUP } from "@neore/ai/models";
 import type { Id } from "@neore/backend/dataModel";
 import { Alert, AlertDescription } from "@neore/ui/components/alert";
 import { Button } from "@neore/ui/components/button";
@@ -120,6 +121,10 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, name, onSav
         serverValue.current = value;
 
         if (inFlight.current === 0 && effortTimer.current === undefined) {
+            const shown = ownRef.current.instructions ?? "";
+
+            // A draft the user has not touched takes the new instructions; one they are editing stays as typed.
+            setDraft((current) => (current === shown ? (value?.instructions ?? "") : current));
             ownRef.current = value ?? {};
             setOwnState(value ?? {});
         }
@@ -299,9 +304,14 @@ const SubAgentRolesSettings: FC = () => {
             .filter(([, entry]) => entry.enabled && entry.hasKey)
             .map(([provider]) => provider),
     );
-    // The save re-checks on the server (model filters included); this keeps the list to chat models a run could use.
+    // The registry rule a role's save applies (`isSelectableTextModel`), so the list offers no model the server would
+    // refuse; the save still re-checks it, with the user's model filters. The gateway list has no `custom:` endpoints.
     const models = offerableBackupModels(
-        flaggedModels.filter((model) => model.enabled && (model.mode === "text" || !model.mode)),
+        flaggedModels.filter((model) => {
+            const definition = MODEL_LOOKUP.get(model.id);
+
+            return model.enabled && definition !== undefined && isSelectableTextModel(definition);
+        }),
         access?.canRunPaidModels === true,
         providersWithKey,
     );
