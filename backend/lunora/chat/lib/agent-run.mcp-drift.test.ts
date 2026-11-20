@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildAgentTools } from "./agent-tools";
 import getAgent from "./get-agent";
 import { resumeApprovedRun } from "./agent-run";
+import { mcpToolOrigin } from "./mcp-tool-fingerprint";
 
 vi.mock("./get-agent", () => {
     return { default: vi.fn() };
@@ -185,6 +186,59 @@ describe("an approved MCP call after a pause", () => {
         expect(await resume({ [TOOL]: "aaa" })).toBe(STOP);
         expect(agent.approveToolCall).not.toHaveBeenCalled();
         expect(agent.denyToolCall).toHaveBeenCalledOnce();
+    });
+
+    // With no fingerprint at the pause (it failed or timed out), the origin alone pins where the call goes.
+    describe("with no fingerprint, under the origin each run computed", () => {
+        const DOCS = { endpoint: "https://docs.example.com/mcp", protocol: "http", serverName: "Docs", toolName: "search" };
+        const NOTION = { ...DOCS, connectorSlug: "notion", endpoint: "https://mcp.notion.example/mcp", serverName: "Notion" };
+        const origins = async (source: Parameters<typeof mcpToolOrigin>[0]) => {
+            return { [TOOL]: await mcpToolOrigin(source) };
+        };
+        const deniedAsReplaced = () => {
+            expect(agent.approveToolCall).not.toHaveBeenCalled();
+            expect(agent.denyToolCall).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ reason: expect.stringContaining("another server's tool") }),
+                expect.anything(),
+                expect.anything(),
+            );
+        };
+
+        it("runs when the server is the same", async () => {
+            rebuiltWith(undefined, true, await origins(DOCS));
+
+            expect(await resume({}, undefined, await origins({ ...DOCS }))).toBe(STOP);
+            expect(agent.approveToolCall).toHaveBeenCalledOnce();
+        });
+
+        it("is not run when the server's transport changed", async () => {
+            rebuiltWith(undefined, true, await origins({ ...DOCS, protocol: "sse" }));
+
+            expect(await resume({}, undefined, await origins(DOCS))).toBe(STOP);
+            deniedAsReplaced();
+        });
+
+        it("is not run when a connector's endpoint changed", async () => {
+            rebuiltWith(undefined, true, await origins({ ...NOTION, endpoint: "https://elsewhere.example/mcp" }));
+
+            expect(await resume({}, undefined, await origins(NOTION))).toBe(STOP);
+            deniedAsReplaced();
+        });
+
+        // The hash before transport and endpoint joined it: an approval paused under it is asked again, never run, never an error.
+        it("is not run under an origin an earlier version recorded, and the model is told to call again", async () => {
+            const legacy = new TextEncoder().encode(JSON.stringify({ server: { name: "Docs", url: DOCS.endpoint }, tool: "search" }));
+            const legacyHash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", legacy))]
+                .map((byte) => byte.toString(16).padStart(2, "0"))
+                .join("")
+                .slice(0, 32);
+
+            rebuiltWith(undefined, true, await origins(DOCS));
+
+            expect(await resume({}, undefined, { [TOOL]: legacyHash })).toBe(STOP);
+            deniedAsReplaced();
+        });
     });
 
     it("runs a snapshot written before origins as before when the tool is unchanged", async () => {

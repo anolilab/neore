@@ -38,12 +38,12 @@ vi.mock("./mcp-tools", () => {
             // The docs server is listed under the name the user renamed it to: its selectors still match it by address.
             const descriptors = new Map(
                 [
-                    ["mcp_docs__read", { serverName: "Docs (renamed)", toolName: "read", url: DOCS_URL }],
-                    ["mcp_docs__search", { serverName: "Docs (renamed)", toolName: "search", url: DOCS_URL }],
-                    ["mcp_mail__send", { serverName: "mail", toolName: "send", url: MAIL_URL }],
+                    ["mcp_docs__read", { endpoint: DOCS_URL, protocol: "http", serverName: "Docs (renamed)", toolName: "read", url: DOCS_URL }],
+                    ["mcp_docs__search", { endpoint: DOCS_URL, protocol: "http", serverName: "Docs (renamed)", toolName: "search", url: DOCS_URL }],
+                    ["mcp_mail__send", { endpoint: MAIL_URL, protocol: "http", serverName: "mail", toolName: "send", url: MAIL_URL }],
                 ].filter(([, source]) => servers.some((server) => server.url === (source as { url: string }).url)) as [
                     string,
-                    { serverName: string; toolName: string; url: string },
+                    { endpoint: string; protocol: string; serverName: string; toolName: string; url: string },
                 ][],
             );
 
@@ -231,15 +231,10 @@ describe("buildAgentTools with a bot's tool selection", () => {
         const { mcpToolOrigins } = await buildAgentTools(ctx(), { model: "m", organizationId: null, searchMode: "web", threadId: "thread-1", userId: "owner" });
 
         expect(Object.keys(mcpToolOrigins).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["mcp_docs__read", "mcp_mail__send"]);
-        expect(mcpToolOrigins.mcp_docs__read).toBe(await mcpToolOrigin({ serverName: "Docs (renamed)", toolName: "read", url: DOCS_URL }));
-        expect(mcpToolOrigins.mcp_mail__send).toBe(await mcpToolOrigin({ serverName: "mail", toolName: "send", url: MAIL_URL }));
-        expect(await mcpToolOrigin({ serverName: "Docs (renamed)", toolName: "read", url: DOCS_URL })).not.toBe(
-            await mcpToolOrigin({ serverName: "Docs (renamed)", toolName: "read", url: MAIL_URL }),
+        expect(mcpToolOrigins.mcp_docs__read).toBe(
+            await mcpToolOrigin({ endpoint: DOCS_URL, protocol: "http", serverName: "Docs (renamed)", toolName: "read" }),
         );
-        // Two servers saved under one address are two servers.
-        expect(await mcpToolOrigin({ serverName: "a", toolName: "read", url: DOCS_URL })).not.toBe(
-            await mcpToolOrigin({ serverName: "b", toolName: "read", url: DOCS_URL }),
-        );
+        expect(mcpToolOrigins.mcp_mail__send).toBe(await mcpToolOrigin({ endpoint: MAIL_URL, protocol: "http", serverName: "mail", toolName: "send" }));
     });
 
     it("reads no selection for a run with neither a bot nor a thread", async () => {

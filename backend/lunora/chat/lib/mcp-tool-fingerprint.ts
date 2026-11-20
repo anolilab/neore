@@ -137,17 +137,31 @@ export const fingerprintMcpTool = async (tool: ToolSet[string], source: Fingerpr
 };
 
 /**
- * Which server's which tool a runtime name stood for: the server's identity (a connector's slug, else its name and address) and the
- * tool's own name, hashed. Runtime names are given in listing order (`mcpRuntimeToolName`), so when the servers a run lists
- * change between a pause and its continuation (a bot's selection, a server switched off), a name can pass to another
- * server's tool. The continuation runs an approved call only under the same origin. Unlike the fingerprint it never fails:
- * nothing in it resolves lazily. Only the hash is stored, never the address.
+ * Which server's which tool a runtime name stood for: everything that decides where its calls go (the server's identity, a
+ * connector's slug or else a user server's name, plus the address and transport the calls are sent to) and the tool's own
+ * name, hashed. Runtime names are given in listing order (`mcpRuntimeToolName`), so when the servers a run lists change
+ * between a pause and its continuation (a bot's selection, a server switched off, an edited address or transport), a name
+ * can pass to another server's tool. The continuation runs an approved call only under the same origin, so the origin alone
+ * pins the destination when the tool could not be fingerprinted. Unlike the fingerprint it never fails: nothing in it
+ * resolves lazily. Only the hash is stored, never the address. An origin saved by an older version of this hash matches no
+ * current one, so its approval is answered as denied and asked again.
  */
-export const mcpToolOrigin = async (source: { connectorSlug?: string; serverName: string; toolName: string; url?: string }): Promise<string> => {
+export const mcpToolOrigin = async (source: {
+    connectorSlug?: string;
+    endpoint: string;
+    protocol: string;
+    serverName: string;
+    toolName: string;
+}): Promise<string> => {
     // A user's server by its name AND address: two saved under one address are two servers (their own credentials), and a
-    // rename between the pause and the continuation denies the call, the safe way.
+    // rename between the pause and the continuation denies the call, the safe way. A connector by its slug: its display name
+    // is the provider's, but its endpoint and transport still decide where the call goes.
     const identity = canonicalJson({
-        server: source.connectorSlug === undefined ? { name: source.serverName, url: source.url ?? null } : { connector: source.connectorSlug },
+        server: {
+            ...(source.connectorSlug === undefined ? { name: source.serverName } : { connector: source.connectorSlug }),
+            endpoint: source.endpoint,
+            protocol: source.protocol,
+        },
         tool: source.toolName,
     });
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity));

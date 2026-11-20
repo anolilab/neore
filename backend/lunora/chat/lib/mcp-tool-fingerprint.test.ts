@@ -1,7 +1,7 @@
 import { dynamicTool, jsonSchema, type JSONSchema7, type ToolSet } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
-import { FINGERPRINT_DEADLINE_MS, fingerprintMcpTool, mcpToolDrift, mcpToolOriginDrift } from "./mcp-tool-fingerprint";
+import { FINGERPRINT_DEADLINE_MS, fingerprintMcpTool, mcpToolDrift, mcpToolOrigin, mcpToolOriginDrift } from "./mcp-tool-fingerprint";
 
 /** An MCP tool shaped like the ones the MCP client builds from a `tools/list` entry. */
 const mcpTool = (schema: JSONSchema7 | PromiseLike<JSONSchema7>): ToolSet[string] =>
@@ -167,6 +167,39 @@ describe(fingerprintMcpTool, () => {
 
     it("is a short hash, not the schema", async () => {
         expect(await fingerprintMcpTool(mcpTool(SEARCH_SCHEMA), SOURCE)).toMatch(SHORT_HASH);
+    });
+});
+
+describe(mcpToolOrigin, () => {
+    const USER_SERVER = { endpoint: "https://docs.example.com/mcp", protocol: "http", serverName: "Docs", toolName: "search" };
+    const CONNECTOR = { ...USER_SERVER, connectorSlug: "notion", serverName: "Notion" };
+
+    it("is the same for the same server and tool", async () => {
+        expect(await mcpToolOrigin({ ...USER_SERVER })).toBe(await mcpToolOrigin(USER_SERVER));
+        expect(await mcpToolOrigin(USER_SERVER)).toMatch(SHORT_HASH);
+    });
+
+    it("changes when a server's tool now goes to another address", async () => {
+        expect(await mcpToolOrigin({ ...USER_SERVER, endpoint: "https://other.example.com/mcp" })).not.toBe(await mcpToolOrigin(USER_SERVER));
+    });
+
+    it("changes when the same address is now reached over another transport", async () => {
+        expect(await mcpToolOrigin({ ...USER_SERVER, protocol: "sse" })).not.toBe(await mcpToolOrigin(USER_SERVER));
+        expect(await mcpToolOrigin({ ...CONNECTOR, protocol: "sse" })).not.toBe(await mcpToolOrigin(CONNECTOR));
+    });
+
+    it("changes when a connector's tool now goes to another address, and not when only its display name does", async () => {
+        expect(await mcpToolOrigin({ ...CONNECTOR, endpoint: "https://elsewhere.example.com/mcp" })).not.toBe(await mcpToolOrigin(CONNECTOR));
+        expect(await mcpToolOrigin({ ...CONNECTOR, serverName: "Notion (work)" })).toBe(await mcpToolOrigin(CONNECTOR));
+    });
+
+    it("tells two servers saved under one address apart, and a server from a connector at the same address", async () => {
+        expect(await mcpToolOrigin({ ...USER_SERVER, serverName: "Docs 2" })).not.toBe(await mcpToolOrigin(USER_SERVER));
+        expect(await mcpToolOrigin(CONNECTOR)).not.toBe(await mcpToolOrigin(USER_SERVER));
+    });
+
+    it("changes with the tool", async () => {
+        expect(await mcpToolOrigin({ ...USER_SERVER, toolName: "delete" })).not.toBe(await mcpToolOrigin(USER_SERVER));
     });
 });
 
