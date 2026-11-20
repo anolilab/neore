@@ -154,3 +154,9 @@ fn unpairing_a_machine_that_is_not_paired_succeeds_and_asks_nothing() {
     assert!(!dir.join(NONCE_FILE).exists());
     assert!(!dir.join("host.json.tmp").exists());
 }
+
+#[test]
+fn run_compares_signed_expiry_with_the_date_not_the_uptime() {
+    // 2020-01-01 in milliseconds: any date-based clock is past it, a clock counting from process start is not.
+    assert!(wall_now_ms() > 1_577_836_800_000);
+}

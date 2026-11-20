@@ -6,9 +6,18 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use super::http::UreqHttp;
-use super::pair::{self, Identity, SystemTimer, Timer};
+use super::pair::{self, Identity, SystemTimer};
 use super::serve::{RunLock, Service};
 use super::vault::{default_dir, OsKeychain, Vault};
+
+/// Wall-clock milliseconds since the epoch: a signed call's `expiresAt` is a date, so `run` compares it with this,
+/// never with `SystemTimer`, which only measures durations.
+fn wall_now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|age| age.as_millis() as u64)
+        .unwrap_or_default()
+}
 
 /// The used-nonce history `run` keeps beside the pairing.
 const NONCE_FILE: &str = "nonces.json";
@@ -235,12 +244,11 @@ pub fn main(command: &str, args: impl Iterator<Item = String>) -> ExitCode {
                 loaded.record.storage.describe()
             );
 
-            let timer = SystemTimer;
             let mut service = match Service::new(
                 &loaded.record.device_id,
                 &loaded.secret,
                 &vault.dir().join(NONCE_FILE),
-                timer.now_ms(),
+                wall_now_ms(),
             ) {
                 Ok(service) => service,
                 Err(error) => {
@@ -250,7 +258,7 @@ pub fn main(command: &str, args: impl Iterator<Item = String>) -> ExitCode {
                 }
             };
 
-            match service.run(io::stdin().lock(), io::stdout(), || timer.now_ms()) {
+            match service.run(io::stdin().lock(), io::stdout(), wall_now_ms) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {
                     eprintln!("neore-host: {error}");
