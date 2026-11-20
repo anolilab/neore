@@ -34,6 +34,7 @@ describe("startUploadWait", () => {
                 { complete: false, fileId: undefined, id: "b" },
             ],
             referenceIds: ["r1"],
+            target: "",
             text: "see files",
             threadId: "thread-1",
         });
@@ -107,6 +108,14 @@ describe("settleUploadWait", () => {
         expect(settleUploadWait(wait, { attachments: files(["a", "complete"]), references: [], text: "see files" }, "thread-1", "user-1")).toStrictEqual({
             kind: "send",
         });
+    });
+
+    it("ends as retargeted when comparison mode or its models changed while the uploads ran", () => {
+        const wait = startUploadWait({ attachments: files(["a", "uploading"]), references: [], target: "", text: "see files" }, "thread-1");
+        const done = { attachments: files(["a", "complete"]), references: [], text: "see files" };
+
+        expect(settleUploadWait(wait, { ...done, target: "model-a\nmodel-b" }, "thread-1")).toStrictEqual({ kind: "retargeted" });
+        expect(settleUploadWait(wait, { ...done, target: "" }, "thread-1")).toStrictEqual({ kind: "send" });
     });
 
     it("cancels quietly when the account changed, even in the same chat", () => {

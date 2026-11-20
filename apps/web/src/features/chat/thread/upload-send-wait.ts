@@ -11,6 +11,8 @@ interface WaitedReference {
 export interface Draft {
     attachments: ReadonlyArray<WaitedAttachment>;
     references: ReadonlyArray<WaitedReference>;
+    /** Where the send goes: the models a comparison sends to, or empty for an ordinary send. */
+    target?: string;
     text: string;
 }
 
@@ -30,11 +32,18 @@ export interface UploadWait {
     attachmentIds: ReadonlyArray<string>;
     pressedAttachments: ReadonlyArray<PressedAttachment>;
     referenceIds: ReadonlyArray<string>;
+    target: string;
     text: string;
     threadId: string | undefined;
 }
 
-export type UploadWaitOutcome = { kind: "cancelled" } | { kind: "edited" } | { kind: "failed"; name: string } | { kind: "send" } | { kind: "waiting" };
+export type UploadWaitOutcome =
+    | { kind: "cancelled" }
+    | { kind: "edited" }
+    | { kind: "failed"; name: string }
+    | { kind: "retargeted" }
+    | { kind: "send" }
+    | { kind: "waiting" };
 
 const pressedAttachment = (attachment: WaitedAttachment): PressedAttachment => {
     const complete = attachment.status === "complete";
@@ -50,6 +59,7 @@ export const startUploadWait = (draft: Draft, threadId: string | undefined, acco
         attachmentIds: draft.attachments.filter((attachment) => attachment.status !== "complete").map((attachment) => attachment.id),
         pressedAttachments: draft.attachments.map((attachment) => pressedAttachment(attachment)),
         referenceIds: draft.references.map((reference) => reference.id),
+        target: draft.target ?? "",
         text: draft.text,
         threadId,
     };
@@ -88,6 +98,11 @@ export const settleUploadWait = (wait: UploadWait, draft: Draft, threadId: strin
 
     if (draft.text !== wait.text || !sameAttachments(draft.attachments, wait.pressedAttachments) || !sameReferences(draft.references, wait.referenceIds)) {
         return { kind: "edited" };
+    }
+
+    // A change to comparison mode or its models would send the draft somewhere else than the press chose.
+    if ((draft.target ?? "") !== wait.target) {
+        return { kind: "retargeted" };
     }
 
     const waited = draft.attachments.filter((attachment) => wait.attachmentIds.includes(attachment.id));

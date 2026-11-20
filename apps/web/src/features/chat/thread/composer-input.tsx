@@ -531,6 +531,8 @@ const ComposerInput = ({
     const selectedModelsForComparison = useModelStore((state) => state.selectedModelsForComparison);
     const { isLoading: isComparisonLoading, sendComparisonMessage } = useComparisonChat({ jwtToken });
     const isComparisonValid = comparisonMode && selectedModelsForComparison.length >= MIN_COMPARISON_MODELS;
+    // Where a send goes: the compared models, or empty for an ordinary send. A waiting send keeps the one it was pressed for.
+    const sendTarget = isComparisonValid ? selectedModelsForComparison.join("\n") : "";
 
     // SSE streaming in progress
     const isSSEStreaming = !!sseStreamState;
@@ -1188,7 +1190,7 @@ const ComposerInput = ({
             // effect after the auto-submit).
             setUploadWait(
                 startUploadWait(
-                    { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, text: draftText },
+                    { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, target: sendTarget, text: draftText },
                     threadId,
                     accountId,
                 ),
@@ -1323,6 +1325,7 @@ const ComposerInput = ({
         setText,
         notifyFailedUpload,
         accountId,
+        sendTarget,
     ]);
 
     // "Send as a new chat" from outside the chat UI (the native shell's Quick
@@ -1399,7 +1402,7 @@ const ComposerInput = ({
         const live = useChatUIStore.getState();
         const outcome = settleUploadWait(
             uploadWait,
-            { attachments: live.composerAttachments, references: live.attachedReferences, text: live.composerText },
+            { attachments: live.composerAttachments, references: live.attachedReferences, target: sendTarget, text: live.composerText },
             threadId,
             accountId,
         );
@@ -1419,6 +1422,12 @@ const ComposerInput = ({
 
             case "failed": {
                 notifyFailedUpload(outcome.name);
+
+                break;
+            }
+
+            case "retargeted": {
+                showInfo(t`The model selection changed while the uploads ran, so the message was not sent. Press send to send it.`);
 
                 break;
             }
@@ -1459,6 +1468,7 @@ const ComposerInput = ({
         isStreaming,
         isThreadComposer,
         notifyFailedUpload,
+        sendTarget,
         t,
         text,
         threadId,
