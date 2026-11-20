@@ -76,6 +76,8 @@ export interface PendingAttachment {
     progress?: number;
     /** Restored by its file id after a reload: `file` is an empty stand-in, and this is the uploaded file's size in bytes. */
     restoredSize?: number;
+    /** How often the user edited it in the composer; a placeholder swapped for the real file does not count. */
+    revision?: number;
     status: "pending" | "uploading" | "complete" | "error";
     type: "image" | "file" | "document";
 }

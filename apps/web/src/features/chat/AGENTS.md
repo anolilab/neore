@@ -79,3 +79,6 @@ Tabs: `"summary"` | `"prompts"` | `"variables"` | `"pins"` (and any future tabs 
   `thread/composer-tiptap/emoji-shortcode/emoji-index.ts`, which the composer starts once the list can open.
 - A composer text-input rule must be a plugin registered after `VimMode`, not an editor prop: editor props are asked
   before plugins, so a props handler runs ahead of vim's normal mode (`composer-tiptap/wrap-selection.ts`).
+- Never send a draft attachment that is not complete. A send pressed during an upload waits (`thread/upload-send-wait.ts`);
+  a failed upload stops it, any edit (removing a file included) ends it with a notice, and a chat or account change, a
+  manual Stop or a manual send that goes out ends it quietly. Keep the pending check in `handleSubmit` when changing it.
