@@ -35,6 +35,11 @@ describe("matchesGlob", () => {
         expect(matchesGlob(glob, path)).toBe(expected);
     });
 
+    it("reads a backslash in a pattern as a folder separator, as in a path", () => {
+        expect(matchesGlob(String.raw`db\*.sql`, "db/schema.sql")).toBe(true);
+        expect(matchesGlob(String.raw`db\*.sql`, String.raw`db\schema.sql`)).toBe(true);
+    });
+
     it("answers a pattern built to backtrack without hanging", () => {
         expect(matchesGlob(`${"*a".repeat(40)}*b`, "a".repeat(1000))).toBe(false);
         expect(matchesGlob("**/".repeat(60), `${"x/".repeat(400)}y`)).toBe(false);

@@ -189,7 +189,8 @@ const matchPattern = (pattern: string, subject: string, budget: MatchBudget): bo
 
 /**
  * Whether `path` matches `glob`. A pattern without a `/` is matched against the file's name alone (`*.sql` matches
- * `db/schema.sql`); one with a `/` against the whole path. Backslashes count as `/`, a leading `./` or `/` is ignored.
+ * `db/schema.sql`); one with a `/` against the whole path. Backslashes count as `/` in both, a leading `./` or `/` is
+ * ignored.
  */
 export const matchesGlob = (glob: string, path: string, shared?: MatchBudget): boolean => {
     const budget = shared ?? { steps: GLOB_MATCH_STEPS_PER_RUN };
@@ -199,7 +200,7 @@ export const matchesGlob = (glob: string, path: string, shared?: MatchBudget): b
     }
 
     const normalized = path.replaceAll("\\", "/").replace(LEADING_ROOT, "").slice(0, MAX_MATCHED_PATH_LENGTH);
-    const trimmed = glob.trim().replace(LEADING_ROOT, "");
+    const trimmed = glob.trim().replaceAll("\\", "/").replace(LEADING_ROOT, "");
 
     if (!trimmed || !normalized) {
         return false;
