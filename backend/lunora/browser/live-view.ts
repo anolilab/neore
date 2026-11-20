@@ -161,7 +161,7 @@ export const getThreadBrowser = authQuery
  * lapsed while the provider minted is over even where a nested call still reads the time its action started at.
  */
 export const getReaderBrowser = internalQuery
-    .input({ at: v.optional(v.number()), threadId: v.id("threads"), userId: v.string() })
+    .input({ at: v.optional(v.number()), claim: v.optional(v.string()), threadId: v.id("threads"), userId: v.string() })
     .output(
         v.union(
             v.object({ kind: v.literal("denied") }),
@@ -170,14 +170,14 @@ export const getReaderBrowser = internalQuery
                 canControl: v.boolean(),
                 /** Someone other than the caller drives the browser. */
                 controlledByOther: v.boolean(),
-                /** The caller holds a lease they have not handed back. */
+                /** The caller holds a lease they have not handed back; with `claim`, the lease that claim names. */
                 inControl: v.boolean(),
                 kind: v.literal("watchable"),
                 providerSessionId: v.string(),
             }),
         ),
     )
-    .query(async ({ args: { at, threadId, userId }, ctx }) => {
+    .query(async ({ args: { at, claim, threadId, userId }, ctx }) => {
         const browser = await readerBrowser(ctx, threadId, userId, Math.max(ctx.now, at ?? 0), { primary: true });
 
         if (browser.kind !== "watchable") {
@@ -187,7 +187,10 @@ export const getReaderBrowser = internalQuery
         return {
             canControl: browser.canControl,
             controlledByOther: browser.control !== undefined && browser.control.by !== userId,
-            inControl: browser.control?.by === userId && browser.session.control?.ended === undefined,
+            inControl:
+                browser.control?.by === userId &&
+                browser.session.control?.ended === undefined &&
+                (claim === undefined || browser.session.control?.claim === claim),
             kind: browser.kind,
             providerSessionId: browser.providerSessionId,
         };
@@ -513,8 +516,15 @@ export const takeControl = authAction
         }
 
         // The provider call takes time: a grant removed or lowered, a chat locked or trashed, a lease handed back, taken
-        // over or lapsed, or a browser replaced while it ran gets no URL.
-        const after = await ctx.runQuery(internal.browser.live_view.getReaderBrowser, { at: Date.now(), threadId, userId });
+        // over, renewed by another of the caller's tabs or lapsed, or a browser replaced while it ran gets no URL.
+        const after = await ctx
+            .runQuery(internal.browser.live_view.getReaderBrowser, { at: Date.now(), claim: claim.claim, threadId, userId })
+            .catch(async (error: unknown) => {
+                // No URL leaves this call: the claim goes as on any other failure, and the error with it.
+                await drop();
+
+                throw error;
+            });
 
         if (after.kind === "denied") {
             await refuse("ended", "denied_after_mint");
@@ -616,7 +626,7 @@ export const navigateInControl = authAction
             return { error: "Browser automation is not configured.", status: "refused" as const };
         }
 
-        const navigation = await ctx.runMutation(internal.browser.live_view.beginControlNavigation, { claim, threadId, url, userId });
+        const navigation = await ctx.runMutation(internal.browser.live_view.beginControlNavigation, { at: Date.now(), claim, threadId, url, userId });
 
         if (navigation.kind === "denied") {
             return throwThreadNotFound();
@@ -639,17 +649,21 @@ export const navigateInControl = authAction
         // The hold was written before this call: one that starts late is cut off before the hold ends, never after it,
         // and one too late for any of it is not sent (no answer, like a call that failed: the browser is left as it is).
         const budget = rendererCallBudget(navigation.navigatingUntil, startedAt);
+        const signal = budget === 0 ? undefined : AbortSignal.timeout(budget);
         const { data } =
-            budget === 0
+            signal === undefined
                 ? { data: undefined }
                 : await browserAction({
                       body: { action: "navigate", sessionId: navigation.providerSessionId, url },
                       client,
-                      signal: AbortSignal.timeout(budget),
+                      signal,
                   }).catch(() => {
                       return { data: undefined };
                   });
         const result = data as BrowserActionResponse | undefined;
+        // A call cut off at its deadline may still be loading the page in the renderer: its hold runs out on its own, so
+        // the agent never acts while it lands. The signal, as the clock may lag the timer that fired it.
+        const mayStillLoad = signal !== undefined && result === undefined && (signal.aborted || Date.now() >= startedAt + budget);
 
         // The audit row, on the row the navigation began on, and a browser the renderer replaced or closed (a blocked
         // redirect closes it and answers no id: nothing is left to watch). Not the session's page: others who watch the
@@ -670,11 +684,14 @@ export const navigateInControl = authAction
                 target: url,
             });
         } finally {
-            await ctx.runMutation(internal.browser.live_view.endControlNavigation, {
-                navigatingUntil: navigation.navigatingUntil,
-                sessionId: navigation.sessionId,
-                userId,
-            });
+            if (!mayStillLoad) {
+                await ctx.runMutation(internal.browser.live_view.endControlNavigation, {
+                    at: Date.now(),
+                    navigatingUntil: navigation.navigatingUntil,
+                    sessionId: navigation.sessionId,
+                    userId,
+                });
+            }
         }
 
         if (result?.success !== true) {
@@ -689,10 +706,11 @@ export const navigateInControl = authAction
  * thread, the owner has not turned browsing off or listed the address, and no page they asked for still loads. The
  * lease lasts at least as long as the renderer call (`rendererCallHold`: the call may start a little later and is
  * cut off before the hold ends), and a hand back meanwhile waits for it ({@link handBack}), so the agent never acts
- * while the page the person asked for loads. `navigatingUntil` names this navigation.
+ * while the page the person asked for loads. `navigatingUntil` names this navigation. `at`: the action's clock, as in
+ * `getReaderBrowser`, so a lease that lapsed since the action started is over.
  */
 export const beginControlNavigation = internalMutation
-    .input({ claim: v.string(), threadId: v.id("threads"), url: v.string(), userId: v.string() })
+    .input({ at: v.optional(v.number()), claim: v.string(), threadId: v.id("threads"), url: v.string(), userId: v.string() })
     .output(
         v.union(
             v.object({ kind: v.union(v.literal("denied"), v.literal("loading"), v.literal("refused")) }),
@@ -707,8 +725,9 @@ export const beginControlNavigation = internalMutation
             }),
         ),
     )
-    .mutation(async ({ args: { claim, threadId, url, userId }, ctx }) => {
-        const browser = await readerBrowser(ctx, threadId, userId, ctx.now, { primary: true });
+    .mutation(async ({ args: { at, claim, threadId, url, userId }, ctx }) => {
+        const now = Math.max(ctx.now, at ?? 0);
+        const browser = await readerBrowser(ctx, threadId, userId, now, { primary: true });
 
         if (browser.kind === "denied") {
             return { kind: "denied" as const };
@@ -721,7 +740,7 @@ export const beginControlNavigation = internalMutation
         }
 
         // One page at a time: a second would end its hold when the first one loads, while it still runs.
-        if ((control.navigatingUntil ?? 0) > ctx.now) {
+        if ((control.navigatingUntil ?? 0) > now) {
             return { kind: "loading" as const };
         }
 
@@ -735,7 +754,7 @@ export const beginControlNavigation = internalMutation
             return { error: blocked, kind: "blocked" as const };
         }
 
-        const navigatingUntil = rendererCallHold(ctx.now);
+        const navigatingUntil = rendererCallHold(now);
 
         await patchRow(ctx.db, "browserSessions", browser.session, {
             control: { ...control, navigatingUntil, until: Math.max(control.until, navigatingUntil) },
@@ -750,10 +769,15 @@ export const beginControlNavigation = internalMutation
         };
     });
 
-/** The person's page loaded (or failed): a lease handed back meanwhile ends now. Only that navigation's own hold ends. */
+/**
+ * The person's page loaded (or failed): a lease handed back meanwhile ends now, and one still held starts a fresh idle
+ * window, so the person is not cut off the moment the page they opened appears. Only that navigation's own hold ends,
+ * and a lease that lapsed meanwhile, or whose holder may no longer write in the chat, is not renewed. `at`: the action's clock once the page loaded (see `getReaderBrowser`).
+ */
 export const endControlNavigation = internalMutation
-    .input({ navigatingUntil: v.number(), sessionId: v.id("browserSessions"), userId: v.string() })
-    .mutation(async ({ args: { navigatingUntil, sessionId, userId }, ctx }) => {
+    .input({ at: v.optional(v.number()), navigatingUntil: v.number(), sessionId: v.id("browserSessions"), userId: v.string() })
+    .mutation(async ({ args: { at, navigatingUntil, sessionId, userId }, ctx }) => {
+        const now = Math.max(ctx.now, at ?? 0);
         const session = await ctx.db.get("browserSessions", sessionId);
         const control = session?.control;
 
@@ -761,8 +785,19 @@ export const endControlNavigation = internalMutation
             return;
         }
 
-        // `undefined` removes the deadline: the page loaded.
+        if (control.ended !== undefined) {
+            // `undefined` removes the deadline: the page loaded.
+            await patchRow(ctx.db, "browserSessions", session, { control: { ...control, navigatingUntil: undefined, until: Math.min(control.until, now) } });
+
+            return;
+        }
+
+        // Renewed like `keepControl`: only while the person may still drive the browser.
+        const reader = control.until > now ? await readerBrowser(ctx, session.threadId, userId, now, { primary: true }) : undefined;
+        const held = reader?.kind === "watchable" && reader.canControl && reader.session._id === sessionId;
+
         await patchRow(ctx.db, "browserSessions", session, {
-            control: { ...control, navigatingUntil: undefined, until: control.ended === undefined ? control.until : Math.min(control.until, ctx.now) },
+            ...(held && activeNow(session, now)),
+            control: { ...control, navigatingUntil: undefined, until: held ? Math.max(control.until, now + CONTROL_IDLE_MS) : control.until },
         });
     });

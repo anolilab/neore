@@ -3,9 +3,11 @@
  * that ended (closed, idle past the provider's reap, or gone at the provider) gives neither.
  */
 import { lunoraTest } from "@lunora/testing";
+import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { internalQuery } from "../lib/crpc";
 import schema from "../schema";
 import { getBrowserActions } from "../chat/functions";
 import { logAction } from "./functions";
@@ -85,13 +87,22 @@ vi.mock("../agent/thread-read-access", async (importOriginal) => {
     };
 });
 
-const { renderer, rendererStart } = vi.hoisted(() => {
+const { actionStart, renderer, rendererStart } = vi.hoisted(() => {
     // `rendererStart` runs when a renderer call is about to start: a test makes the call start late with it.
-    return { renderer: vi.fn(), rendererStart: { hook: undefined as (() => void) | undefined } };
+    // `actionStart` runs as `navigateInControl` begins, after the action's own clock was read.
+    return { actionStart: { hook: undefined as (() => void) | undefined }, renderer: vi.fn(), rendererStart: { hook: undefined as (() => void) | undefined } };
 });
 
 vi.mock("../lib/services", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("../lib/services")>()), isServiceBound: () => true, serviceFetch: () => fetch };
+    return {
+        ...(await importOriginal<typeof import("../lib/services")>()),
+        isServiceBound: () => {
+            actionStart.hook?.();
+
+            return true;
+        },
+        serviceFetch: () => fetch,
+    };
 });
 
 vi.mock("@neore/service-sdk/browser-renderer", async (importOriginal) => {
@@ -171,6 +182,7 @@ beforeEach(async () => {
 
 afterEach(() => {
     delete replica.grant;
+    actionStart.hook = undefined;
     rendererStart.hook = undefined;
     vi.restoreAllMocks();
     harness.close();
@@ -681,6 +693,48 @@ describe("taking control of the browser", () => {
         await expect(statusFor(READER)).resolves.toMatchObject({ control: { byYou: false } });
     });
 
+    it("returns no URL to a view whose claim another of the person's tabs replaced while the provider minted it", async () => {
+        let newer = "";
+
+        await addSession();
+        fetchMock
+            .mockImplementationOnce(async () => {
+                // A second tab of the same person takes control and gets its view first.
+                newer = ((await take(OWNER)) as { claim: string }).claim;
+
+                return answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" });
+            })
+            .mockResolvedValueOnce(answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-2" }));
+
+        await expect(take(OWNER)).resolves.toEqual({ status: "unavailable" });
+        // The newer tab's lease goes on.
+        await expect(control()).resolves.toMatchObject({ by: OWNER, claim: newer, until: NOW + CONTROL_IDLE_MS });
+        expect(newer).not.toBe("");
+    });
+
+    it("drops the claim when the re-read after the mint fails, and returns no URL", async () => {
+        const key = "browser_live_view:getReaderBrowser";
+        const reader = registry.get(key);
+
+        await addSession();
+        registry.set(
+            key,
+            internalQuery
+                .input({ at: v.optional(v.number()), claim: v.optional(v.string()), threadId: v.id("threads"), userId: v.string() })
+                .query(async () => {
+                    throw new Error("read failed");
+                }),
+        );
+
+        try {
+            await expect(take(OWNER)).rejects.toThrow("read failed");
+        } finally {
+            registry.set(key, reader);
+        }
+
+        await expect(control()).resolves.toBeUndefined();
+    });
+
     it("keeps the agent's note of an earlier hand back when a new claim's mint fails", async () => {
         await addSession({ control: { by: WRITER, claim: "c-0", ended: "handed_back", since: NOW - 5000, until: NOW - 1 } });
         fetchMock.mockResolvedValue(answer(500, {}));
@@ -751,6 +805,75 @@ describe("opening a page while in control", () => {
 
         expect(loaded.control).toMatchObject({ by: OWNER, ended: "handed_back", since: NOW, until: NOW });
         expect(loaded.control).not.toHaveProperty("navigatingUntil");
+    });
+
+    it("gives the person a full idle window once their page has loaded, however late in the lease it started", async () => {
+        await addSession();
+        await take(OWNER);
+        // Late in the idle window: the hold outlasts the lease, and the page loads near the hold's end.
+        vi.setSystemTime(NOW + 100_000);
+        renderer.mockImplementationOnce(async () => {
+            vi.setSystemTime(NOW + 170_000);
+
+            return { data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } };
+        });
+
+        await navigate(OWNER);
+
+        const after = await session();
+
+        expect(after.control.until).toBe(NOW + 170_000 + CONTROL_IDLE_MS);
+        expect(after.lastActivityAt).toBe(NOW + 170_000);
+    });
+
+    it("gives no fresh idle window to a writer whose grant was lowered to read while their page loaded", async () => {
+        await addSession();
+        await take(WRITER);
+        vi.setSystemTime(NOW + 100_000);
+        renderer.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => {
+                const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: WRITER } });
+
+                await ctx.db.patch("threadAccess", grant._id, { permission: "read" });
+            });
+            vi.setSystemTime(NOW + 170_000);
+
+            return { data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } };
+        });
+
+        await navigate(WRITER);
+
+        const after = await session();
+
+        expect(after.control.until).toBe(rendererCallHold(NOW + 100_000));
+    });
+
+    it("refuses a page once the lease lapsed after the action started, though the action's clock still reads it held", async () => {
+        await addSession();
+        await take(OWNER);
+        vi.setSystemTime(NOW + CONTROL_IDLE_MS - 1);
+        actionStart.hook = () => vi.setSystemTime(NOW + CONTROL_IDLE_MS);
+
+        await expect(navigate(OWNER)).resolves.toEqual({ error: "You do not have control of the browser.", status: "refused" });
+        expect(renderer).not.toHaveBeenCalled();
+    });
+
+    it("keeps the page's hold until it runs out when the renderer call was cut off, also after a hand back", async () => {
+        await addSession();
+        await take(OWNER);
+        renderer.mockImplementationOnce(async () => {
+            await giveBack(OWNER, "handed_back");
+            // The call's deadline: the renderer may still be loading the page.
+            vi.setSystemTime(NOW + 60_000);
+
+            throw new DOMException("The operation timed out.", "TimeoutError");
+        });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ error: "The page could not be opened.", status: "refused" });
+
+        const after = await session();
+
+        expect(after.control).toMatchObject({ ended: "handed_back", navigatingUntil: rendererCallHold(NOW), until: rendererCallHold(NOW) });
     });
 
     it("refuses a second page while one loads, and any page once handed back mid-load", async () => {
