@@ -161,14 +161,11 @@ export const deleteUserMemories = internalMutation
     .output(vBatchResult)
     .mutation(async ({ args: { userId }, ctx: context }) => await eraseMemoriesForUser(context, userId));
 
+/** One page of the user's projects with their rule files (`agent/gdpr.ts`). */
 export const deleteUserProjects = internalMutation
     .input({ userId: v.string() })
-    .output(v.null())
-    .mutation(async ({ args: { userId }, ctx: context }) => {
-        await eraseProjectsForUser(context, userId);
-
-        return null;
-    });
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }) => await eraseProjectsForUser(context, userId));
 
 /** The user's chat-import jobs (`chat-import/gdpr.ts`). */
 export const deleteUserImportJobs = internalMutation

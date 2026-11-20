@@ -360,8 +360,8 @@ export const collectProjectRuleFilesForExport = internalQuery
     });
 
 /**
- * The rule files of `projectId`, once the project row is gone: `agent.projects.deleteProject`, and for account
- * deletion `agent/gdpr.ts#eraseProjectsForUser`, so a save that landed before it leaves nothing, and one after it finds
+ * The rule files of `projectId`, once the project row is gone: `agent.projects.deleteProject` (account deletion pages
+ * through {@link eraseProjectsRuleFiles}), so a save that landed before it leaves nothing, and one after it finds
  * no project and erases its own (`setProjectRuleFiles`). Also that save's own take-back.
  */
 export const eraseProjectRuleFiles = async (ctx: MutationCtx, projectId: Id<"projects">): Promise<void> => {
@@ -387,9 +387,34 @@ export const markProjectRuleFilesErasing = async (ctx: MutationCtx, projectId: I
 
 /**
  * Rule-file rows one erasure or sweep reads at most: each is charged whole, up to `MAX_RULE_FILES_BYTES`, so a page
- * stays far under a transaction's read limit.
+ * stays far under a transaction's read limit. Also the projects one account-deletion page erases, one row each at most.
  */
-const RULE_FILE_ROWS_PER_PAGE = 8;
+export const RULE_FILE_ROWS_PER_PAGE = 8;
+
+/**
+ * Marks the rule files of a page of projects (at most {@link RULE_FILE_ROWS_PER_PAGE}) in one read, as
+ * {@link markProjectRuleFilesErasing} does one: account deletion's `agent/gdpr.ts#eraseProjectsForUser`.
+ */
+export const markProjectsRuleFilesErasing = async (ctx: MutationCtx, projectIds: ReadonlyArray<Id<"projects">>): Promise<void> => {
+    if (projectIds.length === 0) {
+        return;
+    }
+
+    const { page: rows } = await ctx.db.projectRuleFiles.findMany({ consistency: "primary", where: { projectId: { in: [...projectIds] } } });
+
+    await Promise.all(rows.map((row) => ctx.db.patch("projectRuleFiles", row._id, { deletingAt: ctx.now })));
+};
+
+/** Erases the rule files of a page of projects whose rows are gone in one read, as {@link eraseProjectRuleFiles} does one. */
+export const eraseProjectsRuleFiles = async (ctx: MutationCtx, projectIds: ReadonlyArray<Id<"projects">>): Promise<void> => {
+    if (projectIds.length === 0) {
+        return;
+    }
+
+    const { page: rows } = await ctx.db.projectRuleFiles.findMany({ consistency: "primary", where: { projectId: { in: [...projectIds] } } });
+
+    await Promise.all(rows.map((row) => ctx.db.delete("projectRuleFiles", row._id)));
+};
 
 /**
  * The rule-file rows of the user's projects by their copy of the owner (`userId`), one page: a row whose project is

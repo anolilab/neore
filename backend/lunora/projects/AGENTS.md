@@ -14,7 +14,8 @@
   (`agent.projects.deleteProject`): a `.global()` write does not roll back, so erasing first could leave a live project
   without its rules. A row a failed delete left marked is finished by the daily `sweepUnfinishedRuleFileErasures` once
   its project is gone (unmarked while it lives). Account deletion erases by owner (`eraseProjectRuleFilesForUser`, in
-  `deleteUserWorkflowData`), orphans included, and per project again in `eraseProjectsForUser`.
+  `deleteUserWorkflowData`), orphans included, and again with each page of projects in `eraseProjectsForUser` (`RULE_FILE_ROWS_PER_PAGE` per
+  step, drained by the workflow), then by owner once no project is left, for a page that failed after its deletes.
 - A save refuses while the project's delete is under way (`deleteUnderway`, as the repository mutations do), and
   erases its own row when the project is gone after its write.
 - Changing them follows `updateProject` exactly: the owner only (`mayEditProject` in `edit-access.ts`, through

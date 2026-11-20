@@ -385,7 +385,7 @@ export const deleteUserIntegrations = internalMutation
  * Workflow-builder data. By `userId` for what the user did anywhere, and by
  * project for everything attached to projects the user owns — including other
  * people's presence rows, which point at a project that is about to vanish.
- * Runs BEFORE `deleteUserProjects`, which only removes the project rows.
+ * Runs BEFORE `deleteUserProjects`, which removes the project rows and their rule files.
  * Executions, project knowledge, repositories and rule files are erased by
  * their owners (`agent/gdpr.ts`, `knowledge/gdpr.ts`, `projects/gdpr.ts`).
  */

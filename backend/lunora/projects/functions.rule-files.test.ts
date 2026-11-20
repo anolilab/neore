@@ -16,7 +16,7 @@ import {
     listPinnedProjects as listOwnPinned,
     updateProject as writeProject,
 } from "../agent/projects";
-import { eraseProjectsForUser } from "../agent/gdpr";
+import { deleteUserProjects } from "../gdpr/steps/deletion-steps";
 import schema from "../schema";
 import { runProjectFor } from "../tasks/internal";
 import { getWorkflow } from "../workflow/functions";
@@ -35,7 +35,9 @@ import {
     collectProjectRuleFilesForExport,
     eraseProjectRuleFiles,
     eraseProjectRuleFilesForUser,
+    eraseProjectsRuleFiles,
     markProjectRuleFilesErasing,
+    RULE_FILE_ROWS_PER_PAGE,
     sweepUnfinishedRuleFileErasures,
 } from "./gdpr";
 import { DELETION_MARKER_TTL_MS, DELETION_MARKER_URL } from "./repositories";
@@ -87,7 +89,11 @@ vi.mock("../agent/table-writes", async (importOriginal) => {
 vi.mock("./gdpr", async (importOriginal) => {
     const original = await importOriginal<typeof import("./gdpr")>();
 
-    return { ...original, eraseProjectRuleFiles: vi.fn(original.eraseProjectRuleFiles) };
+    return {
+        ...original,
+        eraseProjectRuleFiles: vi.fn(original.eraseProjectRuleFiles),
+        eraseProjectsRuleFiles: vi.fn(original.eraseProjectsRuleFiles),
+    };
 });
 
 vi.mock("../lib/audit-triggers", async (importOriginal) => {
@@ -104,6 +110,7 @@ let harness: ReturnType<typeof lunoraTest>;
 beforeAll(async () => {
     registerModule(registry, "projects_functions", await import("./functions"));
     registerModule(registry, "agent_projects", await import("../agent/projects"));
+    registerModule(registry, "gdpr_steps_deletion_steps", await import("../gdpr/steps/deletion-steps"));
 }, 30_000);
 
 beforeEach(() => {
@@ -448,20 +455,101 @@ describe("changing a project's rule files", () => {
 
         await expect(savedFiles(kept)).resolves.toBeUndefined();
 
-        // The account's last project step takes the rule files with each project, a row saved after the earlier step too,
-        // once the project row is gone, as a delete does.
+        // The account's last project step takes the rule files with each page of projects, a row saved after the earlier
+        // step too, once the project rows are gone, as a delete does.
         const last = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "last", userId: OWNER });
 
-        vi.mocked(eraseProjectRuleFiles).mockImplementationOnce(async (ctx, projectId) => {
-            projectAtErase.push(await ctx.db.projects.findFirst({ where: { _id: projectId } }));
-            const { eraseProjectRuleFiles: erase } = await vi.importActual<typeof import("./gdpr")>("./gdpr");
+        vi.mocked(eraseProjectsRuleFiles).mockImplementationOnce(async (ctx, projectIds) => {
+            // `kept` too, whose rule files went above.
+            expect(new Set(projectIds)).toStrictEqual(new Set([kept, last]));
 
-            await erase(ctx, projectId);
+            for (const projectId of projectIds) {
+                projectAtErase.push(await ctx.db.projects.findFirst({ where: { _id: projectId } }));
+            }
+
+            // Marked before the project row went.
+            const marked = await ctx.db.projectRuleFiles.findFirst({ where: { projectId: last as never } });
+
+            expect(marked?.deletingAt).toBeGreaterThan(0);
+
+            const { eraseProjectsRuleFiles: erase } = await vi.importActual<typeof import("./gdpr")>("./gdpr");
+
+            await erase(ctx, projectIds);
         });
-        await harness.run(async (ctx: any) => await eraseProjectsForUser(ctx, OWNER));
+        await harness.run(async (ctx: any) => await ctx.runMutation(deleteUserProjects as never, { userId: OWNER }));
 
-        expect(projectAtErase).toStrictEqual([null, null]);
+        expect(projectAtErase).toStrictEqual([null, null, null]);
         await expect(savedFiles(last)).resolves.toBeUndefined();
+    });
+
+    it("erases the rule files a failed project page left once the account has no project left", async () => {
+        const owned = await Promise.all(
+            Array.from(
+                { length: 3 },
+                async (_, index) => await project({ createdAt: index, ruleFiles: [sqlRules], title: `p${String(index)}`, userId: OWNER }),
+            ),
+        );
+        const theirs = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "theirs", userId: STRANGER });
+
+        // A round that failed after its project deletes: a `.global()` write does not roll back, so the rows stay marked.
+        await harness.run(async (ctx: any) => {
+            for (const projectId of owned) {
+                await markProjectRuleFilesErasing(ctx, projectId as never);
+                await ctx.db.delete("projects", projectId);
+            }
+        });
+
+        // The retry finds no project of theirs and erases the rows by owner.
+        await expect(harness.run(async (ctx: any) => await ctx.runMutation(deleteUserProjects as never, { userId: OWNER }))).resolves.toStrictEqual({
+            hasMore: false,
+        });
+
+        for (const projectId of owned) {
+            await expect(ruleRow(projectId)).resolves.toBeNull();
+        }
+
+        await expect(savedFiles(theirs)).resolves.toStrictEqual([sqlRules]);
+    });
+
+    it("erases an account's projects a page per step, each page's rule files with it, until none are left", async () => {
+        const count = RULE_FILE_ROWS_PER_PAGE * 2 + 3;
+        const owned = await Promise.all(
+            Array.from(
+                { length: count },
+                async (_, index) => await project({ createdAt: index, ruleFiles: [sqlRules], title: `p${String(index)}`, userId: OWNER }),
+            ),
+        );
+        const theirs = await project({ createdAt: 0, ruleFiles: [sqlRules], title: "theirs", userId: STRANGER });
+        const results: { hasMore: boolean }[] = [];
+
+        vi.mocked(eraseProjectsRuleFiles).mockClear();
+
+        for (let step = 0; step < 10; step += 1) {
+            const result = (await harness.run(async (ctx: any) => await ctx.runMutation(deleteUserProjects as never, { userId: OWNER }))) as {
+                hasMore: boolean;
+            };
+
+            results.push(result);
+
+            if (!result.hasMore) {
+                break;
+            }
+        }
+
+        // Two full pages, then the last three: no step reads or writes more than a page.
+        expect(results.map((result) => result.hasMore)).toStrictEqual([true, true, false]);
+        expect(vi.mocked(eraseProjectsRuleFiles).mock.calls.map(([, projectIds]) => projectIds.length)).toStrictEqual([
+            RULE_FILE_ROWS_PER_PAGE,
+            RULE_FILE_ROWS_PER_PAGE,
+            3,
+        ]);
+
+        for (const projectId of owned) {
+            await expect(savedFiles(projectId)).resolves.toBeUndefined();
+            await expect(harness.run(async (ctx: any) => await ctx.db.projects.findFirst({ where: { _id: projectId } }))).resolves.toBeNull();
+        }
+
+        await expect(savedFiles(theirs)).resolves.toStrictEqual([sqlRules]);
     });
 
     it("marks the project changed on every save, a list without a context too", async () => {
