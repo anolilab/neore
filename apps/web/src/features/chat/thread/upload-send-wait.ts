@@ -37,7 +37,10 @@ export interface UploadWait {
 export type UploadWaitOutcome = { kind: "cancelled" } | { kind: "edited" } | { kind: "failed"; name: string } | { kind: "send" } | { kind: "waiting" };
 
 const pressedAttachment = (attachment: WaitedAttachment): PressedAttachment => {
-    return { complete: attachment.status === "complete", fileId: attachment.fileId, id: attachment.id };
+    const complete = attachment.status === "complete";
+
+    // A file still uploading may hold the id of the upload it replaces (an edit or a retry); only a finished one's is kept.
+    return { complete, fileId: complete ? attachment.fileId : undefined, id: attachment.id };
 };
 
 /** The wait a send pressed on `draft` starts with, for the chat and account the send was pressed in. */

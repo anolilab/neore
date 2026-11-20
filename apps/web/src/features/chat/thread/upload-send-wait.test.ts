@@ -93,6 +93,14 @@ describe("settleUploadWait", () => {
         ).toStrictEqual({ kind: "edited" });
     });
 
+    it("sends once a re-upload finishes, though it held the old file id while it ran", () => {
+        const retried = startUploadWait({ attachments: [file("a", "uploading", "old")], references: [], text: "see files" }, "thread-1");
+
+        expect(settleUploadWait(retried, { attachments: [file("a", "complete", "new")], references: [], text: "see files" }, "thread-1")).toStrictEqual({
+            kind: "send",
+        });
+    });
+
     it("cancels quietly when the account changed, even in the same chat", () => {
         const wait = startUploadWait({ attachments: files(["a", "uploading"]), references: [], text: "see files" }, "thread-1", "user-1");
         const done = { attachments: files(["a", "complete"]), references: [], text: "see files" };
