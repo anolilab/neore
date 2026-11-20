@@ -189,34 +189,11 @@ describe("thread follow rows across people and threads", () => {
             await setThreadFollowState(context, { now: 1, state: "on", threadId, userId: STRANGER });
         });
 
-        // The round that deletes rows is not the last: only a read that finds none is.
-        await expect(harness.run(async (context: any) => await deleteFollowRowsOfThread(context, threadId))).resolves.toBe(false);
-        await expect(harness.run(async (context: any) => await deleteFollowRowsOfThread(context, threadId))).resolves.toBe(true);
+        const done = await harness.run(async (context: any) => await deleteFollowRowsOfThread(context, threadId));
+
+        expect(done).toBe(true);
         expect(await followRowsFor(GRANTEE)).toHaveLength(0);
         expect(await followRowsFor(OWNER)).toHaveLength(0);
-    });
-
-    it("is not done while a delete left a row behind, as one checked on a lagging replica does", async () => {
-        await harness.run(async (context: any) => {
-            await setThreadFollowState(context, { now: 1, state: "on", threadId, userId: GRANTEE });
-        });
-
-        const missingDeletes = (context: any) => {
-            return {
-                db: new Proxy(context.db, { get: (target, property) => (property === "delete" ? async () => undefined : Reflect.get(target, property)) }),
-            };
-        };
-
-        await harness.run(async (context: any) => {
-            await expect(deleteFollowRowsOfThread(missingDeletes(context) as never, threadId)).resolves.toBe(false);
-            await expect(deleteFollowRowsOfThread(missingDeletes(context) as never, threadId)).resolves.toBe(false);
-            await expect(deleteFollowRowsOfUserBatch(missingDeletes(context) as never, GRANTEE)).resolves.toBe(false);
-            await expect(deleteThreadFollowRow(missingDeletes(context) as never, { threadId, userId: GRANTEE })).rejects.toThrow(
-                "A follow row survived its delete",
-            );
-        });
-
-        expect(await followRowsFor(GRANTEE)).toHaveLength(1);
     });
 
     it("erasing a person removes their rows on every thread they follow", async () => {

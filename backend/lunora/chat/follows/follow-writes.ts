@@ -30,8 +30,6 @@ export const mergeThreadFollowsPage = async (db: MutationCtx["db"], from: string
             continue;
         }
 
-        // TODO(anolilab/lunora#1631): the patch and the deletes read the row on a replica. A lagging one fails the patch,
-        // and the queue redelivers the merge; a delete it skips leaves the row for the next page to handle again.
         try {
             await db.patch("threadFollows", row._id, { userId: to });
             moved += 1;

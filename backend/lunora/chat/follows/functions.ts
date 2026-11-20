@@ -43,8 +43,6 @@ export const setThreadFollowState = async (
     const existing = await ctx.db.threadFollows.findFirst({ consistency: "primary", where: { threadId, userId } });
 
     if (existing) {
-        // TODO(anolilab/lunora#1631): the patch re-reads the row on a replica, which can miss an insert this
-        // primary read sees and fail the change as "document not found"; the person retries it.
         await ctx.db.patch("threadFollows", existing._id, { state, updatedAt: now });
 
         return;
@@ -93,39 +91,27 @@ export const ensureThreadFollowDefault = async (
 export const deleteThreadFollowRow = async (ctx: Pick<MutationCtx, "db">, { threadId, userId }: { threadId: Id<"threads">; userId: string }): Promise<void> => {
     const existing = await ctx.db.threadFollows.findFirst({ consistency: "primary", where: { threadId, userId } });
 
-    if (!existing) {
-        return;
-    }
-
-    await ctx.db.delete("threadFollows", existing._id);
-
-    // TODO(anolilab/lunora#1631): a global delete checks the row on a replica and returns quietly when it lags, so
-    // the removal is confirmed on the primary; the error makes the caller retry it.
-    if (await ctx.db.threadFollows.findFirst({ consistency: "primary", where: { threadId, userId } })) {
-        throw new Error("A follow row survived its delete");
+    if (existing) {
+        await ctx.db.delete("threadFollows", existing._id);
     }
 };
 
-/**
- * Deletes one batch of a thread's follow rows; `true` when none are left, so the caller can delete the thread. Only a
- * primary read that finds no row counts as done: a global delete can miss a row it was handed
- * (TODO(anolilab/lunora#1631)), and the next round deletes it again.
- */
+/** Deletes one batch of a thread's follow rows; `true` when none are left, so the caller can delete the thread. */
 export const deleteFollowRowsOfThread = async (ctx: Pick<MutationCtx, "db">, threadId: Id<"threads">): Promise<boolean> => {
     const page = await ctx.db.threadFollows.findMany({ consistency: "primary", limit: FOLLOW_DELETE_BATCH, where: { threadId } });
 
     await Promise.all(page.page.map((row) => ctx.db.delete("threadFollows", row._id)));
 
-    return page.page.length === 0;
+    return page.isDone;
 };
 
-/** Deletes one batch of a person's follow rows; `true` when none are left, as {@link deleteFollowRowsOfThread} decides it. */
+/** Deletes one batch of a person's follow rows; `true` when none are left. Account erasure drains it round by round. */
 export const deleteFollowRowsOfUserBatch = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<boolean> => {
     const page = await ctx.db.threadFollows.findMany({ consistency: "primary", limit: FOLLOW_DELETE_BATCH, where: { userId } });
 
     await Promise.all(page.page.map((row) => ctx.db.delete("threadFollows", row._id)));
 
-    return page.page.length === 0;
+    return page.isDone;
 };
 
 /** Removes a member's follow row when the owner or an admin removes their access: a trusted write, past the admin's RLS view. */
