@@ -167,6 +167,13 @@ export const wrapSelection = (state: EditorState, from: number, to: number, type
     const wrap = wrapFor(typed, body, insideWord);
     const underscore = typed === "_" && !insideWord;
 
+    // A copy of the delimiter character right beside the wrap joins its run, and CommonMark then pairs the wrong runs.
+    const delimiter = wrap.open.charAt(0);
+
+    if (typed !== "`" && (openBefore === delimiter || closeAfter === delimiter)) {
+        return null;
+    }
+
     if (typed !== "`" && !delimitersWork({ closeAfter, closeBefore: lastCharacter(body), openAfter: firstCharacter(body), openBefore, underscore })) {
         return null;
     }

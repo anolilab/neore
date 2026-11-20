@@ -391,4 +391,22 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(wrapSelectionOnTextInput(editor.view, 2, 3, "*")).toBe(false);
         expect(text(editor)).toBe("a.b");
     });
+
+    it("leaves an italic wrap alone when an underscore is already beside the selection, so the runs would merge", () => {
+        const editor = editorWith("<p>foo_bar</p>");
+
+        select(editor, 5, 8);
+
+        expect(wrapSelectionOnTextInput(editor.view, 5, 8, "_")).toBe(false);
+        expect(text(editor)).toBe("foo_bar");
+    });
+
+    it("leaves a bold wrap alone when an asterisk is already before the selection, so the runs would merge", () => {
+        const editor = editorWith("<p>a**foo</p>");
+
+        select(editor, 4, 7);
+
+        expect(wrapSelectionOnTextInput(editor.view, 4, 7, "*")).toBe(false);
+        expect(text(editor)).toBe("a**foo");
+    });
 });
