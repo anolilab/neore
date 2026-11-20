@@ -10,7 +10,7 @@ import { Label } from "@neore/ui/components/label";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { KeyRound, Pencil, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
@@ -85,10 +85,35 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
     const loginsQuery = crpc.vault.site_logins.listSiteLogins.queryOptions({});
     const { data: loginList } = useQuery(loginsQuery);
     const { data: botList = [], isSuccess: botListLoaded } = useQuery(crpc.bots.functions.listBots.queryOptions({}));
-    // An account switch keeps the last account's cached lists until this one's arrive: show only what is this user's.
+    // The query keys carry no user: right after an account switch they can still hold the last account's lists, even
+    // fresh ones. Show only what is this user's, and refetch below.
     const logins = loginList?.userId === userId ? loginList.logins : [];
     const bots = botList.filter((bot) => bot.userId === userId);
     const botsLoaded = botListLoaded && bots.length === botList.length;
+    const holdsAnotherAccountsLogins = loginList !== undefined && loginList.userId !== userId;
+    const holdsAnotherAccountsBots = botListLoaded && !botsLoaded;
+
+    useEffect(() => {
+        if (holdsAnotherAccountsLogins) {
+            void queryClient.invalidateQueries({ queryKey: crpc.vault.site_logins.listSiteLogins.queryKey({}) });
+        }
+    }, [crpc, holdsAnotherAccountsLogins, queryClient]);
+
+    useEffect(() => {
+        if (holdsAnotherAccountsBots) {
+            void queryClient.invalidateQueries({ queryKey: crpc.bots.functions.listBots.queryKey({}) });
+        }
+    }, [crpc, holdsAnotherAccountsBots, queryClient]);
+
+    // An empty bot list names no user: one cached when the form mounts (once per account) may be the last account's.
+    useEffect(() => {
+        const queryKey = crpc.bots.functions.listBots.queryKey({});
+
+        if (queryClient.getQueryData<unknown[]>(queryKey)?.length === 0) {
+            void queryClient.invalidateQueries({ queryKey });
+        }
+    }, [crpc, queryClient]);
+
     // An empty list could be the last account's cached one, so only a non-empty one may drop a deleted teammate here.
     const knownBots = botsLoaded && bots.length > 0;
     const saveMutation = useMutation(crpc.vault.site_logins.saveSiteLogin.mutationOptions());

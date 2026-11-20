@@ -1,7 +1,7 @@
 /**
  * `<SiteLogins>`: a typed password never outlasts its account, a save or a failed delete never discards edits it did
  * not send, an edit never drops a login's bots while the bot list is missing, the form stops at the server's limit, and
- * another account's cached logins and bots never show.
+ * another account's cached logins and bots never show and are refetched.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -46,58 +46,58 @@ vi.mock("@/features/auth/hooks/use-auth-session", () => {
 });
 
 vi.mock("@/lib/lunora/crpc", () => {
-    return {
-        useCRPC: () => {
-            return {
-                bots: {
-                    functions: {
-                        listBots: {
-                            queryOptions: () => {
-                                return {
-                                    queryFn: async () => {
-                                        if (harness.botsState === "pending") {
-                                            return await new Promise(() => {});
-                                        }
+    // One object for every render, as the app's memoised `useCRPC` is.
+    const crpc = {
+        bots: {
+            functions: {
+                listBots: {
+                    queryKey: () => ["bots"],
+                    queryOptions: () => {
+                        return {
+                            queryFn: async () => {
+                                if (harness.botsState === "pending") {
+                                    return await new Promise(() => {});
+                                }
 
-                                        if (harness.botsState === "failed") {
-                                            throw new Error("bots unavailable");
-                                        }
+                                if (harness.botsState === "failed") {
+                                    throw new Error("bots unavailable");
+                                }
 
-                                        return harness.bots;
-                                    },
-                                    queryKey: ["bots"],
-                                };
+                                return harness.bots;
                             },
-                        },
+                            queryKey: ["bots"],
+                        };
                     },
                 },
-                vault: {
-                    site_logins: {
-                        deleteSiteLogin: {
-                            mutationOptions: () => {
-                                return { mutationFn: harness.deleteSiteLogin };
-                            },
-                        },
-                        listSiteLogins: {
-                            queryOptions: () => {
-                                // One key for every account, as in the app: a switch finds the last account's list cached.
-                                return {
-                                    queryFn: async () =>
-                                        harness.loginsPending ? await new Promise(() => {}) : { logins: harness.logins, userId: harness.userId },
-                                    queryKey: ["site-logins"],
-                                };
-                            },
-                        },
-                        saveSiteLogin: {
-                            mutationOptions: () => {
-                                return { mutationFn: harness.saveSiteLogin };
-                            },
-                        },
+            },
+        },
+        vault: {
+            site_logins: {
+                deleteSiteLogin: {
+                    mutationOptions: () => {
+                        return { mutationFn: harness.deleteSiteLogin };
                     },
                 },
-            };
+                listSiteLogins: {
+                    queryKey: () => ["site-logins"],
+                    queryOptions: () => {
+                        // One key for every account, as in the app: a switch finds the last account's list cached.
+                        return {
+                            queryFn: async () => (harness.loginsPending ? await new Promise(() => {}) : { logins: harness.logins, userId: harness.userId }),
+                            queryKey: ["site-logins"],
+                        };
+                    },
+                },
+                saveSiteLogin: {
+                    mutationOptions: () => {
+                        return { mutationFn: harness.saveSiteLogin };
+                    },
+                },
+            },
         },
     };
+
+    return { useCRPC: () => crpc };
 });
 
 const { toast } = await import("sonner");
@@ -116,7 +116,8 @@ const botsOf = (userId: string, count: number) =>
     });
 
 const mount = () => {
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    // Fresh for 30 seconds, as in the app: a switch within that window finds the last account's lists still fresh.
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } });
     const tree = () => createElement(QueryClientProvider, { client: queryClient }, createElement(SiteLogins));
     const view = render(tree());
 
@@ -264,6 +265,24 @@ describe("SiteLogins", () => {
 
         expect(screen.queryByRole("button", { name: `Edit login for ${SITE}` })).toBeNull();
         expect(screen.queryByText(USERNAME_TEXT)).toBeNull();
+        expect(screen.queryByText("Bot 0")).toBeNull();
+    });
+
+    it.each([0, 1])("fetches and shows the new account's logins and bots when a switch finds the last account's (%i bots) still fresh", async (count) => {
+        harness.bots = botsOf("user-a", count);
+        harness.logins = [savedLogin()];
+        const view = mount();
+
+        await screen.findByRole("button", { name: `Edit login for ${SITE}` });
+        await waitFor(() => expect(view.queryClient.getQueryData(["bots"])).toHaveLength(count));
+
+        harness.userId = "user-b";
+        harness.bots = [{ _id: "bot-b", name: "Bot B", userId: "user-b" }];
+        harness.logins = [{ ...savedLogin(["bot-b"]), id: "login-b", site: "https://b.example" }];
+        view.rerender();
+
+        expect(await screen.findByRole("button", { name: "Edit login for https://b.example" })).toBeDefined();
+        expect(await screen.findByText("Bot B")).toBeDefined();
         expect(screen.queryByText("Bot 0")).toBeNull();
     });
 
