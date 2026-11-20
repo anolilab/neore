@@ -344,12 +344,22 @@ fn unpair(vault: &Vault<'_>, confirmed: bool) -> ExitCode {
         return ExitCode::FAILURE;
     };
 
-    // Nothing paired is already the state `unpair` aims for, so it is a success, not a failure, and asks nothing.
+    // Nothing paired is already the state `unpair` aims for, so it asks nothing. A history left by an earlier unpair
+    // whose clean-up failed is removed here, so running it again finishes that clean-up.
     let asked_about = match vault.record() {
         Ok(None) => {
-            println!("This machine holds no pairing. Nothing to remove.");
+            return match forget_nonces(vault.dir()) {
+                Ok(()) => {
+                    println!("This machine holds no pairing. Nothing to remove.");
 
-            return ExitCode::SUCCESS;
+                    ExitCode::SUCCESS
+                }
+                Err(error) => {
+                    eprintln!("neore-host: {error}");
+
+                    ExitCode::FAILURE
+                }
+            };
         }
         Ok(Some(record)) => record,
         Err(error) => {

@@ -138,4 +138,13 @@ fn unpairing_a_machine_that_is_not_paired_succeeds_and_asks_nothing() {
         format!("{:?}", unpair(&vault, false)),
         format!("{:?}", ExitCode::SUCCESS)
     );
+
+    // A history an earlier unpair failed to remove goes when unpair runs again.
+    std::fs::write(dir.join(NONCE_FILE), "{ damaged").unwrap();
+
+    assert_eq!(
+        format!("{:?}", unpair(&vault, false)),
+        format!("{:?}", ExitCode::SUCCESS)
+    );
+    assert!(!dir.join(NONCE_FILE).exists());
 }
