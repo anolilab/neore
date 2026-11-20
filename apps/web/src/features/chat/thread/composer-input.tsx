@@ -78,6 +78,7 @@ import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
 import { breaksBefore, inOpenFence, isLongPaste, onOwnLines, planPaste, planText } from "./composer-paste/paste-plan";
 import { takesPaste } from "./composer-paste/paste-target";
+import { useComposerPrefill } from "./composer-prefill";
 import ComposerPromptQueue from "./composer-prompt-queue";
 import { composerSubmitIntent } from "./composer-submit-intent";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
@@ -1620,6 +1621,20 @@ const ComposerInput = ({
             }),
         [getComposerText, promptHistory, restoreFile, setText],
     );
+
+    // A prompt another part of the thread's UI wrote for this thread (`composer-prefill.ts`): added after what is typed,
+    // never sent. The same prompt twice is not added twice.
+    useComposerPrefill(isThreadComposer ? threadId : undefined, (prefill) => {
+        const current = getComposerText();
+
+        promptHistory.reset();
+
+        if (!current.includes(prefill)) {
+            setText(textAfterRestore(current, { append: true, files: [], text: prefill }));
+        }
+
+        inputAreaRef.current?.focus();
+    });
 
     // Handle "Upload new file" from @ popup — open file dialog
     const handleSelectFileUpload = useCallback(() => {
