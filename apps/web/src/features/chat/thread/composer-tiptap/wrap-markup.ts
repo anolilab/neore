@@ -41,32 +41,44 @@ const MARKED_BLOCK_TYPES: ReadonlySet<string> = new Set(["blockquote", "heading"
 /** A blockquote marker `>` and the space after it, matched at `lastIndex`. */
 const QUOTE_MARKER = /[ \t]{0,3}>[ \t]?/y;
 
-/** A list bullet or number, or heading `#`s, and the spaces after them, matched at `lastIndex`. */
-const LIST_OR_HEADING_MARKER = /[ \t]{0,3}(?:[-+*]|\d{1,9}[.)]|#{1,6})(?=[ \t]|$)[ \t]*/y;
+/** A list bullet or number and the spaces after it, matched at `lastIndex`. */
+const LIST_MARKER = /[ \t]{0,3}(?:[-+*]|\d{1,9}[.)])(?=[ \t]|$)[ \t]*/y;
+
+/** Heading `#`s and the spaces after them, matched at `lastIndex`. */
+const HEADING_MARKER = /[ \t]{0,3}#{1,6}(?=[ \t]|$)[ \t]*/y;
 
 /** A GFM task-list box (`[ ]`, `[x]`) and the spaces after it, matched at `lastIndex`. */
 const TASK_MARKER = /\[[ x]\][ \t]+/iy;
 
-/** The block marker at `offset` in `line`, or an empty string. */
-const markerAt = (line: string, offset: number): string => {
-    QUOTE_MARKER.lastIndex = offset;
-    LIST_OR_HEADING_MARKER.lastIndex = offset;
-    TASK_MARKER.lastIndex = offset;
+/** The sticky marker patterns, by name. */
+const MARKERS = { heading: HEADING_MARKER, list: LIST_MARKER, quote: QUOTE_MARKER, task: TASK_MARKER } as const;
 
-    return (QUOTE_MARKER.exec(line) ?? LIST_OR_HEADING_MARKER.exec(line) ?? TASK_MARKER.exec(line))?.[0] ?? "";
+/** The marker of kind `kind` at `offset` in `line`, or an empty string. */
+const matchAt = (kind: keyof typeof MARKERS, line: string, offset: number): string => {
+    MARKERS[kind].lastIndex = offset;
+
+    return MARKERS[kind].exec(line)?.[0] ?? "";
 };
 
-/** The length of the block markers at the start of `line`, nested ones included (`> - item`), read in one pass. */
+/**
+ * The length of the block markers at the start of `line`, nested ones included (`> - item`), read in one pass. A task
+ * box (`[ ]`) is a marker only right after a list marker; after a heading or a quote it is text.
+ */
 const markerLength = (line: string): number => {
     let offset = 0;
-    let marker = markerAt(line, offset);
+    let afterList = false;
 
-    while (marker !== "") {
+    for (;;) {
+        const list = matchAt("list", line, offset);
+        const marker = list || matchAt("quote", line, offset) || matchAt("heading", line, offset) || (afterList ? matchAt("task", line, offset) : "");
+
+        if (marker === "") {
+            return offset;
+        }
+
+        afterList = list !== "";
         offset += marker.length;
-        marker = markerAt(line, offset);
     }
-
-    return offset;
 };
 
 const runLength = (text: string, start: number): number => {
@@ -436,19 +448,31 @@ const bareEmails = (text: string): [number, number][] => {
 /** Punctuation GFM leaves out of the end of a bare link. */
 const TRAILING_PUNCTUATION: ReadonlySet<string> = new Set(["!", '"', "'", ")", "*", ",", ".", ":", "?", "]", "_", "~"]);
 
+/** Whether the parentheses of `address` pair up, so its last `)` closes one of its own. */
+const balanced = (address: string): boolean => address.split("(").length === address.split(")").length;
+
 /** The bare links in `text`, as constructs a wrap may hold whole but not split. */
 const bareLinks = (text: string): Construct[] =>
     [...[...text.matchAll(BARE_WEB_ADDRESS)].map((match): [number, number] => [match.index, match.index + match[0].length]), ...bareEmails(text)].map(
         ([start, matchEnd]) => {
             let end = matchEnd;
 
-            while (end > start && TRAILING_PUNCTUATION.has(text[end - 1] ?? "")) {
+            // GFM keeps a closing parenthesis that a `(` inside the address balances (`.../Foo_(bar)`).
+            while (end > start && TRAILING_PUNCTUATION.has(text[end - 1] ?? "") && !(text[end - 1] === ")" && balanced(text.slice(start, end)))) {
                 end -= 1;
             }
 
             return { code: false, holdable: true, range: [start, end] };
         },
     );
+
+/** The bare links not inside a link's label: GFM does not link an address that is already a link's text. */
+const bareLinksOutsideLabels = (text: string, constructs: ReadonlyArray<Construct>): Construct[] => {
+    const labels = constructs.flatMap((construct) => (construct.inner === undefined ? [] : [construct.inner]));
+
+    // An address that starts inside a label is part of the link's text; the pattern may run on past the label's `]`.
+    return bareLinks(text).filter((link) => labels.every(([labelStart, labelEnd]) => link.range[0] < labelStart || link.range[0] >= labelEnd));
+};
 
 /** The number of backslashes right before `index`. */
 const trailingBackslashCount = (text: string, index: number): number => {
@@ -461,10 +485,31 @@ const trailingBackslashCount = (text: string, index: number): number => {
     return count;
 };
 
+/** Names already checked: whether the parser decodes `&name;` to a character, as only known entity names do. */
+const knownReferences = new Map<string, boolean>();
+
+/** Whether `reference` stands for a character: numeric ones always do, named ones when the parser decodes them. */
+const isCharacterReference = (reference: string): boolean => {
+    if (reference.startsWith("&#")) {
+        return true;
+    }
+
+    let known = knownReferences.get(reference);
+
+    if (known === undefined) {
+        const paragraph = parser.parse(reference).children?.[0] as (MarkdownNode & { children?: { value?: string }[] }) | undefined;
+
+        known = paragraph?.children?.[0]?.value !== reference;
+        knownReferences.set(reference, known);
+    }
+
+    return known;
+};
+
 /** The character references in `text` that no odd run of backslashes escapes, as constructs a wrap may hold whole. */
 const characterReferences = (text: string): Construct[] =>
     [...text.matchAll(CHARACTER_REFERENCE)]
-        .filter((match) => trailingBackslashCount(text, match.index) % 2 === 0)
+        .filter((match) => trailingBackslashCount(text, match.index) % 2 === 0 && isCharacterReference(match[0]))
         .map((match) => {
             return { code: false, holdable: true, range: [match.index, match.index + match[0].length] };
         });
@@ -523,7 +568,9 @@ export const markupAround = (
         blocked:
             from < markers ||
             breaksTable(text, draftFrom, draftTo) ||
-            [...constructs, ...characterReferences(text), ...bareLinks(text)].some((construct) => breaks(construct, draftFrom, draftTo)),
+            [...constructs, ...characterReferences(text), ...bareLinksOutsideLabels(text, constructs)].some((construct) =>
+                breaks(construct, draftFrom, draftTo),
+            ),
         paragraph,
         takenFences: new Set(unmatched.filter((run) => run.start < draftFrom).map((run) => run.length)),
     };

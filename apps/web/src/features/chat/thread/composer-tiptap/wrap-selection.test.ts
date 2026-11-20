@@ -863,6 +863,41 @@ describe("wrapSelectionOnTextInput Markdown edge cases", () => {
         expect(text(editor)).toBe("- [ ] **task**");
     });
 
+    it("keeps a bare address's balanced closing parenthesis inside the address", () => {
+        const editor = editorWith("<p>see https://e.com/Foo_(bar) now</p>");
+        const before = text(editor);
+
+        select(editor, 27, 28);
+
+        expect(selectedText(editor)).toBe(")");
+        expect(wrapSelectionOnTextInput(editor.view, 27, 28, "`")).toBe(true);
+        expect(text(editor)).toBe(before);
+    });
+
+    it.each([
+        ["a heading's [x], which is text and no task box", "<p># [x] heading</p>", 3, 6, "`", "# `[x]` heading"],
+        ["an address inside a link's label, which GFM does not link again", "<p>[https://foo.com](target)</p>", 10, 13, "*", "[https://**foo**.com](target)"],
+    ])("wraps %s", (_name, content, from, to, typed, expected) => {
+        const editor = editorWith(content);
+
+        select(editor, from, to);
+        wrapSelectionOnTextInput(editor.view, from, to, typed);
+
+        expect(text(editor)).toBe(expected);
+    });
+
+    it("wraps text inside an unknown entity name, which is literal text", () => {
+        const editor = editorWith("<p>x &amp;bogus; y</p>");
+
+        select(editor, 4, 9);
+
+        expect(selectedText(editor)).toBe("bogus");
+
+        wrapSelectionOnTextInput(editor.view, 4, 9, "*");
+
+        expect(text(editor)).toBe("x &**bogus**; y");
+    });
+
     it("wraps literal ](url) text that has no link label before it", () => {
         const editor = editorWith("<p>literal ](url) text</p>");
 
