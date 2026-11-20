@@ -349,10 +349,12 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
                     </div>
                 </div>
             ) : (
-                <p className="mt-0.5 text-sm leading-snug" id={textId}>
-                    {memory.memory}
-                </p>
+                <p className="mt-0.5 text-sm leading-snug">{memory.memory}</p>
             )}
+            {/* What each source link is described by: kept while the row is edited too, so the link never loses it. */}
+            <span hidden id={textId}>
+                {memory.memory}
+            </span>
 
             {hasSource && (
                 <div

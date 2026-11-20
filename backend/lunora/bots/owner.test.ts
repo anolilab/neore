@@ -188,3 +188,31 @@ describe("owner records a cut-short bot write left wrong", () => {
         }
     });
 });
+
+describe("the owner-record sweep's statement budget", () => {
+    it("stops at its budget and leaves the rest for the next run", async () => {
+        expect.assertions(1);
+
+        const harness = lunoraTest(schema as never);
+        const now = BOT_OWNER_TOMBSTONE_TTL_MS * 2;
+
+        try {
+            const left = await harness.run(async (ctx: any) => {
+                for (let i = 0; i < 10; i += 1) {
+                    await ctx.db.insert("botOwners", { botId: `old-${i}`, createdAt: 1, deletedAt: 1, ownerId: "user-1" });
+                }
+
+                // One statement reads, the other four delete.
+                await pruneBotOwnerTombstonesOf(ctx, "user-1", now, { left: 5 });
+
+                const { page } = await ctx.db.botOwners.findMany({ where: { ownerId: "user-1" } });
+
+                return page.length;
+            });
+
+            expect(left).toBe(6);
+        } finally {
+            harness.close();
+        }
+    });
+});
