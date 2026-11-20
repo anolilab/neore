@@ -185,7 +185,9 @@ jobs:
                   pnpm --filter @neore/mobile run build
 
             # The timings `files-changed` picked for this run, recorded on main by `full-test.yml`. With none, every
-            # shard uses the committed seed.
+            # shard uses the committed seed. A miss fails on purpose: other timings would split the files differently
+            # from the shards that already ran. It happens when a shard alone is re-run after the entry was evicted;
+            # "Re-run all jobs" picks a fresh one.
             - name: "Restore the test timings"
               if: "needs.files-changed.outputs.timings-key != ''"
               uses: "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
