@@ -288,6 +288,12 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
 
     const exchange = async (): Promise<EgressResponse> => {
         const [address] = await resolveChecked(target.hostname, dependencies, controller.signal);
+
+        // The deadline can pass while a lookup is in flight. Cleanup has already run by then, so open nothing.
+        if (controller.signal.aborted) {
+            throw new EgressError("timeout", "The request timed out.");
+        }
+
         const plain = dependencies.connect({ hostname: address as string, port: HTTPS_PORT }, { allowHalfOpen: false, secureTransport: "starttls" });
 
         opened.push(plain);
@@ -312,6 +318,8 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
         return await Promise.race([exchange(), deadline]);
     } finally {
         clearTimeout(timer);
+        // Cancels a lookup still in flight when its sibling failed, so it cannot outlive this call.
+        controller.abort();
         await closeAll();
     }
 };

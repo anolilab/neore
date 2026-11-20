@@ -83,6 +83,7 @@ describe("isPublicIPv4", () => {
         "172.16.0.1",
         "172.31.255.255",
         "192.0.0.8",
+        "192.0.0.170",
         "192.0.2.1",
         "192.168.1.1",
         "198.18.0.1",
@@ -242,5 +243,43 @@ describe("postCheckedHttps", () => {
             postCheckedHttps({ body: "", headers: {}, timeoutMs: 20, url: HOOK }, dependencies(dnsFetch({ A: ["93.184.216.34"] }), connection)),
         ).rejects.toMatchObject({ code: "timeout" });
         expect(connection.close).toHaveBeenCalled();
+    });
+
+    it("opens nothing when the lookup finishes after the deadline", async () => {
+        const connection = fakeConnect("HTTP/1.1 204 No Content\r\n\r\n");
+        const answer = dnsFetch({ A: ["93.184.216.34"] });
+        const lateFetch = vi.fn(async (input: string) => {
+            await new Promise((resolve) => {
+                setTimeout(resolve, 30);
+            });
+
+            return await answer(input);
+        });
+
+        await expect(postCheckedHttps({ body: "", headers: {}, timeoutMs: 5, url: HOOK }, dependencies(lateFetch, connection))).rejects.toMatchObject({
+            code: "timeout",
+        });
+        await new Promise((resolve) => {
+            setTimeout(resolve, 60);
+        });
+        expect(connection.connect).not.toHaveBeenCalled();
+        expect(connection.written).toEqual([]);
+    });
+
+    it("aborts a lookup that is still pending when its sibling fails", async () => {
+        const connection = fakeConnect("HTTP/1.1 204 No Content\r\n\r\n");
+        let pendingSignal: AbortSignal | undefined;
+        const fetch = vi.fn(async (input: string, init?: RequestInit) => {
+            if (new URL(input).searchParams.get("type") === "A") {
+                throw new TypeError("network down");
+            }
+
+            pendingSignal = init?.signal ?? undefined;
+
+            return await new Promise<Response>(() => {});
+        });
+
+        await expect(postCheckedHttps({ body: "", headers: {}, url: HOOK }, dependencies(fetch, connection))).rejects.toThrow("network down");
+        expect(pendingSignal?.aborted).toBe(true);
     });
 });
