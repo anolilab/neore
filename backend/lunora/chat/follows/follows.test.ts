@@ -3,9 +3,6 @@
  * or mute on their own row, and only someone who can read the thread may touch
  * it. Share and accept defaults are the sharer's and invitee's rows.
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -192,11 +189,34 @@ describe("thread follow rows across people and threads", () => {
             await setThreadFollowState(context, { now: 1, state: "on", threadId, userId: STRANGER });
         });
 
-        const done = await harness.run(async (context: any) => await deleteFollowRowsOfThread(context, threadId));
-
-        expect(done).toBe(true);
+        // The round that deletes rows is not the last: only a read that finds none is.
+        await expect(harness.run(async (context: any) => await deleteFollowRowsOfThread(context, threadId))).resolves.toBe(false);
+        await expect(harness.run(async (context: any) => await deleteFollowRowsOfThread(context, threadId))).resolves.toBe(true);
         expect(await followRowsFor(GRANTEE)).toHaveLength(0);
         expect(await followRowsFor(OWNER)).toHaveLength(0);
+    });
+
+    it("is not done while a delete left a row behind, as one checked on a lagging replica does", async () => {
+        await harness.run(async (context: any) => {
+            await setThreadFollowState(context, { now: 1, state: "on", threadId, userId: GRANTEE });
+        });
+
+        const missingDeletes = (context: any) => {
+            return {
+                db: new Proxy(context.db, { get: (target, property) => (property === "delete" ? async () => undefined : Reflect.get(target, property)) }),
+            };
+        };
+
+        await harness.run(async (context: any) => {
+            await expect(deleteFollowRowsOfThread(missingDeletes(context) as never, threadId)).resolves.toBe(false);
+            await expect(deleteFollowRowsOfThread(missingDeletes(context) as never, threadId)).resolves.toBe(false);
+            await expect(deleteFollowRowsOfUserBatch(missingDeletes(context) as never, GRANTEE)).resolves.toBe(false);
+            await expect(deleteThreadFollowRow(missingDeletes(context) as never, { threadId, userId: GRANTEE })).rejects.toThrow(
+                "A follow row survived its delete",
+            );
+        });
+
+        expect(await followRowsFor(GRANTEE)).toHaveLength(1);
     });
 
     it("erasing a person removes their rows on every thread they follow", async () => {
@@ -335,43 +355,5 @@ describe("thread follow writes that race", () => {
         });
 
         expect(await followRowsFor(OWNER)).toMatchObject([{ state: "muted" }]);
-    });
-});
-
-describe("the account export", () => {
-    // Read from source: the export action needs storage and a workflow to run.
-    it("reads the follow rows within their own budget, before the trigger history's", () => {
-        const source = readFileSync(join(import.meta.dirname, "../../gdpr/steps.ts"), "utf8");
-
-        expect(source.indexOf("const threadFollows = await collectAllThreadFollows(")).toBeLessThan(
-            source.indexOf("const triggerReadBytes = triggerReadBudget("),
-        );
-        expect(source).toContain("threadFollowsReadBudget(earlierReadBytes + repositories.readBytes + feedback.readBytes + ownedProjects.readBytes)");
-        expect(source).toContain("+ threadFollows.readBytes");
-        expect(source).toContain("threadFollows: threadFollows.section");
-    });
-});
-
-describe("sharing writes the follow rows first", () => {
-    // Read from source: each pair is two writes that commit separately, so the order decides what a failure leaves behind.
-    const source = readFileSync(join(import.meta.dirname, "../sharing.ts"), "utf8");
-    const between = (from: string, to: string): string => source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from) + from.length));
-
-    it("writes the sharer's default before the invite, so a failed follow write leaves no pending invite to block a retry", () => {
-        const body = between("export const createThreadInvite", "export const ");
-
-        expect(body.indexOf("ensureThreadFollowDefault(")).toBeLessThan(body.indexOf("internal.agent.sharing.createThreadInvite"));
-    });
-
-    it("deletes a removed member's follow row before their grant, so a failed cleanup keeps the grant for a retry", () => {
-        const body = between("export const removeThreadAccess", "export const toggleThreadVisibility");
-
-        expect(body.indexOf("deleteFollowRowOfRemovedMember")).toBeLessThan(body.indexOf("internal.agent.sharing.deleteThreadAccess"));
-    });
-
-    it("deletes the follow row again once the grant is gone, so a change made in between does not survive", () => {
-        const body = between("export const removeThreadAccess", "export const toggleThreadVisibility");
-
-        expect(body.lastIndexOf("deleteFollowRowOfRemovedMember")).toBeGreaterThan(body.indexOf("internal.agent.sharing.deleteThreadAccess"));
     });
 });

@@ -10,6 +10,7 @@ import { getAuthUserIdentity } from "../auth";
  * Streaming message operations.
  * Migrated from `@neore/backend-agent` component.
  */
+import { deleteFollowRowsOfThread } from "../chat/follows/functions";
 import { pick } from "../lib/collections";
 import { admittedThreadDb } from "./admitted-thread-db";
 import { resolveThreadReadAccess } from "./thread-read-access";
@@ -538,7 +539,8 @@ export const deleteAllStreamsForThreadIdAsync = internalMutation
     .mutation(async ({ args, ctx }) => {
         const result = await deleteStreamsPageForThreadId(ctx, args);
 
-        if (result.isDone) {
+        // The thread goes once its follow rows are gone (`chat/follows/functions.ts`); until then this re-runs.
+        if (result.isDone && (await deleteFollowRowsOfThread(ctx, args.threadId))) {
             await ctx.db.delete("threads", args.threadId);
         } else {
             await ctx.scheduler.runAfter(0, internal.agent.streams.deleteAllStreamsForThreadIdAsync, {
