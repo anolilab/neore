@@ -298,22 +298,29 @@ fn unpair_request(args: &[String]) -> UnpairRequest {
 /// as a check before the real command.
 fn unpair_dry_run(vault: &Vault<'_>) -> ExitCode {
     match vault.record() {
-        Ok(Some(_)) if RunLock::acquire(vault.dir()).is_err() => {
-            eprintln!("neore-host: `neore-host run` is using this pairing, so unpair would be refused; stop it first. Nothing was changed.");
+        Ok(Some(record)) => match RunLock::is_held(vault.dir()) {
+            Ok(false) => {
+                println!(
+                    "Would forget \"{}\" (device {}) on {}, and remove its secret from {}. Nothing was changed.",
+                    record.name,
+                    record.device_id,
+                    record.backend,
+                    record.storage.describe()
+                );
 
-            ExitCode::FAILURE
-        }
-        Ok(Some(record)) => {
-            println!(
-                "Would forget \"{}\" (device {}) on {}, and remove its secret from {}. Nothing was changed.",
-                record.name,
-                record.device_id,
-                record.backend,
-                record.storage.describe()
-            );
+                ExitCode::SUCCESS
+            }
+            Ok(true) => {
+                eprintln!("neore-host: `neore-host run` is using this pairing, so unpair would be refused; stop it first. Nothing was changed.");
 
-            ExitCode::SUCCESS
-        }
+                ExitCode::FAILURE
+            }
+            Err(error) => {
+                eprintln!("neore-host: {error}");
+
+                ExitCode::FAILURE
+            }
+        },
         Ok(None) => {
             println!("This machine holds no pairing. Nothing to remove.");
 

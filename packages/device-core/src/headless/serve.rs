@@ -21,6 +21,8 @@ const MAX_LINE_BYTES: u64 = 1024 * 1024;
 
 /// Holds this pairing's run lock until dropped. The used-nonce history is one process's memory plus one file, so two
 /// `neore-host run` processes on the same pairing could each accept the same call; the second one is refused.
+const LOCK_FILE: &str = "run.lock";
+
 pub struct RunLock {
     _file: std::fs::File,
 }
@@ -30,7 +32,7 @@ impl RunLock {
         // The vault refuses a folder others can enter, so a missing one is made owner-only here too.
         super::vault::ensure_private_dir(dir)?;
 
-        let path = dir.join("run.lock");
+        let path = dir.join(LOCK_FILE);
         let file = std::fs::OpenOptions::new()
             .create(true)
             .truncate(false)
@@ -43,6 +45,18 @@ impl RunLock {
         })?;
 
         Ok(RunLock { _file: file })
+    }
+
+    /// Whether a `run` holds the pairing in `dir`, found without creating anything: a missing lock file means no run
+    /// has ever held it.
+    pub fn is_held(dir: &Path) -> Result<bool, String> {
+        let path = dir.join(LOCK_FILE);
+
+        match std::fs::OpenOptions::new().write(true).open(&path) {
+            Ok(file) => Ok(file.try_lock().is_err()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(error) => Err(format!("{} could not be opened: {error}", path.display())),
+        }
     }
 }
 

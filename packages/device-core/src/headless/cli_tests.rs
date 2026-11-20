@@ -81,6 +81,9 @@ fn unpair_is_refused_while_a_run_holds_the_pairing_and_nothing_is_asked() {
         )
         .unwrap();
 
+    assert_eq!(format!("{:?}", unpair_dry_run(&vault)), success);
+    assert!(!dir.join("run.lock").exists(), "a preview creates nothing");
+
     let running = RunLock::acquire(&dir).unwrap();
 
     assert_eq!(
