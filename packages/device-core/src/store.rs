@@ -318,7 +318,19 @@ pub fn load_nonces_strict(path: &Path) -> Result<HashMap<String, u64>, String> {
 pub fn save_nonces(path: &Path, nonces: &HashMap<String, u64>) -> Result<(), String> {
     let text = serde_json::to_string(nonces).map_err(|error| error.to_string())?;
 
-    write_owner_only(path, &text)
+    write_owner_only(path, &text)?;
+
+    // The rename lives in the folder's entry. Until that is on disk a power loss can bring back the previous history
+    // and make an accepted call replayable, so a failed sync refuses the call. Only here: the settings file's caller
+    // rolls the keychain back on an error, which would be wrong once the new file is already in place.
+    #[cfg(unix)]
+    if let Some(parent) = path.parent() {
+        fs::File::open(parent)
+            .and_then(|dir| dir.sync_all())
+            .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
 }
 
 fn write_owner_only(path: &Path, text: &str) -> Result<(), String> {
@@ -354,18 +366,7 @@ fn write_owner_only(path: &Path, text: &str) -> Result<(), String> {
     file.write_all(text.as_bytes())
         .and_then(|()| file.sync_all())
         .map_err(|error| error.to_string())?;
-    fs::rename(&temporary, path).map_err(|error| error.to_string())?;
-
-    // The rename lives in the folder's entry. Until that is on disk a power loss can bring back the previous file, and
-    // for the nonce history that would make an accepted call replayable, so a failed sync is a failed save.
-    #[cfg(unix)]
-    if let Some(parent) = path.parent() {
-        fs::File::open(parent)
-            .and_then(|dir| dir.sync_all())
-            .map_err(|error| error.to_string())?;
-    }
-
-    Ok(())
+    fs::rename(&temporary, path).map_err(|error| error.to_string())
 }
 
 /// An in-process keychain for tests, so they never touch the real one. A device id
