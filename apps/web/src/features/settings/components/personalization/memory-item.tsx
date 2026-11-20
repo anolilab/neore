@@ -100,7 +100,8 @@ const useLearnedLabel = (memory: MemoryItemData, learnedOn: string): string => {
  * in, at the message when it still exists. Read each time the row is expanded, so
  * a chat locked, trashed or unshared since shows no link (and, locked, no quote).
  */
-const MemorySource: FC<{ memoryId: string }> = ({ memoryId }) => {
+/** `describedBy` names the memory's text, so each "Open message" link says which memory it belongs to. */
+const MemorySource: FC<{ describedBy: string; memoryId: string }> = ({ describedBy, memoryId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const {
@@ -141,6 +142,7 @@ const MemorySource: FC<{ memoryId: string }> = ({ memoryId }) => {
             )}
             {source?.threadId !== undefined && (
                 <Link
+                    aria-describedby={describedBy}
                     className="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-[10px] underline-offset-2 hover:underline pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                     params={{ threadId: source.threadId }}
                     to="/chat/$threadId"
@@ -173,6 +175,7 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
     const untilLabel = memory.validUntil ? t`Until ${day(memory.validUntil)}` : undefined;
     const [showSource, setShowSource] = useState(false);
     const sourceId = useId();
+    const textId = useId();
     // The date of the words the shown quote came from; the creation date when there is none.
     const learnedOn = i18n.date(new Date(memory.evidenceAt ?? memory.createdAt), { dateStyle: "medium" });
     const learnedLabel = useLearnedLabel(memory, learnedOn);
@@ -346,7 +349,9 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
                     </div>
                 </div>
             ) : (
-                <p className="mt-0.5 text-sm leading-snug">{memory.memory}</p>
+                <p className="mt-0.5 text-sm leading-snug" id={textId}>
+                    {memory.memory}
+                </p>
             )}
 
             {hasSource && (
@@ -355,7 +360,7 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
                     hidden={!showSource}
                     id={sourceId}
                 >
-                    {showSource && <MemorySource memoryId={memory._id} />}
+                    {showSource && <MemorySource describedBy={textId} memoryId={memory._id} />}
                 </div>
             )}
         </li>

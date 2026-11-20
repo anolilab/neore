@@ -15,6 +15,9 @@ const BOT_OWNER_BATCH = 50;
  */
 export const BOT_OWNER_TOMBSTONE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
+/** Live owner records read per sweep run to find one whose bot is gone; live records are at most a user's bots. */
+const ORPHAN_PAGE = 200;
+
 /** Tombstones removed per sweep run; the next daily run takes the rest. */
 const TOMBSTONE_PRUNE_PAGE = 100;
 
@@ -32,11 +35,12 @@ export const markBotOwnerDeleted = async (ctx: Pick<MutationCtx, "db">, botId: I
 };
 
 /**
- * Clears the tombstone of each of `userId`'s bots that still exists. `deleteBot` writes the tombstone to the global store
- * and deletes the bot on the owner's shard, and the two do not commit together, so a delete that failed after its
- * tombstone was written would otherwise leave a live bot labelled as deleted in other people's lists. Run on that shard.
+ * Brings `userId`'s owner records back in line with their bots, on their shard. A bot and its record are written to two
+ * stores that do not commit together (`createBot`, `deleteBot`), so a write cut short leaves a bot labelled wrongly in
+ * other people's lists: a live bot's tombstone is cleared, a live bot with no record gets one, and a live record whose
+ * bot is gone is tombstoned.
  */
-export const restoreLiveBotOwnersOf = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<void> => {
+export const restoreLiveBotOwnersOf = async (ctx: Pick<MutationCtx, "db">, userId: string, now: number): Promise<void> => {
     const bots = await ctx.db
         .query("bots")
         .withIndex("by_userId", (q) => q.eq("userId", userId))
@@ -62,6 +66,32 @@ export const restoreLiveBotOwnersOf = async (ctx: Pick<MutationCtx, "db">, userI
             }
 
             await ctx.db.delete("botOwners", owner._id);
+        }
+
+        // A bot whose owner record was never written (`createBot` writes it after the bot, and the two do not commit
+        // together) gets one, so its memories name their owner.
+        const recorded = new Set(page.map((row) => row.botId as string));
+
+        const batchBots = bots.slice(start, start + BOT_OWNER_BATCH);
+
+        for (const bot of batchBots) {
+            if (!recorded.has(bot._id as string)) {
+                await ctx.db.insert("botOwners", { botId: bot._id, createdAt: bot.createdAt, ownerId: userId });
+            }
+        }
+    }
+
+    // A live record whose bot is gone (a delete that failed before its tombstone was written) is tombstoned now.
+    const existing = new Set(botIds as string[]);
+    const { page: liveRecords } = await ctx.db.botOwners.findMany({
+        consistency: "primary",
+        limit: ORPHAN_PAGE,
+        where: { deletedAt: { isNull: true }, ownerId: userId },
+    });
+
+    for (const owner of liveRecords) {
+        if (!existing.has(owner.botId as string)) {
+            await ctx.db.patch("botOwners", owner._id, { deletedAt: now });
         }
     }
 };
@@ -90,7 +120,7 @@ export const restoreLiveBotOwners = internalMutation
         const userId = currentUserShard();
 
         if (userId !== undefined) {
-            await restoreLiveBotOwnersOf(ctx, userId);
+            await restoreLiveBotOwnersOf(ctx, userId, ctx.now);
             await pruneBotOwnerTombstonesOf(ctx, userId, ctx.now);
         }
 

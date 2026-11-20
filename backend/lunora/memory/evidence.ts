@@ -251,7 +251,7 @@ export const evidenceQuote = (claimed: string | undefined, userText: string, bef
  * The quote {@link evidenceQuote} takes from the person's typed text (`typed`, a blockquote or an attachment taken out),
  * with the label check that also reads the text as sent (`raw`): a quoted "What is your password?" sits right above a typed value that has no
  * label of its own once the quoted line is gone. A quote that cannot be placed in `raw` (it ran across the removed
- * text) is kept only when nothing in `raw` looks secret.
+ * text) is not kept: the person never wrote those words as one phrase.
  */
 export const typedEvidenceQuote = (claimed: string | undefined, typed: string, raw: string, before?: string): string | undefined => {
     const quote = evidenceQuote(claimed, typed, before);
@@ -260,10 +260,8 @@ export const typedEvidenceQuote = (claimed: string | undefined, typed: string, r
         return quote;
     }
 
-    if (evidenceMatchEnd(claimed, raw) === undefined) {
-        return looksSecret(raw) ? undefined : quote;
-    }
-
+    // Words that run together only once a quoted line or an attachment between them is gone were never written as one
+    // phrase: the quote must stand in the text as sent, too.
     return evidenceQuote(claimed, raw, before) === undefined ? undefined : quote;
 };
 

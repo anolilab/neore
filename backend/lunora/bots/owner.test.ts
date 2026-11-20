@@ -78,7 +78,7 @@ describe(restoreLiveBotOwnersOf, () => {
 
                 await ctx.db.insert("botOwners", { botId: live, createdAt: 1, deletedAt: 5, ownerId: "user-1" });
                 await ctx.db.insert("botOwners", { botId: "gone-bot", createdAt: 1, deletedAt: 5, ownerId: "user-1" });
-                await restoreLiveBotOwnersOf(ctx, "user-1");
+                await restoreLiveBotOwnersOf(ctx, "user-1", 9);
 
                 const { page } = await ctx.db.botOwners.findMany({ where: { ownerId: "user-1" } });
 
@@ -114,7 +114,7 @@ describe("a restore cut short", () => {
                 // The restore inserted the live row, then failed before deleting the tombstoned one.
                 await ctx.db.insert("botOwners", { botId: bot, createdAt: 1, deletedAt: 5, ownerId: "user-1" });
                 await ctx.db.insert("botOwners", { botId: bot, createdAt: 1, ownerId: "user-1" });
-                await restoreLiveBotOwnersOf(ctx, "user-1");
+                await restoreLiveBotOwnersOf(ctx, "user-1", 9);
 
                 const { page } = await ctx.db.botOwners.findMany({ where: { ownerId: "user-1" } });
 
@@ -148,6 +148,41 @@ describe(pruneBotOwnerTombstonesOf, () => {
             });
 
             expect(left).toEqual(["live", "recent"]);
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("owner records a cut-short bot write left wrong", () => {
+    it("gives a live bot with no record one, and tombstones a live record whose bot is gone", async () => {
+        expect.assertions(2);
+
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const rows = await harness.run(async (ctx: any) => {
+                const bot = await ctx.db.insert("bots", {
+                    computerEnabled: false,
+                    createdAt: 3,
+                    instructions: "",
+                    model: "m",
+                    name: "Unrecorded",
+                    updatedAt: 3,
+                    userId: "user-1",
+                });
+
+                // A delete that removed its bot but never wrote the tombstone.
+                await ctx.db.insert("botOwners", { botId: "deleted-bot", createdAt: 1, ownerId: "user-1" });
+                await restoreLiveBotOwnersOf(ctx, "user-1", 9);
+
+                const { page } = await ctx.db.botOwners.findMany({ where: { ownerId: "user-1" } });
+
+                return { added: page.find((row: any) => row.botId === bot), orphan: page.find((row: any) => row.botId === "deleted-bot") };
+            });
+
+            expect(rows.added).toMatchObject({ createdAt: 3, ownerId: "user-1" });
+            expect(rows.orphan.deletedAt).toBe(9);
         } finally {
             harness.close();
         }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { compressedEvidenceSources, type ThreadMemory } from "./compress";
-import { EVIDENCE_QUOTE_MAX_CHARS, evidenceQuote, newestEvidence } from "./evidence";
+import { EVIDENCE_QUOTE_MAX_CHARS, evidenceQuote, newestEvidence, typedEvidenceQuote } from "./evidence";
 import { factEvidence } from "./extract";
 
 /** An opaque all-letter token, built at run time so the commit secret scan does not take the fixture for a real one. */
@@ -150,6 +150,16 @@ describe("evidenceQuote and the shared secret detector", () => {
 
         expect(evidenceQuote(`my code=${value}`, `Remember my code=${value} please`)).toBeUndefined();
         expect(evidenceQuote("I like jazz", "I like jazz")).toBe("I like jazz");
+    });
+});
+
+describe("typedEvidenceQuote and a quoted line between typed words", () => {
+    it("quotes no phrase the person never wrote as one, joined only once a quoted line is taken out", () => {
+        expect.assertions(1);
+
+        const raw = "I am\n> a line from the reply\nvegetarian";
+
+        expect(typedEvidenceQuote("I am vegetarian", "I am\nvegetarian", raw)).toBeUndefined();
     });
 });
 

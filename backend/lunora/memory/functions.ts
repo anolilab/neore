@@ -200,7 +200,8 @@ export const listUserMemories = authQuery
  */
 /** Whether `userId` holds an unexpired grant to another person's thread (`threadAccess`, global, so readable from any shard). */
 const holdsThreadGrant = async (context: Pick<QueryCtx, "db">, threadId: string, userId: string): Promise<boolean> => {
-    const grant = await context.db.threadAccess.findFirst({ where: { threadId: threadId as Id<"threads">, userId } });
+    // Primary: a replica that lags a revocation would still show the grant.
+    const grant = await context.db.threadAccess.findFirst({ consistency: "primary", where: { threadId: threadId as Id<"threads">, userId } });
 
     return grant !== null && (grant.expiresAt === undefined || grant.expiresAt >= Date.now());
 };
